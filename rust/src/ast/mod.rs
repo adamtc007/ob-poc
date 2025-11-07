@@ -25,17 +25,39 @@ pub struct Workflow {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Statement {
-    DeclareEntity(DeclareEntity),
-    ObtainDocument(ObtainDocument),
-    ParallelObtain(ParallelObtain),
-    CreateEdge(CreateEdge),
+    DeclareEntity {
+        id: String,
+        entity_type: String,
+        properties: PropertyMap,
+    },
+    ObtainDocument {
+        document_type: String,
+        source: String,
+        properties: PropertyMap,
+    },
+    CreateEdge {
+        from: String,
+        to: String,
+        edge_type: String,
+        properties: PropertyMap,
+    },
+    CalculateUbo {
+        entity_id: String,
+        properties: PropertyMap,
+    },
+    // Legacy variants for compatibility
     SolicitAttribute(SolicitAttribute),
-    CalculateUbo(CalculateUbo),
     ResolveConflict(ResolveConflict),
     GenerateReport(GenerateReport),
     ScheduleMonitoring(ScheduleMonitoring),
+    ParallelObtain(ParallelObtain),
     Parallel(Vec<Statement>),
     Sequential(Vec<Statement>),
+    // Placeholder for unknown statement types during parsing
+    Placeholder {
+        command: String,
+        args: Vec<Value>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

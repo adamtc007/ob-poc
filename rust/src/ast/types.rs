@@ -1,6 +1,254 @@
-//! Type system support for AST values
+//! Enhanced type system support for AST values with semantic analysis and database integration
 
 use super::*;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use uuid::Uuid;
+
+/// Enhanced semantic information for DSL elements
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SemanticInfo {
+    pub source_location: SourceLocation,
+    pub type_info: TypeInfo,
+    pub validation_state: ValidationState,
+    pub dependencies: Vec<String>,
+    pub database_refs: Vec<DatabaseReference>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SourceLocation {
+    pub line: usize,
+    pub column: usize,
+    pub file: Option<String>,
+    pub span: Option<(usize, usize)>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TypeInfo {
+    pub expected_type: DSLType,
+    pub inferred_type: Option<DSLType>,
+    pub constraints: Vec<TypeConstraint>,
+    pub nullable: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum DSLType {
+    String {
+        max_length: Option<usize>,
+    },
+    Number {
+        min: Option<f64>,
+        max: Option<f64>,
+    },
+    Integer {
+        min: Option<i64>,
+        max: Option<i64>,
+    },
+    Boolean,
+    Date,
+    DateTime,
+    UUID,
+    EntityReference {
+        entity_type: String,
+    },
+    VocabularyVerb {
+        domain: String,
+    },
+    List {
+        element_type: Box<DSLType>,
+    },
+    Map {
+        value_type: Box<DSLType>,
+    },
+    Union {
+        types: Vec<DSLType>,
+    },
+    Custom {
+        name: String,
+        schema: HashMap<String, DSLType>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum TypeConstraint {
+    Required,
+    Unique,
+    MinLength(usize),
+    MaxLength(usize),
+    Pattern(String),
+    InSet(Vec<String>),
+    CustomValidator {
+        name: String,
+        params: HashMap<String, Value>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum ValidationState {
+    Pending,
+    Valid,
+    Invalid { errors: Vec<ValidationError> },
+    Warning { warnings: Vec<ValidationWarning> },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ValidationError {
+    pub code: String,
+    pub message: String,
+    pub severity: ErrorSeverity,
+    pub location: Option<SourceLocation>,
+    pub suggestions: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ValidationWarning {
+    pub code: String,
+    pub message: String,
+    pub location: Option<SourceLocation>,
+    pub auto_fix: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum ErrorSeverity {
+    Error,
+    Warning,
+    Info,
+}
+
+/// Database integration metadata
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DatabaseReference {
+    pub table: String,
+    pub column: Option<String>,
+    pub reference_type: DbReferenceType,
+    pub uuid: Option<Uuid>,
+    pub version: Option<i32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum DbReferenceType {
+    GrammarRule,
+    VocabularyVerb,
+    DomainDefinition,
+    AttributeDefinition,
+    EntityType,
+    WorkflowState,
+    ValidationRule,
+}
+
+/// Enhanced Value type with semantic information
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum EnhancedValue {
+    String {
+        value: String,
+        semantic: Option<SemanticInfo>,
+    },
+    Number {
+        value: f64,
+        semantic: Option<SemanticInfo>,
+    },
+    Integer {
+        value: i64,
+        semantic: Option<SemanticInfo>,
+    },
+    Boolean {
+        value: bool,
+        semantic: Option<SemanticInfo>,
+    },
+    Date {
+        value: chrono::NaiveDate,
+        semantic: Option<SemanticInfo>,
+    },
+    DateTime {
+        value: DateTime<Utc>,
+        semantic: Option<SemanticInfo>,
+    },
+    UUID {
+        value: Uuid,
+        semantic: Option<SemanticInfo>,
+    },
+    List {
+        values: Vec<EnhancedValue>,
+        semantic: Option<SemanticInfo>,
+    },
+    Map {
+        values: HashMap<String, EnhancedValue>,
+        semantic: Option<SemanticInfo>,
+    },
+    MultiValue {
+        values: Vec<ValueWithSource>,
+        semantic: Option<SemanticInfo>,
+    },
+    Null {
+        semantic: Option<SemanticInfo>,
+    },
+}
+
+/// Grammar rule representation for database integration
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GrammarRule {
+    pub rule_id: Uuid,
+    pub rule_name: String,
+    pub rule_definition: String,
+    pub rule_type: GrammarRuleType,
+    pub domain: Option<String>,
+    pub version: String,
+    pub active: bool,
+    pub description: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum GrammarRuleType {
+    Production,
+    Terminal,
+    Lexical,
+}
+
+/// Vocabulary verb representation for database integration
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct VocabularyVerb {
+    pub vocab_id: Uuid,
+    pub domain: String,
+    pub verb: String,
+    pub category: Option<String>,
+    pub description: Option<String>,
+    pub parameters: Option<serde_json::Value>,
+    pub examples: Option<Vec<String>>,
+    pub phase: Option<String>,
+    pub active: bool,
+    pub version: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// DSL lifecycle state tracking
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DSLState {
+    pub state_id: Uuid,
+    pub dsl_version_id: Uuid,
+    pub current_state: LifecycleState,
+    pub previous_state: Option<LifecycleState>,
+    pub transition_reason: Option<String>,
+    pub transition_timestamp: DateTime<Utc>,
+    pub metadata: HashMap<String, EnhancedValue>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum LifecycleState {
+    Draft,
+    Validating,
+    Valid,
+    Invalid,
+    Compiling,
+    Compiled,
+    Deploying,
+    Active,
+    Deprecated,
+    Archived,
+}
 
 impl Value {
     pub fn as_string(&self) -> Option<&str> {
@@ -34,5 +282,186 @@ impl Value {
 
     pub fn is_null(&self) -> bool {
         matches!(self, Value::Null)
+    }
+
+    /// Convert to enhanced value with semantic information
+    pub fn to_enhanced(&self, semantic: Option<SemanticInfo>) -> EnhancedValue {
+        match self {
+            Value::String(s) => EnhancedValue::String {
+                value: s.clone(),
+                semantic,
+            },
+            Value::Number(n) => EnhancedValue::Number {
+                value: *n,
+                semantic,
+            },
+            Value::Integer(i) => EnhancedValue::Integer {
+                value: *i,
+                semantic,
+            },
+            Value::Boolean(b) => EnhancedValue::Boolean {
+                value: *b,
+                semantic,
+            },
+            Value::Date(d) => EnhancedValue::Date {
+                value: *d,
+                semantic,
+            },
+            Value::List(list) => EnhancedValue::List {
+                values: list.iter().map(|v| v.to_enhanced(None)).collect(),
+                semantic,
+            },
+            Value::Map(map) => {
+                let enhanced_map = map
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.to_enhanced(None)))
+                    .collect();
+                EnhancedValue::Map {
+                    values: enhanced_map,
+                    semantic,
+                }
+            }
+            Value::MultiValue(multi) => EnhancedValue::MultiValue {
+                values: multi.clone(),
+                semantic,
+            },
+            Value::Null => EnhancedValue::Null { semantic },
+        }
+    }
+}
+
+impl EnhancedValue {
+    /// Extract the underlying value without semantic information
+    pub fn extract_value(&self) -> Value {
+        match self {
+            EnhancedValue::String { value, .. } => Value::String(value.clone()),
+            EnhancedValue::Number { value, .. } => Value::Number(*value),
+            EnhancedValue::Integer { value, .. } => Value::Integer(*value),
+            EnhancedValue::Boolean { value, .. } => Value::Boolean(*value),
+            EnhancedValue::Date { value, .. } => Value::Date(*value),
+            EnhancedValue::DateTime { .. } => Value::Null, // No direct mapping in original Value
+            EnhancedValue::UUID { .. } => Value::Null,     // No direct mapping in original Value
+            EnhancedValue::List { values, .. } => {
+                Value::List(values.iter().map(|v| v.extract_value()).collect())
+            }
+            EnhancedValue::Map { values, .. } => {
+                let map = values
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.extract_value()))
+                    .collect();
+                Value::Map(map)
+            }
+            EnhancedValue::MultiValue { values, .. } => Value::MultiValue(values.clone()),
+            EnhancedValue::Null { .. } => Value::Null,
+        }
+    }
+
+    pub fn get_semantic_info(&self) -> Option<&SemanticInfo> {
+        match self {
+            EnhancedValue::String { semantic, .. }
+            | EnhancedValue::Number { semantic, .. }
+            | EnhancedValue::Integer { semantic, .. }
+            | EnhancedValue::Boolean { semantic, .. }
+            | EnhancedValue::Date { semantic, .. }
+            | EnhancedValue::DateTime { semantic, .. }
+            | EnhancedValue::UUID { semantic, .. }
+            | EnhancedValue::List { semantic, .. }
+            | EnhancedValue::Map { semantic, .. }
+            | EnhancedValue::MultiValue { semantic, .. }
+            | EnhancedValue::Null { semantic, .. } => semantic.as_ref(),
+        }
+    }
+
+    pub fn set_semantic_info(&mut self, new_semantic: SemanticInfo) {
+        let semantic_ref = match self {
+            EnhancedValue::String { semantic, .. }
+            | EnhancedValue::Number { semantic, .. }
+            | EnhancedValue::Integer { semantic, .. }
+            | EnhancedValue::Boolean { semantic, .. }
+            | EnhancedValue::Date { semantic, .. }
+            | EnhancedValue::DateTime { semantic, .. }
+            | EnhancedValue::UUID { semantic, .. }
+            | EnhancedValue::List { semantic, .. }
+            | EnhancedValue::Map { semantic, .. }
+            | EnhancedValue::MultiValue { semantic, .. }
+            | EnhancedValue::Null { semantic, .. } => semantic,
+        };
+        *semantic_ref = Some(new_semantic);
+    }
+}
+
+impl Default for ValidationState {
+    fn default() -> Self {
+        ValidationState::Pending
+    }
+}
+
+impl Default for LifecycleState {
+    fn default() -> Self {
+        LifecycleState::Draft
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_enhanced_value_creation() {
+        let original = Value::String("test".to_string());
+        let enhanced = original.to_enhanced(None);
+
+        match enhanced {
+            EnhancedValue::String { value, semantic } => {
+                assert_eq!(value, "test");
+                assert!(semantic.is_none());
+            }
+            _ => panic!("Expected String variant"),
+        }
+    }
+
+    #[test]
+    fn test_enhanced_value_extraction() {
+        let enhanced = EnhancedValue::Number {
+            value: 42.0,
+            semantic: None,
+        };
+
+        let extracted = enhanced.extract_value();
+        match extracted {
+            Value::Number(n) => assert_eq!(n, 42.0),
+            _ => panic!("Expected Number variant"),
+        }
+    }
+
+    #[test]
+    fn test_semantic_info_manipulation() {
+        let mut enhanced = EnhancedValue::Boolean {
+            value: true,
+            semantic: None,
+        };
+
+        assert!(enhanced.get_semantic_info().is_none());
+
+        let semantic = SemanticInfo {
+            source_location: SourceLocation {
+                line: 1,
+                column: 1,
+                file: None,
+                span: None,
+            },
+            type_info: TypeInfo {
+                expected_type: DSLType::Boolean,
+                inferred_type: None,
+                constraints: vec![],
+                nullable: false,
+            },
+            validation_state: ValidationState::Valid,
+            dependencies: vec![],
+            database_refs: vec![],
+        };
+
+        enhanced.set_semantic_info(semantic);
+        assert!(enhanced.get_semantic_info().is_some());
     }
 }
