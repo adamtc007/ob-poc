@@ -16,6 +16,11 @@
 dsl-poc
 dsl-ob-poc
 
+# Binary directories
+bin/
+*/bin/
+**/bin/
+
 # Test binary, built with `go test -c`
 *.test
 
@@ -32,7 +37,7 @@ go.work
 .gocache/
 
 # Go modules
-go/go.sum
+# go.sum should be committed, removing this line
 
 # IDE files
 .vscode/
