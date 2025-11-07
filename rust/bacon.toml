@@ -1,0 +1,55 @@
+# Bacon configuration for ubo-poc
+# This file configures bacon for auto-rebuild on save
+
+[jobs.check]
+command = ["cargo", "check", "--color", "always"]
+need_stdout = false
+
+[jobs.check-all]
+command = ["cargo", "check", "--all-targets", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy]
+command = ["cargo", "clippy", "--color", "always"]
+need_stdout = false
+
+[jobs.test]
+command = ["cargo", "test", "--color", "always"]
+need_stdout = true
+
+[jobs.run]
+command = ["cargo", "run", "--bin", "cli", "--color", "always"]
+need_stdout = true
+
+[jobs.run-example]
+command = ["cargo", "run", "--example", "parse_zenith", "--color", "always"]
+need_stdout = true
+
+[jobs.doc]
+command = ["cargo", "doc", "--color", "always"]
+need_stdout = false
+
+# Default job when running just 'bacon'
+default_job = "check"
+
+# File watching configuration
+[keybindings]
+# Press 'c' for check
+c = "job:check"
+# Press 'l' for clippy
+l = "job:clippy"
+# Press 't' for test
+t = "job:test"
+# Press 'r' for run
+r = "job:run"
+# Press 'e' for example
+e = "job:run-example"
+# Press 'd' for doc
+d = "job:doc"
+# Press 'a' for check-all
+a = "job:check-all"
+
+# Additional settings
+[settings]
+# Don't run on hidden files
+on_change_strategy = "restart"

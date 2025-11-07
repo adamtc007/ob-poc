@@ -1,0 +1,129 @@
+{
+  "attr_id": "beneficial-owner-percentage",
+  "display_name": "Beneficial Ownership Percentage",
+  "data_type": "Percentage",
+  "constraints": {
+    "min": 0.0,
+    "max": 100.0,
+    "precision": 2,
+    "required": true
+  },
+  "semantic": {
+    "description": "The percentage of ownership or control that a natural person exercises over the legal entity, directly or indirectly. Used to determine if the person meets the threshold for beneficial ownership reporting under FinCEN regulations.",
+    "context": "Required for CIP/KYC compliance when onboarding corporate entities. Threshold is typically 25% for US regulations, 10% for EU entities.",
+    "related_concepts": [
+      "ultimate-beneficial-owner",
+      "control-person",
+      "ownership-structure",
+      "fincen-rule"
+    ],
+    "usage_examples": [
+      "Natural person owns 30% of shares directly",
+      "Person controls 15% through holding company + 12% directly = 27% total"
+    ],
+    "regulatory_citations": [
+      "31 CFR 1010.230",
+      "FinCEN CDD Rule"
+    ]
+  },
+  "embedding": {
+    "vector": null,
+    "model": "text-embedding-3-large",
+    "dimension": 3072,
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  "ui_metadata": {
+    "category": "ownership-structure",
+    "subcategory": "beneficial-owners",
+    "display_order": 10,
+    "form_section": "entity-ownership",
+    "layout_weight": 1.0,
+    "visual_importance": "High",
+    "proximity_preferences": [
+      "beneficial-owner-name",
+      "beneficial-owner-address"
+    ],
+    "break_after": false
+  },
+  "sources": {
+    "primary": {
+      "source_type": "DocumentExtraction",
+      "details": {
+        "doc_types": [
+          "articles-of-incorporation",
+          "cap-table",
+          "shareholder-registry"
+        ],
+        "extraction_confidence_threshold": 0.85,
+        "method": "llm-extraction"
+      }
+    },
+    "secondary": {
+      "source_type": "Solicitation",
+      "details": {
+        "form_id": "beneficial-ownership-form",
+        "validation": "cross-reference-with-primary"
+      }
+    },
+    "tertiary": {
+      "source_type": "ThirdPartyService",
+      "details": {
+        "provider": "dun-and-bradstreet",
+        "api_endpoint": "/beneficial-ownership",
+        "fallback": true
+      }
+    }
+  },
+  "sinks": {
+    "operational": {
+      "sink_type": "PostgreSQL",
+      "details": {
+        "table": "party_kyc_data",
+        "column": "beneficial_ownership_pct",
+        "update_strategy": "latest-verified"
+      },
+      "retention": "active-relationship"
+    },
+    "master": {
+      "sink_type": "PostgreSQL",
+      "details": {
+        "table": "mdm_beneficial_owners",
+        "gold_record": true,
+        "deduplication": true
+      },
+      "retention": "7-years-post-relationship"
+    },
+    "archive": {
+      "sink_type": "S3",
+      "details": {
+        "bucket": "kyc-archive",
+        "path": "/party/{party-id}/attributes/{attr-id}",
+        "format": "parquet",
+        "compression": "snappy",
+        "immutable": true
+      },
+      "retention": "indefinite"
+    },
+    "audit": {
+      "sink_type": "PostgreSQL",
+      "details": {
+        "table": "audit_trail",
+        "include_metadata": [
+          "source",
+          "timestamp",
+          "user",
+          "verification_status"
+        ]
+      },
+      "retention": "10-years"
+    }
+  },
+  "verification": {
+    "required_confidence": 0.90,
+    "requires_human_review": true,
+    "review_trigger": "value-change > 5%",
+    "cross_validation": [
+      "sum-of-all-beneficial-owners <= 100%"
+    ]
+  }
+}

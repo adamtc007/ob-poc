@@ -1,0 +1,51 @@
+[
+  {
+    "cbu_entity_role_id": "cer-001",
+    "cbu_id": "123e4567-e89b-12d3-a456-426614174000",
+    "entity_id": "ent-001-aviva-investors",
+    "role_id": "role-001-investment-manager",
+    "created_at": "2024-01-15T10:30:00Z"
+  },
+  {
+    "cbu_entity_role_id": "cer-002",
+    "cbu_id": "123e4567-e89b-12d3-a456-426614174000",
+    "entity_id": "ent-006-john-smith",
+    "role_id": "role-006-main-client",
+    "created_at": "2024-01-15T10:30:00Z"
+  },
+  {
+    "cbu_entity_role_id": "cer-003",
+    "cbu_id": "123e4567-e89b-12d3-a456-426614174000",
+    "entity_id": "ent-004-investment-partners",
+    "role_id": "role-002-asset-owner",
+    "created_at": "2024-01-15T10:30:00Z"
+  },
+  {
+    "cbu_entity_role_id": "cer-004",
+    "cbu_id": "987fcdeb-51a2-43f7-8765-ba9876543210",
+    "entity_id": "ent-002-european-fund-mgmt",
+    "role_id": "role-004-management-company",
+    "created_at": "2024-02-01T14:20:00Z"
+  },
+  {
+    "cbu_entity_role_id": "cer-005",
+    "cbu_id": "987fcdeb-51a2-43f7-8765-ba9876543210",
+    "entity_id": "ent-007-marie-dubois",
+    "role_id": "role-005-strategy-owner",
+    "created_at": "2024-02-01T14:20:00Z"
+  },
+  {
+    "cbu_entity_role_id": "cer-006",
+    "cbu_id": "456789ab-cdef-1234-5678-9abcdef01234",
+    "entity_id": "ent-003-emerging-markets-ltd",
+    "role_id": "role-001-investment-manager",
+    "created_at": "2024-03-10T09:15:00Z"
+  },
+  {
+    "cbu_entity_role_id": "cer-007",
+    "cbu_id": "456789ab-cdef-1234-5678-9abcdef01234",
+    "entity_id": "ent-008-hans-mueller",
+    "role_id": "role-006-main-client",
+    "created_at": "2024-03-10T09:15:00Z"
+  }
+]

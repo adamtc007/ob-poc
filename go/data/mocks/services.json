@@ -1,0 +1,93 @@
+[
+  {
+    "service_id": "svc-001-custody-service",
+    "name": "CustodyService",
+    "description": "Core custody and safekeeping service",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "service_id": "svc-002-settlement-service",
+    "name": "SettlementService",
+    "description": "Trade settlement and clearing service",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "service_id": "svc-003-fund-accounting-service",
+    "name": "FundAccountingService",
+    "description": "Fund accounting and NAV calculation service",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "service_id": "svc-004-reporting-service",
+    "name": "ReportingService",
+    "description": "Financial and regulatory reporting service",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "service_id": "svc-005-transfer-agency-service",
+    "name": "TransferAgencyService",
+    "description": "Shareholder registry and transaction processing",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "service_id": "svc-006-portfolio-management",
+    "name": "PortfolioManagementService",
+    "description": "Investment portfolio management and rebalancing",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "service_id": "svc-007-risk-monitoring",
+    "name": "RiskMonitoringService",
+    "description": "Real-time risk monitoring and compliance checking",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "service_id": "svc-custody-001-safekeeping",
+    "name": "Safekeeping",
+    "description": "Asset safekeeping and segregation service ensuring physical and electronic custody of client assets with proper legal ownership protection",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "service_id": "svc-custody-002-security-movement",
+    "name": "SecurityMovement",
+    "description": "Security movement and control service managing the transfer, delivery, and receipt of securities across accounts and counterparties",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "service_id": "svc-custody-003-trade-capture",
+    "name": "TradeCapture",
+    "description": "Trade capture and control service for recording, validating, and processing trade transactions from multiple sources",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "service_id": "svc-custody-004-reconciliation",
+    "name": "Reconciliation",
+    "description": "Position and cash reconciliation service ensuring accuracy between internal records and external counterparties",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "service_id": "svc-custody-005-ssi",
+    "name": "SpecialSettlementInstructions",
+    "description": "Special Settlement Instructions service managing client-specific settlement preferences and standing instructions",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "service_id": "svc-custody-006-reporting",
+    "name": "CustodyReporting",
+    "description": "Comprehensive custody reporting service providing position statements, transaction reports, and regulatory filings",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  }
+]

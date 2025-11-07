@@ -1,0 +1,113 @@
+{
+  "attr_id": "legal-entity-name",
+  "display_name": "Legal Entity Name",
+  "data_type": "String",
+  "constraints": {
+    "min": null,
+    "max": null,
+    "precision": null,
+    "pattern": null,
+    "required": true
+  },
+  "semantic": {
+    "description": "The official registered legal name of the business entity as it appears on formation documents filed with the relevant government authority. This is the primary identifier for the entity in official records.",
+    "context": "Must match exactly with government registration documents. Used for entity verification, sanctions screening, and adverse media checks. Critical for establishing entity identity.",
+    "related_concepts": [
+      "registration-number",
+      "jurisdiction",
+      "dba-name",
+      "entity-type"
+    ],
+    "usage_examples": [
+      "Alpha Holdings Pte. Ltd.",
+      "Zenith Capital Partners LP",
+      "Gamma Investments Limited"
+    ],
+    "regulatory_citations": [
+      "Corporate Transparency Act",
+      "FinCEN CDD Rule"
+    ]
+  },
+  "embedding": {
+    "vector": null,
+    "model": "text-embedding-3-large",
+    "dimension": 3072,
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  "ui_metadata": {
+    "category": "entity-identification",
+    "subcategory": "core-details",
+    "display_order": 1,
+    "form_section": "entity-basic-info",
+    "layout_weight": 2.0,
+    "visual_importance": "Critical",
+    "proximity_preferences": [
+      "registration-number",
+      "jurisdiction",
+      "entity-type"
+    ],
+    "break_after": false
+  },
+  "sources": {
+    "primary": {
+      "source_type": "DocumentExtraction",
+      "details": {
+        "doc_types": [
+          "certificate-of-incorporation",
+          "articles-of-incorporation",
+          "partnership-agreement"
+        ],
+        "extraction_confidence_threshold": 0.95,
+        "method": "ocr-plus-llm"
+      }
+    },
+    "secondary": {
+      "source_type": "ThirdPartyService",
+      "details": {
+        "provider": "company-registry-api",
+        "api_endpoint": "/entity-lookup",
+        "fallback": false
+      }
+    }
+  },
+  "sinks": {
+    "operational": {
+      "sink_type": "PostgreSQL",
+      "details": {
+        "table": "legal_entities",
+        "column": "legal_name",
+        "update_strategy": "immutable-after-verification"
+      },
+      "retention": "active-relationship"
+    },
+    "master": {
+      "sink_type": "PostgreSQL",
+      "details": {
+        "table": "mdm_entities",
+        "gold_record": true,
+        "deduplication": true
+      },
+      "retention": "indefinite"
+    },
+    "audit": {
+      "sink_type": "PostgreSQL",
+      "details": {
+        "table": "audit_trail",
+        "include_metadata": [
+          "source",
+          "timestamp",
+          "verification_method"
+        ]
+      },
+      "retention": "10-years"
+    }
+  },
+  "verification": {
+    "required_confidence": 0.98,
+    "requires_human_review": false,
+    "review_trigger": null,
+    "cross_validation": [
+      "must-match-registry-exactly"
+    ]
+  }
+}

@@ -1,0 +1,44 @@
+[
+  {
+    "role_id": "role-001-investment-manager",
+    "name": "Investment Manager",
+    "description": "Manages investment strategies and portfolio decisions",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "role_id": "role-002-asset-owner",
+    "name": "Asset Owner",
+    "description": "Owns the assets being managed and sets investment objectives",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "role_id": "role-003-sicav",
+    "name": "SiCAV",
+    "description": "Société d'Investissement à Capital Variable - investment company",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "role_id": "role-004-management-company",
+    "name": "Management Company",
+    "description": "Company responsible for fund management and administration",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "role_id": "role-005-strategy-owner",
+    "name": "Strategy Owner",
+    "description": "Defines and owns the investment strategy",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "role_id": "role-006-main-client",
+    "name": "Main Client (Commercial)",
+    "description": "Primary commercial relationship and decision maker",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  }
+]

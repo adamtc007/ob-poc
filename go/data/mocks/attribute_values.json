@@ -1,0 +1,57 @@
+[
+  {
+    "av_id": "av-001",
+    "cbu_id": "123e4567-e89b-12d3-a456-426614174000",
+    "dsl_ob_id": null,
+    "dsl_version": 1,
+    "attribute_id": "123e4567-e89b-12d3-a456-426614174000",
+    "value": "\"CBU-1234\"",
+    "state": "resolved",
+    "source": "{\"type\": \"manual\", \"collector\": \"onboarding_system\"}",
+    "observed_at": "2024-01-15T10:30:00Z"
+  },
+  {
+    "av_id": "av-002",
+    "cbu_id": "123e4567-e89b-12d3-a456-426614174000",
+    "dsl_ob_id": null,
+    "dsl_version": 1,
+    "attribute_id": "987fcdeb-51a2-43f7-8765-ba9876543210",
+    "value": "\"Aviva Investors Global Fund\"",
+    "state": "resolved",
+    "source": "{\"type\": \"manual\", \"collector\": \"onboarding_system\"}",
+    "observed_at": "2024-01-15T10:30:00Z"
+  },
+  {
+    "av_id": "av-003",
+    "cbu_id": "987fcdeb-51a2-43f7-8765-ba9876543210",
+    "dsl_ob_id": null,
+    "dsl_version": 1,
+    "attribute_id": "123e4567-e89b-12d3-a456-426614174000",
+    "value": "\"CBU-5678\"",
+    "state": "resolved",
+    "source": "{\"type\": \"manual\", \"collector\": \"onboarding_system\"}",
+    "observed_at": "2024-02-01T14:20:00Z"
+  },
+  {
+    "av_id": "av-004",
+    "cbu_id": "987fcdeb-51a2-43f7-8765-ba9876543210",
+    "dsl_ob_id": null,
+    "dsl_version": 1,
+    "attribute_id": "789abcde-f012-3456-7890-abcdef123456",
+    "value": "1234567.89",
+    "state": "resolved",
+    "source": "{\"type\": \"calculation\", \"system\": \"nav_engine\"}",
+    "observed_at": "2024-02-01T14:20:00Z"
+  },
+  {
+    "av_id": "av-005",
+    "cbu_id": "456789ab-cdef-1234-5678-9abcdef01234",
+    "dsl_ob_id": null,
+    "dsl_version": 1,
+    "attribute_id": "123e4567-e89b-12d3-a456-426614174000",
+    "value": "\"CBU-9999\"",
+    "state": "resolved",
+    "source": "{\"type\": \"manual\", \"collector\": \"onboarding_system\"}",
+    "observed_at": "2024-03-10T09:15:00Z"
+  }
+]

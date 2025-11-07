@@ -1,0 +1,291 @@
+; Corporate UBO Discovery Workflow Template
+; Implements FinCEN CDD Rule and EU 5MLD for corporate beneficial ownership
+; Supports control prong and ownership prong analysis with cross-jurisdictional compliance
+
+(workflow.corporate.ubo
+  (entity.name "{{.EntityName}}")
+  (entity.type "CORPORATE")
+  (jurisdiction "{{.Jurisdiction}}")
+  (workflow.id "{{.SessionID}}")
+  (created.at "{{.CreatedAt}}")
+
+  ; Corporate structure identification
+  (corporate.structure.analyze
+    (entity.legal.form "{{.LegalForm | default "CORPORATION"}}")
+    (incorporation.jurisdiction "{{.IncorporationJurisdiction | default .Jurisdiction}}")
+    (business.purpose "{{.BusinessPurpose}}")
+    (public.company "{{.IsPublicCompany | default false}}")
+    (regulated.entity "{{.IsRegulatedEntity | default false}}")
+    (subsidiary.of.public.company "{{.IsSubsidiaryOfPublic | default false}}")
+    (attributes
+      "@attr{corporate.legal_name}"
+      "@attr{corporate.incorporation_number}"
+      "@attr{corporate.tax_identification_number}"
+      "@attr{corporate.registered_address}"
+      "@attr{corporate.business_address}"
+      "@attr{corporate.legal_form}"
+    )
+  )
+
+  ; Ownership structure mapping
+  (ownership.structure.mapping
+    (shareholding.analysis true)
+    (voting.rights.analysis true)
+    (ownership.layers.count "{{.OwnershipLayers | default 1}}")
+    (complex.structure "{{.IsComplexStructure | default false}}")
+    (nominee.shareholders "{{.HasNomineeShareholders | default false}}")
+    (bearer.shares "{{.HasBearerShares | default false}}")
+  )
+
+  ; Control prong analysis (FinCEN requirements)
+  (ubo.control.prong.analysis
+    (control.threshold 25)
+    (control.mechanisms
+      "VOTING_RIGHTS"
+      "BOARD_APPOINTMENT_RIGHTS"
+      "VETO_POWERS"
+      "MANAGEMENT_AGREEMENT"
+      "PROFIT_SHARING_AGREEMENT"
+      "LOAN_AGREEMENT_CONTROL"
+    )
+
+    ; Direct control identification
+    (direct.control.persons
+      (voting.control.analysis true)
+      (board.control.analysis true)
+      (management.control.analysis true)
+      (attributes
+        "@attr{ubo.control.person.legal_name}"
+        "@attr{ubo.control.person.control_percentage}"
+        "@attr{ubo.control.person.control_mechanism}"
+        "@attr{ubo.control.person.direct_indirect}"
+      )
+    )
+
+    ; Indirect control through entities
+    (indirect.control.analysis
+      (parent.company.control true)
+      (holding.company.structure true)
+      (management.company.control true)
+      (trust.control.mechanisms true)
+      (voting.trust.arrangements true)
+    )
+
+    ; Joint control arrangements
+    (joint.control.analysis
+      (shareholder.agreements true)
+      (voting.agreements true)
+      (board.composition.agreements true)
+      (combined.control.threshold.analysis true)
+    )
+  )
+
+  ; Ownership prong analysis (beneficial ownership identification)
+  (ubo.ownership.prong.analysis
+    (ownership.threshold "{{.UBOThreshold | default 25}}")
+    (economic.interests.analysis true)
+    (dividend.rights.analysis true)
+    (liquidation.rights.analysis true)
+
+    ; Direct ownership analysis
+    (direct.ownership.analysis
+      (registered.shareholders.review true)
+      (share.register.analysis true)
+      (voting.shares.vs.non.voting true)
+      (preferred.shares.analysis true)
+      (attributes
+        "@attr{ubo.ownership.person.legal_name}"
+        "@attr{ubo.ownership.person.ownership_percentage}"
+        "@attr{ubo.ownership.person.share_class}"
+        "@attr{ubo.ownership.person.voting_rights_percentage}"
+      )
+    )
+
+    ; Indirect ownership through chain analysis
+    (indirect.ownership.analysis
+      (ownership.chain.mapping true)
+      (intermediate.entities.analysis true)
+      (ultimate.beneficial.owner.calculation true)
+      (cross.shareholdings.analysis true)
+      (circular.ownership.detection true)
+    )
+
+    ; Nominee arrangements identification
+    (nominee.arrangements.analysis
+      (nominee.shareholders.identification true)
+      (beneficial.ownership.behind.nominees true)
+      (nominee.agreements.review true)
+      (ultimate.beneficiaries.identification true)
+    )
+  )
+
+  ; Senior management identification
+  (senior.management.identification
+    (ceo.identification true)
+    (cfo.identification true)
+    (board.chairman.identification true)
+    (managing.directors.identification true)
+    (authorized.signatories.identification true)
+    (attributes
+      "@attr{corporate.senior.manager.legal_name}"
+      "@attr{corporate.senior.manager.title}"
+      "@attr{corporate.senior.manager.appointment_date}"
+      "@attr{corporate.senior.manager.authority_level}"
+    )
+  )
+
+  ; Regulatory framework application
+  {{if eq .Jurisdiction "US"}}
+  (compliance.fincen.cdd.rule
+    (beneficial.ownership.threshold 25)
+    (control.person.identification true)
+    (ownership.person.identification true)
+    (senior.manager.identification true)
+    (certification.form.completion true)
+    (ongoing.monitoring.requirements true)
+    (suspicious.activity.reporting true)
+  )
+  {{else if or (eq .Jurisdiction "LU") (eq .Jurisdiction "DE") (eq .Jurisdiction "FR") (eq .Jurisdiction "IE") (eq .Jurisdiction "NL")}}
+  (compliance.eu.5mld
+    (beneficial.ownership.register.filing true)
+    (ownership.threshold 25)
+    (control.threshold "SIGNIFICANT_INFLUENCE")
+    (public.access.requirements "{{.RequiresPublicDisclosure | default false}}")
+    (competent.authority.reporting true)
+    (ongoing.monitoring.obligations true)
+    (sanctions.screening.requirements true)
+  )
+  {{else if eq .Jurisdiction "GB"}}
+  (compliance.uk.psc.register
+    (persons.of.significant.control.identification true)
+    (companies.house.filing true)
+    (psc.register.maintenance true)
+    (control.threshold 25)
+    (significant.influence.assessment true)
+  )
+  {{else if eq .Jurisdiction "CH"}}
+  (compliance.swiss.amla
+    (beneficial.ownership.identification true)
+    (control.person.analysis true)
+    (finma.reporting.requirements "{{.IsRegulatedEntity}}")
+    (ongoing.monitoring.enhanced "{{eq .ComplianceTier "ENHANCED"}}")
+  )
+  {{end}}
+
+  ; Complex structure analysis (for multi-layered ownership)
+  {{if .IsComplexStructure}}
+  (complex.structure.analysis
+    (ownership.layers.mapping true)
+    (intermediate.entities.kyc true)
+    (consolidation.rules.application true)
+    (look.through.analysis true)
+    (aggregation.rules.application true)
+    (exemption.analysis
+      "PUBLIC_COMPANY_EXEMPTION"
+      "REGULATED_ENTITY_EXEMPTION"
+      "GOVERNMENT_ENTITY_EXEMPTION"
+    )
+  )
+  {{end}}
+
+  ; Public company and exemption analysis
+  {{if .IsPublicCompany}}
+  (public.company.exemptions
+    (stock.exchange.listing.verification true)
+    (regulatory.oversight.verification true)
+    (disclosure.requirements.compliance true)
+    (market.capitalization.threshold.check true)
+    (senior.management.identification.only true)
+  )
+  {{end}}
+
+  ; Risk assessment and enhanced due diligence
+  (risk.assessment.corporate
+    (business.complexity.score "{{.BusinessComplexityScore | default "MEDIUM"}}")
+    (jurisdiction.risk.assessment "{{.JurisdictionRisk | default "STANDARD"}}")
+    (ownership.complexity.score "{{.OwnershipComplexityScore | default "MEDIUM"}}")
+    (pep.exposure.analysis true)
+    (sanctions.exposure.analysis true)
+    (adverse.media.screening true)
+    {{if eq .ComplianceTier "ENHANCED"}}
+    (enhanced.due.diligence.triggers
+      "HIGH_RISK_JURISDICTION"
+      "COMPLEX_OWNERSHIP_STRUCTURE"
+      "PEP_INVOLVEMENT"
+      "SANCTIONS_EXPOSURE"
+      "ADVERSE_MEDIA"
+    )
+    {{end}}
+  )
+
+  ; Source of funds and wealth verification
+  (source.verification
+    (source.of.funds.analysis "{{.ComplianceTier}}")
+    (source.of.wealth.analysis "{{eq .ComplianceTier "ENHANCED"}}")
+    (business.rationale.assessment true)
+    (expected.transaction.patterns true)
+    (attributes
+      "@attr{corporate.source.of.funds}"
+      "@attr{corporate.business.rationale}"
+      "@attr{corporate.expected.activity}"
+    )
+  )
+
+  ; Documentation requirements
+  (documentation.requirements
+    (articles.of.incorporation true)
+    (corporate.bylaws true)
+    (share.register.current true)
+    (board.resolutions.recent true)
+    (shareholder.agreements true)
+    (management.agreements "{{.HasManagementAgreements | default false}}")
+    (voting.agreements "{{.HasVotingAgreements | default false}}")
+    (nominee.agreements "{{.HasNomineeArrangements | default false}}")
+    (regulatory.licenses "{{.IsRegulatedEntity}}")
+    (audited.financial.statements "{{eq .ComplianceTier "ENHANCED"}}")
+  )
+
+  ; Cross-domain dependencies and handoffs
+  (dependencies.resolution
+    (depends.on.domains "kyc" "onboarding")
+    (provides.to.domains "custody" "compliance" "reporting")
+    (shared.attributes
+      "@attr{corporate.ubo.control_persons}"
+      "@attr{corporate.ubo.ownership_persons}"
+      "@attr{corporate.ubo.senior_managers}"
+      "@attr{corporate.ubo.combined_threshold_persons}"
+      "@attr{corporate.risk.assessment_score}"
+      "@attr{corporate.compliance.status}"
+      "@attr{corporate.exemption.status}"
+    )
+  )
+
+  ; Ongoing monitoring and refresh requirements
+  (ongoing.monitoring.requirements
+    (ownership.change.monitoring true)
+    (control.change.monitoring true)
+    (management.change.monitoring true)
+    (refresh.frequency "{{.UBORefreshFrequency | default "ANNUAL"}}")
+    (trigger.events.monitoring
+      "OWNERSHIP_CHANGE_ABOVE_5_PERCENT"
+      "CONTROL_CHANGE"
+      "MANAGEMENT_CHANGE"
+      "CORPORATE_RESTRUCTURING"
+      "REGULATORY_FILING_CHANGES"
+    )
+  )
+
+  ; Final UBO determination and certification
+  (ubo.final.determination
+    (control.persons.final.list "@attr{corporate.final.control_persons}")
+    (ownership.persons.final.list "@attr{corporate.final.ownership_persons}")
+    (senior.managers.final.list "@attr{corporate.final.senior_managers}")
+    (combined.ubo.final.list "@attr{corporate.final.ubo_persons}")
+    (exemption.applied.reason "@attr{corporate.exemption_reason}")
+    (no.ubo.identified.reason "@attr{corporate.no_ubo_reason}")
+    (certification.completion true)
+    (regulatory.filing.completion true)
+    (internal.record.keeping.setup true)
+    (ongoing.monitoring.schedule.setup true)
+  )
+)

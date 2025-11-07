@@ -1,0 +1,37 @@
+[
+  {
+    "product_id": "prod-001-custody",
+    "name": "CUSTODY",
+    "description": "Custody and safekeeping services for investment assets",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "product_id": "prod-002-fund-accounting",
+    "name": "FUND_ACCOUNTING",
+    "description": "Fund accounting and administration services",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "product_id": "prod-003-transfer-agency",
+    "name": "TRANSFER_AGENCY",
+    "description": "Transfer agency and shareholder services",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "product_id": "prod-004-investment-management",
+    "name": "INVESTMENT_MANAGEMENT",
+    "description": "Investment management and portfolio services",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "product_id": "prod-005-risk-management",
+    "name": "RISK_MANAGEMENT",
+    "description": "Risk management and compliance services",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  }
+]

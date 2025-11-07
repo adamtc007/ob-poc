@@ -1,0 +1,345 @@
+; Custody Requirements Template
+; Implements comprehensive custody account setup with regulatory compliance
+; Supports prime brokerage, segregated accounts, and cross-jurisdictional requirements
+
+(workflow.product.custody
+  (entity.name "{{.EntityName}}")
+  (entity.type "{{.EntityType}}")
+  (jurisdiction "{{.Jurisdiction}}")
+  (product.id "CUSTODY")
+  (workflow.id "{{.SessionID}}")
+  (created.at "{{.CreatedAt}}")
+
+  ; Account structure determination
+  (custody.account.structure.analysis
+    (entity.classification "{{.EntityType}}")
+    (investment.strategy "{{.InvestmentStrategy | default "DIVERSIFIED"}}")
+    (expected.assets.under.custody "{{.ExpectedAUC}}")
+    (multi.currency.requirements "{{.RequiresMultiCurrency | default true}}")
+    (segregation.requirements.analysis true)
+
+    ; Determine account type based on entity and requirements
+    {{if eq .EntityType "INDIVIDUAL"}}
+    (account.type.recommendation "INDIVIDUAL_SEGREGATED")
+    {{else if eq .EntityType "CORPORATE"}}
+    (account.type.recommendation "CORPORATE_PRIME_BROKERAGE")
+    {{else if eq .EntityType "TRUST"}}
+    (account.type.recommendation "TRUST_SEGREGATED")
+    {{else if eq .EntityType "PARTNERSHIP"}}
+    (account.type.recommendation "PARTNERSHIP_PRIME_BROKERAGE")
+    {{end}}
+  )
+
+  ; Account opening requirements
+  (custody.account.opening
+    (account.number.generation
+      (format "CUST-{{.Jurisdiction}}-{{.EntityType}}-{sequence}")
+      (attribute "@attr{custody.account_number}")
+    )
+
+    (account.title.setup
+      (legal.name "{{.EntityName}}")
+      (account.designation "{{.AccountDesignation | default "GENERAL"}}")
+      (attribute "@attr{custody.account_title}")
+    )
+
+    (account.currency.setup
+      (base.currency "{{.BaseCurrency | default "USD"}}")
+      (additional.currencies {{range .AdditionalCurrencies}}"{{.}}" {{end}})
+      (fx.settlement.instructions true)
+    )
+  )
+
+  ; Signatory authority establishment
+  (custody.signatory.authority
+    (authorized.persons.identification true)
+    (signing.authority.levels true)
+    (dual.control.requirements "{{.RequiresDualControl | default false}}")
+
+    {{if eq .EntityType "INDIVIDUAL"}}
+    (individual.signatory
+      (primary.account.holder "@attr{individual.legal_name}")
+      (power.of.attorney "{{.HasPowerOfAttorney | default false}}")
+      (joint.account.holders {{.JointAccountHolders | default 0}})
+    )
+    {{else if eq .EntityType "CORPORATE"}}
+    (corporate.signatory
+      (authorized.officers.list "@attr{corporate.authorized_officers}")
+      (board.resolution.requirements true)
+      (specimen.signatures.collection true)
+      (corporate.seal.requirements "{{.RequiresCorporateSeal | default false}}")
+    )
+    {{else if eq .EntityType "TRUST"}}
+    (trust.signatory
+      (trustee.authority.verification true)
+      (trust.deed.review.for.authority true)
+      (individual.trustee.signing.authority "@attr{trust.individual_trustees}")
+      (corporate.trustee.signing.authority "@attr{trust.corporate_trustees}")
+    )
+    {{end}}
+
+    (attributes
+      "@attr{custody.authorized_signatories}"
+      "@attr{custody.signing_authority_matrix}"
+      "@attr{custody.dual_control_requirements}"
+    )
+  )
+
+  ; Investment restrictions and guidelines
+  (custody.investment.restrictions
+    (permitted.instruments.analysis true)
+    (restricted.instruments.identification true)
+    (concentration.limits.setup true)
+    (liquidity.requirements.analysis true)
+
+    ; Standard instrument permissions
+    (permitted.asset.classes
+      "CASH_AND_EQUIVALENTS"
+      "GOVERNMENT_BONDS"
+      "CORPORATE_BONDS"
+      "LISTED_EQUITIES"
+      {{if .AllowsAlternatives}}
+      "HEDGE_FUNDS"
+      "PRIVATE_EQUITY"
+      "REAL_ESTATE"
+      {{end}}
+      {{if .AllowsDerivatives}}
+      "OPTIONS"
+      "FUTURES"
+      "SWAPS"
+      {{end}}
+    )
+
+    (investment.restrictions.setup
+      (concentration.limit.single.issuer "{{.ConcentrationLimit | default 10}}")
+      (liquidity.minimum.requirement "{{.LiquidityRequirement | default 10}}")
+      (currency.exposure.limits true)
+      (geographic.exposure.limits "{{.HasGeographicLimits | default false}}")
+    )
+
+    (attributes
+      "@attr{custody.permitted_instruments}"
+      "@attr{custody.investment_restrictions}"
+      "@attr{custody.concentration_limits}"
+    )
+  )
+
+  ; Custody fees and pricing structure
+  (custody.fees.structure
+    (fee.schedule.application true)
+    (asset.based.fees.calculation true)
+    (transaction.based.fees.setup true)
+    (minimum.fees.application true)
+
+    (fee.components
+      (custody.fee.rate "{{.CustodyFeeRate | default "0.15"}}")
+      (transaction.fee.schedule true)
+      (fx.conversion.fees true)
+      (cash.management.fees true)
+      (reporting.fees "{{.RequiresPremiumReporting | default false}}")
+    )
+
+    (attributes
+      "@attr{custody.fee_schedule}"
+      "@attr{custody.minimum_fees}"
+      "@attr{custody.billing_frequency}"
+    )
+  )
+
+  ; Regulatory compliance framework
+  {{if eq .Jurisdiction "US"}}
+  (compliance.us.custody
+    (sec.custody.rule.compliance true)
+    (cftc.segregation.requirements "{{.RequiresCFTCCompliance | default false}}")
+    (finra.customer.protection.rule true)
+    (sipc.coverage.verification true)
+    (bank.secrecy.act.compliance true)
+    (fatca.reporting.requirements true)
+  )
+  {{else if or (eq .Jurisdiction "LU") (eq .Jurisdiction "DE") (eq .Jurisdiction "FR") (eq .Jurisdiction "IE")}}
+  (compliance.eu.custody
+    (mifid.investor.protection.compliance true)
+    (ucits.depositary.requirements "{{.IsUCITSFund | default false}}")
+    (aifmd.depositary.requirements "{{.IsAIFMFund | default false}}")
+    (client.asset.segregation.requirements true)
+    (crd.capital.requirements.compliance true)
+  )
+  {{else if eq .Jurisdiction "CH"}}
+  (compliance.swiss.custody
+    (finma.custody.requirements true)
+    (collective.investment.schemes.act "{{.IsCISFund | default false}}")
+    (client.asset.segregation.swiss true)
+    (depositary.bank.requirements true)
+  )
+  {{else if eq .Jurisdiction "GB"}}
+  (compliance.uk.custody
+    (fca.custody.rules.compliance true)
+    (client.money.asset.rules true)
+    (depositary.requirements "{{.IsUKFund | default false}}")
+    (fscs.coverage.verification true)
+  )
+  {{end}}
+
+  ; Asset segregation and protection
+  (custody.asset.segregation
+    (client.asset.segregation true)
+    (omnibus.vs.segregated.analysis
+      (recommendation "{{.SegregationRecommendation | default "SEGREGATED"}}")
+      (cost.benefit.analysis true)
+    )
+
+    (custody.chain.mapping
+      (prime.broker.relationship "{{.HasPrimeBroker | default false}}")
+      (sub.custodian.arrangements true)
+      (global.custody.network.access true)
+      (local.market.access.requirements true)
+    )
+
+    (asset.protection.mechanisms
+      (insurance.coverage.verification true)
+      (collateral.management.setup "{{.RequiresCollateralManagement | default false}}")
+      (securities.lending.opt.out "{{.OptOutSecuritiesLending | default true}}")
+    )
+
+    (attributes
+      "@attr{custody.segregation_type}"
+      "@attr{custody.sub_custodians}"
+      "@attr{custody.insurance_coverage}"
+    )
+  )
+
+  ; Settlement and clearing arrangements
+  (custody.settlement.clearing
+    (settlement.instruction.setup true)
+    (delivery.versus.payment.requirements true)
+    (settlement.cycle.optimization true)
+    (failed.trade.management true)
+
+    (clearing.arrangements
+      (central.clearing.access "{{.RequiresCentralClearing | default false}}")
+      (bilateral.clearing.arrangements "{{.AllowsBilateralClearing | default true}}")
+      (clearing.member.relationships true)
+    )
+
+    (settlement.locations
+      {{range .SettlementMarkets}}
+      (market "{{.Market}}" (currency "{{.Currency}}") (local.agent "{{.LocalAgent}}"))
+      {{end}}
+    )
+
+    (attributes
+      "@attr{custody.settlement_instructions}"
+      "@attr{custody.clearing_arrangements}"
+      "@attr{custody.settlement_locations}"
+    )
+  )
+
+  ; Reporting and communication requirements
+  (custody.reporting.requirements
+    (portfolio.valuation.frequency "{{.ValuationFrequency | default "DAILY"}}")
+    (transaction.reporting.real.time "{{.RequiresRealTimeReporting | default false}}")
+    (regulatory.reporting.automation true)
+    (client.reporting.customization true)
+
+    (standard.reports
+      "PORTFOLIO_VALUATION"
+      "TRANSACTION_SUMMARY"
+      "CASH_POSITION"
+      "CORPORATE_ACTIONS"
+      "TAX_REPORTING"
+      {{if eq .ComplianceTier "ENHANCED"}}
+      "RISK_ANALYTICS"
+      "PERFORMANCE_ATTRIBUTION"
+      {{end}}
+    )
+
+    (communication.preferences
+      (delivery.method "{{.ReportingDeliveryMethod | default "SECURE_PORTAL"}}")
+      (frequency.preferences "@attr{custody.reporting_frequency}")
+      (format.preferences "@attr{custody.reporting_format}")
+    )
+  )
+
+  ; Corporate actions processing
+  (custody.corporate.actions
+    (corporate.actions.processing.automation true)
+    (client.election.management true)
+    (dividend.reinvestment.programs "{{.AllowsDRIP | default false}}")
+    (proxy.voting.services "{{.RequiresProxyVoting | default false}}")
+
+    (processing.rules
+      (automatic.cash.distribution true)
+      (stock.dividend.processing true)
+      (rights.offering.processing true)
+      (merger.acquisition.processing true)
+      (spin.off.processing true)
+    )
+
+    (attributes
+      "@attr{custody.corporate_actions_preferences}"
+      "@attr{custody.proxy_voting_instructions}"
+      "@attr{custody.dividend_preferences}"
+    )
+  )
+
+  ; Technology and connectivity requirements
+  (custody.technology.integration
+    (api.connectivity.setup "{{.RequiresAPIAccess | default false}}")
+    (sftp.file.transfer.setup true)
+    (real.time.data.feeds "{{.RequiresRealTimeData | default false}}")
+    (mobile.access.setup "{{.RequiresMobileAccess | default false}}")
+
+    (integration.requirements
+      (portfolio.management.system.integration "{{.HasPMS | default false}}")
+      (accounting.system.integration "{{.HasAccountingSystem | default false}}")
+      (risk.management.system.integration "{{.HasRMS | default false}}")
+    )
+
+    (security.requirements
+      (two.factor.authentication true)
+      (ip.whitelisting "{{.RequiresIPWhitelisting | default false}}")
+      (encryption.standards.compliance true)
+    )
+  )
+
+  ; Cross-domain dependencies and handoffs
+  (dependencies.resolution
+    (depends.on.domains "onboarding" "kyc")
+    {{if ne .EntityType "INDIVIDUAL"}}
+    (depends.on.domains "ubo")
+    {{end}}
+    (provides.to.domains "trading" "fund-accounting" "compliance" "reporting")
+
+    (shared.attributes
+      "@attr{custody.account_number}"
+      "@attr{custody.account_title}"
+      "@attr{custody.authorized_signatories}"
+      "@attr{custody.investment_restrictions}"
+      "@attr{custody.fee_schedule}"
+      "@attr{custody.settlement_instructions}"
+      "@attr{custody.reporting_preferences}"
+    )
+  )
+
+  ; Account activation and final setup
+  (custody.account.activation
+    (documentation.completeness.check true)
+    (regulatory.compliance.verification true)
+    (system.setup.completion.verification true)
+    (client.communication.and.welcome.package true)
+
+    (activation.checklist
+      (account.opening.documents.complete true)
+      (kyc.aml.verification.complete true)
+      (signatory.authority.established true)
+      (investment.restrictions.programmed true)
+      (fee.agreements.executed true)
+      (reporting.preferences.configured true)
+      (technology.access.provisioned true)
+    )
+
+    (go.live.date.scheduling true)
+    (initial.funding.instructions true)
+    (ongoing.relationship.management.assignment true)
+  )
+)

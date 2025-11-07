@@ -1,0 +1,22 @@
+[package]
+name = "ob-poc"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+nom = "7.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+
+[dev-dependencies]
+pretty_assertions = "1.4"
+
+[[bin]]
+name = "cli"
+path = "src/bin/cli.rs"
+
+[[example]]
+name = "parse_zenith"
+path = "examples/parse_zenith.rs"

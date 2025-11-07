@@ -1,0 +1,42 @@
+[
+  {
+    "entity_type_id": "et-001-limited-company",
+    "name": "Limited Company",
+    "description": "Limited liability company or corporation",
+    "table_name": "entity_limited_companies",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "entity_type_id": "et-002-partnership",
+    "name": "Partnership",
+    "description": "General, limited, or limited liability partnership",
+    "table_name": "entity_partnerships",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "entity_type_id": "et-003-individual",
+    "name": "Individual",
+    "description": "Natural person or proper person",
+    "table_name": "entity_proper_persons",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "entity_type_id": "et-004-sicav",
+    "name": "SICAV",
+    "description": "Société d'Investissement à Capital Variable - Luxembourg investment company with variable capital",
+    "table_name": "entity_sicavs",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "entity_type_id": "et-005-spv",
+    "name": "SPV",
+    "description": "Special Purpose Vehicle - entity created for specific investment purposes",
+    "table_name": "entity_spvs",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  }
+]

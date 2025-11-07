@@ -1,0 +1,164 @@
+(* ============================================================================
+   UBO/KYC DSL - Extended Backus-Naur Form (EBNF) Grammar
+   ============================================================================
+
+   This grammar defines a declarative S-expression based DSL for modeling
+   institutional KYC workflows, entity ownership structures, and UBO discovery.
+
+   Key Design Principles:
+   - S-expression syntax for homoiconicity
+   - EDF / Clojure : token use for readability
+   - Declarative graph construction
+   - Multi-source data with conflict resolution
+   - Audit trail via EVIDENCED_BY relationships
+   ============================================================================ *)
+
+(* Top-level program structure *)
+program = workflow* ;
+
+workflow = '(' 'define-kyc-investigation'
+             string                         (* workflow-id *)
+             property-list                  (* workflow properties *)
+             statement*                     (* workflow statements *)
+           ')' ;
+
+(* Core Statements *)
+statement = declare-entity
+          | obtain-document
+          | create-edge
+          | solicit-attribute
+          | calculate-ubo
+          | resolve-conflict
+          | generate-report
+          | schedule-monitoring
+          | parallel-block
+          | sequential-block ;
+
+(* Entity Declaration *)
+declare-entity = '(' 'declare-entity'
+                   ':node-id' identifier
+                   ':label' entity-label
+                   ':properties' property-map
+                 ')' ;
+
+entity-label = 'Company' | 'Person' | 'Trust' | 'Address'
+             | 'Document' | 'Officer' ;
+
+(* Document Operations *)
+obtain-document = '(' 'obtain-document'
+                    ':doc-id' identifier
+                    ':doc-type' string
+                    ':issuer' string
+                    ':issue-date' date
+                    ':confidence' number
+                    property-list?
+                  ')' ;
+
+parallel-obtain = '(' 'parallel-obtain'
+                    obtain-document+
+                  ')' ;
+
+(* Graph Edge Creation *)
+create-edge = '(' 'create-edge'
+                ':from' identifier
+                ':to' identifier
+                ':type' edge-type
+                ':properties' property-map
+                ':evidenced-by' evidence-list
+              ')' ;
+
+edge-type = 'HAS_OWNERSHIP' | 'HAS_CONTROL' | 'IS_DIRECTOR_OF'
+          | 'IS_SECRETARY_OF' | 'HAS_SHAREHOLDER' | 'RESIDES_AT'
+          | 'HAS_REGISTERED_OFFICE' | 'EVIDENCED_BY' ;
+
+evidence-list = '[' (string (',' string)*)? ']' ;
+
+(* Attribute Solicitation *)
+solicit-attribute = '(' 'solicit-attribute'
+                      ':attr-id' identifier
+                      ':from' identifier
+                      ':value-type' type-spec
+                      property-list?
+                    ')' ;
+
+(* UBO Calculation *)
+calculate-ubo = '(' 'calculate-ubo-prongs'
+                  ':target' identifier
+                  ':algorithm' string
+                  ':max-depth' integer
+                  ':threshold' number
+                  ':traversal-rules' rule-map
+                  ':output' output-map
+                ')' ;
+
+(* Conflict Resolution *)
+resolve-conflict = '(' 'resolve-conflicts'
+                     ':node' identifier
+                     ':property' string
+                     ':strategy' waterfall-strategy
+                     ':resolution' resolution-map
+                   ')' ;
+
+waterfall-strategy = '(' 'waterfall'
+                       source-priority+
+                     ')' ;
+
+source-priority = '(' source-type string ':confidence' number ')' ;
+
+source-type = 'primary-source' | 'government-registry'
+            | 'third-party-service' | 'self-declared' ;
+
+(* Report Generation *)
+generate-report = '(' 'generate-ubo-report'
+                    ':target' identifier
+                    ':status' string
+                    ':identified-ubos' ubo-list
+                    ':unresolved-prongs' prong-list
+                    property-list?
+                  ')' ;
+
+(* Monitoring *)
+schedule-monitoring = '(' 'schedule-monitoring'
+                        ':target' identifier
+                        ':frequency' string
+                        ':triggers' trigger-list
+                        property-list?
+                      ')' ;
+
+(* Control Flow *)
+parallel-block = '(' 'parallel' statement+ ')' ;
+sequential-block = '(' 'sequential' statement+ ')' ;
+
+(* Property Structures *)
+property-list = (property-pair)* ;
+property-pair = keyword value ;
+
+property-map = '{' (map-entry (',' map-entry)*)? '}' ;
+map-entry = keyword value ;
+
+(* Value Types *)
+value = string | number | boolean | date | identifier
+      | list | map | multi-value ;
+
+multi-value = '[' value-with-source+ ']' ;
+value-with-source = '{' ':value' value ':source' string '}' ;
+
+list = '[' (value (',' value)*)? ']' ;
+map = '{' (map-entry (',' map-entry)*)? '}' ;
+
+(* Primitives *)
+string = '"' character* '"' ;
+number = integer | float ;
+integer = digit+ ;
+float = digit+ '.' digit+ ;
+boolean = 'true' | 'false' ;
+date = string ;  (* ISO 8601 format in practice *)
+identifier = (letter | '-' | '_') (letter | digit | '-' | '_')* ;
+keyword = ':' identifier ;
+
+letter = 'a'..'z' | 'A'..'Z' ;
+digit = '0'..'9' ;
+character = ? any character except '"' ? ;
+
+(* Comments *)
+comment = ';;' ? any character except newline ? newline ;

@@ -1,0 +1,353 @@
+; FinCEN Control Prong Analysis Template
+; Implements US FinCEN CDD Rule control prong requirements for beneficial ownership identification
+; 31 CFR 1010.230 - Customer Due Diligence requirements for financial institutions
+
+(workflow.regulatory.fincen.control.prong
+  (entity.name "{{.EntityName}}")
+  (entity.type "{{.EntityType}}")
+  (jurisdiction "US")
+  (regulation.reference "31_CFR_1010_230")
+  (workflow.id "{{.SessionID}}")
+  (created.at "{{.CreatedAt}}")
+
+  ; Control prong threshold and definitions
+  (control.prong.definitions
+    (control.threshold 25)
+    (control.definition "SIGNIFICANT_CONTROL_OR_OWNERSHIP")
+    (individual.requirement true)
+    (natural.person.requirement true)
+    (us.person.or.foreign.person.both.covered true)
+  )
+
+  ; Control mechanisms identification
+  (control.mechanisms.analysis
+    (voting.rights.control.analysis
+      (threshold.percentage 25)
+      (direct.voting.rights true)
+      (indirect.voting.rights true)
+      (voting.trust.arrangements true)
+      (proxy.arrangements.permanent true)
+      (voting.agreements.analysis true)
+    )
+
+    (ownership.control.analysis
+      (equity.ownership.threshold 25)
+      (profit.sharing.agreements true)
+      (capital.distribution.rights true)
+      (liquidation.distribution.rights true)
+      (convertible.securities.analysis true)
+      (warrant.and.option.analysis true)
+    )
+
+    (board.and.management.control
+      (board.appointment.rights true)
+      (board.majority.control true)
+      (management.appointment.authority true)
+      (ceo.appointment.authority true)
+      (key.personnel.appointment.authority true)
+      (removal.authority.analysis true)
+    )
+
+    (veto.powers.and.negative.control
+      (fundamental.decision.veto.rights true)
+      (budget.approval.authority true)
+      (major.transaction.approval.authority true)
+      (dividend.distribution.veto.authority true)
+      (strategic.decision.blocking.rights true)
+    )
+
+    (contractual.control.mechanisms
+      (management.agreements.control true)
+      (operating.agreements.control true)
+      (shareholders.agreements.control true)
+      (partnership.agreements.control true)
+      (loan.agreements.with.control.provisions true)
+      (security.agreements.with.control.provisions true)
+    )
+  )
+
+  ; Entity-specific control analysis
+  {{if eq .EntityType "CORPORATE"}}
+  (corporate.control.analysis
+    (shareholding.structure.analysis true)
+    (voting.vs.non.voting.shares true)
+    (preferred.shares.control.rights true)
+    (board.composition.control true)
+    (shareholder.agreements.control.provisions true)
+    (management.services.agreements true)
+
+    (control.persons.identification
+      (majority.shareholder.25.percent.plus true)
+      (board.control.through.appointment.rights true)
+      (management.control.through.agreements true)
+      (veto.rights.over.fundamental.decisions true)
+    )
+
+    (attributes
+      "@attr{fincen.corporate.control.voting_control_persons}"
+      "@attr{fincen.corporate.control.board_control_persons}"
+      "@attr{fincen.corporate.control.management_control_persons}"
+      "@attr{fincen.corporate.control.veto_rights_persons}"
+    )
+  )
+  {{end}}
+
+  {{if eq .EntityType "PARTNERSHIP"}}
+  (partnership.control.analysis
+    (general.partners.control.rights true)
+    (limited.partners.control.rights.analysis true)
+    (managing.partner.identification true)
+    (partnership.agreement.control.provisions true)
+    (profit.sharing.control.implications true)
+
+    (control.persons.identification
+      (general.partners.with.management.authority true)
+      (limited.partners.with.25.percent.plus.interest true)
+      (managing.partners.with.control.authority true)
+      (persons.with.removal.appointment.authority true)
+    )
+
+    (attributes
+      "@attr{fincen.partnership.control.general_partners}"
+      "@attr{fincen.partnership.control.managing_partners}"
+      "@attr{fincen.partnership.control.significant_limited_partners}"
+    )
+  )
+  {{end}}
+
+  {{if eq .EntityType "TRUST"}}
+  (trust.control.analysis
+    (trustee.control.authority.analysis true)
+    (settlor.retained.control.rights true)
+    (beneficiary.control.rights.analysis true)
+    (protector.control.authority.analysis "{{.HasProtector | default false}}")
+    (trust.committee.control.authority "{{.HasTrustCommittee | default false}}")
+
+    (control.persons.identification
+      (trustees.with.discretionary.authority true)
+      (settlors.with.retained.control.rights true)
+      (beneficiaries.with.removal.appointment.rights true)
+      (protectors.with.significant.control.authority "{{.HasProtector | default false}}")
+      (persons.with.trust.amendment.authority true)
+    )
+
+    (attributes
+      "@attr{fincen.trust.control.trustees}"
+      "@attr{fincen.trust.control.settlors_with_control}"
+      "@attr{fincen.trust.control.beneficiaries_with_control}"
+      {{if .HasProtector}}
+      "@attr{fincen.trust.control.protectors}"
+      {{end}}
+    )
+  )
+  {{end}}
+
+  {{if eq .EntityType "LLC"}}
+  (llc.control.analysis
+    (member.control.rights.analysis true)
+    (manager.control.authority.analysis true)
+    (operating.agreement.control.provisions true)
+    (membership.interest.control.implications true)
+
+    (control.persons.identification
+      (managing.members.with.authority true)
+      (members.with.25.percent.plus.interest true)
+      (managers.with.significant.authority true)
+      (persons.with.member.removal.authority true)
+    )
+
+    (attributes
+      "@attr{fincen.llc.control.managing_members}"
+      "@attr{fincen.llc.control.significant_members}"
+      "@attr{fincen.llc.control.managers}"
+    )
+  )
+  {{end}}
+
+  ; Indirect control analysis
+  (indirect.control.analysis
+    (control.through.intermediate.entities true)
+    (layered.ownership.structure.analysis true)
+    (chain.of.control.mapping true)
+    (aggregation.of.control.interests true)
+    (attribution.rules.application true)
+
+    (control.chain.documentation
+      (immediate.control.level.identification true)
+      (ultimate.control.person.identification true)
+      (intermediate.entities.control.analysis true)
+      (consolidation.of.control.interests true)
+    )
+  )
+
+  ; Joint and shared control arrangements
+  (joint.control.analysis
+    (voting.agreements.among.shareholders true)
+    (joint.venture.control.arrangements true)
+    (consortium.control.arrangements true)
+    (family.control.arrangements true)
+    (concert.party.arrangements true)
+
+    (shared.control.determination
+      (combined.voting.control.calculation true)
+      (joint.board.appointment.rights true)
+      (shared.management.authority true)
+      (coordinated.control.exercise true)
+    )
+  )
+
+  ; Control person due diligence requirements
+  (control.person.due.diligence
+    (identity.verification.requirements
+      (full.legal.name.verification true)
+      (date.of.birth.verification true)
+      (residential.address.verification true)
+      (identification.document.verification true)
+      (social.security.number.collection "{{.RequiresSSN | default true}}")
+    )
+
+    (control.relationship.documentation
+      (nature.of.control.description true)
+      (percentage.of.control.quantification true)
+      (mechanism.of.control.explanation true)
+      (duration.of.control.assessment true)
+      (control.exercise.frequency.assessment true)
+    )
+
+    (attributes
+      "@attr{fincen.control.person.identity_verification}"
+      "@attr{fincen.control.person.control_description}"
+      "@attr{fincen.control.person.control_percentage}"
+      "@attr{fincen.control.person.control_mechanism}"
+    )
+  )
+
+  ; Control prong exemptions analysis
+  (control.prong.exemptions.analysis
+    (public.company.exemption.analysis
+      (sec.reporting.company.status "{{.IsSECReportingCompany | default false}}")
+      (nasdaq.nyse.listing.status "{{.IsExchangeListed | default false}}")
+      (otc.reporting.status "{{.IsOTCReporting | default false}}")
+    )
+
+    (regulated.entity.exemption.analysis
+      (bank.holding.company.status "{{.IsBankHoldingCompany | default false}}")
+      (savings.and.loan.holding.company.status "{{.IsSLHoldingCompany | default false}}")
+      (sec.investment.company.status "{{.IsSECInvestmentCompany | default false}}")
+    )
+
+    (pooled.investment.vehicle.analysis
+      (investment.adviser.act.coverage "{{.IsIAARegulated | default false}}")
+      (commodity.pool.operator.registration "{{.IsCPORegistered | default false}}")
+      (sec.exempt.reporting.adviser.status "{{.IsSECExemptAdviser | default false}}")
+    )
+  )
+
+  ; No control person identified scenarios
+  (no.control.person.scenarios
+    (widely.held.ownership.analysis
+      (no.single.25.percent.owner true)
+      (dispersed.ownership.structure.verification true)
+      (senior.manager.identification.fallback true)
+    )
+
+    (senior.managing.official.identification
+      (ceo.or.president.identification true)
+      (chief.operating.officer.identification "{{.HasCOO | default false}}")
+      (managing.director.identification "{{.HasManagingDirector | default false}}")
+      (general.partner.identification "{{eq .EntityType "PARTNERSHIP"}}")
+    )
+
+    (attributes
+      "@attr{fincen.no_control_person_reason}"
+      "@attr{fincen.senior_managing_official}"
+    )
+  )
+
+  ; Documentation and record keeping requirements
+  (documentation.requirements
+    (control.prong.analysis.documentation true)
+    (control.person.identification.documentation true)
+    (exemption.analysis.documentation true)
+    (ongoing.monitoring.procedures.documentation true)
+
+    (required.documentation
+      (organizational.documents.review true)
+      (control.agreements.review true)
+      (voting.agreements.review true)
+      (management.agreements.review true)
+      (board.resolutions.review true)
+      (shareholder.resolutions.review true)
+    )
+
+    (record.retention.requirements
+      (five.year.retention.period true)
+      (electronic.record.keeping.acceptable true)
+      (regulatory.examination.accessibility true)
+    )
+  )
+
+  ; Ongoing monitoring and updates
+  (ongoing.monitoring.requirements
+    (control.changes.monitoring true)
+    (ownership.changes.monitoring.above.threshold true)
+    (management.changes.monitoring true)
+    (control.agreement.amendments.monitoring true)
+
+    (update.triggers
+      "CONTROL_CHANGE_ABOVE_25_PERCENT"
+      "NEW_CONTROL_AGREEMENT"
+      "MANAGEMENT_CHANGE"
+      "BOARD_COMPOSITION_CHANGE"
+      "CORPORATE_RESTRUCTURING"
+    )
+
+    (refresh.schedule
+      (annual.refresh.minimum true)
+      (trigger.based.refresh true)
+      (risk.based.refresh.frequency "{{.ControlPersonRiskLevel | default "STANDARD"}}")
+    )
+  )
+
+  ; Regulatory reporting and compliance
+  (regulatory.compliance.requirements
+    (fincen.cdd.rule.compliance.certification true)
+    (suspicious.activity.reporting.obligations true)
+    (currency.transaction.reporting.obligations true)
+    (ofac.sanctions.screening.requirements true)
+
+    (examination.readiness
+      (regulatory.examination.preparation true)
+      (documentation.organization.and.accessibility true)
+      (staff.training.on.control.prong.requirements true)
+      (quality.assurance.procedures.implementation true)
+    )
+  )
+
+  ; Cross-domain integration and handoffs
+  (dependencies.resolution
+    (depends.on.domains "onboarding" "kyc")
+    (integrates.with "fincen.ownership.prong")
+    (provides.to.domains "compliance" "ongoing-monitoring" "reporting")
+
+    (shared.attributes
+      "@attr{fincen.control.prong.persons_identified}"
+      "@attr{fincen.control.prong.analysis_complete}"
+      "@attr{fincen.control.prong.exemptions_applied}"
+      "@attr{fincen.control.prong.senior_manager_fallback}"
+      "@attr{fincen.control.prong.documentation_complete}"
+      "@attr{fincen.control.prong.next_refresh_date}"
+    )
+  )
+
+  ; Final control prong determination
+  (control.prong.final.determination
+    (control.persons.final.list "@attr{fincen.final.control_persons}")
+    (control.mechanisms.final.summary "@attr{fincen.final.control_mechanisms}")
+    (exemptions.applied.final.list "@attr{fincen.final.exemptions_applied}")
+    (senior.manager.fallback.person "@attr{fincen.final.senior_manager}")
+    (no.control.person.reason "@attr{fincen.final.no_control_reason}")
+    (ongoing.monitoring.schedule "@attr{fincen.final.monitoring_schedule}")
+    (compliance.certification.status "@attr{fincen.final.compliance_status}")
+  )
+)
