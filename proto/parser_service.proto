@@ -1,0 +1,338 @@
+syntax = "proto3";
+
+package ob_poc.parser;
+
+import "dsl_types.proto";
+import "grammar_service.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/ob-poc/proto/parser";
+
+// Main DSL parsing service
+service ParserService {
+  // Parse DSL source code into AST
+  rpc ParseDSL(ParseDSLRequest) returns (ParseDSLResponse);
+
+  // Parse DSL with streaming for large files
+  rpc ParseDSLStream(stream ParseDSLStreamRequest) returns (stream ParseDSLStreamResponse);
+
+  // Parse and validate DSL in one operation
+  rpc ParseAndValidate(ParseAndValidateRequest) returns (ParseAndValidateResponse);
+
+  // Parse a single workflow
+  rpc ParseWorkflow(ParseWorkflowRequest) returns (ParseWorkflowResponse);
+
+  // Parse a single value/expression
+  rpc ParseValue(ParseValueRequest) returns (ParseValueResponse);
+
+  // Validate a parsed AST
+  rpc ValidateAST(ValidateASTRequest) returns (ValidateASTResponse);
+
+  // Get parser configuration
+  rpc GetParserConfig(GetParserConfigRequest) returns (GetParserConfigResponse);
+
+  // Update parser configuration
+  rpc UpdateParserConfig(UpdateParserConfigRequest) returns (UpdateParserConfigResponse);
+
+  // Format/prettify DSL source code
+  rpc FormatDSL(FormatDSLRequest) returns (FormatDSLResponse);
+
+  // Get parse tree for debugging
+  rpc GetParseTree(GetParseTreeRequest) returns (GetParseTreeResponse);
+}
+
+// Parse DSL Request/Response
+message ParseDSLRequest {
+  string source = 1;
+  optional string source_file = 2;
+  ParseConfig config = 3;
+  optional string grammar_name = 4;
+}
+
+message ParseConfig {
+  bool strict_validation = 1;
+  uint32 max_depth = 2;
+  bool debug_mode = 3;
+  bool include_source_locations = 4;
+  bool preserve_comments = 5;
+  uint32 timeout_seconds = 6;
+}
+
+message ParseDSLResponse {
+  oneof result {
+    ob_poc.dsl.Program program = 1;
+    ParseFailure failure = 2;
+  }
+  ParseMetrics metrics = 3;
+  repeated ob_poc.dsl.ValidationWarning warnings = 4;
+}
+
+message ParseFailure {
+  string error_message = 1;
+  ob_poc.dsl.ErrorSeverity severity = 2;
+  ob_poc.dsl.SourceLocation location = 3;
+  string error_code = 4;
+  repeated string suggestions = 5;
+  optional string partial_parse_info = 6;
+}
+
+message ParseMetrics {
+  google.protobuf.Timestamp start_time = 1;
+  google.protobuf.Timestamp end_time = 2;
+  uint64 duration_microseconds = 3;
+  uint32 lines_parsed = 4;
+  uint32 tokens_parsed = 5;
+  uint32 workflows_parsed = 6;
+  uint32 statements_parsed = 7;
+  uint64 memory_used_bytes = 8;
+}
+
+// Streaming parse for large files
+message ParseDSLStreamRequest {
+  oneof request_type {
+    StreamHeader header = 1;
+    StreamChunk chunk = 2;
+    StreamFooter footer = 3;
+  }
+}
+
+message StreamHeader {
+  optional string source_file = 1;
+  ParseConfig config = 2;
+  optional string grammar_name = 3;
+  uint64 total_size_bytes = 4;
+}
+
+message StreamChunk {
+  string content = 1;
+  uint32 chunk_index = 2;
+  bool is_final = 3;
+}
+
+message StreamFooter {
+  string checksum = 1;
+}
+
+message ParseDSLStreamResponse {
+  oneof response_type {
+    StreamProgress progress = 1;
+    StreamResult result = 2;
+    StreamError error = 3;
+  }
+}
+
+message StreamProgress {
+  uint32 chunks_processed = 1;
+  uint64 bytes_processed = 2;
+  uint32 workflows_found = 3;
+  float completion_percentage = 4;
+}
+
+message StreamResult {
+  ob_poc.dsl.Program program = 1;
+  ParseMetrics metrics = 2;
+  repeated ob_poc.dsl.ValidationWarning warnings = 3;
+}
+
+message StreamError {
+  string error_message = 1;
+  ob_poc.dsl.SourceLocation location = 2;
+  bool is_recoverable = 3;
+}
+
+// Parse and Validate Request/Response
+message ParseAndValidateRequest {
+  string source = 1;
+  optional string source_file = 2;
+  ParseConfig parse_config = 3;
+  ValidationConfig validation_config = 4;
+  optional string grammar_name = 5;
+}
+
+message ValidationConfig {
+  bool check_undefined_entities = 1;
+  bool check_circular_references = 2;
+  bool check_type_consistency = 3;
+  bool check_vocabulary_compliance = 4;
+  bool check_business_rules = 5;
+  repeated string custom_validators = 6;
+}
+
+message ParseAndValidateResponse {
+  oneof result {
+    ValidatedProgram validated_program = 1;
+    ParseFailure parse_failure = 2;
+    ValidationFailure validation_failure = 3;
+  }
+  ParseMetrics parse_metrics = 4;
+  ValidationMetrics validation_metrics = 5;
+}
+
+message ValidatedProgram {
+  ob_poc.dsl.Program program = 1;
+  ValidationReport validation_report = 2;
+}
+
+message ValidationFailure {
+  repeated ob_poc.dsl.ValidationError errors = 1;
+  repeated ob_poc.dsl.ValidationWarning warnings = 2;
+  optional ob_poc.dsl.Program partial_program = 3;
+}
+
+message ValidationReport {
+  bool is_valid = 1;
+  uint32 total_checks = 2;
+  uint32 passed_checks = 3;
+  uint32 failed_checks = 4;
+  repeated ValidationCheck checks = 5;
+}
+
+message ValidationCheck {
+  string check_name = 1;
+  string description = 2;
+  bool passed = 3;
+  optional string failure_reason = 4;
+  ob_poc.dsl.ErrorSeverity severity = 5;
+  repeated ob_poc.dsl.SourceLocation affected_locations = 6;
+}
+
+message ValidationMetrics {
+  google.protobuf.Timestamp start_time = 1;
+  google.protobuf.Timestamp end_time = 2;
+  uint64 duration_microseconds = 3;
+  uint32 entities_validated = 4;
+  uint32 relationships_validated = 5;
+  uint32 workflows_validated = 6;
+}
+
+// Parse Workflow Request/Response
+message ParseWorkflowRequest {
+  string source = 1;
+  ParseConfig config = 2;
+  optional string grammar_name = 3;
+}
+
+message ParseWorkflowResponse {
+  oneof result {
+    ob_poc.dsl.Workflow workflow = 1;
+    ParseFailure failure = 2;
+  }
+  ParseMetrics metrics = 3;
+}
+
+// Parse Value Request/Response
+message ParseValueRequest {
+  string source = 1;
+  optional ob_poc.dsl.DSLType expected_type = 2;
+  ParseConfig config = 3;
+}
+
+message ParseValueResponse {
+  oneof result {
+    ob_poc.dsl.Value value = 1;
+    ParseFailure failure = 2;
+  }
+  ob_poc.dsl.DSLType inferred_type = 3;
+  ParseMetrics metrics = 4;
+}
+
+// Validate AST Request/Response
+message ValidateASTRequest {
+  ob_poc.dsl.Program program = 1;
+  ValidationConfig config = 2;
+}
+
+message ValidateASTResponse {
+  ValidationReport report = 1;
+  ValidationMetrics metrics = 2;
+}
+
+// Parser Configuration Request/Response
+message GetParserConfigRequest {}
+
+message GetParserConfigResponse {
+  ob_poc.dsl.DSLConfig config = 1;
+  ParserCapabilities capabilities = 2;
+}
+
+message ParserCapabilities {
+  repeated string supported_formats = 1;
+  repeated string supported_grammars = 2;
+  uint32 max_file_size_mb = 3;
+  uint32 max_recursion_depth = 4;
+  bool supports_streaming = 5;
+  bool supports_incremental_parsing = 6;
+}
+
+message UpdateParserConfigRequest {
+  ob_poc.dsl.DSLConfig config = 1;
+}
+
+message UpdateParserConfigResponse {
+  bool success = 1;
+  optional string error_message = 2;
+  ob_poc.dsl.DSLConfig previous_config = 3;
+}
+
+// Format DSL Request/Response
+message FormatDSLRequest {
+  string source = 1;
+  FormatOptions options = 2;
+}
+
+message FormatOptions {
+  uint32 indent_size = 1;
+  bool use_tabs = 2;
+  uint32 line_length = 3;
+  bool preserve_comments = 4;
+  bool sort_properties = 5;
+  string style = 6; // "compact", "standard", "verbose"
+}
+
+message FormatDSLResponse {
+  oneof result {
+    string formatted_source = 1;
+    string error_message = 2;
+  }
+  FormatMetrics metrics = 3;
+}
+
+message FormatMetrics {
+  uint32 lines_formatted = 1;
+  uint32 changes_made = 2;
+  google.protobuf.Timestamp duration = 3;
+}
+
+// Parse Tree Request/Response (for debugging)
+message GetParseTreeRequest {
+  string source = 1;
+  ParseConfig config = 2;
+  optional string grammar_name = 3;
+  bool include_tokens = 4;
+}
+
+message GetParseTreeResponse {
+  oneof result {
+    ParseTree tree = 1;
+    ParseFailure failure = 2;
+  }
+}
+
+message ParseTree {
+  ParseNode root = 1;
+  repeated Token tokens = 2;
+}
+
+message ParseNode {
+  string rule_name = 1;
+  string text_content = 2;
+  ob_poc.dsl.SourceLocation location = 3;
+  repeated ParseNode children = 4;
+  map<string, string> attributes = 5;
+}
+
+message Token {
+  string type = 1;
+  string value = 2;
+  ob_poc.dsl.SourceLocation location = 3;
+}

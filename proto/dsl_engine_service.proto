@@ -1,0 +1,609 @@
+syntax = "proto3";
+
+package ob_poc.engine;
+
+import "dsl_types.proto";
+import "grammar_service.proto";
+import "parser_service.proto";
+import "ubo_service.proto";
+import "vocabulary_service.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/ob-poc/proto/engine";
+
+// Main DSL Engine service that orchestrates all sub-services
+service DSLEngineService {
+  // System management
+  rpc GetSystemInfo(GetSystemInfoRequest) returns (GetSystemInfoResponse);
+  rpc GetHealth(GetHealthRequest) returns (GetHealthResponse);
+  rpc GetMetrics(GetMetricsRequest) returns (GetMetricsResponse);
+  rpc UpdateConfiguration(UpdateConfigurationRequest) returns (UpdateConfigurationResponse);
+
+  // Complete workflow processing
+  rpc ProcessWorkflow(ProcessWorkflowRequest) returns (ProcessWorkflowResponse);
+  rpc ProcessWorkflowStream(stream ProcessWorkflowStreamRequest) returns (stream ProcessWorkflowStreamResponse);
+
+  // End-to-end DSL operations
+  rpc ParseAndExecute(ParseAndExecuteRequest) returns (ParseAndExecuteResponse);
+  rpc ValidateAndProcess(ValidateAndProcessRequest) returns (ValidateAndProcessResponse);
+
+  // Batch operations
+  rpc ProcessBatch(ProcessBatchRequest) returns (ProcessBatchResponse);
+
+  // Development and debugging
+  rpc AnalyzeDSL(AnalyzeDSLRequest) returns (AnalyzeDSLResponse);
+  rpc GetProcessingTrace(GetProcessingTraceRequest) returns (GetProcessingTraceResponse);
+  rpc ValidateConfiguration(ValidateConfigurationRequest) returns (ValidateConfigurationResponse);
+
+  // Cache management
+  rpc ClearCache(ClearCacheRequest) returns (ClearCacheResponse);
+  rpc GetCacheStats(GetCacheStatsRequest) returns (GetCacheStatsResponse);
+}
+
+// System information and health
+message GetSystemInfoRequest {}
+
+message GetSystemInfoResponse {
+  ob_poc.dsl.SystemInfo system_info = 1;
+  ServiceVersions service_versions = 2;
+  SystemCapabilities capabilities = 3;
+  google.protobuf.Timestamp startup_time = 4;
+}
+
+message ServiceVersions {
+  string grammar_service_version = 1;
+  string parser_service_version = 2;
+  string ubo_service_version = 3;
+  string vocabulary_service_version = 4;
+  string engine_service_version = 5;
+}
+
+message SystemCapabilities {
+  bool supports_streaming = 1;
+  bool supports_batch_processing = 2;
+  bool supports_caching = 3;
+  bool supports_hot_reload = 4;
+  uint32 max_concurrent_workflows = 5;
+  uint32 max_file_size_mb = 6;
+  repeated string supported_export_formats = 7;
+}
+
+message GetHealthRequest {
+  bool include_dependencies = 1;
+}
+
+message GetHealthResponse {
+  HealthStatus overall_status = 1;
+  repeated ServiceHealth service_health = 2;
+  repeated HealthCheck health_checks = 3;
+  google.protobuf.Timestamp last_check_time = 4;
+}
+
+enum HealthStatus {
+  HEALTH_STATUS_UNSPECIFIED = 0;
+  HEALTH_STATUS_HEALTHY = 1;
+  HEALTH_STATUS_DEGRADED = 2;
+  HEALTH_STATUS_UNHEALTHY = 3;
+  HEALTH_STATUS_CRITICAL = 4;
+}
+
+message ServiceHealth {
+  string service_name = 1;
+  HealthStatus status = 2;
+  optional string status_message = 3;
+  google.protobuf.Timestamp last_check = 4;
+  uint64 response_time_ms = 5;
+}
+
+message HealthCheck {
+  string check_name = 1;
+  string description = 2;
+  HealthStatus status = 3;
+  optional string details = 4;
+}
+
+// Metrics and monitoring
+message GetMetricsRequest {
+  optional string time_period = 1; // "1h", "24h", "7d", "30d"
+  repeated string metric_names = 2;
+}
+
+message GetMetricsResponse {
+  SystemMetrics system_metrics = 1;
+  ProcessingMetrics processing_metrics = 2;
+  PerformanceMetrics performance_metrics = 3;
+  ErrorMetrics error_metrics = 4;
+  google.protobuf.Timestamp collected_at = 5;
+}
+
+message SystemMetrics {
+  uint64 uptime_seconds = 1;
+  double cpu_usage_percentage = 2;
+  uint64 memory_used_bytes = 3;
+  uint64 memory_available_bytes = 4;
+  uint32 active_connections = 5;
+  uint64 total_requests = 6;
+}
+
+message ProcessingMetrics {
+  uint64 workflows_processed = 1;
+  uint64 successful_workflows = 2;
+  uint64 failed_workflows = 3;
+  double average_processing_time_ms = 4;
+  double p95_processing_time_ms = 5;
+  uint32 active_workflows = 6;
+  uint32 queued_workflows = 7;
+}
+
+message PerformanceMetrics {
+  uint32 cache_hit_rate_percentage = 1;
+  double average_parse_time_ms = 2;
+  double average_validation_time_ms = 3;
+  double average_execution_time_ms = 4;
+  uint64 total_memory_allocations = 5;
+  double garbage_collection_time_ms = 6;
+}
+
+message ErrorMetrics {
+  uint64 total_errors = 1;
+  uint64 parse_errors = 2;
+  uint64 validation_errors = 3;
+  uint64 execution_errors = 4;
+  uint64 system_errors = 5;
+  repeated ErrorFrequency top_errors = 6;
+}
+
+message ErrorFrequency {
+  string error_code = 1;
+  string error_type = 2;
+  uint64 count = 3;
+  google.protobuf.Timestamp last_occurrence = 4;
+}
+
+// Configuration management
+message UpdateConfigurationRequest {
+  EngineConfiguration configuration = 1;
+  bool apply_immediately = 2;
+  bool validate_before_apply = 3;
+}
+
+message UpdateConfigurationResponse {
+  bool success = 1;
+  optional string error_message = 2;
+  EngineConfiguration previous_configuration = 3;
+  repeated string warnings = 4;
+}
+
+message EngineConfiguration {
+  ob_poc.dsl.DSLConfig dsl_config = 1;
+  ProcessingConfig processing_config = 2;
+  CacheConfig cache_config = 3;
+  SecurityConfig security_config = 4;
+  map<string, string> service_endpoints = 5;
+}
+
+message ProcessingConfig {
+  uint32 max_concurrent_workflows = 1;
+  uint32 workflow_timeout_seconds = 2;
+  uint32 max_recursion_depth = 3;
+  bool enable_async_processing = 4;
+  bool enable_result_caching = 5;
+  uint32 batch_size = 6;
+}
+
+message CacheConfig {
+  bool enable_caching = 1;
+  uint32 cache_size_mb = 2;
+  uint32 cache_ttl_seconds = 3;
+  repeated string cacheable_operations = 4;
+}
+
+message SecurityConfig {
+  bool enable_authentication = 1;
+  bool enable_authorization = 2;
+  repeated string allowed_operations = 3;
+  uint32 rate_limit_requests_per_minute = 4;
+}
+
+// Complete workflow processing
+message ProcessWorkflowRequest {
+  string workflow_source = 1;
+  optional string workflow_name = 2;
+  ProcessingOptions options = 3;
+  map<string, ob_poc.dsl.Value> context_variables = 4;
+  optional string request_id = 5;
+}
+
+message ProcessingOptions {
+  bool validate_grammar = 1;
+  bool validate_vocabulary = 2;
+  bool execute_workflow = 3;
+  bool include_detailed_results = 4;
+  bool enable_tracing = 5;
+  optional string grammar_name = 6;
+  uint32 timeout_seconds = 7;
+}
+
+message ProcessWorkflowResponse {
+  oneof result {
+    WorkflowResult workflow_result = 1;
+    ProcessingError processing_error = 2;
+  }
+  ProcessingMetadata metadata = 3;
+}
+
+message WorkflowResult {
+  string workflow_id = 1;
+  ob_poc.dsl.Workflow parsed_workflow = 2;
+  repeated ExecutionResult execution_results = 3;
+  ob_poc.ubo.UboResult ubo_results = 4;
+  ProcessingStats stats = 5;
+  optional ProcessingTrace trace = 6;
+}
+
+message ExecutionResult {
+  string statement_id = 1;
+  string statement_type = 2;
+  bool success = 3;
+  optional string error_message = 4;
+  map<string, ob_poc.dsl.Value> output_values = 5;
+  uint64 execution_time_microseconds = 6;
+}
+
+message ProcessingError {
+  ProcessingStage failed_stage = 1;
+  string error_code = 2;
+  string error_message = 3;
+  ob_poc.dsl.ErrorSeverity severity = 4;
+  optional ob_poc.dsl.SourceLocation location = 5;
+  repeated string suggestions = 6;
+  map<string, string> error_context = 7;
+}
+
+enum ProcessingStage {
+  PROCESSING_STAGE_UNSPECIFIED = 0;
+  PROCESSING_STAGE_PARSING = 1;
+  PROCESSING_STAGE_GRAMMAR_VALIDATION = 2;
+  PROCESSING_STAGE_VOCABULARY_VALIDATION = 3;
+  PROCESSING_STAGE_SEMANTIC_VALIDATION = 4;
+  PROCESSING_STAGE_EXECUTION = 5;
+  PROCESSING_STAGE_UBO_CALCULATION = 6;
+  PROCESSING_STAGE_RESULT_FORMATTING = 7;
+}
+
+message ProcessingMetadata {
+  string request_id = 1;
+  google.protobuf.Timestamp start_time = 2;
+  google.protobuf.Timestamp end_time = 3;
+  uint64 total_duration_microseconds = 4;
+  string processing_node = 5;
+  string session_id = 6;
+}
+
+message ProcessingStats {
+  uint32 statements_processed = 1;
+  uint32 entities_created = 2;
+  uint32 relationships_created = 3;
+  uint32 calculations_performed = 4;
+  uint32 validations_run = 5;
+  uint64 memory_used_bytes = 6;
+}
+
+// Streaming workflow processing
+message ProcessWorkflowStreamRequest {
+  oneof request_type {
+    StreamWorkflowHeader header = 1;
+    StreamWorkflowChunk chunk = 2;
+    StreamWorkflowFooter footer = 3;
+  }
+}
+
+message StreamWorkflowHeader {
+  optional string workflow_name = 1;
+  ProcessingOptions options = 2;
+  map<string, ob_poc.dsl.Value> context_variables = 3;
+  uint64 total_size_bytes = 4;
+}
+
+message StreamWorkflowChunk {
+  string content = 1;
+  uint32 chunk_index = 2;
+  bool is_final = 3;
+}
+
+message StreamWorkflowFooter {
+  string checksum = 1;
+}
+
+message ProcessWorkflowStreamResponse {
+  oneof response_type {
+    StreamProcessingProgress progress = 1;
+    StreamWorkflowResult result = 2;
+    StreamProcessingError error = 3;
+  }
+}
+
+message StreamProcessingProgress {
+  uint32 chunks_processed = 1;
+  uint64 bytes_processed = 2;
+  ProcessingStage current_stage = 3;
+  float completion_percentage = 4;
+}
+
+message StreamWorkflowResult {
+  WorkflowResult result = 1;
+  ProcessingMetadata metadata = 2;
+}
+
+message StreamProcessingError {
+  ProcessingError error = 1;
+  bool is_recoverable = 2;
+}
+
+// End-to-end operations
+message ParseAndExecuteRequest {
+  string dsl_source = 1;
+  ExecutionConfig execution_config = 2;
+  optional string request_id = 3;
+}
+
+message ExecutionConfig {
+  bool dry_run = 1;
+  bool validate_only = 2;
+  bool include_intermediate_results = 3;
+  map<string, ob_poc.dsl.Value> execution_context = 4;
+  repeated string enabled_features = 5;
+}
+
+message ParseAndExecuteResponse {
+  oneof result {
+    ExecutionResult execution_result = 1;
+    ProcessingError processing_error = 2;
+  }
+  ProcessingMetadata metadata = 3;
+}
+
+message ValidateAndProcessRequest {
+  string dsl_source = 1;
+  ValidationLevel validation_level = 2;
+  ProcessingOptions processing_options = 3;
+}
+
+enum ValidationLevel {
+  VALIDATION_LEVEL_UNSPECIFIED = 0;
+  VALIDATION_LEVEL_SYNTAX_ONLY = 1;
+  VALIDATION_LEVEL_SEMANTIC = 2;
+  VALIDATION_LEVEL_BUSINESS_RULES = 3;
+  VALIDATION_LEVEL_COMPREHENSIVE = 4;
+}
+
+message ValidateAndProcessResponse {
+  ValidationResult validation_result = 1;
+  optional WorkflowResult processing_result = 2;
+  ProcessingMetadata metadata = 3;
+}
+
+message ValidationResult {
+  bool is_valid = 1;
+  ValidationLevel level_achieved = 2;
+  repeated ob_poc.dsl.ValidationError errors = 3;
+  repeated ob_poc.dsl.ValidationWarning warnings = 4;
+  ValidationStats validation_stats = 5;
+}
+
+message ValidationStats {
+  uint32 total_checks = 1;
+  uint32 passed_checks = 2;
+  uint32 failed_checks = 3;
+  uint32 skipped_checks = 4;
+  uint64 validation_time_microseconds = 5;
+}
+
+// Batch processing
+message ProcessBatchRequest {
+  repeated BatchItem items = 1;
+  BatchProcessingOptions options = 2;
+  optional string batch_id = 3;
+}
+
+message BatchItem {
+  string item_id = 1;
+  string dsl_source = 2;
+  ProcessingOptions processing_options = 3;
+  map<string, ob_poc.dsl.Value> context = 4;
+}
+
+message BatchProcessingOptions {
+  bool parallel_processing = 1;
+  bool stop_on_error = 2;
+  uint32 max_concurrent_items = 3;
+  bool include_partial_results = 4;
+}
+
+message ProcessBatchResponse {
+  string batch_id = 1;
+  repeated BatchItemResult results = 2;
+  BatchProcessingStats batch_stats = 3;
+  repeated ProcessingError batch_errors = 4;
+}
+
+message BatchItemResult {
+  string item_id = 1;
+  oneof result {
+    WorkflowResult workflow_result = 2;
+    ProcessingError processing_error = 3;
+  }
+  ProcessingMetadata metadata = 4;
+}
+
+message BatchProcessingStats {
+  uint32 total_items = 1;
+  uint32 successful_items = 2;
+  uint32 failed_items = 3;
+  google.protobuf.Timestamp start_time = 4;
+  google.protobuf.Timestamp end_time = 5;
+  uint64 total_processing_time_microseconds = 6;
+}
+
+// Development and debugging
+message AnalyzeDSLRequest {
+  string dsl_source = 1;
+  repeated AnalysisType analysis_types = 2;
+  AnalysisOptions options = 3;
+}
+
+enum AnalysisType {
+  ANALYSIS_TYPE_UNSPECIFIED = 0;
+  ANALYSIS_TYPE_SYNTAX = 1;
+  ANALYSIS_TYPE_SEMANTICS = 2;
+  ANALYSIS_TYPE_PERFORMANCE = 3;
+  ANALYSIS_TYPE_COMPLEXITY = 4;
+  ANALYSIS_TYPE_DEPENDENCIES = 5;
+  ANALYSIS_TYPE_SECURITY = 6;
+}
+
+message AnalysisOptions {
+  bool include_suggestions = 1;
+  bool include_metrics = 2;
+  bool deep_analysis = 3;
+}
+
+message AnalyzeDSLResponse {
+  repeated AnalysisResult analysis_results = 1;
+  AnalysisSummary summary = 2;
+  ProcessingMetadata metadata = 3;
+}
+
+message AnalysisResult {
+  AnalysisType type = 1;
+  string title = 2;
+  string description = 3;
+  ob_poc.dsl.ErrorSeverity severity = 4;
+  repeated AnalysisIssue issues = 5;
+  repeated string suggestions = 6;
+  map<string, ob_poc.dsl.Value> metrics = 7;
+}
+
+message AnalysisIssue {
+  string issue_code = 1;
+  string message = 2;
+  optional ob_poc.dsl.SourceLocation location = 3;
+  ob_poc.dsl.ErrorSeverity severity = 4;
+  repeated string suggestions = 5;
+}
+
+message AnalysisSummary {
+  uint32 total_issues = 1;
+  uint32 errors = 2;
+  uint32 warnings = 3;
+  uint32 info_items = 4;
+  OverallQuality quality_score = 5;
+}
+
+enum OverallQuality {
+  OVERALL_QUALITY_UNSPECIFIED = 0;
+  OVERALL_QUALITY_EXCELLENT = 1;
+  OVERALL_QUALITY_GOOD = 2;
+  OVERALL_QUALITY_FAIR = 3;
+  OVERALL_QUALITY_POOR = 4;
+  OVERALL_QUALITY_CRITICAL = 5;
+}
+
+// Processing trace for debugging
+message GetProcessingTraceRequest {
+  string trace_id = 1;
+  bool include_detailed_steps = 2;
+}
+
+message GetProcessingTraceResponse {
+  oneof result {
+    ProcessingTrace trace = 1;
+    string error_message = 2;
+  }
+}
+
+message ProcessingTrace {
+  string trace_id = 1;
+  string request_id = 2;
+  google.protobuf.Timestamp start_time = 3;
+  google.protobuf.Timestamp end_time = 4;
+  repeated TraceStep steps = 5;
+  map<string, ob_poc.dsl.Value> trace_data = 6;
+}
+
+message TraceStep {
+  uint32 step_number = 1;
+  ProcessingStage stage = 2;
+  string operation = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  uint64 duration_microseconds = 5;
+  bool success = 6;
+  optional string error_message = 7;
+  map<string, ob_poc.dsl.Value> step_data = 8;
+  repeated string tags = 9;
+}
+
+// Configuration validation
+message ValidateConfigurationRequest {
+  EngineConfiguration configuration = 1;
+}
+
+message ValidateConfigurationResponse {
+  bool is_valid = 1;
+  repeated ConfigurationIssue issues = 2;
+  repeated string warnings = 3;
+}
+
+message ConfigurationIssue {
+  string setting_name = 1;
+  string issue_description = 2;
+  ob_poc.dsl.ErrorSeverity severity = 3;
+  optional string suggested_value = 4;
+}
+
+// Cache management
+message ClearCacheRequest {
+  repeated CacheType cache_types = 1;
+  bool force_clear = 2;
+}
+
+enum CacheType {
+  CACHE_TYPE_UNSPECIFIED = 0;
+  CACHE_TYPE_PARSED_GRAMMARS = 1;
+  CACHE_TYPE_PARSED_WORKFLOWS = 2;
+  CACHE_TYPE_VALIDATION_RESULTS = 3;
+  CACHE_TYPE_UBO_CALCULATIONS = 4;
+  CACHE_TYPE_VOCABULARY_LOOKUPS = 5;
+  CACHE_TYPE_ALL = 6;
+}
+
+message ClearCacheResponse {
+  bool success = 1;
+  repeated CacheClearResult results = 2;
+}
+
+message CacheClearResult {
+  CacheType cache_type = 1;
+  bool cleared = 2;
+  uint32 entries_removed = 3;
+  uint64 memory_freed_bytes = 4;
+}
+
+message GetCacheStatsRequest {
+  repeated CacheType cache_types = 1;
+}
+
+message GetCacheStatsResponse {
+  repeated CacheStats cache_stats = 1;
+  google.protobuf.Timestamp collected_at = 2;
+}
+
+message CacheStats {
+  CacheType cache_type = 1;
+  uint32 total_entries = 2;
+  uint64 memory_used_bytes = 3;
+  uint64 total_hits = 4;
+  uint64 total_misses = 5;
+  double hit_rate_percentage = 6;
+  google.protobuf.Timestamp last_access = 7;
+}

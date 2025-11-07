@@ -1,0 +1,295 @@
+syntax = "proto3";
+
+package ob_poc.dsl;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/ob-poc/proto/dsl";
+
+// Core DSL value types
+message Value {
+  oneof value_type {
+    string string_value = 1;
+    double number_value = 2;
+    int64 integer_value = 3;
+    bool boolean_value = 4;
+    ValueList list_value = 5;
+    ValueMap map_value = 6;
+    google.protobuf.Timestamp datetime_value = 7;
+    string uuid_value = 8; // UUID as string
+  }
+}
+
+message ValueList {
+  repeated Value values = 1;
+}
+
+message ValueMap {
+  map<string, Value> values = 1;
+}
+
+// Property map for workflow and statement properties
+message PropertyMap {
+  map<string, Value> properties = 1;
+}
+
+// Source location information for error reporting
+message SourceLocation {
+  uint32 line = 1;
+  uint32 column = 2;
+  optional string file = 3;
+  optional SourceSpan span = 4;
+}
+
+message SourceSpan {
+  uint32 start = 1;
+  uint32 end = 2;
+}
+
+// DSL type system
+message DSLType {
+  oneof type_def {
+    StringType string_type = 1;
+    NumberType number_type = 2;
+    IntegerType integer_type = 3;
+    BooleanType boolean_type = 4;
+    DateTimeType datetime_type = 5;
+    UUIDType uuid_type = 6;
+    EntityReferenceType entity_reference_type = 7;
+    VocabularyVerbType vocabulary_verb_type = 8;
+    ListType list_type = 9;
+    MapType map_type = 10;
+    UnionType union_type = 11;
+    CustomType custom_type = 12;
+  }
+  bool nullable = 13;
+}
+
+message StringType {
+  optional uint32 max_length = 1;
+  repeated string allowed_values = 2; // enum-like constraints
+}
+
+message NumberType {
+  optional double min_value = 1;
+  optional double max_value = 2;
+}
+
+message IntegerType {
+  optional int64 min_value = 1;
+  optional int64 max_value = 2;
+}
+
+message BooleanType {}
+
+message DateTimeType {}
+
+message UUIDType {}
+
+message EntityReferenceType {
+  string entity_type = 1;
+}
+
+message VocabularyVerbType {
+  string domain = 1;
+}
+
+message ListType {
+  DSLType element_type = 1;
+  optional uint32 min_length = 2;
+  optional uint32 max_length = 3;
+}
+
+message MapType {
+  DSLType value_type = 1;
+}
+
+message UnionType {
+  repeated DSLType types = 1;
+}
+
+message CustomType {
+  string name = 1;
+  map<string, DSLType> schema = 2;
+}
+
+// Type constraints
+message TypeConstraint {
+  oneof constraint_type {
+    RequiredConstraint required = 1;
+    UniqueConstraint unique = 2;
+    LengthConstraint length = 3;
+    PatternConstraint pattern = 4;
+    SetConstraint set = 5;
+    CustomConstraint custom = 6;
+  }
+}
+
+message RequiredConstraint {}
+
+message UniqueConstraint {}
+
+message LengthConstraint {
+  optional uint32 min_length = 1;
+  optional uint32 max_length = 2;
+}
+
+message PatternConstraint {
+  string regex_pattern = 1;
+}
+
+message SetConstraint {
+  repeated string allowed_values = 1;
+}
+
+message CustomConstraint {
+  string validator_name = 1;
+  map<string, Value> parameters = 2;
+}
+
+// Type information with semantic analysis
+message TypeInfo {
+  DSLType expected_type = 1;
+  optional DSLType inferred_type = 2;
+  repeated TypeConstraint constraints = 3;
+  bool nullable = 4;
+}
+
+// Validation states and errors
+enum ValidationState {
+  VALIDATION_STATE_UNSPECIFIED = 0;
+  VALIDATION_STATE_PENDING = 1;
+  VALIDATION_STATE_VALID = 2;
+  VALIDATION_STATE_INVALID = 3;
+  VALIDATION_STATE_WARNING = 4;
+}
+
+enum ErrorSeverity {
+  ERROR_SEVERITY_UNSPECIFIED = 0;
+  ERROR_SEVERITY_INFO = 1;
+  ERROR_SEVERITY_WARNING = 2;
+  ERROR_SEVERITY_ERROR = 3;
+  ERROR_SEVERITY_FATAL = 4;
+}
+
+message ValidationError {
+  string code = 1;
+  string message = 2;
+  ErrorSeverity severity = 3;
+  optional SourceLocation location = 4;
+  map<string, string> context = 5;
+}
+
+message ValidationWarning {
+  string code = 1;
+  string message = 2;
+  optional SourceLocation location = 3;
+  map<string, string> context = 4;
+}
+
+// Database integration
+message DatabaseReference {
+  string table_name = 1;
+  string column_name = 2;
+  optional string database_name = 3;
+  optional string schema_name = 4;
+  DatabaseReferenceType reference_type = 5;
+}
+
+enum DatabaseReferenceType {
+  DATABASE_REFERENCE_TYPE_UNSPECIFIED = 0;
+  DATABASE_REFERENCE_TYPE_FOREIGN_KEY = 1;
+  DATABASE_REFERENCE_TYPE_LOOKUP = 2;
+  DATABASE_REFERENCE_TYPE_VALIDATION = 3;
+}
+
+// Semantic information
+message SemanticInfo {
+  SourceLocation source_location = 1;
+  TypeInfo type_info = 2;
+  ValidationState validation_state = 3;
+  repeated string dependencies = 4;
+  repeated DatabaseReference database_refs = 5;
+  repeated ValidationError validation_errors = 6;
+  repeated ValidationWarning validation_warnings = 7;
+}
+
+// AST Statement types
+message Statement {
+  oneof statement_type {
+    DeclareEntityStatement declare_entity = 1;
+    ObtainDocumentStatement obtain_document = 2;
+    CreateEdgeStatement create_edge = 3;
+    CalculateUboStatement calculate_ubo = 4;
+    CustomStatement custom = 5;
+  }
+  PropertyMap properties = 6;
+  optional SemanticInfo semantic_info = 7;
+}
+
+message DeclareEntityStatement {
+  string entity_id = 1;
+  string entity_type = 2;
+}
+
+message ObtainDocumentStatement {
+  string document_id = 1;
+  string document_type = 2;
+  optional string source = 3;
+}
+
+message CreateEdgeStatement {
+  string from_entity = 1;
+  string to_entity = 2;
+  string relationship_type = 3;
+}
+
+message CalculateUboStatement {
+  string entity_id = 1;
+  optional string algorithm = 2;
+  optional double threshold = 3;
+}
+
+message CustomStatement {
+  string verb = 1;
+  repeated Value arguments = 2;
+}
+
+// Workflow definition
+message Workflow {
+  string id = 1;
+  PropertyMap properties = 2;
+  repeated Statement statements = 3;
+  optional SemanticInfo semantic_info = 4;
+  google.protobuf.Timestamp created_at = 5;
+  optional google.protobuf.Timestamp updated_at = 6;
+}
+
+// Complete DSL program
+message Program {
+  repeated Workflow workflows = 1;
+  PropertyMap global_properties = 2;
+  repeated ValidationError global_errors = 3;
+  repeated ValidationWarning global_warnings = 4;
+  optional SemanticInfo semantic_info = 5;
+  google.protobuf.Timestamp parsed_at = 6;
+}
+
+// Configuration for DSL processing
+message DSLConfig {
+  bool strict_validation = 1;
+  uint32 max_depth = 2;
+  bool debug_mode = 3;
+  optional string grammar_file = 4;
+  map<string, string> custom_settings = 5;
+}
+
+// System information
+message SystemInfo {
+  string version = 1;
+  string package_name = 2;
+  string rust_version = 3;
+  string build_date = 4;
+  map<string, string> environment = 5;
+}

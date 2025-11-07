@@ -62,6 +62,15 @@ pub mod grammar;
 pub mod parser;
 pub mod vocabulary;
 
+// DSL Manager - core create/edit functionality
+pub mod dsl_manager;
+
+// gRPC protobuf modules - disabled due to compilation issues
+// pub mod proto;
+
+// gRPC service implementations - disabled due to compilation issues
+// pub mod grpc;
+
 // Re-export key types and functions for public API
 pub use ast::{Program, PropertyMap, Statement, Value, Workflow};
 pub use error::{
@@ -73,6 +82,9 @@ pub use parser::{
     parse_program, parse_value_standalone as parse_value,
     parse_workflow_standalone as parse_workflow, validate_ast,
 };
+
+// Re-export DSL manager functionality
+pub use dsl_manager::{DomainDsl, DslError as DslManagerError, DslManager, DslResult};
 
 /// Version information
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

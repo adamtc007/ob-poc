@@ -1,0 +1,660 @@
+syntax = "proto3";
+
+package ob_poc.ubo;
+
+import "dsl_types.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/ob-poc/proto/ubo";
+
+// UBO calculation and analysis service
+service UboService {
+  // Calculate UBO for a single entity
+  rpc CalculateUbo(CalculateUboRequest) returns (CalculateUboResponse);
+
+  // Calculate UBO for multiple entities in batch
+  rpc CalculateUboBatch(CalculateUboBatchRequest) returns (CalculateUboBatchResponse);
+
+  // Stream UBO calculations for large entity networks
+  rpc CalculateUboStream(stream CalculateUboStreamRequest) returns (stream CalculateUboStreamResponse);
+
+  // Get UBO calculation history for an entity
+  rpc GetUboHistory(GetUboHistoryRequest) returns (GetUboHistoryResponse);
+
+  // Analyze ownership structure without full UBO calculation
+  rpc AnalyzeOwnershipStructure(AnalyzeOwnershipRequest) returns (AnalyzeOwnershipResponse);
+
+  // Validate UBO calculation rules and thresholds
+  rpc ValidateUboRules(ValidateUboRulesRequest) returns (ValidateUboRulesResponse);
+
+  // Get UBO calculation metrics and performance stats
+  rpc GetUboMetrics(GetUboMetricsRequest) returns (GetUboMetricsResponse);
+
+  // Export UBO results to various formats
+  rpc ExportUboResults(ExportUboResultsRequest) returns (ExportUboResultsResponse);
+
+  // Trace UBO calculation path for debugging
+  rpc TraceUboCalculation(TraceUboCalculationRequest) returns (TraceUboCalculationResponse);
+
+  // Update UBO calculation algorithms
+  rpc UpdateUboAlgorithm(UpdateUboAlgorithmRequest) returns (UpdateUboAlgorithmResponse);
+}
+
+// Entity representation for UBO calculations
+message Entity {
+  string entity_id = 1;
+  EntityType entity_type = 2;
+  string name = 3;
+  map<string, ob_poc.dsl.Value> properties = 4;
+  repeated OwnershipRelation incoming_relations = 5;
+  repeated OwnershipRelation outgoing_relations = 6;
+  optional EntityMetadata metadata = 7;
+  google.protobuf.Timestamp created_at = 8;
+  optional google.protobuf.Timestamp updated_at = 9;
+}
+
+enum EntityType {
+  ENTITY_TYPE_UNSPECIFIED = 0;
+  ENTITY_TYPE_PERSON = 1;
+  ENTITY_TYPE_COMPANY = 2;
+  ENTITY_TYPE_TRUST = 3;
+  ENTITY_TYPE_FOUNDATION = 4;
+  ENTITY_TYPE_PARTNERSHIP = 5;
+  ENTITY_TYPE_GOVERNMENT = 6;
+  ENTITY_TYPE_OTHER = 7;
+}
+
+message EntityMetadata {
+  string jurisdiction = 1;
+  string registration_number = 2;
+  optional string tax_id = 3;
+  repeated string regulatory_identifiers = 4;
+  EntityStatus status = 5;
+  map<string, string> custom_fields = 6;
+}
+
+enum EntityStatus {
+  ENTITY_STATUS_UNSPECIFIED = 0;
+  ENTITY_STATUS_ACTIVE = 1;
+  ENTITY_STATUS_INACTIVE = 2;
+  ENTITY_STATUS_DISSOLVED = 3;
+  ENTITY_STATUS_SUSPENDED = 4;
+  ENTITY_STATUS_PENDING = 5;
+}
+
+// Ownership relationship between entities
+message OwnershipRelation {
+  string relation_id = 1;
+  string from_entity_id = 2;
+  string to_entity_id = 3;
+  RelationType relation_type = 4;
+  double ownership_percentage = 5;
+  double voting_percentage = 6;
+  ControlType control_type = 7;
+  bool is_direct = 8;
+  repeated string evidence_documents = 9;
+  google.protobuf.Timestamp effective_date = 10;
+  optional google.protobuf.Timestamp end_date = 11;
+  map<string, ob_poc.dsl.Value> properties = 12;
+}
+
+enum RelationType {
+  RELATION_TYPE_UNSPECIFIED = 0;
+  RELATION_TYPE_OWNERSHIP = 1;
+  RELATION_TYPE_CONTROL = 2;
+  RELATION_TYPE_BENEFICIAL_OWNERSHIP = 3;
+  RELATION_TYPE_MANAGEMENT = 4;
+  RELATION_TYPE_TRUSTEESHIP = 5;
+  RELATION_TYPE_NOMINEE = 6;
+}
+
+enum ControlType {
+  CONTROL_TYPE_UNSPECIFIED = 0;
+  CONTROL_TYPE_DIRECT = 1;
+  CONTROL_TYPE_INDIRECT = 2;
+  CONTROL_TYPE_JOINT = 3;
+  CONTROL_TYPE_ULTIMATE = 4;
+  CONTROL_TYPE_NONE = 5;
+}
+
+// UBO calculation configuration
+message UboCalculationConfig {
+  double ownership_threshold = 1; // Default 25%
+  double control_threshold = 2;   // Default 25%
+  uint32 max_calculation_depth = 3; // Default 10
+  UboAlgorithm algorithm = 4;
+  bool include_indirect_ownership = 5;
+  bool include_voting_rights = 6;
+  bool stop_at_listed_companies = 7;
+  repeated string excluded_jurisdictions = 8;
+  map<string, double> custom_thresholds = 9;
+}
+
+enum UboAlgorithm {
+  UBO_ALGORITHM_UNSPECIFIED = 0;
+  UBO_ALGORITHM_SIMPLE_THRESHOLD = 1;
+  UBO_ALGORITHM_WEIGHTED_OWNERSHIP = 2;
+  UBO_ALGORITHM_CONTROL_BASED = 3;
+  UBO_ALGORITHM_REGULATORY_COMPLIANT = 4;
+  UBO_ALGORITHM_CUSTOM = 5;
+}
+
+// Calculate UBO Request/Response
+message CalculateUboRequest {
+  string entity_id = 1;
+  UboCalculationConfig config = 2;
+  optional string calculation_context = 3;
+  bool include_calculation_path = 4;
+  repeated string additional_entity_ids = 5; // For network context
+}
+
+message CalculateUboResponse {
+  oneof result {
+    UboResult ubo_result = 1;
+    UboCalculationError error = 2;
+  }
+  UboCalculationMetrics metrics = 3;
+}
+
+message UboResult {
+  string entity_id = 1;
+  repeated UboPerson ubo_persons = 2;
+  OwnershipStructure ownership_structure = 3;
+  UboCalculationConfig config_used = 4;
+  google.protobuf.Timestamp calculated_at = 5;
+  string calculation_id = 6;
+  optional CalculationPath calculation_path = 7;
+  repeated UboWarning warnings = 8;
+}
+
+message UboPerson {
+  string person_id = 1;
+  string name = 2;
+  double total_ownership_percentage = 3;
+  double total_voting_percentage = 4;
+  repeated OwnershipPath ownership_paths = 5;
+  UboClassification classification = 6;
+  ControlMechanism control_mechanism = 7;
+  repeated string supporting_documents = 8;
+  map<string, ob_poc.dsl.Value> person_details = 9;
+}
+
+message OwnershipPath {
+  repeated PathSegment segments = 1;
+  double path_ownership_percentage = 2;
+  double path_voting_percentage = 3;
+  PathType path_type = 4;
+  uint32 path_length = 5;
+}
+
+message PathSegment {
+  string from_entity_id = 1;
+  string to_entity_id = 2;
+  double ownership_percentage = 3;
+  double voting_percentage = 4;
+  RelationType relation_type = 5;
+  string relation_id = 6;
+}
+
+enum PathType {
+  PATH_TYPE_UNSPECIFIED = 0;
+  PATH_TYPE_DIRECT = 1;
+  PATH_TYPE_INDIRECT = 2;
+  PATH_TYPE_COMPLEX_CHAIN = 3;
+  PATH_TYPE_CIRCULAR = 4;
+}
+
+enum UboClassification {
+  UBO_CLASSIFICATION_UNSPECIFIED = 0;
+  UBO_CLASSIFICATION_OWNERSHIP_BASED = 1;
+  UBO_CLASSIFICATION_CONTROL_BASED = 2;
+  UBO_CLASSIFICATION_COMBINED = 3;
+  UBO_CLASSIFICATION_REGULATORY = 4;
+}
+
+enum ControlMechanism {
+  CONTROL_MECHANISM_UNSPECIFIED = 0;
+  CONTROL_MECHANISM_OWNERSHIP_PERCENTAGE = 1;
+  CONTROL_MECHANISM_VOTING_RIGHTS = 2;
+  CONTROL_MECHANISM_BOARD_CONTROL = 3;
+  CONTROL_MECHANISM_MANAGEMENT_CONTROL = 4;
+  CONTROL_MECHANISM_CONTRACTUAL = 5;
+  CONTROL_MECHANISM_OTHER = 6;
+}
+
+message UboCalculationError {
+  string error_code = 1;
+  string error_message = 2;
+  ob_poc.dsl.ErrorSeverity severity = 3;
+  repeated string affected_entities = 4;
+  optional string recovery_suggestion = 5;
+}
+
+message UboWarning {
+  string warning_code = 1;
+  string warning_message = 2;
+  repeated string affected_entities = 3;
+  optional string recommendation = 4;
+}
+
+message OwnershipStructure {
+  string root_entity_id = 1;
+  repeated Entity entities = 2;
+  repeated OwnershipRelation relations = 3;
+  StructureMetrics metrics = 4;
+  repeated StructureAnomaly anomalies = 5;
+}
+
+message StructureMetrics {
+  uint32 total_entities = 1;
+  uint32 total_relations = 2;
+  uint32 max_ownership_depth = 3;
+  uint32 circular_references_count = 4;
+  double network_density = 5;
+  repeated string jurisdiction_distribution = 6;
+}
+
+message StructureAnomaly {
+  AnomalyType type = 1;
+  string description = 2;
+  repeated string affected_entities = 3;
+  ob_poc.dsl.ErrorSeverity severity = 4;
+}
+
+enum AnomalyType {
+  ANOMALY_TYPE_UNSPECIFIED = 0;
+  ANOMALY_TYPE_CIRCULAR_OWNERSHIP = 1;
+  ANOMALY_TYPE_ORPHANED_ENTITY = 2;
+  ANOMALY_TYPE_PERCENTAGE_MISMATCH = 3;
+  ANOMALY_TYPE_JURISDICTION_INCONSISTENCY = 4;
+  ANOMALY_TYPE_DATE_INCONSISTENCY = 5;
+}
+
+// Batch calculation
+message CalculateUboBatchRequest {
+  repeated string entity_ids = 1;
+  UboCalculationConfig config = 2;
+  optional string batch_context = 3;
+  bool parallel_processing = 4;
+}
+
+message CalculateUboBatchResponse {
+  repeated UboResult results = 1;
+  repeated UboCalculationError errors = 2;
+  BatchMetrics batch_metrics = 3;
+}
+
+message BatchMetrics {
+  uint32 total_entities = 1;
+  uint32 successful_calculations = 2;
+  uint32 failed_calculations = 3;
+  google.protobuf.Timestamp start_time = 4;
+  google.protobuf.Timestamp end_time = 5;
+  uint64 total_duration_microseconds = 6;
+}
+
+// Streaming calculation
+message CalculateUboStreamRequest {
+  oneof request_type {
+    StreamCalculationHeader header = 1;
+    StreamEntityBatch entity_batch = 2;
+    StreamCalculationFooter footer = 3;
+  }
+}
+
+message StreamCalculationHeader {
+  UboCalculationConfig config = 1;
+  uint32 expected_entity_count = 2;
+  optional string stream_context = 3;
+}
+
+message StreamEntityBatch {
+  repeated string entity_ids = 1;
+  uint32 batch_index = 2;
+}
+
+message StreamCalculationFooter {
+  string checksum = 1;
+}
+
+message CalculateUboStreamResponse {
+  oneof response_type {
+    StreamCalculationProgress progress = 1;
+    StreamUboResult result = 2;
+    StreamCalculationError error = 3;
+  }
+}
+
+message StreamCalculationProgress {
+  uint32 entities_processed = 1;
+  uint32 total_entities = 2;
+  float completion_percentage = 3;
+}
+
+message StreamUboResult {
+  UboResult result = 1;
+  uint32 result_index = 2;
+}
+
+message StreamCalculationError {
+  UboCalculationError error = 1;
+  uint32 error_index = 2;
+  bool is_recoverable = 3;
+}
+
+// UBO History
+message GetUboHistoryRequest {
+  string entity_id = 1;
+  optional google.protobuf.Timestamp from_date = 2;
+  optional google.protobuf.Timestamp to_date = 3;
+  uint32 limit = 4;
+}
+
+message GetUboHistoryResponse {
+  repeated UboHistoryEntry entries = 1;
+  uint32 total_count = 2;
+  string next_page_token = 3;
+}
+
+message UboHistoryEntry {
+  string calculation_id = 1;
+  google.protobuf.Timestamp calculated_at = 2;
+  UboResult result = 3;
+  UboCalculationConfig config_used = 4;
+  string triggered_by = 5;
+  repeated UboChange changes = 6;
+}
+
+message UboChange {
+  ChangeType change_type = 1;
+  string description = 2;
+  optional UboPerson previous_value = 3;
+  optional UboPerson new_value = 4;
+}
+
+enum ChangeType {
+  CHANGE_TYPE_UNSPECIFIED = 0;
+  CHANGE_TYPE_NEW_UBO = 1;
+  CHANGE_TYPE_REMOVED_UBO = 2;
+  CHANGE_TYPE_PERCENTAGE_CHANGE = 3;
+  CHANGE_TYPE_PATH_CHANGE = 4;
+  CHANGE_TYPE_CLASSIFICATION_CHANGE = 5;
+}
+
+// Ownership Structure Analysis
+message AnalyzeOwnershipRequest {
+  string entity_id = 1;
+  AnalysisConfig analysis_config = 2;
+}
+
+message AnalysisConfig {
+  bool include_risk_assessment = 1;
+  bool include_complexity_analysis = 2;
+  bool include_jurisdiction_analysis = 3;
+  uint32 analysis_depth = 4;
+}
+
+message AnalyzeOwnershipResponse {
+  OwnershipAnalysis analysis = 1;
+  AnalysisMetrics metrics = 2;
+}
+
+message OwnershipAnalysis {
+  string entity_id = 1;
+  ComplexityAssessment complexity = 2;
+  RiskAssessment risk = 3;
+  JurisdictionAnalysis jurisdiction = 4;
+  repeated AnalysisInsight insights = 5;
+}
+
+message ComplexityAssessment {
+  ComplexityLevel level = 1;
+  uint32 structure_depth = 2;
+  uint32 entity_count = 3;
+  uint32 relation_count = 4;
+  double complexity_score = 5;
+}
+
+enum ComplexityLevel {
+  COMPLEXITY_LEVEL_UNSPECIFIED = 0;
+  COMPLEXITY_LEVEL_SIMPLE = 1;
+  COMPLEXITY_LEVEL_MODERATE = 2;
+  COMPLEXITY_LEVEL_COMPLEX = 3;
+  COMPLEXITY_LEVEL_HIGH = 4;
+}
+
+message RiskAssessment {
+  RiskLevel overall_risk = 1;
+  repeated RiskFactor risk_factors = 2;
+  double risk_score = 3;
+}
+
+enum RiskLevel {
+  RISK_LEVEL_UNSPECIFIED = 0;
+  RISK_LEVEL_LOW = 1;
+  RISK_LEVEL_MEDIUM = 2;
+  RISK_LEVEL_HIGH = 3;
+  RISK_LEVEL_CRITICAL = 4;
+}
+
+message RiskFactor {
+  string factor_name = 1;
+  string description = 2;
+  double weight = 3;
+  RiskLevel level = 4;
+}
+
+message JurisdictionAnalysis {
+  repeated JurisdictionInfo jurisdictions = 1;
+  repeated JurisdictionRisk jurisdiction_risks = 2;
+}
+
+message JurisdictionInfo {
+  string jurisdiction_code = 1;
+  string jurisdiction_name = 2;
+  uint32 entity_count = 3;
+  double ownership_percentage = 4;
+}
+
+message JurisdictionRisk {
+  string jurisdiction_code = 1;
+  RiskLevel risk_level = 2;
+  repeated string risk_reasons = 3;
+}
+
+message AnalysisInsight {
+  string insight_type = 1;
+  string title = 2;
+  string description = 3;
+  ob_poc.dsl.ErrorSeverity importance = 4;
+  repeated string recommendations = 5;
+}
+
+message AnalysisMetrics {
+  google.protobuf.Timestamp analysis_duration = 1;
+  uint32 entities_analyzed = 2;
+  uint32 relations_analyzed = 3;
+}
+
+// Validation of UBO rules
+message ValidateUboRulesRequest {
+  UboCalculationConfig config = 1;
+  optional string jurisdiction = 2;
+}
+
+message ValidateUboRulesResponse {
+  bool is_valid = 1;
+  repeated RuleValidationResult validation_results = 2;
+}
+
+message RuleValidationResult {
+  string rule_name = 1;
+  bool is_valid = 2;
+  optional string error_message = 3;
+  repeated string recommendations = 4;
+}
+
+// UBO metrics
+message GetUboMetricsRequest {
+  optional string time_period = 1; // "1h", "24h", "7d", "30d"
+  repeated string entity_ids = 2;
+}
+
+message GetUboMetricsResponse {
+  UboServiceMetrics metrics = 1;
+  google.protobuf.Timestamp collected_at = 2;
+}
+
+message UboServiceMetrics {
+  uint64 total_calculations = 1;
+  uint64 successful_calculations = 2;
+  uint64 failed_calculations = 3;
+  double average_calculation_time_ms = 4;
+  double p95_calculation_time_ms = 5;
+  uint32 active_calculations = 6;
+  repeated AlgorithmMetrics algorithm_metrics = 7;
+}
+
+message AlgorithmMetrics {
+  UboAlgorithm algorithm = 1;
+  uint64 usage_count = 2;
+  double average_duration_ms = 3;
+  double success_rate = 4;
+}
+
+// Export UBO results
+message ExportUboResultsRequest {
+  repeated string calculation_ids = 1;
+  ExportFormat format = 2;
+  ExportOptions options = 3;
+}
+
+enum ExportFormat {
+  EXPORT_FORMAT_UNSPECIFIED = 0;
+  EXPORT_FORMAT_JSON = 1;
+  EXPORT_FORMAT_XML = 2;
+  EXPORT_FORMAT_CSV = 3;
+  EXPORT_FORMAT_PDF = 4;
+  EXPORT_FORMAT_XLSX = 5;
+}
+
+message ExportOptions {
+  bool include_calculation_paths = 1;
+  bool include_supporting_documents = 2;
+  bool include_historical_data = 3;
+  optional string template_name = 4;
+}
+
+message ExportUboResultsResponse {
+  oneof result {
+    bytes exported_data = 1;
+    string error_message = 2;
+  }
+  ExportFormat format = 3;
+  uint32 records_exported = 4;
+}
+
+// Trace calculation path
+message TraceUboCalculationRequest {
+  string calculation_id = 1;
+  optional string entity_id = 2;
+  bool include_intermediate_steps = 3;
+}
+
+message TraceUboCalculationResponse {
+  CalculationTrace trace = 1;
+}
+
+message CalculationTrace {
+  string calculation_id = 1;
+  repeated CalculationStep steps = 2;
+  CalculationSummary summary = 3;
+}
+
+message CalculationStep {
+  uint32 step_number = 1;
+  string step_type = 2;
+  string description = 3;
+  repeated string input_entities = 4;
+  repeated string output_entities = 5;
+  google.protobuf.Timestamp timestamp = 6;
+  uint64 duration_microseconds = 7;
+  map<string, ob_poc.dsl.Value> step_data = 8;
+}
+
+message CalculationSummary {
+  google.protobuf.Timestamp start_time = 1;
+  google.protobuf.Timestamp end_time = 2;
+  uint32 total_steps = 3;
+  uint32 entities_processed = 4;
+  UboAlgorithm algorithm_used = 5;
+}
+
+// Update UBO algorithm
+message UpdateUboAlgorithmRequest {
+  string algorithm_name = 1;
+  AlgorithmDefinition definition = 2;
+}
+
+message AlgorithmDefinition {
+  string name = 1;
+  string description = 2;
+  string implementation_code = 3;
+  repeated AlgorithmParameter parameters = 4;
+  AlgorithmMetadata metadata = 5;
+}
+
+message AlgorithmParameter {
+  string name = 1;
+  string type = 2;
+  ob_poc.dsl.Value default_value = 3;
+  bool is_required = 4;
+  optional string description = 5;
+}
+
+message AlgorithmMetadata {
+  string version = 1;
+  string author = 2;
+  google.protobuf.Timestamp created_at = 3;
+  repeated string supported_jurisdictions = 4;
+}
+
+message UpdateUboAlgorithmResponse {
+  bool success = 1;
+  optional string error_message = 2;
+  optional string previous_version = 3;
+}
+
+// Shared metrics
+message UboCalculationMetrics {
+  google.protobuf.Timestamp start_time = 1;
+  google.protobuf.Timestamp end_time = 2;
+  uint64 duration_microseconds = 3;
+  uint32 entities_processed = 4;
+  uint32 relations_analyzed = 5;
+  uint32 calculation_depth_reached = 6;
+  uint64 memory_used_bytes = 7;
+  uint32 cache_hits = 8;
+  uint32 cache_misses = 9;
+}
+
+// Calculation path for detailed tracing
+message CalculationPath {
+  repeated CalculationNode nodes = 1;
+  repeated CalculationEdge edges = 2;
+}
+
+message CalculationNode {
+  string entity_id = 1;
+  EntityType entity_type = 2;
+  double cumulative_ownership = 3;
+  uint32 depth_level = 4;
+  bool is_ubo = 5;
+}
+
+message CalculationEdge {
+  string from_entity_id = 1;
+  string to_entity_id = 2;
+  double ownership_percentage = 3;
+  RelationType relation_type = 4;
+}

@@ -1,0 +1,661 @@
+syntax = "proto3";
+
+package ob_poc.vocabulary;
+
+import "dsl_types.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/ob-poc/proto/vocabulary";
+
+// Vocabulary management service for domain-specific verb handling
+service VocabularyService {
+  // Register a new verb in a domain
+  rpc RegisterVerb(RegisterVerbRequest) returns (RegisterVerbResponse);
+
+  // Update an existing verb definition
+  rpc UpdateVerb(UpdateVerbRequest) returns (UpdateVerbResponse);
+
+  // Remove a verb from a domain
+  rpc RemoveVerb(RemoveVerbRequest) returns (RemoveVerbResponse);
+
+  // Get verb definition and metadata
+  rpc GetVerb(GetVerbRequest) returns (GetVerbResponse);
+
+  // List verbs in a domain with filtering
+  rpc ListVerbs(ListVerbsRequest) returns (ListVerbsResponse);
+
+  // Search verbs across domains
+  rpc SearchVerbs(SearchVerbsRequest) returns (SearchVerbsResponse);
+
+  // Validate verb usage in context
+  rpc ValidateVerbUsage(ValidateVerbUsageRequest) returns (ValidateVerbUsageResponse);
+
+  // Register a new domain
+  rpc RegisterDomain(RegisterDomainRequest) returns (RegisterDomainResponse);
+
+  // List available domains
+  rpc ListDomains(ListDomainsRequest) returns (ListDomainsResponse);
+
+  // Get domain information and statistics
+  rpc GetDomainInfo(GetDomainInfoRequest) returns (GetDomainInfoResponse);
+
+  // Migrate verbs between domains
+  rpc MigrateVerbs(MigrateVerbsRequest) returns (MigrateVerbsResponse);
+
+  // Export vocabulary to various formats
+  rpc ExportVocabulary(ExportVocabularyRequest) returns (ExportVocabularyResponse);
+
+  // Import vocabulary from external sources
+  rpc ImportVocabulary(ImportVocabularyRequest) returns (ImportVocabularyResponse);
+
+  // Get vocabulary usage statistics
+  rpc GetVocabularyStats(GetVocabularyStatsRequest) returns (GetVocabularyStatsResponse);
+
+  // Validate vocabulary consistency
+  rpc ValidateVocabularyConsistency(ValidateVocabularyConsistencyRequest) returns (ValidateVocabularyConsistencyResponse);
+}
+
+// Verb definition with full metadata
+message VerbDefinition {
+  string verb_name = 1;
+  string domain = 2;
+  string description = 3;
+  VerbSignature signature = 4;
+  VerbCategory category = 5;
+  repeated string aliases = 6;
+  repeated string tags = 7;
+  VerbMetadata metadata = 8;
+  repeated VerbExample examples = 9;
+  VerbValidation validation = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+}
+
+message VerbSignature {
+  repeated Parameter parameters = 1;
+  optional ob_poc.dsl.DSLType return_type = 2;
+  bool is_variadic = 3;
+  uint32 min_parameters = 4;
+  uint32 max_parameters = 5;
+}
+
+message Parameter {
+  string name = 1;
+  ob_poc.dsl.DSLType type = 2;
+  bool is_required = 3;
+  optional ob_poc.dsl.Value default_value = 4;
+  string description = 5;
+  repeated ob_poc.dsl.TypeConstraint constraints = 6;
+}
+
+enum VerbCategory {
+  VERB_CATEGORY_UNSPECIFIED = 0;
+  VERB_CATEGORY_ENTITY_MANAGEMENT = 1;
+  VERB_CATEGORY_RELATIONSHIP = 2;
+  VERB_CATEGORY_CALCULATION = 3;
+  VERB_CATEGORY_VALIDATION = 4;
+  VERB_CATEGORY_WORKFLOW_CONTROL = 5;
+  VERB_CATEGORY_DATA_MANIPULATION = 6;
+  VERB_CATEGORY_REPORTING = 7;
+  VERB_CATEGORY_INTEGRATION = 8;
+  VERB_CATEGORY_CUSTOM = 9;
+}
+
+message VerbMetadata {
+  string version = 1;
+  string author = 2;
+  string documentation_url = 3;
+  VerbStatus status = 4;
+  DeprecationInfo deprecation = 5;
+  repeated string dependencies = 6;
+  map<string, string> custom_attributes = 7;
+}
+
+enum VerbStatus {
+  VERB_STATUS_UNSPECIFIED = 0;
+  VERB_STATUS_ACTIVE = 1;
+  VERB_STATUS_DEPRECATED = 2;
+  VERB_STATUS_EXPERIMENTAL = 3;
+  VERB_STATUS_INTERNAL = 4;
+}
+
+message DeprecationInfo {
+  string reason = 1;
+  google.protobuf.Timestamp deprecated_since = 2;
+  optional google.protobuf.Timestamp removal_date = 3;
+  optional string replacement_verb = 4;
+  string migration_guide = 5;
+}
+
+message VerbExample {
+  string title = 1;
+  string description = 2;
+  string usage_example = 3;
+  string expected_result = 4;
+  map<string, string> context = 5;
+}
+
+message VerbValidation {
+  repeated ValidationRule rules = 1;
+  repeated string preconditions = 2;
+  repeated string postconditions = 3;
+}
+
+message ValidationRule {
+  string rule_name = 1;
+  string description = 2;
+  string validation_expression = 3;
+  string error_message = 4;
+  ob_poc.dsl.ErrorSeverity severity = 5;
+}
+
+// Domain definition and management
+message DomainDefinition {
+  string domain_name = 1;
+  string description = 2;
+  string namespace = 3;
+  DomainMetadata metadata = 4;
+  repeated string verb_names = 5;
+  DomainPolicy policy = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message DomainMetadata {
+  string version = 1;
+  string owner = 2;
+  repeated string maintainers = 3;
+  string documentation_url = 4;
+  DomainStatus status = 5;
+  map<string, string> custom_attributes = 6;
+}
+
+enum DomainStatus {
+  DOMAIN_STATUS_UNSPECIFIED = 0;
+  DOMAIN_STATUS_ACTIVE = 1;
+  DOMAIN_STATUS_DEPRECATED = 2;
+  DOMAIN_STATUS_EXPERIMENTAL = 3;
+  DOMAIN_STATUS_ARCHIVED = 4;
+}
+
+message DomainPolicy {
+  VerbNamingPolicy naming_policy = 1;
+  bool allow_verb_overrides = 2;
+  bool require_documentation = 3;
+  repeated string required_tags = 4;
+  DeprecationPolicy deprecation_policy = 5;
+}
+
+message VerbNamingPolicy {
+  string pattern_regex = 1;
+  repeated string reserved_prefixes = 2;
+  repeated string forbidden_names = 3;
+  bool enforce_domain_prefix = 4;
+}
+
+message DeprecationPolicy {
+  uint32 min_deprecation_days = 1;
+  bool require_replacement = 2;
+  bool require_migration_guide = 3;
+  repeated string notification_channels = 4;
+}
+
+// Register Verb Request/Response
+message RegisterVerbRequest {
+  VerbDefinition verb = 1;
+  RegisterOptions options = 2;
+}
+
+message RegisterOptions {
+  bool validate_before_register = 1;
+  bool overwrite_existing = 2;
+  bool skip_domain_validation = 3;
+}
+
+message RegisterVerbResponse {
+  bool success = 1;
+  optional string error_message = 2;
+  optional VerbConflict conflict = 3;
+  VerbRegistrationStats stats = 4;
+}
+
+message VerbConflict {
+  string conflicting_verb = 1;
+  string existing_domain = 2;
+  ConflictResolution suggested_resolution = 3;
+}
+
+enum ConflictResolution {
+  CONFLICT_RESOLUTION_UNSPECIFIED = 0;
+  CONFLICT_RESOLUTION_USE_NAMESPACE = 1;
+  CONFLICT_RESOLUTION_RENAME_VERB = 2;
+  CONFLICT_RESOLUTION_OVERRIDE = 3;
+  CONFLICT_RESOLUTION_MERGE = 4;
+}
+
+message VerbRegistrationStats {
+  google.protobuf.Timestamp registration_time = 1;
+  string registered_by = 2;
+  string registration_id = 3;
+}
+
+// Update Verb Request/Response
+message UpdateVerbRequest {
+  string verb_name = 1;
+  string domain = 2;
+  VerbDefinition updated_verb = 3;
+  UpdateOptions options = 4;
+}
+
+message UpdateOptions {
+  bool validate_before_update = 1;
+  bool create_backup = 2;
+  bool notify_dependents = 3;
+  VersioningStrategy versioning = 4;
+}
+
+enum VersioningStrategy {
+  VERSIONING_STRATEGY_UNSPECIFIED = 0;
+  VERSIONING_STRATEGY_PATCH = 1;
+  VERSIONING_STRATEGY_MINOR = 2;
+  VERSIONING_STRATEGY_MAJOR = 3;
+  VERSIONING_STRATEGY_CUSTOM = 4;
+}
+
+message UpdateVerbResponse {
+  bool success = 1;
+  optional string error_message = 2;
+  optional string backup_id = 3;
+  string previous_version = 4;
+  string new_version = 5;
+  repeated string affected_dependents = 6;
+}
+
+// Remove Verb Request/Response
+message RemoveVerbRequest {
+  string verb_name = 1;
+  string domain = 2;
+  RemovalOptions options = 3;
+}
+
+message RemovalOptions {
+  bool force_removal = 1;
+  bool check_dependencies = 2;
+  bool create_backup = 3;
+  optional google.protobuf.Timestamp scheduled_removal = 4;
+}
+
+message RemoveVerbResponse {
+  bool success = 1;
+  optional string error_message = 2;
+  repeated string blocking_dependencies = 3;
+  optional string backup_id = 4;
+}
+
+// Get Verb Request/Response
+message GetVerbRequest {
+  string verb_name = 1;
+  optional string domain = 2;
+  bool include_examples = 3;
+  bool include_dependencies = 4;
+  optional string version = 5;
+}
+
+message GetVerbResponse {
+  oneof result {
+    VerbDefinition verb = 1;
+    string error_message = 2;
+  }
+  repeated VerbDefinition related_verbs = 3;
+  VerbUsageStats usage_stats = 4;
+}
+
+message VerbUsageStats {
+  uint64 total_usage_count = 1;
+  uint64 recent_usage_count = 2;
+  google.protobuf.Timestamp last_used = 3;
+  repeated UsageContext usage_contexts = 4;
+}
+
+message UsageContext {
+  string context_name = 1;
+  uint64 usage_count = 2;
+  google.protobuf.Timestamp last_used = 3;
+}
+
+// List Verbs Request/Response
+message ListVerbsRequest {
+  optional string domain = 1;
+  VerbFilter filter = 2;
+  SortOptions sort = 3;
+  PaginationOptions pagination = 4;
+}
+
+message VerbFilter {
+  repeated VerbCategory categories = 1;
+  repeated VerbStatus statuses = 2;
+  repeated string tags = 3;
+  optional string name_pattern = 4;
+  optional google.protobuf.Timestamp created_after = 5;
+  optional google.protobuf.Timestamp updated_after = 6;
+}
+
+message SortOptions {
+  SortField sort_by = 1;
+  SortOrder order = 2;
+}
+
+enum SortField {
+  SORT_FIELD_UNSPECIFIED = 0;
+  SORT_FIELD_NAME = 1;
+  SORT_FIELD_DOMAIN = 2;
+  SORT_FIELD_CREATED_AT = 3;
+  SORT_FIELD_UPDATED_AT = 4;
+  SORT_FIELD_USAGE_COUNT = 5;
+}
+
+enum SortOrder {
+  SORT_ORDER_UNSPECIFIED = 0;
+  SORT_ORDER_ASC = 1;
+  SORT_ORDER_DESC = 2;
+}
+
+message PaginationOptions {
+  uint32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListVerbsResponse {
+  repeated VerbDefinition verbs = 1;
+  string next_page_token = 2;
+  uint32 total_count = 3;
+  ListingStats stats = 4;
+}
+
+message ListingStats {
+  uint32 active_verbs = 1;
+  uint32 deprecated_verbs = 2;
+  uint32 experimental_verbs = 3;
+  map<string, uint32> category_counts = 4;
+}
+
+// Search Verbs Request/Response
+message SearchVerbsRequest {
+  string query = 1;
+  SearchOptions options = 2;
+  repeated string domains = 3;
+  uint32 max_results = 4;
+}
+
+message SearchOptions {
+  bool fuzzy_matching = 1;
+  bool include_aliases = 2;
+  bool include_descriptions = 3;
+  bool include_examples = 4;
+  float similarity_threshold = 5;
+}
+
+message SearchVerbsResponse {
+  repeated SearchResult results = 1;
+  SearchStats search_stats = 2;
+}
+
+message SearchResult {
+  VerbDefinition verb = 1;
+  float relevance_score = 2;
+  repeated string matched_fields = 3;
+  string match_explanation = 4;
+}
+
+message SearchStats {
+  uint32 total_results = 1;
+  google.protobuf.Timestamp search_duration = 2;
+  repeated string searched_domains = 3;
+}
+
+// Validate Verb Usage Request/Response
+message ValidateVerbUsageRequest {
+  string verb_name = 1;
+  string domain = 2;
+  repeated ob_poc.dsl.Value arguments = 3;
+  UsageContext usage_context = 4;
+}
+
+message ValidateVerbUsageResponse {
+  bool is_valid = 1;
+  repeated ob_poc.dsl.ValidationError errors = 2;
+  repeated ob_poc.dsl.ValidationWarning warnings = 3;
+  repeated string suggestions = 4;
+}
+
+// Register Domain Request/Response
+message RegisterDomainRequest {
+  DomainDefinition domain = 1;
+}
+
+message RegisterDomainResponse {
+  bool success = 1;
+  optional string error_message = 2;
+}
+
+// List Domains Request/Response
+message ListDomainsRequest {
+  DomainFilter filter = 1;
+  SortOptions sort = 2;
+  PaginationOptions pagination = 3;
+}
+
+message DomainFilter {
+  repeated DomainStatus statuses = 1;
+  optional string name_pattern = 2;
+  optional string owner = 3;
+}
+
+message ListDomainsResponse {
+  repeated DomainDefinition domains = 1;
+  string next_page_token = 2;
+  uint32 total_count = 3;
+}
+
+// Get Domain Info Request/Response
+message GetDomainInfoRequest {
+  string domain_name = 1;
+  bool include_verb_list = 2;
+  bool include_stats = 3;
+}
+
+message GetDomainInfoResponse {
+  oneof result {
+    DomainInfo info = 1;
+    string error_message = 2;
+  }
+}
+
+message DomainInfo {
+  DomainDefinition domain = 1;
+  DomainStats stats = 2;
+  repeated string recent_verbs = 3;
+}
+
+message DomainStats {
+  uint32 total_verbs = 1;
+  uint32 active_verbs = 2;
+  uint32 deprecated_verbs = 3;
+  google.protobuf.Timestamp last_activity = 4;
+  uint64 total_usage = 5;
+}
+
+// Migrate Verbs Request/Response
+message MigrateVerbsRequest {
+  string source_domain = 1;
+  string target_domain = 2;
+  repeated string verb_names = 3;
+  MigrationOptions options = 4;
+}
+
+message MigrationOptions {
+  bool preserve_source = 1;
+  bool update_references = 2;
+  bool validate_target_domain = 3;
+  ConflictResolution conflict_resolution = 4;
+}
+
+message MigrateVerbsResponse {
+  uint32 migrated_count = 1;
+  repeated MigrationResult results = 2;
+  repeated string migration_warnings = 3;
+}
+
+message MigrationResult {
+  string verb_name = 1;
+  bool success = 2;
+  optional string error_message = 3;
+  optional string new_name = 4;
+}
+
+// Export/Import Vocabulary
+message ExportVocabularyRequest {
+  repeated string domains = 1;
+  ExportFormat format = 2;
+  ExportOptions options = 3;
+}
+
+enum ExportFormat {
+  EXPORT_FORMAT_UNSPECIFIED = 0;
+  EXPORT_FORMAT_JSON = 1;
+  EXPORT_FORMAT_YAML = 2;
+  EXPORT_FORMAT_XML = 3;
+  EXPORT_FORMAT_PROTOBUF = 4;
+  EXPORT_FORMAT_OPENAPI = 5;
+}
+
+message ExportOptions {
+  bool include_examples = 1;
+  bool include_metadata = 2;
+  bool include_deprecated = 3;
+  bool minify_output = 4;
+}
+
+message ExportVocabularyResponse {
+  oneof result {
+    bytes exported_data = 1;
+    string error_message = 2;
+  }
+  ExportFormat format = 3;
+  ExportStats stats = 4;
+}
+
+message ExportStats {
+  uint32 domains_exported = 1;
+  uint32 verbs_exported = 2;
+  uint32 file_size_bytes = 3;
+}
+
+message ImportVocabularyRequest {
+  bytes vocabulary_data = 1;
+  ExportFormat format = 2;
+  ImportOptions options = 3;
+}
+
+message ImportOptions {
+  bool validate_before_import = 1;
+  bool overwrite_existing = 2;
+  bool skip_deprecated = 3;
+  ConflictResolution conflict_resolution = 4;
+}
+
+message ImportVocabularyResponse {
+  bool success = 1;
+  repeated string error_messages = 2;
+  ImportStats stats = 3;
+}
+
+message ImportStats {
+  uint32 domains_imported = 1;
+  uint32 verbs_imported = 2;
+  uint32 conflicts_resolved = 3;
+  uint32 errors_encountered = 4;
+}
+
+// Vocabulary Statistics
+message GetVocabularyStatsRequest {
+  optional string time_period = 1; // "1h", "24h", "7d", "30d"
+  repeated string domains = 2;
+}
+
+message GetVocabularyStatsResponse {
+  VocabularyStats stats = 1;
+  google.protobuf.Timestamp collected_at = 2;
+}
+
+message VocabularyStats {
+  uint32 total_domains = 1;
+  uint32 total_verbs = 2;
+  uint64 total_usage = 3;
+  repeated TopVerb top_verbs = 4;
+  repeated DomainUsage domain_usage = 5;
+  CategoryBreakdown category_breakdown = 6;
+}
+
+message TopVerb {
+  string verb_name = 1;
+  string domain = 2;
+  uint64 usage_count = 3;
+  float usage_percentage = 4;
+}
+
+message DomainUsage {
+  string domain_name = 1;
+  uint32 verb_count = 2;
+  uint64 total_usage = 3;
+  float usage_percentage = 4;
+}
+
+message CategoryBreakdown {
+  map<string, uint32> category_counts = 1;
+  map<string, uint64> category_usage = 2;
+}
+
+// Consistency Validation
+message ValidateVocabularyConsistencyRequest {
+  repeated string domains = 1;
+  ConsistencyCheckOptions options = 2;
+}
+
+message ConsistencyCheckOptions {
+  bool check_naming_conventions = 1;
+  bool check_dependencies = 2;
+  bool check_duplicates = 3;
+  bool check_circular_references = 4;
+}
+
+message ValidateVocabularyConsistencyResponse {
+  bool is_consistent = 1;
+  repeated ConsistencyIssue issues = 2;
+  ConsistencyStats stats = 3;
+}
+
+message ConsistencyIssue {
+  IssueType type = 1;
+  ob_poc.dsl.ErrorSeverity severity = 2;
+  string description = 3;
+  repeated string affected_items = 4;
+  repeated string recommendations = 5;
+}
+
+enum IssueType {
+  ISSUE_TYPE_UNSPECIFIED = 0;
+  ISSUE_TYPE_NAMING_VIOLATION = 1;
+  ISSUE_TYPE_DUPLICATE_VERB = 2;
+  ISSUE_TYPE_MISSING_DEPENDENCY = 3;
+  ISSUE_TYPE_CIRCULAR_REFERENCE = 4;
+  ISSUE_TYPE_DEPRECATED_USAGE = 5;
+}
+
+message ConsistencyStats {
+  uint32 total_checks = 1;
+  uint32 passed_checks = 2;
+  uint32 failed_checks = 3;
+  uint32 warnings = 4;
+  google.protobuf.Timestamp check_duration = 5;
+}

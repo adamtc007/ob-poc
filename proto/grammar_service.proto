@@ -1,0 +1,347 @@
+syntax = "proto3";
+
+package ob_poc.grammar;
+
+import "dsl_types.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/ob-poc/proto/grammar";
+
+// Grammar service for EBNF parsing and validation
+service GrammarService {
+  // Parse EBNF grammar from source text
+  rpc ParseGrammar(ParseGrammarRequest) returns (ParseGrammarResponse);
+
+  // Validate a parsed grammar for consistency
+  rpc ValidateGrammar(ValidateGrammarRequest) returns (ValidateGrammarResponse);
+
+  // Load grammar into the engine by name
+  rpc LoadGrammar(LoadGrammarRequest) returns (LoadGrammarResponse);
+
+  // Get information about a loaded grammar
+  rpc GetGrammarInfo(GetGrammarInfoRequest) returns (GetGrammarInfoResponse);
+
+  // List all loaded grammars
+  rpc ListGrammars(ListGrammarsRequest) returns (ListGrammarsResponse);
+
+  // Set active grammar for parsing
+  rpc SetActiveGrammar(SetActiveGrammarRequest) returns (SetActiveGrammarResponse);
+
+  // Get grammar summary statistics
+  rpc GetGrammarSummary(GetGrammarSummaryRequest) returns (GetGrammarSummaryResponse);
+
+  // Export grammar to different formats
+  rpc ExportGrammar(ExportGrammarRequest) returns (ExportGrammarResponse);
+
+  // Analyze grammar for potential issues
+  rpc AnalyzeGrammar(AnalyzeGrammarRequest) returns (AnalyzeGrammarResponse);
+}
+
+// EBNF Grammar representation
+message EBNFGrammar {
+  map<string, EBNFRule> rules = 1;
+  optional string start_rule = 2;
+  google.protobuf.Timestamp created_at = 3;
+  optional google.protobuf.Timestamp updated_at = 4;
+  map<string, string> metadata = 5;
+}
+
+// Individual EBNF rule
+message EBNFRule {
+  string name = 1;
+  EBNFExpression expression = 2;
+  optional string comment = 3;
+  ob_poc.dsl.SourceLocation location = 4;
+}
+
+// EBNF expression types - recursive structure
+message EBNFExpression {
+  oneof expression_type {
+    TerminalExpression terminal = 1;
+    NonTerminalExpression non_terminal = 2;
+    CharacterClassExpression character_class = 3;
+    CharacterRangeExpression character_range = 4;
+    SequenceExpression sequence = 5;
+    ChoiceExpression choice = 6;
+    OptionalExpression optional = 7;
+    ZeroOrMoreExpression zero_or_more = 8;
+    OneOrMoreExpression one_or_more = 9;
+    GroupExpression group = 10;
+  }
+}
+
+message TerminalExpression {
+  string value = 1;
+}
+
+message NonTerminalExpression {
+  string name = 1;
+}
+
+message CharacterClassExpression {
+  string pattern = 1;
+}
+
+message CharacterRangeExpression {
+  string start_char = 1;
+  string end_char = 2;
+}
+
+message SequenceExpression {
+  repeated EBNFExpression expressions = 1;
+}
+
+message ChoiceExpression {
+  repeated EBNFExpression alternatives = 1;
+}
+
+message OptionalExpression {
+  EBNFExpression expression = 1;
+}
+
+message ZeroOrMoreExpression {
+  EBNFExpression expression = 1;
+}
+
+message OneOrMoreExpression {
+  EBNFExpression expression = 1;
+}
+
+message GroupExpression {
+  EBNFExpression expression = 1;
+}
+
+// Parse Grammar Request/Response
+message ParseGrammarRequest {
+  string source = 1;
+  optional string name = 2;
+  ParseOptions options = 3;
+}
+
+message ParseOptions {
+  bool strict_mode = 1;
+  bool enable_comments = 2;
+  uint32 max_recursion_depth = 3;
+}
+
+message ParseGrammarResponse {
+  oneof result {
+    EBNFGrammar grammar = 1;
+    ParseError error = 2;
+  }
+  repeated ob_poc.dsl.ValidationWarning warnings = 3;
+  ParseStats stats = 4;
+}
+
+message ParseError {
+  string message = 1;
+  ob_poc.dsl.SourceLocation location = 2;
+  string error_code = 3;
+  repeated string suggestions = 4;
+}
+
+message ParseStats {
+  uint32 rules_parsed = 1;
+  uint32 expressions_parsed = 2;
+  google.protobuf.Timestamp parse_duration = 3;
+  uint32 lines_processed = 4;
+}
+
+// Validate Grammar Request/Response
+message ValidateGrammarRequest {
+  oneof grammar_source {
+    string grammar_name = 1;
+    EBNFGrammar grammar = 2;
+  }
+  ValidationOptions options = 3;
+}
+
+message ValidationOptions {
+  bool check_undefined_references = 1;
+  bool check_unreachable_rules = 2;
+  bool check_left_recursion = 3;
+  bool check_ambiguity = 4;
+}
+
+message ValidateGrammarResponse {
+  bool is_valid = 1;
+  repeated ob_poc.dsl.ValidationError errors = 2;
+  repeated ob_poc.dsl.ValidationWarning warnings = 3;
+  ValidationStats stats = 4;
+}
+
+message ValidationStats {
+  uint32 rules_checked = 1;
+  uint32 references_resolved = 2;
+  uint32 circular_dependencies_found = 3;
+}
+
+// Load Grammar Request/Response
+message LoadGrammarRequest {
+  string name = 1;
+  string source = 2;
+  bool set_as_active = 3;
+  LoadOptions options = 4;
+}
+
+message LoadOptions {
+  bool overwrite_existing = 1;
+  bool validate_before_load = 2;
+}
+
+message LoadGrammarResponse {
+  bool success = 1;
+  optional string error_message = 2;
+  optional string previous_version_backup = 3;
+}
+
+// Get Grammar Info Request/Response
+message GetGrammarInfoRequest {
+  string name = 1;
+}
+
+message GetGrammarInfoResponse {
+  oneof result {
+    GrammarInfo info = 1;
+    string error_message = 2;
+  }
+}
+
+message GrammarInfo {
+  string name = 1;
+  uint32 rule_count = 2;
+  optional string start_rule = 3;
+  google.protobuf.Timestamp created_at = 4;
+  optional google.protobuf.Timestamp updated_at = 5;
+  bool is_active = 6;
+  map<string, string> metadata = 7;
+}
+
+// List Grammars Request/Response
+message ListGrammarsRequest {
+  optional string filter = 1;
+  uint32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListGrammarsResponse {
+  repeated GrammarInfo grammars = 1;
+  string next_page_token = 2;
+  uint32 total_count = 3;
+}
+
+// Set Active Grammar Request/Response
+message SetActiveGrammarRequest {
+  string name = 1;
+}
+
+message SetActiveGrammarResponse {
+  bool success = 1;
+  optional string error_message = 2;
+  optional string previous_active = 3;
+}
+
+// Grammar Summary Request/Response
+message GetGrammarSummaryRequest {
+  optional string name = 1; // If empty, use active grammar
+}
+
+message GetGrammarSummaryResponse {
+  oneof result {
+    GrammarSummary summary = 1;
+    string error_message = 2;
+  }
+}
+
+message GrammarSummary {
+  uint32 rule_count = 1;
+  uint32 terminal_count = 2;
+  uint32 optional_count = 3;
+  uint32 repetition_count = 4;
+  uint32 max_depth = 5;
+  repeated string entry_points = 6;
+  repeated DependencyInfo dependencies = 7;
+}
+
+message DependencyInfo {
+  string rule_name = 1;
+  repeated string depends_on = 2;
+  repeated string depended_by = 3;
+  uint32 depth_level = 4;
+}
+
+// Export Grammar Request/Response
+message ExportGrammarRequest {
+  string name = 1;
+  ExportFormat format = 2;
+  ExportOptions options = 3;
+}
+
+enum ExportFormat {
+  EXPORT_FORMAT_UNSPECIFIED = 0;
+  EXPORT_FORMAT_EBNF = 1;
+  EXPORT_FORMAT_BNF = 2;
+  EXPORT_FORMAT_ANTLR = 3;
+  EXPORT_FORMAT_PEG = 4;
+  EXPORT_FORMAT_JSON = 5;
+  EXPORT_FORMAT_YAML = 6;
+}
+
+message ExportOptions {
+  bool include_comments = 1;
+  bool format_output = 2;
+  optional string custom_template = 3;
+}
+
+message ExportGrammarResponse {
+  oneof result {
+    string exported_content = 1;
+    string error_message = 2;
+  }
+  ExportFormat format = 3;
+}
+
+// Analyze Grammar Request/Response
+message AnalyzeGrammarRequest {
+  string name = 1;
+  repeated AnalysisType analysis_types = 2;
+}
+
+enum AnalysisType {
+  ANALYSIS_TYPE_UNSPECIFIED = 0;
+  ANALYSIS_TYPE_COMPLEXITY = 1;
+  ANALYSIS_TYPE_AMBIGUITY = 2;
+  ANALYSIS_TYPE_LEFT_RECURSION = 3;
+  ANALYSIS_TYPE_UNREACHABLE_RULES = 4;
+  ANALYSIS_TYPE_UNDEFINED_REFERENCES = 5;
+  ANALYSIS_TYPE_PERFORMANCE = 6;
+}
+
+message AnalyzeGrammarResponse {
+  repeated AnalysisResult results = 1;
+  AnalysisStats stats = 2;
+}
+
+message AnalysisResult {
+  AnalysisType type = 1;
+  string title = 2;
+  string description = 3;
+  ob_poc.dsl.ErrorSeverity severity = 4;
+  repeated AnalysisIssue issues = 5;
+  map<string, string> metadata = 6;
+}
+
+message AnalysisIssue {
+  string message = 1;
+  ob_poc.dsl.SourceLocation location = 2;
+  repeated string affected_rules = 3;
+  repeated string suggestions = 4;
+}
+
+message AnalysisStats {
+  uint32 total_issues = 1;
+  uint32 errors = 2;
+  uint32 warnings = 3;
+  uint32 info = 4;
+  google.protobuf.Timestamp analysis_duration = 5;
+}

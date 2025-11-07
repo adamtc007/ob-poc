@@ -1,0 +1,24 @@
+version: v1
+plugins:
+  # Go plugins
+  - plugin: buf.build/protocolbuffers/go
+    out: ../go/internal/proto
+    opt:
+      - paths=source_relative
+
+  - plugin: buf.build/grpc/go
+    out: ../go/internal/proto
+    opt:
+      - paths=source_relative
+
+  # Rust plugins
+  - plugin: buf.build/community/neoeinstein-prost
+    out: ../rust/src/proto
+    opt:
+      - bytes=.
+
+  - plugin: buf.build/community/neoeinstein-tonic
+    out: ../rust/src/proto
+    opt:
+      - no_include
+      - compile_well_known_types
