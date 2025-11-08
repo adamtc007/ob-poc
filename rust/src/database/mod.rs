@@ -31,7 +31,7 @@ impl Default for DatabaseConfig {
     fn default() -> Self {
         Self {
             database_url: std::env::var("DATABASE_URL")
-                .unwrap_or_else(|_| "postgresql://localhost/ob-poc".to_string()),
+                .unwrap_or_else(|_| "postgresql://localhost:5432/ob-poc".to_string()),
             max_connections: std::env::var("DATABASE_POOL_SIZE")
                 .ok()
                 .and_then(|s| s.parse().ok())

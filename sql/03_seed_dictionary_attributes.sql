@@ -122,4 +122,4 @@ INSERT INTO "ob-poc".dictionary (attribute_id, name, long_description, group_id,
 ('57913bdf-6802-ace4-6802-ace579135794', 'ubo.date_of_birth', 'Date of birth of UBO', 'UBO', 'date', 'Legal', '', '{"type": "manual", "required": true}', '{"type": "database", "table": "ubos"}', NOW(), NOW()),
 ('57913bdf-6802-ace4-6802-ace579135795', 'ubo.nationality', 'Nationality of UBO', 'UBO', 'string', 'Legal', '', '{"type": "manual", "required": true, "format": "ISO-3166-1"}', '{"type": "database", "table": "ubos"}', NOW(), NOW())
 
-ON CONFLICT (attribute_id) DO NOTHING;
+ON CONFLICT (name) DO NOTHING;

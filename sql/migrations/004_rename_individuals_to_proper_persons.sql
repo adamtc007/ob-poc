@@ -60,11 +60,11 @@ UPDATE "ob-poc".dictionary
 SET long_description = REPLACE(long_description, ' person', ' proper person')
 WHERE long_description LIKE '% person%' AND name NOT LIKE '%person%';
 
-UPDATE "dsl-ob-poc".dictionary
+UPDATE "ob-poc".dictionary
 SET long_description = REPLACE(long_description, 'person ', 'proper person ')
 WHERE long_description LIKE '%person %' AND name NOT LIKE '%person%';
 
-UPDATE "dsl-ob-poc".dictionary
+UPDATE "ob-poc".dictionary
 SET long_description = REPLACE(long_description, 'Person', 'Proper Person')
 WHERE long_description LIKE '%Person%' AND name NOT LIKE '%person%';
 

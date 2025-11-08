@@ -230,9 +230,9 @@ BEGIN
         AND table_name = 'partnership_interests'
         AND table_schema = 'dsl-ob-poc'
     ) THEN
-        ALTER TABLE "dsl-ob-poc".partnership_interests
+        ALTER TABLE "ob-poc".partnership_interests
         ADD CONSTRAINT fk_partnership_interests_partnership_id
-        FOREIGN KEY (partnership_id) REFERENCES "dsl-ob-poc".entity_partnerships(partnership_id) ON DELETE CASCADE;
+        FOREIGN KEY (partnership_id) REFERENCES "ob-poc".entity_partnerships(partnership_id) ON DELETE CASCADE;
     END IF;
 END $$;
 
@@ -245,9 +245,9 @@ BEGIN
         AND table_name = 'partnership_interests'
         AND table_schema = 'dsl-ob-poc'
     ) THEN
-        ALTER TABLE "dsl-ob-poc".partnership_interests
+        ALTER TABLE "ob-poc".partnership_interests
         ADD CONSTRAINT fk_partnership_interests_entity_id
-        FOREIGN KEY (entity_id) REFERENCES "dsl-ob-poc".entities(entity_id) ON DELETE CASCADE;
+        FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
     END IF;
 END $$;
 
@@ -260,9 +260,9 @@ BEGIN
         AND table_name = 'partnership_control_mechanisms'
         AND table_schema = 'dsl-ob-poc'
     ) THEN
-        ALTER TABLE "dsl-ob-poc".partnership_control_mechanisms
+        ALTER TABLE "ob-poc".partnership_control_mechanisms
         ADD CONSTRAINT fk_partnership_control_mechanisms_partnership_id
-        FOREIGN KEY (partnership_id) REFERENCES "dsl-ob-poc".entity_partnerships(partnership_id) ON DELETE CASCADE;
+        FOREIGN KEY (partnership_id) REFERENCES "ob-poc".entity_partnerships(partnership_id) ON DELETE CASCADE;
     END IF;
 END $$;
 
@@ -274,9 +274,9 @@ BEGIN
         AND table_name = 'partnership_control_mechanisms'
         AND table_schema = 'dsl-ob-poc'
     ) THEN
-        ALTER TABLE "dsl-ob-poc".partnership_control_mechanisms
+        ALTER TABLE "ob-poc".partnership_control_mechanisms
         ADD CONSTRAINT fk_partnership_control_mechanisms_entity_id
-        FOREIGN KEY (entity_id) REFERENCES "dsl-ob-poc".entities(entity_id) ON DELETE CASCADE;
+        FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
     END IF;
 END $$;
 
@@ -293,9 +293,9 @@ BEGIN
         AND table_name = 'ubo_registry'
         AND table_schema = 'dsl-ob-poc'
     ) THEN
-        ALTER TABLE "dsl-ob-poc".ubo_registry
+        ALTER TABLE "ob-poc".ubo_registry
         ADD CONSTRAINT fk_ubo_registry_subject_entity_id
-        FOREIGN KEY (subject_entity_id) REFERENCES "dsl-ob-poc".entities(entity_id) ON DELETE CASCADE;
+        FOREIGN KEY (subject_entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
     END IF;
 END $$;
 
@@ -308,9 +308,9 @@ BEGIN
         AND table_name = 'ubo_registry'
         AND table_schema = 'dsl-ob-poc'
     ) THEN
-        ALTER TABLE "dsl-ob-poc".ubo_registry
+        ALTER TABLE "ob-poc".ubo_registry
         ADD CONSTRAINT fk_ubo_registry_ubo_proper_person_id
-        FOREIGN KEY (ubo_proper_person_id) REFERENCES "dsl-ob-poc".entities(entity_id) ON DELETE CASCADE;
+        FOREIGN KEY (ubo_proper_person_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
     END IF;
 END $$;
 
@@ -327,9 +327,9 @@ BEGIN
         AND table_name = 'orchestration_domain_sessions'
         AND table_schema = 'dsl-ob-poc'
     ) THEN
-        ALTER TABLE "dsl-ob-poc".orchestration_domain_sessions
+        ALTER TABLE "ob-poc".orchestration_domain_sessions
         ADD CONSTRAINT fk_orchestration_domain_sessions_orchestration_session_id
-        FOREIGN KEY (orchestration_session_id) REFERENCES "dsl-ob-poc".orchestration_sessions(session_id) ON DELETE CASCADE;
+        FOREIGN KEY (orchestration_session_id) REFERENCES "ob-poc".orchestration_sessions(session_id) ON DELETE CASCADE;
     END IF;
 END $$;
 
@@ -342,9 +342,9 @@ BEGIN
         AND table_name = 'orchestration_tasks'
         AND table_schema = 'dsl-ob-poc'
     ) THEN
-        ALTER TABLE "dsl-ob-poc".orchestration_tasks
+        ALTER TABLE "ob-poc".orchestration_tasks
         ADD CONSTRAINT fk_orchestration_tasks_orchestration_session_id
-        FOREIGN KEY (orchestration_session_id) REFERENCES "dsl-ob-poc".orchestration_sessions(session_id) ON DELETE CASCADE;
+        FOREIGN KEY (orchestration_session_id) REFERENCES "ob-poc".orchestration_sessions(session_id) ON DELETE CASCADE;
     END IF;
 END $$;
 
@@ -357,9 +357,9 @@ BEGIN
         AND table_name = 'orchestration_state_history'
         AND table_schema = 'dsl-ob-poc'
     ) THEN
-        ALTER TABLE "dsl-ob-poc".orchestration_state_history
+        ALTER TABLE "ob-poc".orchestration_state_history
         ADD CONSTRAINT fk_orchestration_state_history_orchestration_session_id
-        FOREIGN KEY (orchestration_session_id) REFERENCES "dsl-ob-poc".orchestration_sessions(session_id) ON DELETE CASCADE;
+        FOREIGN KEY (orchestration_session_id) REFERENCES "ob-poc".orchestration_sessions(session_id) ON DELETE CASCADE;
     END IF;
 END $$;
 
@@ -376,9 +376,9 @@ BEGIN
         AND table_name = 'cbu_entity_roles'
         AND table_schema = 'dsl-ob-poc'
     ) THEN
-        ALTER TABLE "dsl-ob-poc".cbu_entity_roles
+        ALTER TABLE "ob-poc".cbu_entity_roles
         ADD CONSTRAINT fk_cbu_entity_roles_cbu_id
-        FOREIGN KEY (cbu_id) REFERENCES "dsl-ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+        FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
     END IF;
 END $$;
 
@@ -390,9 +390,9 @@ BEGIN
         AND table_name = 'cbu_entity_roles'
         AND table_schema = 'dsl-ob-poc'
     ) THEN
-        ALTER TABLE "dsl-ob-poc".cbu_entity_roles
+        ALTER TABLE "ob-poc".cbu_entity_roles
         ADD CONSTRAINT fk_cbu_entity_roles_entity_id
-        FOREIGN KEY (entity_id) REFERENCES "dsl-ob-poc".entities(entity_id) ON DELETE CASCADE;
+        FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
     END IF;
 END $$;
 
@@ -404,9 +404,9 @@ BEGIN
         AND table_name = 'cbu_entity_roles'
         AND table_schema = 'dsl-ob-poc'
     ) THEN
-        ALTER TABLE "dsl-ob-poc".cbu_entity_roles
+        ALTER TABLE "ob-poc".cbu_entity_roles
         ADD CONSTRAINT fk_cbu_entity_roles_role_id
-        FOREIGN KEY (role_id) REFERENCES "dsl-ob-poc".roles(role_id) ON DELETE CASCADE;
+        FOREIGN KEY (role_id) REFERENCES "ob-poc".roles(role_id) ON DELETE CASCADE;
     END IF;
 END $$;
 
@@ -427,12 +427,12 @@ BEGIN
         AND table_name = 'ubo_registry'
         AND table_schema = 'dsl-ob-poc'
     ) THEN
-        ALTER TABLE "dsl-ob-poc".ubo_registry DROP CONSTRAINT fk_ubo_registry_cbu_id;
+        ALTER TABLE "ob-poc".ubo_registry DROP CONSTRAINT fk_ubo_registry_cbu_id;
     END IF;
 
-    ALTER TABLE "dsl-ob-poc".ubo_registry
+    ALTER TABLE "ob-poc".ubo_registry
     ADD CONSTRAINT fk_ubo_registry_cbu_id
-    FOREIGN KEY (cbu_id) REFERENCES "dsl-ob-poc".cbus(cbu_id) ON DELETE SET NULL;
+    FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE SET NULL;
 END $$;
 
 -- ============================================================================
@@ -440,26 +440,26 @@ END $$;
 -- ============================================================================
 
 -- Create a view to check for orphaned records
-CREATE OR REPLACE VIEW "dsl-ob-poc".referential_integrity_check AS
+CREATE OR REPLACE VIEW "ob-poc".referential_integrity_check AS
 WITH integrity_issues AS (
     -- Check for orphaned dsl_ob records
     SELECT 'dsl_ob' as table_name, 'cbu_id' as column_name, cbu_id::text as orphaned_value, 'missing CBU reference' as issue
-    FROM "dsl-ob-poc".dsl_ob d
-    WHERE NOT EXISTS (SELECT 1 FROM "dsl-ob-poc".cbus c WHERE c.cbu_id = d.cbu_id)
+    FROM "ob-poc".dsl_ob d
+    WHERE NOT EXISTS (SELECT 1 FROM "ob-poc".cbus c WHERE c.cbu_id = d.cbu_id)
 
     UNION ALL
 
     -- Check for orphaned attribute_values records
     SELECT 'attribute_values' as table_name, 'cbu_id' as column_name, cbu_id::text as orphaned_value, 'missing CBU reference' as issue
-    FROM "dsl-ob-poc".attribute_values av
-    WHERE NOT EXISTS (SELECT 1 FROM "dsl-ob-poc".cbus c WHERE c.cbu_id = av.cbu_id)
+    FROM "ob-poc".attribute_values av
+    WHERE NOT EXISTS (SELECT 1 FROM "ob-poc".cbus c WHERE c.cbu_id = av.cbu_id)
 
     UNION ALL
 
     -- Check for orphaned attribute_values.attribute_id
     SELECT 'attribute_values' as table_name, 'attribute_id' as column_name, attribute_id::text as orphaned_value, 'missing dictionary reference' as issue
-    FROM "dsl-ob-poc".attribute_values av
-    WHERE NOT EXISTS (SELECT 1 FROM "dsl-ob-poc".dictionary d WHERE d.attribute_id = av.attribute_id)
+    FROM "ob-poc".attribute_values av
+    WHERE NOT EXISTS (SELECT 1 FROM "ob-poc".dictionary d WHERE d.attribute_id = av.attribute_id)
 
     -- Add more checks as needed...
 )
@@ -469,7 +469,7 @@ SELECT * FROM integrity_issues;
 -- 13. Add comments documenting the foreign key relationships
 -- ============================================================================
 
-COMMENT ON TABLE "dsl-ob-poc".dsl_ob IS 'DSL documents with enforced CBU referential integrity';
+COMMENT ON TABLE "ob-poc".dsl_ob IS 'DSL documents with enforced CBU referential integrity';
 COMMENT ON TABLE "dsl-ob-poc".attribute_values IS 'Attribute values with enforced dictionary and CBU referential integrity';
 COMMENT ON TABLE "dsl-ob-poc".ubo_registry IS 'UBO identification results with proper entity referential integrity';
 

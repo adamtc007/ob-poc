@@ -1,16 +1,15 @@
 package orchestration
 
 import (
-	"context"
-	"database/sql"
-	"encoding/json"
-	"fmt"
-	"time"
+    "context"
+    "encoding/json"
+    "fmt"
+    "time"
 
-	"github.com/google/uuid"
+    "github.com/google/uuid"
 
-	"dsl-ob-poc/internal/datastore"
-	"dsl-ob-poc/internal/store"
+    "dsl-ob-poc/internal/datastore"
+    "dsl-ob-poc/internal/store"
 )
 
 // ProductRequirements defines what DSL operations and attributes are required for a specific product

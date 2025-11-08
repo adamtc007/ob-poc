@@ -192,7 +192,7 @@ END $migration$;
 -- ============================================================================
 
 -- View for latest version of each domain
-CREATE OR REPLACE VIEW "dsl-ob-poc".dsl_latest_versions AS
+CREATE OR REPLACE VIEW "ob-poc".dsl_latest_versions AS
 SELECT
     d.domain_name,
     d.description as domain_description,
@@ -204,19 +204,19 @@ SELECT
     dv.created_by,
     dv.created_at,
     CASE WHEN pa.ast_id IS NOT NULL THEN true ELSE false END as has_compiled_ast
-FROM "dsl-ob-poc".dsl_domains d
-JOIN "dsl-ob-poc".dsl_versions dv ON d.domain_id = dv.domain_id
-LEFT JOIN "dsl-ob-poc".parsed_asts pa ON dv.version_id = pa.version_id
+FROM "ob-poc".dsl_domains d
+JOIN "ob-poc".dsl_versions dv ON d.domain_id = dv.domain_id
+LEFT JOIN "ob-poc".parsed_asts pa ON dv.version_id = pa.version_id
 WHERE dv.version_number = (
     SELECT MAX(version_number)
-    FROM "dsl-ob-poc".dsl_versions dv2
+    FROM "ob-poc".dsl_versions dv2
     WHERE dv2.domain_id = dv.domain_id
 )
 AND d.active = true
 ORDER BY d.domain_name;
 
 -- View for execution status summary
-CREATE OR REPLACE VIEW "dsl-ob-poc".dsl_execution_summary AS
+CREATE OR REPLACE VIEW "ob-poc".dsl_execution_summary AS
 SELECT
     d.domain_name,
     dv.version_number,
@@ -226,9 +226,9 @@ SELECT
     COUNT(CASE WHEN del.status = 'FAILED' THEN 1 END) as failed_executions,
     AVG(del.duration_ms) as avg_duration_ms,
     MAX(del.started_at) as last_execution_at
-FROM "dsl-ob-poc".dsl_domains d
-JOIN "dsl-ob-poc".dsl_versions dv ON d.domain_id = dv.domain_id
-LEFT JOIN "dsl-ob-poc".dsl_execution_log del ON dv.version_id = del.version_id
+FROM "ob-poc".dsl_domains d
+JOIN "ob-poc".dsl_versions dv ON d.domain_id = dv.domain_id
+LEFT JOIN "ob-poc".dsl_execution_log del ON dv.version_id = del.version_id
 GROUP BY d.domain_name, dv.version_number, dv.compilation_status
 ORDER BY d.domain_name, dv.version_number DESC;
 
@@ -237,15 +237,15 @@ ORDER BY d.domain_name, dv.version_number DESC;
 -- ============================================================================
 
 -- Function to get next version number for a domain
-CREATE OR REPLACE FUNCTION "dsl-ob-poc".get_next_version_number(domain_name_param VARCHAR)
+CREATE OR REPLACE FUNCTION "ob-poc".get_next_version_number(domain_name_param VARCHAR)
 RETURNS INTEGER AS $$
 DECLARE
     next_version INTEGER;
 BEGIN
     SELECT COALESCE(MAX(dv.version_number), 0) + 1
     INTO next_version
-    FROM "dsl-ob-poc".dsl_domains d
-    JOIN "dsl-ob-poc".dsl_versions dv ON d.domain_id = dv.domain_id
+    FROM "ob-poc".dsl_domains d
+    JOIN "ob-poc".dsl_versions dv ON d.domain_id = dv.domain_id
     WHERE d.domain_name = domain_name_param;
 
     RETURN next_version;
@@ -253,12 +253,12 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Function to invalidate AST cache when DSL source changes
-CREATE OR REPLACE FUNCTION "dsl-ob-poc".invalidate_ast_cache()
+CREATE OR REPLACE FUNCTION "ob-poc".invalidate_ast_cache()
 RETURNS TRIGGER AS $$
 BEGIN
     -- If DSL source code changed, invalidate the AST
     IF OLD.dsl_source_code IS DISTINCT FROM NEW.dsl_source_code THEN
-        UPDATE "dsl-ob-poc".parsed_asts
+        UPDATE "ob-poc".parsed_asts
         SET invalidated_at = now()
         WHERE version_id = NEW.version_id;
     END IF;
@@ -268,9 +268,9 @@ $$ LANGUAGE plpgsql;
 
 -- Create trigger for AST cache invalidation
 CREATE TRIGGER trigger_invalidate_ast_cache
-    AFTER UPDATE ON "dsl-ob-poc".dsl_versions
+    AFTER UPDATE ON "ob-poc".dsl_versions
     FOR EACH ROW
-    EXECUTE FUNCTION "dsl-ob-poc".invalidate_ast_cache();
+    EXECUTE FUNCTION "ob-poc".invalidate_ast_cache();
 
 -- ============================================================================
 -- STEP 6: GRANT APPROPRIATE PERMISSIONS
@@ -294,6 +294,6 @@ SELECT
     tablename,
     tableowner
 FROM pg_tables
-WHERE schemaname = 'dsl-ob-poc'
+WHERE schemaname = 'ob-poc'
     AND tablename IN ('dsl_domains', 'dsl_versions', 'parsed_asts', 'dsl_execution_log')
 ORDER BY tablename;

@@ -1,26 +1,8 @@
 package store
 
 import (
-	"context"
-	"database/sql"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"
-
-	"dsl-ob-poc/internal/dictionary"
-
-	"github.com/lib/pq"
-	_ "github.com/lib/pq"
+    "time"
 )
-
-// Store represents the database connection and operations.
-type Store struct {
-	db *sql.DB
-}
 
 // CBU represents a Client Business Unit in the catalog.
 type CBU struct {
@@ -46,16 +28,16 @@ type Service struct {
 
 // Phase 5 Product Requirements Types
 type ProductRequirements struct {
-	ProductID        string                   `json:"product_id"`
-	ProductName      string                   `json:"product_name"`
-	EntityTypes      JSONBStringArray         `json:"entity_types"`      // JSONB array
-	RequiredDSL      JSONBStringArray         `json:"required_dsl"`      // JSONB array
-	Attributes       JSONBStringArray         `json:"attributes"`        // JSONB array
-	Compliance       []ProductComplianceRule  `json:"compliance"`        // Will be marshaled as JSONB
-	Prerequisites    JSONBStringArray         `json:"prerequisites"`     // JSONB array
-	ConditionalRules []ProductConditionalRule `json:"conditional_rules"` // Will be marshaled as JSONB
-	CreatedAt        time.Time                `json:"created_at"`
-	UpdatedAt        time.Time                `json:"updated_at"`
+    ProductID        string                   `json:"product_id"`
+    ProductName      string                   `json:"product_name"`
+    EntityTypes      []string                 `json:"entity_types"`
+    RequiredDSL      []string                 `json:"required_dsl"`
+    Attributes       []string                 `json:"attributes"`
+    Compliance       []ProductComplianceRule  `json:"compliance"`
+    Prerequisites    []string                 `json:"prerequisites"`
+    ConditionalRules []ProductConditionalRule `json:"conditional_rules"`
+    CreatedAt        time.Time                `json:"created_at"`
+    UpdatedAt        time.Time                `json:"updated_at"`
 }
 
 type ProductComplianceRule struct {
@@ -72,12 +54,12 @@ type ProductConditionalRule struct {
 }
 
 type EntityProductMapping struct {
-	EntityType     string           `json:"entity_type"`
-	ProductID      string           `json:"product_id"`
-	Compatible     bool             `json:"compatible"`
-	Restrictions   JSONBStringArray `json:"restrictions"`    // JSONB array
-	RequiredFields JSONBStringArray `json:"required_fields"` // JSONB array
-	CreatedAt      time.Time        `json:"created_at"`
+    EntityType     string    `json:"entity_type"`
+    ProductID      string    `json:"product_id"`
+    Compatible     bool      `json:"compatible"`
+    Restrictions   []string  `json:"restrictions"`
+    RequiredFields []string  `json:"required_fields"`
+    CreatedAt      time.Time `json:"created_at"`
 }
 
 // ProdResource represents a resource required by products/services.
@@ -168,36 +150,8 @@ type Individual struct {
 	IDDocumentNumber     string     `json:"id_document_number"`
 }
 
-// NewStore creates a new Store instance and opens a database connection.
-func NewStore(connString string) (*Store, error) {
-	db, err := sql.Open("postgres", connString)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %w", err)
-	}
-
-	// Test the connection
-	if pingErr := db.Ping(); pingErr != nil {
-		db.Close()
-		return nil, fmt.Errorf("failed to ping database: %w", pingErr)
-	}
-
-	return &Store{db: db}, nil
-}
-
-// NewStoreFromDB constructs a Store from an existing *sql.DB. Useful for tests.
-func NewStoreFromDB(db *sql.DB) *Store {
-	return &Store{db: db}
-}
-
-// Close closes the database connection.
-func (s *Store) Close() error {
-	if s.db != nil {
-		return s.db.Close()
-	}
-	return nil
-}
-
-// DB returns the underlying database connection.
+// NOTE: All direct database access removed from Go code. This package now
+// provides only shared type definitions used across the application.
 func (s *Store) DB() *sql.DB {
 	return s.db
 }
