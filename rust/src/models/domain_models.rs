@@ -74,9 +74,10 @@ pub struct DslExecutionLog {
 }
 
 /// Compilation status enumeration
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, sqlx::Type, Default)]
 #[sqlx(type_name = "compilation_status", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum CompilationStatus {
+    #[default]
     Draft,
     Compiling,
     Compiled,
@@ -263,11 +264,7 @@ impl DslExecutionLog {
     }
 }
 
-impl Default for CompilationStatus {
-    fn default() -> Self {
-        CompilationStatus::Draft
-    }
-}
+// Default derived on enum
 
 impl std::fmt::Display for CompilationStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

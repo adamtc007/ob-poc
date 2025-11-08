@@ -395,11 +395,11 @@ DECLARE
 BEGIN
     -- Get current state
     SELECT workflow_state INTO v_current_state
-    FROM "dsl-ob-poc".dsl_request_workflow_states
+    FROM "ob-poc".dsl_request_workflow_states
     WHERE request_id = p_request_id AND is_current_state = true;
 
     -- Mark current state as exited
-    UPDATE "dsl-ob-poc".dsl_request_workflow_states
+    UPDATE "ob-poc".dsl_request_workflow_states
     SET
         is_current_state = false,
         exited_at = now(),
@@ -407,7 +407,7 @@ BEGIN
     WHERE request_id = p_request_id AND is_current_state = true;
 
     -- Create new state
-    INSERT INTO "dsl-ob-poc".dsl_request_workflow_states (
+    INSERT INTO "ob-poc".dsl_request_workflow_states (
         request_id,
         workflow_state,
         state_description,
@@ -424,7 +424,7 @@ BEGIN
     ) RETURNING state_id INTO v_state_id;
 
     -- Update business request timestamp
-    UPDATE "dsl-ob-poc".dsl_business_requests
+    UPDATE "ob-poc".dsl_business_requests
     SET updated_at = now()
     WHERE request_id = p_request_id;
 
@@ -502,6 +502,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Ensure trigger can be re-applied idempotently
+DROP TRIGGER IF EXISTS trigger_update_business_request_on_version_change ON "ob-poc".dsl_versions;
 -- Create trigger for version changes
 CREATE TRIGGER trigger_update_business_request_on_version_change
     AFTER UPDATE ON "ob-poc".dsl_versions

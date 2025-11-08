@@ -169,7 +169,7 @@ impl VocabularyRegistry {
         // Update domain ownership
         self.domain_ownership
             .entry(domain)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(verb);
 
         Ok(())

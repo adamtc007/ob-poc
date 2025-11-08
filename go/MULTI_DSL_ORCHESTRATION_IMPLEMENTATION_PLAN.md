@@ -146,7 +146,8 @@ Onboarding Request (CBU + Entities + Products)
 **Database Schema for Grammar Storage:**
 ```sql
 -- Core EBNF grammar rules stored as data
-CREATE TABLE "dsl-ob-poc".grammar_rules (
+-- Canonical schema is "ob-poc" (legacy name "dsl-ob-poc" normalized)
+CREATE TABLE "ob-poc".grammar_rules (
     rule_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     rule_name VARCHAR(100) NOT NULL,        -- "s_expression", "attribute_ref", etc.
     rule_definition TEXT NOT NULL,          -- EBNF rule definition  
@@ -159,7 +160,7 @@ CREATE TABLE "dsl-ob-poc".grammar_rules (
 );
 
 -- AST node type definitions  
-CREATE TABLE "dsl-ob-poc".ast_node_types (
+CREATE TABLE "ob-poc".ast_node_types (
     node_type_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     node_name VARCHAR(100) NOT NULL,        -- "Statement", "Argument", "AttributeRef"
     node_structure JSONB NOT NULL,          -- Field definitions, validation rules
@@ -170,7 +171,7 @@ CREATE TABLE "dsl-ob-poc".ast_node_types (
 );
 
 -- Token definitions for lexical analysis
-CREATE TABLE "dsl-ob-poc".token_definitions (
+CREATE TABLE "ob-poc".token_definitions (
     token_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     token_name VARCHAR(100) NOT NULL,       -- "UUID", "IDENTIFIER", "STRING"
     token_pattern TEXT NOT NULL,            -- Regex pattern or EBNF rule
@@ -180,8 +181,8 @@ CREATE TABLE "dsl-ob-poc".token_definitions (
     created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
 );
 
-CREATE INDEX idx_grammar_rules_active ON "dsl-ob-poc".grammar_rules (is_active, version);
-CREATE INDEX idx_ast_node_types_active ON "dsl-ob-poc".ast_node_types (is_active, version);
+CREATE INDEX idx_grammar_rules_active ON "ob-poc".grammar_rules (is_active, version);
+CREATE INDEX idx_ast_node_types_active ON "ob-poc".ast_node_types (is_active, version);
 ```
 
 **Seed Data - Universal Grammar Rules:**

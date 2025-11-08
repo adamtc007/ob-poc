@@ -1,4 +1,5 @@
 //! Idiomatic EBNF grammar parser using nom combinators
+#![allow(clippy::only_used_in_recursion)]
 //!
 //! This module provides a clean, stateless EBNF parser that follows Rust idioms
 //! and works properly with nom's combinator system without borrow checker issues.
@@ -100,7 +101,7 @@ impl EBNFParser {
 // Standalone parser functions to avoid lifetime issues
 
 /// Parse complete grammar: multiple rules
-fn grammar(input: &str) -> EBNFResult<Vec<EBNFRule>> {
+fn grammar(input: &str) -> EBNFResult<'_, Vec<EBNFRule>> {
     context(
         "grammar",
         preceded(multispace0, many1(terminated(rule, multispace0))),
@@ -108,7 +109,7 @@ fn grammar(input: &str) -> EBNFResult<Vec<EBNFRule>> {
 }
 
 /// Parse a single EBNF rule: rule_name ::= expression ;
-fn rule(input: &str) -> EBNFResult<EBNFRule> {
+fn rule(input: &str) -> EBNFResult<'_, EBNFRule> {
     context(
         "rule",
         map(
@@ -127,12 +128,12 @@ fn rule(input: &str) -> EBNFResult<EBNFRule> {
 }
 
 /// Parse EBNF expressions with proper precedence
-fn expression(input: &str) -> EBNFResult<EBNFExpression> {
+fn expression(input: &str) -> EBNFResult<'_, EBNFExpression> {
     context("expression", choice)(input)
 }
 
 /// Parse choice expressions: A | B | C
-fn choice(input: &str) -> EBNFResult<EBNFExpression> {
+fn choice(input: &str) -> EBNFResult<'_, EBNFExpression> {
     context(
         "choice",
         map(
@@ -149,7 +150,7 @@ fn choice(input: &str) -> EBNFResult<EBNFExpression> {
 }
 
 /// Parse sequence expressions: A B C
-fn sequence(input: &str) -> EBNFResult<EBNFExpression> {
+fn sequence(input: &str) -> EBNFResult<'_, EBNFExpression> {
     context(
         "sequence",
         map(many1(terminated(postfix, space0)), |terms| {
@@ -163,7 +164,7 @@ fn sequence(input: &str) -> EBNFResult<EBNFExpression> {
 }
 
 /// Parse postfix operators: ?, *, +
-fn postfix(input: &str) -> EBNFResult<EBNFExpression> {
+fn postfix(input: &str) -> EBNFResult<'_, EBNFExpression> {
     context("postfix", pair(primary, opt(one_of("?*+"))))(input).map(|(remaining, (expr, op))| {
         let result = match op {
             Some('?') => EBNFExpression::Optional(Box::new(expr)),
@@ -176,7 +177,7 @@ fn postfix(input: &str) -> EBNFResult<EBNFExpression> {
 }
 
 /// Parse primary expressions: terminals, non-terminals, groups
-fn primary(input: &str) -> EBNFResult<EBNFExpression> {
+fn primary(input: &str) -> EBNFResult<'_, EBNFExpression> {
     context(
         "primary",
         alt((terminal, character_class, group, non_terminal)),
@@ -184,7 +185,7 @@ fn primary(input: &str) -> EBNFResult<EBNFExpression> {
 }
 
 /// Parse grouped expressions: ( expression )
-fn group(input: &str) -> EBNFResult<EBNFExpression> {
+fn group(input: &str) -> EBNFResult<'_, EBNFExpression> {
     context(
         "group",
         map(
@@ -195,7 +196,7 @@ fn group(input: &str) -> EBNFResult<EBNFExpression> {
 }
 
 /// Parse terminal strings: "string" or 'string'
-fn terminal(input: &str) -> EBNFResult<EBNFExpression> {
+fn terminal(input: &str) -> EBNFResult<'_, EBNFExpression> {
     context(
         "terminal",
         alt((double_quoted_terminal, single_quoted_terminal)),
@@ -203,7 +204,7 @@ fn terminal(input: &str) -> EBNFResult<EBNFExpression> {
 }
 
 /// Parse double-quoted terminal: "string"
-fn double_quoted_terminal(input: &str) -> EBNFResult<EBNFExpression> {
+fn double_quoted_terminal(input: &str) -> EBNFResult<'_, EBNFExpression> {
     context(
         "double_quoted_terminal",
         map(
@@ -214,7 +215,7 @@ fn double_quoted_terminal(input: &str) -> EBNFResult<EBNFExpression> {
 }
 
 /// Parse single-quoted terminal: 'string'
-fn single_quoted_terminal(input: &str) -> EBNFResult<EBNFExpression> {
+fn single_quoted_terminal(input: &str) -> EBNFResult<'_, EBNFExpression> {
     context(
         "single_quoted_terminal",
         map(
@@ -225,7 +226,7 @@ fn single_quoted_terminal(input: &str) -> EBNFResult<EBNFExpression> {
 }
 
 /// Parse character class: [abc] or [a-z]
-fn character_class(input: &str) -> EBNFResult<EBNFExpression> {
+fn character_class(input: &str) -> EBNFResult<'_, EBNFExpression> {
     context(
         "character_class",
         map(
@@ -236,7 +237,8 @@ fn character_class(input: &str) -> EBNFResult<EBNFExpression> {
 }
 
 /// Parse character range: a-z
-fn character_range(input: &str) -> EBNFResult<EBNFExpression> {
+#[allow(dead_code)]
+fn character_range(input: &str) -> EBNFResult<'_, EBNFExpression> {
     context(
         "character_range",
         map(
@@ -247,15 +249,15 @@ fn character_range(input: &str) -> EBNFResult<EBNFExpression> {
 }
 
 /// Parse non-terminal reference: identifier
-fn non_terminal(input: &str) -> EBNFResult<EBNFExpression> {
+fn non_terminal(input: &str) -> EBNFResult<'_, EBNFExpression> {
     context(
         "non_terminal",
-        map(identifier, |name| EBNFExpression::NonTerminal(name)),
+        map(identifier, EBNFExpression::NonTerminal),
     )(input)
 }
 
 /// Parse identifier: letter (letter | digit | '_')*
-fn identifier(input: &str) -> EBNFResult<String> {
+fn identifier(input: &str) -> EBNFResult<'_, String> {
     context(
         "identifier",
         map(
@@ -269,7 +271,7 @@ fn identifier(input: &str) -> EBNFResult<String> {
 }
 
 /// Parse comment: // text
-fn comment(input: &str) -> EBNFResult<String> {
+fn comment(input: &str) -> EBNFResult<'_, String> {
     context(
         "comment",
         map(preceded(tag("//"), take_until("\n")), |s: &str| {
@@ -387,6 +389,7 @@ impl EBNFGrammar {
 }
 
 /// Helper function to parse single characters not in the given set
+#[allow(dead_code)]
 fn none_of(chars: &'static str) -> impl Fn(&str) -> EBNFResult<char> {
     move |input| {
         if let Some(c) = input.chars().next() {

@@ -10,12 +10,14 @@ use tracing::{info, warn};
 
 pub mod business_request_repository;
 pub mod dsl_domain_repository;
+pub mod cbu_repository;
 
 // Re-export repository and trait for convenience
 pub use business_request_repository::{
     DslBusinessRequestRepository, DslBusinessRequestRepositoryTrait,
 };
 pub use dsl_domain_repository::{DslDomainRepository, DslDomainRepositoryTrait};
+pub use cbu_repository::{CbuRepository};
 
 /// Database configuration
 #[derive(Debug, Clone)]
@@ -128,7 +130,7 @@ impl DatabaseManager {
         )
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| sqlx::migrate::MigrateError::Execute(e))?;
+        .map_err(sqlx::migrate::MigrateError::Execute)?;
 
         let count: i64 = tables_exist.get("count");
 

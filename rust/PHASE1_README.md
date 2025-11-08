@@ -41,7 +41,7 @@ ob-poc/rust/src/
 ├── models/
 │   ├── mod.rs                    # Module exports
 │   └── domain_models.rs          # Data structures and types
-├── dsl_manager_v2.rs             # Enhanced database-backed DSL manager
+├── dsl_manager.rs                # Consolidated database-backed DSL manager
 ├── bin/
 │   └── test_phase1.rs            # Integration test binary
 └── lib.rs                        # Updated with new exports

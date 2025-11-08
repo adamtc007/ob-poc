@@ -118,7 +118,7 @@ pub struct ASTVisualization {
 ### Basic AST Compilation and Visualization
 
 ```rust
-use ob_poc::dsl_manager_v2::{DslManagerV2, LayoutType, VisualizationOptions};
+use ob_poc::dsl_manager::{DslManager, LayoutType, VisualizationOptions};
 use ob_poc::database::DslDomainRepository;
 
 #[tokio::main]
@@ -165,7 +165,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### Advanced Filtering Example
 
 ```rust
-use ob_poc::dsl_manager_v2::{FilterConfig, LayoutType, VisualizationOptions};
+use ob_poc::dsl_manager::{FilterConfig, LayoutType, VisualizationOptions};
 
 // Create entity-focused visualization
 let entity_options = VisualizationOptions {
@@ -230,7 +230,7 @@ Run the comprehensive test suite:
 
 ```bash
 cd ob-poc/rust
-cargo test dsl_manager_v2
+cargo test dsl_manager
 ```
 
 Key test categories:

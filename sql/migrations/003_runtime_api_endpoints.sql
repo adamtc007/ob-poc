@@ -6,29 +6,39 @@
 -- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Create enums for action types and execution status
-CREATE TYPE action_type_enum AS ENUM (
-    'HTTP_API',
-    'BPMN_WORKFLOW',
-    'MESSAGE_QUEUE',
-    'DATABASE_OPERATION',
-    'EXTERNAL_SERVICE'
-);
+-- Create enums for action types and execution status (idempotent)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'action_type_enum') THEN
+        CREATE TYPE action_type_enum AS ENUM (
+            'HTTP_API',
+            'BPMN_WORKFLOW',
+            'MESSAGE_QUEUE',
+            'DATABASE_OPERATION',
+            'EXTERNAL_SERVICE'
+        );
+    END IF;
+END $$;
 
-CREATE TYPE execution_status_enum AS ENUM (
-    'PENDING',
-    'RUNNING',
-    'COMPLETED',
-    'FAILED',
-    'CANCELLED'
-);
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'execution_status_enum') THEN
+        CREATE TYPE execution_status_enum AS ENUM (
+            'PENDING',
+            'RUNNING',
+            'COMPLETED',
+            'FAILED',
+            'CANCELLED'
+        );
+    END IF;
+END $$;
 
 -- =============================================================================
 -- Resource Types and Resource Dictionary
 -- =============================================================================
 
 -- Resource Types: Define concrete runtime resources (e.g., CustodyAccount)
-CREATE TABLE resource_types (
+CREATE TABLE IF NOT EXISTS resource_types (
     resource_type_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     resource_type_name VARCHAR(200) NOT NULL,
     description TEXT,
@@ -40,11 +50,11 @@ CREATE TABLE resource_types (
 );
 
 -- Ensure unique resource type names per environment/version
-CREATE UNIQUE INDEX idx_resource_types_name_env_ver
+CREATE UNIQUE INDEX IF NOT EXISTS idx_resource_types_name_env_ver
 ON resource_types(resource_type_name, environment, version);
 
 -- Resource Type Attributes: Subset of main dictionary per resource type
-CREATE TABLE resource_type_attributes (
+CREATE TABLE IF NOT EXISTS resource_type_attributes (
     resource_type_id UUID REFERENCES resource_types(resource_type_id) ON DELETE CASCADE,
     attribute_id UUID NOT NULL, -- References "ob-poc".dictionary.attribute_id
     required BOOLEAN DEFAULT false,
@@ -55,7 +65,7 @@ CREATE TABLE resource_type_attributes (
 );
 
 -- Resource Type Endpoints: Lifecycle actions (create, activate, etc.)
-CREATE TABLE resource_type_endpoints (
+CREATE TABLE IF NOT EXISTS resource_type_endpoints (
     endpoint_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     resource_type_id UUID REFERENCES resource_types(resource_type_id) ON DELETE CASCADE,
     lifecycle_action VARCHAR(50) NOT NULL, -- e.g., 'create', 'activate', 'suspend'
@@ -75,7 +85,7 @@ CREATE TABLE resource_type_endpoints (
 -- =============================================================================
 
 -- Actions Registry: DSL verb to API endpoint mappings
-CREATE TABLE actions_registry (
+CREATE TABLE IF NOT EXISTS actions_registry (
     action_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     action_name VARCHAR(255) NOT NULL,
     verb_pattern VARCHAR(100) NOT NULL, -- e.g., "resources.create"
@@ -95,13 +105,13 @@ CREATE TABLE actions_registry (
 );
 
 -- Indexes for action lookup performance
-CREATE INDEX idx_actions_verb_pattern ON actions_registry(verb_pattern);
-CREATE INDEX idx_actions_domain ON actions_registry(domain);
-CREATE INDEX idx_actions_active ON actions_registry(active);
-CREATE INDEX idx_actions_resource_type ON actions_registry(resource_type_id);
+CREATE INDEX IF NOT EXISTS idx_actions_verb_pattern ON actions_registry(verb_pattern);
+CREATE INDEX IF NOT EXISTS idx_actions_domain ON actions_registry(domain);
+CREATE INDEX IF NOT EXISTS idx_actions_active ON actions_registry(active);
+CREATE INDEX IF NOT EXISTS idx_actions_resource_type ON actions_registry(resource_type_id);
 
 -- Action Executions: Track individual execution attempts
-CREATE TABLE action_executions (
+CREATE TABLE IF NOT EXISTS action_executions (
     execution_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     action_id UUID REFERENCES actions_registry(action_id),
     cbu_id UUID REFERENCES "ob-poc".cbus(cbu_id),
@@ -135,19 +145,19 @@ CREATE TABLE action_executions (
 );
 
 -- Indexes for execution tracking and monitoring
-CREATE INDEX idx_executions_status ON action_executions(execution_status);
-CREATE INDEX idx_executions_cbu ON action_executions(cbu_id);
-CREATE INDEX idx_executions_action ON action_executions(action_id);
-CREATE INDEX idx_executions_started_at ON action_executions(started_at);
-CREATE INDEX idx_executions_idempotency ON action_executions(idempotency_key);
+CREATE INDEX IF NOT EXISTS idx_executions_status ON action_executions(execution_status);
+CREATE INDEX IF NOT EXISTS idx_executions_cbu ON action_executions(cbu_id);
+CREATE INDEX IF NOT EXISTS idx_executions_action ON action_executions(action_id);
+CREATE INDEX IF NOT EXISTS idx_executions_started_at ON action_executions(started_at);
+CREATE INDEX IF NOT EXISTS idx_executions_idempotency ON action_executions(idempotency_key);
 
 -- Unique constraint to prevent duplicate executions (idempotency)
-CREATE UNIQUE INDEX uq_action_dedupe
+CREATE UNIQUE INDEX IF NOT EXISTS uq_action_dedupe
 ON action_executions(action_id, cbu_id, idempotency_key)
 WHERE idempotency_key IS NOT NULL;
 
 -- Action Execution Attempts: Detailed retry tracking
-CREATE TABLE action_execution_attempts (
+CREATE TABLE IF NOT EXISTS action_execution_attempts (
     attempt_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     execution_id UUID REFERENCES action_executions(execution_id) ON DELETE CASCADE,
     attempt_no INTEGER NOT NULL,
@@ -169,16 +179,16 @@ CREATE TABLE action_execution_attempts (
 );
 
 -- Ensure unique attempt sequence per execution
-CREATE UNIQUE INDEX uq_attempt_seq ON action_execution_attempts(execution_id, attempt_no);
-CREATE INDEX idx_attempts_execution ON action_execution_attempts(execution_id);
-CREATE INDEX idx_attempts_status ON action_execution_attempts(status);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_attempt_seq ON action_execution_attempts(execution_id, attempt_no);
+CREATE INDEX IF NOT EXISTS idx_attempts_execution ON action_execution_attempts(execution_id);
+CREATE INDEX IF NOT EXISTS idx_attempts_status ON action_execution_attempts(status);
 
 -- =============================================================================
 -- Credentials Management
 -- =============================================================================
 
 -- Credentials Vault: Secure storage for API authentication
-CREATE TABLE credentials_vault (
+CREATE TABLE IF NOT EXISTS credentials_vault (
     credential_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     credential_name VARCHAR(255) UNIQUE NOT NULL,
     credential_type VARCHAR(50) NOT NULL, -- oauth2, api_key, basic_auth, etc.
@@ -189,9 +199,9 @@ CREATE TABLE credentials_vault (
     active BOOLEAN DEFAULT true
 );
 
-CREATE INDEX idx_credentials_environment ON credentials_vault(environment);
-CREATE INDEX idx_credentials_active ON credentials_vault(active);
-CREATE INDEX idx_credentials_expires ON credentials_vault(expires_at);
+CREATE INDEX IF NOT EXISTS idx_credentials_environment ON credentials_vault(environment);
+CREATE INDEX IF NOT EXISTS idx_credentials_active ON credentials_vault(active);
+CREATE INDEX IF NOT EXISTS idx_credentials_expires ON credentials_vault(expires_at);
 
 -- =============================================================================
 -- Insert Sample Data for Development
@@ -201,7 +211,8 @@ CREATE INDEX idx_credentials_expires ON credentials_vault(expires_at);
 INSERT INTO resource_types (resource_type_name, description, environment) VALUES
 ('CustodyAccount', 'Client custody account for asset segregation and safekeeping', 'development'),
 ('FundAccountingSetup', 'Fund accounting infrastructure and reporting setup', 'development'),
-('TradingAccount', 'Trading account with market access and settlement capabilities', 'development');
+('TradingAccount', 'Trading account with market access and settlement capabilities', 'development')
+ON CONFLICT DO NOTHING;
 
 -- Sample Resource Type Attributes (referencing existing dictionary attributes)
 -- Note: These would reference actual attribute_ids from the dictionary table
@@ -250,7 +261,7 @@ BEGIN
         300,
         '{"max_retries": 3, "backoff_strategy": "exponential", "base_delay_ms": 1000}',
         'development'
-    );
+    ) ON CONFLICT DO NOTHING;
 END $$;
 
 -- Sample Action Definition for Custody Account Creation
@@ -307,14 +318,14 @@ INSERT INTO credentials_vault (
     'encrypted_api_key_data_here'::bytea,
     'development',
     true
-);
+) ON CONFLICT DO NOTHING;
 
 -- =============================================================================
 -- Views for easier querying
 -- =============================================================================
 
 -- View: Complete action definitions with resource type information
-CREATE VIEW v_action_definitions AS
+CREATE OR REPLACE VIEW v_action_definitions AS
 SELECT
     a.action_id,
     a.action_name,
@@ -336,7 +347,7 @@ FROM actions_registry a
 LEFT JOIN resource_types rt ON a.resource_type_id = rt.resource_type_id;
 
 -- View: Execution summary with action details
-CREATE VIEW v_execution_summary AS
+CREATE OR REPLACE VIEW v_execution_summary AS
 SELECT
     e.execution_id,
     e.cbu_id,

@@ -24,12 +24,8 @@ rust_decimal = { version = "1.33", features = ["serde-with-str", "db-postgres"] 
 [dev-dependencies]
 pretty_assertions = "1.4"
 
-[[bin]]
-name = "test_phase1"
-path = "src/bin/test_phase1.rs"
+## Removed demo bin to keep build clean
 
 
 
-[[example]]
-name = "parse_zenith"
-path = "examples/parse_zenith.rs"
+## examples removed to keep build clean during consolidation

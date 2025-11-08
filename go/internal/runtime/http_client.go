@@ -15,12 +15,11 @@ import (
 
 // HTTPClient provides HTTP API calling capabilities with authentication
 type HTTPClient struct {
-	client        *http.Client
-	credentialMgr *CredentialManager
+	client *http.Client
 }
 
 // NewHTTPClient creates a new HTTP client for runtime API calls
-func NewHTTPClient(credentialMgr *CredentialManager) *HTTPClient {
+func NewHTTPClient() *HTTPClient {
 	return &HTTPClient{
 		client: &http.Client{
 			Timeout: 30 * time.Second, // Default timeout
@@ -34,7 +33,6 @@ func NewHTTPClient(credentialMgr *CredentialManager) *HTTPClient {
 				IdleConnTimeout:     90 * time.Second,
 			},
 		},
-		credentialMgr: credentialMgr,
 	}
 }
 
@@ -210,20 +208,9 @@ func (c *HTTPClient) applyAuthentication(ctx context.Context, req *http.Request,
 
 // applyAPIKeyAuth applies API key authentication
 func (c *HTTPClient) applyAPIKeyAuth(ctx context.Context, req *http.Request, authConfig map[string]interface{}) error {
-	credentialsRef, ok := authConfig["credentials_ref"].(string)
+	apiKey, ok := authConfig["api_key"].(string)
 	if !ok {
-		return fmt.Errorf("credentials_ref not specified for API key auth")
-	}
-
-	// Get credentials from credential manager
-	credentials, err := c.credentialMgr.GetCredentials(ctx, credentialsRef)
-	if err != nil {
-		return fmt.Errorf("failed to get API key credentials: %w", err)
-	}
-
-	apiKey, ok := credentials["api_key"].(string)
-	if !ok {
-		return fmt.Errorf("api_key not found in credentials")
+		return fmt.Errorf("api_key not provided in auth config")
 	}
 
 	// Apply API key based on configuration
@@ -248,19 +235,9 @@ func (c *HTTPClient) applyAPIKeyAuth(ctx context.Context, req *http.Request, aut
 
 // applyBearerAuth applies Bearer token authentication
 func (c *HTTPClient) applyBearerAuth(ctx context.Context, req *http.Request, authConfig map[string]interface{}) error {
-	credentialsRef, ok := authConfig["credentials_ref"].(string)
+	token, ok := authConfig["token"].(string)
 	if !ok {
-		return fmt.Errorf("credentials_ref not specified for Bearer auth")
-	}
-
-	credentials, err := c.credentialMgr.GetCredentials(ctx, credentialsRef)
-	if err != nil {
-		return fmt.Errorf("failed to get Bearer token credentials: %w", err)
-	}
-
-	token, ok := credentials["token"].(string)
-	if !ok {
-		return fmt.Errorf("token not found in credentials")
+		return fmt.Errorf("token not provided in auth config")
 	}
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
@@ -269,24 +246,14 @@ func (c *HTTPClient) applyBearerAuth(ctx context.Context, req *http.Request, aut
 
 // applyBasicAuth applies Basic authentication
 func (c *HTTPClient) applyBasicAuth(ctx context.Context, req *http.Request, authConfig map[string]interface{}) error {
-	credentialsRef, ok := authConfig["credentials_ref"].(string)
+	username, ok := authConfig["username"].(string)
 	if !ok {
-		return fmt.Errorf("credentials_ref not specified for Basic auth")
+		return fmt.Errorf("username not provided in auth config")
 	}
 
-	credentials, err := c.credentialMgr.GetCredentials(ctx, credentialsRef)
-	if err != nil {
-		return fmt.Errorf("failed to get Basic auth credentials: %w", err)
-	}
-
-	username, ok := credentials["username"].(string)
+	password, ok := authConfig["password"].(string)
 	if !ok {
-		return fmt.Errorf("username not found in credentials")
-	}
-
-	password, ok := credentials["password"].(string)
-	if !ok {
-		return fmt.Errorf("password not found in credentials")
+		return fmt.Errorf("password not provided in auth config")
 	}
 
 	req.SetBasicAuth(username, password)
@@ -295,19 +262,9 @@ func (c *HTTPClient) applyBasicAuth(ctx context.Context, req *http.Request, auth
 
 // applyOAuth2Auth applies OAuth2 authentication
 func (c *HTTPClient) applyOAuth2Auth(ctx context.Context, req *http.Request, authConfig map[string]interface{}) error {
-	credentialsRef, ok := authConfig["credentials_ref"].(string)
+	accessToken, ok := authConfig["access_token"].(string)
 	if !ok {
-		return fmt.Errorf("credentials_ref not specified for OAuth2 auth")
-	}
-
-	credentials, err := c.credentialMgr.GetCredentials(ctx, credentialsRef)
-	if err != nil {
-		return fmt.Errorf("failed to get OAuth2 credentials: %w", err)
-	}
-
-	accessToken, ok := credentials["access_token"].(string)
-	if !ok {
-		return fmt.Errorf("access_token not found in credentials")
+		return fmt.Errorf("access_token not provided in auth config")
 	}
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
@@ -316,28 +273,12 @@ func (c *HTTPClient) applyOAuth2Auth(ctx context.Context, req *http.Request, aut
 
 // applyCustomAuth applies custom authentication
 func (c *HTTPClient) applyCustomAuth(ctx context.Context, req *http.Request, authConfig map[string]interface{}) error {
-	credentialsRef, ok := authConfig["credentials_ref"].(string)
-	if !ok {
-		return fmt.Errorf("credentials_ref not specified for custom auth")
-	}
-
-	credentials, err := c.credentialMgr.GetCredentials(ctx, credentialsRef)
-	if err != nil {
-		return fmt.Errorf("failed to get custom auth credentials: %w", err)
-	}
-
-	// Apply custom headers based on configuration
+	// Apply custom headers directly from config
 	if headers, ok := authConfig["headers"].(map[string]interface{}); ok {
-		for headerName, headerValueTemplate := range headers {
-			headerValue := headerValueTemplate.(string)
-
-			// Replace placeholders with credential values
-			for credKey, credValue := range credentials {
-				placeholder := fmt.Sprintf("{{%s}}", credKey)
-				headerValue = strings.ReplaceAll(headerValue, placeholder, credValue.(string))
+		for headerName, v := range headers {
+			if headerValue, ok := v.(string); ok {
+				req.Header.Set(headerName, headerValue)
 			}
-
-			req.Header.Set(headerName, headerValue)
 		}
 	}
 

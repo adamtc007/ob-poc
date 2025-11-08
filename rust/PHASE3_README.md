@@ -172,7 +172,7 @@ pub struct DomainEnhancedVisualization {
 ### Basic Domain-Enhanced Visualization
 
 ```rust
-use ob_poc::dsl_manager_v2::{DslManagerV2, DomainVisualizationOptions};
+use ob_poc::dsl_manager::{DslManager, DomainVisualizationOptions};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

@@ -228,7 +228,7 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_partnership_interests_partnership_id'
         AND table_name = 'partnership_interests'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
         ALTER TABLE "ob-poc".partnership_interests
         ADD CONSTRAINT fk_partnership_interests_partnership_id
@@ -243,7 +243,7 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_partnership_interests_entity_id'
         AND table_name = 'partnership_interests'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
         ALTER TABLE "ob-poc".partnership_interests
         ADD CONSTRAINT fk_partnership_interests_entity_id
@@ -258,7 +258,7 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_partnership_control_mechanisms_partnership_id'
         AND table_name = 'partnership_control_mechanisms'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
         ALTER TABLE "ob-poc".partnership_control_mechanisms
         ADD CONSTRAINT fk_partnership_control_mechanisms_partnership_id
@@ -272,7 +272,7 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_partnership_control_mechanisms_entity_id'
         AND table_name = 'partnership_control_mechanisms'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
         ALTER TABLE "ob-poc".partnership_control_mechanisms
         ADD CONSTRAINT fk_partnership_control_mechanisms_entity_id
@@ -291,7 +291,7 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_ubo_registry_subject_entity_id'
         AND table_name = 'ubo_registry'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
         ALTER TABLE "ob-poc".ubo_registry
         ADD CONSTRAINT fk_ubo_registry_subject_entity_id
@@ -306,7 +306,7 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_ubo_registry_ubo_proper_person_id'
         AND table_name = 'ubo_registry'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
         ALTER TABLE "ob-poc".ubo_registry
         ADD CONSTRAINT fk_ubo_registry_ubo_proper_person_id
@@ -325,7 +325,7 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_orchestration_domain_sessions_orchestration_session_id'
         AND table_name = 'orchestration_domain_sessions'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
         ALTER TABLE "ob-poc".orchestration_domain_sessions
         ADD CONSTRAINT fk_orchestration_domain_sessions_orchestration_session_id
@@ -340,7 +340,7 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_orchestration_tasks_orchestration_session_id'
         AND table_name = 'orchestration_tasks'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
         ALTER TABLE "ob-poc".orchestration_tasks
         ADD CONSTRAINT fk_orchestration_tasks_orchestration_session_id
@@ -355,7 +355,7 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_orchestration_state_history_orchestration_session_id'
         AND table_name = 'orchestration_state_history'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
         ALTER TABLE "ob-poc".orchestration_state_history
         ADD CONSTRAINT fk_orchestration_state_history_orchestration_session_id
@@ -374,7 +374,7 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_cbu_entity_roles_cbu_id'
         AND table_name = 'cbu_entity_roles'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
         ALTER TABLE "ob-poc".cbu_entity_roles
         ADD CONSTRAINT fk_cbu_entity_roles_cbu_id
@@ -388,7 +388,7 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_cbu_entity_roles_entity_id'
         AND table_name = 'cbu_entity_roles'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
         ALTER TABLE "ob-poc".cbu_entity_roles
         ADD CONSTRAINT fk_cbu_entity_roles_entity_id
@@ -402,7 +402,7 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_cbu_entity_roles_role_id'
         AND table_name = 'cbu_entity_roles'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
         ALTER TABLE "ob-poc".cbu_entity_roles
         ADD CONSTRAINT fk_cbu_entity_roles_role_id
@@ -425,7 +425,7 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_ubo_registry_cbu_id'
         AND table_name = 'ubo_registry'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
         ALTER TABLE "ob-poc".ubo_registry DROP CONSTRAINT fk_ubo_registry_cbu_id;
     END IF;
@@ -470,15 +470,15 @@ SELECT * FROM integrity_issues;
 -- ============================================================================
 
 COMMENT ON TABLE "ob-poc".dsl_ob IS 'DSL documents with enforced CBU referential integrity';
-COMMENT ON TABLE "dsl-ob-poc".attribute_values IS 'Attribute values with enforced dictionary and CBU referential integrity';
-COMMENT ON TABLE "dsl-ob-poc".ubo_registry IS 'UBO identification results with proper entity referential integrity';
+COMMENT ON TABLE "ob-poc".attribute_values IS 'Attribute values with enforced dictionary and CBU referential integrity';
+COMMENT ON TABLE "ob-poc".ubo_registry IS 'UBO identification results with proper entity referential integrity';
 
 -- Add completion log
-INSERT INTO "dsl-ob-poc".dsl_ob (cbu_id, dsl_text)
+INSERT INTO "ob-poc".dsl_ob (cbu_id, dsl_text)
 SELECT
     c.cbu_id,
     '(system.migration (migration-id "002_fix_foreign_key_constraints") (status "completed") (timestamp "' || now()::text || '"))'
-FROM "dsl-ob-poc".cbus c
+FROM "ob-poc".cbus c
 LIMIT 1
 ON CONFLICT DO NOTHING;
 

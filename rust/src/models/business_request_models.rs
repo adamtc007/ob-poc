@@ -277,10 +277,11 @@ impl From<String> for RequestStatus {
 }
 
 /// Priority Level enumeration
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, Default)]
 #[sqlx(type_name = "priority_level", rename_all = "UPPERCASE")]
 pub enum PriorityLevel {
     Low,
+    #[default]
     Normal,
     High,
     Critical,
@@ -309,11 +310,7 @@ impl From<String> for PriorityLevel {
     }
 }
 
-impl Default for PriorityLevel {
-    fn default() -> Self {
-        PriorityLevel::Normal
-    }
-}
+// Default derived above
 
 // ============================================================================
 // HELPER FUNCTIONS AND IMPLEMENTATIONS

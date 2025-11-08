@@ -97,7 +97,7 @@ pub struct ASTVisualization {
 ## 📁 Files Delivered
 
 ### Core Implementation
-- `src/dsl_manager_v2.rs` - Enhanced DSL Manager with complete Phase 2 functionality
+- `src/dsl_manager.rs` - Consolidated DSL Manager with complete Phase 2 functionality
 - `examples/phase2_ast_visualization_demo.rs` - Comprehensive demonstration example
 - `PHASE2_README.md` - Detailed technical documentation and API reference
 

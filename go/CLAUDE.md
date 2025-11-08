@@ -213,7 +213,8 @@ Where each **attributeID** is a **UUID** that references the **dictionary table*
 ### Dictionary Table Structure
 
 ```sql
-CREATE TABLE "dsl-ob-poc".dictionary (
+-- Note: canonical schema is "ob-poc" (legacy "dsl-ob-poc" normalized)
+CREATE TABLE "ob-poc".dictionary (
     attribute_id UUID PRIMARY KEY,           -- The "type" identifier
     name VARCHAR(255) NOT NULL UNIQUE,       -- Human-readable name
     long_description TEXT,                   -- For AI discovery
@@ -499,7 +500,7 @@ make init-db            # Initialize schema and tables
 - `dsl_ob` - Immutable versioned DSL records (event sourcing core)
 - `products`, `services`, `prod_resources` - Catalog tables
 - `attributes`, `dictionaries` - Data classification with privacy flags
-- Uses `"dsl-ob-poc"` schema with UUID primary keys
+- Uses `"ob-poc"` schema with UUID primary keys (legacy name normalized)
 
 **Package Structure**:
 - `internal/cli/` - Command implementations for state machine operations

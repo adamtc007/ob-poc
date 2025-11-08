@@ -21,7 +21,7 @@ pub type NomParseError<'a> = VerboseError<&'a str>;
 pub type ParseResult<'a, T> = IResult<&'a str, T, NomParseError<'a>>;
 
 /// Parse a complete DSL program
-pub fn parse_program(input: &str) -> Result<Program, NomParseError> {
+pub fn parse_program(input: &str) -> Result<Program, NomParseError<'_>> {
     let (remaining, program) = program_internal(input).finish()?;
 
     if !remaining.trim().is_empty() {
@@ -35,14 +35,14 @@ pub fn parse_program(input: &str) -> Result<Program, NomParseError> {
 }
 
 /// Parse program: multiple workflows
-fn program_internal(input: &str) -> ParseResult<Program> {
+fn program_internal(input: &str) -> ParseResult<'_, Program> {
     let (input, _) = multispace0(input)?;
     let (input, workflows) = many1(terminated(parse_workflow, multispace0))(input)?;
     Ok((input, Program { workflows }))
 }
 
 /// Parse workflow: (workflow "id" properties statements...)
-pub fn parse_workflow(input: &str) -> ParseResult<Workflow> {
+pub fn parse_workflow(input: &str) -> ParseResult<'_, Workflow> {
     let (input, _) = char('(')(input)?;
     let (input, _) = tag("workflow")(input)?;
     let (input, _) = space1(input)?;
@@ -64,7 +64,7 @@ pub fn parse_workflow(input: &str) -> ParseResult<Workflow> {
 }
 
 /// Parse properties: (properties key1 value1 key2 value2...)
-pub fn parse_properties(input: &str) -> ParseResult<PropertyMap> {
+pub fn parse_properties(input: &str) -> ParseResult<'_, PropertyMap> {
     let (input, _) = char('(')(input)?;
     let (input, _) = tag("properties")(input)?;
     let (input, _) = space0(input)?;
@@ -74,7 +74,7 @@ pub fn parse_properties(input: &str) -> ParseResult<PropertyMap> {
 }
 
 /// Parse a key-value property pair
-fn parse_property_pair(input: &str) -> ParseResult<(String, Value)> {
+fn parse_property_pair(input: &str) -> ParseResult<'_, (String, Value)> {
     let (input, key) = parse_identifier(input)?;
     let (input, _) = space1(input)?;
     let (input, value) = parse_value(input)?;
@@ -82,7 +82,7 @@ fn parse_property_pair(input: &str) -> ParseResult<(String, Value)> {
 }
 
 /// Parse statement - the main DSL constructs
-pub fn parse_statement(input: &str) -> ParseResult<Statement> {
+pub fn parse_statement(input: &str) -> ParseResult<'_, Statement> {
     let (input, _) = char('(')(input)?;
     let (input, statement) = alt((
         parse_declare_entity,
@@ -96,7 +96,7 @@ pub fn parse_statement(input: &str) -> ParseResult<Statement> {
 }
 
 /// Parse declare-entity statement
-fn parse_declare_entity(input: &str) -> ParseResult<Statement> {
+fn parse_declare_entity(input: &str) -> ParseResult<'_, Statement> {
     let (input, _) = tag("declare-entity")(input)?;
     let (input, _) = space1(input)?;
     let (input, id) = parse_string_literal(input)?;
@@ -116,7 +116,7 @@ fn parse_declare_entity(input: &str) -> ParseResult<Statement> {
 }
 
 /// Parse obtain-document statement
-fn parse_obtain_document(input: &str) -> ParseResult<Statement> {
+fn parse_obtain_document(input: &str) -> ParseResult<'_, Statement> {
     let (input, _) = tag("obtain-document")(input)?;
     let (input, _) = space1(input)?;
     let (input, document_type) = parse_string_literal(input)?;
@@ -136,7 +136,7 @@ fn parse_obtain_document(input: &str) -> ParseResult<Statement> {
 }
 
 /// Parse create-edge statement
-fn parse_create_edge(input: &str) -> ParseResult<Statement> {
+fn parse_create_edge(input: &str) -> ParseResult<'_, Statement> {
     let (input, _) = tag("create-edge")(input)?;
     let (input, _) = space1(input)?;
     let (input, from) = parse_string_literal(input)?;
@@ -159,7 +159,7 @@ fn parse_create_edge(input: &str) -> ParseResult<Statement> {
 }
 
 /// Parse calculate-ubo statement
-fn parse_calculate_ubo(input: &str) -> ParseResult<Statement> {
+fn parse_calculate_ubo(input: &str) -> ParseResult<'_, Statement> {
     let (input, _) = tag("calculate-ubo")(input)?;
     let (input, _) = space1(input)?;
     let (input, entity_id) = parse_string_literal(input)?;
@@ -176,14 +176,14 @@ fn parse_calculate_ubo(input: &str) -> ParseResult<Statement> {
 }
 
 /// Placeholder for unimplemented statement types
-fn parse_placeholder_statement(input: &str) -> ParseResult<Statement> {
+fn parse_placeholder_statement(input: &str) -> ParseResult<'_, Statement> {
     let (input, command) = parse_identifier(input)?;
     let (input, args) = many0(preceded(space1, parse_value))(input)?;
     Ok((input, Statement::Placeholder { command, args }))
 }
 
 /// Parse values - strings, numbers, booleans, lists, maps
-pub fn parse_value(input: &str) -> ParseResult<Value> {
+pub fn parse_value(input: &str) -> ParseResult<'_, Value> {
     alt((
         parse_string_value,
         parse_number_value,
@@ -195,13 +195,13 @@ pub fn parse_value(input: &str) -> ParseResult<Value> {
 }
 
 /// Parse string values: "quoted strings"
-fn parse_string_value(input: &str) -> ParseResult<Value> {
+fn parse_string_value(input: &str) -> ParseResult<'_, Value> {
     let (input, s) = parse_string_literal(input)?;
     Ok((input, Value::String(s)))
 }
 
 /// Parse string literals with proper escaping
-pub fn parse_string_literal(input: &str) -> ParseResult<String> {
+pub fn parse_string_literal(input: &str) -> ParseResult<'_, String> {
     alt((
         delimited(
             char('"'),
@@ -227,12 +227,12 @@ pub fn parse_string_literal(input: &str) -> ParseResult<String> {
 }
 
 /// Parse numeric values with proper error handling
-fn parse_number_value(input: &str) -> ParseResult<Value> {
+fn parse_number_value(input: &str) -> ParseResult<'_, Value> {
     alt((parse_float, parse_integer))(input)
 }
 
 /// Parse float values with proper error handling
-fn parse_float(input: &str) -> ParseResult<Value> {
+fn parse_float(input: &str) -> ParseResult<'_, Value> {
     let (input, num_str) = recognize(tuple((opt(char('-')), digit1, char('.'), digit1)))(input)?;
     let num = num_str.parse::<f64>().map_err(|_| {
         nom::Err::Error(VerboseError::from_error_kind(
@@ -244,7 +244,7 @@ fn parse_float(input: &str) -> ParseResult<Value> {
 }
 
 /// Parse integer values with proper error handling
-fn parse_integer(input: &str) -> ParseResult<Value> {
+fn parse_integer(input: &str) -> ParseResult<'_, Value> {
     let (input, num_str) = recognize(tuple((opt(char('-')), digit1)))(input)?;
     let num = num_str.parse::<i64>().map_err(|_| {
         nom::Err::Error(VerboseError::from_error_kind(
@@ -256,7 +256,7 @@ fn parse_integer(input: &str) -> ParseResult<Value> {
 }
 
 /// Parse boolean values
-fn parse_boolean_value(input: &str) -> ParseResult<Value> {
+fn parse_boolean_value(input: &str) -> ParseResult<'_, Value> {
     alt((
         value(Value::Boolean(true), tag("true")),
         value(Value::Boolean(false), tag("false")),
@@ -264,12 +264,12 @@ fn parse_boolean_value(input: &str) -> ParseResult<Value> {
 }
 
 /// Parse null values
-fn parse_null_value(input: &str) -> ParseResult<Value> {
+fn parse_null_value(input: &str) -> ParseResult<'_, Value> {
     value(Value::Null, tag("null"))(input)
 }
 
 /// Parse list values: [item1, item2, item3]
-fn parse_list_value(input: &str) -> ParseResult<Value> {
+fn parse_list_value(input: &str) -> ParseResult<'_, Value> {
     let (input, _) = char('[')(input)?;
     let (input, values) = separated_list0(tuple((space0, char(','), space0)), parse_value)(input)?;
     let (input, _) = space0(input)?;
@@ -278,7 +278,7 @@ fn parse_list_value(input: &str) -> ParseResult<Value> {
 }
 
 /// Parse map values: {key1: value1, key2: value2}
-fn parse_map_value(input: &str) -> ParseResult<Value> {
+fn parse_map_value(input: &str) -> ParseResult<'_, Value> {
     let (input, _) = char('{')(input)?;
     let (input, pairs) = separated_list0(tuple((space0, char(','), space0)), |input| {
         let (input, key) = parse_string_literal(input)?;
@@ -294,7 +294,7 @@ fn parse_map_value(input: &str) -> ParseResult<Value> {
 }
 
 /// Parse identifiers: alphanumeric with underscore, dash, dot
-pub fn parse_identifier(input: &str) -> ParseResult<String> {
+pub fn parse_identifier(input: &str) -> ParseResult<'_, String> {
     let (input, id) = recognize(pair(
         alt((alpha1, tag("_"))),
         many0(alt((alphanumeric1, tag("_"), tag("-"), tag(".")))),
@@ -355,8 +355,8 @@ mod tests {
 
         // Test float
         assert_eq!(
-            parse_number_value("3.14").unwrap(),
-            ("", Value::Number(3.14))
+            parse_number_value("3.14159265").unwrap(),
+            ("", Value::Number(std::f64::consts::PI))
         );
 
         // Test negative

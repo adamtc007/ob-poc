@@ -654,7 +654,7 @@ case "hf-subscribe-request":
 CREATE SCHEMA IF NOT EXISTS "hf-investor";
 
 -- Tables: hf_investors, hf_funds, hf_register_events, etc.
--- Completely isolated from "dsl-ob-poc" schema
+-- Completely isolated from "ob-poc" schema (legacy name "dsl-ob-poc" normalized)
 ```
 
 ### Running Hedge Fund Commands
@@ -763,7 +763,7 @@ go test ./... -v
 - **Location**: All code in `hedge-fund-investor-source/` subdirectory
 
 ### 🔍 Known Items
-- **Module Path**: Uses `dsl-ob-poc` import paths for integration with main POC
+- **Module Path**: Uses consolidated Rust manager via gRPC; schema is `"ob-poc"` (legacy `"dsl-ob-poc"` normalized)
 - **Test Infrastructure**: Some integration tests require database connection
 - **Mock Data**: Test fixtures provided for disconnected development
 

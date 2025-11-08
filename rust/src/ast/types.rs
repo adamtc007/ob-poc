@@ -84,8 +84,9 @@ pub enum TypeConstraint {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub enum ValidationState {
+    #[default]
     Pending,
     Valid,
     Invalid { errors: Vec<ValidationError> },
@@ -236,8 +237,9 @@ pub struct DSLState {
     pub metadata: HashMap<String, EnhancedValue>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub enum LifecycleState {
+    #[default]
     Draft,
     Validating,
     Valid,
@@ -390,17 +392,7 @@ impl EnhancedValue {
     }
 }
 
-impl Default for ValidationState {
-    fn default() -> Self {
-        ValidationState::Pending
-    }
-}
-
-impl Default for LifecycleState {
-    fn default() -> Self {
-        LifecycleState::Draft
-    }
-}
+// duplicate LifecycleState removed during clippy cleanup
 
 #[cfg(test)]
 mod tests {

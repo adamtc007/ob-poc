@@ -745,7 +745,7 @@ use warp::Filter;
 use serde_json;
 use std::sync::Arc;
 use ob_poc::{
-    dsl_manager_v2::DslManagerV2,
+    dsl_manager::DslManager,
     database::DslDomainRepository,
 };
 

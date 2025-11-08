@@ -68,11 +68,8 @@ pub mod models;
 
 // DSL Manager - core create/edit functionality
 pub mod dsl_manager;
-pub mod dsl_manager_consolidated;
-pub mod dsl_manager_v2;
 
-// Domain-specific visualization features (Phase 3)
-pub mod domain_visualizations;
+// Domain-specific visualization features (Phase 3) removed during consolidation
 
 // Deprecated modules moved to src/deprecated/ (not needed for Phase 1)
 // - proto/ - gRPC protobuf modules (for future web services)
@@ -90,18 +87,13 @@ pub use parser::{
     parse_workflow_standalone as parse_workflow, validate_ast,
 };
 
-// Re-export DSL manager functionality
-pub use dsl_manager::{
-    DomainDsl, DslError as DslManagerError, DslManager as DslManagerV1, DslResult,
-};
-
 // Re-export consolidated DSL manager (main interface)
-pub use dsl_manager_consolidated::{
-    CbuInfo, DomainVisualizationOptions, DslError as ConsolidatedDslError, DslInstance,
-    DslInstanceVersion, DslManager, DslResult as ConsolidatedDslResult, DslStorageKeys,
-    DslTemplate, InstanceStatus, KycCaseCreationResult, OnboardingRequestCreationResult,
-    OnboardingSessionRecord, OperationType, TemplateType,
-    VisualizationOptions as ConsolidatedVisualizationOptions,
+pub use dsl_manager::{
+    CbuInfo, DomainVisualizationOptions, DslError as DslManagerError, DslInstance,
+    DslInstanceVersion, DslManager, DslResult, DslStorageKeys, DslTemplate, InstanceStatus,
+    KycCaseCreationResult, OnboardingRequestCreationResult, OnboardingSessionRecord,
+    OperationType, TemplateType, VisualizationOptions, ASTVisualization, VisualNode, VisualEdge,
+    VisualizationStatistics,
 };
 
 // Re-export database and models
@@ -110,10 +102,7 @@ pub use models::{
     CompilationStatus, DslDomain, DslVersion, ExecutionPhase, ExecutionStatus, ParsedAst,
 };
 
-// Re-export enhanced DSL manager
-pub use dsl_manager_v2::{
-    ASTVisualization, DslError as DslManagerV2Error, DslManagerV2, DslResult as DslManagerV2Result,
-};
+// Legacy managers removed; consolidated manager is the single entry point
 
 /// Version information
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

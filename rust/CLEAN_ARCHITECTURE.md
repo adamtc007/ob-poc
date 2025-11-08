@@ -35,7 +35,7 @@ src/
 │   └── dsl_domain_repository.rs # Repository pattern
 ├── models/                 # Database models
 │   └── domain_models.rs   # DSL domain data structures
-├── dsl_manager_v2.rs      # Enhanced database-backed DSL manager
+├── dsl_manager.rs         # Consolidated database-backed DSL manager
 ├── parser/                # NOM-based DSL parsing
 ├── grammar/               # EBNF grammar engine
 ├── vocabulary/            # Domain vocabularies

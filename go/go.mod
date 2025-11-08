@@ -5,7 +5,6 @@ go 1.25.1
 require (
     github.com/google/generative-ai-go v0.20.1
     github.com/google/uuid v1.6.0
-    github.com/spf13/cobra v1.10.1
     github.com/stretchr/testify v1.10.0
     google.golang.org/api v0.254.0
 )

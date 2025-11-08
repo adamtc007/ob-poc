@@ -11,7 +11,7 @@
 //! - Entity relationship emphasis
 //! - Compliance workflow tracking
 
-use crate::dsl_manager_v2::{ASTVisualization, VisualEdge, VisualNode, VisualizationOptions};
+use crate::dsl_manager::{ASTVisualization, VisualEdge, VisualNode, VisualizationOptions};
 use crate::models::{DslDomain, DslVersion};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -54,7 +54,7 @@ impl DomainVisualizer {
     /// Enhance visualization with domain-specific features
     pub fn enhance_visualization(
         &self,
-        mut visualization: ASTVisualization,
+        visualization: ASTVisualization,
         domain: &DslDomain,
         version: &DslVersion,
         options: &VisualizationOptions,
@@ -295,7 +295,7 @@ impl DomainVisualizer {
     fn generate_node_annotations(
         &self,
         node: &VisualNode,
-        rules: &DomainVisualizationRules,
+        _rules: &DomainVisualizationRules,
     ) -> Vec<String> {
         let mut annotations = Vec::new();
 
@@ -339,7 +339,7 @@ impl DomainVisualizer {
         rules.base_execution_time_ms
     }
 
-    fn calculate_risk_score(&self, statistics: &crate::dsl_manager_v2::ASTStatistics) -> f64 {
+    fn calculate_risk_score(&self, statistics: &crate::dsl_manager::VisualizationStatistics) -> f64 {
         // Simple risk calculation based on complexity
         let complexity_factor = statistics
             .complexity_score
@@ -954,8 +954,8 @@ fn create_compliance_visualization_rules() -> DomainVisualizationRules {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dsl_manager_v2::{
-        ASTStatistics, CompilationInfo, LayoutType, VisualizationMetadata,
+    use crate::dsl_manager::{
+        VisualizationStatistics, CompilationInfo, LayoutType, VisualizationMetadata,
     };
     use crate::models::CompilationStatus;
     use chrono::Utc;
@@ -994,7 +994,7 @@ mod tests {
     }
 
     fn create_test_visualization() -> ASTVisualization {
-        use crate::dsl_manager_v2::{DomainContext, VisualNode};
+        use crate::dsl_manager::{DomainContext, VisualNode};
 
         ASTVisualization {
             metadata: VisualizationMetadata {
@@ -1166,7 +1166,7 @@ mod tests {
         let visualizer = DomainVisualizer::new();
 
         // Test KYC domain
-        assert!(visualizer.domain_rules.get("KYC").is_some());
+        assert!(visualizer.domain_rules.contains_key("KYC"));
 
         // Test Onboarding domain
         let onboarding_rules = visualizer.domain_rules.get("Onboarding");

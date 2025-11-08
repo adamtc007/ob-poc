@@ -175,7 +175,7 @@ BEGIN
                 format('Migrated from dsl_ob table. Original CBU: %s', dsl_record.cbu_id),
                 'MIGRATION_SCRIPT',
                 dsl_record.created_at
-            );
+            ) ON CONFLICT (version_id) DO NOTHING;
 
             version_counter := version_counter + 1;
         END LOOP;
@@ -266,6 +266,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Ensure trigger can be re-applied idempotently
+DROP TRIGGER IF EXISTS trigger_invalidate_ast_cache ON "ob-poc".dsl_versions;
 -- Create trigger for AST cache invalidation
 CREATE TRIGGER trigger_invalidate_ast_cache
     AFTER UPDATE ON "ob-poc".dsl_versions

@@ -398,7 +398,7 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
         .bind(&version.functional_state)
         .bind(&version.dsl_source_code)
         .bind(&version.change_description)
-        .bind(&version.parent_version_id)
+        .bind(version.parent_version_id)
         .bind(&version.created_by)
         .fetch_one(&self.pool)
         .await
@@ -486,14 +486,14 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
                       parsed_at, invalidated_at
             "#,
         )
-        .bind(&ast.version_id)
+        .bind(ast.version_id)
         .bind(&ast.ast_json)
         .bind(&ast.parse_metadata)
         .bind(&ast.grammar_version)
         .bind(&ast.parser_version)
         .bind(&ast.ast_hash)
-        .bind(&ast.node_count)
-        .bind(&ast.complexity_score)
+        .bind(ast.node_count)
+        .bind(ast.complexity_score)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| DslError::DatabaseError(e.to_string()))?;
@@ -552,7 +552,7 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
                       started_at, completed_at, duration_ms
             "#,
         )
-        .bind(&log.version_id)
+        .bind(log.version_id)
         .bind(&log.cbu_id)
         .bind(log.execution_phase.to_string())
         .bind(log.status.to_string())
@@ -560,7 +560,7 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
         .bind(&log.error_details)
         .bind(&log.performance_metrics)
         .bind(&log.executed_by)
-        .bind(&log.started_at)
+        .bind(log.started_at)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| DslError::DatabaseError(e.to_string()))?;
@@ -738,6 +738,7 @@ mod tests {
     use sqlx::PgPool;
 
     // Helper function to create test repository (would need actual DB for integration tests)
+    #[allow(dead_code)]
     fn create_test_repository(pool: PgPool) -> DslDomainRepository {
         DslDomainRepository::new(pool)
     }

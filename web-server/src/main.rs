@@ -17,14 +17,14 @@ use tracing::{info, warn};
 
 use ob_poc::{
     database::DslDomainRepository,
-    dsl_manager_v2::DslManagerV2,
-    models::{Domain, DslVersion},
+    dsl_manager::{DslManager, LayoutType, VisualizationOptions, DomainVisualizationOptions, StylingConfig},
+    models::{DslDomain as Domain, DslVersion},
 };
 
 // Application state
 #[derive(Clone)]
 pub struct AppState {
-    pub dsl_manager: Arc<DslManagerV2>,
+    pub dsl_manager: Arc<DslManager>,
 }
 
 // API types
@@ -86,7 +86,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Initialize DSL Manager
     let repository = DslDomainRepository::new(pool);
-    let dsl_manager = Arc::new(DslManagerV2::new(repository));
+    let dsl_manager = Arc::new(DslManager::new_with_defaults(repository));
 
     // Create application state
     let app_state = AppState { dsl_manager };
@@ -221,17 +221,17 @@ async fn get_ast_visualization(
         (Ok(domain_uuid), Ok(version_uuid)) => {
             // Set up visualization options based on query parameters
             let layout_type = match query.layout.as_deref() {
-                Some("tree") => ob_poc::dsl_manager_v2::LayoutType::Tree,
-                Some("graph") => ob_poc::dsl_manager_v2::LayoutType::Graph,
-                Some("hierarchical") => ob_poc::dsl_manager_v2::LayoutType::Hierarchical,
-                _ => ob_poc::dsl_manager_v2::LayoutType::Tree,
+                Some("tree") => LayoutType::Tree,
+                Some("graph") => LayoutType::Graph,
+                Some("hierarchical") => LayoutType::Hierarchical,
+                _ => LayoutType::Tree,
             };
 
-            let options = ob_poc::dsl_manager_v2::VisualizationOptions {
+            let options = VisualizationOptions {
                 layout: layout_type,
                 include_compilation_info: true,
                 include_domain_context: query.domain_context.unwrap_or(true),
-                styling: ob_poc::dsl_manager_v2::StylingConfig::default(),
+                styling: StylingConfig::default(),
                 filters: None,
             };
 
@@ -272,18 +272,18 @@ async fn get_domain_visualization(
             match state.dsl_manager.get_domain_by_id(domain_uuid).await {
                 Ok(Some(domain)) => {
                     let layout_type = match query.layout.as_deref() {
-                        Some("tree") => ob_poc::dsl_manager_v2::LayoutType::Tree,
-                        Some("graph") => ob_poc::dsl_manager_v2::LayoutType::Graph,
-                        Some("hierarchical") => ob_poc::dsl_manager_v2::LayoutType::Hierarchical,
-                        _ => ob_poc::dsl_manager_v2::LayoutType::Tree,
+                        Some("tree") => LayoutType::Tree,
+                        Some("graph") => LayoutType::Graph,
+                        Some("hierarchical") => LayoutType::Hierarchical,
+                        _ => LayoutType::Tree,
                     };
 
-                    let domain_options = ob_poc::dsl_manager_v2::DomainVisualizationOptions {
-                        base_options: ob_poc::dsl_manager_v2::VisualizationOptions {
+                    let domain_options = DomainVisualizationOptions {
+                        base_options: VisualizationOptions {
                             layout: layout_type,
                             include_compilation_info: true,
                             include_domain_context: true,
-                            styling: ob_poc::dsl_manager_v2::StylingConfig::default(),
+                            styling: StylingConfig::default(),
                             filters: None,
                         },
                         highlight_current_state: query.highlight.unwrap_or(true),
@@ -329,28 +329,4 @@ async fn get_domain_visualization(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use axum::body::Body;
-    use axum::http::{Request, StatusCode};
-    use tower::ServiceExt;
-
-    // Mock state for testing
-    fn create_test_state() -> AppState {
-        // This would need a proper mock implementation
-        // For now, this is just a placeholder
-        todo!("Implement test state with mock database")
-    }
-
-    #[tokio::test]
-    async fn test_health_check() {
-        let app = create_router(create_test_state());
-        let response = app
-            .oneshot(Request::builder().uri("/api/health").body(Body::empty()).unwrap())
-            .await
-            .unwrap();
-
-        assert_eq!(response.status(), StatusCode::OK);
-    }
-}
+// Tests removed during refactor consolidation

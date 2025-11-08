@@ -4,7 +4,7 @@
 //! workflow states, and the complete business request lifecycle. This is the
 //! primary interface for business context management in the DSL system.
 
-use crate::dsl_manager_v2::DslError;
+use crate::dsl_manager::DslError;
 use crate::models::business_request_models::*;
 use async_trait::async_trait;
 use serde_json::Value;
@@ -112,6 +112,7 @@ impl DslBusinessRequestRepository {
     }
 
     /// Helper method to validate domain exists and is active
+    #[allow(dead_code)]
     async fn validate_domain(&self, domain_name: &str) -> Result<Uuid, DslError> {
         let row = sqlx::query(
             r#"SELECT domain_id FROM "ob-poc".dsl_domains WHERE domain_name = $1 AND active = true"#,
@@ -123,9 +124,7 @@ impl DslBusinessRequestRepository {
 
         match row {
             Some(row) => Ok(row.get("domain_id")),
-            None => Err(DslError::NotFound {
-                id: format!("domain: {}", domain_name),
-            }),
+            None => Err(DslError::NotFound { message: format!("domain: {}", domain_name) }),
         }
     }
 
@@ -410,12 +409,12 @@ impl DslBusinessRequestRepositoryTrait for DslBusinessRequestRepository {
         }
 
         if set_clauses.is_empty() {
-            return Err(DslError::ValidationFailed {
-                message: "No updates provided".to_string(),
-            });
+            return Err(DslError::ValidationError { message: "No updates provided".to_string() });
         }
 
-        set_clauses.push(format!("updated_at = now()"));
+        set_clauses.push("updated_at = now()".to_string());
+        // Silence unused assignment warnings for bind_count in this simplified flow
+        let _ = bind_count;
         // For simplicity, we'll fetch the updated record separately
         // In a production system, you'd want to build this more dynamically
         sqlx::query(
@@ -428,9 +427,7 @@ impl DslBusinessRequestRepositoryTrait for DslBusinessRequestRepository {
 
         self.get_business_request(request_id)
             .await?
-            .ok_or_else(|| DslError::NotFound {
-                id: format!("business_request: {}", request_id),
-            })
+            .ok_or_else(|| DslError::NotFound { message: format!("business_request: {}", request_id) })
     }
 
     async fn delete_business_request(&self, request_id: &Uuid) -> Result<(), DslError> {
@@ -444,9 +441,7 @@ impl DslBusinessRequestRepositoryTrait for DslBusinessRequestRepository {
                 .map_err(|e| DslError::DatabaseError(e.to_string()))?;
 
         if result.rows_affected() == 0 {
-            return Err(DslError::NotFound {
-                id: format!("business_request: {}", request_id),
-            });
+            return Err(DslError::NotFound { message: format!("business_request: {}", request_id) });
         }
 
         info!("Deleted business request: {}", request_id);
@@ -570,7 +565,7 @@ impl DslBusinessRequestRepositoryTrait for DslBusinessRequestRepository {
         let row = sqlx::query(
             r#"SELECT * FROM "ob-poc".dsl_request_workflow_states WHERE state_id = $1"#,
         )
-        .bind(&state_id)
+        .bind(state_id)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| DslError::DatabaseError(e.to_string()))?;

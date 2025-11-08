@@ -4,7 +4,9 @@
 
 Database schema for the DSL Onboarding POC implementing an immutable, versioned state machine with comprehensive entity relationship management and attribute-driven configuration.
 
-## Schema: `"dsl-ob-poc"`
+## Schema: `"ob-poc"`
+
+Note: `ob-poc` is the canonical schema. Any legacy references to `"dsl-ob-poc"` should be interpreted as `"ob-poc"`. Migration scripts normalize the old name automatically.
 
 ### Core Architecture
 

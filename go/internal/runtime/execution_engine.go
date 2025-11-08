@@ -1,45 +1,33 @@
 package runtime
 
 import (
-	"context"
-	"database/sql"
-	"encoding/json"
-	"fmt"
-	"regexp"
-	"strings"
-	"time"
+    "context"
+    "encoding/json"
+    "fmt"
+    "regexp"
+    "strings"
+    "time"
 
-	"dsl-ob-poc/internal/datastore"
+    "dsl-ob-poc/internal/datastore"
 )
 
 // ExecutionEngine orchestrates the execution of DSL actions
 type ExecutionEngine struct {
-	repository        *Repository
-	dataStore         datastore.DataStore
-	httpClient        *HTTPClient
-	attributeResolver *AttributeResolver
-	credentialMgr     *CredentialManager
+    dataStore         datastore.DataStore
+    httpClient        *HTTPClient
+    attributeResolver *AttributeResolver
 }
 
 // NewExecutionEngine creates a new execution engine
-func NewExecutionEngine(db *sql.DB, dataStore datastore.DataStore) (*ExecutionEngine, error) {
-	repository := NewRepository(db)
+func NewExecutionEngine(_ interface{}, dataStore datastore.DataStore) (*ExecutionEngine, error) {
+    httpClient := NewHTTPClient()
+    attributeResolver := NewAttributeResolver(dataStore)
 
-	credentialMgr, err := NewCredentialManager(db)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create credential manager: %w", err)
-	}
-
-	httpClient := NewHTTPClient(credentialMgr)
-	attributeResolver := NewAttributeResolver(dataStore)
-
-	return &ExecutionEngine{
-		repository:        repository,
-		dataStore:         dataStore,
-		httpClient:        httpClient,
-		attributeResolver: attributeResolver,
-		credentialMgr:     credentialMgr,
-	}, nil
+    return &ExecutionEngine{
+        dataStore:         dataStore,
+        httpClient:        httpClient,
+        attributeResolver: attributeResolver,
+    }, nil
 }
 
 // ExecuteAction executes a single action based on execution request

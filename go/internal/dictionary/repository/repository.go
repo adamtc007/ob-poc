@@ -62,8 +62,8 @@ type repositoryConfig struct {
 
 // NewDictionaryRepository creates a new dictionary repository
 func NewDictionaryRepository(
-	connectionString string,
-	opts ...Option,
+    connectionString string,
+    opts ...Option,
 ) (DictionaryRepository, error) {
 	// Default configuration
 	config := &repositoryConfig{
@@ -78,8 +78,8 @@ func NewDictionaryRepository(
 		opt(config)
 	}
 
-	// Create PostgreSQL repository implementation
-	return newPostgresDictionaryRepository(connectionString, config)
+    // Deprecated: DB-backed repository is removed; use Rust backend or mocks
+    return nil, errors.New("PostgreSQL dictionary repository is deprecated; use Rust gRPC backend or mocks")
 }
 
 // WithCaching enables result caching for repository queries

@@ -228,7 +228,7 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_partnership_interests_partnership_id'
         AND table_name = 'partnership_interests'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
         ALTER TABLE "ob-poc".partnership_interests
         ADD CONSTRAINT fk_partnership_interests_partnership_id
@@ -243,7 +243,7 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_partnership_interests_entity_id'
         AND table_name = 'partnership_interests'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
         ALTER TABLE "ob-poc".partnership_interests
         ADD CONSTRAINT fk_partnership_interests_entity_id
@@ -258,7 +258,7 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_partnership_control_mechanisms_partnership_id'
         AND table_name = 'partnership_control_mechanisms'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
         ALTER TABLE "ob-poc".partnership_control_mechanisms
         ADD CONSTRAINT fk_partnership_control_mechanisms_partnership_id
@@ -272,7 +272,7 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_partnership_control_mechanisms_entity_id'
         AND table_name = 'partnership_control_mechanisms'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
         ALTER TABLE "ob-poc".partnership_control_mechanisms
         ADD CONSTRAINT fk_partnership_control_mechanisms_entity_id
@@ -291,7 +291,7 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_ubo_registry_subject_entity_id'
         AND table_name = 'ubo_registry'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
         ALTER TABLE "ob-poc".ubo_registry
         ADD CONSTRAINT fk_ubo_registry_subject_entity_id
@@ -306,7 +306,7 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_ubo_registry_ubo_proper_person_id'
         AND table_name = 'ubo_registry'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
         ALTER TABLE "ob-poc".ubo_registry
         ADD CONSTRAINT fk_ubo_registry_ubo_proper_person_id
@@ -325,7 +325,7 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_orchestration_domain_sessions_orchestration_session_id'
         AND table_name = 'orchestration_domain_sessions'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
         ALTER TABLE "ob-poc".orchestration_domain_sessions
         ADD CONSTRAINT fk_orchestration_domain_sessions_orchestration_session_id
@@ -340,7 +340,7 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_orchestration_tasks_orchestration_session_id'
         AND table_name = 'orchestration_tasks'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
         ALTER TABLE "ob-poc".orchestration_tasks
         ADD CONSTRAINT fk_orchestration_tasks_orchestration_session_id

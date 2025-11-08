@@ -141,7 +141,7 @@ pub struct DomainMetrics {
 
 ### Core Implementation
 - `src/domain_visualizations.rs` - Complete domain-aware visualization system (851 lines)
-- `src/dsl_manager_v2.rs` - Enhanced with Phase 3 domain capabilities (+200 lines)
+- `src/dsl_manager.rs` - Consolidated manager with Phase 3 domain capabilities (+200 lines)
 - `examples/phase3_domain_visualization_demo.rs` - Comprehensive demonstration (825 lines)
 - `PHASE3_README.md` - Detailed technical documentation and API reference (491 lines)
 
