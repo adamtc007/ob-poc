@@ -36,6 +36,20 @@ go.work
 # Go build cache
 .gocache/
 
+# Protobuf tools and binaries
+buf
+
+# Archive files and binary artifacts
+*.zip
+*.tar.gz
+*.tar.bz2
+*.rar
+*.7z
+*.tar
+*.gz
+*.bz2
+*.xz
+
 # Go modules
 # go.sum should be committed, removing this line
 
