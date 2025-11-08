@@ -1,0 +1,651 @@
+;; ==========================================================================
+;; COMPREHENSIVE KYC & UBO DSL EXAMPLE
+;; ==========================================================================
+;; This example demonstrates a complete KYC (Know Your Customer) and UBO
+;; (Ultimate Beneficial Owner) identification workflow for a complex
+;; multi-jurisdictional corporate structure.
+;;
+;; Client: Meridian Global Investment Fund
+;; Scenario: High-risk onboarding with complex ownership structure
+;; Regulatory Framework: EU 5MLD, US BSA/AML, Singapore MAS Guidelines
+;; Risk Rating: HIGH (PEP connections, multiple jurisdictions, trust structures)
+;; ==========================================================================
+
+;; ==========================================================================
+;; SECTION 1: KYC INVESTIGATION SETUP
+;; ==========================================================================
+
+(define-kyc-investigation "meridian-global-kyc-2024"
+  :target-entity "company-meridian-global-fund"
+  :investigation-type "ENHANCED_DUE_DILIGENCE"
+  :risk-rating "HIGH"
+  :regulatory-framework ["EU_5MLD" "US_BSA_AML" "SG_MAS_AML_CFT"]
+  :investigation-depth 7
+  :ubo-threshold 10.0
+  :completion-deadline "2024-02-15"
+
+  ;; Enhanced KYC requirements for high-risk client
+  :kyc-requirements {
+    :customer-identification "ENHANCED"
+    :source-of-funds "DETAILED_VERIFICATION"
+    :source-of-wealth "MANDATORY"
+    :business-purpose "COMPREHENSIVE_REVIEW"
+    :pep-screening "CONTINUOUS_MONITORING"
+    :sanctions-screening "REAL_TIME"
+    :adverse-media "DEEP_SEARCH"
+  })
+
+;; ==========================================================================
+;; SECTION 2: TARGET ENTITY DECLARATION
+;; ==========================================================================
+
+(declare-entity
+  :node-id "company-meridian-global-fund"
+  :label Company
+  :properties {
+    :legal-name "Meridian Global Investment Fund S.C.A."
+    :registration-number "LU-B234567"
+    :jurisdiction "LU"
+    :entity-type "Investment Fund (SCA)"
+    :incorporation-date "2022-08-15"
+    :status "active"
+    :business-activity "Alternative investment management"
+    :aum "2500000000"
+    :currency "EUR"
+    :address {
+      :street "12 Boulevard Royal"
+      :city "Luxembourg"
+      :postal-code "L-2449"
+      :country "LU"
+    }
+    :kyc-risk-factors [
+      "COMPLEX_OWNERSHIP_STRUCTURE"
+      "MULTIPLE_JURISDICTIONS"
+      "HIGH_NET_WORTH_CLIENTS"
+      "PEP_CONNECTIONS"
+      "TRUST_STRUCTURES"
+    ]
+  })
+
+;; ==========================================================================
+;; SECTION 3: KYC DATA COLLECTION & VERIFICATION
+;; ==========================================================================
+
+;; Collect and verify corporate documentation
+(kyc-collect-documents
+  :entity "company-meridian-global-fund"
+  :document-types [
+    {
+      :type "CERTIFICATE_OF_INCORPORATION"
+      :source "LUXEMBOURG_COMPANY_REGISTRY"
+      :verification-status "VERIFIED"
+      :document-id "doc-lu-incorporation-001"
+      :issue-date "2022-08-15"
+      :validity "CURRENT"
+    }
+    {
+      :type "ARTICLES_OF_ASSOCIATION"
+      :source "CLIENT_PROVIDED"
+      :verification-status "PENDING_REGISTRY_CHECK"
+      :document-id "doc-articles-001"
+      :last-updated "2023-11-20"
+    }
+    {
+      :type "REGULATORY_LICENSE"
+      :source "CSSF_LUXEMBOURG"
+      :verification-status "VERIFIED"
+      :document-id "doc-cssf-license-001"
+      :license-number "A00001234"
+      :status "ACTIVE"
+    }
+  ])
+
+;; Perform enhanced customer identification
+(kyc-customer-identification
+  :entity "company-meridian-global-fund"
+  :identification-level "ENHANCED"
+  :verification-methods [
+    "CORPORATE_REGISTRY_CHECK"
+    "REGULATORY_DATABASE_SEARCH"
+    "THIRD_PARTY_DATABASE_VERIFICATION"
+    "ON_SITE_VERIFICATION"
+  ]
+  :results {
+    :identity-confirmed true
+    :legal-status-verified true
+    :regulatory-standing "GOOD"
+    :adverse-findings []
+  })
+
+;; Source of funds verification
+(kyc-source-of-funds
+  :entity "company-meridian-global-fund"
+  :verification-level "DETAILED"
+  :funding-sources [
+    {
+      :source-type "INSTITUTIONAL_INVESTORS"
+      :amount 1800000000
+      :currency "EUR"
+      :verification-status "VERIFIED"
+      :supporting-docs ["doc-investor-commitments-001" "doc-fund-statements-001"]
+    }
+    {
+      :source-type "HIGH_NET_WORTH_INDIVIDUALS"
+      :amount 500000000
+      :currency "EUR"
+      :verification-status "UNDER_REVIEW"
+      :risk-flags ["SOME_PEP_INVESTORS"]
+    }
+    {
+      :source-type "FAMILY_OFFICES"
+      :amount 200000000
+      :currency "EUR"
+      :verification-status "ENHANCED_REVIEW_REQUIRED"
+      :risk-flags ["COMPLEX_STRUCTURES" "OFFSHORE_JURISDICTIONS"]
+    }
+  ])
+
+;; ==========================================================================
+;; SECTION 4: UBO IDENTIFICATION - COMPLEX OWNERSHIP STRUCTURE
+;; ==========================================================================
+
+;; General Partner - Direct Control
+(declare-entity
+  :node-id "company-meridian-gp"
+  :label Company
+  :properties {
+    :legal-name "Meridian GP S.à r.l."
+    :registration-number "LU-B234568"
+    :jurisdiction "LU"
+    :entity-type "Management Company"
+    :control-type "GENERAL_PARTNER"
+    :management-fees "2.0%"
+    :carried-interest "20.0%"
+  })
+
+(create-edge
+  :from "company-meridian-gp"
+  :to "company-meridian-global-fund"
+  :type HAS_CONTROL
+  :properties {
+    :control-type "GENERAL_PARTNER_CONTROL"
+    :voting-rights 100.0
+    :management-control true
+    :investment-decisions true
+  }
+  :evidenced-by ["doc-partnership-agreement-001" "doc-lu-registry-001"])
+
+;; Major Limited Partner - Sovereign Wealth Fund
+(declare-entity
+  :node-id "entity-nordic-sovereign-fund"
+  :label SovereignWealthFund
+  :properties {
+    :legal-name "Nordic Sovereign Investment Fund"
+    :jurisdiction "NO"
+    :entity-type "Sovereign Wealth Fund"
+    :government-entity true
+    :assets-under-management "180000000000"
+    :transparency-level "HIGH"
+  })
+
+(create-edge
+  :from "entity-nordic-sovereign-fund"
+  :to "company-meridian-global-fund"
+  :type HAS_OWNERSHIP
+  :properties {
+    :percent 35.0
+    :investment-amount 875000000
+    :share-class "Limited Partner Interest"
+    :acquisition-date "2022-09-01"
+    :lock-up-period "5_YEARS"
+  }
+  :evidenced-by ["doc-subscription-agreement-001" "doc-fund-registry-001"])
+
+;; Complex Trust Structure - High Risk
+(declare-entity
+  :node-id "trust-cayman-discretionary"
+  :label Trust
+  :properties {
+    :trust-name "Pinnacle Discretionary Trust"
+    :registration-number "CT-789456"
+    :jurisdiction "KY"
+    :trust-type "Discretionary Trust"
+    :established-date "2018-03-20"
+    :beneficiaries-disclosed false
+    :protector-appointed true
+    :purpose "WEALTH_PRESERVATION"
+    :opacity-level "HIGH"
+    :kyc-risk-rating "HIGH"
+  })
+
+(create-edge
+  :from "trust-cayman-discretionary"
+  :to "company-meridian-global-fund"
+  :type HAS_OWNERSHIP
+  :properties {
+    :percent 22.0
+    :investment-amount 550000000
+    :share-class "Limited Partner Interest"
+    :beneficial-owners-unknown true
+  }
+  :evidenced-by ["doc-trust-subscription-001"]
+  :risk-flags ["BENEFICIAL_OWNERS_UNDISCLOSED" "OFFSHORE_JURISDICTION"])
+
+;; Trust Trustee - Professional Service Provider
+(declare-entity
+  :node-id "company-cayman-trustee"
+  :label Company
+  :properties {
+    :legal-name "Cayman Professional Trust Services Ltd."
+    :registration-number "CT-123789"
+    :jurisdiction "KY"
+    :entity-type "Professional Trust Company"
+    :license-status "LICENSED"
+    :regulated-by "CIMA"
+  })
+
+(create-edge
+  :from "company-cayman-trustee"
+  :to "trust-cayman-discretionary"
+  :type ACTS_AS_TRUSTEE
+  :properties {
+    :appointment-date "2018-03-20"
+    :fiduciary-duties true
+    :discretionary-powers true
+  })
+
+;; Family Office Structure
+(declare-entity
+  :node-id "company-chen-family-office"
+  :label Company
+  :properties {
+    :legal-name "Chen Family Investment Office Pte. Ltd."
+    :registration-number "202301234A"
+    :jurisdiction "SG"
+    :entity-type "Single Family Office"
+    :mfas-license true
+    :family-name "Chen"
+  })
+
+(create-edge
+  :from "company-chen-family-office"
+  :to "company-meridian-global-fund"
+  :type HAS_OWNERSHIP
+  :properties {
+    :percent 18.0
+    :investment-amount 450000000
+    :investment-structure "DIRECT_INVESTMENT"
+  }
+  :evidenced-by ["doc-sg-registry-001" "doc-subscription-002"])
+
+;; Ultimate Beneficial Owner - Chen Wei (PEP)
+(declare-entity
+  :node-id "person-chen-wei"
+  :label Person
+  :properties {
+    :full-name "Chen Wei"
+    :date-of-birth "1968-04-12"
+    :nationality ["SG" "US"]
+    :pep-status "CURRENT_PEP"
+    :pep-category "FOREIGN_PROMINENT_PUBLIC_OFFICIAL"
+    :pep-position "Former Minister of Trade and Industry, Singapore"
+    :pep-end-date "2019-05-15"
+    :high-risk-individual true
+    :source-of-wealth "BUSINESS_VENTURES_GOVERNMENT_SERVICE"
+    :net-worth "5000000000"
+    :residency "SG"
+    :tax-residencies ["SG" "US"]
+  })
+
+(create-edge
+  :from "person-chen-wei"
+  :to "company-chen-family-office"
+  :type HAS_CONTROL
+  :properties {
+    :percent 100.0
+    :control-type "SOLE_BENEFICIAL_OWNER"
+    :date-established "2023-01-15"
+  }
+  :evidenced-by ["doc-sg-beneficial-ownership-001"])
+
+;; Private Equity Firm
+(declare-entity
+  :node-id "company-alpine-capital"
+  :label Company
+  :properties {
+    :legal-name "Alpine Capital Partners LLP"
+    :registration-number "OC387654"
+    :jurisdiction "GB"
+    :entity-type "Limited Liability Partnership"
+    :business-activity "Private Equity"
+    :fca-authorized true
+    :assets-under-management "12000000000"
+  })
+
+(create-edge
+  :from "company-alpine-capital"
+  :to "company-meridian-global-fund"
+  :type HAS_OWNERSHIP
+  :properties {
+    :percent 15.0
+    :investment-amount 375000000
+    :investor-type "INSTITUTIONAL"
+  })
+
+;; ==========================================================================
+;; SECTION 5: UBO CALCULATION & ANALYSIS
+;; ==========================================================================
+
+(calculate-ubo-prongs
+  :target "company-meridian-global-fund"
+  :algorithm "RECURSIVE_OWNERSHIP_ANALYSIS"
+  :threshold 10.0
+  :max-depth 5
+  :calculation-date "2024-01-15"
+  :traversal-rules {
+    :follow-edges [HAS_OWNERSHIP HAS_CONTROL ACTS_AS_TRUSTEE]
+    :terminal-nodes [Person SovereignWealthFund]
+    :blocked-structures [Trust]
+    :nominee-handling "LOOK_THROUGH"
+  }
+  :results {
+    :total-ownership-analyzed 90.0
+    :identified-ubos [
+      {
+        :person "person-chen-wei"
+        :effective-ownership 18.0
+        :control-path ["company-meridian-global-fund" "company-chen-family-office" "person-chen-wei"]
+        :pep-status "CURRENT_PEP"
+        :risk-rating "HIGH"
+      }
+    ]
+    :sovereign-entities [
+      {
+        :entity "entity-nordic-sovereign-fund"
+        :ownership 35.0
+        :exemption-applicable true
+        :exemption-basis "SOVEREIGN_WEALTH_FUND"
+      }
+    ]
+    :blocked-structures [
+      {
+        :entity "trust-cayman-discretionary"
+        :ownership-at-risk 22.0
+        :blocker-type "UNDISCLOSED_BENEFICIARIES"
+        :additional-due-diligence "REQUIRED"
+      }
+    ]
+    :institutional-investors [
+      {
+        :entity "company-alpine-capital"
+        :ownership 15.0
+        :regulated-status true
+        :further-lookthrough "NOT_REQUIRED"
+      }
+    ]
+  })
+
+;; ==========================================================================
+;; SECTION 6: ENHANCED DUE DILIGENCE FOR HIGH-RISK FINDINGS
+;; ==========================================================================
+
+;; Enhanced screening for PEP
+(kyc-enhanced-screening
+  :subject "person-chen-wei"
+  :screening-type "PEP_ENHANCED_DUE_DILIGENCE"
+  :databases ["WORLD_CHECK" "REFINITIV" "LexisNexis" "LOCAL_PEP_DATABASE"]
+  :screening-results {
+    :pep-confirmed true
+    :sanctions-match false
+    :adverse-media-findings [
+      {
+        :headline "Former Singapore Minister Chen Wei launches family office"
+        :source "Financial Times"
+        :date "2023-01-20"
+        :risk-assessment "LOW_RISK_POSITIVE_NEWS"
+      }
+    ]
+    :ongoing-monitoring-required true
+  })
+
+;; Additional due diligence on trust structure
+(kyc-trust-investigation
+  :subject "trust-cayman-discretionary"
+  :investigation-level "ENHANCED"
+  :information-requests [
+    "BENEFICIAL_OWNERS_DISCLOSURE"
+    "TRUSTEE_DUE_DILIGENCE_FILE"
+    "SOURCE_OF_TRUST_ASSETS"
+    "PURPOSE_OF_TRUST_STRUCTURE"
+  ]
+  :responses {
+    :beneficial-owners "DECLINED_TO_DISCLOSE"
+    :trustee-cooperation "PARTIAL"
+    :source-of-assets "BUSINESS_PROFITS_INVESTMENTS"
+    :legitimate-purpose "WEALTH_PRESERVATION_TAX_PLANNING"
+  }
+  :risk-assessment {
+    :overall-risk "MEDIUM_HIGH"
+    :mitigating-factors ["REGULATED_TRUSTEE" "LEGITIMATE_PURPOSE"]
+    :aggravating-factors ["UNDISCLOSED_BENEFICIARIES" "OFFSHORE_JURISDICTION"]
+    :recommendation "ACCEPT_WITH_ENHANCED_MONITORING"
+  })
+
+;; ==========================================================================
+;; SECTION 7: COMPLIANCE CHECKS & VALIDATIONS
+;; ==========================================================================
+
+;; Sanctions screening
+(compliance-sanctions-screening
+  :entities ["company-meridian-global-fund" "company-meridian-gp" "person-chen-wei" "trust-cayman-discretionary"]
+  :sanctions-lists ["OFAC_SDN" "EU_SANCTIONS" "UK_HMT" "UN_SANCTIONS"]
+  :screening-results {
+    :matches-found false
+    :false-positives 3
+    :screening-date "2024-01-15"
+    :next-screening "2024-01-22"
+  })
+
+;; Regulatory compliance validation
+(compliance-regulatory-check
+  :jurisdiction "LU"
+  :regulations ["5MLD" "AIFMD" "GDPR"]
+  :compliance-status {
+    :ubo-disclosure-adequate false
+    :ubo-disclosure-gaps ["TRUST_BENEFICIAL_OWNERS"]
+    :regulatory-filing-required true
+    :suspicious-transaction-report false
+    :enhanced-monitoring-required true
+  })
+
+;; ==========================================================================
+;; SECTION 8: RISK ASSESSMENT & DECISION
+;; ==========================================================================
+
+(risk-assessment-comprehensive
+  :entity "company-meridian-global-fund"
+  :assessment-date "2024-01-15"
+  :risk-factors {
+    :geographic-risk "MEDIUM"
+    :customer-risk "HIGH"
+    :product-risk "MEDIUM_HIGH"
+    :transaction-risk "MEDIUM"
+  }
+  :detailed-analysis {
+    :pep-exposure {
+      :rating "HIGH"
+      :details "Ultimate beneficial owner is current PEP - Former Singapore Minister"
+      :mitigation "Enhanced ongoing monitoring, senior management approval"
+    }
+    :jurisdictional-risk {
+      :rating "MEDIUM"
+      :details "Multiple jurisdictions including offshore (Cayman Islands)"
+      :mitigation "Enhanced due diligence on trust structures"
+    }
+    :ownership-complexity {
+      :rating "HIGH"
+      :details "Complex ownership with undisclosed trust beneficiaries"
+      :mitigation "Ongoing attempts to obtain beneficial owner disclosure"
+    }
+    :business-rationale {
+      :rating "LOW"
+      :details "Legitimate investment fund with clear business purpose"
+      :mitigation "None required"
+    }
+  }
+  :overall-risk-rating "HIGH"
+  :risk-appetite-check "WITHIN_APPETITE_WITH_CONDITIONS")
+
+;; ==========================================================================
+;; SECTION 9: ONBOARDING DECISION & CONDITIONS
+;; ==========================================================================
+
+(onboarding-decision
+  :entity "company-meridian-global-fund"
+  :decision "CONDITIONAL_ACCEPTANCE"
+  :decision-date "2024-01-15"
+  :decision-authority "SENIOR_MANAGEMENT"
+  :conditions [
+    {
+      :condition "ENHANCED_ONGOING_MONITORING"
+      :frequency "QUARTERLY"
+      :focus-areas ["PEP_STATUS_CHANGES" "TRUST_BENEFICIAL_OWNERS" "SOURCE_OF_FUNDS"]
+    }
+    {
+      :condition "ANNUAL_UBO_REVIEW"
+      :requirement "Full UBO verification including trust beneficiaries"
+      :deadline "2025-01-15"
+    }
+    {
+      :condition "TRANSACTION_MONITORING"
+      :level "ENHANCED"
+      :thresholds "REDUCED_BY_50%"
+      :suspicious-activity-focus true
+    }
+    {
+      :condition "SENIOR_MANAGEMENT_APPROVAL"
+      :requirement "All transactions >EUR 10M require pre-approval"
+      :approval-committee "AML_COMMITTEE"
+    }
+  ]
+  :review-date "2024-07-15"
+  :exit-strategy "DEFINED_IF_CONDITIONS_NOT_MET")
+
+;; ==========================================================================
+;; SECTION 10: ONGOING MONITORING SETUP
+;; ==========================================================================
+
+(setup-ongoing-monitoring
+  :entity "company-meridian-global-fund"
+  :monitoring-level "ENHANCED"
+  :monitoring-components {
+    :transaction-monitoring {
+      :frequency "REAL_TIME"
+      :thresholds "ENHANCED_SENSITIVITY"
+      :focus-areas ["LARGE_TRANSACTIONS" "UNUSUAL_PATTERNS" "PEP_RELATED_FLOWS"]
+    }
+    :kyc-refresh {
+      :frequency "ANNUAL"
+      :comprehensive-review true
+      :ubo-verification-required true
+    }
+    :pep-monitoring {
+      :frequency "MONTHLY"
+      :databases ["WORLD_CHECK" "REFINITIV"]
+      :adverse-media-screening true
+    }
+    :regulatory-updates {
+      :frequency "QUARTERLY"
+      :jurisdictions ["LU" "SG" "KY" "GB" "NO"]
+      :regulatory-changes-impact-assessment true
+    }
+  }
+  :escalation-procedures {
+    :level-1 "RELATIONSHIP_MANAGER"
+    :level-2 "COMPLIANCE_OFFICER"
+    :level-3 "AML_COMMITTEE"
+    :regulatory-reporting "AUTOMATIC_IF_REQUIRED"
+  })
+
+;; ==========================================================================
+;; SECTION 11: FINAL REPORT GENERATION
+;; ==========================================================================
+
+(generate-kyc-ubo-report
+  :investigation-id "meridian-global-kyc-2024"
+  :report-type "COMPREHENSIVE_KYC_UBO_ANALYSIS"
+  :completion-date "2024-01-15"
+  :report-status "COMPLETE_WITH_CONDITIONS"
+
+  :executive-summary {
+    :entity-name "Meridian Global Investment Fund S.C.A."
+    :risk-rating "HIGH"
+    :onboarding-decision "CONDITIONAL_ACCEPTANCE"
+    :key-risk-factors ["PEP_UBO" "COMPLEX_OWNERSHIP" "TRUST_OPACITY"]
+    :mitigation-measures ["ENHANCED_MONITORING" "SENIOR_APPROVAL" "QUARTERLY_REVIEW"]
+  }
+
+  :ubo-findings {
+    :total-ownership-traced 90.0
+    :identified-ubos [
+      {
+        :name "Chen Wei"
+        :effective-ownership 18.0
+        :pep-status "CURRENT_PEP"
+        :risk-level "HIGH"
+      }
+    ]
+    :unresolved-ownership 22.0
+    :unresolved-reason "TRUST_BENEFICIARIES_UNDISCLOSED"
+  }
+
+  :compliance-status {
+    :regulatory-requirements-met "PARTIALLY"
+    :outstanding-items ["TRUST_UBO_DISCLOSURE"]
+    :regulatory-filings-required ["UBO_REGISTER_UPDATE"]
+    :ongoing-obligations ["ENHANCED_MONITORING" "ANNUAL_REVIEW"]
+  }
+
+  :recommendations {
+    :immediate-actions [
+      "SETUP_ENHANCED_MONITORING"
+      "OBTAIN_SENIOR_MANAGEMENT_APPROVAL"
+      "CONFIGURE_TRANSACTION_MONITORING"
+    ]
+    :ongoing-requirements [
+      "QUARTERLY_PEP_SCREENING"
+      "ANNUAL_UBO_VERIFICATION"
+      "TRUST_BENEFICIARY_DISCLOSURE_ATTEMPTS"
+    ]
+    :exit-criteria [
+      "MATERIAL_ADVERSE_CHANGES_IN_PEP_STATUS"
+      "INABILITY_TO_OBTAIN_REQUIRED_UBO_INFORMATION"
+      "REGULATORY_ACTION_AGAINST_KEY_PARTIES"
+    ]
+  })
+
+;; ==========================================================================
+;; END OF DSL EXAMPLE
+;; ==========================================================================
+;;
+;; This comprehensive example demonstrates:
+;; 1. Complex multi-jurisdictional KYC investigation setup
+;; 2. Enhanced due diligence for high-risk clients
+;; 3. UBO identification through complex ownership structures
+;; 4. PEP identification and enhanced screening
+;; 5. Trust structure analysis and risk assessment
+;; 6. Comprehensive compliance checking
+;; 7. Risk-based decision making with conditions
+;; 8. Ongoing monitoring setup for high-risk relationships
+;; 9. Complete audit trail and reporting
+;;
+;; Key DSL Features Demonstrated:
+;; - Declarative entity modeling
+;; - Relationship mapping with evidence tracking
+;; - Risk-based conditional logic
+;; - Regulatory compliance automation
+;; - Multi-jurisdiction support
+;; - PEP and sanctions screening integration
+;; - Enhanced due diligence workflows
+;; - Ongoing monitoring automation
+;; ==========================================================================

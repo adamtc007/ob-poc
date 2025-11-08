@@ -116,6 +116,11 @@ impl DslManager {
         domain: Option<String>,
         dsl_content: Option<String>,
     ) -> DslResult<DomainDsl> {
+        // Validate DSL content first if provided
+        if let Some(ref new_content) = dsl_content {
+            self.validate_dsl_content(new_content)?;
+        }
+
         // Find the existing DSL
         let domain_dsl = self
             .storage
@@ -138,19 +143,22 @@ impl DslManager {
 
         // Update DSL content if provided
         if let Some(new_content) = dsl_content {
-            self.validate_dsl_content(&new_content)?;
             domain_dsl.dsl_content = new_content;
             updated = true;
         }
 
         if updated {
-            // Update timestamp and increment version
+            // Store the current version to avoid borrowing issues
+            let current_version = domain_dsl.version.clone();
+            let new_version = Self::increment_version(&current_version);
+
+            // Update timestamp and version
             domain_dsl.updated_at = chrono::Utc::now();
-            domain_dsl.version = self.increment_version(&domain_dsl.version);
+            domain_dsl.version = new_version.clone();
 
             println!(
                 "🔄 Updated domain DSL '{}' (ID: {}) to version {}",
-                domain_dsl.name, id, domain_dsl.version
+                domain_dsl.name, id, new_version
             );
         }
 
@@ -199,7 +207,7 @@ impl DslManager {
     }
 
     /// Increment version string (simple semantic versioning)
-    fn increment_version(&self, current_version: &str) -> String {
+    fn increment_version(current_version: &str) -> String {
         let parts: Vec<&str> = current_version.split('.').collect();
         match parts.as_slice() {
             [major, minor, patch] => {
@@ -311,10 +319,8 @@ mod tests {
 
     #[test]
     fn test_version_increment() {
-        let manager = DslManager::new();
-
-        assert_eq!(manager.increment_version("1.0.0"), "1.0.1");
-        assert_eq!(manager.increment_version("2.5.10"), "2.5.11");
-        assert_eq!(manager.increment_version("invalid"), "1.0.1");
+        assert_eq!(DslManager::increment_version("1.0.0"), "1.0.1");
+        assert_eq!(DslManager::increment_version("2.5.10"), "2.5.11");
+        assert_eq!(DslManager::increment_version("invalid"), "1.0.1");
     }
 }

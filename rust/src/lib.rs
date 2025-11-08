@@ -62,14 +62,17 @@ pub mod grammar;
 pub mod parser;
 pub mod vocabulary;
 
+// Database and models for domain architecture
+pub mod database;
+pub mod models;
+
 // DSL Manager - core create/edit functionality
 pub mod dsl_manager;
+pub mod dsl_manager_v2;
 
-// gRPC protobuf modules - disabled due to compilation issues
-// pub mod proto;
-
-// gRPC service implementations - disabled due to compilation issues
-// pub mod grpc;
+// Deprecated modules moved to src/deprecated/ (not needed for Phase 1)
+// - proto/ - gRPC protobuf modules (for future web services)
+// - grpc/ - gRPC service implementations (for future web services)
 
 // Re-export key types and functions for public API
 pub use ast::{Program, PropertyMap, Statement, Value, Workflow};
@@ -85,6 +88,18 @@ pub use parser::{
 
 // Re-export DSL manager functionality
 pub use dsl_manager::{DomainDsl, DslError as DslManagerError, DslManager, DslResult};
+
+// Re-export database and models
+pub use database::{DatabaseConfig, DatabaseManager, DslDomainRepository};
+pub use models::{
+    CompilationStatus, DslDomain, DslVersion, ExecutionPhase, ExecutionStatus, ParsedAst,
+};
+
+// Re-export enhanced DSL manager
+pub use dsl_manager_v2::{
+    ASTVisualization, DslError as DslManagerV2Error, DslManagerV2, DslResult as DslManagerV2Result,
+    VisualizationOptions,
+};
 
 /// Version information
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
