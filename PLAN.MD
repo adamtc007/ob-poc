@@ -490,352 +490,159 @@ COMMIT;
 - [ ] Integration with existing grammar system
 - [ ] Support for functional state progression
 
-### Phase 5: FORTH-based DSL Execution Engine (2 weeks) - **DEFERRED**
-*Implementation will be deferred until AST visualization and AST storage are fully implemented and working.*
+### Phase 5: Web-Based AST Visualization (egui/wasm) (2-3 weeks)
+Create interactive web-based AST visualization using egui and WebAssembly, providing browser-based access to the domain-specific visualization capabilities developed in Phase 4.
 
-#### 5.1 DSL Execution Architecture Overview
-Based on the FORTH discussion, the DSL execution will use a three-layer architecture:
+**Previous Phase 5 Content**: The original FORTH-based DSL Execution Engine plan has been moved to `compiler_runtime.md` for future implementation.
 
-1. **AST → Bytecode Compiler** (`compiler.rs`)
-2. **FORTH Stack VM** (`vm.rs`) 
-3. **Domain-Specific OpCodes** (Workflow & Graph Engine)
+#### 5.1 Technology Stack & Architecture
 
-#### 5.2 Execute DSL Implementation
-**File**: `src/dsl_manager.rs` (addition)
-```rust
-impl DslManager {
-    /// Execute compiled DSL using FORTH-based VM
-    pub async fn execute_dsl(
-        &self,
-        domain_name: &str,
-        version_number: i32,
-        context: &ExecutionContext, // Data Dictionary
-    ) -> DslResult<ExecutionResult> {
-        
-        // 1. GET THE AST
-        // Leverages the new AST storage architecture
-        let parsed_ast_record = self.compile_dsl_version(domain_name, version_number, false).await?;
-        let ast: AstNode = serde_json::from_value(parsed_ast_record.ast_json)?;
+**Frontend Stack**:
+- **Framework**: egui (immediate mode GUI)
+- **Target**: WebAssembly (wasm32-unknown-unknown)  
+- **Build Tool**: trunk for wasm bundling and development server
+- **HTTP Client**: reqwest with wasm features
 
-        // 2. THE "BRIDGE" (COMPILE AST TO BYTECODE)
-        // Maps AST to FORTH vocabulary using domain-specific opcodes
-        let bytecode = match compiler::compile_ast_to_bytecode(&ast) {
-            Ok(bc) => bc,
-            Err(e) => return Err(DslError::CompileError(e.to_string())),
-        };
+**Backend API**:
+- **Server**: warp or axum for REST endpoints
+- **Integration**: Direct integration with existing DslManagerV2
+- **Serialization**: serde_json for web API communication
 
-        // 3. THE "VM" (EXECUTE BYTECODE)
-        // FORTH stack machine with workflow/graph engine capabilities
-        let mut vm = ForthVM::new(context);
-        match vm.execute(&bytecode) {
-            Ok(result) => Ok(result),
-            Err(e) => Err(DslError::RuntimeError(e.to_string())),
-        }
-    }
-}
+**Architecture Overview**:
+```
+┌─────────────────────┐    ┌─────────────────────┐    ┌─────────────────────┐
+│   Browser (WASM)    │◄──►│   Web API Server    │◄──►│  AST Visualization  │
+│                     │    │                     │    │     Engine          │
+│  ┌─────────────────┐│    │ ┌─────────────────┐ │    │ ┌─────────────────┐ │
+│  │  egui Web App   ││    │ │ REST Endpoints  │ │    │ │ DslManagerV2    │ │
+│  │                 ││    │ │                 │ │    │ │                 │ │
+│  │ • AST Renderer  ││    │ │ • /domains      │ │    │ │ • AST Storage   │ │
+│  │ • Domain Panel  ││    │ │ • /visualize    │ │    │ │ • Visualization │ │
+│  │ • Controls UI   ││    │ │ • /versions     │ │    │ │ • Domain Rules  │ │
+│  └─────────────────┘│    │ └─────────────────┘ │    │ └─────────────────┘ │
+└─────────────────────┘    └─────────────────────┘    └─────────────────────┘
 ```
 
-#### 5.3 FORTH VM OpCode Architecture
-**File**: `src/execution/opcodes.rs`
+#### 5.2 Web Frontend Implementation
+
+**Core egui Application**:
+- Interactive AST node and edge rendering with zoom/pan
+- Domain-specific styling and highlighting (KYC, Onboarding, Account Opening)
+- Real-time visualization updates via WebSocket or polling
+- Export capabilities (SVG, PNG) for documentation
+
+**UI Components**:
+- **Domain Panel**: Domain and version selection interface
+- **Visualization Controls**: Layout options, filters, styling controls
+- **Property Inspector**: Detailed node/edge information display
+- **Status Bar**: Connection status, performance metrics
+
+**Interaction Features**:
+- Click/drag node selection and positioning
+- Hover tooltips with domain-specific information
+- Zoom and pan navigation
+- Multi-select operations for bulk actions
+
+#### 5.3 Web API Server
+
+**REST Endpoints**:
 ```rust
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum OpCode {
-    // Stack operations
-    Push(Value),
-    Pop,
-    Dup,
-    Swap,
-    
-    // Domain-specific workflow opcodes (not simple math!)
-    CallDeclareEntity,     // Pops entity data, executes DB INSERT
-    CallCreateEdge,        // Pops edge data, creates relationships
-    CallKycCollect,        // Executes KYC data collection
-    CallCalculateUBO,      // Runs UBO calculation algorithms
-    CallGenerateReport,    // Generates compliance reports
-    CallScheduleMonitoring, // Sets up ongoing monitoring
-    
-    // Control flow
-    Branch(usize),
-    BranchIf(usize),
-    Call(String),
-    Return,
-    
-    // Data dictionary operations
-    LoadAttribute(String),
-    StoreAttribute(String),
-    ValidateAttribute(String),
-}
+// Domain Management
+GET /api/domains                           // List available domains
+GET /api/domains/{domain}/versions         // List domain versions
+
+// Visualization
+GET /api/visualize/{domain}/{version}      // Basic AST visualization
+GET /api/visualize/{domain}/{version}/enhanced  // Domain-enhanced visualization
+POST /api/visualize/custom                 // Custom visualization options
+
+// Real-time Updates  
+WebSocket /ws/visualize/{domain}/{version} // Live visualization updates
 ```
 
-#### 5.4 Domain-Specific VM Context
-**File**: `src/execution/context.rs`
-```rust
-/// Execution context containing data dictionary and database connections
-#[derive(Debug)]
-pub struct ExecutionContext {
-    // Data dictionary with runtime values
-    pub attributes: HashMap<String, AttributeValue>,
-    
-    // Database connections for entity operations
-    pub db_pool: sqlx::PgPool,
-    
-    // Domain-specific services
-    pub kyc_service: Box<dyn KycService>,
-    pub ubo_calculator: Box<dyn UboCalculator>,
-    pub compliance_checker: Box<dyn ComplianceChecker>,
-    
-    // Execution tracking
-    pub execution_log: Vec<ExecutionEvent>,
-    pub current_step: Option<String>,
-    
-    // Security context
-    pub user_permissions: UserPermissions,
-    pub audit_trail: AuditTrail,
-}
+**Integration Points**:
+- Direct integration with existing `DslManagerV2` APIs
+- Domain-enhanced visualization pipeline from Phase 4
+- Database connectivity for live domain data
+- CORS configuration for cross-origin requests
 
-impl ExecutionContext {
-    /// Execute domain-specific operations based on OpCode
-    pub async fn execute_opcode(&mut self, opcode: &OpCode, stack: &mut Vec<Value>) -> Result<(), ExecutionError> {
-        match opcode {
-            OpCode::CallDeclareEntity => {
-                // Pop entity data from FORTH stack
-                let properties = stack.pop().unwrap().as_map()?;
-                let entity_type = stack.pop().unwrap().as_string()?;
-                let node_id = stack.pop().unwrap().as_string()?;
-                
-                // Execute database operation
-                self.declare_entity(node_id, entity_type, properties).await?;
-                
-                // Push result back to stack
-                stack.push(Value::Boolean(true));
-            },
-            OpCode::CallCreateEdge => {
-                // Pop edge data from stack
-                let evidenced_by = stack.pop().unwrap().as_list()?;
-                let properties = stack.pop().unwrap().as_map()?;
-                let edge_type = stack.pop().unwrap().as_string()?;
-                let to = stack.pop().unwrap().as_string()?;
-                let from = stack.pop().unwrap().as_string()?;
-                
-                // Execute graph operation
-                self.create_edge(from, to, edge_type, properties, evidenced_by).await?;
-                stack.push(Value::Boolean(true));
-            },
-            OpCode::CallCalculateUBO => {
-                // Pop UBO calculation parameters
-                let traversal_rules = stack.pop().unwrap().as_map()?;
-                let threshold = stack.pop().unwrap().as_number()?;
-                let target = stack.pop().unwrap().as_string()?;
-                
-                // Execute UBO calculation
-                let result = self.ubo_calculator.calculate(target, threshold, traversal_rules).await?;
-                stack.push(Value::Map(result));
-            },
-            // ... other domain-specific opcodes
-            _ => return Err(ExecutionError::UnsupportedOpCode(format!("{:?}", opcode))),
-        }
-        Ok(())
-    }
-}
-```
+#### 5.4 Key Implementation Components
 
-#### 5.5 AST to Bytecode Compiler
-**File**: `src/execution/compiler.rs`
-```rust
-pub struct ASTCompiler {
-    opcodes: Vec<OpCode>,
-    symbol_table: HashMap<String, usize>,
-}
+**AST Renderer** (`ast_renderer.rs`):
+- egui-based graph rendering with custom painting
+- Force-directed layout algorithms
+- Domain-aware node/edge styling
+- Interactive selection and manipulation
+- Performance optimization for large graphs
 
-impl ASTCompiler {
-    /// Compile AST to FORTH bytecode
-    pub fn compile_ast_to_bytecode(ast: &AstNode) -> Result<Vec<OpCode>, CompileError> {
-        let mut compiler = ASTCompiler::new();
-        compiler.compile_node(ast)?;
-        Ok(compiler.opcodes)
-    }
-    
-    fn compile_node(&mut self, node: &AstNode) -> Result<(), CompileError> {
-        match node {
-            AstNode::Statement(Statement::DeclareEntity { id, entity_type, properties }) => {
-                // Push arguments in reverse order (FORTH stack)
-                self.opcodes.push(OpCode::Push(Value::String(id.clone())));
-                self.opcodes.push(OpCode::Push(Value::String(entity_type.clone())));
-                self.opcodes.push(OpCode::Push(Value::Map(properties.clone())));
-                
-                // Call the domain-specific opcode
-                self.opcodes.push(OpCode::CallDeclareEntity);
-            },
-            AstNode::Statement(Statement::CreateEdge { from, to, edge_type, properties, evidenced_by }) => {
-                // Push arguments for edge creation
-                self.opcodes.push(OpCode::Push(Value::String(from.clone())));
-                self.opcodes.push(OpCode::Push(Value::String(to.clone())));
-                self.opcodes.push(OpCode::Push(Value::String(edge_type.to_string())));
-                self.opcodes.push(OpCode::Push(Value::Map(properties.clone())));
-                self.opcodes.push(OpCode::Push(Value::List(
-                    evidenced_by.iter().map(|s| Value::String(s.clone())).collect()
-                )));
-                
-                self.opcodes.push(OpCode::CallCreateEdge);
-            },
-            AstNode::Statement(Statement::CalculateUbo { entity_id, properties }) => {
-                // Extract UBO calculation parameters
-                let target = entity_id.clone();
-                let threshold = properties.get("threshold")
-                    .and_then(|v| v.as_number())
-                    .unwrap_or(25.0);
-                let traversal_rules = properties.get("traversal_rules")
-                    .and_then(|v| v.as_map())
-                    .cloned()
-                    .unwrap_or_default();
-                
-                self.opcodes.push(OpCode::Push(Value::String(target)));
-                self.opcodes.push(OpCode::Push(Value::Number(threshold)));
-                self.opcodes.push(OpCode::Push(Value::Map(traversal_rules)));
-                
-                self.opcodes.push(OpCode::CallCalculateUBO);
-            },
-            // ... compile other AST node types
-            _ => return Err(CompileError::UnsupportedAstNode(format!("{:?}", node))),
-        }
-        Ok(())
-    }
-}
-```
+**API Client** (`api_client.rs`):
+- Async HTTP client with reqwest
+- WebAssembly-compatible networking
+- Error handling and retry logic
+- Caching for improved performance
 
-#### 5.6 FORTH Virtual Machine
-**File**: `src/execution/vm.rs`
-```rust
-pub struct ForthVM {
-    stack: Vec<Value>,
-    call_stack: Vec<usize>,
-    instruction_pointer: usize,
-    context: ExecutionContext,
-}
+**State Management**:
+- Centralized application state
+- Async state updates from API calls
+- UI reactivity and data binding
+- Persistence of user preferences
 
-impl ForthVM {
-    pub fn new(context: ExecutionContext) -> Self {
-        Self {
-            stack: Vec::new(),
-            call_stack: Vec::new(),
-            instruction_pointer: 0,
-            context,
-        }
-    }
-    
-    /// Execute bytecode using FORTH stack machine
-    pub async fn execute(&mut self, bytecode: &[OpCode]) -> Result<ExecutionResult, ExecutionError> {
-        self.instruction_pointer = 0;
-        
-        while self.instruction_pointer < bytecode.len() {
-            let opcode = &bytecode[self.instruction_pointer];
-            
-            match opcode {
-                OpCode::Push(value) => {
-                    self.stack.push(value.clone());
-                },
-                OpCode::Pop => {
-                    self.stack.pop()
-                        .ok_or(ExecutionError::StackUnderflow)?;
-                },
-                OpCode::Dup => {
-                    let value = self.stack.last()
-                        .ok_or(ExecutionError::StackUnderflow)?
-                        .clone();
-                    self.stack.push(value);
-                },
-                // Domain-specific opcodes executed through context
-                OpCode::CallDeclareEntity | 
-                OpCode::CallCreateEdge | 
-                OpCode::CallCalculateUBO |
-                OpCode::CallKycCollect |
-                OpCode::CallGenerateReport |
-                OpCode::CallScheduleMonitoring => {
-                    self.context.execute_opcode(opcode, &mut self.stack).await?;
-                },
-                OpCode::Branch(target) => {
-                    self.instruction_pointer = *target;
-                    continue;
-                },
-                OpCode::BranchIf(target) => {
-                    let condition = self.stack.pop()
-                        .ok_or(ExecutionError::StackUnderflow)?;
-                    if condition.as_bool().unwrap_or(false) {
-                        self.instruction_pointer = *target;
-                        continue;
-                    }
-                },
-                // ... other opcodes
-            }
-            
-            self.instruction_pointer += 1;
-        }
-        
-        // Return execution results
-        Ok(ExecutionResult {
-            final_stack: self.stack.clone(),
-            execution_log: self.context.execution_log.clone(),
-            entities_created: self.context.get_entities_created(),
-            relationships_created: self.context.get_relationships_created(),
-        })
-    }
-}
-```
+#### 5.5 Development Workflow
 
-#### 5.7 Execution Result Types
-**File**: `src/execution/types.rs`
-```rust
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExecutionResult {
-    pub final_stack: Vec<Value>,
-    pub execution_log: Vec<ExecutionEvent>,
-    pub entities_created: Vec<EntityId>,
-    pub relationships_created: Vec<RelationshipId>,
-    pub compliance_results: Vec<ComplianceResult>,
-    pub reports_generated: Vec<ReportId>,
-    pub monitoring_scheduled: Vec<MonitoringTask>,
-}
+**Frontend Development**:
+1. `trunk serve` - Development server with hot reload
+2. Browser-based testing and debugging  
+3. WebAssembly optimization for production builds
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExecutionEvent {
-    pub timestamp: DateTime<Utc>,
-    pub event_type: EventType,
-    pub description: String,
-    pub data: Option<serde_json::Value>,
-}
+**Backend API**:
+1. `cargo run --bin web-api` - API server development
+2. Integration testing with existing DSL manager
+3. CORS configuration for local development
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum EventType {
-    EntityDeclared,
-    EdgeCreated,
-    UboCalculated,
-    ComplianceChecked,
-    ReportGenerated,
-    MonitoringScheduled,
-    Error,
-}
-```
+**Integrated Testing**:
+1. Full-stack visualization pipeline testing
+2. Domain-specific visualization validation
+3. Performance benchmarking for large ASTs
+4. Cross-browser compatibility testing
 
-#### 5.8 Integration with Existing DSL Manager
-The execution phase integrates seamlessly with the existing architecture:
+#### 5.6 Success Criteria
 
-1. **AST Storage** → Used as input to compiler
-2. **Domain Context** → Informs execution context setup
-3. **Visualization** → Can show execution flow and results
-4. **Database** → Execution results stored for audit trail
+**Functional Requirements**:
+- [ ] Interactive web-based AST visualization in browser
+- [ ] Domain-aware styling and highlighting (KYC, Onboarding, Account Opening)
+- [ ] Real-time domain and version selection
+- [ ] Zoom, pan, and selection interactions
+- [ ] Export capabilities (SVG, PNG)
+- [ ] Responsive design for different screen sizes
 
-#### 5.9 Key Insights from KYC DSL Example
-The `kyc_ubo_example_dsl.txt` reveals that the VM is not a simple calculator but a **Workflow and Graph Engine**:
+**Performance Requirements**:
+- [ ] <2s initial load time for typical DSL visualizations
+- [ ] <100ms interaction response time (zoom, pan, select)
+- [ ] Support for ASTs with 100+ nodes without performance degradation
+- [ ] Efficient WebAssembly bundle size (<5MB compressed)
 
-- **Complex Verbs**: `(declare-entity ...)`, `(create-edge ...)`, `(calculate-ubo-prongs ...)`
-- **Database Operations**: Entity creation, relationship mapping
-- **Domain Logic**: KYC compliance, UBO calculations
-- **State Management**: Investigation tracking, monitoring setup
+**User Experience**:
+- [ ] Intuitive navigation and control interfaces
+- [ ] Domain-specific help and documentation
+- [ ] Error handling with user-friendly messages
+- [ ] Offline capability for cached visualizations
 
-#### 5.10 FORTH Stack Usage
-The FORTH stack passes complex arguments to domain-specific functions:
-- `:node-id "company-meridian-global-fund"`
-- `:properties { :legal-name "..." :jurisdiction "LU" }`
-- `:traversal-rules { :follow-edges [HAS_OWNERSHIP HAS_CONTROL] }`
+#### 5.7 Future Enhancements
 
-This updated plan reflects the proper domain-based DSL architecture with AST storage, compilation pipeline integration, and FORTH-based execution engine.
+**Advanced Interactions**:
+- Collaborative editing with multiple users
+- Real-time DSL editing with live AST updates
+- Animation of DSL execution flows
+- Integration with external documentation systems
+
+**Visualization Extensions**:
+- 3D visualization modes for complex hierarchies
+- Timeline-based visualization for state changes
+- Comparison views for different DSL versions
+- Custom theming and branding options
+
+**Mobile Support**:
+- Touch-optimized interactions
+- Responsive layout adaptation
+- Mobile-specific UI patterns
+- Progressive Web App (PWA) capabilities

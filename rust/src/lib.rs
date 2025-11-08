@@ -70,6 +70,9 @@ pub mod models;
 pub mod dsl_manager;
 pub mod dsl_manager_v2;
 
+// Domain-specific visualization features (Phase 3)
+pub mod domain_visualizations;
+
 // Deprecated modules moved to src/deprecated/ (not needed for Phase 1)
 // - proto/ - gRPC protobuf modules (for future web services)
 // - grpc/ - gRPC service implementations (for future web services)

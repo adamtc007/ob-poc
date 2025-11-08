@@ -27,6 +27,7 @@ pub struct DslDomain {
 pub struct DslVersion {
     pub version_id: Uuid,
     pub domain_id: Uuid,
+    pub request_id: Option<Uuid>, // Business request context
     pub version_number: i32,
     pub functional_state: Option<String>,
     pub dsl_source_code: String,
@@ -109,6 +110,7 @@ pub enum ExecutionStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NewDslVersion {
     pub domain_name: String,
+    pub request_id: Option<Uuid>, // Business request context
     pub functional_state: Option<String>,
     pub dsl_source_code: String,
     pub change_description: Option<String>,

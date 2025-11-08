@@ -8,9 +8,13 @@ use sqlx::{postgres::PgPoolOptions, PgPool};
 use std::time::Duration;
 use tracing::{info, warn};
 
+pub mod business_request_repository;
 pub mod dsl_domain_repository;
 
 // Re-export repository and trait for convenience
+pub use business_request_repository::{
+    DslBusinessRequestRepository, DslBusinessRequestRepositoryTrait,
+};
 pub use dsl_domain_repository::{DslDomainRepository, DslDomainRepositoryTrait};
 
 /// Database configuration
@@ -91,6 +95,11 @@ impl DatabaseManager {
     /// Create a new DSL domain repository using this database connection
     pub fn dsl_repository(&self) -> DslDomainRepository {
         DslDomainRepository::new(self.pool.clone())
+    }
+
+    /// Create a new DSL business request repository using this database connection
+    pub fn business_request_repository(&self) -> DslBusinessRequestRepository {
+        DslBusinessRequestRepository::new(self.pool.clone())
     }
 
     /// Test database connectivity
