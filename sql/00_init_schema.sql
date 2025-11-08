@@ -4,12 +4,12 @@ v3: Refactors the attributes table to be the central dictionary.
 - Renames to 'dictionary' as it's the master table.
 - Removes the old 'dictionaries' and 'dictionary_attributes' tables,
   as an attribute's 'dictionary_id' (now 'group_id') is just a string for grouping.
-- **Sets main schema to "dsl-ob-poc"**
+- **Sets main schema to "ob-poc"**
 */
-CREATE SCHEMA IF NOT EXISTS "dsl-ob-poc";
+CREATE SCHEMA IF NOT EXISTS "ob-poc";
 
 -- Table to store immutable, versioned DSL files
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dsl_ob (
+CREATE TABLE IF NOT EXISTS "ob-poc".dsl_ob (
     version_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     cbu_id VARCHAR(255) NOT NULL,
     dsl_text TEXT NOT NULL,
@@ -17,10 +17,10 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dsl_ob (
 );
 
 CREATE INDEX IF NOT EXISTS idx_dsl_ob_cbu_id_created_at
-ON "dsl-ob-poc".dsl_ob (cbu_id, created_at DESC);
+ON "ob-poc".dsl_ob (cbu_id, created_at DESC);
 
 -- CBU table: Client Business Unit definitions
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".cbus (
+CREATE TABLE IF NOT EXISTS "ob-poc".cbus (
     cbu_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
@@ -28,32 +28,32 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".cbus (
     created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
     updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
 );
-CREATE INDEX IF NOT EXISTS idx_cbus_name ON "dsl-ob-poc".cbus (name);
+CREATE INDEX IF NOT EXISTS idx_cbus_name ON "ob-poc".cbus (name);
 
 -- Products table: Core product definitions
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".products (
+CREATE TABLE IF NOT EXISTS "ob-poc".products (
     product_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
     created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
     updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
 );
-CREATE INDEX IF NOT EXISTS idx_products_name ON "dsl-ob-poc".products (name);
+CREATE INDEX IF NOT EXISTS idx_products_name ON "ob-poc".products (name);
 
 -- Services table: Services that can be offered with or without products
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".services (
+CREATE TABLE IF NOT EXISTS "ob-poc".services (
     service_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
     created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
     updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
 );
-CREATE INDEX IF NOT EXISTS idx_services_name ON "dsl-ob-poc".services (name);
+CREATE INDEX IF NOT EXISTS idx_services_name ON "ob-poc".services (name);
 
 -- Product <-> Service Join Table
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".product_services (
-    product_id UUID NOT NULL REFERENCES "dsl-ob-poc".products (product_id) ON DELETE CASCADE,
-    service_id UUID NOT NULL REFERENCES "dsl-ob-poc".services (service_id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS "ob-poc".product_services (
+    product_id UUID NOT NULL REFERENCES "ob-poc".products (product_id) ON DELETE CASCADE,
+    service_id UUID NOT NULL REFERENCES "ob-poc".services (service_id) ON DELETE CASCADE,
     PRIMARY KEY (product_id, service_id)
 );
 
@@ -62,8 +62,8 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".product_services (
 -- ============================================================================
 
 -- Product Requirements table: DSL operations and attributes required per product
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".product_requirements (
-    product_id UUID NOT NULL REFERENCES "dsl-ob-poc".products (product_id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS "ob-poc".product_requirements (
+    product_id UUID NOT NULL REFERENCES "ob-poc".products (product_id) ON DELETE CASCADE,
     entity_types JSONB NOT NULL,           -- Array of supported entity types ["TRUST", "CORPORATION", etc.]
     required_dsl JSONB NOT NULL,           -- Array of required DSL verbs for this product
     attributes JSONB NOT NULL,             -- Array of required attribute IDs
@@ -76,9 +76,9 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".product_requirements (
 );
 
 -- Entity Product Mappings table: Compatibility matrix for entity types and products
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".entity_product_mappings (
+CREATE TABLE IF NOT EXISTS "ob-poc".entity_product_mappings (
     entity_type VARCHAR(100) NOT NULL,     -- TRUST, CORPORATION, PARTNERSHIP, PROPER_PERSON
-    product_id UUID NOT NULL REFERENCES "dsl-ob-poc".products (product_id) ON DELETE CASCADE,
+    product_id UUID NOT NULL REFERENCES "ob-poc".products (product_id) ON DELETE CASCADE,
     compatible BOOLEAN NOT NULL,           -- Whether this entity type can use this product
     restrictions JSONB,                    -- Array of restriction descriptions
     required_fields JSONB,                 -- Array of additional fields required for this combination
@@ -87,10 +87,10 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".entity_product_mappings (
 );
 
 -- Product Workflows table: Generated workflows for specific product-entity combinations
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".product_workflows (
+CREATE TABLE IF NOT EXISTS "ob-poc".product_workflows (
     workflow_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     cbu_id VARCHAR(255) NOT NULL,
-    product_id UUID NOT NULL REFERENCES "dsl-ob-poc".products (product_id),
+    product_id UUID NOT NULL REFERENCES "ob-poc".products (product_id),
     entity_type VARCHAR(100) NOT NULL,
     required_dsl JSONB NOT NULL,           -- Array of DSL verbs for this workflow
     generated_dsl TEXT NOT NULL,           -- Complete generated DSL document
@@ -101,20 +101,20 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".product_workflows (
 );
 
 -- Indexes for product requirements tables
-CREATE INDEX IF NOT EXISTS idx_product_requirements_product ON "dsl-ob-poc".product_requirements (product_id);
-CREATE INDEX IF NOT EXISTS idx_entity_product_mappings_entity ON "dsl-ob-poc".entity_product_mappings (entity_type);
-CREATE INDEX IF NOT EXISTS idx_entity_product_mappings_product ON "dsl-ob-poc".entity_product_mappings (product_id);
-CREATE INDEX IF NOT EXISTS idx_entity_product_mappings_compatible ON "dsl-ob-poc".entity_product_mappings (compatible);
-CREATE INDEX IF NOT EXISTS idx_product_workflows_cbu ON "dsl-ob-poc".product_workflows (cbu_id);
-CREATE INDEX IF NOT EXISTS idx_product_workflows_status ON "dsl-ob-poc".product_workflows (status);
-CREATE INDEX IF NOT EXISTS idx_product_workflows_product_entity ON "dsl-ob-poc".product_workflows (product_id, entity_type);
+CREATE INDEX IF NOT EXISTS idx_product_requirements_product ON "ob-poc".product_requirements (product_id);
+CREATE INDEX IF NOT EXISTS idx_entity_product_mappings_entity ON "ob-poc".entity_product_mappings (entity_type);
+CREATE INDEX IF NOT EXISTS idx_entity_product_mappings_product ON "ob-poc".entity_product_mappings (product_id);
+CREATE INDEX IF NOT EXISTS idx_entity_product_mappings_compatible ON "ob-poc".entity_product_mappings (compatible);
+CREATE INDEX IF NOT EXISTS idx_product_workflows_cbu ON "ob-poc".product_workflows (cbu_id);
+CREATE INDEX IF NOT EXISTS idx_product_workflows_status ON "ob-poc".product_workflows (status);
+CREATE INDEX IF NOT EXISTS idx_product_workflows_product_entity ON "ob-poc".product_workflows (product_id, entity_type);
 
 -- ============================================================================
 -- GRAMMAR AND VOCABULARY TABLES (PHASE 4 MIGRATION)
 -- ============================================================================
 
 -- DSL Grammar Rules - Database-stored EBNF grammar definitions
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".grammar_rules (
+CREATE TABLE IF NOT EXISTS "ob-poc".grammar_rules (
     rule_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     rule_name VARCHAR(100) NOT NULL UNIQUE, -- e.g., "s_expression", "verb_call", "attribute_ref"
     rule_definition TEXT NOT NULL,          -- EBNF rule definition
@@ -127,12 +127,12 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".grammar_rules (
     updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
 );
 
-CREATE INDEX IF NOT EXISTS idx_grammar_rules_name ON "dsl-ob-poc".grammar_rules (rule_name);
-CREATE INDEX IF NOT EXISTS idx_grammar_rules_domain ON "dsl-ob-poc".grammar_rules (domain);
-CREATE INDEX IF NOT EXISTS idx_grammar_rules_active ON "dsl-ob-poc".grammar_rules (active);
+CREATE INDEX IF NOT EXISTS idx_grammar_rules_name ON "ob-poc".grammar_rules (rule_name);
+CREATE INDEX IF NOT EXISTS idx_grammar_rules_domain ON "ob-poc".grammar_rules (domain);
+CREATE INDEX IF NOT EXISTS idx_grammar_rules_active ON "ob-poc".grammar_rules (active);
 
 -- Domain Vocabularies - Database-stored DSL verbs by domain
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".domain_vocabularies (
+CREATE TABLE IF NOT EXISTS "ob-poc".domain_vocabularies (
     vocab_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     domain VARCHAR(100) NOT NULL,          -- e.g., "onboarding", "kyc", "hedge-fund-investor"
     verb VARCHAR(100) NOT NULL,            -- e.g., "case.create", "kyc.start", "investor.create-opportunity"
@@ -147,12 +147,12 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".domain_vocabularies (
     updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_domain_vocabularies_domain_verb ON "dsl-ob-poc".domain_vocabularies (domain, verb);
-CREATE INDEX IF NOT EXISTS idx_domain_vocabularies_category ON "dsl-ob-poc".domain_vocabularies (category);
-CREATE INDEX IF NOT EXISTS idx_domain_vocabularies_active ON "dsl-ob-poc".domain_vocabularies (active);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_domain_vocabularies_domain_verb ON "ob-poc".domain_vocabularies (domain, verb);
+CREATE INDEX IF NOT EXISTS idx_domain_vocabularies_category ON "ob-poc".domain_vocabularies (category);
+CREATE INDEX IF NOT EXISTS idx_domain_vocabularies_active ON "ob-poc".domain_vocabularies (active);
 
 -- Cross-Domain Verb Registry - Global verb registry for conflict detection
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".verb_registry (
+CREATE TABLE IF NOT EXISTS "ob-poc".verb_registry (
     verb VARCHAR(100) PRIMARY KEY,        -- The actual verb (e.g., "case.create")
     primary_domain VARCHAR(100) NOT NULL, -- Domain that "owns" this verb
     shared BOOLEAN DEFAULT false,         -- Can be used by multiple domains
@@ -163,12 +163,12 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".verb_registry (
     updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
 );
 
-CREATE INDEX IF NOT EXISTS idx_verb_registry_domain ON "dsl-ob-poc".verb_registry (primary_domain);
-CREATE INDEX IF NOT EXISTS idx_verb_registry_shared ON "dsl-ob-poc".verb_registry (shared);
-CREATE INDEX IF NOT EXISTS idx_verb_registry_deprecated ON "dsl-ob-poc".verb_registry (deprecated);
+CREATE INDEX IF NOT EXISTS idx_verb_registry_domain ON "ob-poc".verb_registry (primary_domain);
+CREATE INDEX IF NOT EXISTS idx_verb_registry_shared ON "ob-poc".verb_registry (shared);
+CREATE INDEX IF NOT EXISTS idx_verb_registry_deprecated ON "ob-poc".verb_registry (deprecated);
 
 -- Vocabulary Change Audit - Track all vocabulary changes for compliance
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".vocabulary_audit (
+CREATE TABLE IF NOT EXISTS "ob-poc".vocabulary_audit (
     audit_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     domain VARCHAR(100) NOT NULL,
     verb VARCHAR(100) NOT NULL,
@@ -180,9 +180,9 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".vocabulary_audit (
     created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
 );
 
-CREATE INDEX IF NOT EXISTS idx_vocabulary_audit_domain_verb ON "dsl-ob-poc".vocabulary_audit (domain, verb);
-CREATE INDEX IF NOT EXISTS idx_vocabulary_audit_change_type ON "dsl-ob-poc".vocabulary_audit (change_type);
-CREATE INDEX IF NOT EXISTS idx_vocabulary_audit_created_at ON "dsl-ob-poc".vocabulary_audit (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_vocabulary_audit_domain_verb ON "ob-poc".vocabulary_audit (domain, verb);
+CREATE INDEX IF NOT EXISTS idx_vocabulary_audit_change_type ON "ob-poc".vocabulary_audit (change_type);
+CREATE INDEX IF NOT EXISTS idx_vocabulary_audit_created_at ON "ob-poc".vocabulary_audit (created_at DESC);
 
 -- ============================================================================
 -- DICTIONARY AND RESOURCE TABLES (REFACTORED)
@@ -190,7 +190,7 @@ CREATE INDEX IF NOT EXISTS idx_vocabulary_audit_created_at ON "dsl-ob-poc".vocab
 
 -- Master Data Dictionary (Attributes table)
 -- This is the central pillar.
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dictionary (
+CREATE TABLE IF NOT EXISTS "ob-poc".dictionary (
     attribute_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     -- The unique "variable name" for the DSL, e.g., "entity.legal_name"
     name VARCHAR(255) NOT NULL UNIQUE,
@@ -215,17 +215,17 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dictionary (
     updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
 );
 
-CREATE INDEX IF NOT EXISTS idx_dictionary_name ON "dsl-ob-poc".dictionary (name);
-CREATE INDEX IF NOT EXISTS idx_dictionary_group_id ON "dsl-ob-poc".dictionary (group_id);
-CREATE INDEX IF NOT EXISTS idx_dictionary_domain ON "dsl-ob-poc".dictionary (domain);
+CREATE INDEX IF NOT EXISTS idx_dictionary_name ON "ob-poc".dictionary (name);
+CREATE INDEX IF NOT EXISTS idx_dictionary_group_id ON "ob-poc".dictionary (group_id);
+CREATE INDEX IF NOT EXISTS idx_dictionary_domain ON "ob-poc".dictionary (domain);
 
 -- Attribute Values table: Runtime values for onboarding instances
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".attribute_values (
+CREATE TABLE IF NOT EXISTS "ob-poc".attribute_values (
     av_id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    cbu_id        UUID NOT NULL REFERENCES "dsl-ob-poc".cbus(cbu_id),
+    cbu_id        UUID NOT NULL REFERENCES "ob-poc".cbus(cbu_id),
     dsl_ob_id     UUID,                  -- optional: reference precise DSL row, if you store dsl_ob.id
     dsl_version   INTEGER NOT NULL,      -- tie values to the exact runbook snapshot
-    attribute_id  UUID NOT NULL REFERENCES "dsl-ob-poc".dictionary (attribute_id) ON DELETE CASCADE,
+    attribute_id  UUID NOT NULL REFERENCES "ob-poc".dictionary (attribute_id) ON DELETE CASCADE,
     value         JSONB NOT NULL,
     state         TEXT NOT NULL DEFAULT 'resolved', -- 'pending' | 'resolved' | 'invalid'
     source        JSONB,                 -- provenance (table/column/system/collector)
@@ -233,10 +233,10 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".attribute_values (
     UNIQUE (cbu_id, dsl_version, attribute_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_attr_vals_lookup ON "dsl-ob-poc".attribute_values (cbu_id, attribute_id, dsl_version);
+CREATE INDEX IF NOT EXISTS idx_attr_vals_lookup ON "ob-poc".attribute_values (cbu_id, attribute_id, dsl_version);
 
 -- Production Resources table
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".prod_resources (
+CREATE TABLE IF NOT EXISTS "ob-poc".prod_resources (
     resource_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
@@ -251,15 +251,15 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".prod_resources (
     updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
 );
 
-CREATE INDEX IF NOT EXISTS idx_prod_resources_name ON "dsl-ob-poc".prod_resources (name);
-CREATE INDEX IF NOT EXISTS idx_prod_resources_owner ON "dsl-ob-poc".prod_resources (owner);
-CREATE INDEX IF NOT EXISTS idx_prod_resources_dict_group ON "dsl-ob-poc".prod_resources (dictionary_group);
+CREATE INDEX IF NOT EXISTS idx_prod_resources_name ON "ob-poc".prod_resources (name);
+CREATE INDEX IF NOT EXISTS idx_prod_resources_owner ON "ob-poc".prod_resources (owner);
+CREATE INDEX IF NOT EXISTS idx_prod_resources_dict_group ON "ob-poc".prod_resources (dictionary_group);
 
 
 -- Service <-> Resource Join Table
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".service_resources (
-    service_id UUID NOT NULL REFERENCES "dsl-ob-poc".services (service_id) ON DELETE CASCADE,
-    resource_id UUID NOT NULL REFERENCES "dsl-ob-poc".prod_resources (resource_id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS "ob-poc".service_resources (
+    service_id UUID NOT NULL REFERENCES "ob-poc".services (service_id) ON DELETE CASCADE,
+    resource_id UUID NOT NULL REFERENCES "ob-poc".prod_resources (resource_id) ON DELETE CASCADE,
     PRIMARY KEY (service_id, resource_id)
 );
 
@@ -268,17 +268,17 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".service_resources (
 -- ============================================================================
 
 -- Roles table: Defines roles entities can play within a CBU
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".roles (
+CREATE TABLE IF NOT EXISTS "ob-poc".roles (
     role_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
     created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
     updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
 );
-CREATE INDEX IF NOT EXISTS idx_roles_name ON "dsl-ob-poc".roles (name);
+CREATE INDEX IF NOT EXISTS idx_roles_name ON "ob-poc".roles (name);
 
 -- Entity Types table: Defines the different types of entities
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".entity_types (
+CREATE TABLE IF NOT EXISTS "ob-poc".entity_types (
     entity_type_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
@@ -286,7 +286,7 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".entity_types (
     created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
     updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
 );
-CREATE INDEX IF NOT EXISTS idx_entity_types_name ON "dsl-ob-poc".entity_types (name);
+CREATE INDEX IF NOT EXISTS idx_entity_types_name ON "ob-poc".entity_types (name);
 CREATE INDEX IF NOT EXISTS idx_entity_types_table ON "dsl-ob-poc".entity_types (table_name);
 
 -- Entities table: Central entity registry

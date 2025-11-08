@@ -31,7 +31,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Try to connect to database, fall back to mock mode if unavailable
     let database_url = env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgresql://localhost:5432/dsl-ob-poc".to_string());
+        .unwrap_or_else(|_| "postgresql://localhost:5432/ob-poc".to_string());
 
     info!("🔌 Connecting to database...");
     let pool_result = PgPool::connect(&database_url).await;

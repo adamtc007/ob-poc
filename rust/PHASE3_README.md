@@ -382,7 +382,7 @@ cargo test functional_state
 
 ```bash
 # Set up test database
-export DATABASE_URL="postgresql://localhost:5432/dsl-ob-poc-test"
+export DATABASE_URL="postgresql://localhost:5432/ob-poc-test"
 
 # Run Phase 3 comprehensive demonstration
 cargo run --example phase3_domain_visualization_demo

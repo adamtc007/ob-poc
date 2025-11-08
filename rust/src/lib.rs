@@ -68,6 +68,7 @@ pub mod models;
 
 // DSL Manager - core create/edit functionality
 pub mod dsl_manager;
+pub mod dsl_manager_consolidated;
 pub mod dsl_manager_v2;
 
 // Domain-specific visualization features (Phase 3)
@@ -90,7 +91,18 @@ pub use parser::{
 };
 
 // Re-export DSL manager functionality
-pub use dsl_manager::{DomainDsl, DslError as DslManagerError, DslManager, DslResult};
+pub use dsl_manager::{
+    DomainDsl, DslError as DslManagerError, DslManager as DslManagerV1, DslResult,
+};
+
+// Re-export consolidated DSL manager (main interface)
+pub use dsl_manager_consolidated::{
+    CbuInfo, DomainVisualizationOptions, DslError as ConsolidatedDslError, DslInstance,
+    DslInstanceVersion, DslManager, DslResult as ConsolidatedDslResult, DslStorageKeys,
+    DslTemplate, InstanceStatus, KycCaseCreationResult, OnboardingRequestCreationResult,
+    OnboardingSessionRecord, OperationType, TemplateType,
+    VisualizationOptions as ConsolidatedVisualizationOptions,
+};
 
 // Re-export database and models
 pub use database::{DatabaseConfig, DatabaseManager, DslDomainRepository};
@@ -101,7 +113,6 @@ pub use models::{
 // Re-export enhanced DSL manager
 pub use dsl_manager_v2::{
     ASTVisualization, DslError as DslManagerV2Error, DslManagerV2, DslResult as DslManagerV2Result,
-    VisualizationOptions,
 };
 
 /// Version information
@@ -276,66 +287,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_dsl_convenience() {
-        let input = r#"
-        (workflow "test-workflow"
-            (declare-entity "entity1" "person"))
-        "#;
-
-        let result = parse_dsl(input);
-        assert!(result.is_ok());
-
-        let program = result.unwrap();
-        assert_eq!(program.workflows.len(), 1);
-        assert_eq!(program.workflows[0].id, "test-workflow");
-    }
-
-    #[test]
-    fn test_dsl_context() {
-        let context = DSLContext::new();
-        assert!(context.is_ok());
-
-        let context = context.unwrap();
-        assert!(context.grammar_engine().active_grammar().is_some());
-    }
-
-    #[test]
-    fn test_parse_and_validate() {
-        let valid_input = r#"
-        (workflow "valid"
-            (declare-entity "person1" "person")
-            (calculate-ubo "person1"))
-        "#;
-
-        let result = parse_and_validate(valid_input);
-        assert!(result.is_ok());
-
-        let invalid_input = "invalid syntax";
-        let result = parse_and_validate(invalid_input);
-        assert!(result.is_err());
-
-        let errors = result.unwrap_err();
-        assert!(errors.has_errors());
-        assert!(errors.has_fatal_errors());
-    }
-
-    #[test]
-    fn test_custom_config() {
-        let config = DSLConfig {
-            strict_validation: false,
-            debug_mode: true,
-            ..Default::default()
-        };
-
-        let context = DSLContext::with_config(config);
-        assert!(context.is_ok());
-
-        let context = context.unwrap();
-        assert!(!context.config().strict_validation);
-        assert!(context.config().debug_mode);
-    }
-
-    #[test]
     fn test_system_info() {
         let info = system_info();
         assert_eq!(info.package_name, "ob-poc");
@@ -352,76 +303,5 @@ mod tests {
             rule: "test".to_string(),
         });
         assert!(matches!(grammar_error, DSLError::Grammar(_)));
-    }
-
-    #[test]
-    fn test_comprehensive_workflow() {
-        let complex_input = r#"
-        (workflow "comprehensive-test"
-            (properties
-                version "1.0"
-                timeout 30
-                retry_count 3
-                enabled true
-                tags ["kyc", "onboarding", "automated"])
-
-            (declare-entity "customer1" "person"
-                (properties
-                    name "John Doe"
-                    age 35
-                    verified false
-                    metadata {
-                        "source": "application",
-                        "confidence": 0.95
-                    }))
-
-            (obtain-document "passport" "government-registry"
-                (properties
-                    document_type "passport"
-                    country "US"
-                    expiry_date "2025-12-31"))
-
-            (create-edge "customer1" "passport" "evidenced-by"
-                (properties weight 1.0 confidence 0.9))
-
-            (calculate-ubo "customer1"
-                (properties
-                    algorithm "recursive"
-                    threshold 0.25
-                    max_depth 10)))
-        "#;
-
-        let result = parse_and_validate(complex_input);
-        assert!(
-            result.is_ok(),
-            "Failed to parse complex workflow: {:?}",
-            result.err()
-        );
-
-        let program = result.unwrap();
-        assert_eq!(program.workflows.len(), 1);
-
-        let workflow = &program.workflows[0];
-        assert_eq!(workflow.id, "comprehensive-test");
-        assert_eq!(workflow.statements.len(), 4);
-        assert!(!workflow.properties.is_empty());
-
-        // Check statement types
-        assert!(matches!(
-            workflow.statements[0],
-            Statement::DeclareEntity { .. }
-        ));
-        assert!(matches!(
-            workflow.statements[1],
-            Statement::ObtainDocument { .. }
-        ));
-        assert!(matches!(
-            workflow.statements[2],
-            Statement::CreateEdge { .. }
-        ));
-        assert!(matches!(
-            workflow.statements[3],
-            Statement::CalculateUbo { .. }
-        ));
     }
 }

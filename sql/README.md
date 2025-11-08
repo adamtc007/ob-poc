@@ -4,7 +4,7 @@ This directory contains the shared PostgreSQL schema used by both the Go and Rus
 
 ## Schema Structure
 
-The database uses the `dsl-ob-poc` schema and is organized into several key areas:
+The database uses the `ob-poc` schema and is organized into several key areas:
 
 ### Core Tables
 
@@ -88,7 +88,7 @@ psql -d your_database -f sql/migrations/004_rename_individuals_to_proper_persons
 
 Both Go and Rust codebases should reference this shared schema:
 
-- Go applications should update their database connection to use schema `dsl-ob-poc`
+- Go applications should update their database connection to use schema `ob-poc`
 - Rust applications should use the same schema name in their database configurations
 - All SQL queries should be qualified with the schema name or use `SET search_path`
 

@@ -74,8 +74,8 @@ pub struct DslExecutionLog {
 }
 
 /// Compilation status enumeration
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "compilation_status", rename_all = "UPPERCASE")]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "compilation_status", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum CompilationStatus {
     Draft,
     Compiling,
@@ -320,6 +320,7 @@ mod tests {
         let mut version = DslVersion {
             version_id: Uuid::new_v4(),
             domain_id: Uuid::new_v4(),
+            request_id: None,
             version_number: 1,
             functional_state: None,
             dsl_source_code: "test".to_string(),

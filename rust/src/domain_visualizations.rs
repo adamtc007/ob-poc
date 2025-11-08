@@ -979,6 +979,7 @@ mod tests {
         DslVersion {
             version_id: Uuid::new_v4(),
             domain_id: Uuid::new_v4(),
+            request_id: None,
             version_number: 1,
             functional_state: Some("Generate_UBO".to_string()),
             dsl_source_code: "test".to_string(),

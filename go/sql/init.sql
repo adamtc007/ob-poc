@@ -4,12 +4,12 @@ v3: Refactors the attributes table to be the central dictionary.
 - Renames to 'dictionary' as it's the master table.
 - Removes the old 'dictionaries' and 'dictionary_attributes' tables,
   as an attribute's 'dictionary_id' (now 'group_id') is just a string for grouping.
-- **Sets main schema to "dsl-ob-poc"**
+- **Sets main schema to "ob-poc"**
 */
-CREATE SCHEMA IF NOT EXISTS "dsl-ob-poc";
+CREATE SCHEMA IF NOT EXISTS "ob-poc";
 
 -- Table to store immutable, versioned DSL files
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dsl_ob (
+CREATE TABLE IF NOT EXISTS "ob-poc".dsl_ob (
     version_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     cbu_id VARCHAR(255) NOT NULL,
     dsl_text TEXT NOT NULL,
@@ -17,10 +17,10 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dsl_ob (
 );
 
 CREATE INDEX IF NOT EXISTS idx_dsl_ob_cbu_id_created_at
-ON "dsl-ob-poc".dsl_ob (cbu_id, created_at DESC);
+ON "ob-poc".dsl_ob (cbu_id, created_at DESC);
 
 -- CBU table: Client Business Unit definitions
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".cbus (
+CREATE TABLE IF NOT EXISTS "ob-poc".cbus (
     cbu_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
@@ -28,32 +28,32 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".cbus (
     created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
     updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
 );
-CREATE INDEX IF NOT EXISTS idx_cbus_name ON "dsl-ob-poc".cbus (name);
+CREATE INDEX IF NOT EXISTS idx_cbus_name ON "ob-poc".cbus (name);
 
 -- Products table: Core product definitions
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".products (
+CREATE TABLE IF NOT EXISTS "ob-poc".products (
     product_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
     created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
     updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
 );
-CREATE INDEX IF NOT EXISTS idx_products_name ON "dsl-ob-poc".products (name);
+CREATE INDEX IF NOT EXISTS idx_products_name ON "ob-poc".products (name);
 
 -- Services table: Services that can be offered with or without products
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".services (
+CREATE TABLE IF NOT EXISTS "ob-poc".services (
     service_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
     created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
     updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
 );
-CREATE INDEX IF NOT EXISTS idx_services_name ON "dsl-ob-poc".services (name);
+CREATE INDEX IF NOT EXISTS idx_services_name ON "ob-poc".services (name);
 
 -- Product <-> Service Join Table
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".product_services (
-    product_id UUID NOT NULL REFERENCES "dsl-ob-poc".products (product_id) ON DELETE CASCADE,
-    service_id UUID NOT NULL REFERENCES "dsl-ob-poc".services (service_id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS "ob-poc".product_services (
+    product_id UUID NOT NULL REFERENCES "ob-poc".products (product_id) ON DELETE CASCADE,
+    service_id UUID NOT NULL REFERENCES "ob-poc".services (service_id) ON DELETE CASCADE,
     PRIMARY KEY (product_id, service_id)
 );
 
@@ -62,8 +62,8 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".product_services (
 -- ============================================================================
 
 -- Product Requirements table: DSL operations and attributes required per product
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".product_requirements (
-    product_id UUID NOT NULL REFERENCES "dsl-ob-poc".products (product_id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS "ob-poc".product_requirements (
+    product_id UUID NOT NULL REFERENCES "ob-poc".products (product_id) ON DELETE CASCADE,
     entity_types JSONB NOT NULL,           -- Array of supported entity types ["TRUST", "CORPORATION", etc.]
     required_dsl JSONB NOT NULL,           -- Array of required DSL verbs for this product
     attributes JSONB NOT NULL,             -- Array of required attribute IDs
@@ -76,9 +76,9 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".product_requirements (
 );
 
 -- Entity Product Mappings table: Compatibility matrix for entity types and products
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".entity_product_mappings (
+CREATE TABLE IF NOT EXISTS "ob-poc".entity_product_mappings (
     entity_type VARCHAR(100) NOT NULL,     -- TRUST, CORPORATION, PARTNERSHIP, PROPER_PERSON
-    product_id UUID NOT NULL REFERENCES "dsl-ob-poc".products (product_id) ON DELETE CASCADE,
+    product_id UUID NOT NULL REFERENCES "ob-poc".products (product_id) ON DELETE CASCADE,
     compatible BOOLEAN NOT NULL,           -- Whether this entity type can use this product
     restrictions JSONB,                    -- Array of restriction descriptions
     required_fields JSONB,                 -- Array of additional fields required for this combination
@@ -87,10 +87,10 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".entity_product_mappings (
 );
 
 -- Product Workflows table: Generated workflows for specific product-entity combinations
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".product_workflows (
+CREATE TABLE IF NOT EXISTS "ob-poc".product_workflows (
     workflow_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     cbu_id VARCHAR(255) NOT NULL,
-    product_id UUID NOT NULL REFERENCES "dsl-ob-poc".products (product_id),
+    product_id UUID NOT NULL REFERENCES "ob-poc".products (product_id),
     entity_type VARCHAR(100) NOT NULL,
     required_dsl JSONB NOT NULL,           -- Array of DSL verbs for this workflow
     generated_dsl TEXT NOT NULL,           -- Complete generated DSL document

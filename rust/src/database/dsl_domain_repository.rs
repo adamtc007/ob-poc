@@ -78,9 +78,14 @@ impl DslDomainRepository {
         Self { pool }
     }
 
+    /// Get a reference to the connection pool
+    pub fn pool(&self) -> &PgPool {
+        &self.pool
+    }
+
     /// Get the next version number for a domain
     pub async fn get_next_version_number(&self, domain_name: &str) -> Result<i32, DslError> {
-        let row = sqlx::query(r#"SELECT "dsl-ob-poc".get_next_version_number($1) as next_version"#)
+        let row = sqlx::query(r#"SELECT "ob-poc".get_next_version_number($1) as next_version"#)
             .bind(domain_name)
             .fetch_one(&self.pool)
             .await
@@ -104,14 +109,14 @@ impl DslDomainRepository {
                 COALESCE(SUM(el.total_executions), 0) as total_executions,
                 COALESCE(AVG(el.success_rate), 0) as success_rate,
                 MAX(dv.created_at) as last_activity
-            FROM "dsl-ob-poc".dsl_domains d
-            LEFT JOIN "dsl-ob-poc".dsl_versions dv ON d.domain_id = dv.domain_id
+            FROM "ob-poc".dsl_domains d
+            LEFT JOIN "ob-poc".dsl_versions dv ON d.domain_id = dv.domain_id
             LEFT JOIN (
                 SELECT
                     version_id,
                     COUNT(*) as total_executions,
                     (COUNT(CASE WHEN status = 'SUCCESS' THEN 1 END)::float / COUNT(*)::float) * 100 as success_rate
-                FROM "dsl-ob-poc".dsl_execution_log
+                FROM "ob-poc".dsl_execution_log
                 GROUP BY version_id
             ) el ON dv.version_id = el.version_id
             WHERE d.domain_name = $1
@@ -151,7 +156,7 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
             r#"
             SELECT domain_id, domain_name, description, base_grammar_version,
                    vocabulary_version, active, created_at, updated_at
-            FROM "dsl-ob-poc".dsl_domains
+            FROM "ob-poc".dsl_domains
             WHERE domain_name = $1
             "#,
         )
@@ -172,7 +177,7 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
             r#"
             SELECT domain_id, domain_name, description, base_grammar_version,
                    vocabulary_version, active, created_at, updated_at
-            FROM "dsl-ob-poc".dsl_domains
+            FROM "ob-poc".dsl_domains
             WHERE domain_id = $1
             "#,
         )
@@ -189,7 +194,7 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
             r#"
             SELECT domain_id, domain_name, description, base_grammar_version,
                    vocabulary_version, active, created_at, updated_at
-            FROM "dsl-ob-poc".dsl_domains
+            FROM "ob-poc".dsl_domains
             WHERE active = true
             ORDER BY domain_name
             "#
@@ -197,7 +202,7 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
             r#"
             SELECT domain_id, domain_name, description, base_grammar_version,
                    vocabulary_version, active, created_at, updated_at
-            FROM "dsl-ob-poc".dsl_domains
+            FROM "ob-poc".dsl_domains
             ORDER BY domain_name
             "#
         };
@@ -218,7 +223,7 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
     async fn create_domain(&self, domain: NewDslDomain) -> Result<DslDomain, DslError> {
         let result = sqlx::query_as::<_, DslDomain>(
             r#"
-            INSERT INTO "dsl-ob-poc".dsl_domains
+            INSERT INTO "ob-poc".dsl_domains
                 (domain_name, description, base_grammar_version, vocabulary_version, active)
             VALUES ($1, $2, $3, $4, $5)
             RETURNING domain_id, domain_name, description, base_grammar_version,
@@ -258,8 +263,8 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
             SELECT dv.version_id, dv.domain_id, dv.version_number, dv.functional_state,
                    dv.dsl_source_code, dv.compilation_status, dv.change_description,
                    dv.parent_version_id, dv.created_by, dv.created_at, dv.compiled_at, dv.activated_at
-            FROM "dsl-ob-poc".dsl_versions dv
-            JOIN "dsl-ob-poc".dsl_domains d ON dv.domain_id = d.domain_id
+            FROM "ob-poc".dsl_versions dv
+            JOIN "ob-poc".dsl_domains d ON dv.domain_id = d.domain_id
             WHERE d.domain_name = $1 AND dv.version_number = $2
             "#,
         )
@@ -282,7 +287,7 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
             SELECT version_id, domain_id, version_number, functional_state,
                    dsl_source_code, compilation_status, change_description,
                    parent_version_id, created_by, created_at, compiled_at, activated_at
-            FROM "dsl-ob-poc".dsl_versions
+            FROM "ob-poc".dsl_versions
             WHERE version_id = $1
             "#,
         )
@@ -300,8 +305,8 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
             SELECT dv.version_id, dv.domain_id, dv.version_number, dv.functional_state,
                    dv.dsl_source_code, dv.compilation_status, dv.change_description,
                    dv.parent_version_id, dv.created_by, dv.created_at, dv.compiled_at, dv.activated_at
-            FROM "dsl-ob-poc".dsl_versions dv
-            JOIN "dsl-ob-poc".dsl_domains d ON dv.domain_id = d.domain_id
+            FROM "ob-poc".dsl_versions dv
+            JOIN "ob-poc".dsl_domains d ON dv.domain_id = d.domain_id
             WHERE d.domain_name = $1
             ORDER BY dv.version_number DESC
             LIMIT 1
@@ -326,8 +331,8 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
                 SELECT dv.version_id, dv.domain_id, dv.version_number, dv.functional_state,
                        dv.dsl_source_code, dv.compilation_status, dv.change_description,
                        dv.parent_version_id, dv.created_by, dv.created_at, dv.compiled_at, dv.activated_at
-                FROM "dsl-ob-poc".dsl_versions dv
-                JOIN "dsl-ob-poc".dsl_domains d ON dv.domain_id = d.domain_id
+                FROM "ob-poc".dsl_versions dv
+                JOIN "ob-poc".dsl_domains d ON dv.domain_id = d.domain_id
                 WHERE d.domain_name = $1
                 ORDER BY dv.version_number DESC
                 LIMIT $2
@@ -338,8 +343,8 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
                 SELECT dv.version_id, dv.domain_id, dv.version_number, dv.functional_state,
                        dv.dsl_source_code, dv.compilation_status, dv.change_description,
                        dv.parent_version_id, dv.created_by, dv.created_at, dv.compiled_at, dv.activated_at
-                FROM "dsl-ob-poc".dsl_versions dv
-                JOIN "dsl-ob-poc".dsl_domains d ON dv.domain_id = d.domain_id
+                FROM "ob-poc".dsl_versions dv
+                JOIN "ob-poc".dsl_domains d ON dv.domain_id = d.domain_id
                 WHERE d.domain_name = $1
                 ORDER BY dv.version_number DESC
                 "#
@@ -379,7 +384,7 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
 
         let result = sqlx::query_as::<_, DslVersion>(
             r#"
-            INSERT INTO "dsl-ob-poc".dsl_versions
+            INSERT INTO "ob-poc".dsl_versions
                 (domain_id, version_number, functional_state, dsl_source_code,
                  change_description, parent_version_id, created_by)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -419,7 +424,7 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
 
         sqlx::query(
             r#"
-            UPDATE "dsl-ob-poc".dsl_versions
+            UPDATE "ob-poc".dsl_versions
             SET compilation_status = $2,
                 compiled_at = CASE WHEN $2 = 'COMPILED' THEN $3 ELSE compiled_at END,
                 activated_at = CASE WHEN $2 = 'ACTIVE' THEN $3 ELSE activated_at END
@@ -446,7 +451,7 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
             SELECT ast_id, version_id, ast_json, parse_metadata, grammar_version,
                    parser_version, ast_hash, node_count, complexity_score,
                    parsed_at, invalidated_at
-            FROM "dsl-ob-poc".parsed_asts
+            FROM "ob-poc".parsed_asts
             WHERE version_id = $1 AND invalidated_at IS NULL
             "#,
         )
@@ -461,7 +466,7 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
     async fn store_parsed_ast(&self, ast: NewParsedAst) -> Result<ParsedAst, DslError> {
         let result = sqlx::query_as::<_, ParsedAst>(
             r#"
-            INSERT INTO "dsl-ob-poc".parsed_asts
+            INSERT INTO "ob-poc".parsed_asts
                 (version_id, ast_json, parse_metadata, grammar_version, parser_version,
                  ast_hash, node_count, complexity_score)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -500,7 +505,7 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
     async fn invalidate_ast(&self, version_id: &Uuid) -> Result<(), DslError> {
         sqlx::query(
             r#"
-            UPDATE "dsl-ob-poc".parsed_asts
+            UPDATE "ob-poc".parsed_asts
             SET invalidated_at = now()
             WHERE version_id = $1
             "#,
@@ -517,7 +522,7 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
     async fn cleanup_old_asts(&self, retention_days: i32) -> Result<i32, DslError> {
         let result = sqlx::query(
             r#"
-            DELETE FROM "dsl-ob-poc".parsed_asts
+            DELETE FROM "ob-poc".parsed_asts
             WHERE invalidated_at IS NOT NULL
             AND invalidated_at < now() - interval '%d days'
             "#,
@@ -538,7 +543,7 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
     async fn log_execution(&self, log: NewExecutionLog) -> Result<DslExecutionLog, DslError> {
         let result = sqlx::query_as::<_, DslExecutionLog>(
             r#"
-            INSERT INTO "dsl-ob-poc".dsl_execution_log
+            INSERT INTO "ob-poc".dsl_execution_log
                 (version_id, cbu_id, execution_phase, status, result_data,
                  error_details, performance_metrics, executed_by, started_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -574,7 +579,7 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
                 SELECT execution_id, version_id, cbu_id, execution_phase, status,
                        result_data, error_details, performance_metrics, executed_by,
                        started_at, completed_at, duration_ms
-                FROM "dsl-ob-poc".dsl_execution_log
+                FROM "ob-poc".dsl_execution_log
                 WHERE version_id = $1
                 ORDER BY started_at DESC
                 LIMIT $2
@@ -585,7 +590,7 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
                 SELECT execution_id, version_id, cbu_id, execution_phase, status,
                        result_data, error_details, performance_metrics, executed_by,
                        started_at, completed_at, duration_ms
-                FROM "dsl-ob-poc".dsl_execution_log
+                FROM "ob-poc".dsl_execution_log
                 WHERE version_id = $1
                 ORDER BY started_at DESC
                 "#
@@ -618,7 +623,7 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
             SELECT domain_name, domain_description, version_id, version_number,
                    functional_state, compilation_status, change_description,
                    created_by, created_at, has_compiled_ast
-            FROM "dsl-ob-poc".dsl_latest_versions
+            FROM "ob-poc".dsl_latest_versions
             "#,
         )
         .fetch_all(&self.pool)
@@ -638,7 +643,7 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
                 SELECT domain_name, version_number, compilation_status,
                        total_executions, successful_executions, failed_executions,
                        avg_duration_ms, last_execution_at
-                FROM "dsl-ob-poc".dsl_execution_summary
+                FROM "ob-poc".dsl_execution_summary
                 WHERE domain_name = $1
                 "#
             }
@@ -647,7 +652,7 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
                 SELECT domain_name, version_number, compilation_status,
                        total_executions, successful_executions, failed_executions,
                        avg_duration_ms, last_execution_at
-                FROM "dsl-ob-poc".dsl_execution_summary
+                FROM "ob-poc".dsl_execution_summary
                 "#
             }
         };

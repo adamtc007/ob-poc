@@ -46,7 +46,7 @@ ON resource_types(resource_type_name, environment, version);
 -- Resource Type Attributes: Subset of main dictionary per resource type
 CREATE TABLE resource_type_attributes (
     resource_type_id UUID REFERENCES resource_types(resource_type_id) ON DELETE CASCADE,
-    attribute_id UUID NOT NULL, -- References "dsl-ob-poc".dictionary.attribute_id
+    attribute_id UUID NOT NULL, -- References "ob-poc".dictionary.attribute_id
     required BOOLEAN DEFAULT false,
     constraints JSONB, -- Resource-specific constraints
     transformation VARCHAR(100), -- Optional default transform key
@@ -104,8 +104,8 @@ CREATE INDEX idx_actions_resource_type ON actions_registry(resource_type_id);
 CREATE TABLE action_executions (
     execution_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     action_id UUID REFERENCES actions_registry(action_id),
-    cbu_id UUID REFERENCES "dsl-ob-poc".cbus(cbu_id),
-    dsl_version_id UUID REFERENCES "dsl-ob-poc".dsl_ob(version_id),
+    cbu_id UUID REFERENCES "ob-poc".cbus(cbu_id),
+    dsl_version_id UUID REFERENCES "ob-poc".dsl_ob(version_id),
     execution_status execution_status_enum NOT NULL DEFAULT 'PENDING',
 
     -- Execution context and results

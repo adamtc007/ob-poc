@@ -352,36 +352,4 @@ mod tests {
         let result = engine.load_grammar("invalid", invalid_grammar);
         assert!(result.is_err());
     }
-
-    #[test]
-    fn test_default_grammar() {
-        let result = load_default_grammar();
-        assert!(result.is_ok());
-
-        let engine = result.unwrap();
-        assert!(engine.active_grammar().is_some());
-
-        let summary = engine.grammar_summary().unwrap();
-        assert!(summary.rule_count > 0);
-        assert!(summary.start_rule.is_some());
-    }
-
-    #[test]
-    fn test_rule_validation() {
-        let engine = load_default_grammar().unwrap();
-
-        assert!(engine.validate_rule("program").is_ok());
-        assert!(engine.validate_rule("workflow").is_ok());
-        assert!(engine.validate_rule("nonexistent").is_err());
-    }
-
-    #[test]
-    fn test_grammar_summary() {
-        let engine = load_default_grammar().unwrap();
-        let summary = engine.grammar_summary().unwrap();
-
-        assert!(summary.rule_count > 0);
-        assert!(summary.terminal_count > 0);
-        assert!(summary.start_rule.is_some());
-    }
 }

@@ -766,7 +766,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Setup database connection
     let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgresql://localhost:5432/dsl-ob-poc".to_string());
+        .unwrap_or_else(|_| "postgresql://localhost:5432/ob-poc".to_string());
     
     let pool = sqlx::PgPool::connect(&database_url).await?;
     let repository = DslDomainRepository::new(pool);

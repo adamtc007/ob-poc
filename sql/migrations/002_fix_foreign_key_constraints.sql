@@ -15,11 +15,11 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_dsl_ob_cbu_id'
         AND table_name = 'dsl_ob'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
-        ALTER TABLE "dsl-ob-poc".dsl_ob
+        ALTER TABLE "ob-poc".dsl_ob
         ADD CONSTRAINT fk_dsl_ob_cbu_id
-        FOREIGN KEY (cbu_id) REFERENCES "dsl-ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+        FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
     END IF;
 END $$;
 
@@ -35,18 +35,18 @@ BEGIN
         SELECT 1 FROM information_schema.columns
         WHERE table_name = 'attribute_values'
         AND column_name = 'dsl_ob_id'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
         -- Add foreign key constraint for dsl_ob_id if it doesn't exist
         IF NOT EXISTS (
             SELECT 1 FROM information_schema.table_constraints
             WHERE constraint_name = 'fk_attribute_values_dsl_ob_id'
             AND table_name = 'attribute_values'
-            AND table_schema = 'dsl-ob-poc'
+            AND table_schema = 'ob-poc'
         ) THEN
-            ALTER TABLE "dsl-ob-poc".attribute_values
+            ALTER TABLE "ob-poc".attribute_values
             ADD CONSTRAINT fk_attribute_values_dsl_ob_id
-            FOREIGN KEY (dsl_ob_id) REFERENCES "dsl-ob-poc".dsl_ob(version_id) ON DELETE SET NULL;
+            FOREIGN KEY (dsl_ob_id) REFERENCES "ob-poc".dsl_ob(version_id) ON DELETE SET NULL;
         END IF;
     END IF;
 END $$;
@@ -62,11 +62,11 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_product_requirements_product_id'
         AND table_name = 'product_requirements'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
-        ALTER TABLE "dsl-ob-poc".product_requirements
+        ALTER TABLE "ob-poc".product_requirements
         ADD CONSTRAINT fk_product_requirements_product_id
-        FOREIGN KEY (product_id) REFERENCES "dsl-ob-poc".products(product_id) ON DELETE CASCADE;
+        FOREIGN KEY (product_id) REFERENCES "ob-poc".products(product_id) ON DELETE CASCADE;
     END IF;
 END $$;
 
@@ -77,11 +77,11 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_entity_product_mappings_product_id'
         AND table_name = 'entity_product_mappings'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
-        ALTER TABLE "dsl-ob-poc".entity_product_mappings
+        ALTER TABLE "ob-poc".entity_product_mappings
         ADD CONSTRAINT fk_entity_product_mappings_product_id
-        FOREIGN KEY (product_id) REFERENCES "dsl-ob-poc".products(product_id) ON DELETE CASCADE;
+        FOREIGN KEY (product_id) REFERENCES "ob-poc".products(product_id) ON DELETE CASCADE;
     END IF;
 END $$;
 
@@ -92,11 +92,11 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_product_workflows_product_id'
         AND table_name = 'product_workflows'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
-        ALTER TABLE "dsl-ob-poc".product_workflows
+        ALTER TABLE "ob-poc".product_workflows
         ADD CONSTRAINT fk_product_workflows_product_id
-        FOREIGN KEY (product_id) REFERENCES "dsl-ob-poc".products(product_id) ON DELETE CASCADE;
+        FOREIGN KEY (product_id) REFERENCES "ob-poc".products(product_id) ON DELETE CASCADE;
     END IF;
 END $$;
 
@@ -111,11 +111,11 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_service_resources_service_id'
         AND table_name = 'service_resources'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
-        ALTER TABLE "dsl-ob-poc".service_resources
+        ALTER TABLE "ob-poc".service_resources
         ADD CONSTRAINT fk_service_resources_service_id
-        FOREIGN KEY (service_id) REFERENCES "dsl-ob-poc".services(service_id) ON DELETE CASCADE;
+        FOREIGN KEY (service_id) REFERENCES "ob-poc".services(service_id) ON DELETE CASCADE;
     END IF;
 END $$;
 
@@ -126,11 +126,11 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_service_resources_resource_id'
         AND table_name = 'service_resources'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
-        ALTER TABLE "dsl-ob-poc".service_resources
+        ALTER TABLE "ob-poc".service_resources
         ADD CONSTRAINT fk_service_resources_resource_id
-        FOREIGN KEY (resource_id) REFERENCES "dsl-ob-poc".prod_resources(resource_id) ON DELETE CASCADE;
+        FOREIGN KEY (resource_id) REFERENCES "ob-poc".prod_resources(resource_id) ON DELETE CASCADE;
     END IF;
 END $$;
 
@@ -145,11 +145,11 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_entities_entity_type_id'
         AND table_name = 'entities'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
-        ALTER TABLE "dsl-ob-poc".entities
+        ALTER TABLE "ob-poc".entities
         ADD CONSTRAINT fk_entities_entity_type_id
-        FOREIGN KEY (entity_type_id) REFERENCES "dsl-ob-poc".entity_types(entity_type_id) ON DELETE CASCADE;
+        FOREIGN KEY (entity_type_id) REFERENCES "ob-poc".entity_types(entity_type_id) ON DELETE CASCADE;
     END IF;
 END $$;
 
@@ -164,11 +164,11 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_trust_parties_trust_id'
         AND table_name = 'trust_parties'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
-        ALTER TABLE "dsl-ob-poc".trust_parties
+        ALTER TABLE "ob-poc".trust_parties
         ADD CONSTRAINT fk_trust_parties_trust_id
-        FOREIGN KEY (trust_id) REFERENCES "dsl-ob-poc".entity_trusts(trust_id) ON DELETE CASCADE;
+        FOREIGN KEY (trust_id) REFERENCES "ob-poc".entity_trusts(trust_id) ON DELETE CASCADE;
     END IF;
 END $$;
 
@@ -179,11 +179,11 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_trust_parties_entity_id'
         AND table_name = 'trust_parties'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
-        ALTER TABLE "dsl-ob-poc".trust_parties
+        ALTER TABLE "ob-poc".trust_parties
         ADD CONSTRAINT fk_trust_parties_entity_id
-        FOREIGN KEY (entity_id) REFERENCES "dsl-ob-poc".entities(entity_id) ON DELETE CASCADE;
+        FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
     END IF;
 END $$;
 
@@ -194,11 +194,11 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_trust_beneficiary_classes_trust_id'
         AND table_name = 'trust_beneficiary_classes'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
-        ALTER TABLE "dsl-ob-poc".trust_beneficiary_classes
+        ALTER TABLE "ob-poc".trust_beneficiary_classes
         ADD CONSTRAINT fk_trust_beneficiary_classes_trust_id
-        FOREIGN KEY (trust_id) REFERENCES "dsl-ob-poc".entity_trusts(trust_id) ON DELETE CASCADE;
+        FOREIGN KEY (trust_id) REFERENCES "ob-poc".entity_trusts(trust_id) ON DELETE CASCADE;
     END IF;
 END $$;
 
@@ -209,11 +209,11 @@ BEGIN
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'fk_trust_protector_powers_trust_party_id'
         AND table_name = 'trust_protector_powers'
-        AND table_schema = 'dsl-ob-poc'
+        AND table_schema = 'ob-poc'
     ) THEN
-        ALTER TABLE "dsl-ob-poc".trust_protector_powers
+        ALTER TABLE "ob-poc".trust_protector_powers
         ADD CONSTRAINT fk_trust_protector_powers_trust_party_id
-        FOREIGN KEY (trust_party_id) REFERENCES "dsl-ob-poc".trust_parties(trust_party_id) ON DELETE CASCADE;
+        FOREIGN KEY (trust_party_id) REFERENCES "ob-poc".trust_parties(trust_party_id) ON DELETE CASCADE;
     END IF;
 END $$;
 

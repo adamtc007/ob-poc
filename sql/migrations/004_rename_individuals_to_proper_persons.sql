@@ -2,13 +2,13 @@
 -- This migration renames all references to individuals/persons to use "Proper Person" terminology
 
 -- 1. Rename the entity_proper_persons table to entity_proper_persons
-ALTER TABLE "dsl-ob-poc".entity_proper_persons RENAME TO entity_proper_persons;
+ALTER TABLE "ob-poc".entity_proper_persons RENAME TO entity_proper_persons;
 
 -- 2. Rename the primary key column
-ALTER TABLE "dsl-ob-poc".entity_proper_persons RENAME COLUMN proper_person_id TO proper_person_id;
+ALTER TABLE "ob-poc".entity_proper_persons RENAME COLUMN proper_person_id TO proper_person_id;
 
 -- 3. Update entity_types table reference
-UPDATE "dsl-ob-poc".entity_types
+UPDATE "ob-poc".entity_types
 SET
     name = 'PROPER_PERSON',
     description = 'Natural Person/Proper Person',
@@ -20,18 +20,18 @@ WHERE name = 'PROPER_PERSON';
 -- For now, we'll document that PROPER_PERSON should be treated as PROPER_PERSON
 
 -- 5. Rename indexes
-ALTER INDEX IF EXISTS "dsl-ob-poc".idx_proper_persons_full_name RENAME TO idx_proper_persons_full_name;
-ALTER INDEX IF EXISTS "dsl-ob-poc".idx_proper_persons_nationality RENAME TO idx_proper_persons_nationality;
-ALTER INDEX IF EXISTS "dsl-ob-poc".idx_proper_persons_id_document RENAME TO idx_proper_persons_id_document;
+ALTER INDEX IF EXISTS "ob-poc".idx_proper_persons_full_name RENAME TO idx_proper_persons_full_name;
+ALTER INDEX IF EXISTS "ob-poc".idx_proper_persons_nationality RENAME TO idx_proper_persons_nationality;
+ALTER INDEX IF EXISTS "ob-poc".idx_proper_persons_id_document RENAME TO idx_proper_persons_id_document;
 
 -- 6. Update trust_parties table enum values
 -- Update party_type enum values from PROPER_PERSON to PROPER_PERSON
-UPDATE "dsl-ob-poc".trust_parties
+UPDATE "ob-poc".trust_parties
 SET party_type = 'PROPER_PERSON'
 WHERE party_type = 'PROPER_PERSON';
 
 -- 7. Update dictionary seed data KYC attributes
-UPDATE "dsl-ob-poc".dictionary
+UPDATE "ob-poc".dictionary
 SET
     name = REPLACE(name, 'kyc.proper_person.', 'kyc.proper_person.'),
     long_description = REPLACE(long_description, 'individual', 'proper person'),
@@ -39,24 +39,24 @@ SET
 WHERE name LIKE 'kyc.proper_person.%';
 
 -- 8. Update entity type references in dictionary (step by step to avoid multiple assignments)
-UPDATE "dsl-ob-poc".dictionary
+UPDATE "ob-poc".dictionary
 SET long_description = REPLACE(long_description, 'individual', 'proper person')
 WHERE long_description LIKE '%individual%';
 
-UPDATE "dsl-ob-poc".dictionary
+UPDATE "ob-poc".dictionary
 SET long_description = REPLACE(long_description, 'PROPER_PERSON', 'PROPER_PERSON')
 WHERE long_description LIKE '%PROPER_PERSON%';
 
-UPDATE "dsl-ob-poc".dictionary
+UPDATE "ob-poc".dictionary
 SET source = REPLACE(source::text, 'kyc_proper_person', 'kyc_proper_person')::jsonb
 WHERE source::text LIKE '%kyc_proper_person%';
 
-UPDATE "dsl-ob-poc".dictionary
+UPDATE "ob-poc".dictionary
 SET sink = REPLACE(sink::text, 'kyc_proper_person', 'kyc_proper_person')::jsonb
 WHERE sink::text LIKE '%kyc_proper_person%';
 
 -- 9. Update any remaining person/people references in comments and descriptions (step by step)
-UPDATE "dsl-ob-poc".dictionary
+UPDATE "ob-poc".dictionary
 SET long_description = REPLACE(long_description, ' person', ' proper person')
 WHERE long_description LIKE '% person%' AND name NOT LIKE '%person%';
 
@@ -69,10 +69,10 @@ SET long_description = REPLACE(long_description, 'Person', 'Proper Person')
 WHERE long_description LIKE '%Person%' AND name NOT LIKE '%person%';
 
 -- 10. Update UBO registry column comment (metadata only)
-COMMENT ON COLUMN "dsl-ob-poc".ubo_registry.ubo_proper_person_id IS 'References the proper person entity who is the UBO';
+COMMENT ON COLUMN "ob-poc".ubo_registry.ubo_proper_person_id IS 'References the proper person entity who is the UBO';
 
 -- 11. Create a view for backward compatibility (temporary)
-CREATE OR REPLACE VIEW "dsl-ob-poc".entity_proper_persons AS
+CREATE OR REPLACE VIEW "ob-poc".entity_proper_persons AS
 SELECT
     proper_person_id as proper_person_id,
     first_name,
@@ -85,17 +85,17 @@ SELECT
     id_document_number,
     created_at,
     updated_at
-FROM "dsl-ob-poc".entity_proper_persons;
+FROM "ob-poc".entity_proper_persons;
 
 -- 12. Create schema_migrations table if it doesn't exist
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".schema_migrations (
+CREATE TABLE IF NOT EXISTS "ob-poc".schema_migrations (
     version VARCHAR(10) PRIMARY KEY,
     description TEXT NOT NULL,
     applied_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
 );
 
 -- 13. Add migration tracking
-INSERT INTO "dsl-ob-poc".schema_migrations (version, description, applied_at)
+INSERT INTO "ob-poc".schema_migrations (version, description, applied_at)
 VALUES ('004', 'Rename individuals to proper persons', NOW())
 ON CONFLICT (version) DO NOTHING;
 

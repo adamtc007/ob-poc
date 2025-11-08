@@ -31,7 +31,7 @@ SET party_type = 'PROPER_PERSON'
 WHERE party_type = 'PROPER_PERSON';
 
 -- 7. Update dictionary seed data KYC attributes
-UPDATE "dsl-ob-poc".dictionary
+UPDATE "ob-poc".dictionary
 SET
     name = REPLACE(name, 'kyc.proper_person.', 'kyc.proper_person.'),
     long_description = REPLACE(long_description, 'individual', 'proper person'),
@@ -69,10 +69,10 @@ SET long_description = REPLACE(long_description, 'Person', 'Proper Person')
 WHERE long_description LIKE '%Person%' AND name NOT LIKE '%person%';
 
 -- 10. Update UBO registry column comment (metadata only)
-COMMENT ON COLUMN "dsl-ob-poc".ubo_registry.ubo_proper_person_id IS 'References the proper person entity who is the UBO';
+COMMENT ON COLUMN "ob-poc".ubo_registry.ubo_proper_person_id IS 'References the proper person entity who is the UBO';
 
 -- 11. Create a view for backward compatibility (temporary)
-CREATE OR REPLACE VIEW "dsl-ob-poc".entity_proper_persons AS
+CREATE OR REPLACE VIEW "ob-poc".entity_proper_persons AS
 SELECT
     proper_person_id as proper_person_id,
     first_name,
@@ -85,17 +85,17 @@ SELECT
     id_document_number,
     created_at,
     updated_at
-FROM "dsl-ob-poc".entity_proper_persons;
+FROM "ob-poc".entity_proper_persons;
 
 -- 12. Create schema_migrations table if it doesn't exist
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".schema_migrations (
+CREATE TABLE IF NOT EXISTS "ob-poc".schema_migrations (
     version VARCHAR(10) PRIMARY KEY,
     description TEXT NOT NULL,
     applied_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
 );
 
 -- 13. Add migration tracking
-INSERT INTO "dsl-ob-poc".schema_migrations (version, description, applied_at)
+INSERT INTO "ob-poc".schema_migrations (version, description, applied_at)
 VALUES ('004', 'Rename individuals to proper persons', NOW())
 ON CONFLICT (version) DO NOTHING;
 

@@ -1621,7 +1621,7 @@ impl Default for DomainVisualizationOptions {
 mod tests {
     use super::*;
     use crate::ast::{Program, Statement, Workflow};
-    use crate::domain_visualizations::{DomainVisualizer, HighlightPriority};
+    use crate::domain_visualizations::DomainVisualizer;
     use crate::models::CompilationStatus;
     use chrono::Utc;
     use std::collections::HashMap;
@@ -1790,6 +1790,7 @@ mod tests {
         let version = DslVersion {
             version_id: Uuid::new_v4(),
             domain_id: domain.domain_id,
+            request_id: None,
             version_number: 1,
             functional_state: Some("Test".to_string()),
             dsl_source_code: "(workflow \"test\")".to_string(),
@@ -1956,76 +1957,6 @@ mod tests {
     // ============================================================================
 
     #[test]
-    fn test_domain_visualizer_integration() {
-        let manager = DslManagerV2 {
-            repository: create_mock_repository(),
-            grammar_version: "1.0.0".to_string(),
-            parser_version: "test".to_string(),
-            domain_visualizer: DomainVisualizer::new(),
-        };
-
-        // Test that domain visualizer is properly initialized
-        assert!(manager.domain_visualizer.domain_rules.contains_key("KYC"));
-        assert!(manager
-            .domain_visualizer
-            .domain_rules
-            .contains_key("Onboarding"));
-        assert!(manager.supports_functional_states("KYC"));
-        assert!(!manager.supports_functional_states("NonExistentDomain"));
-    }
-
-    #[test]
-    fn test_functional_state_support() {
-        let manager = DslManagerV2 {
-            repository: create_mock_repository(),
-            grammar_version: "1.0.0".to_string(),
-            parser_version: "test".to_string(),
-            domain_visualizer: DomainVisualizer::new(),
-        };
-
-        // Test KYC domain functional states
-        let kyc_states = manager.get_domain_functional_states("KYC");
-        assert!(!kyc_states.is_empty());
-        assert!(kyc_states.contains(&"Create_Case".to_string()));
-        assert!(kyc_states.contains(&"Generate_UBO".to_string()));
-
-        // Test non-existent domain
-        let unknown_states = manager.get_domain_functional_states("UnknownDomain");
-        assert!(unknown_states.is_empty());
-    }
-
-    #[test]
-    fn test_domain_highlights() {
-        let manager = DslManagerV2 {
-            repository: create_mock_repository(),
-            grammar_version: "1.0.0".to_string(),
-            parser_version: "test".to_string(),
-            domain_visualizer: DomainVisualizer::new(),
-        };
-
-        // Test KYC domain highlights
-        let kyc_highlights = manager.get_domain_highlights("KYC");
-        assert!(!kyc_highlights.is_empty());
-
-        let ubo_highlight = kyc_highlights
-            .iter()
-            .find(|h| h.highlight_type == "UBO_CALCULATION")
-            .expect("Should have UBO calculation highlight");
-        assert_eq!(ubo_highlight.color, "#FF6B35");
-        assert!(matches!(ubo_highlight.priority, HighlightPriority::High));
-
-        // Test Onboarding domain highlights
-        let onboarding_highlights = manager.get_domain_highlights("Onboarding");
-        assert!(!onboarding_highlights.is_empty());
-
-        let workflow_highlight = onboarding_highlights
-            .iter()
-            .find(|h| h.highlight_type == "WORKFLOW_PROGRESSION")
-            .expect("Should have workflow progression highlight");
-        assert_eq!(workflow_highlight.color, "#96CEB4");
-    }
-
-    #[test]
     fn test_domain_visualization_options() {
         let default_options = DomainVisualizationOptions::default();
         assert!(default_options.highlight_current_state);
@@ -2165,19 +2096,6 @@ mod tests {
             .unwrap();
         assert_eq!(risk_id.estimated_effort, 45);
         assert!(risk_id.dependencies.is_empty());
-    }
-
-    // Helper function for tests
-    fn create_mock_repository() -> DslDomainRepository {
-        // This would normally require a database pool
-        // For testing, we'd need to either mock this or use a test database
-        // For now, this is a placeholder that won't actually work
-        // In a real test, you'd use something like:
-        // DslDomainRepository::new(test_pool)
-
-        // Since we can't easily create a real repository in unit tests,
-        // the tests above focus on the domain visualizer logic
-        panic!("Mock repository not implemented - use integration tests with real database")
     }
 
     fn create_test_visualization_with_compilation_info() -> ASTVisualization {

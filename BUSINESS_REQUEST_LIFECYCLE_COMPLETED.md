@@ -321,7 +321,7 @@ The comprehensive demo (`business_request_lifecycle_demo.rs`) demonstrates:
 
 ```bash
 # With database connection
-DATABASE_URL="postgresql://localhost:5432/dsl-ob-poc" cargo run --example business_request_lifecycle_demo
+DATABASE_URL="postgresql://localhost:5432/ob-poc" cargo run --example business_request_lifecycle_demo
 
 # Mock mode (no database required)  
 cargo run --example business_request_lifecycle_demo
@@ -332,7 +332,7 @@ cargo run --example business_request_lifecycle_demo
 ### Database Migration
 ```sql
 -- Run the business request lifecycle migration
-psql -d dsl-ob-poc -f sql/migrations/005_dsl_business_request_lifecycle.sql
+psql -d ob-poc -f sql/migrations/005_dsl_business_request_lifecycle.sql
 ```
 
 ### Code Integration

@@ -71,7 +71,7 @@ The migration script will:
 
 ```bash
 # Required environment variables
-export DATABASE_URL="postgresql://user:password@localhost:5432/dsl_ob_poc"
+export DATABASE_URL="postgresql://user:password@localhost:5432/ob-poc"
 export DATABASE_POOL_SIZE=10
 
 # Optional
@@ -206,7 +206,7 @@ Test coverage includes:
 ```
 🚀 Starting Phase 1 Integration Test
 📋 Checking environment...
-   Database URL: postgresql://***@localhost:5432/dsl_ob_poc
+   Database URL: postgresql://***@localhost:5432/ob-poc
 🔌 Testing database connection...
    ✓ Database connection successful
    ✓ Database schema verified
@@ -320,10 +320,10 @@ Phase 1 provides the foundation for:
 pg_isready -h localhost -p 5432
 
 # Verify database exists
-psql -l | grep dsl_ob_poc
+psql -l | grep ob-poc
 
 # Check permissions
-psql -d dsl_ob_poc -c "SELECT version();"
+psql -d ob-poc -c "SELECT version();"
 ```
 
 #### Migration Issues
@@ -332,7 +332,7 @@ psql -d dsl_ob_poc -c "SELECT version();"
 psql -d dsl_ob_poc -c "\dt \"dsl-ob-poc\".*"
 
 # Re-run migration if needed
-psql -d dsl_ob_poc -f sql/migrations/001_dsl_domain_architecture.sql
+psql -d ob-poc -f sql/migrations/001_dsl_domain_architecture.sql
 ```
 
 #### Compilation Errors

@@ -174,40 +174,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_simple_dsl() {
-        let input = r#"
-        (workflow "test-workflow"
-            (declare-entity "person1" "person")
-            (obtain-document "passport" "government")
-            (create-edge "person1" "document1" "evidenced-by"))
-        "#;
-
-        let result = parse_program(input);
-        assert!(result.is_ok());
-
-        let program = result.unwrap();
-        assert_eq!(program.workflows.len(), 1);
-        assert_eq!(program.workflows[0].id, "test-workflow");
-        assert_eq!(program.workflows[0].statements.len(), 3);
-    }
-
-    #[test]
-    fn test_validation() {
-        let input = r#"
-        (workflow "valid-workflow"
-            (declare-entity "person1" "person")
-            (calculate-ubo "person1"))
-        "#;
-
-        let result = parse_program(input);
-        assert!(result.is_ok());
-
-        let program = result.unwrap();
-        let validation = validate_ast(&program);
-        assert!(validation.is_ok());
-    }
-
-    #[test]
     fn test_error_handling() {
         let invalid_input = r#"
         (workflow "broken

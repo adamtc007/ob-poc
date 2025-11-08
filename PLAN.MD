@@ -31,7 +31,7 @@ The system supports multiple DSL domains with functional states:
 #### Current Schema Analysis
 ```sql
 -- Existing DSL storage
-CREATE TABLE "dsl-ob-poc".dsl_ob (
+CREATE TABLE "ob-poc".dsl_ob (
     version_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     cbu_id VARCHAR(255) NOT NULL,
     dsl_text TEXT NOT NULL,
@@ -43,7 +43,7 @@ CREATE TABLE "dsl-ob-poc".dsl_ob (
 
 ##### 1. DSL Domain Management Table
 ```sql
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dsl_domains (
+CREATE TABLE IF NOT EXISTS "ob-poc".dsl_domains (
     domain_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     domain_name VARCHAR(100) NOT NULL UNIQUE, -- 'Onboarding', 'KYC', 'KYC_UBO', 'Account_Opening'
     description TEXT,
@@ -57,9 +57,9 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dsl_domains (
 ##### 2. Updated DSL Storage Table
 ```sql
 -- Rename/restructure existing dsl_ob table
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dsl_versions (
+CREATE TABLE IF NOT EXISTS "ob-poc".dsl_versions (
     version_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    domain_id UUID NOT NULL REFERENCES "dsl-ob-poc".dsl_domains (domain_id),
+    domain_id UUID NOT NULL REFERENCES "ob-poc".dsl_domains (domain_id),
     version_number INTEGER NOT NULL, -- Sequential: 1, 2, 3, etc.
     functional_state VARCHAR(100), -- 'Create_Case', 'Generate_UBO', 'Review_Edit', etc.
     dsl_source_code TEXT NOT NULL,
@@ -73,9 +73,9 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dsl_versions (
 
 ##### 3. AST Storage Table (NEW)
 ```sql
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".parsed_asts (
+CREATE TABLE IF NOT EXISTS "ob-poc".parsed_asts (
     ast_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    version_id UUID NOT NULL REFERENCES "dsl-ob-poc".dsl_versions (version_id),
+    version_id UUID NOT NULL REFERENCES "ob-poc".dsl_versions (version_id),
     ast_json JSONB NOT NULL, -- Complete AST structure
     parse_metadata JSONB, -- Parser info, timing, validation results
     grammar_version VARCHAR(20), -- eBNF grammar version used
@@ -84,15 +84,15 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".parsed_asts (
     UNIQUE (version_id)
 );
 
-CREATE INDEX idx_parsed_asts_version_id ON "dsl-ob-poc".parsed_asts (version_id);
-CREATE INDEX idx_parsed_asts_parsed_at ON "dsl-ob-poc".parsed_asts (parsed_at DESC);
+CREATE INDEX idx_parsed_asts_version_id ON "ob-poc".parsed_asts (version_id);
+CREATE INDEX idx_parsed_asts_parsed_at ON "ob-poc".parsed_asts (parsed_at DESC);
 ```
 
 ##### 4. DSL Execution Pipeline Table
 ```sql
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dsl_execution_log (
+CREATE TABLE IF NOT EXISTS "ob-poc".dsl_execution_log (
     execution_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    version_id UUID NOT NULL REFERENCES "dsl-ob-poc".dsl_versions (version_id),
+    version_id UUID NOT NULL REFERENCES "ob-poc".dsl_versions (version_id),
     cbu_id VARCHAR(255), -- Client Business Unit context
     execution_phase VARCHAR(50), -- 'COMPILE', 'VALIDATE', 'EXECUTE', 'COMPLETE'
     status VARCHAR(50), -- 'SUCCESS', 'FAILED', 'IN_PROGRESS'
@@ -447,7 +447,7 @@ BEGIN;
 -- (DDL from above)
 
 -- Migrate existing data
-INSERT INTO "dsl-ob-poc".dsl_domains (domain_name, description)
+INSERT INTO "ob-poc".dsl_domains (domain_name, description)
 VALUES 
     ('Legacy', 'Migrated from old dsl_ob table'),
     ('KYC', 'Know Your Customer workflows'),
@@ -455,13 +455,13 @@ VALUES
     ('Account_Opening', 'Account opening workflows');
 
 -- Migrate existing DSL records
-INSERT INTO "dsl-ob-poc".dsl_versions (domain_id, version_number, dsl_source_code, created_at)
+INSERT INTO "ob-poc".dsl_versions (domain_id, version_number, dsl_source_code, created_at)
 SELECT 
-    (SELECT domain_id FROM "dsl-ob-poc".dsl_domains WHERE domain_name = 'Legacy'),
+    (SELECT domain_id FROM "ob-poc".dsl_domains WHERE domain_name = 'Legacy'),
     ROW_NUMBER() OVER (ORDER BY created_at),
     dsl_text,
     created_at
-FROM "dsl-ob-poc".dsl_ob;
+FROM "ob-poc".dsl_ob;
 
 COMMIT;
 ```

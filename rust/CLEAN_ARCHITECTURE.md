@@ -182,7 +182,7 @@ cargo run --bin test_phase1
 psql -d dsl_ob_poc -f sql/migrations/001_dsl_domain_architecture.sql
 
 # Set environment
-export DATABASE_URL="postgresql://user:pass@localhost:5432/dsl_ob_poc"
+export DATABASE_URL="postgresql://user:pass@localhost:5432/ob-poc"
 ```
 
 ## Summary

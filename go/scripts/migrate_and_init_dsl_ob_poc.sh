@@ -27,7 +27,8 @@ psql -d "$DB_NAME" -c "\\dn+" || true
 
 # 2) Migrate: rename schema and set owner to adamtc007
 echo "\n== Running migration: rename schema and set owner =="
-psql -d "$DB_NAME" -v ON_ERROR_STOP=1 -f sql/migrate_kyc-dsl_to_dsl-ob-poc.sql
+# If you are migrating from older schemas, adjust this migration as needed
+# psql -d "$DB_NAME" -v ON_ERROR_STOP=1 -f sql/migrate_kyc-dsl_to_ob-poc.sql
 
 # 3) Initialize/ensure tables in new schema (idempotent)
 echo "\n== Running init.sql to ensure tables =="
@@ -35,15 +36,15 @@ psql -d "$DB_NAME" -v ON_ERROR_STOP=1 -f sql/init.sql
 
 # 4) Ensure schema owner (redundant if migration ran, but safe)
 echo "\n== Ensuring schema owner is adamtc007 =="
-psql -d "$DB_NAME" -v ON_ERROR_STOP=1 -c 'ALTER SCHEMA "dsl-ob-poc" OWNER TO "adamtc007";'
+psql -d "$DB_NAME" -v ON_ERROR_STOP=1 -c 'ALTER SCHEMA "ob-poc" OWNER TO "adamtc007";'
 
 # 5) Ensure all objects in schema are owned by adamtc007 (tables + sequences)
 echo "\n== Ensuring all objects in schema are owned by adamtc007 =="
 psql -d "$DB_NAME" -v ON_ERROR_STOP=1 -c "DO $$ DECLARE r RECORD; BEGIN \
-  FOR r IN SELECT '"' || schemaname || '"."' || tablename || '"' AS q FROM pg_tables WHERE schemaname='dsl-ob-poc' LOOP \
+  FOR r IN SELECT '"' || schemaname || '"."' || tablename || '"' AS q FROM pg_tables WHERE schemaname='ob-poc' LOOP \
     EXECUTE 'ALTER TABLE ' || r.q || ' OWNER TO \"adamtc007\"'; \
   END LOOP; \
-  FOR r IN SELECT '"' || sequence_schema || '"."' || sequence_name || '"' AS q FROM information_schema.sequences WHERE sequence_schema='dsl-ob-poc' LOOP \
+  FOR r IN SELECT '"' || sequence_schema || '"."' || sequence_name || '"' AS q FROM information_schema.sequences WHERE sequence_schema='ob-poc' LOOP \
     EXECUTE 'ALTER SEQUENCE ' || r.q || ' OWNER TO \"adamtc007\"'; \
   END LOOP; \
 END $$;"
@@ -52,11 +53,10 @@ END $$;"
 echo "\n== Schemas after =="
 psql -d "$DB_NAME" -v ON_ERROR_STOP=1 -c "\\dn+"
 
-echo "\n== Tables in schema dsl-ob-poc =="
-psql -d "$DB_NAME" -v ON_ERROR_STOP=1 -c '"\\dt+ \"dsl-ob-poc\".*"'
+echo "\n== Tables in schema ob-poc =="
+psql -d "$DB_NAME" -v ON_ERROR_STOP=1 -c '"\\dt+ \"ob-poc\".*"'
 
 echo "\n== Sample latest DSL rows (if any) =="
-psql -d "$DB_NAME" -v ON_ERROR_STOP=1 -c 'SELECT version_id, cbu_id, created_at FROM "dsl-ob-poc".dsl_ob ORDER BY created_at DESC LIMIT 5;'
+psql -d "$DB_NAME" -v ON_ERROR_STOP=1 -c 'SELECT version_id, cbu_id, created_at FROM "ob-poc".dsl_ob ORDER BY created_at DESC LIMIT 5;'
 
 echo "\nAll done."
-

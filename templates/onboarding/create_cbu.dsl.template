@@ -1,0 +1,61 @@
+---
+template_id: "onboarding_create_cbu"
+domain: "onboarding"
+template_type: "CreateCbu"
+description: "Creates initial onboarding DSL for a CBU"
+variables:
+  - name: "cbu_id"
+    type: "uuid"
+    required: true
+    description: "Client Business Unit ID"
+  - name: "cbu_name"
+    type: "string"
+    required: true
+    description: "CBU name"
+  - name: "cbu_description"
+    type: "string"
+    required: false
+    description: "CBU description"
+  - name: "onboarding_name"
+    type: "string"
+    required: true
+    description: "Name of the onboarding request"
+  - name: "onboarding_description"
+    type: "string"
+    required: false
+    description: "Description of the onboarding request"
+  - name: "ob_request_id"
+    type: "uuid"
+    required: true
+    description: "Generated onboarding request ID"
+requirements:
+  prerequisite_operations: []
+  required_attributes: ["cbu_id", "onboarding_name"]
+  database_queries: []
+  validation_rules: ["cbu_id must be valid UUID", "onboarding_name must not be empty"]
+---
+
+(onboarding.request.create
+  (request.id "{{ob_request_id}}")
+  (cbu.id "{{cbu_id}}")
+  (cbu.name "{{cbu_name}}")
+  (cbu.description "{{cbu_description}}")
+  (request.name "{{onboarding_name}}")
+  (request.description "{{onboarding_description}}")
+  (request.status "CREATED")
+  (created.at "{{timestamp}}")
+
+  (workflow "Initial Onboarding Setup"
+    BEGIN
+      (declare-entity "{{cbu_id}}" "cbu")
+      (set-attribute "entity.cbu_id" "{{cbu_id}}")
+      (set-attribute "entity.name" "{{cbu_name}}")
+      (set-attribute "onboard.request_id" "{{ob_request_id}}")
+      (set-attribute "onboard.status" "CREATED")
+
+      (log-event "Onboarding request created"
+                 (cbu "{{cbu_id}}")
+                 (request "{{ob_request_id}}")
+                 (name "{{onboarding_name}}"))
+    END)
+)

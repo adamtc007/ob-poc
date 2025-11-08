@@ -21,7 +21,7 @@ BEGIN;
 
 -- DSL Domain Management Table
 -- Supports: Onboarding, KYC, KYC_UBO, Account_Opening, etc.
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dsl_domains (
+CREATE TABLE IF NOT EXISTS "ob-poc".dsl_domains (
     domain_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     domain_name VARCHAR(100) NOT NULL UNIQUE, -- 'Onboarding', 'KYC', 'KYC_UBO', 'Account_Opening'
     description TEXT,
@@ -33,20 +33,20 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dsl_domains (
 );
 
 -- Create indexes for domains
-CREATE INDEX IF NOT EXISTS idx_dsl_domains_name ON "dsl-ob-poc".dsl_domains (domain_name);
-CREATE INDEX IF NOT EXISTS idx_dsl_domains_active ON "dsl-ob-poc".dsl_domains (active);
+CREATE INDEX IF NOT EXISTS idx_dsl_domains_name ON "ob-poc".dsl_domains (domain_name);
+CREATE INDEX IF NOT EXISTS idx_dsl_domains_active ON "ob-poc".dsl_domains (active);
 
 -- DSL Versions Table (replaces/extends dsl_ob)
 -- Each domain has sequential versions with complete change tracking
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dsl_versions (
+CREATE TABLE IF NOT EXISTS "ob-poc".dsl_versions (
     version_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    domain_id UUID NOT NULL REFERENCES "dsl-ob-poc".dsl_domains (domain_id) ON DELETE CASCADE,
+    domain_id UUID NOT NULL REFERENCES "ob-poc".dsl_domains (domain_id) ON DELETE CASCADE,
     version_number INTEGER NOT NULL, -- Sequential: 1, 2, 3, etc.
     functional_state VARCHAR(100), -- 'Create_Case', 'Generate_UBO', 'Review_Edit', 'Confirm_Compile', 'Run'
     dsl_source_code TEXT NOT NULL,
     compilation_status VARCHAR(50) DEFAULT 'DRAFT', -- 'DRAFT', 'COMPILING', 'COMPILED', 'ACTIVE', 'DEPRECATED', 'ERROR'
     change_description TEXT, -- Change log entry describing what changed
-    parent_version_id UUID REFERENCES "dsl-ob-poc".dsl_versions (version_id), -- For branching/merging
+    parent_version_id UUID REFERENCES "ob-poc".dsl_versions (version_id), -- For branching/merging
     created_by VARCHAR(255), -- User who created this version
     created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
     compiled_at TIMESTAMPTZ, -- When compilation completed
@@ -55,16 +55,16 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dsl_versions (
 );
 
 -- Create indexes for dsl_versions
-CREATE INDEX IF NOT EXISTS idx_dsl_versions_domain_version ON "dsl-ob-poc".dsl_versions (domain_id, version_number DESC);
-CREATE INDEX IF NOT EXISTS idx_dsl_versions_status ON "dsl-ob-poc".dsl_versions (compilation_status);
-CREATE INDEX IF NOT EXISTS idx_dsl_versions_functional_state ON "dsl-ob-poc".dsl_versions (functional_state);
-CREATE INDEX IF NOT EXISTS idx_dsl_versions_created_at ON "dsl-ob-poc".dsl_versions (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_dsl_versions_domain_version ON "ob-poc".dsl_versions (domain_id, version_number DESC);
+CREATE INDEX IF NOT EXISTS idx_dsl_versions_status ON "ob-poc".dsl_versions (compilation_status);
+CREATE INDEX IF NOT EXISTS idx_dsl_versions_functional_state ON "ob-poc".dsl_versions (functional_state);
+CREATE INDEX IF NOT EXISTS idx_dsl_versions_created_at ON "ob-poc".dsl_versions (created_at DESC);
 
 -- Parsed AST Storage Table
 -- Stores compiled AST with metadata for fast execution
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".parsed_asts (
+CREATE TABLE IF NOT EXISTS "ob-poc".parsed_asts (
     ast_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    version_id UUID NOT NULL REFERENCES "dsl-ob-poc".dsl_versions (version_id) ON DELETE CASCADE,
+    version_id UUID NOT NULL REFERENCES "ob-poc".dsl_versions (version_id) ON DELETE CASCADE,
     ast_json JSONB NOT NULL, -- Complete AST structure from NOM parser
     parse_metadata JSONB, -- Parser timing, validation results, warnings
     grammar_version VARCHAR(20) NOT NULL, -- eBNF grammar version used for parsing
@@ -78,16 +78,16 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".parsed_asts (
 );
 
 -- Create indexes for parsed_asts
-CREATE INDEX IF NOT EXISTS idx_parsed_asts_version_id ON "dsl-ob-poc".parsed_asts (version_id);
-CREATE INDEX IF NOT EXISTS idx_parsed_asts_parsed_at ON "dsl-ob-poc".parsed_asts (parsed_at DESC);
-CREATE INDEX IF NOT EXISTS idx_parsed_asts_grammar_version ON "dsl-ob-poc".parsed_asts (grammar_version);
-CREATE INDEX IF NOT EXISTS idx_parsed_asts_hash ON "dsl-ob-poc".parsed_asts (ast_hash);
+CREATE INDEX IF NOT EXISTS idx_parsed_asts_version_id ON "ob-poc".parsed_asts (version_id);
+CREATE INDEX IF NOT EXISTS idx_parsed_asts_parsed_at ON "ob-poc".parsed_asts (parsed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_parsed_asts_grammar_version ON "ob-poc".parsed_asts (grammar_version);
+CREATE INDEX IF NOT EXISTS idx_parsed_asts_hash ON "ob-poc".parsed_asts (ast_hash);
 
 -- DSL Execution Log Table
 -- Tracks the complete compilation and execution pipeline
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dsl_execution_log (
+CREATE TABLE IF NOT EXISTS "ob-poc".dsl_execution_log (
     execution_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    version_id UUID NOT NULL REFERENCES "dsl-ob-poc".dsl_versions (version_id) ON DELETE CASCADE,
+    version_id UUID NOT NULL REFERENCES "ob-poc".dsl_versions (version_id) ON DELETE CASCADE,
     cbu_id VARCHAR(255), -- Client Business Unit context (when executed)
     execution_phase VARCHAR(50) NOT NULL, -- 'PARSE', 'COMPILE', 'VALIDATE', 'EXECUTE', 'COMPLETE'
     status VARCHAR(50) NOT NULL, -- 'SUCCESS', 'FAILED', 'IN_PROGRESS', 'CANCELLED'
@@ -107,17 +107,17 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dsl_execution_log (
 );
 
 -- Create indexes for execution log
-CREATE INDEX IF NOT EXISTS idx_dsl_execution_version_phase ON "dsl-ob-poc".dsl_execution_log (version_id, execution_phase);
-CREATE INDEX IF NOT EXISTS idx_dsl_execution_status ON "dsl-ob-poc".dsl_execution_log (status);
-CREATE INDEX IF NOT EXISTS idx_dsl_execution_started_at ON "dsl-ob-poc".dsl_execution_log (started_at DESC);
-CREATE INDEX IF NOT EXISTS idx_dsl_execution_cbu_id ON "dsl-ob-poc".dsl_execution_log (cbu_id);
+CREATE INDEX IF NOT EXISTS idx_dsl_execution_version_phase ON "ob-poc".dsl_execution_log (version_id, execution_phase);
+CREATE INDEX IF NOT EXISTS idx_dsl_execution_status ON "ob-poc".dsl_execution_log (status);
+CREATE INDEX IF NOT EXISTS idx_dsl_execution_started_at ON "ob-poc".dsl_execution_log (started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_dsl_execution_cbu_id ON "ob-poc".dsl_execution_log (cbu_id);
 
 -- ============================================================================
 -- STEP 2: INSERT DEFAULT DOMAINS
 -- ============================================================================
 
 -- Insert the standard DSL domains
-INSERT INTO "dsl-ob-poc".dsl_domains (domain_name, description, base_grammar_version, vocabulary_version)
+INSERT INTO "ob-poc".dsl_domains (domain_name, description, base_grammar_version, vocabulary_version)
 VALUES
     ('Legacy', 'Migrated DSL content from original dsl_ob table', '1.0.0', '1.0.0'),
     ('Onboarding', 'Client onboarding workflows and processes', '1.0.0', '1.0.0'),
@@ -141,21 +141,21 @@ DECLARE
 BEGIN
     -- Get the Legacy domain ID
     SELECT domain_id INTO legacy_domain_id
-    FROM "dsl-ob-poc".dsl_domains
+    FROM "ob-poc".dsl_domains
     WHERE domain_name = 'Legacy';
 
     -- Only migrate if dsl_ob table exists and has data
     IF EXISTS (SELECT 1 FROM information_schema.tables
-               WHERE table_schema = 'dsl-ob-poc'
+               WHERE table_schema = 'ob-poc'
                AND table_name = 'dsl_ob') THEN
 
         -- Migrate each record from dsl_ob to dsl_versions
         FOR dsl_record IN
             SELECT version_id, cbu_id, dsl_text, created_at
-            FROM "dsl-ob-poc".dsl_ob
+            FROM "ob-poc".dsl_ob
             ORDER BY created_at ASC
         LOOP
-            INSERT INTO "dsl-ob-poc".dsl_versions (
+            INSERT INTO "ob-poc".dsl_versions (
                 version_id,
                 domain_id,
                 version_number,

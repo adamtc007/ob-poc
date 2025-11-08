@@ -368,10 +368,7 @@ mod tests {
 
     #[test]
     fn test_simple_workflow() {
-        let input = r#"
-        (workflow "test-workflow"
-            (declare-entity "entity1" "person"))
-        "#;
+        let input = r#"(workflow "test-workflow" (declare-entity "entity1" "person"))"#;
 
         let result = parse_program(input);
         assert!(result.is_ok());

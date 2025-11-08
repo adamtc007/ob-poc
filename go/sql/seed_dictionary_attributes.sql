@@ -1,7 +1,7 @@
 -- Seed comprehensive dictionary attributes for DSL onboarding system
 -- This populates the dictionary table with 76+ common financial onboarding attributes
 
-INSERT INTO "dsl-ob-poc".dictionary (attribute_id, name, long_description, group_id, mask, domain, vector, source, sink, created_at, updated_at) VALUES
+INSERT INTO "ob-poc".dictionary (attribute_id, name, long_description, group_id, mask, domain, vector, source, sink, created_at, updated_at) VALUES
 
 -- Core Onboarding Attributes (referenced by DSL generation)
 ('123e4567-e89b-12d3-a456-426614174001', 'onboard.cbu_id', 'Client Business Unit identifier', 'Onboarding', 'string', 'Onboarding', '', '{"type": "generated", "pattern": "CBU-[0-9]{4}-[0-9]{3}", "required": true}', '{"type": "database", "table": "onboarding_cases"}', NOW(), NOW()),

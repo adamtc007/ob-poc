@@ -114,7 +114,7 @@ impl DslBusinessRequestRepository {
     /// Helper method to validate domain exists and is active
     async fn validate_domain(&self, domain_name: &str) -> Result<Uuid, DslError> {
         let row = sqlx::query(
-            r#"SELECT domain_id FROM "dsl-ob-poc".dsl_domains WHERE domain_name = $1 AND active = true"#,
+            r#"SELECT domain_id FROM "ob-poc".dsl_domains WHERE domain_name = $1 AND active = true"#,
         )
         .bind(domain_name)
         .fetch_optional(&self.pool)
@@ -176,7 +176,7 @@ impl DslBusinessRequestRepositoryTrait for DslBusinessRequestRepository {
 
         // Use the stored function to create the business request with proper lifecycle
         let request_id = sqlx::query_scalar::<_, Uuid>(
-            r#"SELECT "dsl-ob-poc".create_business_request($1, $2, $3, $4, $5, $6, $7, $8, $9)"#,
+            r#"SELECT "ob-poc".create_business_request($1, $2, $3, $4, $5, $6, $7, $8, $9)"#,
         )
         .bind(&request.domain_name)
         .bind(&request.business_reference)
@@ -216,7 +216,7 @@ impl DslBusinessRequestRepositoryTrait for DslBusinessRequestRepository {
         let row = sqlx::query(
             r#"
             SELECT br.*
-            FROM "dsl-ob-poc".dsl_business_requests br
+            FROM "ob-poc".dsl_business_requests br
             WHERE br.request_id = $1
             "#,
         )
@@ -246,8 +246,8 @@ impl DslBusinessRequestRepositoryTrait for DslBusinessRequestRepository {
         let row = sqlx::query(
             r#"
             SELECT br.*
-            FROM "dsl-ob-poc".dsl_business_requests br
-            JOIN "dsl-ob-poc".dsl_domains d ON br.domain_id = d.domain_id
+            FROM "ob-poc".dsl_business_requests br
+            JOIN "ob-poc".dsl_domains d ON br.domain_id = d.domain_id
             WHERE d.domain_name = $1 AND br.business_reference = $2
             "#,
         )
@@ -276,7 +276,7 @@ impl DslBusinessRequestRepositoryTrait for DslBusinessRequestRepository {
         debug!("Listing business requests with filters");
 
         let mut query = r#"
-            SELECT * FROM "dsl-ob-poc".dsl_active_business_requests
+            SELECT * FROM "ob-poc".dsl_active_business_requests
             WHERE 1=1
         "#
         .to_string();
@@ -419,7 +419,7 @@ impl DslBusinessRequestRepositoryTrait for DslBusinessRequestRepository {
         // For simplicity, we'll fetch the updated record separately
         // In a production system, you'd want to build this more dynamically
         sqlx::query(
-            r#"UPDATE "dsl-ob-poc".dsl_business_requests SET updated_at = now() WHERE request_id = $1"#
+            r#"UPDATE "ob-poc".dsl_business_requests SET updated_at = now() WHERE request_id = $1"#,
         )
         .bind(request_id)
         .execute(&self.pool)
@@ -437,7 +437,7 @@ impl DslBusinessRequestRepositoryTrait for DslBusinessRequestRepository {
         debug!("Deleting business request: {}", request_id);
 
         let result =
-            sqlx::query(r#"DELETE FROM "dsl-ob-poc".dsl_business_requests WHERE request_id = $1"#)
+            sqlx::query(r#"DELETE FROM "ob-poc".dsl_business_requests WHERE request_id = $1"#)
                 .bind(request_id)
                 .execute(&self.pool)
                 .await
@@ -464,7 +464,7 @@ impl DslBusinessRequestRepositoryTrait for DslBusinessRequestRepository {
 
         let row = sqlx::query(
             r#"
-            SELECT * FROM "dsl-ob-poc".dsl_request_workflow_states
+            SELECT * FROM "ob-poc".dsl_request_workflow_states
             WHERE request_id = $1 AND is_current_state = true
             "#,
         )
@@ -505,7 +505,7 @@ impl DslBusinessRequestRepositoryTrait for DslBusinessRequestRepository {
         debug!("Fetching workflow history for request: {}", request_id);
 
         let rows = sqlx::query(
-            r#"SELECT * FROM "dsl-ob-poc".dsl_request_workflow_history WHERE request_id = $1"#,
+            r#"SELECT * FROM "ob-poc".dsl_request_workflow_history WHERE request_id = $1"#,
         )
         .bind(request_id)
         .fetch_all(&self.pool)
@@ -550,7 +550,7 @@ impl DslBusinessRequestRepositoryTrait for DslBusinessRequestRepository {
         );
 
         let state_id = sqlx::query_scalar::<_, Uuid>(
-            r#"SELECT "dsl-ob-poc".transition_request_state($1, $2, $3, $4, $5)"#,
+            r#"SELECT "ob-poc".transition_request_state($1, $2, $3, $4, $5)"#,
         )
         .bind(request_id)
         .bind(new_state)
@@ -568,7 +568,7 @@ impl DslBusinessRequestRepositoryTrait for DslBusinessRequestRepository {
 
         // Fetch and return the new state
         let row = sqlx::query(
-            r#"SELECT * FROM "dsl-ob-poc".dsl_request_workflow_states WHERE state_id = $1"#,
+            r#"SELECT * FROM "ob-poc".dsl_request_workflow_states WHERE state_id = $1"#,
         )
         .bind(&state_id)
         .fetch_one(&self.pool)
@@ -607,7 +607,7 @@ impl DslBusinessRequestRepositoryTrait for DslBusinessRequestRepository {
         debug!("Creating DSL amendment for request: {}", request_id);
 
         let version_id = sqlx::query_scalar::<_, Uuid>(
-            r#"SELECT "dsl-ob-poc".create_dsl_amendment($1, $2, $3, $4, $5)"#,
+            r#"SELECT "ob-poc".create_dsl_amendment($1, $2, $3, $4, $5)"#,
         )
         .bind(request_id)
         .bind(dsl_source_code)
@@ -632,7 +632,7 @@ impl DslBusinessRequestRepositoryTrait for DslBusinessRequestRepository {
     ) -> Result<Option<BusinessRequestSummary>, DslError> {
         debug!("Fetching business request summary: {}", request_id);
 
-        let row = sqlx::query(r#"SELECT * FROM "dsl-ob-poc".get_business_request_summary($1)"#)
+        let row = sqlx::query(r#"SELECT * FROM "ob-poc".get_business_request_summary($1)"#)
             .bind(request_id)
             .fetch_optional(&self.pool)
             .await
@@ -676,8 +676,8 @@ impl DslBusinessRequestRepositoryTrait for DslBusinessRequestRepository {
                 COUNT(CASE WHEN priority_level = 'CRITICAL' THEN 1 END) as critical_requests,
                 AVG(CASE WHEN completed_at IS NOT NULL THEN
                     EXTRACT(EPOCH FROM (completed_at - created_at))/3600.0 END) as avg_completion_hours
-            FROM "dsl-ob-poc".dsl_business_requests br
-            JOIN "dsl-ob-poc".dsl_domains d ON br.domain_id = d.domain_id
+            FROM "ob-poc".dsl_business_requests br
+            JOIN "ob-poc".dsl_domains d ON br.domain_id = d.domain_id
             WHERE d.domain_name = $1
             AND br.created_at >= NOW() - INTERVAL '{} days'
             "#,
@@ -708,7 +708,7 @@ impl DslBusinessRequestRepositoryTrait for DslBusinessRequestRepository {
         debug!("Fetching all request types");
 
         let rows = sqlx::query(
-            r#"SELECT * FROM "dsl-ob-poc".dsl_request_types WHERE active = true ORDER BY request_type"#,
+            r#"SELECT * FROM "ob-poc".dsl_request_types WHERE active = true ORDER BY request_type"#,
         )
         .fetch_all(&self.pool)
         .await
@@ -739,7 +739,7 @@ impl DslBusinessRequestRepositoryTrait for DslBusinessRequestRepository {
         debug!("Fetching request type: {}", request_type);
 
         let row =
-            sqlx::query(r#"SELECT * FROM "dsl-ob-poc".dsl_request_types WHERE request_type = $1"#)
+            sqlx::query(r#"SELECT * FROM "ob-poc".dsl_request_types WHERE request_type = $1"#)
                 .bind(request_type)
                 .fetch_optional(&self.pool)
                 .await

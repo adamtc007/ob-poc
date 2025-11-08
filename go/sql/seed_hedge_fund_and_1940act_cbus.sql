@@ -2,7 +2,7 @@
 -- Run after init.sql and seed-catalog
 
 -- First, ensure we have the necessary entity types in the entity_types table
-INSERT INTO "dsl-ob-poc".entity_types (entity_type_id, name, description, table_name, created_at, updated_at)
+INSERT INTO "ob-poc".entity_types (entity_type_id, name, description, table_name, created_at, updated_at)
 VALUES
     ('11111111-1111-1111-1111-111111111111', 'PARTNERSHIP', 'Limited Liability Partnership', 'entity_partnerships', NOW(), NOW()),
     ('22222222-2222-2222-2222-222222222222', 'LIMITED_COMPANY', 'Limited Company/Corporation', 'entity_limited_companies', NOW(), NOW()),
@@ -10,7 +10,7 @@ VALUES
 ON CONFLICT (name) DO NOTHING;
 
 -- Create standard roles for financial entities
-INSERT INTO "dsl-ob-poc".roles (role_id, name, description, created_at, updated_at)
+INSERT INTO "ob-poc".roles (role_id, name, description, created_at, updated_at)
 VALUES
     ('a1111111-1111-1111-1111-111111111111', 'GENERAL_PARTNER', 'General Partner of hedge fund', NOW(), NOW()),
     ('a2222222-2222-2222-2222-222222222222', 'INVESTMENT_MANAGER', 'Investment Manager', NOW(), NOW()),
@@ -24,27 +24,27 @@ ON CONFLICT (name) DO NOTHING;
 -- =============================================================================
 
 -- Hedge Fund CBU 1: Quantum Capital Partners
-INSERT INTO "dsl-ob-poc".cbus (cbu_id, name, description, nature_purpose, created_at, updated_at)
+INSERT INTO "ob-poc".cbus (cbu_id, name, description, nature_purpose, created_at, updated_at)
 VALUES ('b1111111-1111-1111-1111-111111111111', 'HF-QCP-001', 'Quantum Capital Partners Hedge Fund', 'Multi-strategy hedge fund focused on equity long/short and merger arbitrage', NOW(), NOW());
 
 -- Hedge Fund CBU 2: Meridian Alpha Fund
-INSERT INTO "dsl-ob-poc".cbus (cbu_id, name, description, nature_purpose, created_at, updated_at)
+INSERT INTO "ob-poc".cbus (cbu_id, name, description, nature_purpose, created_at, updated_at)
 VALUES ('b2222222-2222-2222-2222-222222222222', 'HF-MAF-002', 'Meridian Alpha Fund', 'Quantitative hedge fund specializing in fixed income and derivatives strategies', NOW(), NOW());
 
 -- LLP Entities for Hedge Fund 1 (Quantum Capital Partners)
-INSERT INTO "dsl-ob-poc".entity_partnerships (partnership_id, partnership_name, partnership_type, jurisdiction, formation_date, principal_place_business, partnership_agreement_date, created_at, updated_at)
+INSERT INTO "ob-poc".entity_partnerships (partnership_id, partnership_name, partnership_type, jurisdiction, formation_date, principal_place_business, partnership_agreement_date, created_at, updated_at)
 VALUES
     ('c1111111-1111-1111-1111-111111111111', 'Quantum Capital Management LLP', 'Limited Liability', 'US-DE', '2020-03-15', '200 Greenwich Street, New York, NY 10007', '2020-03-10', NOW(), NOW()),
     ('c1222222-1111-1111-1111-111111111111', 'QCP Investment Advisors LLP', 'Limited Liability', 'US-DE', '2020-03-15', '200 Greenwich Street, New York, NY 10007', '2020-03-10', NOW(), NOW());
 
 -- LLP Entities for Hedge Fund 2 (Meridian Alpha Fund)
-INSERT INTO "dsl-ob-poc".entity_partnerships (partnership_id, partnership_name, partnership_type, jurisdiction, formation_date, principal_place_business, partnership_agreement_date, created_at, updated_at)
+INSERT INTO "ob-poc".entity_partnerships (partnership_id, partnership_name, partnership_type, jurisdiction, formation_date, principal_place_business, partnership_agreement_date, created_at, updated_at)
 VALUES
     ('c2111111-2222-2222-2222-222222222222', 'Meridian Investment Management LLP', 'Limited Liability', 'US-NY', '2019-09-22', '1345 Avenue of the Americas, New York, NY 10105', '2019-09-20', NOW(), NOW()),
     ('c2222222-2222-2222-2222-222222222222', 'Meridian Alpha GP LLP', 'Limited Liability', 'US-NY', '2019-09-22', '1345 Avenue of the Americas, New York, NY 10105', '2019-09-20', NOW(), NOW());
 
 -- Register LLP entities in central entities table
-INSERT INTO "dsl-ob-poc".entities (entity_id, entity_type_id, external_id, name, created_at, updated_at)
+INSERT INTO "ob-poc".entities (entity_id, entity_type_id, external_id, name, created_at, updated_at)
 VALUES
     -- Quantum Capital Partners LLPs
     ('d1111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111', 'c1111111-1111-1111-1111-111111111111', 'Quantum Capital Management LLP', NOW(), NOW()),
@@ -54,7 +54,7 @@ VALUES
     ('d2222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'c2222222-2222-2222-2222-222222222222', 'Meridian Alpha GP LLP', NOW(), NOW());
 
 -- Link Hedge Fund CBUs to their LLP entities with roles
-INSERT INTO "dsl-ob-poc".cbu_entity_roles (cbu_entity_role_id, cbu_id, entity_id, role_id, created_at)
+INSERT INTO "ob-poc".cbu_entity_roles (cbu_entity_role_id, cbu_id, entity_id, role_id, created_at)
 VALUES
     -- Quantum Capital Partners CBU relationships
     ('e1111111-1111-1111-1111-111111111111', 'b1111111-1111-1111-1111-111111111111', 'd1111111-1111-1111-1111-111111111111', 'a2222222-2222-2222-2222-222222222222', NOW()), -- Investment Manager

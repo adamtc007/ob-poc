@@ -22,9 +22,9 @@ BEGIN;
 -- DSL Business Requests Table
 -- This is the primary business context that tracks individual cases/requests
 -- Examples: KYC.Case.123, Onboarding.Request.456, Account.Opening.789
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dsl_business_requests (
+CREATE TABLE IF NOT EXISTS "ob-poc".dsl_business_requests (
     request_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    domain_id UUID NOT NULL REFERENCES "dsl-ob-poc".dsl_domains (domain_id) ON DELETE RESTRICT,
+    domain_id UUID NOT NULL REFERENCES "ob-poc".dsl_domains (domain_id) ON DELETE RESTRICT,
 
     -- Business context identifiers
     business_reference VARCHAR(255) NOT NULL, -- External reference (case number, account ID, etc.)
@@ -69,29 +69,29 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dsl_business_requests (
 );
 
 -- Create indexes for business requests
-CREATE INDEX IF NOT EXISTS idx_dsl_business_requests_domain_id ON "dsl-ob-poc".dsl_business_requests (domain_id);
-CREATE INDEX IF NOT EXISTS idx_dsl_business_requests_business_ref ON "dsl-ob-poc".dsl_business_requests (business_reference);
-CREATE INDEX IF NOT EXISTS idx_dsl_business_requests_request_type ON "dsl-ob-poc".dsl_business_requests (request_type);
-CREATE INDEX IF NOT EXISTS idx_dsl_business_requests_status ON "dsl-ob-poc".dsl_business_requests (request_status);
-CREATE INDEX IF NOT EXISTS idx_dsl_business_requests_client_id ON "dsl-ob-poc".dsl_business_requests (client_id);
-CREATE INDEX IF NOT EXISTS idx_dsl_business_requests_assigned_to ON "dsl-ob-poc".dsl_business_requests (assigned_to);
-CREATE INDEX IF NOT EXISTS idx_dsl_business_requests_created_at ON "dsl-ob-poc".dsl_business_requests (created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_dsl_business_requests_due_date ON "dsl-ob-poc".dsl_business_requests (due_date);
+CREATE INDEX IF NOT EXISTS idx_dsl_business_requests_domain_id ON "ob-poc".dsl_business_requests (domain_id);
+CREATE INDEX IF NOT EXISTS idx_dsl_business_requests_business_ref ON "ob-poc".dsl_business_requests (business_reference);
+CREATE INDEX IF NOT EXISTS idx_dsl_business_requests_request_type ON "ob-poc".dsl_business_requests (request_type);
+CREATE INDEX IF NOT EXISTS idx_dsl_business_requests_status ON "ob-poc".dsl_business_requests (request_status);
+CREATE INDEX IF NOT EXISTS idx_dsl_business_requests_client_id ON "ob-poc".dsl_business_requests (client_id);
+CREATE INDEX IF NOT EXISTS idx_dsl_business_requests_assigned_to ON "ob-poc".dsl_business_requests (assigned_to);
+CREATE INDEX IF NOT EXISTS idx_dsl_business_requests_created_at ON "ob-poc".dsl_business_requests (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_dsl_business_requests_due_date ON "ob-poc".dsl_business_requests (due_date);
 
 -- Create unique constraint for business reference within domain
 CREATE UNIQUE INDEX IF NOT EXISTS idx_dsl_business_requests_domain_business_ref
-ON "dsl-ob-poc".dsl_business_requests (domain_id, business_reference);
+ON "ob-poc".dsl_business_requests (domain_id, business_reference);
 
 -- ============================================================================
 -- STEP 2: ADD REQUEST_ID TO DSL_VERSIONS TABLE
 -- ============================================================================
 
 -- Add request_id column to dsl_versions table
-ALTER TABLE "dsl-ob-poc".dsl_versions
-ADD COLUMN IF NOT EXISTS request_id UUID REFERENCES "dsl-ob-poc".dsl_business_requests (request_id) ON DELETE CASCADE;
+ALTER TABLE "ob-poc".dsl_versions
+ADD COLUMN IF NOT EXISTS request_id UUID REFERENCES "ob-poc".dsl_business_requests (request_id) ON DELETE CASCADE;
 
 -- Create index for the new foreign key
-CREATE INDEX IF NOT EXISTS idx_dsl_versions_request_id ON "dsl-ob-poc".dsl_versions (request_id);
+CREATE INDEX IF NOT EXISTS idx_dsl_versions_request_id ON "ob-poc".dsl_versions (request_id);
 
 -- Update existing records to have null request_id (will be populated by migration script if needed)
 -- Note: Existing records without business context will remain with NULL request_id
@@ -102,9 +102,9 @@ CREATE INDEX IF NOT EXISTS idx_dsl_versions_request_id ON "dsl-ob-poc".dsl_versi
 
 -- DSL Request Workflow States Table
 -- Tracks the workflow progression for each business request
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dsl_request_workflow_states (
+CREATE TABLE IF NOT EXISTS "ob-poc".dsl_request_workflow_states (
     state_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    request_id UUID NOT NULL REFERENCES "dsl-ob-poc".dsl_business_requests (request_id) ON DELETE CASCADE,
+    request_id UUID NOT NULL REFERENCES "ob-poc".dsl_business_requests (request_id) ON DELETE CASCADE,
 
     -- Workflow state information
     workflow_state VARCHAR(100) NOT NULL, -- 'initial_draft', 'collecting_data', 'review_required', 'approved', etc.
@@ -131,16 +131,16 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dsl_request_workflow_states (
 );
 
 -- Create indexes for workflow states
-CREATE INDEX IF NOT EXISTS idx_dsl_workflow_states_request_id ON "dsl-ob-poc".dsl_request_workflow_states (request_id);
-CREATE INDEX IF NOT EXISTS idx_dsl_workflow_states_current ON "dsl-ob-poc".dsl_request_workflow_states (request_id, is_current_state);
-CREATE INDEX IF NOT EXISTS idx_dsl_workflow_states_entered_at ON "dsl-ob-poc".dsl_request_workflow_states (entered_at DESC);
+CREATE INDEX IF NOT EXISTS idx_dsl_workflow_states_request_id ON "ob-poc".dsl_request_workflow_states (request_id);
+CREATE INDEX IF NOT EXISTS idx_dsl_workflow_states_current ON "ob-poc".dsl_request_workflow_states (request_id, is_current_state);
+CREATE INDEX IF NOT EXISTS idx_dsl_workflow_states_entered_at ON "ob-poc".dsl_request_workflow_states (entered_at DESC);
 
 -- ============================================================================
 -- STEP 4: CREATE UPDATED VIEWS WITH BUSINESS REQUEST CONTEXT
 -- ============================================================================
 
 -- View for active business requests with latest DSL version
-CREATE OR REPLACE VIEW "dsl-ob-poc".dsl_active_business_requests AS
+CREATE OR REPLACE VIEW "ob-poc".dsl_active_business_requests AS
 SELECT
     br.request_id,
     br.business_reference,
@@ -177,22 +177,22 @@ SELECT
     ws.state_description as current_state_description,
     ws.entered_at as state_entered_at
 
-FROM "dsl-ob-poc".dsl_business_requests br
-JOIN "dsl-ob-poc".dsl_domains d ON br.domain_id = d.domain_id
-LEFT JOIN "dsl-ob-poc".dsl_versions dv ON br.request_id = dv.request_id
+FROM "ob-poc".dsl_business_requests br
+JOIN "ob-poc".dsl_domains d ON br.domain_id = d.domain_id
+LEFT JOIN "ob-poc".dsl_versions dv ON br.request_id = dv.request_id
     AND dv.version_number = (
         SELECT MAX(version_number)
-        FROM "dsl-ob-poc".dsl_versions dv2
+        FROM "ob-poc".dsl_versions dv2
         WHERE dv2.request_id = br.request_id
     )
-LEFT JOIN "dsl-ob-poc".parsed_asts pa ON dv.version_id = pa.version_id
-LEFT JOIN "dsl-ob-poc".dsl_request_workflow_states ws ON br.request_id = ws.request_id
+LEFT JOIN "ob-poc".parsed_asts pa ON dv.version_id = pa.version_id
+LEFT JOIN "ob-poc".dsl_request_workflow_states ws ON br.request_id = ws.request_id
     AND ws.is_current_state = true
 WHERE br.request_status NOT IN ('COMPLETED', 'CANCELLED')
 ORDER BY br.created_at DESC;
 
 -- View for request workflow history
-CREATE OR REPLACE VIEW "dsl-ob-poc".dsl_request_workflow_history AS
+CREATE OR REPLACE VIEW "ob-poc".dsl_request_workflow_history AS
 SELECT
     br.request_id,
     br.business_reference,
@@ -217,9 +217,9 @@ SELECT
             EXTRACT(EPOCH FROM (now() - ws.entered_at)) / 3600.0
     END as hours_in_state
 
-FROM "dsl-ob-poc".dsl_business_requests br
-JOIN "dsl-ob-poc".dsl_domains d ON br.domain_id = d.domain_id
-JOIN "dsl-ob-poc".dsl_request_workflow_states ws ON br.request_id = ws.request_id
+FROM "ob-poc".dsl_business_requests br
+JOIN "ob-poc".dsl_domains d ON br.domain_id = d.domain_id
+JOIN "ob-poc".dsl_request_workflow_states ws ON br.request_id = ws.request_id
 ORDER BY br.request_id, ws.entered_at DESC;
 
 -- ============================================================================
@@ -227,7 +227,7 @@ ORDER BY br.request_id, ws.entered_at DESC;
 -- ============================================================================
 
 -- Function to create a new business request and initial DSL version
-CREATE OR REPLACE FUNCTION "dsl-ob-poc".create_business_request(
+CREATE OR REPLACE FUNCTION "ob-poc".create_business_request(
     p_domain_name VARCHAR,
     p_business_reference VARCHAR,
     p_request_type VARCHAR,
@@ -246,7 +246,7 @@ DECLARE
 BEGIN
     -- Get domain ID
     SELECT domain_id INTO v_domain_id
-    FROM "dsl-ob-poc".dsl_domains
+    FROM "ob-poc".dsl_domains
     WHERE domain_name = p_domain_name AND active = true;
 
     IF v_domain_id IS NULL THEN
@@ -254,7 +254,7 @@ BEGIN
     END IF;
 
     -- Create the business request
-    INSERT INTO "dsl-ob-poc".dsl_business_requests (
+    INSERT INTO "ob-poc".dsl_business_requests (
         domain_id,
         business_reference,
         request_type,
@@ -277,7 +277,7 @@ BEGIN
     ) RETURNING request_id INTO v_request_id;
 
     -- Create initial workflow state
-    INSERT INTO "dsl-ob-poc".dsl_request_workflow_states (
+    INSERT INTO "ob-poc".dsl_request_workflow_states (
         request_id,
         workflow_state,
         state_description,
@@ -293,7 +293,7 @@ BEGIN
     IF p_initial_dsl_code IS NOT NULL THEN
         v_version_number := 1;
 
-        INSERT INTO "dsl-ob-poc".dsl_versions (
+        INSERT INTO "ob-poc".dsl_versions (
             domain_id,
             request_id,
             version_number,
@@ -319,7 +319,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Function to create new DSL version for existing business request
-CREATE OR REPLACE FUNCTION "dsl-ob-poc".create_dsl_amendment(
+CREATE OR REPLACE FUNCTION "ob-poc".create_dsl_amendment(
     p_request_id UUID,
     p_dsl_source_code TEXT,
     p_functional_state VARCHAR DEFAULT NULL,
@@ -333,7 +333,7 @@ DECLARE
 BEGIN
     -- Get domain ID and next version number for this request
     SELECT br.domain_id INTO v_domain_id
-    FROM "dsl-ob-poc".dsl_business_requests br
+    FROM "ob-poc".dsl_business_requests br
     WHERE br.request_id = p_request_id;
 
     IF v_domain_id IS NULL THEN
@@ -343,11 +343,11 @@ BEGIN
     -- Get next version number for this request
     SELECT COALESCE(MAX(version_number), 0) + 1
     INTO v_version_number
-    FROM "dsl-ob-poc".dsl_versions
+    FROM "ob-poc".dsl_versions
     WHERE request_id = p_request_id;
 
     -- Create new DSL version
-    INSERT INTO "dsl-ob-poc".dsl_versions (
+    INSERT INTO "ob-poc".dsl_versions (
         domain_id,
         request_id,
         version_number,
@@ -368,7 +368,7 @@ BEGIN
     ) RETURNING version_id INTO v_version_id;
 
     -- Update business request status if still in draft
-    UPDATE "dsl-ob-poc".dsl_business_requests
+    UPDATE "ob-poc".dsl_business_requests
     SET
         request_status = CASE
             WHEN request_status = 'DRAFT' THEN 'IN_PROGRESS'
@@ -382,7 +382,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Function to transition business request workflow state
-CREATE OR REPLACE FUNCTION "dsl-ob-poc".transition_request_state(
+CREATE OR REPLACE FUNCTION "ob-poc".transition_request_state(
     p_request_id UUID,
     p_new_state VARCHAR,
     p_state_description TEXT DEFAULT NULL,
@@ -433,7 +433,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Function to get business request summary
-CREATE OR REPLACE FUNCTION "dsl-ob-poc".get_business_request_summary(p_request_id UUID)
+CREATE OR REPLACE FUNCTION "ob-poc".get_business_request_summary(p_request_id UUID)
 RETURNS TABLE (
     request_id UUID,
     business_reference VARCHAR,
@@ -459,16 +459,16 @@ BEGIN
         COALESCE(version_count.latest_version, 0) as latest_version_number,
         br.created_at,
         br.updated_at as last_updated
-    FROM "dsl-ob-poc".dsl_business_requests br
-    JOIN "dsl-ob-poc".dsl_domains d ON br.domain_id = d.domain_id
-    LEFT JOIN "dsl-ob-poc".dsl_request_workflow_states ws ON br.request_id = ws.request_id
+    FROM "ob-poc".dsl_business_requests br
+    JOIN "ob-poc".dsl_domains d ON br.domain_id = d.domain_id
+    LEFT JOIN "ob-poc".dsl_request_workflow_states ws ON br.request_id = ws.request_id
         AND ws.is_current_state = true
     LEFT JOIN (
         SELECT
             request_id,
             COUNT(*) as total_versions,
             MAX(version_number) as latest_version
-        FROM "dsl-ob-poc".dsl_versions
+        FROM "ob-poc".dsl_versions
         GROUP BY request_id
     ) version_count ON br.request_id = version_count.request_id
     WHERE br.request_id = p_request_id;
@@ -480,17 +480,17 @@ $$ LANGUAGE plpgsql;
 -- ============================================================================
 
 -- Trigger function to automatically update business request status
-CREATE OR REPLACE FUNCTION "dsl-ob-poc".update_business_request_on_version_change()
+CREATE OR REPLACE FUNCTION "ob-poc".update_business_request_on_version_change()
 RETURNS TRIGGER AS $$
 BEGIN
     -- Update the business request's updated_at timestamp
-    UPDATE "dsl-ob-poc".dsl_business_requests
+    UPDATE "ob-poc".dsl_business_requests
     SET updated_at = now()
     WHERE request_id = NEW.request_id;
 
     -- Auto-transition workflow state based on compilation status
     IF NEW.compilation_status = 'COMPILED' AND OLD.compilation_status != 'COMPILED' THEN
-        PERFORM "dsl-ob-poc".transition_request_state(
+        PERFORM "ob-poc".transition_request_state(
             NEW.request_id,
             'compiled_ready_for_review',
             'DSL successfully compiled and ready for review',
@@ -504,17 +504,17 @@ $$ LANGUAGE plpgsql;
 
 -- Create trigger for version changes
 CREATE TRIGGER trigger_update_business_request_on_version_change
-    AFTER UPDATE ON "dsl-ob-poc".dsl_versions
+    AFTER UPDATE ON "ob-poc".dsl_versions
     FOR EACH ROW
     WHEN (NEW.request_id IS NOT NULL)
-    EXECUTE FUNCTION "dsl-ob-poc".update_business_request_on_version_change();
+    EXECUTE FUNCTION "ob-poc".update_business_request_on_version_change();
 
 -- ============================================================================
 -- STEP 7: INSERT SAMPLE BUSINESS REQUEST TYPES
 -- ============================================================================
 
 -- Create a reference table for standard request types
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dsl_request_types (
+CREATE TABLE IF NOT EXISTS "ob-poc".dsl_request_types (
     request_type VARCHAR(100) PRIMARY KEY,
     domain_name VARCHAR(100) NOT NULL,
     display_name VARCHAR(255) NOT NULL,
@@ -526,7 +526,7 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dsl_request_types (
 );
 
 -- Insert standard request types
-INSERT INTO "dsl-ob-poc".dsl_request_types (request_type, domain_name, display_name, description, default_workflow_states)
+INSERT INTO "ob-poc".dsl_request_types (request_type, domain_name, display_name, description, default_workflow_states)
 VALUES
     ('KYC_CASE', 'KYC', 'KYC Case Investigation', 'Know Your Customer compliance case',
      ARRAY['initial_draft', 'collecting_documents', 'ubo_analysis', 'compliance_review', 'approved', 'completed']),
@@ -550,14 +550,14 @@ SELECT 'Migration 005 completed successfully - DSL Business Request Lifecycle' a
 SELECT
     'Business Requests Table' as component,
     COUNT(*) as record_count
-FROM "dsl-ob-poc".dsl_business_requests
+FROM "ob-poc".dsl_business_requests
 UNION ALL
 SELECT
     'Request Types',
     COUNT(*)
-FROM "dsl-ob-poc".dsl_request_types
+FROM "ob-poc".dsl_request_types
 UNION ALL
 SELECT
     'Workflow States',
     COUNT(*)
-FROM "dsl-ob-poc".dsl_request_workflow_states;
+FROM "ob-poc".dsl_request_workflow_states;

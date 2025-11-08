@@ -246,7 +246,7 @@ Run the full demonstration:
 
 ```bash
 # Set up database connection
-export DATABASE_URL="postgresql://localhost:5432/dsl-ob-poc"
+export DATABASE_URL="postgresql://localhost:5432/ob-poc"
 
 # Run the Phase 2 demonstration
 cargo run --example phase2_ast_visualization_demo
