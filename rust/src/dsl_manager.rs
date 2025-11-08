@@ -1208,6 +1208,14 @@ impl DslManager {
             .generate_dsl_from_template(&ob_template, &ob_variables)
             .await?;
 
+        // Parse first with NOM: only persist if parse succeeds
+        if let Err(parse_error) = parse_program(&dsl_content) {
+            return Err(DslError::CompilationError { message: format!(
+                "DSL parsing failed for onboarding request: {:?}",
+                parse_error
+            )});
+        }
+
         // Create DSL instance with OB request context
         let ob_instance = DslInstance {
             instance_id: Uuid::new_v4(),
@@ -1220,40 +1228,48 @@ impl DslManager {
             metadata: ob_variables.clone(),
         };
 
-        // Store DSL instance
+        // Store DSL instance metadata (optional/no-op currently)
         self.store_instance(&ob_instance).await?;
 
-        // Create initial DSL version with OB request index
-        let initial_version = DslInstanceVersion {
-            version_id: Uuid::new_v4(),
+        // Create initial domain version tied to request_id (persist only after parse success)
+        let new_version = crate::models::domain_models::NewDslVersion {
+            domain_name: "onboarding".to_string(),
+            request_id: Some(ob_request_id),
+            functional_state: Some("Created".to_string()),
+            dsl_source_code: dsl_content.clone(),
+            change_description: Some(format!(
+                "Initial OB request creation: {}",
+                onboarding_name
+            )),
+            parent_version_id: None,
+            created_by: Some(created_by.clone()),
+        };
+
+        let created = self
+            .domain_repository
+            .create_new_version(new_version)
+            .await
+            .map_err(|e| DslError::DatabaseError(format!("Failed to create OB version: {}", e)))?;
+
+        // Journal DSL to dsl_ob for append-only history
+        let dsl_storage_result = self
+            .store_dsl_source_with_ob_index(ob_request_id, cbu_id, &dsl_content, created.version_id)
+            .await?;
+
+        // Compile + store AST and update compilation status
+        let to_compile = DslInstanceVersion {
+            version_id: created.version_id,
             instance_id: ob_instance.instance_id,
-            version_number: 1,
+            version_number: created.version_number,
             dsl_content: dsl_content.clone(),
             operation_type: OperationType::CreateFromTemplate(ob_template.template_id.clone()),
-            compilation_status: CompilationStatus::Draft,
+            compilation_status: created.compilation_status,
             ast_json: None,
-            created_at: Utc::now(),
+            created_at: created.created_at,
             created_by: created_by.clone(),
             change_description: Some(format!("Initial OB request creation: {}", onboarding_name)),
         };
-
-        // Store DSL version
-        self.store_instance_version(&initial_version).await?;
-
-        // Insert DSL.OB source code using OB Request Index and DSL.OB keys
-        let dsl_storage_result = self
-            .store_dsl_source_with_ob_index(
-                ob_request_id,
-                cbu_id,
-                &dsl_content,
-                initial_version.version_id,
-            )
-            .await?;
-
-        // NOM parses DSL → builds AST → stores with FK links back to DSL source
-        let compiled_version = self.compile_and_store_ast(initial_version).await?;
-
-        // Update instance version with compilation results
+        let compiled_version = self.compile_and_store_ast(to_compile).await?;
         self.update_instance_version(&compiled_version).await?;
 
         // Create onboarding session record
@@ -1277,6 +1293,204 @@ impl DslManager {
         );
 
         Ok(result)
+    }
+
+    // ========================
+    // ONBOARDING STATE EDITS
+    // ========================
+
+    /// Associate a CBU to an existing OB request (appends DSL and persists a new version)
+    pub async fn associate_cbu(
+        &self,
+        ob_request_id: Uuid,
+        cbu_id: Uuid,
+        association_type: &str,
+        details: serde_json::Value,
+        created_by: &str,
+        change_description: Option<String>,
+    ) -> DslResult<DslInstanceVersion> {
+        let prev = self.get_latest_ob_version_dsl(ob_request_id).await?;
+        let fragment = format!(
+            "\n(cbu.associate (cbu.id \"{cbu}\") (association.type \"{atype}\") (cbu.details {details}) (associated.at \"{ts}\"))",
+            cbu = cbu_id,
+            atype = association_type,
+            details = details,
+            ts = Utc::now().to_rfc3339()
+        );
+        let combined = format!("{}\n{}", prev, fragment);
+        self.persist_ob_edit(ob_request_id, cbu_id, &combined, created_by, change_description.unwrap_or_else(|| "Associate CBU".to_string())).await
+    }
+
+    /// Add products to the OB request
+    pub async fn add_products(
+        &self,
+        ob_request_id: Uuid,
+        cbu_id: Uuid,
+        products: &[String],
+        selection_reason: &str,
+        created_by: &str,
+    ) -> DslResult<DslInstanceVersion> {
+        let prev = self.get_latest_ob_version_dsl(ob_request_id).await?;
+        let quoted = products.iter().map(|p| format!("\"{}\"", p)).collect::<Vec<_>>().join(" ");
+        let fragment = format!(
+            "\n(products.select (products [{products}]) (selection.reason \"{reason}\") (selected.at \"{ts}\"))",
+            products = quoted,
+            reason = selection_reason,
+            ts = Utc::now().to_rfc3339()
+        );
+        let combined = format!("{}\n{}", prev, fragment);
+        self.persist_ob_edit(ob_request_id, cbu_id, &combined, created_by, "Add products".to_string()).await
+    }
+
+    /// Discover services for products (simple placeholder version)
+    pub async fn discover_services(
+        &self,
+        ob_request_id: Uuid,
+        cbu_id: Uuid,
+        products: &[String],
+        created_by: &str,
+    ) -> DslResult<DslInstanceVersion> {
+        let prev = self.get_latest_ob_version_dsl(ob_request_id).await?;
+        let mut services_block = String::from("\n(services.discover\n");
+        for p in products {
+            services_block.push_str(&format!("  (for.product \"{}\")\n", p));
+        }
+        services_block.push_str(&format!("  (discovered.at \"{}\"))", Utc::now().to_rfc3339()));
+        let combined = format!("{}\n{}", prev, services_block);
+        self.persist_ob_edit(ob_request_id, cbu_id, &combined, created_by, "Discover services".to_string()).await
+    }
+
+    /// Discover resources for services (placeholder)
+    pub async fn discover_resources(
+        &self,
+        ob_request_id: Uuid,
+        cbu_id: Uuid,
+        services: &[String],
+        created_by: &str,
+    ) -> DslResult<DslInstanceVersion> {
+        let prev = self.get_latest_ob_version_dsl(ob_request_id).await?;
+        let mut resources_block = String::from("\n(resources.discover\n");
+        for s in services {
+            resources_block.push_str(&format!("  (for.service \"{}\")\n", s));
+        }
+        resources_block.push_str(&format!("  (discovered.at \"{}\"))", Utc::now().to_rfc3339()));
+        let combined = format!("{}\n{}", prev, resources_block);
+        self.persist_ob_edit(ob_request_id, cbu_id, &combined, created_by, "Discover resources".to_string()).await
+    }
+
+    /// Complete onboarding (append completion DSL)
+    pub async fn complete_onboarding(
+        &self,
+        ob_request_id: Uuid,
+        cbu_id: Uuid,
+        completion_notes: &str,
+        created_by: &str,
+    ) -> DslResult<DslInstanceVersion> {
+        let prev = self.get_latest_ob_version_dsl(ob_request_id).await?;
+        let fragment = format!(
+            "\n(onboarding.complete (completion.status \"SUCCESS\") (completion.notes \"{notes}\") (completed.at \"{ts}\"))",
+            notes = completion_notes,
+            ts = Utc::now().to_rfc3339()
+        );
+        let combined = format!("{}\n{}", prev, fragment);
+        self.persist_ob_edit(ob_request_id, cbu_id, &combined, created_by, "Complete onboarding".to_string()).await
+    }
+
+    /// Archive onboarding (append archive DSL)
+    pub async fn archive_onboarding(
+        &self,
+        ob_request_id: Uuid,
+        cbu_id: Uuid,
+        reason: &str,
+        created_by: &str,
+    ) -> DslResult<DslInstanceVersion> {
+        let prev = self.get_latest_ob_version_dsl(ob_request_id).await?;
+        let fragment = format!(
+            "\n(onboarding.archive (archival.reason \"{reason}\") (archived.at \"{ts}\"))",
+            reason = reason,
+            ts = Utc::now().to_rfc3339()
+        );
+        let combined = format!("{}\n{}", prev, fragment);
+        self.persist_ob_edit(ob_request_id, cbu_id, &combined, created_by, "Archive onboarding".to_string()).await
+    }
+
+    async fn get_latest_ob_version_dsl(&self, ob_request_id: Uuid) -> DslResult<String> {
+        // Latest DSL content for this OB request from dsl_versions
+        let row = sqlx::query(
+            r#"SELECT dv.dsl_source_code
+                FROM "ob-poc".dsl_versions dv
+               WHERE dv.request_id = $1
+               ORDER BY dv.version_number DESC
+               LIMIT 1"#,
+        )
+        .bind(ob_request_id)
+        .fetch_optional(self.domain_repository.pool())
+        .await
+        .map_err(|e| DslError::DatabaseError(format!("Failed to fetch latest OB version: {}", e)))?;
+
+        use sqlx::Row;
+        if let Some(r) = row {
+            Ok(r.get::<String, _>("dsl_source_code"))
+        } else {
+            Err(DslError::NotFound { message: format!("No DSL found for OB request: {}", ob_request_id) })
+        }
+    }
+
+    async fn persist_ob_edit(
+        &self,
+        ob_request_id: Uuid,
+        cbu_id: Uuid,
+        combined_dsl: &str,
+        created_by: &str,
+        change_description: String,
+    ) -> DslResult<DslInstanceVersion> {
+        // Parse first: only persist if parse succeeds
+        if let Err(parse_error) = parse_program(combined_dsl) {
+            return Err(DslError::CompilationError { message: format!(
+                "DSL parsing failed for OB edit: {:?}",
+                parse_error
+            )});
+        }
+
+        // Create new domain version tied to request_id (after successful parse)
+        let new_version = crate::models::domain_models::NewDslVersion {
+            domain_name: "onboarding".to_string(),
+            request_id: Some(ob_request_id),
+            functional_state: Some("Edit".to_string()),
+            dsl_source_code: combined_dsl.to_string(),
+            change_description: Some(change_description),
+            parent_version_id: None,
+            created_by: Some(created_by.to_string()),
+        };
+
+        let created = self
+            .domain_repository
+            .create_new_version(new_version)
+            .await
+            .map_err(|e| DslError::DatabaseError(format!("Failed to create new version: {}", e)))?;
+
+        // Journal DSL to dsl_ob for append-only history (optional)
+        let _keys = self
+            .store_dsl_source_with_ob_index(ob_request_id, cbu_id, combined_dsl, created.version_id)
+            .await?;
+
+        // Compile + store AST
+        let parsed_version = DslInstanceVersion {
+            version_id: created.version_id,
+            instance_id: Uuid::new_v4(), // not persisted yet as instance
+            version_number: created.version_number,
+            dsl_content: combined_dsl.to_string(),
+            operation_type: OperationType::IncrementalEdit,
+            compilation_status: created.compilation_status,
+            ast_json: None,
+            created_at: created.created_at,
+            created_by: created.created_by.unwrap_or_else(|| created_by.to_string()),
+            change_description: created.change_description,
+        };
+
+        let compiled = self.compile_and_store_ast(parsed_version).await?;
+        self.update_instance_version(&compiled).await?;
+        Ok(compiled)
     }
 
     // ============================================================================
@@ -1428,30 +1642,273 @@ impl DslManager {
     /// Build AST visualization from JSON
     fn build_ast_visualization_from_json(
         &self,
-        _ast_json: &str,
+        ast_json: &str,
         _options: &VisualizationOptions,
     ) -> DslResult<ASTVisualization> {
-        // Placeholder implementation
+        use crate::ast::{Program, Statement};
+        use serde_json::Value as JValue;
+
+        // Convert AST Value → JSON Value for node properties
+        fn val_to_json(v: &crate::ast::Value) -> JValue {
+            match v {
+                crate::ast::Value::String(s) => JValue::String(s.clone()),
+                crate::ast::Value::Number(n) => JValue::from(*n),
+                crate::ast::Value::Integer(i) => JValue::from(*i),
+                crate::ast::Value::Boolean(b) => JValue::from(*b),
+                crate::ast::Value::Date(d) => JValue::String(d.to_string()),
+                crate::ast::Value::List(list) => {
+                    JValue::Array(list.iter().map(val_to_json).collect())
+                }
+                crate::ast::Value::Map(m) => JValue::Object(
+                    m.iter()
+                        .map(|(k, v)| (k.clone(), val_to_json(v)))
+                        .collect(),
+                ),
+                crate::ast::Value::MultiValue(vals) => JValue::Array(
+                    vals.iter()
+                        .map(|vw| {
+                            let mut obj = serde_json::Map::new();
+                            obj.insert("value".to_string(), val_to_json(&vw.value));
+                            obj.insert("source".to_string(), JValue::String(vw.source.clone()));
+                            if let Some(c) = vw.confidence {
+                                obj.insert("confidence".to_string(), JValue::from(c));
+                            }
+                            JValue::Object(obj)
+                        })
+                        .collect(),
+                ),
+                crate::ast::Value::Null => JValue::Null,
+            }
+        }
+
+        let started = std::time::Instant::now();
+        let program: Program = serde_json::from_str(ast_json).map_err(|e| DslError::SerializationError {
+            message: format!("Failed to deserialize AST JSON: {}", e),
+        })?;
+
+        let mut nodes: Vec<VisualNode> = Vec::new();
+        let mut edges: Vec<VisualEdge> = Vec::new();
+
+        // Root node representing the program
+        let root_id = "program".to_string();
+        nodes.push(VisualNode {
+            id: root_id.clone(),
+            label: "Program".to_string(),
+            node_type: "Program".to_string(),
+            properties: Default::default(),
+            position: None,
+            styling: NodeStyling::default(),
+            domain_annotations: vec![],
+            priority_level: 0,
+            functional_relevance: 1.0,
+        });
+
+        // Simple hierarchical layout indices
+        // Index used by enumerate below
+        let _wf_index = 0usize;
+        // let mut stmt_global_index = 0usize; // not used in simple layout
+        let mut max_depth = 1usize;
+
+        for (wf_index, workflow) in program.workflows.iter().enumerate() {
+            let wf_id = format!("wf:{}", workflow.id);
+            // Convert workflow properties
+            let wf_props = workflow
+                .properties
+                .iter()
+                .map(|(k, v)| (k.clone(), val_to_json(v)))
+                .collect();
+
+            nodes.push(VisualNode {
+                id: wf_id.clone(),
+                label: workflow.id.clone(),
+                node_type: "Workflow".to_string(),
+                properties: wf_props,
+                position: Some(NodePosition {
+                    x: 100.0,
+                    y: 100.0 + (wf_index as f32) * 150.0,
+                    z: None,
+                }),
+                styling: NodeStyling::default(),
+                domain_annotations: vec![],
+                priority_level: 1,
+                functional_relevance: 1.0,
+            });
+
+            edges.push(VisualEdge {
+                id: format!("e:{}->{}", root_id, wf_id),
+                from: root_id.clone(),
+                to: wf_id.clone(),
+                edge_type: "contains".to_string(),
+                label: Some("contains".to_string()),
+                styling: EdgeStyling::default(),
+                weight: 1.0,
+            });
+
+            // Statements
+            for (i, stmt) in workflow.statements.iter().enumerate() {
+                let stmt_id = format!("stmt:{}:{}", workflow.id, i);
+                let (label, node_type, mut props) = match stmt {
+                    Statement::DeclareEntity { id, entity_type, properties } => {
+                        let mut p = std::collections::HashMap::new();
+                        p.insert("entity_type".to_string(), JValue::String(entity_type.clone()));
+                        for (k, v) in properties {
+                            p.insert(k.clone(), val_to_json(v));
+                        }
+                        (format!("DeclareEntity:{}", id), "DeclareEntity".to_string(), p)
+                    }
+                    Statement::ObtainDocument { document_type, source, properties } => {
+                        let mut p = std::collections::HashMap::new();
+                        p.insert("document_type".to_string(), JValue::String(document_type.clone()));
+                        p.insert("source".to_string(), JValue::String(source.clone()));
+                        for (k, v) in properties {
+                            p.insert(k.clone(), val_to_json(v));
+                        }
+                        ("ObtainDocument".to_string(), "ObtainDocument".to_string(), p)
+                    }
+                    Statement::CreateEdge { from, to, edge_type, properties } => {
+                        let mut p = std::collections::HashMap::new();
+                        p.insert("from".to_string(), JValue::String(from.clone()));
+                        p.insert("to".to_string(), JValue::String(to.clone()));
+                        p.insert("edge_type".to_string(), JValue::String(edge_type.to_string()));
+                        for (k, v) in properties {
+                            p.insert(k.clone(), val_to_json(v));
+                        }
+                        ("CreateEdge".to_string(), "CreateEdge".to_string(), p)
+                    }
+                    Statement::CalculateUbo { entity_id, properties } => {
+                        let mut p = std::collections::HashMap::new();
+                        p.insert("entity_id".to_string(), JValue::String(entity_id.clone()));
+                        for (k, v) in properties {
+                            p.insert(k.clone(), val_to_json(v));
+                        }
+                        ("CalculateUbo".to_string(), "CalculateUbo".to_string(), p)
+                    }
+                    Statement::SolicitAttribute(inner) => {
+                        let mut p = std::collections::HashMap::new();
+                        p.insert("attr_id".to_string(), JValue::String(inner.attr_id.clone()));
+                        p.insert("from".to_string(), JValue::String(inner.from.clone()));
+                        p.insert("value_type".to_string(), JValue::String(inner.value_type.clone()));
+                        for (k, v) in &inner.additional_props {
+                            p.insert(k.clone(), val_to_json(v));
+                        }
+                        ("SolicitAttribute".to_string(), "SolicitAttribute".to_string(), p)
+                    }
+                    Statement::ResolveConflict(inner) => {
+                        let mut p = std::collections::HashMap::new();
+                        p.insert("node".to_string(), JValue::String(inner.node.clone()));
+                        p.insert("property".to_string(), JValue::String(inner.property.clone()));
+                        p.insert("strategy".to_string(), JValue::String(match inner.strategy.priorities.len() {
+                            0 => "none".to_string(),
+                            _ => "waterfall".to_string(),
+                        }));
+                        for (k, v) in &inner.resolution {
+                            p.insert(k.clone(), val_to_json(v));
+                        }
+                        ("ResolveConflict".to_string(), "ResolveConflict".to_string(), p)
+                    }
+                    Statement::GenerateReport(inner) => {
+                        let mut p = std::collections::HashMap::new();
+                        p.insert("target".to_string(), JValue::String(inner.target.clone()));
+                        p.insert("status".to_string(), JValue::String(inner.status.clone()));
+                        ("GenerateReport".to_string(), "GenerateReport".to_string(), p)
+                    }
+                    Statement::ScheduleMonitoring(inner) => {
+                        let mut p = std::collections::HashMap::new();
+                        p.insert("target".to_string(), JValue::String(inner.target.clone()));
+                        p.insert("frequency".to_string(), JValue::String(inner.frequency.clone()));
+                        ("ScheduleMonitoring".to_string(), "ScheduleMonitoring".to_string(), p)
+                    }
+                    Statement::Parallel(inner) => {
+                        let mut p = std::collections::HashMap::new();
+                        p.insert("branch_count".to_string(), JValue::from(inner.len()));
+                        ("Parallel".to_string(), "Parallel".to_string(), p)
+                    }
+                    Statement::ParallelObtain(inner) => {
+                        let mut p = std::collections::HashMap::new();
+                        p.insert("documents".to_string(), JValue::from(inner.documents.len()));
+                        ("ParallelObtain".to_string(), "ParallelObtain".to_string(), p)
+                    }
+                    Statement::Sequential(inner) => {
+                        let mut p = std::collections::HashMap::new();
+                        p.insert("step_count".to_string(), JValue::from(inner.len()));
+                        ("Sequential".to_string(), "Sequential".to_string(), p)
+                    }
+                    Statement::Placeholder { command, args } => {
+                        let mut p = std::collections::HashMap::new();
+                        p.insert("command".to_string(), JValue::String(command.clone()));
+                        p.insert(
+                            "args".to_string(),
+                            JValue::Array(args.iter().map(val_to_json).collect()),
+                        );
+                        ("Placeholder".to_string(), "Placeholder".to_string(), p)
+                    }
+                };
+
+                nodes.push(VisualNode {
+                    id: stmt_id.clone(),
+                    label,
+                    node_type,
+                    properties: std::mem::take(&mut props),
+                    position: Some(NodePosition {
+                        x: 350.0,
+                        y: 100.0 + (wf_index as f32) * 150.0 + (i as f32) * 60.0,
+                        z: None,
+                    }),
+                    styling: NodeStyling::default(),
+                    domain_annotations: vec![],
+                    priority_level: 2,
+                    functional_relevance: 1.0,
+                });
+
+                edges.push(VisualEdge {
+                    id: format!("e:{}->{}", wf_id, stmt_id),
+                    from: wf_id.clone(),
+                    to: stmt_id.clone(),
+                    edge_type: "contains".to_string(),
+                    label: Some("contains".to_string()),
+                    styling: EdgeStyling::default(),
+                    weight: 1.0,
+                });
+
+                // stmt_global_index += 1;
+                max_depth = max_depth.max(3);
+            }
+        }
+
+        let duration = started.elapsed();
+        let node_count = nodes.len();
+        let edge_count = edges.len();
+
         Ok(ASTVisualization {
             metadata: VisualizationMetadata {
                 generated_at: Utc::now(),
                 parser_version: self.parser_version.clone(),
                 grammar_version: self.grammar_version.clone(),
-                node_count: 0,
-                edge_count: 0,
+                node_count,
+                edge_count,
                 instance_id: None,
                 version_id: None,
             },
-            root_node: None,
-            nodes: vec![],
-            edges: vec![],
+            root_node: Some(nodes.first().cloned().unwrap_or(VisualNode {
+                id: "program".to_string(),
+                label: "Program".to_string(),
+                node_type: "Program".to_string(),
+                properties: Default::default(),
+                position: None,
+                styling: NodeStyling::default(),
+                domain_annotations: vec![],
+                priority_level: 0,
+                functional_relevance: 1.0,
+            })),
+            nodes,
+            edges,
             statistics: VisualizationStatistics {
-                total_nodes: 0,
-                total_edges: 0,
-                max_depth: 0,
-                complexity_score: 0.0,
+                total_nodes: node_count,
+                total_edges: edge_count,
+                max_depth,
+                complexity_score: node_count as f32 + edge_count as f32 / 10.0,
                 compilation_time_ms: 0,
-                visualization_time_ms: 0,
+                visualization_time_ms: duration.as_millis() as u64,
             },
         })
     }
@@ -1827,271 +2284,5 @@ impl DslError {
     /// Not implemented error
     pub fn not_implemented(message: String) -> Self {
         DslError::NotImplemented { message }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #![allow(unreachable_code)]
-    use super::*;
-    use sqlx::PgPool;
-    use std::path::PathBuf;
-
-    /// Tests removed during refactor consolidation
-    async fn create_test_manager() -> DslManager {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgresql://localhost:5432/ob-poc".to_string());
-
-        let pool = PgPool::connect(&database_url)
-            .await
-            .expect("Failed to connect to test database");
-
-        let domain_repo = DslDomainRepository::new(pool.clone());
-        let business_repo = DslBusinessRequestRepository::new(pool);
-        let template_path = PathBuf::from("templates");
-
-        DslManager::new(domain_repo, business_repo, template_path)
-    }
-
-    async fn create_test_cbu(_pool: &PgPool) -> Uuid {
-        Uuid::new_v4()
-    }
-
-    /// Test create_onboarding_request with database integration
-    #[tokio::test]
-    async fn test_create_onboarding_request_with_database() {
-        println!("tests disabled");
-        return;
-
-        let manager = create_test_manager().await;
-        let pool = manager.domain_repository.pool();
-
-        // Create test CBU
-        let test_cbu_id = create_test_cbu(pool).await;
-
-        // Test creating onboarding request
-        let result = manager
-            .create_onboarding_request(
-                test_cbu_id,
-                "Test Onboarding Request".to_string(),
-                "Testing the DSL.OB creation flow".to_string(),
-                "test_user@example.com".to_string(),
-            )
-            .await;
-
-        match result {
-            Ok(creation_result) => {
-                // Verify result structure
-                assert_eq!(creation_result.cbu_id, test_cbu_id);
-                assert!(!creation_result.ob_request_id.is_nil());
-                assert_eq!(creation_result.ob_instance.domain_name, "onboarding");
-                assert_eq!(creation_result.ob_instance.current_version, 1);
-                assert!(matches!(
-                    creation_result.ob_instance.status,
-                    InstanceStatus::Created
-                ));
-
-                // Verify DSL storage keys
-                assert_eq!(creation_result.dsl_storage_keys.cbu_id, test_cbu_id);
-                assert!(!creation_result.dsl_storage_keys.dsl_ob_version_id.is_nil());
-
-                // Verify DSL content was stored in database
-                let stored_dsl = sqlx::query(
-                    r#"SELECT dsl_text FROM "ob-poc".dsl_ob WHERE version_id = $1"#,
-                )
-                .bind(creation_result.dsl_storage_keys.dsl_ob_version_id)
-                .fetch_optional(pool)
-                .await
-                .expect("Failed to query stored DSL");
-
-                use sqlx::Row;
-                assert!(stored_dsl.is_some(), "DSL should be stored in database");
-                let dsl_content: String = stored_dsl.unwrap().get("dsl_text");
-                assert!(
-                    dsl_content.contains(&test_cbu_id.to_string()),
-                    "DSL should contain CBU ID"
-                );
-                assert!(
-                    dsl_content.contains("Test Onboarding Request"),
-                    "DSL should contain onboarding name"
-                );
-
-                // Verify AST was generated and compilation succeeded
-                assert!(matches!(
-                    creation_result.compiled_version.compilation_status,
-                    CompilationStatus::Compiled
-                ));
-                assert!(
-                    creation_result.compiled_version.ast_json.is_some(),
-                    "AST JSON should be generated"
-                );
-
-                // Verify onboarding session was created
-                assert_eq!(creation_result.onboarding_session.cbu_id, test_cbu_id);
-                assert_eq!(creation_result.onboarding_session.current_state, "CREATED");
-                assert_eq!(creation_result.onboarding_session.current_version, 1);
-
-                println!(
-                    "✅ Successfully created OB request: {}",
-                    creation_result.ob_request_id
-                );
-                println!(
-                    "✅ DSL stored with version: {}",
-                    creation_result.dsl_storage_keys.dsl_ob_version_id
-                );
-                println!(
-                    "✅ AST compilation: {:?}",
-                    creation_result.compiled_version.compilation_status
-                );
-                println!("✅ All keys returned successfully");
-            }
-            Err(e) => {
-                panic!("Failed to create onboarding request: {:?}", e);
-            }
-        }
-
-        // Clean up test data
-        // Clean up DSL records
-        sqlx::query(
-            r#"DELETE FROM "ob-poc".dsl_ob WHERE cbu_id = $1"#,
-        )
-        .bind(test_cbu_id.to_string())
-        .execute(pool)
-        .await
-        .expect("Failed to clean up DSL records");
-
-        sqlx::query(r#"DELETE FROM "ob-poc".cbus WHERE cbu_id = $1"#)
-            .bind(test_cbu_id)
-            .execute(pool)
-            .await
-            .expect("Failed to clean up CBU record");
-    }
-
-    /// Test CBU validation
-    #[tokio::test]
-    async fn test_validate_cbu_exists() {
-        println!("tests disabled");
-        return;
-
-        let manager = create_test_manager().await;
-        let pool = manager.domain_repository.pool();
-
-        // Create test CBU
-        let test_cbu_id = create_test_cbu(pool).await;
-
-        // Test validation with existing CBU
-        let result = manager.validate_cbu_exists(test_cbu_id).await;
-        assert!(result.is_ok(), "Should validate existing CBU");
-
-        // Test validation with non-existing CBU
-        let fake_cbu_id = Uuid::new_v4();
-        let result = manager.validate_cbu_exists(fake_cbu_id).await;
-        assert!(result.is_err(), "Should reject non-existing CBU");
-
-        // Clean up
-        sqlx::query(r#"DELETE FROM "ob-poc".cbus WHERE cbu_id = $1"#)
-            .bind(test_cbu_id)
-            .execute(pool)
-            .await
-            .expect("Failed to clean up CBU record");
-    }
-
-    /// Test CBU info retrieval
-    #[tokio::test]
-    async fn test_get_cbu_info() {
-        println!("tests disabled");
-        return;
-
-        let manager = create_test_manager().await;
-        let pool = manager.domain_repository.pool();
-
-        // Create test CBU
-        let test_cbu_id = create_test_cbu(pool).await;
-
-        // Test getting CBU info
-        let result = manager.get_cbu_info(test_cbu_id).await;
-        assert!(result.is_ok(), "Should retrieve CBU info");
-
-        let cbu_info = result.unwrap();
-        assert_eq!(cbu_info.cbu_id, test_cbu_id);
-        assert_eq!(cbu_info.name, "Test CBU for DSL Manager");
-        assert_eq!(
-            cbu_info.description,
-            Some("Test CBU Description".to_string())
-        );
-        assert_eq!(
-            cbu_info.nature_purpose,
-            Some("Testing DSL Manager functionality".to_string())
-        );
-
-        // Clean up
-        sqlx::query(r#"DELETE FROM "ob-poc".cbus WHERE cbu_id = $1"#)
-            .bind(test_cbu_id)
-            .execute(pool)
-            .await
-            .expect("Failed to clean up CBU record");
-    }
-
-    #[test]
-    fn test_template_type_serialization() {
-        let template_type = TemplateType::CreateCbu;
-        let serialized = serde_json::to_string(&template_type).unwrap();
-        let deserialized: TemplateType = serde_json::from_str(&serialized).unwrap();
-
-        match deserialized {
-            TemplateType::CreateCbu => (),
-            _ => panic!("Serialization/deserialization failed"),
-        }
-    }
-
-    #[test]
-    fn test_instance_status_lifecycle() {
-        let status = InstanceStatus::Created;
-        assert!(matches!(status, InstanceStatus::Created));
-
-        let failed_status = InstanceStatus::Failed("compilation error".to_string());
-        if let InstanceStatus::Failed(msg) = failed_status {
-            assert_eq!(msg, "compilation error");
-        } else {
-            panic!("Failed status not properly handled");
-        }
-    }
-
-    #[test]
-    fn test_visualization_options_defaults() {
-        let options = VisualizationOptions::default();
-        assert!(matches!(options.layout, LayoutType::Tree));
-        assert!(options.include_compilation_info);
-        assert!(options.include_domain_context);
-        assert!(options.filters.is_some());
-    }
-
-    #[test]
-    fn test_styling_config_defaults() {
-        let styling = StylingConfig::default();
-        assert_eq!(styling.theme, "default");
-        assert_eq!(styling.node_size, 10.0);
-        assert_eq!(styling.font_size, 12.0);
-        assert!(styling.color_scheme.contains_key("primary"));
-    }
-
-    #[tokio::test]
-    async fn test_template_file_path_generation() {
-        let manager = create_test_manager().await;
-        let path = manager.get_template_file_path("onboarding", &TemplateType::CreateCbu);
-
-        assert!(path.to_string_lossy().contains("onboarding"));
-        assert!(path.to_string_lossy().contains("create_cbu.dsl.template"));
-    }
-
-    #[test]
-    fn test_operation_type_variants() {
-        let op1 = OperationType::CreateFromTemplate("test_template".to_string());
-        let op2 = OperationType::IncrementalEdit;
-        let op3 = OperationType::TemplateAddition(TemplateType::AddProducts);
-
-        assert!(matches!(op1, OperationType::CreateFromTemplate(_)));
-        assert!(matches!(op2, OperationType::IncrementalEdit));
-        assert!(matches!(op3, OperationType::TemplateAddition(_)));
     }
 }

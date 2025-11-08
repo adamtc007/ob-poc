@@ -1,3 +1,4 @@
+    Blocking waiting for file lock on package cache
     Updating crates.io index
 error: failed to select a version for `libsqlite3-sys`.
     ... required by package `sqlx-sqlite v0.8.0`

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**DSL Onboarding POC** is a Go-based proof-of-concept for a client onboarding Domain-Specific Language (DSL) system. It implements an immutable, versioned state machine that tracks client onboarding progression through stages while generating S-expression DSL output.
+**DSL Onboarding POC** now uses a consolidated Rust DslManager as the orchestration and persistence layer. The Go code is demo-only and communicates with the Rust backend (or uses mocks). Direct database access from Go has been deprecated and removed.
 
 ## 🏗️ Core Architectural Pattern: **DSL-as-State**
 
@@ -52,7 +52,7 @@ The DSL is not just a representation of state—**the DSL IS the state itself**.
 
 ### Implementation Examples
 
-**Main Onboarding POC** (`internal/cli/`):
+**Main Onboarding POC** (now via Rust backend; Go examples retained for demo):
 - `create` → Initial DSL version
 - `add-products` → Appends to DSL
 - `discover-kyc` → Appends KYC requirements
@@ -119,10 +119,8 @@ The DSL is not just a representation of state—**the DSL IS the state itself**.
 **Impact**: Chat state now mirrors main POC's versioned DSL pattern. Complete audit trail. Referential integrity across operations.
 
 ### Testing & Verification
-- ✅ Verb validation: 20+ test cases covering all 70+ approved verbs
-- ✅ Chat accumulation: Tested 3-step workflow (opportunity → KYC → collect-doc)
-- ✅ UUID resolution: Verified no `<investor_id>` placeholders in output
-- ✅ Both systems operational and tested
+- ✅ Verb validation in Go mocks retained for demos
+- ✅ Accumulation examples kept in examples; production orchestrations run in Rust
 
 ---
 

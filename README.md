@@ -59,7 +59,9 @@ bacon
 
 ### Go Implementation (`/go/`)
 
-The original Go POC implementation with established patterns and learnings.
+The original Go POC is retained for demos and mocks only. All orchestration and database persistence have moved to the consolidated Rust `DslManager`. Direct DB access from Go has been removed.
+
+Note on schema naming: The canonical PostgreSQL schema is `"ob-poc"`. Any legacy references to `"dsl-ob-poc"` exist only in migration scripts to normalize existing databases.
 
 ## System Architecture
 

@@ -30,10 +30,7 @@ help:
 	@echo "  make test               - Run tests"
 	@echo "  make test-coverage      - Run tests with coverage report"
 	@echo ""
-	@echo "Database targets:"
-	@echo "  make init-db            - Initialize the database (requires DB_CONN_STRING)"
-	@echo "  make migrate-schema     - Rename schema kyc-dsl -> dsl-ob-poc (requires DB_CONN_STRING)"
-	@echo "  make verify-db          - Verify schema/tables exist (uses DB or DB_CONN_STRING)"
+	@echo "Database targets (deprecated in Go; use Rust backend):"
 	@echo ""
 	@echo "Hedge Fund DSL targets:"
 	@echo "  make validate [FILE=examples/runbook.sample.json]      - Validate a good DSL runbook"
@@ -63,33 +60,7 @@ install-deps:
 	GOCACHE=$(PWD)/.gocache $(GO) mod tidy
 	GOCACHE=$(PWD)/.gocache $(GO) mod download
 
-init-db: build-greenteagc
-	./$(OUTPUT) init-db
 
-migrate-schema:
-	@if [ -z "$$DB_CONN_STRING" ]; then \
-		echo "DB_CONN_STRING is not set"; \
-		exit 1; \
-	fi
-	@if ! command -v psql >/dev/null 2>&1; then \
-		echo "psql is not installed or not in PATH"; \
-		exit 1; \
-	fi
-	psql "$$DB_CONN_STRING" -v ON_ERROR_STOP=1 -f sql/migrate_kyc-dsl_to_dsl-ob-poc.sql
-
-verify-db:
-	@# Use DB_CONN_STRING if set; else use DB; else default to postgres
-	@if [ -n "$$DB_CONN_STRING" ]; then \
-		PSQL_CONN="$$DB_CONN_STRING"; \
-	else \
-		DB_NAME="$${DB:-postgres}"; \
-		PSQL_CONN="postgres:///$${DB_NAME}?sslmode=disable"; \
-	fi; \
-	psql "$$PSQL_CONN" -v ON_ERROR_STOP=1 -c '\dn+ "dsl-ob-poc"' && \
-	psql "$$PSQL_CONN" -v ON_ERROR_STOP=1 -c '\dt+ "dsl-ob-poc".*' && \
-	psql "$$PSQL_CONN" -v ON_ERROR_STOP=1 -c 'SELECT COUNT(*) AS products FROM "dsl-ob-poc".products;' && \
-	psql "$$PSQL_CONN" -v ON_ERROR_STOP=1 -c 'SELECT COUNT(*) AS services FROM "dsl-ob-poc".services;' && \
-	psql "$$PSQL_CONN" -v ON_ERROR_STOP=1 -c 'SELECT COUNT(*) AS dsl_rows FROM "dsl-ob-poc".dsl_ob;'
 
 clean:
 	$(GO) clean

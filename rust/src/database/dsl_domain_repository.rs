@@ -385,15 +385,16 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
         let result = sqlx::query_as::<_, DslVersion>(
             r#"
             INSERT INTO "ob-poc".dsl_versions
-                (domain_id, version_number, functional_state, dsl_source_code,
+                (domain_id, request_id, version_number, functional_state, dsl_source_code,
                  change_description, parent_version_id, created_by)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING version_id, domain_id, version_number, functional_state,
                       dsl_source_code, compilation_status, change_description,
                       parent_version_id, created_by, created_at, compiled_at, activated_at
             "#,
         )
         .bind(domain.domain_id)
+        .bind(version.request_id)
         .bind(next_version)
         .bind(&version.functional_state)
         .bind(&version.dsl_source_code)
