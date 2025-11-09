@@ -51,7 +51,7 @@ pub struct ParsedAst {
     pub parser_version: String,
     pub ast_hash: Option<String>,
     pub node_count: Option<i32>,
-    pub complexity_score: Option<rust_decimal::Decimal>,
+    pub complexity_score: Option<f64>,
     pub parsed_at: DateTime<Utc>,
     pub invalidated_at: Option<DateTime<Utc>>,
 }
@@ -129,7 +129,7 @@ pub struct NewParsedAst {
     pub parser_version: String,
     pub ast_hash: Option<String>,
     pub node_count: Option<i32>,
-    pub complexity_score: Option<rust_decimal::Decimal>,
+    pub complexity_score: Option<f64>,
 }
 
 /// Latest version view representation
@@ -156,7 +156,7 @@ pub struct DslExecutionSummary {
     pub total_executions: Option<i64>,
     pub successful_executions: Option<i64>,
     pub failed_executions: Option<i64>,
-    pub avg_duration_ms: Option<rust_decimal::Decimal>,
+    pub avg_duration_ms: Option<f64>,
     pub last_execution_at: Option<DateTime<Utc>>,
 }
 
@@ -184,7 +184,7 @@ pub struct VersionHistoryEntry {
     pub compilation_status: CompilationStatus,
     pub lines_added: Option<i32>,
     pub lines_deleted: Option<i32>,
-    pub complexity_delta: Option<rust_decimal::Decimal>,
+    pub complexity_delta: Option<f64>,
 }
 
 impl DslDomain {

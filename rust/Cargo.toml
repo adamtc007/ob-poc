@@ -2,30 +2,65 @@
 name = "ob-poc"
 version = "0.1.0"
 edition = "2021"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-nom = "7.1"
+# Core libraries
+anyhow = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+log = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "1.0"
-chrono = { version = "0.4", features = ["serde"] }
-uuid = { version = "1.0", features = ["v4", "serde"] }
-tokio = { version = "1.0", features = ["full"] }
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "json", "rust_decimal"] }
-async-trait = "0.1"
+uuid = { version = "1.4", features = ["v4", "serde"] }
+dirs = "5.0" # For finding user directories
+# rust_decimal = { version = "1.33", features = ["serde"] } # Replaced with f64
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-regex = "1.0"
-url = "2.4"
-rust_decimal = { version = "1.33", features = ["serde-with-str", "db-postgres"] }
-# Dependencies removed: warp, tonic, prost, prost-types, tokio-stream
-# These were for standalone servers that have been removed
+tracing-subscriber = "0.3"
+async-trait = "0.1"
+url = "2.5"
 
+# DSL parsing and processing
+nom = "7.1"
+pest = "2.7" # For EBNF grammar parsing
+pest_derive = "2.7"
+
+# Database integration
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "macros"] }
+
+# gRPC and Protobuf
+tonic = { version = "0.14", features = ["codegen", "transport"] }
+tonic-web = "0.12"
+prost = "0.12" # Added prost dependency
+prost-derive = "0.12"
+
+# Async runtime and utilities
+tokio = { version = "1", features = ["full"] }
+
+# CLI argument parsing
+clap = { version = "4.4", features = ["derive"] }
+
+# Serialization/Deserialization
+# serde is already included above
+
+# WebAssembly support (if needed for client-side)
+# wasm-bindgen = "0.2"
+
+# For graph visualization (Phase 3)
+# petgraph = "0.6"
+
+# Testing
 [dev-dependencies]
-pretty_assertions = "1.4"
+pretty_env_logger = "0.5"
+wiremock = "0.5"
 
-## Removed demo bin to keep build clean
+# Protobuf compilation (build-dependencies)
+[build-dependencies]
+tonic-build = "0.14" # For generating Rust code from .proto files
+prost-build = "0.12" # For generating Rust code from .proto files
 
-
-
-## examples removed to keep build clean during consolidation
+# Optional: Workspace configuration if you have multiple crates
+# [workspace]
+# members = [
+#     "proto", # Assuming your proto files are in a 'proto' directory
+# ]

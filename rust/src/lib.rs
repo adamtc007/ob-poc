@@ -69,6 +69,10 @@ pub mod models;
 // DSL Manager - core create/edit functionality
 pub mod dsl_manager;
 
+// New modules for gRPC server
+// pub mod dsl_persistence; // Moved into dsl_manager.rs for consolidation
+// pub mod grpc_server; // Commented out - needs proto files setup
+
 // Domain-specific visualization features (Phase 3) removed during consolidation
 
 // Deprecated modules moved to src/deprecated/ (not needed for Phase 1)
@@ -89,11 +93,11 @@ pub use parser::{
 
 // Re-export consolidated DSL manager (main interface)
 pub use dsl_manager::{
-    CbuInfo, DomainVisualizationOptions, DslError as DslManagerError, DslInstance,
-    DslInstanceVersion, DslManager, DslResult, DslStorageKeys, DslTemplate, InstanceStatus,
-    KycCaseCreationResult, OnboardingRequestCreationResult, OnboardingSessionRecord,
-    OperationType, TemplateType, VisualizationOptions, ASTVisualization, VisualNode, VisualEdge,
-    VisualizationStatistics,
+    ASTVisualization, CbuInfo, DomainVisualizationOptions, DslError as DslManagerError,
+    DslInstance, DslInstanceVersion, DslManager, DslResult, DslStorageKeys, DslTemplate,
+    InstanceStatus, KycCaseCreationResult, OnboardingRequestCreationResult,
+    OnboardingSessionRecord, OperationType, TemplateType, VisualEdge, VisualNode,
+    VisualizationOptions, VisualizationStatistics,
 };
 
 // Re-export database and models

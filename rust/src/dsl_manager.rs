@@ -107,7 +107,7 @@ pub struct DslTemplate {
     pub content: String,
     pub variables: Vec<TemplateVariable>,
     pub requirements: TemplateRequirements,
-    pub metadata: HashMap<String, String>,
+    pub metadata: serde_json::Value,
 }
 
 /// Template types for different DSL operations
@@ -149,12 +149,12 @@ pub struct TemplateRequirements {
 pub struct DatabaseQuery {
     pub query_name: String,
     pub table: String,
-    pub filters: HashMap<String, String>,
+    pub filters: serde_json::Value,
     pub result_mapping: String,
 }
 
 /// DSL Instance - Core entity for instance-based management
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DslInstance {
     pub instance_id: Uuid,
     pub domain_name: String,
@@ -163,11 +163,12 @@ pub struct DslInstance {
     pub status: InstanceStatus,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-    pub metadata: HashMap<String, String>,
+    pub metadata: serde_json::Value,
 }
 
 /// Instance status lifecycle
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "text")]
 pub enum InstanceStatus {
     /// Instance created, ready for editing
     Created,
@@ -180,11 +181,11 @@ pub enum InstanceStatus {
     /// Instance archived
     Archived,
     /// Instance failed compilation or validation
-    Failed(String),
+    Failed,
 }
 
 /// DSL Instance Version - Snapshot of DSL content at a point in time
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DslInstanceVersion {
     pub version_id: Uuid,
     pub instance_id: Uuid,
@@ -252,7 +253,7 @@ impl DslManager {
         &self,
         domain_name: &str,
         template_type: TemplateType,
-        variables: HashMap<String, String>,
+        variables: serde_json::Value,
         created_by: &str,
     ) -> DslResult<DslInstance> {
         info!(
@@ -277,7 +278,9 @@ impl DslManager {
         let instance = DslInstance {
             instance_id,
             domain_name: domain_name.to_string(),
-            business_reference: variables.get("business_reference").cloned(),
+            business_reference: variables.get("business_reference")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
             current_version: 1,
             status: InstanceStatus::Created,
             created_at: Utc::now(),
@@ -362,10 +365,7 @@ impl DslManager {
         instance.status = if compiled_version.compilation_status == CompilationStatus::Compiled {
             InstanceStatus::Compiled
         } else {
-            InstanceStatus::Failed(format!(
-                "Compilation failed: {:?}",
-                compiled_version.compilation_status
-            ))
+            InstanceStatus::Failed
         };
 
         self.update_instance(&instance).await?;
@@ -464,7 +464,7 @@ impl DslManager {
         }
 
         // Parse YAML metadata (simplified)
-        let metadata: HashMap<String, String> = HashMap::new(); // TODO: Parse YAML
+        let metadata = serde_json::json!({}); // TODO: Parse YAML
         let dsl_content = parts[2].trim();
 
         Ok(DslTemplate {
@@ -487,7 +487,7 @@ impl DslManager {
     async fn generate_dsl_from_template(
         &self,
         template: &DslTemplate,
-        variables: &HashMap<String, String>,
+        variables: &serde_json::Value,
     ) -> DslResult<String> {
         let mut dsl_content = template.content.clone();
 
@@ -499,9 +499,15 @@ impl DslManager {
         }
 
         // Substitute template variables
-        for (var_name, var_value) in variables {
-            let placeholder = format!("{{{{{}}}}}", var_name);
-            dsl_content = dsl_content.replace(&placeholder, var_value);
+        if let Some(obj) = variables.as_object() {
+            for (var_name, var_value) in obj {
+                let placeholder = format!("{{{{{}}}}}", var_name);
+                if let Some(str_value) = var_value.as_str() {
+                    dsl_content = dsl_content.replace(&placeholder, str_value);
+                } else {
+                    dsl_content = dsl_content.replace(&placeholder, &var_value.to_string());
+                }
+            }
         }
 
         Ok(dsl_content)
@@ -511,7 +517,7 @@ impl DslManager {
     async fn execute_template_query(
         &self,
         query: &DatabaseQuery,
-    ) -> DslResult<Vec<HashMap<String, String>>> {
+    ) -> DslResult<Vec<serde_json::Value>> {
         match query.table.as_str() {
             "products" => {
                 // Query products table
@@ -519,11 +525,11 @@ impl DslManager {
                 Ok(products
                     .into_iter()
                     .map(|p| {
-                        let mut row = HashMap::new();
-                        row.insert("product_id".to_string(), p.product_id.to_string());
-                        row.insert("name".to_string(), p.name);
-                        row.insert("description".to_string(), p.description.unwrap_or_default());
-                        row
+                        serde_json::json!({
+                            "product_id": p.product_id.to_string(),
+                            "name": p.name,
+                            "description": p.description.unwrap_or_default()
+                        })
                     })
                     .collect())
             }
@@ -533,11 +539,11 @@ impl DslManager {
                 Ok(services
                     .into_iter()
                     .map(|s| {
-                        let mut row = HashMap::new();
-                        row.insert("service_id".to_string(), s.service_id.to_string());
-                        row.insert("name".to_string(), s.name);
-                        row.insert("description".to_string(), s.description.unwrap_or_default());
-                        row
+                        serde_json::json!({
+                            "service_id": s.service_id.to_string(),
+                            "name": s.name,
+                            "description": s.description.unwrap_or_default()
+                        })
                     })
                     .collect())
             }
@@ -547,12 +553,12 @@ impl DslManager {
                 Ok(resources
                     .into_iter()
                     .map(|r| {
-                        let mut row = HashMap::new();
-                        row.insert("resource_id".to_string(), r.resource_id.to_string());
-                        row.insert("name".to_string(), r.name);
-                        row.insert("description".to_string(), r.description.unwrap_or_default());
-                        row.insert("owner".to_string(), r.owner);
-                        row
+                        serde_json::json!({
+                            "resource_id": r.resource_id.to_string(),
+                            "name": r.name,
+                            "description": r.description.unwrap_or_default(),
+                            "owner": r.owner
+                        })
                     })
                     .collect())
             }
@@ -567,7 +573,7 @@ impl DslManager {
         &self,
         content: &str,
         result_mapping: &str,
-        results: &[HashMap<String, String>],
+        results: &[serde_json::Value],
     ) -> String {
         // Simple result injection - replace {{query_name}} with formatted results
         // In practice, this would be more sophisticated with proper templating
@@ -577,13 +583,17 @@ impl DslManager {
             let formatted_results = results
                 .iter()
                 .map(|row| {
-                    format!(
-                        "  {}",
-                        row.values()
-                            .map(|v| v.as_str())
-                            .collect::<Vec<_>>()
-                            .join(" ")
-                    )
+                    if let Some(obj) = row.as_object() {
+                        format!(
+                            "  {}",
+                            obj.values()
+                                .map(|v| v.as_str().unwrap_or(""))
+                                .collect::<Vec<_>>()
+                                .join(" ")
+                        )
+                    } else {
+                        format!("  {}", row)
+                    }
                 })
                 .collect::<Vec<_>>()
                 .join("\n");
@@ -599,11 +609,11 @@ impl DslManager {
     async fn validate_template_requirements(
         &self,
         template: &DslTemplate,
-        variables: &HashMap<String, String>,
+        variables: &serde_json::Value,
     ) -> DslResult<()> {
         // Validate required variables are provided
         for template_var in &template.variables {
-            if template_var.required && !variables.contains_key(&template_var.name) {
+            if template_var.required && variables.get(&template_var.name).is_none() {
                 return Err(DslError::TemplateError {
                     message: format!("Required template variable missing: {}", template_var.name),
                 });
@@ -813,13 +823,11 @@ impl DslManager {
             })?;
 
         // Create associated DSL instance
-        let mut template_variables = HashMap::new();
-        template_variables.insert("business_reference".to_string(), business_reference);
-        template_variables.insert("client_id".to_string(), client_id);
-        template_variables.insert(
-            "request_id".to_string(),
-            business_request.request_id.to_string(),
-        );
+        let template_variables = serde_json::json!({
+            "business_reference": business_reference,
+            "client_id": client_id,
+            "request_id": business_request.request_id.to_string()
+        });
 
         let dsl_instance = self
             .create_dsl_instance(&domain_name, template_type, template_variables, &created_by)
@@ -836,9 +844,16 @@ impl DslManager {
     ) -> DslResult<()> {
         // Update instance metadata to include business request reference
         let mut instance = self.get_instance(instance_id).await?;
-        instance
-            .metadata
-            .insert("business_request_id".to_string(), request_id.to_string());
+        if let serde_json::Value::Object(ref mut map) = instance.metadata {
+            map.insert(
+                "business_request_id".to_string(),
+                serde_json::Value::String(request_id.to_string()),
+            );
+        } else {
+            instance.metadata = serde_json::json!({
+                "business_request_id": request_id.to_string()
+            });
+        }
         self.update_instance(&instance).await?;
 
         Ok(())
@@ -849,7 +864,7 @@ impl DslManager {
     // ============================================================================
 
     /// Get latest version for instance
-    async fn get_latest_instance_version(
+    pub async fn get_latest_instance_version(
         &self,
         instance_id: Uuid,
     ) -> DslResult<DslInstanceVersion> {
@@ -1022,7 +1037,7 @@ impl DslManager {
     }
 
     /// Store DSL instance in database
-    async fn store_instance(&self, instance: &DslInstance) -> DslResult<()> {
+    pub async fn store_instance(&self, instance: &DslInstance) -> DslResult<()> {
         info!("Storing DSL instance: {}", instance.instance_id);
 
         // For now, store instance metadata in a JSON format in the domain system
@@ -1042,7 +1057,7 @@ impl DslManager {
     }
 
     /// Update DSL instance in database
-    async fn update_instance(&self, instance: &DslInstance) -> DslResult<()> {
+    pub async fn update_instance(&self, instance: &DslInstance) -> DslResult<()> {
         info!("Updating DSL instance: {}", instance.instance_id);
         // For now, this is a no-op since we're using the domain system
         // Could be extended with dedicated instance management later
@@ -1050,7 +1065,7 @@ impl DslManager {
     }
 
     /// Get DSL instance by ID
-    async fn get_instance(&self, instance_id: Uuid) -> DslResult<DslInstance> {
+    pub async fn get_instance(&self, instance_id: Uuid) -> DslResult<DslInstance> {
         // For now, create a placeholder instance
         // This would be replaced with actual database retrieval
         Err(DslError::NotFound {
@@ -1059,7 +1074,7 @@ impl DslManager {
     }
 
     /// Store DSL instance version in database
-    async fn store_instance_version(&self, version: &DslInstanceVersion) -> DslResult<()> {
+    pub async fn store_instance_version(&self, version: &DslInstanceVersion) -> DslResult<()> {
         info!(
             "Storing DSL instance version: {} (v{})",
             version.version_id, version.version_number
@@ -1075,7 +1090,7 @@ impl DslManager {
     }
 
     /// Update DSL instance version
-    async fn update_instance_version(&self, version: &DslInstanceVersion) -> DslResult<()> {
+    pub async fn update_instance_version(&self, version: &DslInstanceVersion) -> DslResult<()> {
         info!("Updating DSL instance version: {}", version.version_id);
 
         // Update compilation status
@@ -1110,10 +1125,11 @@ impl DslManager {
         self.validate_cbu_exists(cbu_id).await?;
 
         // Create main KYC case DSL instance
-        let mut kyc_variables = HashMap::new();
-        kyc_variables.insert("cbu_id".to_string(), cbu_id.to_string());
-        kyc_variables.insert("case_name".to_string(), case_name.clone());
-        kyc_variables.insert("case_description".to_string(), case_description.clone());
+        let kyc_variables = serde_json::json!({
+            "cbu_id": cbu_id.to_string(),
+            "case_name": case_name.clone(),
+            "case_description": case_description.clone()
+        });
 
         let kyc_instance = self
             .create_dsl_instance(
@@ -1125,12 +1141,10 @@ impl DslManager {
             .await?;
 
         // Create embedded KYC.UBO sub domain DSL instance
-        let mut ubo_variables = HashMap::new();
-        ubo_variables.insert("cbu_id".to_string(), cbu_id.to_string());
-        ubo_variables.insert(
-            "parent_case_id".to_string(),
-            kyc_instance.instance_id.to_string(),
-        );
+        let ubo_variables = serde_json::json!({
+            "cbu_id": cbu_id.to_string(),
+            "parent_case_id": kyc_instance.instance_id.to_string()
+        });
 
         let ubo_instance = self
             .create_dsl_instance(
@@ -1182,30 +1196,31 @@ impl DslManager {
             .await?;
 
         // Populate template with CBU ID and request details
-        let mut ob_variables = HashMap::new();
-        ob_variables.insert("cbu_id".to_string(), cbu_id.to_string());
-        ob_variables.insert("cbu_name".to_string(), cbu_info.name);
+        let mut ob_variables = serde_json::Map::new();
+        ob_variables.insert("cbu_id".to_string(), serde_json::Value::String(cbu_id.to_string()));
+        ob_variables.insert("cbu_name".to_string(), serde_json::Value::String(cbu_info.name));
         ob_variables.insert(
             "cbu_description".to_string(),
-            cbu_info.description.unwrap_or_default(),
+            serde_json::Value::String(cbu_info.description.unwrap_or_default()),
         );
         ob_variables.insert(
             "cbu_nature_purpose".to_string(),
-            cbu_info.nature_purpose.unwrap_or_default(),
+            serde_json::Value::String(cbu_info.nature_purpose.unwrap_or_default()),
         );
-        ob_variables.insert("onboarding_name".to_string(), onboarding_name.clone());
+        ob_variables.insert("onboarding_name".to_string(), serde_json::Value::String(onboarding_name.clone()));
         ob_variables.insert(
             "onboarding_description".to_string(),
-            onboarding_description.clone(),
+            serde_json::Value::String(onboarding_description.clone()),
         );
 
         // Create OB request ID (minted)
         let ob_request_id = Uuid::new_v4();
-        ob_variables.insert("ob_request_id".to_string(), ob_request_id.to_string());
+        ob_variables.insert("ob_request_id".to_string(), serde_json::Value::String(ob_request_id.to_string()));
 
         // Generate DSL content from template
+        let ob_variables_value = serde_json::Value::Object(ob_variables.clone());
         let dsl_content = self
-            .generate_dsl_from_template(&ob_template, &ob_variables)
+            .generate_dsl_from_template(&ob_template, &ob_variables_value)
             .await?;
 
         // Parse first with NOM: only persist if parse succeeds
@@ -1225,7 +1240,7 @@ impl DslManager {
             status: InstanceStatus::Created,
             created_at: Utc::now(),
             updated_at: Utc::now(),
-            metadata: ob_variables.clone(),
+            metadata: ob_variables_value.clone(),
         };
 
         // Store DSL instance metadata (optional/no-op currently)
@@ -1510,10 +1525,16 @@ impl DslManager {
 
         // Update sub-instance metadata to include parent reference
         let mut sub_instance = self.get_instance(sub_instance_id).await?;
-        sub_instance.metadata.insert(
-            "parent_instance_id".to_string(),
-            parent_instance_id.to_string(),
-        );
+        if let serde_json::Value::Object(ref mut map) = sub_instance.metadata {
+            map.insert(
+                "parent_instance_id".to_string(),
+                serde_json::Value::String(parent_instance_id.to_string()),
+            );
+        } else {
+            sub_instance.metadata = serde_json::json!({
+                "parent_instance_id": parent_instance_id.to_string()
+            });
+        }
         self.update_instance(&sub_instance).await?;
 
         Ok(())
@@ -1611,7 +1632,7 @@ impl DslManager {
     /// Get available products with filters
     async fn get_available_products(
         &self,
-        _filters: &HashMap<String, String>,
+        _filters: &serde_json::Value,
     ) -> DslResult<Vec<ProductInfo>> {
         // TODO: Query products table with filters
         Ok(vec![])
@@ -1620,7 +1641,7 @@ impl DslManager {
     /// Get available services with filters
     async fn get_available_services(
         &self,
-        _filters: &HashMap<String, String>,
+        _filters: &serde_json::Value,
     ) -> DslResult<Vec<ServiceInfo>> {
         // TODO: Query services table with filters
         Ok(vec![])
@@ -1629,7 +1650,7 @@ impl DslManager {
     /// Get available resources with filters
     async fn get_available_resources(
         &self,
-        _filters: &HashMap<String, String>,
+        _filters: &serde_json::Value,
     ) -> DslResult<Vec<ResourceInfo>> {
         // TODO: Query prod_resources table with filters
         Ok(vec![])
@@ -1912,6 +1933,56 @@ impl DslManager {
             },
         })
     }
+
+    // ============================================================================
+    // ADDITIONAL PERSISTENCE OPERATIONS (consolidated from dsl_persistence.rs)
+    // Note: Core persistence methods already exist as private methods above
+    // ============================================================================
+
+    /// List all DSL instances with optional filtering
+    pub async fn list_instances(&self, domain_filter: Option<&str>) -> DslResult<Vec<DslInstance>> {
+        let query = if let Some(domain) = domain_filter {
+            sqlx::query_as::<_, DslInstance>(
+                r#"SELECT * FROM "ob-poc".dsl_instances
+                   WHERE domain_name = $1
+                   ORDER BY created_at DESC"#
+            )
+            .bind(domain)
+        } else {
+            sqlx::query_as::<_, DslInstance>(
+                r#"SELECT * FROM "ob-poc".dsl_instances
+                   ORDER BY created_at DESC"#
+            )
+        };
+
+        query
+            .fetch_all(self.domain_repository.pool())
+            .await
+            .map_err(|e| DslError::DatabaseError(e.to_string()))
+    }
+
+    /// Delete DSL instance and all its versions (soft delete by status update)
+    pub async fn delete_instance(&self, instance_id: Uuid) -> DslResult<()> {
+        let mut tx = self.domain_repository.pool().begin().await
+            .map_err(|e| DslError::DatabaseError(e.to_string()))?;
+
+        // Update instance status to Archived instead of hard delete
+        sqlx::query(
+            r#"UPDATE "ob-poc".dsl_instances
+               SET status = $1, updated_at = $2
+               WHERE instance_id = $3"#
+        )
+        .bind(InstanceStatus::Archived)
+        .bind(Utc::now())
+        .bind(instance_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| DslError::DatabaseError(e.to_string()))?;
+
+        tx.commit().await
+            .map_err(|e| DslError::DatabaseError(e.to_string()))?;
+        Ok(())
+    }
 }
 
 // ============================================================================
@@ -1988,7 +2059,7 @@ pub struct StylingConfig {
     pub theme: String,
     pub node_size: f32,
     pub font_size: f32,
-    pub color_scheme: HashMap<String, String>,
+    pub color_scheme: serde_json::Value,
 }
 
 /// CBU information from database
@@ -2074,12 +2145,13 @@ pub struct CriticalPath {
 
 impl Default for StylingConfig {
     fn default() -> Self {
-        let mut color_scheme = HashMap::new();
-        color_scheme.insert("primary".to_string(), "#2563eb".to_string());
-        color_scheme.insert("secondary".to_string(), "#64748b".to_string());
-        color_scheme.insert("success".to_string(), "#059669".to_string());
-        color_scheme.insert("warning".to_string(), "#d97706".to_string());
-        color_scheme.insert("error".to_string(), "#dc2626".to_string());
+        let color_scheme = serde_json::json!({
+            "primary": "#2563eb",
+            "secondary": "#64748b",
+            "success": "#059669",
+            "warning": "#d97706",
+            "error": "#dc2626"
+        });
 
         Self {
             theme: "default".to_string(),

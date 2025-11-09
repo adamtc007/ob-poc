@@ -540,7 +540,7 @@ pub struct DomainMetrics {
     pub compliance_operations: u32,
     pub ubo_calculations: u32,
     pub document_collections: u32,
-    pub complexity_score: rust_decimal::Decimal,
+    pub complexity_score: f64,
     pub estimated_execution_time: u32,
     pub risk_score: f64,
 }
@@ -959,7 +959,7 @@ mod tests {
     };
     use crate::models::CompilationStatus;
     use chrono::Utc;
-    use rust_decimal::Decimal;
+    use f64;
     use uuid::Uuid;
 
     fn create_test_domain() -> DslDomain {
