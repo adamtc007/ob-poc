@@ -18,6 +18,9 @@ pub mod validation;
 pub use attribute::*;
 pub use catalogue::*;
 
+// Re-export key types for convenience
+pub use attribute::AttributeId;
+
 /// Service trait for dictionary validation and lookup
 #[async_trait]
 pub trait DictionaryService: Send + Sync {

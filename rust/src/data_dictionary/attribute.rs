@@ -1,6 +1,46 @@
 //! Attribute definition with complete metadata
 
 use super::*;
+use uuid::Uuid;
+
+/// Unique identifier for attributes in the data dictionary
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct AttributeId(Uuid);
+
+impl AttributeId {
+    /// Create a new random AttributeId
+    pub fn new() -> Self {
+        Self(Uuid::new_v4())
+    }
+
+    /// Create an AttributeId from a UUID
+    pub fn from_uuid(uuid: Uuid) -> Self {
+        Self(uuid)
+    }
+
+    /// Get the inner UUID
+    pub fn as_uuid(&self) -> &Uuid {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for AttributeId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<Uuid> for AttributeId {
+    fn from(uuid: Uuid) -> Self {
+        Self(uuid)
+    }
+}
+
+impl From<AttributeId> for Uuid {
+    fn from(attr_id: AttributeId) -> Self {
+        attr_id.0
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributeDefinition {

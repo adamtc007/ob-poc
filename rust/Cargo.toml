@@ -48,6 +48,9 @@ prost-derive = "0.12"
 # Async runtime and utilities
 tokio = { version = "1", features = ["full"] }
 
+# HTTP client for external integrations
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+
 # CLI argument parsing
 clap = { version = "4.4", features = ["derive"], optional = true }
 
@@ -65,6 +68,9 @@ clap = { version = "4.4", features = ["derive"], optional = true }
 pretty_env_logger = "0.5"
 wiremock = "0.5"
 
+# Additional dependencies for Phase 2 execution engine
+prost-types = "0.12"
+
 # Protobuf compilation (build-dependencies)
 [build-dependencies]
 tonic-build = "0.14" # For generating Rust code from .proto files
@@ -72,7 +78,7 @@ prost-build = "0.12" # For generating Rust code from .proto files
 
 # Features for conditional compilation
 [features]
-default = []
+default = ["database"]
 binaries = ["dep:clap"]  # Only enable binaries when this feature is active
 database = ["dep:sqlx"]  # Only enable database functionality when needed
 

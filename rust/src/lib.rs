@@ -57,6 +57,7 @@
 
 // Core modules
 pub mod ast;
+pub mod data_dictionary;
 pub mod error;
 pub mod grammar;
 pub mod parser;
@@ -77,7 +78,8 @@ pub mod domains;
 
 // New modules for gRPC server and services - temporarily disabled for Phase 1
 // pub mod grpc_server;
-// pub mod services;
+pub mod execution;
+// pub mod services; // Temporarily disabled to focus on execution
 
 // Generated protobuf modules - temporarily disabled for Phase 1
 // pub mod proto;

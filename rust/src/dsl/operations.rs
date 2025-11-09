@@ -490,3 +490,120 @@ mod tests {
         assert_eq!(operation.target_id(), "CBU-1234");
     }
 }
+
+/// Simple DSL operation structure for execution engine compatibility
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecutableDslOperation {
+    pub operation_type: String,
+    pub parameters: HashMap<String, serde_json::Value>,
+    pub metadata: HashMap<String, serde_json::Value>,
+}
+
+impl ExecutableDslOperation {
+    /// Create a new executable DSL operation
+    pub fn new(
+        operation_type: impl Into<String>,
+        parameters: HashMap<String, serde_json::Value>,
+    ) -> Self {
+        Self {
+            operation_type: operation_type.into(),
+            parameters,
+            metadata: HashMap::new(),
+        }
+    }
+
+    /// Add metadata to the operation
+    pub fn with_metadata(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
+        self.metadata.insert(key.into(), value);
+        self
+    }
+
+    /// Convert operation to DSL string representation
+    pub fn to_dsl_string(&self) -> String {
+        match self.operation_type.as_str() {
+            "validate" => {
+                let attr = self
+                    .parameters
+                    .get("attribute_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown_attr");
+                let value = self
+                    .parameters
+                    .get("value")
+                    .map(|v| format!("{}", v))
+                    .unwrap_or_else(|| "null".to_string());
+                format!("(validate {} {})", attr, value)
+            }
+            "collect" => {
+                let attr = self
+                    .parameters
+                    .get("attribute_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown_attr");
+                let from = self
+                    .parameters
+                    .get("from")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown_source");
+                format!("(collect {} :from \"{}\")", attr, from)
+            }
+            "declare-entity" => {
+                let node_id = self
+                    .parameters
+                    .get("node-id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown_node");
+                let label = self
+                    .parameters
+                    .get("label")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown");
+                format!(
+                    "(declare-entity\n  :node-id \"{}\"\n  :label {})",
+                    node_id, label
+                )
+            }
+            "create-edge" => {
+                let from = self
+                    .parameters
+                    .get("from")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown_from");
+                let to = self
+                    .parameters
+                    .get("to")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown_to");
+                let edge_type = self
+                    .parameters
+                    .get("type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("UNKNOWN_RELATION");
+                format!(
+                    "(create-edge\n  :from \"{}\"\n  :to \"{}\"\n  :type {})",
+                    from, to, edge_type
+                )
+            }
+            "check" => {
+                let attr = self
+                    .parameters
+                    .get("attribute_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown_attr");
+                let condition = self
+                    .parameters
+                    .get("condition")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("exists");
+                format!("(check {} :{})", attr, condition)
+            }
+            _ => {
+                format!(
+                    "({} {})",
+                    self.operation_type,
+                    serde_json::to_string(&self.parameters).unwrap_or_else(|_| "{}".to_string())
+                )
+            }
+        }
+    }
+}
