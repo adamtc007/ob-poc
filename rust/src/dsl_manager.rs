@@ -34,6 +34,12 @@ use uuid::Uuid;
 /// Result type for all DSL operations
 pub type DslResult<T> = Result<T, DslError>;
 
+/// Re-export core types from the repositories
+pub use crate::database::dsl_instance_repository::{
+    AstNode, AstNodeType, CompilationStatus, DslBusinessReference, DslCompilationLog, DslInstance,
+    DslInstanceVersion, DslTemplate, InstanceStatus, OperationType,
+};
+
 /// Extended DSL Error types for the consolidated manager
 #[derive(Debug, thiserror::Error)]
 pub enum DslError {
@@ -278,7 +284,8 @@ impl DslManager {
         let instance = DslInstance {
             instance_id,
             domain_name: domain_name.to_string(),
-            business_reference: variables.get("business_reference")
+            business_reference: variables
+                .get("business_reference")
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string()),
             current_version: 1,
@@ -931,13 +938,12 @@ impl DslManager {
     async fn validate_cbu_exists(&self, cbu_id: Uuid) -> DslResult<()> {
         info!("Validating CBU exists: {}", cbu_id);
 
-        let count = sqlx::query_scalar::<_, i64>(
-            r#"SELECT COUNT(*) FROM "ob-poc".cbus WHERE cbu_id = $1"#,
-        )
-        .bind(cbu_id)
-        .fetch_one(self.domain_repository.pool())
-        .await
-        .map_err(|e| DslError::DatabaseError(format!("Failed to validate CBU: {}", e)))?;
+        let count =
+            sqlx::query_scalar::<_, i64>(r#"SELECT COUNT(*) FROM "ob-poc".cbus WHERE cbu_id = $1"#)
+                .bind(cbu_id)
+                .fetch_one(self.domain_repository.pool())
+                .await
+                .map_err(|e| DslError::DatabaseError(format!("Failed to validate CBU: {}", e)))?;
 
         if count == 0 {
             return Err(DslError::NotFound {
@@ -1197,8 +1203,14 @@ impl DslManager {
 
         // Populate template with CBU ID and request details
         let mut ob_variables = serde_json::Map::new();
-        ob_variables.insert("cbu_id".to_string(), serde_json::Value::String(cbu_id.to_string()));
-        ob_variables.insert("cbu_name".to_string(), serde_json::Value::String(cbu_info.name));
+        ob_variables.insert(
+            "cbu_id".to_string(),
+            serde_json::Value::String(cbu_id.to_string()),
+        );
+        ob_variables.insert(
+            "cbu_name".to_string(),
+            serde_json::Value::String(cbu_info.name),
+        );
         ob_variables.insert(
             "cbu_description".to_string(),
             serde_json::Value::String(cbu_info.description.unwrap_or_default()),
@@ -1207,7 +1219,10 @@ impl DslManager {
             "cbu_nature_purpose".to_string(),
             serde_json::Value::String(cbu_info.nature_purpose.unwrap_or_default()),
         );
-        ob_variables.insert("onboarding_name".to_string(), serde_json::Value::String(onboarding_name.clone()));
+        ob_variables.insert(
+            "onboarding_name".to_string(),
+            serde_json::Value::String(onboarding_name.clone()),
+        );
         ob_variables.insert(
             "onboarding_description".to_string(),
             serde_json::Value::String(onboarding_description.clone()),
@@ -1215,7 +1230,10 @@ impl DslManager {
 
         // Create OB request ID (minted)
         let ob_request_id = Uuid::new_v4();
-        ob_variables.insert("ob_request_id".to_string(), serde_json::Value::String(ob_request_id.to_string()));
+        ob_variables.insert(
+            "ob_request_id".to_string(),
+            serde_json::Value::String(ob_request_id.to_string()),
+        );
 
         // Generate DSL content from template
         let ob_variables_value = serde_json::Value::Object(ob_variables.clone());
@@ -1225,10 +1243,12 @@ impl DslManager {
 
         // Parse first with NOM: only persist if parse succeeds
         if let Err(parse_error) = parse_program(&dsl_content) {
-            return Err(DslError::CompilationError { message: format!(
-                "DSL parsing failed for onboarding request: {:?}",
-                parse_error
-            )});
+            return Err(DslError::CompilationError {
+                message: format!(
+                    "DSL parsing failed for onboarding request: {:?}",
+                    parse_error
+                ),
+            });
         }
 
         // Create DSL instance with OB request context
@@ -1252,10 +1272,7 @@ impl DslManager {
             request_id: Some(ob_request_id),
             functional_state: Some("Created".to_string()),
             dsl_source_code: dsl_content.clone(),
-            change_description: Some(format!(
-                "Initial OB request creation: {}",
-                onboarding_name
-            )),
+            change_description: Some(format!("Initial OB request creation: {}", onboarding_name)),
             parent_version_id: None,
             created_by: Some(created_by.clone()),
         };
@@ -1333,7 +1350,14 @@ impl DslManager {
             ts = Utc::now().to_rfc3339()
         );
         let combined = format!("{}\n{}", prev, fragment);
-        self.persist_ob_edit(ob_request_id, cbu_id, &combined, created_by, change_description.unwrap_or_else(|| "Associate CBU".to_string())).await
+        self.persist_ob_edit(
+            ob_request_id,
+            cbu_id,
+            &combined,
+            created_by,
+            change_description.unwrap_or_else(|| "Associate CBU".to_string()),
+        )
+        .await
     }
 
     /// Add products to the OB request
@@ -1346,7 +1370,11 @@ impl DslManager {
         created_by: &str,
     ) -> DslResult<DslInstanceVersion> {
         let prev = self.get_latest_ob_version_dsl(ob_request_id).await?;
-        let quoted = products.iter().map(|p| format!("\"{}\"", p)).collect::<Vec<_>>().join(" ");
+        let quoted = products
+            .iter()
+            .map(|p| format!("\"{}\"", p))
+            .collect::<Vec<_>>()
+            .join(" ");
         let fragment = format!(
             "\n(products.select (products [{products}]) (selection.reason \"{reason}\") (selected.at \"{ts}\"))",
             products = quoted,
@@ -1354,7 +1382,14 @@ impl DslManager {
             ts = Utc::now().to_rfc3339()
         );
         let combined = format!("{}\n{}", prev, fragment);
-        self.persist_ob_edit(ob_request_id, cbu_id, &combined, created_by, "Add products".to_string()).await
+        self.persist_ob_edit(
+            ob_request_id,
+            cbu_id,
+            &combined,
+            created_by,
+            "Add products".to_string(),
+        )
+        .await
     }
 
     /// Discover services for products (simple placeholder version)
@@ -1370,9 +1405,19 @@ impl DslManager {
         for p in products {
             services_block.push_str(&format!("  (for.product \"{}\")\n", p));
         }
-        services_block.push_str(&format!("  (discovered.at \"{}\"))", Utc::now().to_rfc3339()));
+        services_block.push_str(&format!(
+            "  (discovered.at \"{}\"))",
+            Utc::now().to_rfc3339()
+        ));
         let combined = format!("{}\n{}", prev, services_block);
-        self.persist_ob_edit(ob_request_id, cbu_id, &combined, created_by, "Discover services".to_string()).await
+        self.persist_ob_edit(
+            ob_request_id,
+            cbu_id,
+            &combined,
+            created_by,
+            "Discover services".to_string(),
+        )
+        .await
     }
 
     /// Discover resources for services (placeholder)
@@ -1388,9 +1433,19 @@ impl DslManager {
         for s in services {
             resources_block.push_str(&format!("  (for.service \"{}\")\n", s));
         }
-        resources_block.push_str(&format!("  (discovered.at \"{}\"))", Utc::now().to_rfc3339()));
+        resources_block.push_str(&format!(
+            "  (discovered.at \"{}\"))",
+            Utc::now().to_rfc3339()
+        ));
         let combined = format!("{}\n{}", prev, resources_block);
-        self.persist_ob_edit(ob_request_id, cbu_id, &combined, created_by, "Discover resources".to_string()).await
+        self.persist_ob_edit(
+            ob_request_id,
+            cbu_id,
+            &combined,
+            created_by,
+            "Discover resources".to_string(),
+        )
+        .await
     }
 
     /// Complete onboarding (append completion DSL)
@@ -1408,7 +1463,14 @@ impl DslManager {
             ts = Utc::now().to_rfc3339()
         );
         let combined = format!("{}\n{}", prev, fragment);
-        self.persist_ob_edit(ob_request_id, cbu_id, &combined, created_by, "Complete onboarding".to_string()).await
+        self.persist_ob_edit(
+            ob_request_id,
+            cbu_id,
+            &combined,
+            created_by,
+            "Complete onboarding".to_string(),
+        )
+        .await
     }
 
     /// Archive onboarding (append archive DSL)
@@ -1426,7 +1488,14 @@ impl DslManager {
             ts = Utc::now().to_rfc3339()
         );
         let combined = format!("{}\n{}", prev, fragment);
-        self.persist_ob_edit(ob_request_id, cbu_id, &combined, created_by, "Archive onboarding".to_string()).await
+        self.persist_ob_edit(
+            ob_request_id,
+            cbu_id,
+            &combined,
+            created_by,
+            "Archive onboarding".to_string(),
+        )
+        .await
     }
 
     async fn get_latest_ob_version_dsl(&self, ob_request_id: Uuid) -> DslResult<String> {
@@ -1441,13 +1510,17 @@ impl DslManager {
         .bind(ob_request_id)
         .fetch_optional(self.domain_repository.pool())
         .await
-        .map_err(|e| DslError::DatabaseError(format!("Failed to fetch latest OB version: {}", e)))?;
+        .map_err(|e| {
+            DslError::DatabaseError(format!("Failed to fetch latest OB version: {}", e))
+        })?;
 
         use sqlx::Row;
         if let Some(r) = row {
             Ok(r.get::<String, _>("dsl_source_code"))
         } else {
-            Err(DslError::NotFound { message: format!("No DSL found for OB request: {}", ob_request_id) })
+            Err(DslError::NotFound {
+                message: format!("No DSL found for OB request: {}", ob_request_id),
+            })
         }
     }
 
@@ -1461,10 +1534,9 @@ impl DslManager {
     ) -> DslResult<DslInstanceVersion> {
         // Parse first: only persist if parse succeeds
         if let Err(parse_error) = parse_program(combined_dsl) {
-            return Err(DslError::CompilationError { message: format!(
-                "DSL parsing failed for OB edit: {:?}",
-                parse_error
-            )});
+            return Err(DslError::CompilationError {
+                message: format!("DSL parsing failed for OB edit: {:?}", parse_error),
+            });
         }
 
         // Create new domain version tied to request_id (after successful parse)
@@ -1680,11 +1752,9 @@ impl DslManager {
                 crate::ast::Value::List(list) => {
                     JValue::Array(list.iter().map(val_to_json).collect())
                 }
-                crate::ast::Value::Map(m) => JValue::Object(
-                    m.iter()
-                        .map(|(k, v)| (k.clone(), val_to_json(v)))
-                        .collect(),
-                ),
+                crate::ast::Value::Map(m) => {
+                    JValue::Object(m.iter().map(|(k, v)| (k.clone(), val_to_json(v))).collect())
+                }
                 crate::ast::Value::MultiValue(vals) => JValue::Array(
                     vals.iter()
                         .map(|vw| {
@@ -1703,9 +1773,10 @@ impl DslManager {
         }
 
         let started = std::time::Instant::now();
-        let program: Program = serde_json::from_str(ast_json).map_err(|e| DslError::SerializationError {
-            message: format!("Failed to deserialize AST JSON: {}", e),
-        })?;
+        let program: Program =
+            serde_json::from_str(ast_json).map_err(|e| DslError::SerializationError {
+                message: format!("Failed to deserialize AST JSON: {}", e),
+            })?;
 
         let mut nodes: Vec<VisualNode> = Vec::new();
         let mut edges: Vec<VisualEdge> = Vec::new();
@@ -1769,34 +1840,67 @@ impl DslManager {
             for (i, stmt) in workflow.statements.iter().enumerate() {
                 let stmt_id = format!("stmt:{}:{}", workflow.id, i);
                 let (label, node_type, mut props) = match stmt {
-                    Statement::DeclareEntity { id, entity_type, properties } => {
+                    Statement::DeclareEntity {
+                        id,
+                        entity_type,
+                        properties,
+                    } => {
                         let mut p = std::collections::HashMap::new();
-                        p.insert("entity_type".to_string(), JValue::String(entity_type.clone()));
+                        p.insert(
+                            "entity_type".to_string(),
+                            JValue::String(entity_type.clone()),
+                        );
                         for (k, v) in properties {
                             p.insert(k.clone(), val_to_json(v));
                         }
-                        (format!("DeclareEntity:{}", id), "DeclareEntity".to_string(), p)
+                        (
+                            format!("DeclareEntity:{}", id),
+                            "DeclareEntity".to_string(),
+                            p,
+                        )
                     }
-                    Statement::ObtainDocument { document_type, source, properties } => {
+                    Statement::ObtainDocument {
+                        document_type,
+                        source,
+                        properties,
+                    } => {
                         let mut p = std::collections::HashMap::new();
-                        p.insert("document_type".to_string(), JValue::String(document_type.clone()));
+                        p.insert(
+                            "document_type".to_string(),
+                            JValue::String(document_type.clone()),
+                        );
                         p.insert("source".to_string(), JValue::String(source.clone()));
                         for (k, v) in properties {
                             p.insert(k.clone(), val_to_json(v));
                         }
-                        ("ObtainDocument".to_string(), "ObtainDocument".to_string(), p)
+                        (
+                            "ObtainDocument".to_string(),
+                            "ObtainDocument".to_string(),
+                            p,
+                        )
                     }
-                    Statement::CreateEdge { from, to, edge_type, properties } => {
+                    Statement::CreateEdge {
+                        from,
+                        to,
+                        edge_type,
+                        properties,
+                    } => {
                         let mut p = std::collections::HashMap::new();
                         p.insert("from".to_string(), JValue::String(from.clone()));
                         p.insert("to".to_string(), JValue::String(to.clone()));
-                        p.insert("edge_type".to_string(), JValue::String(edge_type.to_string()));
+                        p.insert(
+                            "edge_type".to_string(),
+                            JValue::String(edge_type.to_string()),
+                        );
                         for (k, v) in properties {
                             p.insert(k.clone(), val_to_json(v));
                         }
                         ("CreateEdge".to_string(), "CreateEdge".to_string(), p)
                     }
-                    Statement::CalculateUbo { entity_id, properties } => {
+                    Statement::CalculateUbo {
+                        entity_id,
+                        properties,
+                    } => {
                         let mut p = std::collections::HashMap::new();
                         p.insert("entity_id".to_string(), JValue::String(entity_id.clone()));
                         for (k, v) in properties {
@@ -1808,36 +1912,64 @@ impl DslManager {
                         let mut p = std::collections::HashMap::new();
                         p.insert("attr_id".to_string(), JValue::String(inner.attr_id.clone()));
                         p.insert("from".to_string(), JValue::String(inner.from.clone()));
-                        p.insert("value_type".to_string(), JValue::String(inner.value_type.clone()));
+                        p.insert(
+                            "value_type".to_string(),
+                            JValue::String(inner.value_type.clone()),
+                        );
                         for (k, v) in &inner.additional_props {
                             p.insert(k.clone(), val_to_json(v));
                         }
-                        ("SolicitAttribute".to_string(), "SolicitAttribute".to_string(), p)
+                        (
+                            "SolicitAttribute".to_string(),
+                            "SolicitAttribute".to_string(),
+                            p,
+                        )
                     }
                     Statement::ResolveConflict(inner) => {
                         let mut p = std::collections::HashMap::new();
                         p.insert("node".to_string(), JValue::String(inner.node.clone()));
-                        p.insert("property".to_string(), JValue::String(inner.property.clone()));
-                        p.insert("strategy".to_string(), JValue::String(match inner.strategy.priorities.len() {
-                            0 => "none".to_string(),
-                            _ => "waterfall".to_string(),
-                        }));
+                        p.insert(
+                            "property".to_string(),
+                            JValue::String(inner.property.clone()),
+                        );
+                        p.insert(
+                            "strategy".to_string(),
+                            JValue::String(match inner.strategy.priorities.len() {
+                                0 => "none".to_string(),
+                                _ => "waterfall".to_string(),
+                            }),
+                        );
                         for (k, v) in &inner.resolution {
                             p.insert(k.clone(), val_to_json(v));
                         }
-                        ("ResolveConflict".to_string(), "ResolveConflict".to_string(), p)
+                        (
+                            "ResolveConflict".to_string(),
+                            "ResolveConflict".to_string(),
+                            p,
+                        )
                     }
                     Statement::GenerateReport(inner) => {
                         let mut p = std::collections::HashMap::new();
                         p.insert("target".to_string(), JValue::String(inner.target.clone()));
                         p.insert("status".to_string(), JValue::String(inner.status.clone()));
-                        ("GenerateReport".to_string(), "GenerateReport".to_string(), p)
+                        (
+                            "GenerateReport".to_string(),
+                            "GenerateReport".to_string(),
+                            p,
+                        )
                     }
                     Statement::ScheduleMonitoring(inner) => {
                         let mut p = std::collections::HashMap::new();
                         p.insert("target".to_string(), JValue::String(inner.target.clone()));
-                        p.insert("frequency".to_string(), JValue::String(inner.frequency.clone()));
-                        ("ScheduleMonitoring".to_string(), "ScheduleMonitoring".to_string(), p)
+                        p.insert(
+                            "frequency".to_string(),
+                            JValue::String(inner.frequency.clone()),
+                        );
+                        (
+                            "ScheduleMonitoring".to_string(),
+                            "ScheduleMonitoring".to_string(),
+                            p,
+                        )
                     }
                     Statement::Parallel(inner) => {
                         let mut p = std::collections::HashMap::new();
@@ -1847,7 +1979,11 @@ impl DslManager {
                     Statement::ParallelObtain(inner) => {
                         let mut p = std::collections::HashMap::new();
                         p.insert("documents".to_string(), JValue::from(inner.documents.len()));
-                        ("ParallelObtain".to_string(), "ParallelObtain".to_string(), p)
+                        (
+                            "ParallelObtain".to_string(),
+                            "ParallelObtain".to_string(),
+                            p,
+                        )
                     }
                     Statement::Sequential(inner) => {
                         let mut p = std::collections::HashMap::new();
@@ -1945,13 +2081,13 @@ impl DslManager {
             sqlx::query_as::<_, DslInstance>(
                 r#"SELECT * FROM "ob-poc".dsl_instances
                    WHERE domain_name = $1
-                   ORDER BY created_at DESC"#
+                   ORDER BY created_at DESC"#,
             )
             .bind(domain)
         } else {
             sqlx::query_as::<_, DslInstance>(
                 r#"SELECT * FROM "ob-poc".dsl_instances
-                   ORDER BY created_at DESC"#
+                   ORDER BY created_at DESC"#,
             )
         };
 
@@ -1963,14 +2099,18 @@ impl DslManager {
 
     /// Delete DSL instance and all its versions (soft delete by status update)
     pub async fn delete_instance(&self, instance_id: Uuid) -> DslResult<()> {
-        let mut tx = self.domain_repository.pool().begin().await
+        let mut tx = self
+            .domain_repository
+            .pool()
+            .begin()
+            .await
             .map_err(|e| DslError::DatabaseError(e.to_string()))?;
 
         // Update instance status to Archived instead of hard delete
         sqlx::query(
             r#"UPDATE "ob-poc".dsl_instances
                SET status = $1, updated_at = $2
-               WHERE instance_id = $3"#
+               WHERE instance_id = $3"#,
         )
         .bind(InstanceStatus::Archived)
         .bind(Utc::now())
@@ -1979,7 +2119,8 @@ impl DslManager {
         .await
         .map_err(|e| DslError::DatabaseError(e.to_string()))?;
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| DslError::DatabaseError(e.to_string()))?;
         Ok(())
     }
@@ -2163,8 +2304,7 @@ impl Default for StylingConfig {
 }
 
 /// Filter configuration for visualizations
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct FilterConfig {
     pub node_types: Option<Vec<String>>,
     pub edge_types: Option<Vec<String>>,

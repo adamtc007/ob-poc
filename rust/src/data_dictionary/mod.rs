@@ -7,6 +7,7 @@
 //! - Data lineage (sources and sinks)
 //! - Validation rules
 
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -16,6 +17,26 @@ pub mod validation;
 
 pub use attribute::*;
 pub use catalogue::*;
+
+/// Service trait for dictionary validation and lookup
+#[async_trait]
+pub trait DictionaryService: Send + Sync {
+    /// Validate DSL attributes against the data dictionary
+    async fn validate_dsl_attributes(&self, dsl: &str) -> Result<(), String>;
+
+    /// Get attribute definition by ID
+    async fn get_attribute(
+        &self,
+        attribute_id: &str,
+    ) -> Result<Option<AttributeDefinition>, String>;
+
+    /// Validate attribute value against its definition
+    async fn validate_attribute_value(
+        &self,
+        attribute_id: &str,
+        value: &serde_json::Value,
+    ) -> Result<(), String>;
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DataDictionary {

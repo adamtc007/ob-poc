@@ -9,15 +9,17 @@ use std::time::Duration;
 use tracing::{info, warn};
 
 pub mod business_request_repository;
-pub mod dsl_domain_repository;
 pub mod cbu_repository;
+pub mod dsl_domain_repository;
+pub mod dsl_instance_repository;
 
 // Re-export repository and trait for convenience
 pub use business_request_repository::{
     DslBusinessRequestRepository, DslBusinessRequestRepositoryTrait,
 };
+pub use cbu_repository::CbuRepository;
 pub use dsl_domain_repository::{DslDomainRepository, DslDomainRepositoryTrait};
-pub use cbu_repository::{CbuRepository};
+pub use dsl_instance_repository::{DslInstanceRepository, PgDslInstanceRepository};
 
 /// Database configuration
 #[derive(Debug, Clone)]
@@ -97,6 +99,11 @@ impl DatabaseManager {
     /// Create a new DSL domain repository using this database connection
     pub fn dsl_repository(&self) -> DslDomainRepository {
         DslDomainRepository::new(self.pool.clone())
+    }
+
+    /// Create a new DSL instance repository using this database connection
+    pub fn dsl_instance_repository(&self) -> PgDslInstanceRepository {
+        PgDslInstanceRepository::new(self.pool.clone())
     }
 
     /// Create a new DSL business request repository using this database connection

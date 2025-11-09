@@ -1,0 +1,283 @@
+syntax = "proto3";
+
+package ob_poc.dsl_transform;
+
+import "dsl_types.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/ob-poc/proto/dsl_transform";
+
+// DSL Transform Service handles all state changes and edits to DSL instances
+// This service is responsible for maintaining the immutable state chain
+service DSLTransformService {
+  // Instance management
+  rpc CreateDslInstance(CreateDslInstanceRequest) returns (DslInstanceResponse);
+  rpc UpdateInstanceStatus(UpdateInstanceStatusRequest) returns (DslInstanceResponse);
+  rpc UpdateInstanceMetadata(UpdateInstanceMetadataRequest) returns (DslInstanceResponse);
+  rpc DeleteDslInstance(DeleteDslInstanceRequest) returns (DeleteDslInstanceResponse);
+
+  // Version and state changes
+  rpc CreateVersion(CreateVersionRequest) returns (DslVersionResponse);
+  rpc EditDslContent(EditDslContentRequest) returns (DslVersionResponse);
+  rpc ApplyTemplateToInstance(ApplyTemplateRequest) returns (DslVersionResponse);
+
+  // Template management
+  rpc CreateDslTemplate(CreateDslTemplateRequest) returns (DslTemplateResponse);
+  rpc UpdateDslTemplate(UpdateDslTemplateRequest) returns (DslTemplateResponse);
+
+  // Compilation and AST generation
+  rpc CompileDslVersion(CompileDslVersionRequest) returns (CompilationResponse);
+
+  // Business references
+  rpc LinkBusinessReference(LinkBusinessReferenceRequest) returns (BusinessReferenceResponse);
+
+  // Domain-specific operations
+  rpc CreateOnboardingCase(CreateOnboardingCaseRequest) returns (OnboardingCaseResponse);
+  rpc CreateKycCase(CreateKycCaseRequest) returns (KycCaseResponse);
+  rpc AssociateCbu(AssociateCbuRequest) returns (AssociateCbuResponse);
+  rpc AddProducts(AddProductsRequest) returns (DslVersionResponse);
+  rpc DiscoverServices(DiscoverServicesRequest) returns (DslVersionResponse);
+  rpc DiscoverResources(DiscoverResourcesRequest) returns (DslVersionResponse);
+}
+
+// Instance requests/responses
+message CreateDslInstanceRequest {
+  string domain_name = 1;
+  string business_reference = 2;
+  google.protobuf.Struct metadata = 3;
+}
+
+message DslInstanceResponse {
+  string instance_id = 1;
+  string domain_name = 2;
+  string business_reference = 3;
+  int32 current_version = 4;
+  InstanceStatus status = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  google.protobuf.Struct metadata = 8;
+}
+
+enum InstanceStatus {
+  INSTANCE_STATUS_UNSPECIFIED = 0;
+  INSTANCE_STATUS_CREATED = 1;
+  INSTANCE_STATUS_EDITING = 2;
+  INSTANCE_STATUS_COMPILED = 3;
+  INSTANCE_STATUS_FINALIZED = 4;
+  INSTANCE_STATUS_ARCHIVED = 5;
+  INSTANCE_STATUS_FAILED = 6;
+}
+
+message UpdateInstanceStatusRequest {
+  string instance_id = 1;
+  InstanceStatus status = 2;
+}
+
+message UpdateInstanceMetadataRequest {
+  string instance_id = 1;
+  google.protobuf.Struct metadata = 2;
+}
+
+message DeleteDslInstanceRequest {
+  string instance_id = 1;
+}
+
+message DeleteDslInstanceResponse {
+  bool success = 1;
+}
+
+// Version and DSL content operations
+message CreateVersionRequest {
+  string instance_id = 1;
+  string dsl_content = 2;
+  OperationType operation_type = 3;
+  string created_by = 4;
+  string change_description = 5;
+}
+
+enum OperationType {
+  OPERATION_TYPE_UNSPECIFIED = 0;
+  OPERATION_TYPE_CREATE_FROM_TEMPLATE = 1;
+  OPERATION_TYPE_INCREMENTAL_EDIT = 2;
+  OPERATION_TYPE_TEMPLATE_ADDITION = 3;
+  OPERATION_TYPE_MANUAL_EDIT = 4;
+  OPERATION_TYPE_RECOMPILATION = 5;
+}
+
+message DslVersionResponse {
+  string version_id = 1;
+  string instance_id = 2;
+  int32 version_number = 3;
+  string dsl_content = 4;
+  OperationType operation_type = 5;
+  CompilationStatus compilation_status = 6;
+  google.protobuf.Struct ast_json = 7;
+  google.protobuf.Timestamp created_at = 8;
+  string created_by = 9;
+  string change_description = 10;
+}
+
+enum CompilationStatus {
+  COMPILATION_STATUS_UNSPECIFIED = 0;
+  COMPILATION_STATUS_PENDING = 1;
+  COMPILATION_STATUS_SUCCESS = 2;
+  COMPILATION_STATUS_ERROR = 3;
+}
+
+message EditDslContentRequest {
+  string instance_id = 1;
+  EditType edit_type = 2;
+  string dsl_content = 3;
+  string created_by = 4;
+  string change_description = 5;
+}
+
+enum EditType {
+  EDIT_TYPE_UNSPECIFIED = 0;
+  EDIT_TYPE_APPEND = 1;      // Add to the end of the DSL
+  EDIT_TYPE_REPLACE = 2;     // Replace entire DSL content
+  EDIT_TYPE_INSERT = 3;      // Insert at a specific position
+  EDIT_TYPE_DELETE = 4;      // Delete a specific section
+}
+
+message ApplyTemplateRequest {
+  string instance_id = 1;
+  string template_name = 2;
+  google.protobuf.Struct variables = 3;
+  string created_by = 4;
+  string change_description = 5;
+}
+
+// Template operations
+message CreateDslTemplateRequest {
+  string template_name = 1;
+  string domain_name = 2;
+  string template_type = 3;
+  string content = 4;
+  google.protobuf.Struct variables = 5;
+  google.protobuf.Struct requirements = 6;
+  google.protobuf.Struct metadata = 7;
+}
+
+message UpdateDslTemplateRequest {
+  string template_id = 1;
+  string content = 2;
+  google.protobuf.Struct variables = 3;
+  google.protobuf.Struct requirements = 4;
+  google.protobuf.Struct metadata = 5;
+}
+
+message DslTemplateResponse {
+  string template_id = 1;
+  string template_name = 2;
+  string domain_name = 3;
+  string template_type = 4;
+  string content = 5;
+  google.protobuf.Struct variables = 6;
+  google.protobuf.Struct requirements = 7;
+  google.protobuf.Struct metadata = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+// Compilation operations
+message CompileDslVersionRequest {
+  string version_id = 1;
+  bool store_ast_nodes = 2;  // Whether to store AST nodes in database for querying
+}
+
+message CompilationResponse {
+  string version_id = 1;
+  CompilationStatus status = 2;
+  google.protobuf.Struct ast_json = 3;
+  optional CompilationLog log = 4;
+}
+
+message CompilationLog {
+  string log_id = 1;
+  google.protobuf.Timestamp compilation_start = 2;
+  google.protobuf.Timestamp compilation_end = 3;
+  bool success = 4;
+  string error_message = 5;
+  google.protobuf.Struct error_location = 6;
+  int32 node_count = 7;
+  double complexity_score = 8;
+  google.protobuf.Struct performance_metrics = 9;
+}
+
+// Business reference operations
+message LinkBusinessReferenceRequest {
+  string instance_id = 1;
+  string reference_type = 2;
+  string reference_id_value = 3;
+}
+
+message BusinessReferenceResponse {
+  string reference_id = 1;
+  string instance_id = 2;
+  string reference_type = 3;
+  string reference_id_value = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+// Domain-specific operations
+message CreateOnboardingCaseRequest {
+  string cbu_id = 1;
+  string nature_purpose = 2;
+  string entity_type = 3;
+  repeated string initial_products = 4;
+  google.protobuf.Struct custom_metadata = 5;
+  string created_by = 6;
+}
+
+message OnboardingCaseResponse {
+  string ob_request_id = 1;
+  DslInstanceResponse ob_instance = 2;
+  DslVersionResponse initial_version = 3;
+  string cbu_id = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message CreateKycCaseRequest {
+  string cbu_id = 1;
+  string target_entity = 2;
+  string jurisdiction = 3;
+  double ubo_threshold = 4;
+  string created_by = 5;
+}
+
+message KycCaseResponse {
+  DslInstanceResponse kyc_instance = 1;
+  DslInstanceResponse ubo_sub_instance = 2;
+  string cbu_id = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+message AssociateCbuRequest {
+  string instance_id = 1;
+  string cbu_id = 2;
+}
+
+message AssociateCbuResponse {
+  bool success = 1;
+  DslVersionResponse updated_version = 2;
+}
+
+message AddProductsRequest {
+  string instance_id = 1;
+  repeated string products = 2;
+  string created_by = 3;
+}
+
+message DiscoverServicesRequest {
+  string instance_id = 1;
+  repeated string product_ids = 2;
+  string created_by = 3;
+}
+
+message DiscoverResourcesRequest {
+  string instance_id = 1;
+  repeated string service_ids = 2;
+  string created_by = 3;
+}

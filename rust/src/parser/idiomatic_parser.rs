@@ -356,7 +356,7 @@ mod tests {
         // Test float
         assert_eq!(
             parse_number_value("3.14159265").unwrap(),
-            ("", Value::Number(std::f64::consts::PI))
+            ("", Value::Number(3.14159265))
         );
 
         // Test negative

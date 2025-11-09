@@ -1,0 +1,412 @@
+syntax = "proto3";
+
+package ob_poc.dsl_retrieval;
+
+import "dsl_types.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/ob-poc/proto/dsl_retrieval";
+
+// DSL Retrieval Service is responsible for retrieving DSL instances, versions,
+// and AST data from the database for visualization in the Web UI.
+// This service is read-only and does not modify any state.
+service DSLRetrievalService {
+  // Instance retrieval
+  rpc GetDslInstance(GetDslInstanceRequest) returns (DslInstanceResponse);
+  rpc GetInstanceByReference(GetInstanceByReferenceRequest) returns (DslInstanceResponse);
+  rpc ListDslInstances(ListDslInstancesRequest) returns (ListDslInstancesResponse);
+
+  // Version retrieval
+  rpc GetDslVersion(GetDslVersionRequest) returns (DslVersionResponse);
+  rpc GetLatestVersion(GetLatestVersionRequest) returns (DslVersionResponse);
+  rpc ListVersions(ListVersionsRequest) returns (ListVersionsResponse);
+
+  // AST retrieval
+  rpc GetAstTree(GetAstTreeRequest) returns (AstTreeResponse);
+  rpc GetAstNodeDetails(GetAstNodeDetailsRequest) returns (AstNodeDetailsResponse);
+  rpc FindAstNodesByType(FindAstNodesByTypeRequest) returns (FindAstNodesResponse);
+  rpc FindAstNodesByPath(FindAstNodesByPathRequest) returns (FindAstNodesResponse);
+
+  // Template retrieval
+  rpc GetDslTemplate(GetDslTemplateRequest) returns (DslTemplateResponse);
+  rpc ListDslTemplates(ListDslTemplatesRequest) returns (ListDslTemplatesResponse);
+
+  // Business reference retrieval
+  rpc GetInstancesByBusinessReference(GetInstancesByBusinessReferenceRequest) returns (ListDslInstancesResponse);
+
+  // DSL domain retrieval
+  rpc GetDslByDomainKey(GetDslByDomainKeyRequest) returns (DslByDomainKeyResponse);
+
+  // Visualization
+  rpc GenerateAstVisualization(GenerateAstVisualizationRequest) returns (AstVisualizationResponse);
+  rpc GenerateDomainVisualization(GenerateDomainVisualizationRequest) returns (DomainVisualizationResponse);
+}
+
+// Instance requests/responses
+message GetDslInstanceRequest {
+  string instance_id = 1;
+}
+
+message DslInstanceResponse {
+  string instance_id = 1;
+  string domain_name = 2;
+  string business_reference = 3;
+  int32 current_version = 4;
+  InstanceStatus status = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  google.protobuf.Struct metadata = 8;
+}
+
+enum InstanceStatus {
+  INSTANCE_STATUS_UNSPECIFIED = 0;
+  INSTANCE_STATUS_CREATED = 1;
+  INSTANCE_STATUS_EDITING = 2;
+  INSTANCE_STATUS_COMPILED = 3;
+  INSTANCE_STATUS_FINALIZED = 4;
+  INSTANCE_STATUS_ARCHIVED = 5;
+  INSTANCE_STATUS_FAILED = 6;
+}
+
+message GetInstanceByReferenceRequest {
+  string domain_name = 1;
+  string business_reference = 2;
+}
+
+message ListDslInstancesRequest {
+  optional string domain_name = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+
+message ListDslInstancesResponse {
+  repeated DslInstanceResponse instances = 1;
+  int32 total_count = 2;
+}
+
+// Version requests/responses
+message GetDslVersionRequest {
+  string version_id = 1;
+}
+
+message GetLatestVersionRequest {
+  string instance_id = 1;
+}
+
+message ListVersionsRequest {
+  string instance_id = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+
+message ListVersionsResponse {
+  repeated DslVersionResponse versions = 1;
+  int32 total_count = 2;
+}
+
+message DslVersionResponse {
+  string version_id = 1;
+  string instance_id = 2;
+  int32 version_number = 3;
+  string dsl_content = 4;
+  OperationType operation_type = 5;
+  CompilationStatus compilation_status = 6;
+  google.protobuf.Struct ast_json = 7;
+  google.protobuf.Timestamp created_at = 8;
+  string created_by = 9;
+  string change_description = 10;
+}
+
+enum OperationType {
+  OPERATION_TYPE_UNSPECIFIED = 0;
+  OPERATION_TYPE_CREATE_FROM_TEMPLATE = 1;
+  OPERATION_TYPE_INCREMENTAL_EDIT = 2;
+  OPERATION_TYPE_TEMPLATE_ADDITION = 3;
+  OPERATION_TYPE_MANUAL_EDIT = 4;
+  OPERATION_TYPE_RECOMPILATION = 5;
+}
+
+enum CompilationStatus {
+  COMPILATION_STATUS_UNSPECIFIED = 0;
+  COMPILATION_STATUS_PENDING = 1;
+  COMPILATION_STATUS_SUCCESS = 2;
+  COMPILATION_STATUS_ERROR = 3;
+}
+
+// AST requests/responses
+message GetAstTreeRequest {
+  string version_id = 1;
+}
+
+message AstTreeResponse {
+  string version_id = 1;
+  AstNode root_node = 2;
+  int32 node_count = 3;
+  int32 max_depth = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message AstNode {
+  string node_id = 1;
+  string parent_node_id = 2;
+  NodeType node_type = 3;
+  string node_key = 4;
+  google.protobuf.Value node_value = 5;
+  int32 position_index = 6;
+  int32 depth = 7;
+  string path = 8;
+  repeated AstNode children = 9;
+}
+
+enum NodeType {
+  NODE_TYPE_UNSPECIFIED = 0;
+  NODE_TYPE_VERB = 1;
+  NODE_TYPE_ATTRIBUTE = 2;
+  NODE_TYPE_LIST = 3;
+  NODE_TYPE_MAP = 4;
+  NODE_TYPE_VALUE = 5;
+  NODE_TYPE_ROOT = 6;
+  NODE_TYPE_COMMENT = 7;
+  NODE_TYPE_PLACEHOLDER = 8;
+  NODE_TYPE_REFERENCE = 9;
+  NODE_TYPE_SPECIAL = 10;
+}
+
+message GetAstNodeDetailsRequest {
+  string node_id = 1;
+}
+
+message AstNodeDetailsResponse {
+  AstNode node = 1;
+  repeated AstNode children = 2;
+  AstNode parent = 3;
+  repeated AstNode siblings = 4;
+  repeated string related_business_concepts = 5;
+  DictionaryReference dictionary_ref = 6;
+}
+
+message DictionaryReference {
+  string attribute_id = 1;
+  string name = 2;
+  string long_description = 3;
+  string group_id = 4;
+  google.protobuf.Struct metadata = 5;
+}
+
+message FindAstNodesByTypeRequest {
+  string version_id = 1;
+  NodeType node_type = 2;
+}
+
+message FindAstNodesByPathRequest {
+  string version_id = 1;
+  string path_pattern = 2;
+}
+
+message FindAstNodesResponse {
+  repeated AstNode nodes = 1;
+  int32 total_count = 2;
+}
+
+// Template requests/responses
+message GetDslTemplateRequest {
+  oneof identifier {
+    string template_id = 1;
+    string template_name = 2;
+  }
+}
+
+message ListDslTemplatesRequest {
+  optional string domain_name = 1;
+  optional string template_type = 2;
+}
+
+message ListDslTemplatesResponse {
+  repeated DslTemplateResponse templates = 1;
+}
+
+message DslTemplateResponse {
+  string template_id = 1;
+  string template_name = 2;
+  string domain_name = 3;
+  string template_type = 4;
+  string content = 5;
+  google.protobuf.Struct variables = 6;
+  google.protobuf.Struct requirements = 7;
+  google.protobuf.Struct metadata = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+// Business reference requests/responses
+message GetInstancesByBusinessReferenceRequest {
+  string reference_type = 1;
+  string reference_id_value = 2;
+}
+
+// Domain-specific retrieval
+message GetDslByDomainKeyRequest {
+  string domain = 1;           // e.g., "kyc", "onboarding", "ubo"
+  string key_type = 2;         // e.g., "cbu_id", "entity_id", "case_id"
+  string key_value = 3;
+  bool include_history = 4;    // Whether to include version history
+}
+
+message DslByDomainKeyResponse {
+  repeated DslInstanceResponse instances = 1;
+  DslVersionResponse latest_version = 2;
+  repeated DslVersionResponse version_history = 3;
+  BusinessContextData business_context = 4;
+}
+
+message BusinessContextData {
+  string entity_type = 1;
+  string entity_name = 2;
+  string jurisdiction = 3;
+  repeated string products = 4;
+  repeated string services = 5;
+  google.protobuf.Struct additional_data = 6;
+}
+
+// Visualization requests/responses
+message GenerateAstVisualizationRequest {
+  string version_id = 1;
+  VisualizationOptions options = 2;
+}
+
+message VisualizationOptions {
+  LayoutType layout = 1;
+  StylingConfig styling = 2;
+  bool include_compilation_info = 3;
+  bool include_domain_context = 4;
+  FilterConfig filters = 5;
+}
+
+enum LayoutType {
+  LAYOUT_TYPE_UNSPECIFIED = 0;
+  LAYOUT_TYPE_TREE = 1;
+  LAYOUT_TYPE_GRAPH = 2;
+  LAYOUT_TYPE_HIERARCHICAL = 3;
+}
+
+message StylingConfig {
+  string theme = 1;
+  int32 node_size = 2;
+  int32 font_size = 3;
+  string color_scheme = 4;
+}
+
+message FilterConfig {
+  repeated NodeType node_types = 1;
+  repeated string edge_types = 2;
+  int32 max_depth = 3;
+  bool hide_empty_nodes = 4;
+}
+
+message AstVisualizationResponse {
+  VisualizationMetadata metadata = 1;
+  VisualNode root_node = 2;
+  repeated VisualNode nodes = 3;
+  repeated VisualEdge edges = 4;
+  VisualizationStatistics statistics = 5;
+}
+
+message VisualizationMetadata {
+  google.protobuf.Timestamp generated_at = 1;
+  string parser_version = 2;
+  string grammar_version = 3;
+  int32 node_count = 4;
+  int32 edge_count = 5;
+  string instance_id = 6;
+  string version_id = 7;
+}
+
+message VisualNode {
+  string id = 1;
+  string label = 2;
+  string node_type = 3;
+  google.protobuf.Struct properties = 4;
+  NodePosition position = 5;
+  NodeStyling styling = 6;
+  google.protobuf.Struct domain_annotations = 7;
+  int32 priority_level = 8;
+  string functional_relevance = 9;
+}
+
+message VisualEdge {
+  string id = 1;
+  string from = 2;
+  string to = 3;
+  string edge_type = 4;
+  string label = 5;
+  EdgeStyling styling = 6;
+  int32 weight = 7;
+}
+
+message NodePosition {
+  double x = 1;
+  double y = 2;
+  double z = 3;
+}
+
+message NodeStyling {
+  string color = 1;
+  string border_color = 2;
+  int32 border_width = 3;
+  string shape = 4;
+  int32 size = 5;
+}
+
+message EdgeStyling {
+  string color = 1;
+  int32 width = 2;
+  string style = 3;
+  string arrow_type = 4;
+}
+
+message VisualizationStatistics {
+  int32 total_nodes = 1;
+  int32 total_edges = 2;
+  int32 max_depth = 3;
+  double complexity_score = 4;
+  int32 compilation_time_ms = 5;
+  int32 visualization_time_ms = 6;
+}
+
+message GenerateDomainVisualizationRequest {
+  string instance_id = 1;
+  DomainVisualizationOptions options = 2;
+}
+
+message DomainVisualizationOptions {
+  VisualizationOptions base_options = 1;
+  bool highlight_current_state = 2;
+  bool show_state_transitions = 3;
+  bool include_domain_metrics = 4;
+  bool show_workflow_progression = 5;
+  bool emphasize_critical_paths = 6;
+  google.protobuf.Struct domain_specific_styling = 7;
+}
+
+message DomainVisualizationResponse {
+  AstVisualizationResponse base_visualization = 1;
+  google.protobuf.Struct domain_context = 2;
+  repeated string highlighted_nodes = 3;
+  WorkflowProgression workflow_progression = 4;
+  repeated CriticalPath critical_paths = 5;
+}
+
+message WorkflowProgression {
+  string current_stage = 1;
+  repeated string completed_stages = 2;
+  repeated string remaining_stages = 3;
+  double progression_percentage = 4;
+}
+
+message CriticalPath {
+  string path_id = 1;
+  repeated string nodes = 2;
+  int32 estimated_duration = 3;
+  string risk_level = 4;
+}

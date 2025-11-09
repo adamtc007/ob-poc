@@ -62,16 +62,25 @@ pub mod grammar;
 pub mod parser;
 pub mod vocabulary;
 
-// Database and models for domain architecture
-pub mod database;
-pub mod models;
+// Database and models for domain architecture - temporarily disabled for Phase 1
+// pub mod database;
+// pub mod models;
 
-// DSL Manager - core create/edit functionality
-pub mod dsl_manager;
+// DSL Manager - core create/edit functionality - temporarily disabled for Phase 1
+// pub mod dsl_manager;
 
-// New modules for gRPC server
-// pub mod dsl_persistence; // Moved into dsl_manager.rs for consolidation
-// pub mod grpc_server; // Commented out - needs proto files setup
+// Central DSL system with domain context switching
+pub mod dsl;
+
+// Domain implementations for centralized DSL editing
+pub mod domains;
+
+// New modules for gRPC server and services - temporarily disabled for Phase 1
+// pub mod grpc_server;
+// pub mod services;
+
+// Generated protobuf modules - temporarily disabled for Phase 1
+// pub mod proto;
 
 // Domain-specific visualization features (Phase 3) removed during consolidation
 
@@ -91,20 +100,45 @@ pub use parser::{
     parse_workflow_standalone as parse_workflow, validate_ast,
 };
 
-// Re-export consolidated DSL manager (main interface)
-pub use dsl_manager::{
-    ASTVisualization, CbuInfo, DomainVisualizationOptions, DslError as DslManagerError,
-    DslInstance, DslInstanceVersion, DslManager, DslResult, DslStorageKeys, DslTemplate,
-    InstanceStatus, KycCaseCreationResult, OnboardingRequestCreationResult,
-    OnboardingSessionRecord, OperationType, TemplateType, VisualEdge, VisualNode,
-    VisualizationOptions, VisualizationStatistics,
+// Re-export consolidated DSL manager (main interface) - temporarily disabled for Phase 1
+// pub use dsl_manager::{
+//     ASTVisualization, CbuInfo, DomainVisualizationOptions, DslError as DslManagerError,
+//     DslInstance, DslInstanceVersion, DslManager, DslResult, DslStorageKeys, DslTemplate,
+//     InstanceStatus, KycCaseCreationResult, OnboardingRequestCreationResult,
+//     OnboardingSessionRecord, OperationType, TemplateType, VisualEdge, VisualNode,
+//     VisualizationOptions, VisualizationStatistics,
+// };
+
+// Re-export central DSL system components
+pub use dsl::{
+    central_editor::{CentralDslEditor, EditorConfig, EditorStats},
+    domain_context::{DomainContext, OperationMetadata, OperationPriority, StateRequirements},
+    domain_registry::{DomainHandler, DomainRegistry, DslVocabulary, StateTransition},
+    operations::{DslOperation, OperationBuilder},
+    DslEditError, DslEditResult,
 };
 
-// Re-export database and models
-pub use database::{DatabaseConfig, DatabaseManager, DslDomainRepository};
-pub use models::{
-    CompilationStatus, DslDomain, DslVersion, ExecutionPhase, ExecutionStatus, ParsedAst,
+// Re-export domain implementations
+pub use domains::{
+    available_domains, register_all_domains, KycDomainHandler, OnboardingDomainHandler,
+    UboDomainHandler,
 };
+
+// Re-export gRPC server components - temporarily disabled for Phase 1
+// pub use grpc_server::{
+//     start_grpc_services, start_retrieval_service, start_transform_service, GrpcServerConfig,
+//     GrpcServerManager,
+// };
+// pub use services::{DslRetrievalServiceImpl, DslTransformServiceImpl};
+
+// Re-export database and models - temporarily disabled for Phase 1
+// pub use database::{
+//     DatabaseConfig, DatabaseManager, DslDomainRepository, DslInstanceRepository,
+//     PgDslInstanceRepository,
+// };
+// pub use models::{
+//     CompilationStatus, DslDomain, DslVersion, ExecutionPhase, ExecutionStatus, ParsedAst,
+// };
 
 // Legacy managers removed; consolidated manager is the single entry point
 

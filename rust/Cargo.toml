@@ -4,6 +4,17 @@ version = "0.1.0"
 edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+# Temporarily disable binaries for Phase 1 focus on core DSL editing
+[[bin]]
+name = "cli"
+path = "src/bin/cli.rs"
+required-features = ["binaries"]
+
+[[bin]]
+name = "ast_viz"
+path = "src/bin/ast_viz.rs"
+required-features = ["binaries"]
+
 [dependencies]
 # Core libraries
 anyhow = "1.0"
@@ -25,8 +36,8 @@ nom = "7.1"
 pest = "2.7" # For EBNF grammar parsing
 pest_derive = "2.7"
 
-# Database integration
-sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "macros"] }
+# Database integration (optional for Phase 1)
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "macros"], optional = true }
 
 # gRPC and Protobuf
 tonic = { version = "0.14", features = ["codegen", "transport"] }
@@ -38,7 +49,7 @@ prost-derive = "0.12"
 tokio = { version = "1", features = ["full"] }
 
 # CLI argument parsing
-clap = { version = "4.4", features = ["derive"] }
+clap = { version = "4.4", features = ["derive"], optional = true }
 
 # Serialization/Deserialization
 # serde is already included above
@@ -58,6 +69,12 @@ wiremock = "0.5"
 [build-dependencies]
 tonic-build = "0.14" # For generating Rust code from .proto files
 prost-build = "0.12" # For generating Rust code from .proto files
+
+# Features for conditional compilation
+[features]
+default = []
+binaries = ["dep:clap"]  # Only enable binaries when this feature is active
+database = ["dep:sqlx"]  # Only enable database functionality when needed
 
 # Optional: Workspace configuration if you have multiple crates
 # [workspace]
