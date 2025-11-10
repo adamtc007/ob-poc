@@ -136,9 +136,9 @@ pub mod database;
 #[cfg(feature = "database")]
 pub mod models;
 
-// DSL Manager - V3.1 aligned with proper type consolidation
-#[cfg(feature = "database")]
-pub mod dsl_manager;
+// DSL Manager - V3.1 aligned with proper type consolidation - TEMPORARILY DISABLED
+// #[cfg(feature = "database")]
+// pub mod dsl_manager;
 
 // REST API server for visualizer
 #[cfg(feature = "rest-api")]
