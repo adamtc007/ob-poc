@@ -72,6 +72,7 @@ pub enum DomainError {
 pub mod common {
     use super::*;
     use crate::dsl::domain_context::DomainContext;
+    use crate::{Key, Literal, Value}; // Import new AST types
     use chrono::Utc;
     use std::collections::HashMap;
     use uuid::Uuid;
@@ -81,7 +82,7 @@ pub mod common {
         Utc::now().to_rfc3339()
     }
 
-    /// Generate a unique operation ID
+    /// Generate unique operation ID
     pub fn generate_operation_id() -> String {
         Uuid::new_v4().to_string()
     }
@@ -96,61 +97,117 @@ pub mod common {
         context.get_context::<String>("entity_id")
     }
 
-    /// Create a standard DSL fragment wrapper
-    pub fn wrap_dsl_fragment(
-        verb: &str,
-        attributes: &HashMap<String, serde_json::Value>,
-    ) -> String {
-        let mut parts = vec![format!("({}.", verb)];
+    /// Create a verb form fragment from verb name and key-value attributes
+    pub fn create_verb_form_fragment(verb: &str, attributes: &HashMap<Key, Value>) -> String {
+        let mut parts = vec![verb.to_string()];
 
         for (key, value) in attributes {
-            let formatted_value = match value {
-                serde_json::Value::String(s) => format!("\"{}\"", s),
-                serde_json::Value::Number(n) => n.to_string(),
-                serde_json::Value::Bool(b) => b.to_string(),
-                _ => format!("\"{}\"", value),
-            };
-            parts.push(format!("{} {}", key, formatted_value));
+            let key_str = format!(":{}", key.as_str());
+            let value_str = format_value_to_dsl(value);
+            parts.push(format!("{} {}", key_str, value_str));
         }
 
-        parts.push(")".to_string());
-        parts.join(" ")
+        format!("({})", parts.join(" "))
     }
 
-    /// Validate required context keys are present
+    /// Validate that required context keys are present
     pub fn validate_required_context(
         context: &DomainContext,
         required_keys: &[&str],
-    ) -> Result<(), DomainError> {
+    ) -> Result<(), String> {
         for key in required_keys {
-            if !context.business_context.contains_key(*key) {
-                return Err(DomainError::MissingRequiredContext {
-                    domain: context.domain_name.clone(),
-                    context_key: key.to_string(),
-                });
+            if context.get_context::<String>(key).is_none() {
+                return Err(format!("Missing required context key: {}", key));
             }
         }
         Ok(())
     }
 
-    /// Standard state transition validation
+    /// Validate state transition is allowed
     pub fn validate_state_transition(
-        domain_name: &str,
+        domain: &str,
         allowed_transitions: &[(String, String)],
         from: &str,
         to: &str,
-    ) -> Result<(), DomainError> {
+    ) -> Result<(), String> {
         let transition = (from.to_string(), to.to_string());
+        if allowed_transitions.contains(&transition) {
+            Ok(())
+        } else {
+            Err(format!(
+                "Invalid state transition in {}: {} -> {}",
+                domain, from, to
+            ))
+        }
+    }
 
-        if !allowed_transitions.contains(&transition) {
-            return Err(DomainError::InvalidStateTransition {
-                domain: domain_name.to_string(),
-                from: from.to_string(),
-                to: to.to_string(),
-            });
+    /// Extract a value from DSL text using simple pattern matching
+    pub fn extract_value_from_dsl(dsl: &str, key: &str) -> Option<String> {
+        let patterns = [
+            format!("(:{} \"", key),
+            format!("({} \"", key),
+            format!(" :{} \"", key),
+            format!(" {} \"", key),
+        ];
+
+        for pattern in &patterns {
+            if let Some(start) = dsl.find(pattern) {
+                let value_start = start + pattern.len();
+                if let Some(end) = dsl[value_start..].find('"') {
+                    return Some(dsl[value_start..value_start + end].to_string());
+                }
+            }
+        }
+        None
+    }
+
+    /// Legacy wrapper function for compatibility
+    pub fn wrap_dsl_fragment(
+        verb: &str,
+        attrs: &std::collections::HashMap<String, serde_json::Value>,
+    ) -> String {
+        let mut attributes = HashMap::new();
+
+        for (key, value) in attrs {
+            let dsl_key = Key::new(key);
+            let dsl_value = match value {
+                serde_json::Value::String(s) => Value::Literal(Literal::String(s.clone())),
+                serde_json::Value::Number(n) => {
+                    Value::Literal(Literal::Number(n.as_f64().unwrap_or(0.0)))
+                }
+                serde_json::Value::Bool(b) => Value::Literal(Literal::Boolean(*b)),
+                _ => Value::Literal(Literal::String(value.to_string())),
+            };
+            attributes.insert(dsl_key, dsl_value);
         }
 
-        Ok(())
+        create_verb_form_fragment(verb, &attributes)
+    }
+
+    /// Helper to format a Value into its DSL string representation
+    fn format_value_to_dsl(value: &Value) -> String {
+        match value {
+            Value::Literal(literal) => match literal {
+                Literal::String(s) => format!("\"{}\"", s),
+                Literal::Number(n) => n.to_string(),
+                Literal::Boolean(b) => b.to_string(),
+                Literal::Date(s) => format!("\"{}\"", s), // Dates are strings
+                Literal::Uuid(s) => format!("\"{}\"", s), // UUIDs are strings
+            },
+            Value::Identifier(s) => s.clone(), // Identifiers are not quoted
+            Value::List(items) => {
+                let formatted_items: Vec<String> = items.iter().map(format_value_to_dsl).collect();
+                format!("[{}]", formatted_items.join(", "))
+            }
+            Value::Map(map) => {
+                let formatted_pairs: Vec<String> = map
+                    .iter()
+                    .map(|(key, val)| format!(":{} {}", key.as_str(), format_value_to_dsl(val)))
+                    .collect();
+                format!("{{{}}}", formatted_pairs.join(", "))
+            }
+            Value::AttrRef(uuid_str) => format!("@attr{{{}}}", uuid_str),
+        }
     }
 }
 
@@ -216,9 +273,9 @@ mod tests {
         attrs.insert("status".to_string(), json!("active"));
 
         let fragment = common::wrap_dsl_fragment("create", &attrs);
-        assert!(fragment.starts_with("(create."));
-        assert!(fragment.contains("name \"Test Corp\""));
-        assert!(fragment.contains("status \"active\""));
+        assert!(fragment.starts_with("(create"));
+        assert!(fragment.contains(":name \"Test Corp\""));
+        assert!(fragment.contains(":status \"active\""));
         assert!(fragment.ends_with(')'));
     }
 

@@ -22,7 +22,6 @@ use crate::{
         domain_context::DomainContext, domain_registry::DomainRegistry, operations::DslOperation,
         DslEditError, DslEditResult,
     },
-    grammar::GrammarEngine,
     parser::parse_program,
 };
 use async_trait::async_trait;
@@ -37,14 +36,8 @@ pub struct CentralDslEditor {
     /// Domain registry for handler lookup and routing
     domain_registry: Arc<DomainRegistry>,
 
-    /// Grammar validation engine (ONE EBNF principle)
-    grammar_engine: Arc<GrammarEngine>,
-
     /// Dictionary service for attribute validation (ONE dictionary principle)
     dictionary_service: Arc<dyn DictionaryService>,
-
-    /// Database repository for DSL storage
-    domain_repository: Arc<dyn DomainRepository>,
 
     /// Editor configuration
     config: EditorConfig,
@@ -54,16 +47,12 @@ impl CentralDslEditor {
     /// Create a new central DSL editor
     pub fn new(
         domain_registry: Arc<DomainRegistry>,
-        grammar_engine: Arc<GrammarEngine>,
         dictionary_service: Arc<dyn DictionaryService>,
-        domain_repository: Arc<dyn DomainRepository>,
         config: EditorConfig,
     ) -> Self {
         Self {
             domain_registry,
-            grammar_engine,
             dictionary_service,
-            domain_repository,
             config,
         }
     }
@@ -316,11 +305,6 @@ impl CentralDslEditor {
         Ok(())
     }
 
-    /// Get operation description for logging
-    fn get_operation_description(&self, operation: &DslOperation) -> String {
-        operation.description()
-    }
-
     /// Get editor statistics and health information
     pub async fn get_editor_stats(&self) -> EditorStats {
         let domain_health = self.domain_registry.health_check_all().await;
@@ -424,6 +408,7 @@ mod tests {
     use std::collections::HashMap;
 
     // Mock implementations for testing
+    #[allow(dead_code)]
     struct MockDomainRepository;
 
     #[async_trait]
@@ -448,11 +433,13 @@ mod tests {
         }
     }
 
+    #[allow(dead_code)]
     struct MockGrammarEngine {
         supported_operations: Vec<String>,
     }
 
     impl MockGrammarEngine {
+        #[allow(dead_code)]
         fn new() -> Self {
             Self {
                 supported_operations: vec!["Create Company entity".to_string()],
@@ -495,13 +482,10 @@ mod tests {
             // Generate valid DSL that will parse correctly
             match operation {
                 DslOperation::CreateEntity { entity_type, .. } => Ok(format!(
-                    "(workflow \"test-workflow\" (declare-entity \"test-entity\" \"{}\"))",
+                    "(entity :id \"test-entity\" :label \"{}\")",
                     entity_type
                 )),
-                _ => Ok(
-                    "(workflow \"test-workflow\" (declare-entity \"test-entity\" \"Company\"))"
-                        .to_string(),
-                ),
+                _ => Ok("(entity :id \"test-entity\" :label \"Company\")".to_string()),
             }
         }
 
@@ -561,9 +545,7 @@ mod tests {
 
         let editor = CentralDslEditor::new(
             Arc::new(registry),
-            Arc::new(crate::grammar::GrammarEngine::new()),
             Arc::new(MockDictionaryService),
-            Arc::new(MockDomainRepository),
             EditorConfig::default(),
         );
 
@@ -581,9 +563,7 @@ mod tests {
 
         let editor = CentralDslEditor::new(
             Arc::new(registry),
-            Arc::new(crate::grammar::GrammarEngine::new()),
             Arc::new(MockDictionaryService),
-            Arc::new(MockDomainRepository),
             EditorConfig::default(),
         );
 

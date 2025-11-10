@@ -1,24 +1,40 @@
-# Bacon configuration for ubo-poc
-# This file configures bacon for auto-rebuild on save
+# Bacon configuration for ob-poc
+# Optimized for development workflow with auto-rebuild on save
 
 [jobs.check]
 command = ["cargo", "check", "--color", "always"]
 need_stdout = false
 
 [jobs.check-all]
-command = ["cargo", "check", "--all-targets", "--color", "always"]
+command = ["cargo", "check", "--all-targets", "--features", "visualizer,mock-api,binaries", "--color", "always"]
 need_stdout = false
 
 [jobs.clippy]
-command = ["cargo", "clippy", "--color", "always"]
+command = ["cargo", "clippy", "--features", "visualizer,mock-api,binaries", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-all]
+command = ["cargo", "clippy", "--all-targets", "--features", "visualizer,mock-api,binaries", "--color", "always"]
 need_stdout = false
 
 [jobs.test]
+command = ["cargo", "test", "--lib", "--color", "always"]
+need_stdout = true
+
+[jobs.test-all]
 command = ["cargo", "test", "--color", "always"]
 need_stdout = true
 
-[jobs.run]
-command = ["cargo", "run", "--bin", "cli", "--color", "always"]
+[jobs.run-visualizer]
+command = ["cargo", "run", "--bin", "egui_visualizer", "--features", "visualizer", "--color", "always"]
+need_stdout = true
+
+[jobs.run-mock-api]
+command = ["cargo", "run", "--bin", "mock_rest_api_server", "--features", "mock-api", "--color", "always"]
+need_stdout = true
+
+[jobs.run-cli]
+command = ["cargo", "run", "--bin", "cli", "--features", "database,binaries", "--color", "always"]
 need_stdout = true
 
 [jobs.run-example]
@@ -26,30 +42,42 @@ command = ["cargo", "run", "--example", "parse_zenith", "--color", "always"]
 need_stdout = true
 
 [jobs.doc]
-command = ["cargo", "doc", "--color", "always"]
+command = ["cargo", "doc", "--features", "visualizer,mock-api", "--color", "always"]
 need_stdout = false
 
-# Default job when running just 'bacon'
+[jobs.doc-open]
+command = ["cargo", "doc", "--features", "visualizer,mock-api", "--open", "--color", "always"]
+need_stdout = false
+
+# Default job - fast check for immediate feedback
 default_job = "check"
 
-# File watching configuration
+# File watching configuration - optimized for development workflow
 [keybindings]
-# Press 'c' for check
-c = "job:check"
-# Press 'l' for clippy
-l = "job:clippy"
-# Press 't' for test
-t = "job:test"
-# Press 'r' for run
-r = "job:run"
-# Press 'e' for example
-e = "job:run-example"
-# Press 'd' for doc
-d = "job:doc"
-# Press 'a' for check-all
-a = "job:check-all"
+# Core development keys
+c = "job:check"                # Quick check (default)
+l = "job:clippy"              # Clippy linting
+t = "job:test"                # Run lib tests (fast)
+a = "job:check-all"           # Check all targets
+
+# Extended workflow keys
+shift-c = "job:clippy-all"    # Full clippy check
+shift-t = "job:test-all"      # Run all tests
+shift-a = "job:clippy-all"    # Alternative clippy-all
+
+# Run binaries
+v = "job:run-visualizer"      # Run visualizer
+m = "job:run-mock-api"        # Run mock API
+r = "job:run-cli"             # Run CLI (needs DB)
+e = "job:run-example"         # Run example
+
+# Documentation
+d = "job:doc"                 # Generate docs
+shift-d = "job:doc-open"      # Generate and open docs
 
 # Additional settings
 [settings]
-# Don't run on hidden files
+# Restart on file changes for better responsiveness
 on_change_strategy = "restart"
+# Watch additional file types
+additional_ignores = ["target/", ".git/", "*.tmp", "*.log"]

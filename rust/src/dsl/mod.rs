@@ -18,6 +18,7 @@ pub mod central_editor;
 pub mod domain_context;
 pub mod domain_registry;
 pub mod operations;
+pub mod parsing_coordinator;
 
 // Re-export main types for convenience
 pub use central_editor::CentralDslEditor;

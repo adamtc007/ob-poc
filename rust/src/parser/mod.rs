@@ -1,186 +1,155 @@
-//! Idiomatic Rust DSL parser module
+//! V3.1 DSL Parser Module
 //!
-//! This module provides efficient, stateless parser functions for the UBO DSL using nom combinators.
-//! It follows Rust best practices with strong typing and proper error handling.
+//! Pure V3.1 implementation with unified S-expression syntax for multi-domain workflows.
+//! Supports Document Library and ISDA domain verbs with AttributeID-as-Type pattern.
 
+pub mod debug_test;
 pub mod idiomatic_parser;
+pub mod phase5_integration_test;
+pub mod semantic_agent_integration_test;
+pub mod v31_integration_tests;
 
-use crate::ast::{Program, PropertyMap, Statement, Value, Workflow};
-use crate::error::{DSLError, ParseError};
-
+use crate::{Form, Program};
 use nom::error::VerboseError;
-use nom::Finish;
 
-// Re-export the main parsing functions
+// Re-export the main parsing functions for V3.1
 pub use idiomatic_parser::{
-    parse_identifier, parse_program as parse_program_internal,
-    parse_properties as parse_properties_internal, parse_statement as parse_statement_internal,
-    parse_string_literal, parse_value as parse_value_internal,
-    parse_workflow as parse_workflow_internal,
+    parse_form, parse_identifier, parse_program as parse_program_internal, parse_string_literal,
+    parse_value, parse_verb_form,
 };
 
-/// Main parsing function with strong types
+/// Main V3.1 DSL parsing function
+///
+/// Parses complete DSL programs with unified (verb :key value) syntax
+/// Supports all domains: Document, ISDA, KYC, UBO, Onboarding, Compliance, Graph
 pub fn parse_program(input: &str) -> Result<Program, VerboseError<&str>> {
     idiomatic_parser::parse_program(input)
 }
 
-/// Parse a single workflow - wrapper with better error handling
-pub fn parse_workflow_standalone(input: &str) -> Result<Workflow, DSLError> {
-    match idiomatic_parser::parse_workflow(input).finish() {
-        Ok((remaining, workflow)) => {
-            if remaining.trim().is_empty() {
-                Ok(workflow)
-            } else {
-                Err(DSLError::Parse(ParseError::Syntax {
-                    position: remaining.as_ptr() as usize,
-                    message: "Unexpected content after workflow".to_string(),
-                }))
-            }
-        }
-        Err(e) => Err(DSLError::Parse(ParseError::from(e))),
-    }
-}
-
-/// Parse a property map - wrapper with better error handling
-pub fn parse_properties_standalone(input: &str) -> Result<PropertyMap, DSLError> {
-    match idiomatic_parser::parse_properties(input).finish() {
-        Ok((remaining, properties)) => {
-            if remaining.trim().is_empty() {
-                Ok(properties)
-            } else {
-                Err(DSLError::Parse(ParseError::Syntax {
-                    position: remaining.as_ptr() as usize,
-                    message: "Unexpected content after properties".to_string(),
-                }))
-            }
-        }
-        Err(e) => Err(DSLError::Parse(ParseError::from(e))),
-    }
-}
-
-/// Parse a single value - wrapper with better error handling
-pub fn parse_value_standalone(input: &str) -> Result<Value, DSLError> {
-    match idiomatic_parser::parse_value(input).finish() {
-        Ok((remaining, value)) => {
-            if remaining.trim().is_empty() {
-                Ok(value)
-            } else {
-                Err(DSLError::Parse(ParseError::Syntax {
-                    position: remaining.as_ptr() as usize,
-                    message: "Unexpected content after value".to_string(),
-                }))
-            }
-        }
-        Err(e) => Err(DSLError::Parse(ParseError::from(e))),
-    }
-}
-
-/// Validate parsed AST
-pub fn validate_ast(ast: &Program) -> Result<(), Vec<DSLError>> {
-    let mut errors = Vec::new();
-
-    // Basic validation - can be extended
-    for workflow in &ast.workflows {
-        if workflow.id.is_empty() {
-            errors.push(DSLError::Validation(
-                crate::error::ValidationError::WorkflowError {
-                    message: "Workflow ID cannot be empty".to_string(),
-                },
-            ));
-        }
-
-        // Validate statements
-        for (i, statement) in workflow.statements.iter().enumerate() {
-            if let Err(e) = validate_statement(statement) {
-                errors.push(DSLError::Validation(
-                    crate::error::ValidationError::WorkflowError {
-                        message: format!(
-                            "Statement {} in workflow '{}': {}",
-                            i + 1,
-                            workflow.id,
-                            e
-                        ),
-                    },
-                ));
-            }
-        }
-    }
-
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(errors)
-    }
-}
-
-fn validate_statement(statement: &Statement) -> Result<(), String> {
-    match statement {
-        Statement::DeclareEntity {
-            id, entity_type, ..
-        } => {
-            if id.is_empty() {
-                return Err("Entity ID cannot be empty".to_string());
-            }
-            if entity_type.is_empty() {
-                return Err("Entity type cannot be empty".to_string());
-            }
-        }
-        Statement::ObtainDocument {
-            document_type,
-            source,
-            ..
-        } => {
-            if document_type.is_empty() {
-                return Err("Document type cannot be empty".to_string());
-            }
-            if source.is_empty() {
-                return Err("Document source cannot be empty".to_string());
-            }
-        }
-        Statement::CreateEdge {
-            from,
-            to,
-            edge_type,
-            ..
-        } => {
-            if from.is_empty() {
-                return Err("Edge 'from' cannot be empty".to_string());
-            }
-            if to.is_empty() {
-                return Err("Edge 'to' cannot be empty".to_string());
-            }
-            if edge_type.is_empty() {
-                return Err("Edge type cannot be empty".to_string());
-            }
-        }
-        Statement::CalculateUbo { entity_id, .. } => {
-            if entity_id.is_empty() {
-                return Err("UBO entity ID cannot be empty".to_string());
-            }
-        }
-        Statement::Placeholder { command, .. } => {
-            if command.is_empty() {
-                return Err("Command cannot be empty".to_string());
-            }
-        }
-        // Other statement types can be added here
-        _ => {} // Legacy types - skip validation for now
-    }
-    Ok(())
-}
-
 #[cfg(test)]
-mod tests {
+mod v31_tests {
     use super::*;
+    use crate::{Form, Key, Literal, Value, VerbForm};
 
     #[test]
-    fn test_error_handling() {
-        let invalid_input = r#"
-        (workflow "broken
-            this is not valid syntax
+    fn test_v31_document_catalog() {
+        let dsl = r#"(document.catalog :document-id "doc-001" :document-type "CONTRACT")"#;
+
+        let result = parse_program(dsl);
+        assert!(
+            result.is_ok(),
+            "Failed to parse document.catalog: {:?}",
+            result.err()
+        );
+
+        let forms = result.unwrap();
+        assert_eq!(forms.len(), 1);
+
+        match &forms[0] {
+            Form::Verb(VerbForm { verb, .. }) => {
+                assert_eq!(verb, "document.catalog");
+            }
+            _ => panic!("Expected verb form"),
+        }
+    }
+
+    #[test]
+    fn test_v31_isda_establish_master() {
+        let dsl = r#"(isda.establish_master :agreement-id "ISDA-001" :party-a "entity-a" :party-b "entity-b")"#;
+
+        let result = parse_program(dsl);
+        assert!(
+            result.is_ok(),
+            "Failed to parse isda.establish_master: {:?}",
+            result.err()
+        );
+
+        let forms = result.unwrap();
+        assert_eq!(forms.len(), 1);
+
+        match &forms[0] {
+            Form::Verb(VerbForm { verb, .. }) => {
+                assert_eq!(verb, "isda.establish_master");
+            }
+            _ => panic!("Expected verb form"),
+        }
+    }
+
+    #[test]
+    fn test_v31_entity_with_map() {
+        let dsl = r#"(entity :id "test-001" :label "Company" :props {:legal-name "Test Corp"})"#;
+
+        let result = parse_program(dsl);
+        assert!(
+            result.is_ok(),
+            "Failed to parse entity with map: {:?}",
+            result.err()
+        );
+
+        let forms = result.unwrap();
+        assert_eq!(forms.len(), 1);
+
+        match &forms[0] {
+            Form::Verb(VerbForm { verb, pairs }) => {
+                assert_eq!(verb, "entity");
+                assert_eq!(pairs.len(), 3); // :id, :label, :props
+            }
+            _ => panic!("Expected verb form"),
+        }
+    }
+
+    #[test]
+    fn test_v31_comments() {
+        let dsl = r#"
+        ;; V3.1 DSL with comments
+        (entity :id "test" :label "Company")
         "#;
 
-        let result = parse_program(invalid_input);
-        assert!(result.is_err());
+        let result = parse_program(dsl);
+        assert!(
+            result.is_ok(),
+            "Failed to parse DSL with comments: {:?}",
+            result.err()
+        );
+
+        let forms = result.unwrap();
+        assert_eq!(forms.len(), 2); // comment + verb
+
+        match (&forms[0], &forms[1]) {
+            (Form::Comment(_), Form::Verb(VerbForm { verb, .. })) => {
+                assert_eq!(verb, "entity");
+            }
+            _ => panic!("Expected comment then verb form"),
+        }
+    }
+
+    #[test]
+    fn test_v31_multi_verb_sequence() {
+        let dsl = r#"
+        (document.catalog :document-id "doc-001" :document-type "CONTRACT")
+        (isda.establish_master :agreement-id "ISDA-001" :version "2002")
+        (entity :id "test-001" :label "Company")
+        "#;
+
+        let result = parse_program(dsl);
+        assert!(
+            result.is_ok(),
+            "Failed to parse multi-verb sequence: {:?}",
+            result.err()
+        );
+
+        let forms = result.unwrap();
+        let verb_forms: Vec<_> = forms
+            .iter()
+            .filter_map(|f| match f {
+                Form::Verb(vf) => Some(vf),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(verb_forms.len(), 3);
+        assert_eq!(verb_forms[0].verb, "document.catalog");
+        assert_eq!(verb_forms[1].verb, "isda.establish_master");
+        assert_eq!(verb_forms[2].verb, "entity");
     }
 }

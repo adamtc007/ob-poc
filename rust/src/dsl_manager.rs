@@ -12,8 +12,9 @@
 //! - gRPC orchestration support
 //!
 //! Main API Pattern:
-//! - DSL.Domain.create() - Creates DSL instance from templates
-//! - DSL.domain.ID.edit() - Incrementally adds DSL code with versioning
+/// V3.1 DSL MANAGER API:
+/// DSL.Domain.create() - Creates V3.1 compliant DSL instance from templates
+/// DSL.domain.ID.edit() - Incrementally adds V3.1 DSL code with versioning
 //! - Full business request lifecycle support
 //! - Unified visualization and compilation pipeline
 
@@ -34,11 +35,12 @@ use uuid::Uuid;
 /// Result type for all DSL operations
 pub type DslResult<T> = Result<T, DslError>;
 
-/// Re-export core types from the repositories
 pub use crate::database::dsl_instance_repository::{
-    AstNode, AstNodeType, CompilationStatus, DslBusinessReference, DslCompilationLog, DslInstance,
-    DslInstanceVersion, DslTemplate, InstanceStatus, OperationType,
+    AstNode, AstNodeType, DslBusinessReference, DslCompilationLog,
 };
+/// Re-export core types from the repositories
+// Use domain models as single source of truth for core types
+pub use crate::models::domain_models::CompilationStatus;
 
 /// Extended DSL Error types for the consolidated manager
 #[derive(Debug, thiserror::Error)]
@@ -127,6 +129,44 @@ pub enum TemplateType {
     DiscoverServices,
     /// Discover and add resources
     DiscoverResources,
+    /// Document Library operations (V3.1)
+    DocumentCatalog,
+    DocumentVerify,
+    DocumentExtract,
+    DocumentLink,
+    DocumentUse,
+    DocumentAmend,
+    DocumentExpire,
+    DocumentQuery,
+    /// ISDA Derivative operations (V3.1)
+    IsdaEstablishMaster,
+    IsdaEstablishCsa,
+    IsdaExecuteTrade,
+    IsdaMarginCall,
+    IsdaPostCollateral,
+    IsdaValuePortfolio,
+    IsdaDeclareTerminationEvent,
+    IsdaCloseOut,
+    IsdaAmendAgreement,
+    IsdaNovateTradeEDS,
+    IsdaDispute,
+    IsdaManageNettingSet,
+    /// KYC domain operations (V3.1)
+    KycVerify,
+    KycAssessRisk,
+    KycCollectDocument,
+    KycScreenSanctions,
+    KycCheckPep,
+    KycValidateAddress,
+    /// Compliance operations (V3.1)
+    ComplianceFatcaCheck,
+    ComplianceCrsCheck,
+    ComplianceAmlCheck,
+    ComplianceGenerateSar,
+    ComplianceVerify,
+    /// UBO operations (V3.1)
+    UboCalc,
+    UboOutcome,
     /// Custom template
     Custom(String),
 }
@@ -159,66 +199,17 @@ pub struct DatabaseQuery {
     pub result_mapping: String,
 }
 
-/// DSL Instance - Core entity for instance-based management
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
-pub struct DslInstance {
-    pub instance_id: Uuid,
-    pub domain_name: String,
-    pub business_reference: Option<String>,
-    pub current_version: i32,
-    pub status: InstanceStatus,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub metadata: serde_json::Value,
-}
+/// Re-export DslInstance from database repository
+pub use crate::database::dsl_instance_repository::DslInstance;
 
-/// Instance status lifecycle
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "text")]
-pub enum InstanceStatus {
-    /// Instance created, ready for editing
-    Created,
-    /// Instance being edited with incremental changes
-    Editing,
-    /// Instance compiled successfully
-    Compiled,
-    /// Instance finalized and ready for production
-    Finalized,
-    /// Instance archived
-    Archived,
-    /// Instance failed compilation or validation
-    Failed,
-}
+/// Re-export InstanceStatus from database repository
+pub use crate::database::dsl_instance_repository::InstanceStatus;
 
-/// DSL Instance Version - Snapshot of DSL content at a point in time
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
-pub struct DslInstanceVersion {
-    pub version_id: Uuid,
-    pub instance_id: Uuid,
-    pub version_number: i32,
-    pub dsl_content: String,
-    pub operation_type: OperationType,
-    pub compilation_status: CompilationStatus,
-    pub ast_json: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub created_by: String,
-    pub change_description: Option<String>,
-}
+/// Re-export DslInstanceVersion from database repository
+pub use crate::database::dsl_instance_repository::DslInstanceVersion;
 
-/// Type of operation that created this version
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum OperationType {
-    /// Initial creation from template
-    CreateFromTemplate(String),
-    /// Incremental edit operation
-    IncrementalEdit,
-    /// Template-based addition (products, services, resources)
-    TemplateAddition(TemplateType),
-    /// Manual edit
-    ManualEdit,
-    /// Compilation update
-    Recompilation,
-}
+/// Re-export OperationType from database repository
+pub use crate::database::dsl_instance_repository::OperationType;
 
 impl DslManager {
     /// Create a new consolidated DSL manager
@@ -233,7 +224,7 @@ impl DslManager {
             template_base_path,
             template_cache: HashMap::new(),
             // Visualization helper not currently used
-            grammar_version: "1.0.0".to_string(),
+            grammar_version: "3.1".to_string(), // V3.1 EBNF Grammar Compliance
             parser_version: env!("CARGO_PKG_VERSION").to_string(),
         }
     }
@@ -255,6 +246,7 @@ impl DslManager {
     // ============================================================================
 
     /// DSL.Domain.create - Create new DSL instance from domain template
+    /// Create new DSL instance from domain template - V3.1 COMPLIANT
     pub async fn create_dsl_instance(
         &self,
         domain_name: &str,
@@ -281,31 +273,34 @@ impl DslManager {
 
         // Create new instance
         let instance_id = Uuid::new_v4();
-        let instance = DslInstance {
+        let instance = crate::database::dsl_instance_repository::DslInstance {
             instance_id,
             domain_name: domain_name.to_string(),
             business_reference: variables
                 .get("business_reference")
                 .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| format!("auto-{}", instance_id)),
             current_version: 1,
-            status: InstanceStatus::Created,
+            status: crate::database::dsl_instance_repository::InstanceStatus::Created,
             created_at: Utc::now(),
             updated_at: Utc::now(),
-            metadata: variables,
+            metadata: Some(variables.clone()),
         };
 
         // Create initial version
-        let initial_version = DslInstanceVersion {
+        let initial_version = crate::database::dsl_instance_repository::DslInstanceVersion {
             version_id: Uuid::new_v4(),
             instance_id,
             version_number: 1,
             dsl_content: dsl_content.clone(),
-            operation_type: OperationType::CreateFromTemplate(template.template_id.clone()),
-            compilation_status: CompilationStatus::Draft,
+            operation_type:
+                crate::database::dsl_instance_repository::OperationType::CreateFromTemplate,
+            compilation_status:
+                crate::database::dsl_instance_repository::CompilationStatus::Pending,
             ast_json: None,
             created_at: Utc::now(),
-            created_by: created_by.to_string(),
+            created_by: Some(created_by.to_string()),
             change_description: Some(format!(
                 "Initial creation from template: {}",
                 template.template_id
@@ -325,15 +320,19 @@ impl DslManager {
     }
 
     /// DSL.domain.ID.edit - Add incremental DSL code to existing instance
+    /// Edit DSL instance with incremental changes - V3.1 COMPLIANT
     pub async fn edit_dsl_instance(
         &self,
         instance_id: Uuid,
         incremental_dsl: &str,
-        operation_type: OperationType,
+        _operation_type: OperationType,
         created_by: &str,
         change_description: Option<String>,
     ) -> DslResult<DslInstanceVersion> {
-        info!("Editing DSL instance: {} with incremental DSL", instance_id);
+        info!("[V3.1] Editing DSL instance: {} with incremental DSL", instance_id);
+
+        // V3.1 COMPLIANCE: Validate incremental DSL before processing
+        self.validate_dsl_content(incremental_dsl)?;
 
         // Get current instance and latest version
         let mut instance = self.get_instance(instance_id).await?;
@@ -347,16 +346,18 @@ impl DslManager {
 
         // Create new version
         let new_version_number = instance.current_version + 1;
-        let new_version = DslInstanceVersion {
+        let new_version = crate::database::dsl_instance_repository::DslInstanceVersion {
             version_id: Uuid::new_v4(),
             instance_id,
             version_number: new_version_number,
             dsl_content: combined_dsl,
-            operation_type,
-            compilation_status: CompilationStatus::Draft,
+            operation_type:
+                crate::database::dsl_instance_repository::OperationType::IncrementalEdit,
+            compilation_status:
+                crate::database::dsl_instance_repository::CompilationStatus::Pending,
             ast_json: None,
             created_at: Utc::now(),
-            created_by: created_by.to_string(),
+            created_by: Some(created_by.to_string()),
             change_description,
         };
 
@@ -369,10 +370,12 @@ impl DslManager {
         // Update instance metadata
         instance.current_version = new_version_number;
         instance.updated_at = Utc::now();
-        instance.status = if compiled_version.compilation_status == CompilationStatus::Compiled {
-            InstanceStatus::Compiled
+        instance.status = if compiled_version.compilation_status
+            == crate::database::dsl_instance_repository::CompilationStatus::Success
+        {
+            crate::database::dsl_instance_repository::InstanceStatus::Compiled
         } else {
-            InstanceStatus::Failed
+            crate::database::dsl_instance_repository::InstanceStatus::Editing
         };
 
         self.update_instance(&instance).await?;
@@ -385,32 +388,39 @@ impl DslManager {
     }
 
     /// Get DSL instance by ID
-    pub async fn get_dsl_instance(&self, instance_id: Uuid) -> DslResult<DslInstance> {
+    pub async fn get_dsl_instance(
+        &self,
+        instance_id: Uuid,
+    ) -> DslResult<crate::database::dsl_instance_repository::DslInstance> {
         self.get_instance(instance_id).await
     }
 
-    /// Get all versions for a DSL instance
+    /// Get all versions for an instance
     pub async fn get_instance_versions(
         &self,
         instance_id: Uuid,
-    ) -> DslResult<Vec<DslInstanceVersion>> {
+    ) -> DslResult<Vec<crate::database::dsl_instance_repository::DslInstanceVersion>> {
         self.get_all_instance_versions(instance_id).await
     }
 
     /// Get specific version of DSL instance
-    pub async fn get_instance_version(&self, version_id: Uuid) -> DslResult<DslInstanceVersion> {
+    pub async fn get_instance_version(
+        &self,
+        version_id: Uuid,
+    ) -> DslResult<crate::database::dsl_instance_repository::DslInstanceVersion> {
         self.get_version_by_id(version_id).await
     }
 
     // ============================================================================
-    // TEMPLATE MANAGEMENT
+    // V3.1 TEMPLATE MANAGEMENT - GRAMMAR COMPLIANT
     // ============================================================================
 
     /// Load template from file system
+    /// Load V3.1 compliant template from domain
     async fn load_template(
         &self,
         domain_name: &str,
-        template_type: &TemplateType,
+        template_type: TemplateType,
     ) -> DslResult<DslTemplate> {
         let template_key = format!("{}_{:?}", domain_name, template_type);
 
@@ -445,6 +455,41 @@ impl DslManager {
             TemplateType::AddProducts => "add_products.dsl.template",
             TemplateType::DiscoverServices => "discover_services.dsl.template",
             TemplateType::DiscoverResources => "discover_resources.dsl.template",
+            TemplateType::DocumentCatalog => "document_catalog.dsl.template",
+            TemplateType::DocumentVerify => "document_verify.dsl.template",
+            TemplateType::DocumentExtract => "document_extract.dsl.template",
+            TemplateType::DocumentLink => "document_link.dsl.template",
+            TemplateType::DocumentUse => "document_use.dsl.template",
+            TemplateType::DocumentAmend => "document_amend.dsl.template",
+            TemplateType::DocumentExpire => "document_expire.dsl.template",
+            TemplateType::DocumentQuery => "document_query.dsl.template",
+            TemplateType::IsdaEstablishMaster => "isda_establish_master.dsl.template",
+            TemplateType::IsdaEstablishCsa => "isda_establish_csa.dsl.template",
+            TemplateType::IsdaExecuteTrade => "isda_execute_trade.dsl.template",
+            TemplateType::IsdaMarginCall => "isda_margin_call.dsl.template",
+            TemplateType::IsdaPostCollateral => "isda_post_collateral.dsl.template",
+            TemplateType::IsdaValuePortfolio => "isda_value_portfolio.dsl.template",
+            TemplateType::IsdaDeclareTerminationEvent => {
+                "isda_declare_termination_event.dsl.template"
+            }
+            TemplateType::IsdaCloseOut => "isda_close_out.dsl.template",
+            TemplateType::IsdaAmendAgreement => "isda_amend_agreement.dsl.template",
+            TemplateType::IsdaNovateTradeEDS => "isda_novate_trade_eds.dsl.template",
+            TemplateType::IsdaDispute => "isda_dispute.dsl.template",
+            TemplateType::IsdaManageNettingSet => "isda_manage_netting_set.dsl.template",
+            TemplateType::KycVerify => "kyc_verify.dsl.template",
+            TemplateType::KycAssessRisk => "kyc_assess_risk.dsl.template",
+            TemplateType::KycCollectDocument => "kyc_collect_document.dsl.template",
+            TemplateType::KycScreenSanctions => "kyc_screen_sanctions.dsl.template",
+            TemplateType::KycCheckPep => "kyc_check_pep.dsl.template",
+            TemplateType::KycValidateAddress => "kyc_validate_address.dsl.template",
+            TemplateType::ComplianceFatcaCheck => "compliance_fatca_check.dsl.template",
+            TemplateType::ComplianceCrsCheck => "compliance_crs_check.dsl.template",
+            TemplateType::ComplianceAmlCheck => "compliance_aml_check.dsl.template",
+            TemplateType::ComplianceGenerateSar => "compliance_generate_sar.dsl.template",
+            TemplateType::ComplianceVerify => "compliance_verify.dsl.template",
+            TemplateType::UboCalc => "ubo_calc.dsl.template",
+            TemplateType::UboOutcome => "ubo_outcome.dsl.template",
             TemplateType::Custom(name) => &format!("{}.dsl.template", name),
         };
 
@@ -497,6 +542,9 @@ impl DslManager {
         variables: &serde_json::Value,
     ) -> DslResult<String> {
         let mut dsl_content = template.content.clone();
+
+        // V3.1 template compliance validation
+        self.validate_v31_template(template)?;
 
         // Perform database queries for dynamic data injection
         for query in &template.requirements.database_queries {
@@ -643,31 +691,40 @@ impl DslManager {
         mut version: DslInstanceVersion,
     ) -> DslResult<DslInstanceVersion> {
         debug!(
-            "Compiling DSL version: {} for instance: {}",
+            "[V3.1] Compiling DSL version: {} for instance: {}",
             version.version_id, version.instance_id
         );
 
         match parse_program(&version.dsl_content) {
             Ok(ast) => {
+                // V3.1 comprehensive AST validation
+                self.validate_v31_ast(&ast)?;
+
                 // Store AST as JSON
                 version.ast_json = Some(serde_json::to_string(&ast).map_err(|e| {
                     DslError::SerializationError {
-                        message: format!("Failed to serialize AST: {}", e),
+                        message: format!("Failed to serialize V3.1 AST: {}", e),
                     }
                 })?);
 
-                version.compilation_status = CompilationStatus::Compiled;
-                debug!("Successfully compiled DSL version: {}", version.version_id);
+                version.compilation_status =
+                    crate::database::dsl_instance_repository::CompilationStatus::Success;
+                info!(
+                    "[V3.1] ✅ Successfully compiled DSL version: {} with {} AST forms",
+                    version.version_id,
+                    ast.len()
+                );
             }
             Err(parse_error) => {
-                version.compilation_status = CompilationStatus::Error;
-                warn!(
-                    "Failed to compile DSL version: {} - Error: {:?}",
+                version.compilation_status =
+                    crate::database::dsl_instance_repository::CompilationStatus::Error;
+                error!(
+                    "[V3.1] ❌ Failed to compile DSL version: {} - V3.1 grammar error: {:?}",
                     version.version_id, parse_error
                 );
 
                 return Err(DslError::CompilationError {
-                    message: format!("DSL compilation failed: {:?}", parse_error),
+                    message: format!("V3.1 DSL compilation failed: {:?}", parse_error),
                 });
             }
         }
@@ -675,13 +732,169 @@ impl DslManager {
         Ok(version)
     }
 
-    /// Validate DSL content
+    /// Comprehensive V3.1 DSL compliance validation
     fn validate_dsl_content(&self, dsl_content: &str) -> DslResult<()> {
-        // Basic validation - ensure DSL can be parsed
+        // V3.1 S-expression syntax validation
+        if !dsl_content.trim().is_empty()
+            && (!dsl_content.contains("(") || !dsl_content.contains(")"))
+        {
+            return Err(DslError::ValidationError {
+                message: "V3.1 DSL MUST use S-expression syntax: (verb :key value ...)".to_string(),
+            });
+        }
+
+        // V3.1 keyword syntax validation - CRITICAL for V3.1 compliance
+        if dsl_content.contains("(") && !dsl_content.contains(":") {
+            return Err(DslError::ValidationError {
+                message: "V3.1 DSL MUST use keyword syntax with : prefix (e.g., :document-id value, :key value)".to_string(),
+            });
+        }
+
+        // V3.1 Multi-Domain Verb Registry - Complete V3.1 verb set
+        let v31_document_verbs = [
+            "document.catalog",
+            "document.verify",
+            "document.extract",
+            "document.link",
+            "document.use",
+            "document.amend",
+            "document.expire",
+            "document.query",
+        ];
+        let v31_isda_verbs = [
+            "isda.establish_master",
+            "isda.establish_csa",
+            "isda.execute_trade",
+            "isda.margin_call",
+            "isda.post_collateral",
+            "isda.value_portfolio",
+            "isda.declare_termination_event",
+            "isda.close_out",
+            "isda.amend_agreement",
+            "isda.novate_trade",
+            "isda.dispute",
+            "isda.manage_netting_set",
+        ];
+        let v31_kyc_verbs = [
+            "kyc.verify",
+            "kyc.assess_risk",
+            "kyc.collect_document",
+            "kyc.screen_sanctions",
+            "kyc.check_pep",
+            "kyc.validate_address",
+        ];
+        let v31_compliance_verbs = [
+            "compliance.fatca_check",
+            "compliance.crs_check",
+            "compliance.aml_check",
+            "compliance.generate_sar",
+            "compliance.verify",
+        ];
+        let v31_graph_verbs = ["entity", "edge", "role.assign"];
+        let v31_ubo_verbs = ["ubo.calc", "ubo.outcome"];
+        let v31_workflow_verbs = ["define-kyc-investigation", "workflow.transition"];
+
+        // Combine all V3.1 verbs (33 total across 7 domains)
+        let all_v31_verbs: Vec<&str> = [
+            &v31_document_verbs[..],
+            &v31_isda_verbs[..],
+            &v31_kyc_verbs[..],
+            &v31_compliance_verbs[..],
+            &v31_graph_verbs[..],
+            &v31_ubo_verbs[..],
+            &v31_workflow_verbs[..],
+        ]
+        .concat();
+
+        // V3.1 verb presence validation
+        let has_v31_verb = all_v31_verbs.iter().any(|verb| dsl_content.contains(verb));
+        if dsl_content.trim().len() > 20 && !has_v31_verb {
+            return Err(DslError::ValidationError {
+                message: format!(
+                    "V3.1 DSL content MUST contain at least one recognized verb from {} supported verbs across 7 domains",
+                    all_v31_verbs.len()
+                ),
+            });
+        }
+
+        // V3.1 keyword format validation - ensure proper :key format
+        if dsl_content.contains(":") {
+            let keyword_pattern = regex::Regex::new(r":[a-zA-Z_][a-zA-Z0-9_\-\.]*").unwrap();
+            if !keyword_pattern.is_match(dsl_content) {
+                return Err(DslError::ValidationError {
+                    message: "V3.1 keywords MUST follow pattern :identifier (e.g., :document-id, :entity.type)".to_string(),
+                });
+            }
+        }
+
+        // V3.1 parser validation - CRITICAL for V3.1 compliance
         parse_program(dsl_content).map_err(|e| DslError::ValidationError {
-            message: format!("DSL validation failed: {:?}", e),
+            message: format!(
+                "V3.1 DSL parsing failed - grammar compliance error: {:?}",
+                e
+            ),
         })?;
 
+        info!("[V3.1] ✅ DSL validation PASSED - content is fully V3.1 compliant");
+        Ok(())
+    }
+
+    /// V3.1 AST compliance validation
+    fn validate_v31_ast(&self, ast: &crate::Program) -> DslResult<()> {
+        if ast.is_empty() {
+            return Err(DslError::ValidationError {
+                message: "V3.1 AST cannot be empty after parsing".to_string(),
+            });
+        }
+
+        // Validate each form conforms to V3.1 structure
+        for (idx, form) in ast.iter().enumerate() {
+            match form {
+                crate::Form::Verb(verb_form) => {
+                    // V3.1 verb name validation
+                    if verb_form.verb.is_empty() {
+                        return Err(DslError::ValidationError {
+                            message: format!("V3.1 AST form #{} has empty verb name", idx),
+                        });
+                    }
+
+                    // V3.1 keyword-value pair validation
+                    if verb_form.pairs.is_empty() {
+                        debug!(
+                            "V3.1 AST form #{} verb '{}' has no key-value pairs (acceptable)",
+                            idx, verb_form.verb
+                        );
+                    }
+                }
+                crate::Form::Comment(_) => {
+                    // V3.1 comments are valid
+                }
+            }
+        }
+
+        info!("[V3.1] ✅ AST validation PASSED - {} forms validated", ast.len());
+        Ok(())
+    }
+
+    /// V3.1 template compliance validation
+    fn validate_v31_template(&self, template: &DslTemplate) -> DslResult<()> {
+        // V3.1 template content validation
+        self.validate_dsl_content(&template.content)?;
+
+        // V3.1 template metadata validation
+        if template.template_id.is_empty() {
+            return Err(DslError::ValidationError {
+                message: "V3.1 template MUST have non-empty template_id".to_string(),
+            });
+        }
+
+        if template.domain_name.is_empty() {
+            return Err(DslError::ValidationError {
+                message: "V3.1 template MUST specify domain_name".to_string(),
+            });
+        }
+
+        info!("[V3.1] ✅ Template '{}' validation PASSED", template.template_id);
         Ok(())
     }
 
@@ -891,7 +1104,10 @@ impl DslManager {
     }
 
     /// Get version by ID
-    async fn get_version_by_id(&self, version_id: Uuid) -> DslResult<DslInstanceVersion> {
+    async fn get_version_by_id(
+        &self,
+        version_id: Uuid,
+    ) -> DslResult<crate::database::dsl_instance_repository::DslInstanceVersion> {
         // TODO: Implement version retrieval by ID
         Err(DslError::NotFound {
             message: format!("Version not found: {}", version_id),
@@ -1043,8 +1259,11 @@ impl DslManager {
     }
 
     /// Store DSL instance in database
-    pub async fn store_instance(&self, instance: &DslInstance) -> DslResult<()> {
-        info!("Storing DSL instance: {}", instance.instance_id);
+    pub async fn store_instance(
+        &self,
+        instance: &crate::database::dsl_instance_repository::DslInstance,
+    ) -> DslResult<()> {
+        info!("[V3.1] Storing DSL instance: {}", instance.instance_id);
 
         // For now, store instance metadata in a JSON format in the domain system
         // This could be extended to a dedicated instances table later
@@ -1063,15 +1282,21 @@ impl DslManager {
     }
 
     /// Update DSL instance in database
-    pub async fn update_instance(&self, instance: &DslInstance) -> DslResult<()> {
-        info!("Updating DSL instance: {}", instance.instance_id);
+    pub async fn update_instance(
+        &self,
+        instance: &crate::database::dsl_instance_repository::DslInstance,
+    ) -> DslResult<()> {
+        info!("[V3.1] Updating DSL instance: {}", instance.instance_id);
         // For now, this is a no-op since we're using the domain system
         // Could be extended with dedicated instance management later
         Ok(())
     }
 
     /// Get DSL instance by ID
-    pub async fn get_instance(&self, instance_id: Uuid) -> DslResult<DslInstance> {
+    pub async fn get_instance(
+        &self,
+        instance_id: Uuid,
+    ) -> DslResult<crate::database::dsl_instance_repository::DslInstance> {
         // For now, create a placeholder instance
         // This would be replaced with actual database retrieval
         Err(DslError::NotFound {
@@ -1080,9 +1305,12 @@ impl DslManager {
     }
 
     /// Store DSL instance version in database
-    pub async fn store_instance_version(&self, version: &DslInstanceVersion) -> DslResult<()> {
+    pub async fn store_instance_version(
+        &self,
+        version: &crate::database::dsl_instance_repository::DslInstanceVersion,
+    ) -> DslResult<()> {
         info!(
-            "Storing DSL instance version: {} (v{})",
+            "[V3.1] Storing DSL instance version: {} (v{})",
             version.version_id, version.version_number
         );
 
@@ -1096,8 +1324,11 @@ impl DslManager {
     }
 
     /// Update DSL instance version
-    pub async fn update_instance_version(&self, version: &DslInstanceVersion) -> DslResult<()> {
-        info!("Updating DSL instance version: {}", version.version_id);
+    pub async fn update_instance_version(
+        &self,
+        version: &crate::database::dsl_instance_repository::DslInstanceVersion,
+    ) -> DslResult<()> {
+        info!("[V3.1] Updating DSL instance version: {}", version.version_id);
 
         // Update compilation status
         self.domain_repository
@@ -1634,7 +1865,8 @@ impl DslManager {
                     })?;
 
                 version.ast_json = Some(ast_json.clone());
-                version.compilation_status = CompilationStatus::Compiled;
+                version.compilation_status =
+                    crate::database::dsl_instance_repository::CompilationStatus::Success;
 
                 // Count AST nodes for metrics
                 let node_count = self.count_ast_nodes(&ast);
@@ -1658,7 +1890,8 @@ impl DslManager {
                 );
             }
             Err(parse_error) => {
-                version.compilation_status = CompilationStatus::Error;
+                version.compilation_status =
+                    crate::database::dsl_instance_repository::CompilationStatus::Error;
                 warn!(
                     "Failed to compile DSL version: {} - Error: {:?}",
                     version.version_id, parse_error

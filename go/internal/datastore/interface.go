@@ -1,14 +1,14 @@
 package datastore
 
 import (
-    "context"
-    "encoding/json"
-    "errors"
-    "fmt"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
 
-    "dsl-ob-poc/internal/dictionary"
-    "dsl-ob-poc/internal/mocks"
-    "dsl-ob-poc/internal/store"
+	"dsl-ob-poc/internal/dictionary"
+	"dsl-ob-poc/internal/mocks"
+	"dsl-ob-poc/internal/store"
 )
 
 // DataStore defines the interface for all data access operations
@@ -116,20 +116,20 @@ type Config struct {
 
 // NewDataStore creates a new data store based on configuration
 func NewDataStore(config Config) (DataStore, error) {
-    switch config.Type {
-    case PostgreSQLStore:
-        return newPostgreSQLStore(config.ConnectionString)
-    case MockStore:
-        return newMockStore(config.MockDataPath)
-    default:
-        return nil, &UnsupportedStoreTypeError{Type: string(config.Type)}
-    }
+	switch config.Type {
+	case PostgreSQLStore:
+		return newPostgreSQLStore(config.ConnectionString)
+	case MockStore:
+		return newMockStore(config.MockDataPath)
+	default:
+		return nil, &UnsupportedStoreTypeError{Type: string(config.Type)}
+	}
 }
 
 // newPostgreSQLStore creates a new PostgreSQL store adapter
 func newPostgreSQLStore(connectionString string) (DataStore, error) {
-    // Deprecated: direct DB access from Go is removed.
-    return nil, errors.New("PostgreSQL store is deprecated; use Rust gRPC backend for CRUD")
+	// Deprecated: direct DB access from Go is removed.
+	return nil, errors.New("PostgreSQL store is deprecated; use Rust gRPC backend for CRUD")
 }
 
 // newMockStore creates a new mock store adapter

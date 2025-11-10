@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Phase 6: DSL/AST Visualization Client</title>
+  <meta name="description" content="Interactive web client for visualizing DSL source code and generated Abstract Syntax Trees">
+  <meta name="author" content="OB-POC Team">
+
+  <!-- Preconnect to potential API endpoints for better performance -->
+  <link rel="preconnect" href="http://localhost:8080">
+
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚀</text></svg>">
+
+  <style>
+    /* Initial loading styles before the app takes over */
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #app {
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* Loading screen styles */
+    .initial-loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      color: white;
+      text-align: center;
+      padding: 2rem;
+    }
+
+    .loading-spinner {
+      width: 60px;
+      height: 60px;
+      border: 4px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 1s linear infinite;
+      margin-bottom: 2rem;
+    }
+
+    .loading-title {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+
+    .loading-subtitle {
+      font-size: 1.1rem;
+      opacity: 0.9;
+      margin-bottom: 1rem;
+    }
+
+    .loading-details {
+      font-size: 0.9rem;
+      opacity: 0.7;
+      max-width: 400px;
+      line-height: 1.4;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* Fade out animation for loading screen */
+    .fade-out {
+      opacity: 0;
+      transition: opacity 0.5s ease-out;
+    }
+
+    /* Error state styles */
+    .error-state {
+      background: #dc3545;
+      color: white;
+      padding: 2rem;
+      border-radius: 8px;
+      max-width: 600px;
+      margin: 2rem auto;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .error-title {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .error-message {
+      font-size: 1rem;
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
+
+    .error-actions {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .error-button {
+      padding: 0.75rem 1.5rem;
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      border-radius: 4px;
+      color: white;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .error-button:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    /* Responsive design */
+    @media (max-width: 768px) {
+      .loading-title {
+        font-size: 1.5rem;
+      }
+
+      .loading-subtitle {
+        font-size: 1rem;
+      }
+
+      .initial-loading {
+        padding: 1rem;
+      }
+
+      .error-state {
+        margin: 1rem;
+        padding: 1.5rem;
+      }
+
+      .error-actions {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Main application mount point -->
+  <div id="app">
+    <!-- Initial loading screen (replaced by TypeScript app) -->
+    <div class="initial-loading">
+      <div class="loading-spinner"></div>
+      <h1 class="loading-title">🚀 Phase 6</h1>
+      <h2 class="loading-subtitle">DSL/AST Visualization Client</h2>
+      <p class="loading-details">
+        Initializing TypeScript application with two-panel DSL source and AST visualization...
+      </p>
+    </div>
+  </div>
+
+  <!-- Application scripts -->
+  <script type="module" src="/src/main.ts"></script>
+
+  <!-- Fallback for browsers without module support -->
+  <script nomodule>
+    document.getElementById('app').innerHTML = `
+      <div class="initial-loading">
+        <div class="error-state">
+          <div class="error-title">
+            ⚠️ Browser Not Supported
+          </div>
+          <div class="error-message">
+            This application requires a modern browser with ES6 module support.
+            Please update your browser to the latest version.
+          </div>
+          <div class="error-actions">
+            <button class="error-button" onclick="window.location.reload()">
+              🔄 Try Again
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  </script>
+
+  <!-- Development helpers -->
+  <script>
+    // Add development helpers in dev mode
+    if (import.meta && import.meta.env && import.meta.env.DEV) {
+      console.log('🔧 Phase 6 Development Mode');
+      console.log('📋 Available at: http://localhost:3000');
+      console.log('🌐 API Backend: ' + (import.meta.env.VITE_API_BASE_URL || 'Mock API'));
+
+      // Add global development utilities
+      window.Phase6 = {
+        version: '1.0.0',
+        build: 'development',
+        timestamp: new Date().toISOString()
+      };
+    }
+  </script>
+</body>
+</html>

@@ -413,11 +413,11 @@ func NormalizeVars(dsl string, resolve func(sym string) (attr *dictionary.Attrib
 var reVarAttrID = regexp.MustCompile(`\(\s*var\s*\(\s*attr-id\s*"([^"]+)"\s*\)\s*\)`)
 
 func ExtractVarAttrIDs(dsl string) []string {
-    out := []string{}
-    for _, m := range reVarAttrID.FindAllStringSubmatch(dsl, -1) {
-        out = append(out, m[1]) // m[1] is the UUID
-    }
-    return out
+	out := []string{}
+	for _, m := range reVarAttrID.FindAllStringSubmatch(dsl, -1) {
+		out = append(out, m[1]) // m[1] is the UUID
+	}
+	return out
 }
 
 // Also capture standalone (attr-id "<uuid>") tokens anywhere in the DSL
@@ -426,27 +426,27 @@ var reAttrIDToken = regexp.MustCompile(`\(\s*attr-id\s*"([^"]+)"\s*\)`)
 // ExtractAttributeIDs returns unique attribute IDs referenced via either canonical var
 // or standalone (attr-id ...) tokens.
 func ExtractAttributeIDs(dsl string) []string {
-    seen := make(map[string]bool)
-    ids := []string{}
+	seen := make(map[string]bool)
+	ids := []string{}
 
-    for _, id := range ExtractVarAttrIDs(dsl) {
-        if !seen[id] {
-            seen[id] = true
-            ids = append(ids, id)
-        }
-    }
+	for _, id := range ExtractVarAttrIDs(dsl) {
+		if !seen[id] {
+			seen[id] = true
+			ids = append(ids, id)
+		}
+	}
 
-    for _, m := range reAttrIDToken.FindAllStringSubmatch(dsl, -1) {
-        if len(m) >= 2 {
-            id := m[1]
-            if !seen[id] {
-                seen[id] = true
-                ids = append(ids, id)
-            }
-        }
-    }
+	for _, m := range reAttrIDToken.FindAllStringSubmatch(dsl, -1) {
+		if len(m) >= 2 {
+			id := m[1]
+			if !seen[id] {
+				seen[id] = true
+				ids = append(ids, id)
+			}
+		}
+	}
 
-    return ids
+	return ids
 }
 
 // AttributeReference represents an attribute variable found in DSL

@@ -17,12 +17,14 @@
 //! RESOURCES_PLANNED → ATTRIBUTES_BOUND → WORKFLOW_ACTIVE → COMPLETE
 
 use crate::domains::common;
+use crate::dsl::domain_registry::{DomainHealthStatus, HealthStatus};
 use crate::dsl::{
     domain_context::DomainContext,
     domain_registry::{DomainHandler, DslVocabulary, StateTransition, ValidationRule},
     operations::DslOperation,
     DslEditError, DslEditResult,
 };
+use crate::{Key, Literal, Value};
 use async_trait::async_trait;
 use chrono::Utc;
 use serde_json::json;
@@ -134,23 +136,65 @@ impl OnboardingDomainHandler {
         let cbu_id = payload
             .get("cbu_id")
             .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
             .ok_or_else(|| {
                 DslEditError::DomainValidationError("Missing cbu_id in payload".to_string())
             })?;
 
-        let association_type = payload
-            .get("association_type")
+        let entity_id = payload
+            .get("entity_id")
             .and_then(|v| v.as_str())
-            .unwrap_or("primary");
+            .map(|s| s.to_string())
+            .ok_or_else(|| {
+                DslEditError::DomainValidationError(
+                    "Missing entity_id in payload for CBU association".to_string(),
+                )
+            })?;
 
-        let default_details = json!("Associated via onboarding");
-        let details = payload.get("details").unwrap_or(&default_details);
+        let default_details = serde_json::json!("Associated via onboarding");
+        let details_json = payload.get("details").unwrap_or(&default_details);
 
         let timestamp = common::generate_timestamp();
 
-        Ok(format!(
-            "(cbu.associate (cbu.id \"{}\") (association.type \"{}\") (cbu.details {}) (associated.at \"{}\"))",
-            cbu_id, association_type, details, timestamp
+        let evidence_value = if let Some(arr) = details_json.as_array() {
+            Value::List(
+                arr.iter()
+                    .filter_map(|v| {
+                        v.as_str()
+                            .map(|s| Value::Literal(Literal::String(s.to_string())))
+                    })
+                    .collect(),
+            )
+        } else if let Some(s) = details_json.as_str() {
+            Value::List(vec![Value::Literal(Literal::String(s.to_string()))])
+        } else {
+            Value::List(vec![Value::Literal(Literal::String(
+                details_json.to_string(),
+            ))])
+        };
+
+        let mut attributes = HashMap::new();
+        attributes.insert(
+            Key::new("entity"),
+            Value::Literal(Literal::String(entity_id)),
+        );
+        attributes.insert(
+            Key::new("role"),
+            Value::Literal(Literal::String("UltimateBeneficialOwner".to_string())),
+        );
+        attributes.insert(Key::new("cbu"), Value::Literal(Literal::String(cbu_id)));
+
+        let mut period_map = HashMap::new();
+        period_map.insert(
+            Key::new("start"),
+            Value::Literal(Literal::String(timestamp)),
+        );
+        attributes.insert(Key::new("period"), Value::Map(period_map));
+        attributes.insert(Key::new("evidence"), evidence_value);
+
+        Ok(common::create_verb_form_fragment(
+            "role.assign",
+            &attributes,
         ))
     }
 
@@ -188,7 +232,51 @@ impl OnboardingDomainHandler {
             ));
         }
 
-        Ok(format!("(services.plan\n{})", service_fragments.join("\n")))
+        let mut services_list: Vec<Value> = Vec::new();
+        for service in services {
+            let service_name = service
+                .get("name")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .ok_or_else(|| {
+                    DslEditError::DomainValidationError("Missing service name".to_string())
+                })?;
+
+            let sla = service
+                .get("sla")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "standard".to_string());
+
+            let mut service_map = HashMap::new();
+            service_map.insert(
+                Key::new("name"),
+                Value::Literal(Literal::String(service_name)),
+            );
+            service_map.insert(Key::new("sla"), Value::Literal(Literal::String(sla)));
+
+            // Add other service properties if they exist in the payload
+            if let Some(description) = service
+                .get("description")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+            {
+                service_map.insert(
+                    Key::new("description"),
+                    Value::Literal(Literal::String(description)),
+                );
+            }
+
+            services_list.push(Value::Map(service_map));
+        }
+
+        let mut attributes = HashMap::new();
+        attributes.insert(Key::new("services"), Value::List(services_list));
+
+        Ok(common::create_verb_form_fragment(
+            "services.plan",
+            &attributes,
+        ))
     }
 
     /// Generate resource discovery DSL fragment
@@ -206,7 +294,7 @@ impl OnboardingDomainHandler {
                 )
             })?;
 
-        let mut resource_fragments = Vec::new();
+        let mut resource_list: Vec<Value> = Vec::new();
 
         for resource in resources {
             let resource_type = resource
@@ -221,15 +309,43 @@ impl OnboardingDomainHandler {
                 .and_then(|v| v.as_str())
                 .unwrap_or("system");
 
-            resource_fragments.push(format!(
-                "  (resource \"{}\" (owner \"{}\"))",
-                resource_type, owner
-            ));
+            let mut resource_map = HashMap::new();
+            resource_map.insert(
+                Key::new("type"),
+                Value::Literal(Literal::String(resource_type.to_string())),
+            );
+            resource_map.insert(
+                Key::new("owner"),
+                Value::Literal(Literal::String(owner.to_string())),
+            );
+
+            // Add other resource properties if they exist in the payload
+            if let Some(capacity) = resource.get("capacity").and_then(|v| v.as_f64()) {
+                resource_map.insert(
+                    Key::new("capacity"),
+                    Value::Literal(Literal::Number(capacity)),
+                );
+            }
+            if let Some(location) = resource
+                .get("location")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+            {
+                resource_map.insert(
+                    Key::new("location"),
+                    Value::Literal(Literal::String(location)),
+                );
+            }
+
+            resource_list.push(Value::Map(resource_map));
         }
 
-        Ok(format!(
-            "(resources.plan\n{})",
-            resource_fragments.join("\n")
+        let mut attributes = HashMap::new();
+        attributes.insert(Key::new("resources"), Value::List(resource_list));
+
+        Ok(common::create_verb_form_fragment(
+            "resources.plan",
+            &attributes,
         ))
     }
 
@@ -239,17 +355,31 @@ impl OnboardingDomainHandler {
         payload: &serde_json::Value,
         _context: &DomainContext,
     ) -> DslEditResult<String> {
-        let completion_notes = payload
-            .get("notes")
+        let cbu_id = payload
+            .get("cbu_id")
             .and_then(|v| v.as_str())
-            .unwrap_or("Onboarding completed successfully");
+            .map(|s| s.to_string())
+            .ok_or_else(|| {
+                DslEditError::DomainValidationError("Missing cbu_id in payload".to_string())
+            })?;
+
+        let status = payload
+            .get("status")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "COMPLETE".to_string());
 
         let timestamp = common::generate_timestamp();
 
-        Ok(format!(
-            "(onboarding.complete (completion.status \"SUCCESS\") (completion.notes \"{}\") (completed.at \"{}\"))",
-            completion_notes, timestamp
-        ))
+        let mut attributes = HashMap::new();
+        attributes.insert(Key::new("id"), Value::Literal(Literal::String(cbu_id)));
+        attributes.insert(Key::new("status"), Value::Literal(Literal::String(status)));
+        attributes.insert(
+            Key::new("completed-at"),
+            Value::Literal(Literal::String(timestamp)),
+        );
+
+        Ok(common::create_verb_form_fragment("case.close", &attributes))
     }
 
     /// Generate archival DSL fragment
@@ -258,20 +388,37 @@ impl OnboardingDomainHandler {
         payload: &serde_json::Value,
         _context: &DomainContext,
     ) -> DslEditResult<String> {
-        let reason = payload
-            .get("reason")
+        let cbu_id = payload
+            .get("cbu_id")
             .and_then(|v| v.as_str())
-            .unwrap_or("Archived by user");
+            .map(|s| s.to_string())
+            .ok_or_else(|| {
+                DslEditError::DomainValidationError("Missing cbu_id in payload".to_string())
+            })?;
+
+        let status = payload
+            .get("status")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "ARCHIVED".to_string());
 
         let timestamp = common::generate_timestamp();
 
-        Ok(format!(
-            "(onboarding.archive (archival.reason \"{}\") (archived.at \"{}\"))",
-            reason, timestamp
-        ))
+        let mut attributes = HashMap::new();
+        attributes.insert(Key::new("id"), Value::Literal(Literal::String(cbu_id)));
+        attributes.insert(Key::new("status"), Value::Literal(Literal::String(status)));
+        attributes.insert(
+            Key::new("archived-at"),
+            Value::Literal(Literal::String(timestamp)),
+        );
+
+        Ok(common::create_verb_form_fragment("case.close", &attributes))
     }
 }
 
+/// Implement the DomainHandler trait for OnboardingDomainHandler
+///
+/// This trait defines the core interface for interacting with the DSL engine.
 #[async_trait]
 impl DomainHandler for OnboardingDomainHandler {
     fn domain_name(&self) -> &str {
@@ -283,7 +430,7 @@ impl DomainHandler for OnboardingDomainHandler {
     }
 
     fn domain_description(&self) -> &str {
-        "Client onboarding workflows and case management"
+        "Handles client onboarding workflows and case management."
     }
 
     fn get_vocabulary(&self) -> &DslVocabulary {
@@ -295,6 +442,10 @@ impl DomainHandler for OnboardingDomainHandler {
         operation: &DslOperation,
         context: &DomainContext,
     ) -> DslEditResult<String> {
+        use super::common; // Ensure common is accessible
+        use crate::{Key, Literal, Value}; // Ensure Key, Literal, Value are accessible
+        use std::collections::HashMap;
+
         match operation {
             DslOperation::CreateEntity {
                 entity_type,
@@ -304,35 +455,62 @@ impl DomainHandler for OnboardingDomainHandler {
                 let entity_id = properties
                     .get("entity_id")
                     .and_then(|v| v.as_str())
-                    .unwrap_or("generated-id");
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| "generated-id".to_string());
 
-                let mut attrs = HashMap::new();
-                for (key, value) in properties {
-                    if key != "entity_id" {
-                        attrs.insert(key.clone(), value.clone());
+                let mut props_map = HashMap::new();
+                for (key_str, value_json) in properties {
+                    if key_str != "entity_id" {
+                        let key = Key::new(key_str);
+                        let value = match value_json {
+                            serde_json::Value::String(s) => {
+                                Value::Literal(Literal::String(s.clone()))
+                            }
+                            serde_json::Value::Number(n) => {
+                                Value::Literal(Literal::Number(n.as_f64().unwrap_or_default()))
+                            }
+                            serde_json::Value::Bool(b) => Value::Literal(Literal::Boolean(*b)),
+                            _ => Value::Literal(Literal::String(value_json.to_string())), // Fallback
+                        };
+                        props_map.insert(key, value);
                     }
                 }
 
-                let attrs_str = attrs
-                    .iter()
-                    .map(|(k, v)| format!(":{} \"{}\"", k, v))
-                    .collect::<Vec<_>>()
-                    .join(" ");
+                let mut attributes = HashMap::new();
+                attributes.insert(Key::new("id"), Value::Literal(Literal::String(entity_id)));
+                attributes.insert(
+                    Key::new("entity-type"),
+                    Value::Literal(Literal::String(entity_type.clone())),
+                );
+                attributes.insert(Key::new("props"), Value::Map(props_map));
 
-                Ok(format!(
-                    "(case.create (entity.id \"{}\") (entity.type \"{}\") {})",
-                    entity_id, entity_type, attrs_str
+                Ok(common::create_verb_form_fragment(
+                    "case.create",
+                    &attributes,
                 ))
             }
 
             DslOperation::AddProducts { products, .. } => {
-                let products_str = products
+                let products_values: Vec<Value> = products
                     .iter()
-                    .map(|p| format!("\"{}\"", p))
-                    .collect::<Vec<_>>()
-                    .join(" ");
+                    .map(|p| Value::Literal(Literal::String(p.clone())))
+                    .collect();
 
-                Ok(format!("(products.add {})", products_str))
+                let mut attributes = HashMap::new();
+                // Assuming "case.update" can take :add-products
+                let cbu_id = common::extract_cbu_id(context).ok_or_else(|| {
+                    DslEditError::DomainValidationError(
+                        "Missing CBU ID in context for AddProducts".to_string(),
+                    )
+                })?;
+
+                attributes.insert(Key::new("id"), Value::Literal(Literal::String(cbu_id)));
+                attributes.insert(Key::new("add-products"), Value::List(products_values));
+
+                Ok(common::create_verb_form_fragment(
+                    "case.update",
+                    &attributes,
+                ))
             }
 
             DslOperation::TransitionState {
@@ -348,11 +526,27 @@ impl DomainHandler for OnboardingDomainHandler {
                 let reason = transition_data
                     .get("reason")
                     .and_then(|v| v.as_str())
-                    .unwrap_or("State transition");
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| "State transition".to_string());
 
-                Ok(format!(
-                    "(state.transition (from \"{}\") (to \"{}\") (reason \"{}\") (timestamp \"{}\"))",
-                    from_state, to_state, reason, timestamp
+                let mut attributes = HashMap::new();
+                attributes.insert(
+                    Key::new("from"),
+                    Value::Literal(Literal::String(from_state.clone())),
+                );
+                attributes.insert(
+                    Key::new("to"),
+                    Value::Literal(Literal::String(to_state.clone())),
+                );
+                attributes.insert(Key::new("reason"), Value::Literal(Literal::String(reason)));
+                attributes.insert(
+                    Key::new("timestamp"),
+                    Value::Literal(Literal::String(timestamp)),
+                );
+
+                Ok(common::create_verb_form_fragment(
+                    "workflow.transition",
+                    &attributes,
                 ))
             }
 
@@ -378,17 +572,19 @@ impl DomainHandler for OnboardingDomainHandler {
         context: &DomainContext,
     ) -> DslEditResult<()> {
         // Validate required context for certain operations
-        if let DslOperation::DomainSpecific { operation_type, .. } = operation { match operation_type.as_str() {
-            "associate_cbu" => {
-                common::validate_required_context(context, &["cbu_id"]).map_err(|e| {
-                    DslEditError::DomainValidationError(format!("CBU association: {}", e))
-                })?;
+        if let DslOperation::DomainSpecific { operation_type, .. } = operation {
+            match operation_type.as_str() {
+                "associate_cbu" => {
+                    common::validate_required_context(context, &["cbu_id"]).map_err(|e| {
+                        DslEditError::DomainValidationError(format!("CBU association: {}", e))
+                    })?;
+                }
+                "complete_onboarding" | "archive_onboarding" => {
+                    // These operations can be performed in any context
+                }
+                _ => {}
             }
-            "complete_onboarding" | "archive_onboarding" => {
-                // These operations can be performed in any context
-            }
-            _ => {}
-        } }
+        }
 
         Ok(())
     }
@@ -398,9 +594,8 @@ impl DomainHandler for OnboardingDomainHandler {
     }
 
     fn validate_state_transition(&self, from: &str, to: &str) -> DslEditResult<()> {
-        let allowed_transitions = Self::get_allowed_transitions();
-        common::validate_state_transition("onboarding", &allowed_transitions, from, to)
-            .map_err(|e| DslEditError::DomainValidationError(format!("State transition: {}", e)))
+        common::validate_state_transition("onboarding", &Self::get_allowed_transitions(), from, to)
+            .map_err(|e| DslEditError::DomainValidationError(e.to_string()))
     }
 
     async fn apply_business_rules(
@@ -441,12 +636,12 @@ impl DomainHandler for OnboardingDomainHandler {
 
         // Extract CBU ID if present
         if let Some(cbu_match) = extract_value_from_dsl(dsl, "cbu.id") {
-            context = context.with_context("cbu_id", json!(cbu_match));
+            context = context.with_context("cbu_id", serde_json::json!(cbu_match));
         }
 
         // Extract entity ID if present
         if let Some(entity_match) = extract_value_from_dsl(dsl, "entity.id") {
-            context = context.with_context("entity_id", json!(entity_match));
+            context = context.with_context("entity_id", serde_json::json!(entity_match));
         }
 
         // Extract current state from state transitions
@@ -457,8 +652,8 @@ impl DomainHandler for OnboardingDomainHandler {
         Ok(context)
     }
 
-    async fn health_check(&self) -> crate::dsl::domain_registry::DomainHealthStatus {
-        let mut metrics = HashMap::new();
+    async fn health_check(&self) -> DomainHealthStatus {
+        let mut metrics = std::collections::HashMap::new();
         metrics.insert(
             "supported_operations".to_string(),
             self.supported_operations.len() as f64,
@@ -472,10 +667,10 @@ impl DomainHandler for OnboardingDomainHandler {
             self.validation_rules.len() as f64,
         );
 
-        crate::dsl::domain_registry::DomainHealthStatus {
+        DomainHealthStatus {
             domain_name: "onboarding".to_string(),
-            status: crate::dsl::domain_registry::HealthStatus::Healthy,
-            last_check: Utc::now(),
+            status: HealthStatus::Healthy,
+            last_check: chrono::Utc::now(),
             metrics,
             errors: Vec::new(),
         }
@@ -659,7 +854,8 @@ mod tests {
     #[tokio::test]
     async fn test_add_products_transformation() {
         let handler = OnboardingDomainHandler::new();
-        let context = DomainContext::onboarding();
+        let context =
+            DomainContext::onboarding().with_context("cbu_id", serde_json::json!("CBU-1234"));
 
         let operation = OperationBuilder::new("test_user").add_products(
             "CBU-1234",
@@ -669,10 +865,11 @@ mod tests {
         let result = handler
             .transform_operation_to_dsl(&operation, &context)
             .await;
+
         assert!(result.is_ok());
 
         let dsl = result.unwrap();
-        assert!(dsl.contains("products.add"));
+        assert!(dsl.contains("case.update"));
         assert!(dsl.contains("CUSTODY"));
         assert!(dsl.contains("FUND_ACCOUNTING"));
     }
@@ -710,18 +907,21 @@ mod tests {
         // Test CBU association
         let payload = json!({
             "cbu_id": "CBU-1234",
+            "entity_id": "ENT-001",
             "association_type": "primary"
         });
 
         let result = handler
             .generate_cbu_association_dsl(&payload, &context)
             .await;
+
         assert!(result.is_ok());
 
         let dsl = result.unwrap();
-        assert!(dsl.contains("cbu.associate"));
+
+        assert!(dsl.contains("role.assign"));
         assert!(dsl.contains("CBU-1234"));
-        assert!(dsl.contains("primary"));
+        assert!(dsl.contains("ENT-001"));
     }
 
     #[tokio::test]

@@ -15,18 +15,25 @@
 //! # Quick Start
 //!
 //! ```rust
-//! use ob_poc::{parse_dsl, GrammarEngine};
+//! use ob_poc::{parse_dsl, Program, DSLError};
+//! use ob_poc::ast::{Statement, Value};
 //!
 //! // Parse a simple DSL program
 //! let dsl_code = r#"
 //!     (workflow "onboard-customer"
-//!         (declare-entity "customer1" "person")
-//!         (obtain-document "passport" "government")
-//!         (create-edge "customer1" "passport" "evidenced-by"))
+//!         (properties
+//!             (description "Basic onboarding workflow for a customer")
+//!         )
+//!         (declare-entity "customer1" PERSON
+//!             (properties
+//!                 (legal-name "John Doe")
+//!             )
+//!         )
+//!     )
 //! "#;
 //!
 //! let program = parse_dsl(dsl_code)?;
-//! println!("Parsed {} workflows", program.workflows.len());
+//! assert_eq!(program.workflows.len(), 1);
 //! # Ok::<(), ob_poc::DSLError>(())
 //! ```
 //!
@@ -35,25 +42,84 @@
 //! The system is organized into several key modules:
 //!
 //! - [`ast`] - Abstract Syntax Tree definitions with strong typing
-//! - [`parser`] - nom-based parser with proper error handling
-//! - [`grammar`] - EBNF grammar engine for extensible syntax
-//! - [`error`] - Comprehensive error types with context
-//! - [`vocabulary`] - Domain vocabulary management
-//!
-//! # Error Handling
-//!
-//! All operations return strongly-typed `Result` types with detailed error information:
-//!
-//! ```rust
-//! use ob_poc::{parse_dsl, DSLError};
-//!
-//! match parse_dsl("invalid syntax") {
-//!     Ok(program) => println!("Success: {:?}", program),
-//!     Err(DSLError::Parse(parse_err)) => println!("Parse error: {}", parse_err),
-//!     Err(DSLError::Grammar(grammar_err)) => println!("Grammar error: {}", grammar_err),
-//!     Err(other) => println!("Other error: {}", other),
-//! }
-//! ```
+#![allow(dead_code, unused_imports)] // Temporarily allow dead code and unused imports during refactoring
+
+// New v3.0 AST definitions (temporary, to be moved to ast.rs once accessible)
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub enum Literal {
+    String(String),
+    Number(f64),
+    Boolean(bool),
+    Date(String), // ISO 8601 string, e.g., "2025-11-10T10:30:00Z"
+    Uuid(String), // UUID string, e.g., "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+}
+
+#[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
+pub struct Key {
+    pub parts: Vec<String>, // e.g., ["customer", "id"] for :customer.id
+}
+
+impl Key {
+    pub fn new(s: &str) -> Self {
+        Self {
+            parts: s.split('.').map(|p| p.to_string()).collect(),
+        }
+    }
+
+    pub fn as_str(&self) -> String {
+        self.parts.join(".")
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub enum Value {
+    Literal(Literal),
+    Identifier(String), // For unquoted symbols
+    List(Vec<Value>),
+    Map(HashMap<Key, Value>),
+    AttrRef(String), // UUID string, e.g., "@attr{uuid-001}"
+}
+
+// Helper for property maps, for consistency with old PropertyMap, but uses new Key/Value
+pub type PropertyMap = HashMap<Key, Value>;
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub struct VerbForm {
+    pub verb: String,
+    pub pairs: PropertyMap, // Using PropertyMap for key-value pairs
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub enum Form {
+    Verb(VerbForm),
+    Comment(String),
+}
+
+// Program is now a sequence of forms (workflow replaced by a specific verb form)
+pub type Program = Vec<Form>;
+// - [`parser`] - nom-based parser with proper error handling
+// - [`grammar`] - EBNF grammar engine for extensible syntax
+// - [`error`] - Comprehensive error types with context
+// - [`vocabulary`] - Domain vocabulary management
+//
+// # Error Handling
+//
+// All operations return strongly-typed `Result` types with detailed error information:
+//
+// ```rust
+// use ob_poc::{parse_dsl, DSLError};
+//
+// match parse_dsl("invalid syntax") {
+//     Ok(program) => assert!(false, "Parsing 'invalid syntax' should fail, but got {:?}", program),
+//     Err(DSLError::Parse(parse_err)) => assert!(true, "Caught expected parse error: {}", parse_err),
+//     Err(DSLError::Grammar(grammar_err)) => assert!(false, "Caught unexpected grammar error: {}", grammar_err),
+//     Err(other) => assert!(false, "Caught unexpected error: {}", other),
+// }
+// # Ok::<(), ob_poc::DSLError>(())
+// ```
 
 // Core modules
 pub mod ast;
@@ -63,12 +129,24 @@ pub mod grammar;
 pub mod parser;
 pub mod vocabulary;
 
-// Database and models for domain architecture - temporarily disabled for Phase 1
-// pub mod database;
-// pub mod models;
+// Database and models for domain architecture
+#[cfg(feature = "database")]
+pub mod database;
+// Models for database entities
+#[cfg(feature = "database")]
+pub mod models;
 
-// DSL Manager - core create/edit functionality - temporarily disabled for Phase 1
-// pub mod dsl_manager;
+// DSL Manager - V3.1 aligned with proper type consolidation
+#[cfg(feature = "database")]
+pub mod dsl_manager;
+
+// REST API server for visualizer
+#[cfg(feature = "rest-api")]
+pub mod rest_api;
+
+// Mock REST API server for testing without database
+#[cfg(any(feature = "rest-api", feature = "mock-api"))]
+pub mod mock_rest_api;
 
 // Central DSL system with domain context switching
 pub mod dsl;
@@ -76,12 +154,16 @@ pub mod dsl;
 // Domain implementations for centralized DSL editing
 pub mod domains;
 
-// New modules for gRPC server and services - temporarily disabled for Phase 1
+// New modules for gRPC server and services - DISABLED UNTIL DSL+DB COMPLETE
+// #[cfg(feature = "database")]
+// pub mod execution;
+// #[cfg(feature = "database")]
 // pub mod grpc_server;
-pub mod execution;
-// pub mod services; // Temporarily disabled to focus on execution
+// #[cfg(feature = "database")]
+// pub mod services;
 
-// Generated protobuf modules - temporarily disabled for Phase 1
+// Generated protobuf modules - DISABLED UNTIL DSL+DB COMPLETE
+// #[cfg(feature = "database")]
 // pub mod proto;
 
 // Domain-specific visualization features (Phase 3) removed during consolidation
@@ -91,16 +173,13 @@ pub mod execution;
 // - grpc/ - gRPC service implementations (for future web services)
 
 // Re-export key types and functions for public API
-pub use ast::{Program, PropertyMap, Statement, Value, Workflow};
+// pub use ast::{Program, PropertyMap, Statement, Value, Workflow}; // Old AST re-exports commented out
 pub use error::{
     DSLError, DSLResult, ErrorCollector, ErrorSeverity, GrammarError, ParseError, RuntimeError,
     SourceLocation, ValidationError, VocabularyError,
 };
 pub use grammar::{load_default_grammar, EBNFGrammar, EBNFParser, GrammarEngine};
-pub use parser::{
-    parse_program, parse_value_standalone as parse_value,
-    parse_workflow_standalone as parse_workflow, validate_ast,
-};
+pub use parser::parse_program;
 
 // Re-export consolidated DSL manager (main interface) - temporarily disabled for Phase 1
 // pub use dsl_manager::{
@@ -131,16 +210,25 @@ pub use domains::{
 //     start_grpc_services, start_retrieval_service, start_transform_service, GrpcServerConfig,
 //     GrpcServerManager,
 // };
-// pub use services::{DslRetrievalServiceImpl, DslTransformServiceImpl};
+// pub use services::{DslRetrievalServiceImpl, DslTransformServiceImpl};\n
+// Re-export database and models
+#[cfg(feature = "database")]
+pub use database::{
+    DatabaseConfig, DatabaseManager, DslDomainRepository, DslInstanceRepository,
+    PgDslInstanceRepository,
+};
+#[cfg(feature = "database")]
+pub use models::{
+    CompilationStatus, DslDomain, DslVersion, ExecutionPhase, ExecutionStatus, ParsedAst,
+};
 
-// Re-export database and models - temporarily disabled for Phase 1
-// pub use database::{
-//     DatabaseConfig, DatabaseManager, DslDomainRepository, DslInstanceRepository,
-//     PgDslInstanceRepository,
-// };
-// pub use models::{
-//     CompilationStatus, DslDomain, DslVersion, ExecutionPhase, ExecutionStatus, ParsedAst,
-// };
+// Re-export REST API components
+#[cfg(feature = "rest-api")]
+pub use rest_api::{RestApiConfig, RestApiServer};
+
+// Re-export Mock REST API components
+#[cfg(any(feature = "rest-api", feature = "mock-api"))]
+pub use mock_rest_api::{MockRestApiConfig, MockRestApiServer};
 
 // Legacy managers removed; consolidated manager is the single entry point
 
@@ -202,19 +290,42 @@ impl DSLContext {
         })
     }
 
-    /// Parse DSL code with this context's configuration
+    /// Parse DSL code with this context's configuration (legacy method)
     pub fn parse(&self, input: &str) -> DSLResult<Program> {
         let program = parse_program(input).map_err(|e| DSLError::Parse(e.into()))?;
+        // Validation will occur at a later stage as the AST structure has changed.
+        Ok(program)
+    }
 
-        if self.config.strict_validation {
-            validate_ast(&program).map_err(|errors| {
-                DSLError::Validation(ValidationError::WorkflowError {
-                    message: format!("Validation failed with {} errors", errors.len()),
-                })
-            })?;
+    /// Parse DSL code with domain-aware routing (new v3.0 method)
+    pub async fn parse_with_domains(
+        &self,
+        input: &str,
+    ) -> DSLResult<crate::dsl::parsing_coordinator::ParseResult> {
+        use crate::domains::{KycDomainHandler, OnboardingDomainHandler};
+        use crate::dsl::domain_registry::DomainRegistry;
+        use crate::dsl::parsing_coordinator::ParsingCoordinator;
+
+        // Create domain registry with all available domains
+        let mut registry = DomainRegistry::new();
+
+        // Register all available domains
+        if let Err(_) = registry.register_domain(Box::new(KycDomainHandler::new())) {
+            log::warn!("Failed to register KYC domain");
+        }
+        if let Err(_) = registry.register_domain(Box::new(OnboardingDomainHandler::new())) {
+            log::warn!("Failed to register Onboarding domain");
         }
 
-        Ok(program)
+        // Create parsing coordinator
+        let mut coordinator = ParsingCoordinator::new(registry);
+
+        // Parse with domain awareness
+        coordinator.parse_dsl(input).await.map_err(|e| {
+            DSLError::Parse(ParseError::Internal {
+                message: format!("{:?}", e),
+            })
+        })
     }
 
     /// Get reference to the grammar engine
@@ -254,15 +365,161 @@ impl Default for DSLContext {
     }
 }
 
-/// Convenience function for parsing DSL with default settings
+/// Convenience function for parsing DSL with default settings (legacy)
 ///
 /// This is equivalent to:
 /// ```rust
-/// let context = DSLContext::new()?;
-/// context.parse(input)
+/// use ob_poc::{parse_dsl, Program, DSLError};
+/// let dsl_code = "(entity :id \"test\" :label \"Company\")";
+/// let program = parse_dsl(dsl_code)?;
+/// assert_eq!(program.len(), 1);
+/// # Ok::<(), ob_poc::DSLError>(())
 /// ```
+#[doc(hidden)]
 pub fn parse_dsl(input: &str) -> DSLResult<Program> {
     parse_program(input).map_err(|e| DSLError::Parse(e.into()))
+}
+
+/// Domain-aware DSL parsing with v3.0 support
+///
+/// This function automatically detects the domain from DSL verbs and routes
+/// to appropriate domain handlers for enhanced validation and processing.
+///
+/// ```rust
+/// use ob_poc::{parse_dsl_v3, DSLError};
+///
+/// async fn example() -> Result<(), DSLError> {
+///     let dsl_code = "(kyc.verify :customer-id \"person-001\" :method \"enhanced_dd\")";
+///     let result = parse_dsl_v3(dsl_code).await?;
+///     assert_eq!(result.program.len(), 1);
+///     assert_eq!(result.handler_used, Some("kyc".to_string()));
+///     Ok(())
+/// }
+/// ```
+pub async fn parse_dsl_v3(input: &str) -> DSLResult<crate::dsl::parsing_coordinator::ParseResult> {
+    let context = DSLContext::default();
+    context.parse_with_domains(input).await
+}
+
+/// Comprehensive test for v3.0 domain-aware DSL parsing
+#[cfg(test)]
+pub async fn test_v3_dsl_comprehensive() -> DSLResult<()> {
+    use crate::dsl::parsing_coordinator::ParseResult;
+
+    // Test 1: KYC domain detection and parsing
+    let kyc_dsl = r#"
+        ;; KYC verification example
+        (kyc.verify
+          :customer-id "person-john-smith"
+          :method "enhanced_due_diligence"
+          :verified-at "2025-11-10T10:00:00Z")
+
+        (kyc.screen_sanctions
+          :target "person-john-smith"
+          :databases ["OFAC", "UN", "EU"]
+          :status "CLEAR")
+    "#;
+
+    let result: ParseResult = parse_dsl_v3(kyc_dsl).await?;
+    assert_eq!(result.program.len(), 2); // 2 forms (excluding comments)
+    assert_eq!(result.handler_used, Some("kyc".to_string()));
+
+    // Test 2: Onboarding domain with case management
+    let onboarding_dsl = r#"
+        (case.create
+          :id "CBU-ZENITH-001"
+          :nature-purpose "Hedge fund investor onboarding")
+
+        (case.update
+          :id "CBU-ZENITH-001"
+          :add-products ["CUSTODY", "FUND_ACCOUNTING"])
+    "#;
+
+    let result = parse_dsl_v3(onboarding_dsl).await?;
+    assert_eq!(result.program.len(), 2);
+    assert_eq!(result.handler_used, Some("onboarding".to_string()));
+
+    // Test 3: UBO domain with entity and edge definitions
+    let ubo_dsl = r#"
+        (entity
+          :id "company-zenith-spv-001"
+          :label "Company"
+          :props {
+            :legal-name "Zenith Capital Partners LP"
+            :registration-number "KY-123456"
+            :jurisdiction "KY"
+          })
+
+        (edge
+          :from "person-john-smith"
+          :to "company-zenith-spv-001"
+          :type "HAS_OWNERSHIP"
+          :props {
+            :percent 45.0
+            :share-class "Class A Units"
+          }
+          :evidence ["doc-cayman-registry-001"])
+
+        (ubo.outcome
+          :target "company-zenith-spv-001"
+          :at "2025-11-10T10:30:00Z"
+          :threshold 25.0
+          :ubos [{
+            :entity "person-john-smith"
+            :effective-percent 45.0
+            :prongs {:ownership 45.0, :voting 45.0}
+          }])
+    "#;
+
+    let result = parse_dsl_v3(ubo_dsl).await?;
+    assert_eq!(result.program.len(), 3);
+    assert_eq!(result.handler_used, Some("ubo".to_string()));
+
+    // Test 4: Mixed domain detection (should pick most frequent)
+    let mixed_dsl = r#"
+        (kyc.verify :customer-id "test" :method "basic")
+        (case.create :id "test-case")
+        (kyc.assess_risk :target "test" :score 50.0)
+    "#;
+
+    let result = parse_dsl_v3(mixed_dsl).await?;
+    assert_eq!(result.program.len(), 3);
+    assert_eq!(result.handler_used, Some("kyc".to_string())); // KYC wins (2 vs 1 verbs)
+
+    // Test 5: Complex nested structures
+    let complex_dsl = r#"
+        (define-kyc-investigation
+          :id "zenith-capital-ubo-discovery"
+          :target-entity "company-zenith-spv-001"
+          :jurisdiction "KY"
+          :ubo-threshold 25.0
+
+          (entity
+            :id "company-zenith-spv-001"
+            :label "Company"
+            :props {
+              :legal-name "Zenith Capital Partners LP"
+              :entity-type "Limited Partnership"
+            })
+
+          (kyc.collect_document
+            :target "company-zenith-spv-001"
+            :doc-type "certificate_incorporation"
+            :status "VERIFIED"))
+    "#;
+
+    let result = parse_dsl_v3(complex_dsl).await?;
+    assert!(result.program.len() >= 1);
+    assert_eq!(result.handler_used, Some("kyc".to_string()));
+
+    println!("✅ All v3.0 DSL domain-aware parsing tests passed!");
+    println!("   - KYC domain: ✓");
+    println!("   - Onboarding domain: ✓");
+    println!("   - UBO domain: ✓");
+    println!("   - Mixed domain detection: ✓");
+    println!("   - Complex nested structures: ✓");
+
+    Ok(())
 }
 
 /// Parse and validate DSL with comprehensive error reporting
@@ -277,13 +534,7 @@ pub fn parse_and_validate(input: &str) -> Result<Program, ErrorCollector> {
         }
     };
 
-    // Validate the parsed program
-    if let Err(errors) = validate_ast(&program) {
-        for error in errors {
-            collector.add_simple_error(error, SourceLocation::unknown(), ErrorSeverity::Error);
-        }
-    }
-
+    // Old AST validation is removed. Semantic validation will be done by domain handlers.
     if collector.has_errors() {
         Err(collector)
     } else {

@@ -1,450 +1,453 @@
-; ===============================================================================
-; ULTIMATE BENEFICIAL OWNERSHIP (UBO) DISCOVERY WORKFLOW
-; ===============================================================================
-; This DSL example demonstrates a complete UBO identification and verification
-; workflow for a complex corporate entity. It follows financial services best
-; practices for AML/CFT compliance and regulatory requirements.
-;
-; Entity: TechGlobal Holdings S.à r.l. (Luxembourg)
-; Regulatory Framework: EU 5th Money Laundering Directive (5MLD)
-; Ownership Threshold: 25% (EU standard)
-; ===============================================================================
+;; ===============================================================================
+;; ULTIMATE BENEFICIAL OWNERSHIP (UBO) DISCOVERY WORKFLOW (v3.0)
+;; ===============================================================================
+;; This DSL example demonstrates a complete UBO identification and verification
+;; workflow for a complex corporate entity using v3.0 EBNF compliant syntax.
+;; It follows financial services best practices for AML/CFT compliance.
+;;
+;; Entity: TechGlobal Holdings S.à r.l. (Luxembourg)
+;; Regulatory Framework: EU 5th Money Laundering Directive (5MLD)
+;; Ownership Threshold: 25% (EU standard)
+;; ===============================================================================
 
-; =============================================================================
-; PHASE 1: ENTITY DATA COLLECTION
-; =============================================================================
+(define-kyc-investigation
+  :id "techglobal-ubo-discovery-2024"
+  :target-entity "techglobal-holdings-sarl"
+  :jurisdiction "LU"
+  :ubo-threshold 25.0
+  :regulatory-framework ["EU5MLD", "LU_AML_LAW"]
+  :investigation-date "2024-11-10"
 
-; Step 1.1: Collect comprehensive entity information
-(ubo.collect-entity-data
-  (entity_name "TechGlobal Holdings S.à r.l.")
-  (jurisdiction "LU")
-  (entity_type "LLC")
-  (registration_number "B123456")
-  (business_purpose "Technology investment holding company"))
+  ;; =============================================================================
+  ;; PHASE 1: ENTITY DECLARATIONS
+  ;; =============================================================================
 
-; Step 1.2: Retrieve declared ownership structure from corporate registry
-(ubo.get-ownership-structure
-  (entity_id @attr{entity-uuid-techglobal})
-  (depth_limit 10)
-  (include_voting_rights true)
-  (include_control_agreements true))
+  ;; Primary Target Entity
+  (entity
+    :id "techglobal-holdings-sarl"
+    :label "Company"
+    :props {
+      :legal-name "TechGlobal Holdings S.à r.l."
+      :jurisdiction "LU"
+      :entity-type "LLC"
+      :registration-number "B123456"
+      :incorporation-date "2020-03-15"
+      :business-purpose "Technology investment holding company"
+      :registered-address "12 Rue de la Paix, L-1234 Luxembourg"
+    })
 
-; Step 1.3: Map initial ownership relationships
-(attributes.define
-  (attr-id @attr{ownership-parent-corp})
-  (name "ownership.parent_corporation")
-  (value "InnovateTech Partners Ltd (Cyprus)")
-  (percentage 45.0)
-  (link_type "DIRECT_SHARE"))
+  ;; Parent Corporation (Cyprus)
+  (entity
+    :id "innovatetech-partners-cy"
+    :label "Company"
+    :props {
+      :legal-name "InnovateTech Partners Ltd"
+      :jurisdiction "CY"
+      :entity-type "Private Limited Company"
+      :registration-number "HE123456"
+      :incorporation-date "2018-05-22"
+      :business-purpose "Technology investment and development"
+    })
 
-(attributes.define
-  (attr-id @attr{ownership-venture-fund})
-  (name "ownership.venture_fund")
-  (value "GlobalVenture Fund II L.P. (Delaware)")
-  (percentage 30.0)
-  (link_type "DIRECT_SHARE"))
+  ;; Venture Fund (Delaware)
+  (entity
+    :id "globalventure-fund-ii"
+    :label "Company"
+    :props {
+      :legal-name "GlobalVenture Fund II L.P."
+      :jurisdiction "US-DE"
+      :entity-type "Limited Partnership"
+      :registration-number "DE-7890123"
+      :fund-type "Venture Capital Fund"
+    })
 
-(attributes.define
-  (attr-id @attr{ownership-management})
-  (name "ownership.management_entity")
-  (value "TechFounders Management LLC (Delaware)")
-  (percentage 25.0)
-  (link_type "DIRECT_SHARE"))
+  ;; Management Entity
+  (entity
+    :id "techfounders-management"
+    :label "Company"
+    :props {
+      :legal-name "TechFounders Management LLC"
+      :jurisdiction "US-DE"
+      :entity-type "LLC"
+      :registration-number "DE-4567890"
+    })
 
-; =============================================================================
-; PHASE 2: RECURSIVE OWNERSHIP UNROLLING
-; =============================================================================
+  ;; Individual UBOs
+  (entity
+    :id "person-alice-chen"
+    :label "Person"
+    :props {
+      :legal-name "Alice Chen"
+      :nationality "US"
+      :date-of-birth "1975-08-12"
+      :residence "Singapore"
+      :occupation "Technology Entrepreneur"
+    })
 
-; Step 2.1: Unroll complex ownership structures recursively
-(ubo.unroll-structure
-  (entity_id @attr{entity-uuid-techglobal})
-  (consolidation_method "ADDITIVE")
-  (max_depth 15)
-  (stop_at_natural_persons true)
-  (threshold_cutoff 5.0))
+  (entity
+    :id "person-robert-mueller"
+    :label "Person"
+    :props {
+      :legal-name "Robert Mueller"
+      :nationality "DE"
+      :date-of-birth "1968-11-03"
+      :residence "Berlin, Germany"
+      :occupation "Venture Capital Partner"
+    })
 
-; Step 2.2: Unroll InnovateTech Partners Ltd (Cyprus) - 45% shareholder
-(ubo.collect-entity-data
-  (entity_name "InnovateTech Partners Ltd")
-  (jurisdiction "CY")
-  (entity_type "CORPORATION")
-  (parent_entity_id @attr{entity-uuid-techglobal}))
+  ;; =============================================================================
+  ;; PHASE 2: OWNERSHIP RELATIONSHIPS
+  ;; =============================================================================
 
-(ubo.get-ownership-structure
-  (entity_id @attr{entity-uuid-innovatetech})
-  (depth_limit 5))
+  ;; Direct ownership from parent corporation (45%)
+  (edge
+    :from "innovatetech-partners-cy"
+    :to "techglobal-holdings-sarl"
+    :type "HAS_OWNERSHIP"
+    :props {
+      :percent 45.0
+      :share-class "Class A Shares"
+      :voting-rights 45.0
+      :acquisition-date "2020-03-15"
+    }
+    :evidence ["shareholder-register-2024", "share-certificate-001"])
 
-; InnovateTech Partners ownership breakdown:
-; - Maria Kowalski (Poland): 60% = 27% indirect in TechGlobal (45% × 60%)
-; - Chen Wei Holdings Ltd (Singapore): 40% = 18% indirect in TechGlobal (45% × 40%)
+  ;; Direct ownership from venture fund (30%)
+  (edge
+    :from "globalventure-fund-ii"
+    :to "techglobal-holdings-sarl"
+    :type "HAS_OWNERSHIP"
+    :props {
+      :percent 30.0
+      :share-class "Class B Shares"
+      :voting-rights 30.0
+      :acquisition-date "2020-06-01"
+    }
+    :evidence ["investor-agreement-2020", "cap-table-q2-2024"])
 
-; Step 2.3: Unroll GlobalVenture Fund II L.P. (Delaware) - 30% shareholder
-(ubo.collect-entity-data
-  (entity_name "GlobalVenture Fund II L.P.")
-  (jurisdiction "US")
-  (entity_type "PARTNERSHIP")
-  (parent_entity_id @attr{entity-uuid-techglobal}))
+  ;; Management ownership (25%)
+  (edge
+    :from "techfounders-management"
+    :to "techglobal-holdings-sarl"
+    :type "HAS_OWNERSHIP"
+    :props {
+      :percent 25.0
+      :share-class "Management Shares"
+      :voting-rights 25.0
+      :vesting-schedule "4-year-cliff"
+    }
+    :evidence ["management-agreement-2020", "stock-option-plan"])
 
-; GlobalVenture Fund complex structure:
-; - Limited Partners (various institutions): 95%
-; - General Partner (GlobalVenture Management LLC): 5% (but full control)
+  ;; Indirect ownership through parent corporation
+  (edge
+    :from "person-alice-chen"
+    :to "innovatetech-partners-cy"
+    :type "HAS_OWNERSHIP"
+    :props {
+      :percent 60.0
+      :share-class "Ordinary Shares"
+      :voting-rights 60.0
+      :control-type "DIRECT"
+    }
+    :evidence ["cy-company-registry", "shareholders-agreement"])
 
-; Step 2.4: Unroll TechFounders Management LLC - 25% shareholder
-(ubo.collect-entity-data
-  (entity_name "TechFounders Management LLC")
-  (jurisdiction "US")
-  (entity_type "LLC")
-  (parent_entity_id @attr{entity-uuid-techglobal}))
+  (edge
+    :from "person-robert-mueller"
+    :to "innovatetech-partners-cy"
+    :type "HAS_OWNERSHIP"
+    :props {
+      :percent 40.0
+      :share-class "Ordinary Shares"
+      :voting-rights 40.0
+      :control-type "DIRECT"
+    }
+    :evidence ["cy-company-registry", "shareholders-agreement"])
 
-; TechFounders Management ownership:
-; - Alex Johnson (US citizen): 40% = 10% indirect in TechGlobal (25% × 40%)
-; - Sarah Chen (US citizen): 35% = 8.75% indirect in TechGlobal (25% × 35%)
-; - Tech Employees Trust: 25% = 6.25% indirect in TechGlobal (25% × 25%)
+  ;; Fund management structure
+  (edge
+    :from "person-robert-mueller"
+    :to "globalventure-fund-ii"
+    :type "HAS_CONTROL"
+    :props {
+      :percent 100.0
+      :control-type "GENERAL_PARTNER"
+      :management-fee 2.0
+      :carried-interest 20.0
+    }
+    :evidence ["fund-documents", "gp-agreement"])
 
-; =============================================================================
-; PHASE 3: UBO IDENTIFICATION AND THRESHOLD APPLICATION
-; =============================================================================
+  ;; Management entity control
+  (edge
+    :from "person-alice-chen"
+    :to "techfounders-management"
+    :type "HAS_CONTROL"
+    :props {
+      :percent 100.0
+      :control-type "MANAGING_MEMBER"
+      :voting-rights 100.0
+    }
+    :evidence ["llc-operating-agreement", "management-resolutions"])
 
-; Step 3.1: Calculate total indirect ownership for all natural persons
-(ubo.calculate-indirect-ownership
-  (person_id @attr{person-uuid-maria-kowalski})
-  (target_entity_id @attr{entity-uuid-techglobal})
-  (calculation_method "PATH_MULTIPLICATION")
-  (result_percentage 27.0))
+  ;; =============================================================================
+  ;; PHASE 3: KYC AND COMPLIANCE VERIFICATION
+  ;; =============================================================================
 
-(ubo.calculate-indirect-ownership
-  (person_id @attr{person-uuid-alex-johnson})
-  (target_entity_id @attr{entity-uuid-techglobal})
-  (calculation_method "PATH_MULTIPLICATION")
-  (result_percentage 10.0))
+  ;; Enhanced Due Diligence for the target entity
+  (kyc.verify
+    :customer-id "techglobal-holdings-sarl"
+    :method "enhanced_due_diligence"
+    :required-documents [
+      "certificate_incorporation",
+      "memorandum_articles",
+      "board_resolution",
+      "beneficial_ownership_declaration",
+      "financial_statements"
+    ]
+    :jurisdiction-requirements ["LU_AML", "EU5MLD"]
+    :verified-at "2024-11-10T10:00:00Z")
 
-; Step 3.2: Identify control prong individuals (regardless of ownership %)
-(ubo.identify-control-prong
-  (entity_id @attr{entity-uuid-techglobal})
-  (control_types ["CEO", "BOARD_MAJORITY", "VOTING_CONTROL", "MANAGEMENT_AGREEMENT"])
-  (include_indirect_control true))
+  ;; KYC for individual UBOs
+  (kyc.verify
+    :customer-id "person-alice-chen"
+    :method "simplified_due_diligence"
+    :required-documents ["passport", "utility_bill", "bank_reference"]
+    :pep-check true
+    :verified-at "2024-11-10T10:30:00Z")
 
-; Control prong identification results:
-; - Dr. Hans Mueller (CEO of TechGlobal): Senior Managing Official
-; - GlobalVenture Management LLC: Controls 30% through GP role
+  (kyc.verify
+    :customer-id "person-robert-mueller"
+    :method "simplified_due_diligence"
+    :required-documents ["passport", "utility_bill", "professional_reference"]
+    :pep-check true
+    :verified-at "2024-11-10T10:45:00Z")
 
-; Step 3.3: Apply EU 5MLD regulatory thresholds
-(ubo.apply-thresholds
-  (ownership_results @attr{calculated-ownership-data})
-  (control_results @attr{control-prong-data})
-  (regulatory_framework "EU_5MLD")
-  (ownership_threshold 25.0)
-  (include_control_prong true))
+  ;; Sanctions screening for all entities
+  (kyc.screen_sanctions
+    :target "techglobal-holdings-sarl"
+    :databases ["EU", "UN", "OFAC", "HMT"]
+    :status "CLEAR"
+    :screened-at "2024-11-10T11:00:00Z")
 
-; Step 3.4: Resolve final UBO list
-(ubo.resolve-ubos
-  (entity_id @attr{entity-uuid-techglobal})
-  (ownership_threshold 25.0)
-  (jurisdiction_rules "EU_5MLD")
-  (consolidate_family_interests false)
-  (include_dormant_shareholders false))
+  (kyc.screen_sanctions
+    :target "person-alice-chen"
+    :databases ["EU", "UN", "OFAC", "HMT"]
+    :status "CLEAR"
+    :screened-at "2024-11-10T11:15:00Z")
 
-; Final UBO Results:
-; UBO #1: Maria Kowalski (27% ownership via InnovateTech Partners)
-; UBO #2: Dr. Hans Mueller (0% ownership but CEO control prong)
-; UBO #3: [To be determined from GlobalVenture Fund analysis]
+  (kyc.screen_sanctions
+    :target "person-robert-mueller"
+    :databases ["EU", "UN", "OFAC", "HMT"]
+    :status "CLEAR"
+    :screened-at "2024-11-10T11:30:00Z")
 
-; =============================================================================
-; PHASE 4: IDENTITY VERIFICATION
-; =============================================================================
+  ;; PEP checks
+  (kyc.check_pep
+    :target "person-alice-chen"
+    :status "NOT_PEP"
+    :databases ["PEP_DATABASE_GLOBAL", "ADVERSE_MEDIA"]
+    :checked-at "2024-11-10T11:45:00Z")
 
-; Step 4.1: Verify Maria Kowalski (Poland) - 27% ownership UBO
-(ubo.verify-identity
-  (ubo_id @attr{ubo-uuid-maria-kowalski})
-  (document_list [
-    "polish_national_id",
-    "passport",
-    "proof_of_address_poland",
-    "bank_statement"
-  ])
-  (verification_level "ENHANCED")
-  (require_biometric_check true)
-  (address_verification_required true))
+  (kyc.check_pep
+    :target "person-robert-mueller"
+    :status "NOT_PEP"
+    :databases ["PEP_DATABASE_GLOBAL", "ADVERSE_MEDIA"]
+    :checked-at "2024-11-10T12:00:00Z")
 
-; Step 4.2: Verify Dr. Hans Mueller (Germany) - CEO control prong UBO
-(ubo.verify-identity
-  (ubo_id @attr{ubo-uuid-hans-mueller})
-  (document_list [
-    "german_personalausweis",
-    "passport",
-    "proof_of_address_luxembourg",
-    "employment_contract",
-    "board_appointment_letter"
-  ])
-  (verification_level "SUPERIOR")
-  (management_verification true)
-  (source_of_wealth_required true))
+  ;; Compliance framework verification
+  (compliance.verify
+    :framework "EU5MLD"
+    :jurisdiction "LU"
+    :status "COMPLIANT"
+    :checks [
+      "beneficial_ownership_disclosure",
+      "customer_due_diligence",
+      "ongoing_monitoring",
+      "suspicious_transaction_reporting"
+    ]
+    :verified-at "2024-11-10T12:15:00Z")
 
-; Step 4.3: Verify additional UBOs from fund structure
-(ubo.verify-identity
-  (ubo_id @attr{ubo-uuid-globalventure-controller})
-  (document_list [
-    "us_drivers_license",
-    "ssn_verification",
-    "proof_of_address_us",
-    "sec_form_adv"
-  ])
-  (verification_level "ENHANCED")
-  (investment_adviser_check true))
+  ;; =============================================================================
+  ;; PHASE 4: UBO CALCULATION
+  ;; =============================================================================
 
-; =============================================================================
-; PHASE 5: COMPLIANCE SCREENING
-; =============================================================================
+  ;; Calculate UBO ownership using multiple prongs
+  (ubo.calc
+    :target "techglobal-holdings-sarl"
+    :threshold 25.0
+    :prongs ["ownership", "voting", "control"]
+    :calculation-method "combined"
+    :jurisdiction "LU"
+    :max-depth 5
+    :calculated-at "2024-11-10T13:00:00Z")
 
-; Step 5.1: Screen Maria Kowalski against all relevant databases
-(ubo.screen-person
-  (ubo_id @attr{ubo-uuid-maria-kowalski})
-  (screening_lists [
-    "EU_SANCTIONS",
-    "OFAC_SDN",
-    "OFAC_SECTORAL",
-    "UN_SANCTIONS",
-    "UK_SANCTIONS",
-    "PEP_DATABASE_DOWJONES",
-    "ADVERSE_MEDIA_LEXISNEXIS"
-  ])
-  (screening_intensity "COMPREHENSIVE")
-  (fuzzy_matching_enabled true)
-  (ongoing_monitoring true))
+  ;; =============================================================================
+  ;; PHASE 5: DECLARATIVE UBO OUTCOME
+  ;; =============================================================================
 
-; Step 5.2: Screen Dr. Hans Mueller (enhanced screening for control person)
-(ubo.screen-person
-  (ubo_id @attr{ubo-uuid-hans-mueller})
-  (screening_lists [
-    "EU_SANCTIONS",
-    "OFAC_FULL",
-    "GERMAN_BFI_DATABASE",
-    "PEP_DATABASE_COMPREHENSIVE",
-    "ADVERSE_MEDIA_DEEP_SEARCH",
-    "CRIMINAL_BACKGROUND_CHECK"
-  ])
-  (screening_intensity "DEEP")
-  (management_person_screening true)
-  (country_specific_checks ["DE", "LU"])
-  (professional_sanctions_check true))
+  ;; Authoritative UBO determination results
+  (ubo.outcome
+    :target "techglobal-holdings-sarl"
+    :at "2024-11-10T13:00:00Z"
+    :threshold 25.0
+    :jurisdiction "LU"
+    :regulatory-framework "EU5MLD"
+    :ubos [
+      {
+        :entity "person-alice-chen"
+        :effective-percent 52.0
+        :prongs {
+          :ownership 52.0
+          :voting 52.0
+          :control 70.0
+        }
+        :paths [
+          ["person-alice-chen", "innovatetech-partners-cy", "techglobal-holdings-sarl"],
+          ["person-alice-chen", "techfounders-management", "techglobal-holdings-sarl"]
+        ]
+        :control-mechanisms ["direct_shareholding", "management_control"]
+        :confidence "HIGH"
+        :evidence [
+          "cy-company-registry",
+          "shareholders-agreement",
+          "llc-operating-agreement",
+          "shareholder-register-2024"
+        ]
+      },
+      {
+        :entity "person-robert-mueller"
+        :effective-percent 48.0
+        :prongs {
+          :ownership 48.0
+          :voting 48.0
+          :control 30.0
+        }
+        :paths [
+          ["person-robert-mueller", "innovatetech-partners-cy", "techglobal-holdings-sarl"],
+          ["person-robert-mueller", "globalventure-fund-ii", "techglobal-holdings-sarl"]
+        ]
+        :control-mechanisms ["direct_shareholding", "fund_management"]
+        :confidence "HIGH"
+        :evidence [
+          "cy-company-registry",
+          "fund-documents",
+          "gp-agreement",
+          "cap-table-q2-2024"
+        ]
+      }
+    ]
+    :unresolved []
+    :calculation-notes "Both individuals exceed 25% threshold through multiple ownership paths"
+    :review-date "2025-11-10")
 
-; Step 5.3: Screen fund-related UBOs
-(ubo.screen-person
-  (ubo_id @attr{ubo-uuid-globalventure-controller})
-  (screening_lists [
-    "OFAC_FULL",
-    "FINRA_SANCTIONS",
-    "SEC_SANCTIONS",
-    "CFTC_SANCTIONS",
-    "PEP_DATABASE_US",
-    "ADVERSE_MEDIA_FINANCIAL_SERVICES"
-  ])
-  (screening_intensity "COMPREHENSIVE")
-  (investment_manager_screening true)
-  (finra_background_check true))
+  ;; =============================================================================
+  ;; PHASE 6: CBU ROLE ASSIGNMENTS
+  ;; =============================================================================
 
-; =============================================================================
-; PHASE 6: RISK ASSESSMENT
-; =============================================================================
+  ;; Assign Alice Chen as primary UBO
+  (role.assign
+    :entity "person-alice-chen"
+    :role "UltimateBeneficialOwner"
+    :cbu "CBU-TECHGLOBAL-001"
+    :effective-percent 52.0
+    :control-level "PRIMARY"
+    :period {
+      :start "2024-11-10"
+      :review-date "2025-11-10"
+    }
+    :evidence ["ubo.outcome:techglobal-ubo-discovery-2024"]
+    :confidence "HIGH")
 
-; Step 6.1: Assess individual UBO risk profiles
-(ubo.assess-risk
-  (entity_id @attr{entity-uuid-techglobal})
-  (ubo_list @attr{verified-ubo-list})
-  (risk_factors [
-    "COMPLEX_OWNERSHIP_STRUCTURE",
-    "MULTI_JURISDICTION_PRESENCE",
-    "PRIVATE_EQUITY_INVOLVEMENT",
-    "TECHNOLOGY_SECTOR_EXPOSURE",
-    "EU_REGULATORY_COMPLIANCE"
-  ])
-  (jurisdiction_risk_matrix "EU_5MLD_STANDARD")
-  (industry_risk_profile "TECHNOLOGY_MEDIUM")
-  (customer_risk_appetite "MEDIUM_HIGH"))
+  ;; Assign Robert Mueller as secondary UBO
+  (role.assign
+    :entity "person-robert-mueller"
+    :role "UltimateBeneficialOwner"
+    :cbu "CBU-TECHGLOBAL-001"
+    :effective-percent 48.0
+    :control-level "SECONDARY"
+    :period {
+      :start "2024-11-10"
+      :review-date "2025-11-10"
+    }
+    :evidence ["ubo.outcome:techglobal-ubo-discovery-2024"]
+    :confidence "HIGH")
 
-; Risk Assessment Results:
-; Overall Entity Risk: MEDIUM-HIGH
-; - Maria Kowalski: MEDIUM (EU jurisdiction, no PEP/sanctions hits)
-; - Dr. Hans Mueller: MEDIUM-HIGH (Control person, management role)
-; - Fund Structure: HIGH (Complex US fund structure, multiple LPs)
+  ;; =============================================================================
+  ;; PHASE 7: ONGOING MONITORING SETUP
+  ;; =============================================================================
 
-; Step 6.2: Generate risk-based mitigation requirements
-(compliance.screen
-  (entity_id @attr{entity-uuid-techglobal})
-  (risk_rating "MEDIUM_HIGH")
-  (mitigation_requirements [
-    "ENHANCED_DUE_DILIGENCE",
-    "SENIOR_MANAGEMENT_APPROVAL",
-    "QUARTERLY_UBO_REVIEW",
-    "FUND_STRUCTURE_DOCUMENTATION",
-    "ONGOING_MONITORING_ENHANCED"
-  ])
-  (approval_authority "HEAD_OF_COMPLIANCE")
-  (review_frequency "QUARTERLY"))
+  ;; Schedule periodic UBO review
+  (compliance.schedule-review
+    :target "techglobal-holdings-sarl"
+    :review-type "UBO_PERIODIC_REVIEW"
+    :frequency "ANNUAL"
+    :next-review-date "2025-11-10"
+    :triggers [
+      "ownership_change_above_5_percent",
+      "control_structure_change",
+      "regulatory_requirement_change"
+    ]
+    :scheduled-at "2024-11-10T14:00:00Z")
 
-; =============================================================================
-; PHASE 7: ONGOING MONITORING SETUP
-; =============================================================================
+  ;; Enable continuous monitoring
+  (compliance.enable-monitoring
+    :target "techglobal-holdings-sarl"
+    :monitoring-types [
+      "adverse_media_screening",
+      "sanctions_list_updates",
+      "pep_status_changes",
+      "corporate_registry_updates"
+    ]
+    :frequency "DAILY"
+    :enabled-at "2024-11-10T14:15:00Z")
 
-; Step 7.1: Configure ongoing monitoring for entity structure changes
-(ubo.monitor-changes
-  (entity_id @attr{entity-uuid-techglobal})
-  (monitoring_frequency "MONTHLY")
-  (alert_thresholds [
-    ("OWNERSHIP_CHANGE", 5.0),
-    ("NEW_SHAREHOLDER", 10.0),
-    ("CONTROL_CHANGE", "ANY"),
-    ("SANCTIONS_HIT", "IMMEDIATE"),
-    ("ADVERSE_MEDIA", "HIGH_RISK_ONLY")
-  ])
-  (data_sources [
-    "CORPORATE_REGISTRY_LU",
-    "CORPORATE_REGISTRY_CY",
-    "SEC_FILINGS",
-    "SANCTIONS_DATABASES",
-    "PEP_DATABASES",
-    "ADVERSE_MEDIA_FEEDS"
-  ])
-  (escalation_matrix "UBO_MONITORING_PROTOCOL"))
+  ;; =============================================================================
+  ;; PHASE 8: FINAL WORKFLOW TRANSITION
+  ;; =============================================================================
 
-; Step 7.2: Schedule periodic UBO data refresh
-(ubo.refresh-data
-  (entity_id @attr{entity-uuid-techglobal})
-  (refresh_frequency "QUARTERLY")
-  (full_reverification_frequency "ANNUALLY")
-  (data_sources [
-    "BENEFICIAL_OWNERSHIP_REGISTRIES",
-    "CORPORATE_FILINGS",
-    "FUND_ADMINISTRATOR_REPORTS",
-    "VERIFICATION_PROVIDERS"
-  ])
-  (auto_trigger_conditions [
-    "SIGNIFICANT_OWNERSHIP_CHANGE",
-    "CONTROL_STRUCTURE_CHANGE",
-    "REGULATORY_FRAMEWORK_UPDATE"
-  ]))
+  ;; Complete the UBO discovery workflow
+  (workflow.transition
+    :from "UBO_CALCULATION"
+    :to "UBO_VERIFIED"
+    :reason "UBO identification complete with 2 individuals above 25% threshold"
+    :timestamp "2024-11-10T14:30:00Z"
+    :metadata {
+      :total-entities-analyzed 7
+      :ubos-identified 2
+      :ownership-paths-traced 4
+      :compliance-frameworks ["EU5MLD", "LU_AML"]
+      :confidence-level "HIGH"
+      :next-review "2025-11-10"
+    }))
 
-; Step 7.3: Set up regulatory reporting requirements
-(compliance.monitor
-  (entity_id @attr{entity-uuid-techglobal})
-  (reporting_requirements [
-    ("LU_AML_AUTHORITY", "ANNUAL"),
-    ("EU_5MLD_REPORTING", "ANNUAL"),
-    ("INTERNAL_COMPLIANCE", "QUARTERLY")
-  ])
-  (documentation_requirements [
-    "UBO_IDENTIFICATION_REPORT",
-    "VERIFICATION_EVIDENCE_FILE",
-    "SCREENING_RESULTS_ARCHIVE",
-    "RISK_ASSESSMENT_DOCUMENTATION"
-  ])
-  (retention_period "10_YEARS"))
-
-; =============================================================================
-; PHASE 8: COMPLIANCE DOCUMENTATION AND AUDIT TRAIL
-; =============================================================================
-
-; Step 8.1: Generate comprehensive UBO compliance documentation
-(audit.log
-  (event "UBO_DISCOVERY_COMPLETE")
-  (entity_id @attr{entity-uuid-techglobal})
-  (timestamp @attr{completion-timestamp})
-  (compliance_officer @attr{officer-uuid})
-  (regulatory_framework "EU_5MLD")
-  (ubos_identified 3)
-  (verification_status "COMPLETE")
-  (screening_status "CLEAR")
-  (risk_rating "MEDIUM_HIGH")
-  (approval_status "APPROVED")
-  (next_review_due @attr{next-review-date}))
-
-; Step 8.2: Bind all collected attribute values
-(values.bind
-  (bind (attr-id @attr{entity-legal-name})
-        (value "TechGlobal Holdings S.à r.l."))
-  (bind (attr-id @attr{entity-jurisdiction})
-        (value "LU"))
-  (bind (attr-id @attr{ubo-count})
-        (value 3))
-  (bind (attr-id @attr{ownership-threshold-applied})
-        (value 25.0))
-  (bind (attr-id @attr{regulatory-framework})
-        (value "EU_5MLD"))
-  (bind (attr-id @attr{compliance-status})
-        (value "COMPLIANT"))
-  (bind (attr-id @attr{risk-rating-overall})
-        (value "MEDIUM_HIGH"))
-  (bind (attr-id @attr{monitoring-frequency})
-        (value "MONTHLY"))
-  (bind (attr-id @attr{next-review-due})
-        (value "2024-09-30")))
-
-; =============================================================================
-; WORKFLOW COMPLETION AND NEXT STEPS
-; =============================================================================
-
-; Step 9.1: Transition case to UBO-compliant state
-(workflow.transition
-  (from "UBO_DISCOVERY_PENDING")
-  (to "UBO_COMPLIANT")
-  (condition "ALL_UBOS_VERIFIED_AND_SCREENED")
-  (approval_required true)
-  (approver @attr{compliance-officer-uuid}))
-
-; Step 9.2: Set up future review triggers
-(ubo.trigger-review
-  (entity_id @attr{entity-uuid-techglobal})
-  (review_reason "PERIODIC_REVIEW")
-  (priority "MEDIUM")
-  (scheduled_date "2024-12-31")
-  (review_scope [
-    "OWNERSHIP_STRUCTURE_CHANGES",
-    "UBO_VERIFICATION_REFRESH",
-    "SCREENING_UPDATE",
-    "RISK_REASSESSMENT"
-  ]))
-
-; =============================================================================
-; SUMMARY OF UBO DISCOVERY RESULTS
-; =============================================================================
-
-; Entity: TechGlobal Holdings S.à r.l. (Luxembourg)
-; Total UBOs Identified: 3
-;
-; UBO #1: Maria Kowalski (Polish national)
-;   - Ownership: 27% (indirect via InnovateTech Partners Ltd)
-;   - Qualification: Ownership threshold (>25%)
-;   - Verification: VERIFIED
-;   - Screening: CLEAR
-;   - Risk: MEDIUM
-;
-; UBO #2: Dr. Hans Mueller (German national)
-;   - Ownership: 0%
-;   - Qualification: Control prong (CEO/Senior Managing Official)
-;   - Verification: VERIFIED
-;   - Screening: CLEAR
-;   - Risk: MEDIUM-HIGH
-;
-; UBO #3: [GlobalVenture Fund Controller]
-;   - Ownership: 30% (indirect via fund GP control)
-;   - Qualification: Control prong (GP of fund holding 30%)
-;   - Verification: VERIFIED
-;   - Screening: CLEAR
-;   - Risk: HIGH (complex fund structure)
-;
-; Overall Compliance Status: COMPLIANT
-; Overall Risk Rating: MEDIUM-HIGH
-; Next Review Due: Q4 2024
-; Ongoing Monitoring: ACTIVE (Monthly)
-;
-; This UBO discovery workflow demonstrates comprehensive compliance with
-; EU 5th Money Laundering Directive requirements, including:
-; ✅ 25% ownership threshold application
-; ✅ Control prong identification
-; ✅ Recursive ownership unrolling
-; ✅ Enhanced identity verification
-; ✅ Comprehensive sanctions/PEP screening
-; ✅ Risk-based assessment
-; ✅ Ongoing monitoring setup
-; ✅ Complete audit trail and documentation
-; ===============================================================================
+;; ===============================================================================
+;; UBO DISCOVERY WORKFLOW COMPLETE
+;; ===============================================================================
+;;
+;; Final Results Summary:
+;; - Target Entity: TechGlobal Holdings S.à r.l. (Luxembourg)
+;; - UBO Threshold: 25% (EU5MLD standard)
+;; - UBOs Identified: 2 individuals
+;;   1. Alice Chen: 52% effective ownership (PRIMARY)
+;;   2. Robert Mueller: 48% effective ownership (SECONDARY)
+;;
+;; Ownership Structure:
+;; - Direct ownership through 3 intermediate entities
+;; - Complex control mechanisms including fund management and LLC control
+;; - Multiple ownership paths for each UBO providing redundancy
+;;
+;; Compliance Status: VERIFIED
+;; - All entities and individuals screened (sanctions, PEP, adverse media)
+;; - Enhanced due diligence completed for corporate entity
+;; - Simplified due diligence completed for individual UBOs
+;; - EU 5th Money Laundering Directive requirements satisfied
+;;
+;; This example demonstrates:
+;; ✅ v3.0 EBNF compliant syntax throughout
+;; ✅ Complete UBO discovery workflow with complex ownership structures
+;; ✅ Multiple ownership paths and control mechanisms
+;; ✅ Comprehensive KYC and compliance verification
+;; ✅ Declarative UBO outcome with detailed calculation results
+;; ✅ Role assignments for CBU mapping
+;; ✅ Ongoing monitoring and review scheduling
+;; ✅ DSL-as-State pattern with complete audit trail
+;; ===============================================================================

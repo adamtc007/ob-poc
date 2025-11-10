@@ -124,9 +124,14 @@ impl UboDomainHandler {
         payload: &serde_json::Value,
         _context: &DomainContext,
     ) -> DslEditResult<String> {
+        use super::common;
+        use crate::{Key, Literal, Value};
+        use std::collections::HashMap;
+
         let entity_id = payload
             .get("entity_id")
             .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
             .ok_or_else(|| {
                 DslEditError::DomainValidationError("Missing entity_id in payload".to_string())
             })?;
@@ -134,38 +139,47 @@ impl UboDomainHandler {
         let entity_type = payload
             .get("entity_type")
             .and_then(|v| v.as_str())
-            .unwrap_or("Company");
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "Company".to_string());
 
-        let default_properties = json!({});
+        let default_properties = serde_json::json!({});
         let properties = payload.get("properties").unwrap_or(&default_properties);
 
-        let mut property_fragments = Vec::new();
+        let mut props_map = HashMap::new();
 
         if let Some(legal_name) = properties.get("legal_name").and_then(|v| v.as_str()) {
-            property_fragments.push(format!(":legal-name \"{}\"", legal_name));
+            props_map.insert(
+                Key::new("legal-name"),
+                Value::Literal(Literal::String(legal_name.to_string())),
+            );
         }
 
         if let Some(jurisdiction) = properties.get("jurisdiction").and_then(|v| v.as_str()) {
-            property_fragments.push(format!(":jurisdiction \"{}\"", jurisdiction));
+            props_map.insert(
+                Key::new("jurisdiction"),
+                Value::Literal(Literal::String(jurisdiction.to_string())),
+            );
         }
 
         if let Some(reg_number) = properties
             .get("registration_number")
             .and_then(|v| v.as_str())
         {
-            property_fragments.push(format!(":registration-number \"{}\"", reg_number));
+            props_map.insert(
+                Key::new("registration-number"),
+                Value::Literal(Literal::String(reg_number.to_string())),
+            );
         }
 
-        let properties_str = if property_fragments.is_empty() {
-            String::new()
-        } else {
-            format!(" :properties {{{}}}", property_fragments.join(" "))
-        };
+        let mut attributes = HashMap::new();
+        attributes.insert(Key::new("id"), Value::Literal(Literal::String(entity_id)));
+        attributes.insert(
+            Key::new("label"),
+            Value::Literal(Literal::String(entity_type)),
+        );
+        attributes.insert(Key::new("props"), Value::Map(props_map));
 
-        Ok(format!(
-            "(declare-entity :node-id \"{}\" :label {}{})",
-            entity_id, entity_type, properties_str
-        ))
+        Ok(common::create_verb_form_fragment("entity", &attributes))
     }
 
     /// Generate ownership edge DSL fragment
@@ -174,9 +188,14 @@ impl UboDomainHandler {
         payload: &serde_json::Value,
         _context: &DomainContext,
     ) -> DslEditResult<String> {
+        use super::common;
+        use crate::{Key, Literal, Value};
+        use std::collections::HashMap;
+
         let from_entity = payload
             .get("from_entity")
             .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
             .ok_or_else(|| {
                 DslEditError::DomainValidationError("Missing from_entity in payload".to_string())
             })?;
@@ -184,41 +203,59 @@ impl UboDomainHandler {
         let to_entity = payload
             .get("to_entity")
             .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
             .ok_or_else(|| {
                 DslEditError::DomainValidationError("Missing to_entity in payload".to_string())
             })?;
 
-        let percentage = payload
-            .get("percentage")
-            .and_then(|v| v.as_f64())
-            .unwrap_or(0.0);
-
-        let share_class = payload
-            .get("share_class")
+        let relationship_type = payload
+            .get("relationship_type")
             .and_then(|v| v.as_str())
-            .unwrap_or("Ordinary");
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "HAS_OWNERSHIP".to_string()); // Default to HAS_OWNERSHIP
 
-        let default_evidence = vec![];
-        let evidence = payload
-            .get("evidence")
-            .and_then(|v| v.as_array())
-            .unwrap_or(&default_evidence);
+        let mut props_map = HashMap::new();
+        if let Some(percentage) = payload.get("percentage").and_then(|v| v.as_f64()) {
+            props_map.insert(
+                Key::new("percent"),
+                Value::Literal(Literal::Number(percentage)),
+            );
+        }
+        if let Some(share_class) = payload.get("share_class").and_then(|v| v.as_str()) {
+            props_map.insert(
+                Key::new("share-class"),
+                Value::Literal(Literal::String(share_class.to_string())),
+            );
+        }
 
-        let evidence_str = if evidence.is_empty() {
-            String::new()
+        let default_evidence = serde_json::json!([]); // Use serde_json for default
+        let evidence_json = payload.get("evidence").unwrap_or(&default_evidence);
+
+        let evidence_list: Vec<Value> = if let Some(arr) = evidence_json.as_array() {
+            arr.iter()
+                .filter_map(|v| {
+                    v.as_str()
+                        .map(|s| Value::Literal(Literal::String(s.to_string())))
+                })
+                .collect()
         } else {
-            let evidence_ids: Vec<String> = evidence
-                .iter()
-                .filter_map(|e| e.as_str())
-                .map(|e| format!("\"{}\"", e))
-                .collect();
-            format!(" :evidenced-by [{}]", evidence_ids.join(" "))
+            Vec::new()
         };
 
-        Ok(format!(
-            "(create-edge :from \"{}\" :to \"{}\" :type HAS_OWNERSHIP :properties {{:percent {} :share-class \"{}\"}}{})",
-            from_entity, to_entity, percentage, share_class, evidence_str
-        ))
+        let mut attributes = HashMap::new();
+        attributes.insert(
+            Key::new("from"),
+            Value::Literal(Literal::String(from_entity)),
+        );
+        attributes.insert(Key::new("to"), Value::Literal(Literal::String(to_entity)));
+        attributes.insert(
+            Key::new("type"),
+            Value::Literal(Literal::String(relationship_type)),
+        );
+        attributes.insert(Key::new("props"), Value::Map(props_map));
+        attributes.insert(Key::new("evidence"), Value::List(evidence_list));
+
+        Ok(common::create_verb_form_fragment("edge", &attributes))
     }
 
     /// Generate UBO calculation DSL fragment
@@ -227,9 +264,14 @@ impl UboDomainHandler {
         payload: &serde_json::Value,
         _context: &DomainContext,
     ) -> DslEditResult<String> {
+        use super::common;
+        use crate::{Key, Literal, Value};
+        use std::collections::HashMap;
+
         let target_entity = payload
             .get("target_entity")
             .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
             .ok_or_else(|| {
                 DslEditError::DomainValidationError("Missing target_entity in payload".to_string())
             })?;
@@ -242,19 +284,55 @@ impl UboDomainHandler {
         let jurisdiction = payload
             .get("jurisdiction")
             .and_then(|v| v.as_str())
-            .unwrap_or("US");
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "US".to_string());
 
         let calculation_method = payload
             .get("calculation_method")
             .and_then(|v| v.as_str())
-            .unwrap_or("direct_and_indirect");
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "direct_and_indirect".to_string());
 
         let timestamp = common::generate_timestamp();
 
-        Ok(format!(
-            "(calculate-ubo :target-entity \"{}\" :jurisdiction \"{}\" :ubo-threshold {} :calculation-method \"{}\" :calculated-at \"{}\")",
-            target_entity, jurisdiction, threshold, calculation_method, timestamp
-        ))
+        let mut attributes = HashMap::new();
+        attributes.insert(
+            Key::new("target"),
+            Value::Literal(Literal::String(target_entity)),
+        );
+        attributes.insert(
+            Key::new("threshold"),
+            Value::Literal(Literal::Number(threshold)),
+        );
+        attributes.insert(
+            Key::new("jurisdiction"),
+            Value::Literal(Literal::String(jurisdiction)),
+        );
+
+        // Convert calculation_method to a list of prongs
+        let prongs: Vec<Value> = match calculation_method.as_str() {
+            "direct_ownership" => vec![Value::Literal(Literal::String("ownership".to_string()))],
+            "indirect_ownership" => vec![Value::Literal(Literal::String("ownership".to_string()))], // For simplicity, mapping indirect to ownership too
+            "voting_control" => vec![Value::Literal(Literal::String("voting".to_string()))],
+            "beneficial_interest" => {
+                vec![Value::Literal(Literal::String("beneficial".to_string()))]
+            }
+            "combined_calculation" | "direct_and_indirect" => {
+                vec![
+                    Value::Literal(Literal::String("ownership".to_string())),
+                    Value::Literal(Literal::String("voting".to_string())),
+                ]
+            }
+            _ => vec![Value::Literal(Literal::String("ownership".to_string()))], // Default
+        };
+        attributes.insert(Key::new("prongs"), Value::List(prongs));
+
+        attributes.insert(
+            Key::new("calculated-at"),
+            Value::Literal(Literal::String(timestamp)),
+        );
+
+        Ok(common::create_verb_form_fragment("ubo.calc", &attributes))
     }
 
     /// Generate threshold analysis DSL fragment
@@ -263,6 +341,10 @@ impl UboDomainHandler {
         payload: &serde_json::Value,
         _context: &DomainContext,
     ) -> DslEditResult<String> {
+        use super::common;
+        use crate::{Key, Literal, Value};
+        use std::collections::HashMap;
+
         let entities = payload
             .get("entities")
             .and_then(|v| v.as_array())
@@ -275,7 +357,7 @@ impl UboDomainHandler {
             .and_then(|v| v.as_f64())
             .unwrap_or(25.0);
 
-        let mut analysis_fragments = Vec::new();
+        let mut results_list: Vec<Value> = Vec::new();
 
         for entity in entities {
             if let Some(entity_id) = entity.get("entity_id").and_then(|v| v.as_str()) {
@@ -285,20 +367,36 @@ impl UboDomainHandler {
                     .unwrap_or(0.0);
                 let is_ubo = ownership >= threshold;
 
-                analysis_fragments.push(format!(
-                    "  (entity \"{}\" (ownership {}) (is-ubo {}))",
-                    entity_id, ownership, is_ubo
-                ));
+                let mut entity_map = HashMap::new();
+                entity_map.insert(
+                    Key::new("id"),
+                    Value::Literal(Literal::String(entity_id.to_string())),
+                );
+                entity_map.insert(
+                    Key::new("ownership"),
+                    Value::Literal(Literal::Number(ownership)),
+                );
+                entity_map.insert(Key::new("is-ubo"), Value::Literal(Literal::Boolean(is_ubo)));
+                results_list.push(Value::Map(entity_map));
             }
         }
 
         let timestamp = common::generate_timestamp();
 
-        Ok(format!(
-            "(analyze-thresholds :threshold {} :analyzed-at \"{}\" :results (\n{}\n))",
-            threshold,
-            timestamp,
-            analysis_fragments.join("\n")
+        let mut attributes = HashMap::new();
+        attributes.insert(
+            Key::new("threshold"),
+            Value::Literal(Literal::Number(threshold)),
+        );
+        attributes.insert(
+            Key::new("analyzed-at"),
+            Value::Literal(Literal::String(timestamp)),
+        );
+        attributes.insert(Key::new("results"), Value::List(results_list));
+
+        Ok(common::create_verb_form_fragment(
+            "ubo.analyze_thresholds",
+            &attributes,
         ))
     }
 
@@ -308,20 +406,27 @@ impl UboDomainHandler {
         payload: &serde_json::Value,
         _context: &DomainContext,
     ) -> DslEditResult<String> {
+        use super::common;
+        use crate::{Key, Literal, Value};
+        use std::collections::HashMap;
+
         let compliance_framework = payload
             .get("framework")
             .and_then(|v| v.as_str())
-            .unwrap_or("FATF");
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "FATF".to_string());
 
         let jurisdiction = payload
             .get("jurisdiction")
             .and_then(|v| v.as_str())
-            .unwrap_or("US");
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "US".to_string());
 
         let verification_status = payload
             .get("status")
             .and_then(|v| v.as_str())
-            .unwrap_or("COMPLIANT");
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "COMPLIANT".to_string());
 
         let default_checks = vec![];
         let checks_performed = payload
@@ -329,18 +434,38 @@ impl UboDomainHandler {
             .and_then(|v| v.as_array())
             .unwrap_or(&default_checks);
 
-        let checks_str = checks_performed
+        let checks_list: Vec<Value> = checks_performed
             .iter()
-            .filter_map(|c| c.as_str())
-            .map(|c| format!("\"{}\"", c))
-            .collect::<Vec<_>>()
-            .join(" ");
+            .filter_map(|c| {
+                c.as_str()
+                    .map(|s| Value::Literal(Literal::String(s.to_string())))
+            })
+            .collect();
 
         let timestamp = common::generate_timestamp();
 
-        Ok(format!(
-            "(verify-compliance :framework \"{}\" :jurisdiction \"{}\" :status \"{}\" :checks [{}] :verified-at \"{}\")",
-            compliance_framework, jurisdiction, verification_status, checks_str, timestamp
+        let mut attributes = HashMap::new();
+        attributes.insert(
+            Key::new("framework"),
+            Value::Literal(Literal::String(compliance_framework)),
+        );
+        attributes.insert(
+            Key::new("jurisdiction"),
+            Value::Literal(Literal::String(jurisdiction)),
+        );
+        attributes.insert(
+            Key::new("status"),
+            Value::Literal(Literal::String(verification_status)),
+        );
+        attributes.insert(Key::new("checks"), Value::List(checks_list));
+        attributes.insert(
+            Key::new("verified-at"),
+            Value::Literal(Literal::String(timestamp)),
+        );
+
+        Ok(common::create_verb_form_fragment(
+            "compliance.verify",
+            &attributes,
         ))
     }
 
@@ -350,6 +475,10 @@ impl UboDomainHandler {
         payload: &serde_json::Value,
         _context: &DomainContext,
     ) -> DslEditResult<String> {
+        use super::common;
+        use crate::{Key, Literal, Value};
+        use std::collections::HashMap;
+
         let identified_ubos = payload
             .get("ubos")
             .and_then(|v| v.as_array())
@@ -357,31 +486,49 @@ impl UboDomainHandler {
                 DslEditError::DomainValidationError("Missing ubos array in payload".to_string())
             })?;
 
-        let mut ubo_fragments = Vec::new();
+        let mut ubos_list: Vec<Value> = Vec::new();
 
         for ubo in identified_ubos {
             let entity_id = ubo
                 .get("entity_id")
                 .and_then(|v| v.as_str())
-                .unwrap_or("unknown");
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "unknown".to_string());
             let ownership = ubo.get("ownership").and_then(|v| v.as_f64()).unwrap_or(0.0);
             let control_type = ubo
                 .get("control_type")
                 .and_then(|v| v.as_str())
-                .unwrap_or("ownership");
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "ownership".to_string());
 
-            ubo_fragments.push(format!(
-                "  (ubo :entity \"{}\" :ownership {} :control-type \"{}\")",
-                entity_id, ownership, control_type
-            ));
+            let mut ubo_map = HashMap::new();
+            ubo_map.insert(
+                Key::new("entity"),
+                Value::Literal(Literal::String(entity_id)),
+            );
+            ubo_map.insert(
+                Key::new("ownership"),
+                Value::Literal(Literal::Number(ownership)),
+            );
+            ubo_map.insert(
+                Key::new("control-type"),
+                Value::Literal(Literal::String(control_type)),
+            );
+            ubos_list.push(Value::Map(ubo_map));
         }
 
         let timestamp = common::generate_timestamp();
 
-        Ok(format!(
-            "(identify-ubos :identified-at \"{}\" :results (\n{}\n))",
-            timestamp,
-            ubo_fragments.join("\n")
+        let mut attributes = HashMap::new();
+        attributes.insert(
+            Key::new("identified-at"),
+            Value::Literal(Literal::String(timestamp)),
+        );
+        attributes.insert(Key::new("results"), Value::List(ubos_list));
+
+        Ok(common::create_verb_form_fragment(
+            "ubo.outcome",
+            &attributes,
         ))
     }
 }
@@ -409,6 +556,10 @@ impl DomainHandler for UboDomainHandler {
         operation: &DslOperation,
         context: &DomainContext,
     ) -> DslEditResult<String> {
+        use super::common; // Ensure common is accessible
+        use crate::{Key, Literal, Value}; // Ensure Key, Literal, Value are accessible
+        use std::collections::HashMap; // Ensure HashMap is accessible
+
         match operation {
             DslOperation::CreateEntity {
                 entity_type,
@@ -418,22 +569,32 @@ impl DomainHandler for UboDomainHandler {
                 let entity_id = properties
                     .get("entity_id")
                     .and_then(|v| v.as_str())
-                    .unwrap_or("generated-id");
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| "generated-id".to_string());
 
-                let legal_name = properties
-                    .get("legal_name")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("Unknown Entity");
+                let mut props_map = HashMap::new();
+                for (key_str, value_json) in properties {
+                    let key = Key::new(key_str);
+                    let value = match value_json {
+                        serde_json::Value::String(s) => Value::Literal(Literal::String(s.clone())),
+                        serde_json::Value::Number(n) => {
+                            Value::Literal(Literal::Number(n.as_f64().unwrap_or_default()))
+                        }
+                        serde_json::Value::Bool(b) => Value::Literal(Literal::Boolean(*b)),
+                        _ => Value::Literal(Literal::String(value_json.to_string())), // Fallback
+                    };
+                    props_map.insert(key, value);
+                }
 
-                let jurisdiction = properties
-                    .get("jurisdiction")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("US");
+                let mut attributes = HashMap::new();
+                attributes.insert(Key::new("id"), Value::Literal(Literal::String(entity_id)));
+                attributes.insert(
+                    Key::new("label"),
+                    Value::Literal(Literal::String(entity_type.to_string())),
+                ); // entity_type directly maps to label
+                attributes.insert(Key::new("props"), Value::Map(props_map));
 
-                Ok(format!(
-                    "(declare-entity :node-id \"{}\" :label {} :properties {{:legal-name \"{}\" :jurisdiction \"{}\"}})",
-                    entity_id, entity_type, legal_name, jurisdiction
-                ))
+                Ok(common::create_verb_form_fragment("entity", &attributes))
             }
 
             DslOperation::CreateRelationship {
@@ -443,20 +604,48 @@ impl DomainHandler for UboDomainHandler {
                 properties,
                 ..
             } => {
-                let percentage = properties
-                    .get("percentage")
-                    .and_then(|v| v.as_f64())
-                    .unwrap_or(0.0);
+                let mut props_map = HashMap::new();
+                if let Some(percentage) = properties.get("percentage").and_then(|v| v.as_f64()) {
+                    props_map.insert(
+                        Key::new("percent"),
+                        Value::Literal(Literal::Number(percentage)),
+                    );
+                }
+                if let Some(share_class) = properties.get("share_class").and_then(|v| v.as_str()) {
+                    props_map.insert(
+                        Key::new("share-class"),
+                        Value::Literal(Literal::String(share_class.to_string())),
+                    );
+                }
 
-                let share_class = properties
-                    .get("share_class")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("Ordinary");
+                let mut attributes = HashMap::new();
+                attributes.insert(
+                    Key::new("from"),
+                    Value::Literal(Literal::String(from_entity.clone())),
+                );
+                attributes.insert(
+                    Key::new("to"),
+                    Value::Literal(Literal::String(to_entity.clone())),
+                );
+                attributes.insert(
+                    Key::new("type"),
+                    Value::Literal(Literal::String(relationship_type.to_string())),
+                );
+                attributes.insert(Key::new("props"), Value::Map(props_map));
 
-                Ok(format!(
-                    "(create-edge :from \"{}\" :to \"{}\" :type {} :properties {{:percent {} :share-class \"{}\"}})",
-                    from_entity, to_entity, relationship_type, percentage, share_class
-                ))
+                // Handle evidence if present
+                if let Some(evidence_json) = properties.get("evidence").and_then(|v| v.as_array()) {
+                    let evidence_list: Vec<Value> = evidence_json
+                        .iter()
+                        .filter_map(|s| {
+                            s.as_str()
+                                .map(|s| Value::Literal(Literal::String(s.to_string())))
+                        })
+                        .collect();
+                    attributes.insert(Key::new("evidence"), Value::List(evidence_list));
+                }
+
+                Ok(common::create_verb_form_fragment("edge", &attributes))
             }
 
             DslOperation::DomainSpecific {
@@ -518,12 +707,12 @@ impl DomainHandler for UboDomainHandler {
         let mut processed = dsl_fragment.to_string();
 
         // Rule: Add default threshold if missing from UBO calculation
-        if dsl_fragment.contains("calculate-ubo") && !dsl_fragment.contains("ubo-threshold") {
-            processed = processed.replace(")", " :ubo-threshold 25.0)");
+        if dsl_fragment.contains("ubo.calc") && !dsl_fragment.contains("threshold") {
+            processed = processed.replace(")", " :threshold 25.0)");
         }
 
         // Rule: Add jurisdiction if missing from entity declaration
-        if dsl_fragment.contains("declare-entity") && !dsl_fragment.contains("jurisdiction") {
+        if dsl_fragment.contains("entity") && !dsl_fragment.contains("jurisdiction") {
             processed = processed.replace("}}", " :jurisdiction \"US\"}}");
         }
 
@@ -551,12 +740,12 @@ impl DomainHandler for UboDomainHandler {
         let mut context = DomainContext::ubo();
 
         // Extract target entity if present
-        if let Some(target_match) = extract_value_from_dsl(dsl, "target-entity") {
+        if let Some(target_match) = extract_value_from_dsl(dsl, "target") {
             context = context.with_context("target_entity", json!(target_match));
         }
 
         // Extract threshold if present
-        if let Some(threshold_match) = extract_value_from_dsl(dsl, "ubo-threshold") {
+        if let Some(threshold_match) = extract_value_from_dsl(dsl, "threshold") {
             if let Ok(threshold) = threshold_match.parse::<f64>() {
                 context = context.with_context("threshold", json!(threshold));
             }
@@ -603,34 +792,34 @@ fn create_ubo_vocabulary() -> DslVocabulary {
     DslVocabulary {
         verbs: vec![
             VerbDefinition {
-                name: "declare-entity".to_string(),
+                name: "entity".to_string(),
                 description: "Declare an entity in the UBO graph".to_string(),
-                signature: "(declare-entity :node-id string :label symbol :properties map)".to_string(),
+                signature: "(entity :id string :label symbol :props map)".to_string(),
                 category: "entity_management".to_string(),
                 examples: vec![
-                    "(declare-entity :node-id \"company-001\" :label Company :properties {:legal-name \"Acme Corp\"})".to_string(),
+                    "(entity :id \"company-001\" :label \"Company\" :props {:legal-name \"Acme Corp\"})".to_string(),
                 ],
-                validation_rules: vec!["require_node_id".to_string(), "require_label".to_string()],
+                validation_rules: vec!["require_id".to_string(), "require_label".to_string()],
             },
             VerbDefinition {
-                name: "create-edge".to_string(),
-                description: "Create ownership relationship between entities".to_string(),
-                signature: "(create-edge :from string :to string :type symbol :properties map)".to_string(),
+                name: "edge".to_string(),
+                description: "Create ownership relationship edge".to_string(),
+                signature: "(edge :from string :to string :type symbol :props map)".to_string(),
                 category: "relationship_management".to_string(),
                 examples: vec![
-                    "(create-edge :from \"person-001\" :to \"company-001\" :type HAS_OWNERSHIP :properties {:percent 51.0})".to_string(),
+                    "(edge :from \"person-001\" :to \"company-001\" :type \"HAS_OWNERSHIP\" :props {:percent 25.0})".to_string(),
                 ],
                 validation_rules: vec!["require_from_to".to_string(), "validate_percentage".to_string()],
             },
             VerbDefinition {
-                name: "calculate-ubo".to_string(),
+                name: "ubo.calc".to_string(),
                 description: "Calculate ultimate beneficial ownership".to_string(),
-                signature: "(calculate-ubo :target-entity string :jurisdiction string :ubo-threshold number)".to_string(),
-                category: "ubo_calculation".to_string(),
+                signature: "(ubo.calc :target string :jurisdiction string :threshold number)".to_string(),
+                category: "analysis".to_string(),
                 examples: vec![
-                    "(calculate-ubo :target-entity \"company-001\" :jurisdiction \"US\" :ubo-threshold 25.0)".to_string(),
+                    "(ubo.calc :target \"company-001\" :jurisdiction \"US\" :threshold 25.0)".to_string(),
                 ],
-                validation_rules: vec!["require_target_entity".to_string(), "validate_threshold".to_string()],
+                validation_rules: vec!["require_target".to_string(), "validate_threshold".to_string()],
             },
         ],
         attributes: vec![
@@ -658,8 +847,8 @@ fn create_ubo_vocabulary() -> DslVocabulary {
             },
         ],
         grammar_extensions: vec![
-            "ubo_entity ::= \"(\" \"declare-entity\" entity_params+ \")\"".to_string(),
-            "ubo_edge ::= \"(\" \"create-edge\" edge_params+ \")\"".to_string(),
+            "ubo_entity ::= \"(\" \"entity\" entity_params+ \")\"".to_string(),
+            "ubo_edge ::= \"(\" \"edge\" edge_params+ \")\"".to_string(),
             "entity_params ::= \":\" identifier value".to_string(),
         ],
     }
@@ -797,7 +986,7 @@ mod tests {
         assert!(result.is_ok());
 
         let dsl = result.unwrap();
-        assert!(dsl.contains("declare-entity"));
+        assert!(dsl.contains("entity"));
         assert!(dsl.contains("company-001"));
         assert!(dsl.contains("Acme Corporation"));
         assert!(dsl.contains("DE"));
@@ -822,12 +1011,12 @@ mod tests {
         assert!(result.is_ok());
 
         let dsl = result.unwrap();
-        assert!(dsl.contains("create-edge"));
+        assert!(dsl.contains("edge"));
         assert!(dsl.contains("person-001"));
         assert!(dsl.contains("company-001"));
         assert!(dsl.contains("51"));
         assert!(dsl.contains("Class A Ordinary"));
-        assert!(dsl.contains("evidenced-by"));
+        assert!(dsl.contains(":evidence"));
     }
 
     #[tokio::test]
@@ -848,11 +1037,13 @@ mod tests {
         assert!(result.is_ok());
 
         let dsl = result.unwrap();
-        assert!(dsl.contains("calculate-ubo"));
+        assert!(dsl.contains("ubo.calc"));
         assert!(dsl.contains("company-001"));
         assert!(dsl.contains("25"));
         assert!(dsl.contains("US"));
-        assert!(dsl.contains("direct_and_indirect"));
+        assert!(dsl.contains(":prongs"));
+        assert!(dsl.contains("ownership"));
+        assert!(dsl.contains("voting"));
     }
 
     #[tokio::test]
@@ -878,7 +1069,7 @@ mod tests {
         assert!(result.is_ok());
 
         let dsl = result.unwrap();
-        assert!(dsl.contains("create-edge"));
+        assert!(dsl.contains("edge"));
         assert!(dsl.contains("investor-001"));
         assert!(dsl.contains("target-company"));
         assert!(dsl.contains("HAS_OWNERSHIP"));
@@ -903,15 +1094,15 @@ mod tests {
         let context = DomainContext::ubo();
 
         // Test default threshold addition
-        let dsl_fragment = "(calculate-ubo :target-entity \"company-001\")";
+        let dsl_fragment = "(ubo.calc :target \"company-001\")";
         let result = handler.apply_business_rules(dsl_fragment, &context).await;
         assert!(result.is_ok());
         let processed = result.unwrap();
-        assert!(processed.contains("ubo-threshold 25.0"));
+        assert!(processed.contains(":threshold 25.0"));
 
         // Test evidence requirement for high ownership
         let ownership_fragment =
-            "(create-edge :from \"person-001\" :to \"company-001\" :properties {:percent 51.0})";
+            "(edge :from \"person-001\" :to \"company-001\" :props {:percent 51.0})";
         let result = handler
             .apply_business_rules(ownership_fragment, &context)
             .await;
@@ -924,8 +1115,8 @@ mod tests {
     async fn test_context_extraction() {
         let handler = UboDomainHandler::new();
         let dsl = r#"
-            (calculate-ubo :target-entity "company-zenith-001" :jurisdiction "KY" :ubo-threshold 25.0)
-            (declare-entity :node-id "person-001" :label Person)
+            (ubo.calc :target "company-zenith-001" :jurisdiction "KY" :threshold 25.0)
+            (entity :id "person-001" :label "Person")
         "#;
 
         let result = handler.extract_context_from_dsl(dsl).await;
@@ -946,11 +1137,11 @@ mod tests {
 
     #[test]
     fn test_percentage_extraction() {
-        let dsl = "(create-edge :properties {:percent 45.5})";
+        let dsl = "(edge :props {:percent 45.5})";
         let result = extract_percentage_from_dsl(dsl);
         assert_eq!(result, Some(45.5));
 
-        let dsl_no_percent = "(declare-entity :node-id \"test\")";
+        let dsl_no_percent = "(entity :id \"test\")";
         let result = extract_percentage_from_dsl(dsl_no_percent);
         assert_eq!(result, None);
     }

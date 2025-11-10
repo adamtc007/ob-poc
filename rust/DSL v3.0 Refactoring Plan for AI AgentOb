@@ -1,0 +1,123 @@
+DSL v3.0 Refactoring Plan for AI AgentObjective: Refactor the v2.0 DSL codebase (parser, AST, types, and examples) to the simpler, more powerful v3.0 specification.Core Principles of v3.0:Unified Syntax: All DSL forms must use the same S-expression syntax: (verb :key value :key value ...). All inconsistent parameter styles (e.g., (key val), string+) are to be eliminated.Rich, First-Class Verbs: We will keep the specific domain verbs (e.g., kyc.verify, compliance.fatca_check). We will not collapse them into generic (kyc.do :op "...") strings. This ensures parse-time validation.Declarative State: We will introduce new, authoritative verbs (ubo.outcome ...) and (role.assign ...) to make the final CBU graph and UBO results an explicit, declarative part of the state, fulfilling the "DSL-as-State" goal.Task 1: Refactor the EBNF and Core ParserThe first task is to simplify the grammar and the main parser.Locate the EBNF specification (likely in DSL_COMPLETE_SPECIFICATION.md) and the core parser logic (e.g., in src/parser/mod.rs or similar).Delete all the complex, domain-specific grammar rules and their corresponding parser functions:case-statementproduct-statementservice-statementkyc-statementcompliance-statementAnd all their child rules: case-params, product-list, service-spec, kyc-params, compliance-params, etc.Also delete property-map and property-list. They are being replaced.Implement the new, simpler EBNF:(* --- v3.0 EBNF --- *)
+program   = form* ;
+form      = "(" verb (key value)* ")" | comment ;
+comment   = ";;" ? any character except newline ? ;
+
+key       = ":" identifier ( "." identifier )? ;
+value     = literal | identifier | list | map | attr-ref ;
+
+literal   = string | number | boolean | date | uuid ;
+list      = "[" (value ("," value)*)? "]" ;
+map       = "{" (key value ("," key value)*)? "}" ;
+attr-ref  = "@attr{" uuid "}" ;
+
+(* Primitives are unchanged *)
+string    = '"' character* '"' ;
+number    = "-"? digit+ ("." digit+)? ;
+boolean   = "true" | "false" ;
+date      = string ;
+uuid      = string ;
+identifier= (letter | '_' | '-') (letter | digit | '_' | '-')* ;
+(* ...etc. *)
+Update the core parser to only parse this new structure. It should produce a generic AST node like Form { verb: String, pairs: Vec<(Key, Value)> }.Task 2: Update the Verb Vocabulary and ASTUpdate the verb enumeration/parser to match the new v3.0 vocabulary.Modify the verb parser to accept the following specific verb list:workflow-verb: define-kyc-investigation, workflow.transitiongraph-verb: entity, edgerole-verb: role.assign (NEW)kyc-verb: kyc.verify, kyc.assess_risk, kyc.collect_document, kyc.screen_sanctions, kyc.check_pep, kyc.validate_addresscompliance-verb: compliance.fatca_check, compliance.crs_check, compliance.aml_check, compliance.generate_sarcase-verb: case.create, case.update, case.closeubo-verb: ubo.calc, ubo.outcome (NEW)Rename core AST nodes and parser logic:declare-entity -> entitycreate-edge -> edgecalculate-ubo-prongs -> ubo.calcgenerate-ubo-report is deprecated and will be replaced by ubo.outcome.Task 3: Refactor All Domain Verb HandlersThis is the largest mechanical change. Find all parsers and execution logic for the old domain verbs and refactor them to the new (verb :key value ...) syntax.Rule: All verbs must now be parsed by the single form parser. All domain-specific logic must be in the execution or semantic validation stage, based on the verb and its key-value pairs.Example (Old v2.0):(kyc.verify (customer.id "CUST-001") (verification.method "document_check"))
+(products.add "CUSTODY" "FUND_ACCOUNTING")
+Example (New v3.0):(kyc.verify
+  :customer-id "CUST-001"
+  :method "document_check")
+
+(products.add
+  :products ["CUSTODY" "FUND_ACCOUNTING"])
+Action: Go through every kyc.*, compliance.*, and case.* verb. Update the logic that handles these verbs to expect its arguments from a key-value map, not a custom-parsed parameter list.Consolidation: Verbs like products.add can now be refactored into case.update (e.g., (case.update :id "..." :add-products ["..."])). Make this change to simplify the case verb set.Task 4: Implement New Declarative VerbsImplement the logic for the new ubo.outcome and role.assign verbs.ubo.outcome:Purpose: To create a declarative, machine-readable record of the UBO calculation. This is the state.Action: Modify the execution logic for ubo.calc. After a calculation is performed, the system must emit a new (ubo.outcome ...) form as part of the resulting state.Shape (Example):(ubo.outcome
+  :target "company-zenith-spv-001"
+  :at "2025-11-10T10:30:00Z"
+  :threshold 25.0
+  :ubos [
+    { :entity "person-john-smith"
+      :effective-percent 45.0
+      :prongs {:ownership 45.0, :voting 45.0}
+      :paths [["person-john-smith" "alpha-holdings-sg" "company-zenith-spv-001"]]
+    }
+  ]
+  :unresolved []
+)
+role.assign:Purpose: To explicitly build the final CBU graph by assigning "proper persons" and their roles (UBO, Director, etc.) to a CBU context.Action: Add this as a new, valid verb to the execution engine. This verb will create/update the CBU graph state.Shape (Example):(role.assign 
+  :entity "person-john-smith"
+  :role "UltimateBeneficialOwner"
+  :cbu "CBU-ZENITH-001"
+  :period {:start "2025-11-10"}
+  :evidence ["ubo.outcome:zenith-capital-ubo-discovery"])
+Task 5: Refactor All Examples and DocumentationUpdate all example DSL files and documentation to use the v3.0 syntax.Primary Test Case: Refactor the "Complete UBO Discovery Workflow" from DSL_COMPLETE_SPECIFICATION.md to the new v3.0 syntax.v2.0 "Zenith" Example (to be replaced):(define-kyc-investigation "zenith-capital-ubo-discovery"
+  :target-entity "company-zenith-spv-001"
+  ...
+  (declare-entity
+    :node-id "company-zenith-spv-001"
+    :label Company
+    :properties { ... })
+  (create-edge
+    :from "alpha-holdings-sg"
+    :to "company-zenith-spv-001"
+    :type HAS_OWNERSHIP
+    :properties { ... }
+    :evidenced-by ["..."])
+  (kyc.verify
+    (customer.id "company-zenith-spv-001")
+    (verification.method "enhanced_due_diligence")
+    (required_documents ["..."]))
+  (calculate-ubo-prongs
+    :target "company-zenith-spv-001"
+    ...)
+  (generate-ubo-report
+    :target "company-zenith-spv-001"
+    :status "COMPLETE"
+    :identified-ubos [ ... ])
+)
+v3.0 "Zenith" Example (the new standard):(define-kyc-investigation "zenith-capital-ubo-discovery"
+  :target-entity "company-zenith-spv-001"
+  :jurisdiction "KY"
+  :ubo-threshold 25.0
+
+  ;; 1. GRAPH DEFINITION
+  (entity :id "company-zenith-spv-001" :label Company
+          :props {:legal-name "Zenith Capital Partners LP"
+                  :registration-number "KY-123456"})
+
+  (edge :from "alpha-holdings-sg" :to "company-zenith-spv-001"
+        :type HAS_OWNERSHIP
+        :props {:percent 45.0}
+        :evidence ["doc-cayman-registry-001"])
+
+  ;; 2. KYC/COMPLIANCE ACTIONS
+  (kyc.collect_document
+    :target "company-zenith-spv-001"
+    :doc-type "certificate_incorporation"
+    :doc-id "doc-cayman-registry-001"
+    :status "VERIFIED")
+
+  ;; 3. CALCULATION
+  (ubo.calc
+    :target "company-zenith-spv-001"
+    :threshold 25.0
+    :prongs ["ownership"])
+
+  ;; 4. DECLARATIVE OUTCOME
+  (ubo.outcome
+    :target "company-zenith-spv-0A01"
+    :at "2025-11-10T10:30:00Z"
+    :threshold 25.0
+    :ubos [
+      { :entity "person-john-smith"
+        :effective-percent 45.0
+        :prongs {:ownership 45.0}
+        :paths [["person-john-smith" "alpha-holdings-sg" "company-zenith-spv-001"]]
+      }
+    ]
+  )
+
+  ;; 5. CBU MAPPING
+  (role.assign 
+    :entity "person-john-smith"
+    :role "UltimateBeneficialOwner"
+    :cbu "CBU-ZENITH-001"
+    :evidence ["ubo.outcome:zenith-capital-ubo-discovery"])
+)
+Task 6: Final Validation and CleanupUpdate all unit tests (#[test]) to assert the new v3.0 syntax and logic.Update all integration tests to use the v3.0 example files.Delete all now-unused parser functions and AST node types related to the old v2.0 ...-params, ...-list, etc.Update DSL_COMPLETE_SPECIFICATION.md to reflect the new, simpler v3.0 EBNF and verb list.

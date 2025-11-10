@@ -5,7 +5,6 @@
 //! of the DSL-as-State pattern.
 
 use crate::database::cbu_repository::CbuRepository;
-use crate::error::Error;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -13,8 +12,24 @@ use serde_json::Value as JsonValue;
 use sqlx::{Pool, Postgres, Transaction};
 use std::collections::HashMap;
 use std::sync::Arc;
+use thiserror::Error as ThisError;
 use tokio::sync::RwLock;
 use uuid::Uuid;
+
+/// Error type for DSL instance repository operations
+#[derive(Debug, ThisError)]
+pub enum Error {
+    #[error("Database error: {0}")]
+    Database(#[from] sqlx::Error),
+    #[error("Serialization error: {0}")]
+    Serialization(#[from] serde_json::Error),
+    #[error("Not found: {message}")]
+    NotFound { message: String },
+    #[error("Validation error: {message}")]
+    ValidationError { message: String },
+    #[error("Repository error: {message}")]
+    Repository { message: String },
+}
 
 /// Status of a DSL instance
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, sqlx::Type)]

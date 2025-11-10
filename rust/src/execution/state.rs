@@ -5,7 +5,7 @@
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use serde_json::Value;
 use sqlx::{PgPool, Row};
 use std::collections::HashMap;
@@ -71,73 +71,6 @@ impl PostgresStateStore {
         .context("Failed to initialize DSL state storage schema")?;
 
         Ok(())
-    }
-
-    /// Get the latest state version for a business unit
-    async fn get_latest_version(&self, business_unit_id: &str) -> Result<Option<u64>> {
-        let row = sqlx::query(
-            "SELECT MAX(version) as max_version FROM dsl_states WHERE business_unit_id = $1",
-        )
-        .bind(business_unit_id)
-        .fetch_optional(&self.pool)
-        .await?;
-
-        Ok(row.and_then(|r| r.get::<Option<i64>, _>("max_version").map(|v| v as u64)))
-    }
-
-    /// Rebuild state from all operations for a business unit
-    async fn rebuild_state_from_operations(
-        &self,
-        business_unit_id: &str,
-    ) -> Result<Option<DslState>> {
-        // Get all operations for this business unit, ordered by version
-        let rows = sqlx::query(
-            r#"
-            SELECT operations, metadata, version, created_at
-            FROM dsl_states
-            WHERE business_unit_id = $1
-            ORDER BY version ASC
-            "#,
-        )
-        .bind(business_unit_id)
-        .fetch_all(&self.pool)
-        .await?;
-
-        if rows.is_empty() {
-            return Ok(None);
-        }
-
-        let mut all_operations = Vec::new();
-        let mut latest_metadata: Option<StateMetadata> = None;
-
-        // Collect all operations from all versions
-        for row in rows {
-            let operations_json: Value = row.get("operations");
-            let metadata_json: Value = row.get("metadata");
-
-            // Parse operations
-            let operations: Vec<DslOperation> = serde_json::from_value(operations_json)
-                .context("Failed to parse operations from database")?;
-
-            // Parse metadata (keep the latest)
-            let metadata: StateMetadata = serde_json::from_value(metadata_json)
-                .context("Failed to parse metadata from database")?;
-
-            all_operations.extend(operations);
-            latest_metadata = Some(metadata);
-        }
-
-        if let Some(metadata) = latest_metadata {
-            // Rebuild state from scratch using all operations
-            let state = DslState::rebuild_from_operations(
-                business_unit_id.to_string(),
-                all_operations,
-                metadata.domain.clone(),
-            );
-            Ok(Some(state))
-        } else {
-            Ok(None)
-        }
     }
 }
 

@@ -33,8 +33,61 @@ pub enum DSLError {
     Serialization(#[from] serde_json::Error),
 }
 
+impl serde::Serialize for DSLError {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        match self {
+            DSLError::Parse(err) => {
+                let mut state = serializer.serialize_struct("DSLError", 2)?;
+                state.serialize_field("type", "Parse")?;
+                state.serialize_field("error", err)?;
+                state.end()
+            }
+            DSLError::Grammar(err) => {
+                let mut state = serializer.serialize_struct("DSLError", 2)?;
+                state.serialize_field("type", "Grammar")?;
+                state.serialize_field("error", err)?;
+                state.end()
+            }
+            DSLError::Vocabulary(err) => {
+                let mut state = serializer.serialize_struct("DSLError", 2)?;
+                state.serialize_field("type", "Vocabulary")?;
+                state.serialize_field("error", err)?;
+                state.end()
+            }
+            DSLError::Validation(err) => {
+                let mut state = serializer.serialize_struct("DSLError", 2)?;
+                state.serialize_field("type", "Validation")?;
+                state.serialize_field("error", err)?;
+                state.end()
+            }
+            DSLError::Runtime(err) => {
+                let mut state = serializer.serialize_struct("DSLError", 2)?;
+                state.serialize_field("type", "Runtime")?;
+                state.serialize_field("error", err)?;
+                state.end()
+            }
+            DSLError::Io(err) => {
+                let mut state = serializer.serialize_struct("DSLError", 2)?;
+                state.serialize_field("type", "Io")?;
+                state.serialize_field("error", &err.to_string())?;
+                state.end()
+            }
+            DSLError::Serialization(err) => {
+                let mut state = serializer.serialize_struct("DSLError", 2)?;
+                state.serialize_field("type", "Serialization")?;
+                state.serialize_field("error", &err.to_string())?;
+                state.end()
+            }
+        }
+    }
+}
+
 /// Parse errors from nom-based parsers
-#[derive(Error, Debug)]
+#[derive(Error, Debug, serde::Serialize)]
 pub enum ParseError {
     #[error("Syntax error at position {position}: {message}")]
     Syntax { position: usize, message: String },
@@ -78,7 +131,7 @@ impl From<String> for ParseError {
 }
 
 /// Grammar-related errors
-#[derive(Error, Debug)]
+#[derive(Error, Debug, serde::Serialize)]
 pub enum GrammarError {
     #[error("Rule '{rule}' not found")]
     RuleNotFound { rule: String },
@@ -100,7 +153,7 @@ pub enum GrammarError {
 }
 
 /// Vocabulary and domain-specific errors
-#[derive(Error, Debug)]
+#[derive(Error, Debug, serde::Serialize)]
 pub enum VocabularyError {
     #[error("Unknown verb '{verb}' in domain '{domain}'")]
     UnknownVerb { verb: String, domain: String },
@@ -142,7 +195,7 @@ pub enum VocabularyError {
 }
 
 /// Semantic validation errors
-#[derive(Error, Debug)]
+#[derive(Error, Debug, serde::Serialize)]
 pub enum ValidationError {
     #[error("Type mismatch: expected {expected}, found {found} at {location}")]
     TypeMismatch {
@@ -180,7 +233,7 @@ pub enum ValidationError {
 }
 
 /// Runtime execution errors
-#[derive(Error, Debug)]
+#[derive(Error, Debug, serde::Serialize)]
 pub enum RuntimeError {
     #[error("Execution failed at statement {statement}: {message}")]
     ExecutionFailed { statement: String, message: String },
@@ -213,7 +266,7 @@ pub type ValidationResult<T> = Result<T, ValidationError>;
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
 
 /// Source location information for errors
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct SourceLocation {
     pub file: Option<String>,
     pub line: usize,
@@ -251,7 +304,7 @@ impl fmt::Display for SourceLocation {
 }
 
 /// Error severity levels
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
 pub enum ErrorSeverity {
     Info,
     Warning,
@@ -271,7 +324,7 @@ impl fmt::Display for ErrorSeverity {
 }
 
 /// Structured error with additional context
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct ContextualError {
     pub error: DSLError,
     pub location: SourceLocation,
@@ -318,7 +371,7 @@ impl std::error::Error for ContextualError {
 }
 
 /// Error collector for batch validation
-#[derive(Debug, Default)]
+#[derive(Debug, Default, serde::Serialize)]
 pub struct ErrorCollector {
     pub errors: Vec<ContextualError>,
 }

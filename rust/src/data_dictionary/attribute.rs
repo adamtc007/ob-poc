@@ -7,8 +7,14 @@ use uuid::Uuid;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct AttributeId(Uuid);
 
+impl Default for AttributeId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AttributeId {
-    /// Create a new random AttributeId
+    /// Create a new attribute ID with a fresh UUID
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }

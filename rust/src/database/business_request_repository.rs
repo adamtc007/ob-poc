@@ -4,7 +4,27 @@
 //! workflow states, and the complete business request lifecycle. This is the
 //! primary interface for business context management in the DSL system.
 
-use crate::dsl_manager::DslError;
+// Create DslError mapping for database operations
+#[derive(Debug, thiserror::Error)]
+pub enum DslError {
+    #[error("Not found: {message}")]
+    NotFound { message: String },
+    #[error("Validation error: {message}")]
+    ValidationError { message: String },
+    #[error("Database error: {0}")]
+    DatabaseError(String),
+}
+
+impl From<crate::error::DSLError> for DslError {
+    fn from(err: crate::error::DSLError) -> Self {
+        match err {
+            crate::error::DSLError::Validation(v) => DslError::ValidationError {
+                message: v.to_string(),
+            },
+            _ => DslError::DatabaseError(err.to_string()),
+        }
+    }
+}
 use crate::models::business_request_models::*;
 use async_trait::async_trait;
 use serde_json::Value;
@@ -124,7 +144,9 @@ impl DslBusinessRequestRepository {
 
         match row {
             Some(row) => Ok(row.get("domain_id")),
-            None => Err(DslError::NotFound { message: format!("domain: {}", domain_name) }),
+            None => Err(DslError::NotFound {
+                message: format!("domain: {}", domain_name),
+            }),
         }
     }
 
@@ -409,7 +431,9 @@ impl DslBusinessRequestRepositoryTrait for DslBusinessRequestRepository {
         }
 
         if set_clauses.is_empty() {
-            return Err(DslError::ValidationError { message: "No updates provided".to_string() });
+            return Err(DslError::ValidationError {
+                message: "No updates provided".to_string(),
+            });
         }
 
         set_clauses.push("updated_at = now()".to_string());
@@ -427,7 +451,9 @@ impl DslBusinessRequestRepositoryTrait for DslBusinessRequestRepository {
 
         self.get_business_request(request_id)
             .await?
-            .ok_or_else(|| DslError::NotFound { message: format!("business_request: {}", request_id) })
+            .ok_or_else(|| DslError::NotFound {
+                message: format!("business_request: {}", request_id),
+            })
     }
 
     async fn delete_business_request(&self, request_id: &Uuid) -> Result<(), DslError> {
@@ -441,7 +467,9 @@ impl DslBusinessRequestRepositoryTrait for DslBusinessRequestRepository {
                 .map_err(|e| DslError::DatabaseError(e.to_string()))?;
 
         if result.rows_affected() == 0 {
-            return Err(DslError::NotFound { message: format!("business_request: {}", request_id) });
+            return Err(DslError::NotFound {
+                message: format!("business_request: {}", request_id),
+            });
         }
 
         info!("Deleted business request: {}", request_id);

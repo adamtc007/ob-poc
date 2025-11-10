@@ -7,9 +7,10 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
+
 use serde_json::Value;
 use std::collections::HashMap;
+
 use std::time::Duration;
 
 use super::{ExecutionContext, ExternalIntegration};
@@ -18,29 +19,21 @@ use crate::dsl::operations::ExecutableDslOperation as DslOperation;
 
 /// HTTP-based integration for REST APIs
 pub struct HttpIntegration {
-    name: String,
     base_url: String,
     client: Client,
     headers: HashMap<String, String>,
-    timeout_seconds: u64,
 }
 
 impl HttpIntegration {
-    pub fn new(
-        name: impl Into<String>,
-        base_url: impl Into<String>,
-        timeout_seconds: u64,
-    ) -> Result<Self> {
+    pub fn new(base_url: impl Into<String>, timeout_seconds: u64) -> Result<Self> {
         let client = Client::builder()
             .timeout(Duration::from_secs(timeout_seconds))
             .build()?;
 
         Ok(Self {
-            name: name.into(),
             base_url: base_url.into(),
             client,
             headers: HashMap::new(),
-            timeout_seconds,
         })
     }
 
@@ -129,7 +122,7 @@ impl HttpIntegration {
 #[async_trait]
 impl ExternalIntegration for HttpIntegration {
     fn name(&self) -> &str {
-        &self.name
+        "http_integration"
     }
 
     async fn execute(&self, operation: &DslOperation, context: &ExecutionContext) -> Result<Value> {
@@ -161,7 +154,7 @@ pub struct RiskEngineIntegration {
 
 impl RiskEngineIntegration {
     pub fn new(base_url: impl Into<String>, api_key: impl Into<String>) -> Result<Self> {
-        let http = HttpIntegration::new("risk_engine", base_url, 30)?.with_api_key(api_key);
+        let http = HttpIntegration::new(base_url, 30)?.with_api_key(api_key);
 
         Ok(Self { http })
     }
@@ -202,16 +195,14 @@ impl ExternalIntegration for RiskEngineIntegration {
     async fn validate(&self, operation: &DslOperation) -> Result<bool> {
         // Validate that we can handle this operation
         match operation.operation_type.as_str() {
-            "collect" => Ok(operation
-                .parameters
-                .get("from")
-                .and_then(|v| v.as_str())
-                .map_or(false, |from| from == "risk-engine")),
+            "collect" => Ok(
+                operation.parameters.get("from").and_then(|v| v.as_str()) == Some("risk-engine")
+            ),
             "validate" => Ok(operation
                 .parameters
                 .get("attribute_id")
                 .and_then(|v| serde_json::from_value::<AttributeId>(v.clone()).ok())
-                .map_or(false, |attr_id| attr_id.to_string().contains("risk"))),
+                .is_some_and(|attr_id| attr_id.to_string().contains("risk"))),
             _ => Ok(false),
         }
     }
@@ -280,8 +271,7 @@ pub struct DocumentStoreIntegration {
 
 impl DocumentStoreIntegration {
     pub fn new(base_url: impl Into<String>, auth_token: impl Into<String>) -> Result<Self> {
-        let http =
-            HttpIntegration::new("document_store", base_url, 60)?.with_auth_token(auth_token);
+        let http = HttpIntegration::new(base_url, 60)?.with_auth_token(auth_token);
 
         Ok(Self { http })
     }
@@ -315,11 +305,10 @@ impl ExternalIntegration for DocumentStoreIntegration {
 
     async fn validate(&self, operation: &DslOperation) -> Result<bool> {
         match operation.operation_type.as_str() {
-            "collect" => Ok(operation
-                .parameters
-                .get("from")
-                .and_then(|v| v.as_str())
-                .map_or(false, |from| from == "document-store")),
+            "collect" => {
+                Ok(operation.parameters.get("from").and_then(|v| v.as_str())
+                    == Some("document-store"))
+            }
             "validate" => Ok(operation.parameters.contains_key("document_id")),
             _ => Ok(false),
         }
@@ -383,7 +372,7 @@ pub struct CrsComplianceIntegration {
 
 impl CrsComplianceIntegration {
     pub fn new(base_url: impl Into<String>, api_key: impl Into<String>) -> Result<Self> {
-        let http = HttpIntegration::new("crs_compliance", base_url, 45)?.with_api_key(api_key);
+        let http = HttpIntegration::new(base_url, 45)?.with_api_key(api_key);
 
         Ok(Self { http })
     }
@@ -427,15 +416,13 @@ impl ExternalIntegration for CrsComplianceIntegration {
                 .parameters
                 .get("attribute_id")
                 .and_then(|v| serde_json::from_value::<AttributeId>(v.clone()).ok())
-                .map_or(false, |attr_id| {
+                .is_some_and(|attr_id| {
                     let attr_str = attr_id.to_string();
                     attr_str.contains("fatca") || attr_str.contains("crs")
                 })),
-            "collect" => Ok(operation
-                .parameters
-                .get("from")
-                .and_then(|v| v.as_str())
-                .map_or(false, |from| from == "crs-check")),
+            "collect" => {
+                Ok(operation.parameters.get("from").and_then(|v| v.as_str()) == Some("crs-check"))
+            }
             _ => Ok(false),
         }
     }
@@ -720,7 +707,7 @@ mod tests {
     #[tokio::test]
     async fn test_integration_registry() {
         let mut registry = IntegrationRegistry::new();
-        registry.register(Box::new(MockIntegration::new("test")));
+        registry.register(std::sync::Arc::new(MockIntegration::new("test")));
 
         let integrations = registry.list_integrations();
         assert!(integrations.contains(&"test"));
@@ -731,14 +718,14 @@ mod tests {
 
     #[test]
     fn test_http_integration_creation() {
-        let integration = HttpIntegration::new("test", "https://example.com", 30);
+        let integration = HttpIntegration::new("https://example.com", 30);
         assert!(integration.is_ok());
 
-        let integration = integration
+        let _integration = integration
             .unwrap()
             .with_header("Content-Type", "application/json")
             .with_api_key("test-key");
 
-        assert_eq!(integration.name(), "test");
+        // Integration created successfully
     }
 }

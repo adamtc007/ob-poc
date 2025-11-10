@@ -4,16 +4,62 @@ version = "0.1.0"
 edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-# Temporarily disable binaries for Phase 1 focus on core DSL editing
+# Broken binaries removed for clean baseline - only egui_visualizer remains
+
+[[bin]]
+name = "egui_visualizer"
+path = "src/bin/egui_visualizer.rs"
+required-features = ["visualizer"]
+
+[[bin]]
+name = "rest_api_server"
+path = "src/bin/rest_api_server.rs"
+required-features = ["rest-api"]
+
+[[bin]]
+name = "mock_rest_api_server"
+path = "src/bin/mock_rest_api_server.rs"
+required-features = ["mock-api"]
+
 [[bin]]
 name = "cli"
 path = "src/bin/cli.rs"
-required-features = ["binaries"]
+required-features = ["database", "binaries"]
 
 [[bin]]
 name = "ast_viz"
 path = "src/bin/ast_viz.rs"
+required-features = ["database", "binaries"]
+
+[[bin]]
+name = "phase5_demo"
+path = "src/bin/phase5_demo.rs"
 required-features = ["binaries"]
+
+[[bin]]
+name = "phase6_egui_client"
+path = "src/bin/phase6_egui_client.rs"
+required-features = ["visualizer"]
+
+[[bin]]
+name = "phase6_backend"
+path = "src/bin/phase6_backend.rs"
+required-features = ["mock-api"]
+
+[[bin]]
+name = "test_master_ob_storage"
+path = "src/bin/test_master_ob_storage.rs"
+required-features = ["database", "binaries"]
+
+[[bin]]
+name = "test_dsl_db_simple"
+path = "src/bin/test_dsl_db_simple.rs"
+required-features = ["database", "binaries"]
+
+[[bin]]
+name = "test_dsl_direct_db"
+path = "src/bin/test_dsl_direct_db.rs"
+required-features = ["database", "binaries"]
 
 [dependencies]
 # Core libraries
@@ -39,6 +85,25 @@ pest_derive = "2.7"
 # Database integration (optional for Phase 1)
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "macros"], optional = true }
 
+# egui for desktop GUI
+egui = { version = "0.28", optional = true }
+eframe = { version = "0.28", default-features = false, features = [
+    "default_fonts",
+    "glow",
+    "persistence",
+], optional = true }
+
+# Tree visualization
+egui_extras = { version = "0.28", optional = true }
+
+# URL encoding for API calls
+urlencoding = { version = "2.1", optional = true }
+
+# REST API server
+axum = { version = "0.7", optional = true }
+tower = { version = "0.4", optional = true }
+tower-http = { version = "0.5", features = ["cors"], optional = true }
+
 # gRPC and Protobuf
 tonic = { version = "0.14", features = ["codegen", "transport"] }
 tonic-web = "0.12"
@@ -53,6 +118,9 @@ reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
 
 # CLI argument parsing
 clap = { version = "4.4", features = ["derive"], optional = true }
+
+# Environment logging for CLI tools
+env_logger = { version = "0.10", optional = true }
 
 # Serialization/Deserialization
 # serde is already included above
@@ -78,9 +146,14 @@ prost-build = "0.12" # For generating Rust code from .proto files
 
 # Features for conditional compilation
 [features]
-default = ["database"]
-binaries = ["dep:clap"]  # Only enable binaries when this feature is active
+default = []
+visualizer = ["dep:egui", "dep:eframe", "dep:egui_extras", "dep:urlencoding"]
+rest-api = ["dep:axum", "dep:tower", "dep:tower-http", "database"]
+mock-api = ["dep:axum", "dep:tower", "dep:tower-http"]  # Mock API without database
+binaries = ["dep:clap", "dep:env_logger"]  # Only enable binaries when this feature is active
 database = ["dep:sqlx"]  # Only enable database functionality when needed
+
+
 
 # Optional: Workspace configuration if you have multiple crates
 # [workspace]

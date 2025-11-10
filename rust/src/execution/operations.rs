@@ -3,16 +3,14 @@
 //! This module contains concrete implementations of operation handlers for
 //! the core DSL operations used across different business domains.
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use async_trait::async_trait;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use super::{
-    DslState, ExecutionContext, ExecutionMessage, ExecutionResult, MessageLevel, OperationHandler,
-};
+use super::{DslState, ExecutionContext, ExecutionMessage, ExecutionResult, OperationHandler};
 use crate::data_dictionary::AttributeId;
 use crate::dsl::operations::ExecutableDslOperation as DslOperation;
 
@@ -54,13 +52,12 @@ impl OperationHandler for ValidateHandler {
         if validation_result.is_valid {
             messages.push(ExecutionMessage::info(format!(
                 "Validation successful for attribute {}",
-                attribute_id.to_string()
+                attribute_id
             )));
         } else {
             messages.push(ExecutionMessage::warning(format!(
                 "Validation failed for attribute {}: {}",
-                attribute_id.to_string(),
-                validation_result.message
+                attribute_id, validation_result.message
             )));
         }
 
@@ -137,7 +134,7 @@ impl ValidateHandler {
                 let rating = value
                     .as_str()
                     .ok_or_else(|| anyhow::anyhow!("Risk rating must be a string"))?;
-                let valid_ratings = vec!["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+                let valid_ratings = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
                 Ok(ValidationResult {
                     is_valid: valid_ratings.contains(&rating),
                     message: format!("Risk rating validation: {}", rating),
@@ -198,8 +195,7 @@ impl OperationHandler for CollectHandler {
 
         messages.push(ExecutionMessage::info(format!(
             "Successfully collected data for attribute {} from {}",
-            attribute_id.to_string(),
-            source
+            attribute_id, source
         )));
 
         // Apply operation to create new state
@@ -508,14 +504,12 @@ impl OperationHandler for CheckHandler {
         if check_result.passed {
             messages.push(ExecutionMessage::info(format!(
                 "Check passed for attribute {}: {}",
-                attribute_id.to_string(),
-                check_result.message
+                attribute_id, check_result.message
             )));
         } else {
             messages.push(ExecutionMessage::warning(format!(
                 "Check failed for attribute {}: {}",
-                attribute_id.to_string(),
-                check_result.message
+                attribute_id, check_result.message
             )));
         }
 
@@ -571,7 +565,7 @@ impl CheckHandler {
                 passed: current_value.is_some(),
                 message: format!(
                     "Attribute {} {}",
-                    attribute_id.to_string(),
+                    attribute_id,
                     if current_value.is_some() {
                         "exists"
                     } else {
@@ -590,15 +584,15 @@ impl CheckHandler {
                             } else {
                                 "does not match expected"
                             },
-                            attribute_id.to_string()
+                            attribute_id
                         ),
                     })
                 } else {
                     Ok(CheckResult {
                         passed: false,
-                        message: format!(
+                        message:
                             "Cannot perform equals check - missing current value or expected value"
-                        ),
+                                .to_string(),
                     })
                 }
             }
@@ -616,6 +610,179 @@ struct CheckResult {
     message: String,
 }
 
+/// Handler for the new ubo.outcome declarative verb
+pub struct UboOutcomeHandler;
+
+impl OperationHandler for UboOutcomeHandler {
+    fn handles(&self) -> Vec<String> {
+        vec!["ubo.outcome".to_string()]
+    }
+
+    async fn execute(
+        &self,
+        verb: &str,
+        pairs: &std::collections::HashMap<crate::Key, crate::Value>,
+        context: &mut crate::execution::context::ExecutionContext,
+    ) -> Result<serde_json::Value, crate::execution::context::ExecutionError> {
+        use crate::execution::context::ExecutionError;
+
+        // Extract required fields from key-value pairs
+        let target = pairs
+            .get(&crate::Key::new("target"))
+            .and_then(|v| match v {
+                crate::Value::Literal(crate::Literal::String(s)) => Some(s.clone()),
+                _ => None,
+            })
+            .ok_or_else(|| {
+                ExecutionError::ValidationError("Missing :target in ubo.outcome".to_string())
+            })?;
+
+        let timestamp = pairs
+            .get(&crate::Key::new("at"))
+            .and_then(|v| match v {
+                crate::Value::Literal(crate::Literal::String(s)) => Some(s.clone()),
+                _ => None,
+            })
+            .ok_or_else(|| {
+                ExecutionError::ValidationError("Missing :at in ubo.outcome".to_string())
+            })?;
+
+        let threshold = pairs
+            .get(&crate::Key::new("threshold"))
+            .and_then(|v| match v {
+                crate::Value::Literal(crate::Literal::Number(n)) => Some(*n),
+                _ => None,
+            })
+            .ok_or_else(|| {
+                ExecutionError::ValidationError("Missing :threshold in ubo.outcome".to_string())
+            })?;
+
+        // Store the UBO outcome as declarative state
+        let outcome = serde_json::json!({
+            "verb": "ubo.outcome",
+            "target": target,
+            "at": timestamp,
+            "threshold": threshold,
+            "ubos": pairs.get(&crate::Key::new("ubos")).unwrap_or(&crate::Value::List(vec![])),
+            "unresolved": pairs.get(&crate::Key::new("unresolved")).unwrap_or(&crate::Value::List(vec![])),
+        });
+
+        // Update execution context with the outcome
+        context.set_state(&format!("ubo_outcome_{}", target), outcome.clone());
+
+        Ok(outcome)
+    }
+
+    async fn validate(
+        &self,
+        verb: &str,
+        pairs: &std::collections::HashMap<crate::Key, crate::Value>,
+    ) -> Result<bool, String> {
+        // Validate required fields exist
+        if !pairs.contains_key(&crate::Key::new("target")) {
+            return Err("ubo.outcome requires :target".to_string());
+        }
+        if !pairs.contains_key(&crate::Key::new("at")) {
+            return Err("ubo.outcome requires :at".to_string());
+        }
+        if !pairs.contains_key(&crate::Key::new("threshold")) {
+            return Err("ubo.outcome requires :threshold".to_string());
+        }
+        Ok(true)
+    }
+}
+
+/// Handler for the new role.assign declarative verb
+pub struct RoleAssignHandler;
+
+impl OperationHandler for RoleAssignHandler {
+    fn handles(&self) -> Vec<String> {
+        vec!["role.assign".to_string()]
+    }
+
+    async fn execute(
+        &self,
+        verb: &str,
+        pairs: &std::collections::HashMap<crate::Key, crate::Value>,
+        context: &mut crate::execution::context::ExecutionContext,
+    ) -> Result<serde_json::Value, crate::execution::context::ExecutionError> {
+        use crate::execution::context::ExecutionError;
+
+        // Extract required fields from key-value pairs
+        let entity = pairs
+            .get(&crate::Key::new("entity"))
+            .and_then(|v| match v {
+                crate::Value::Literal(crate::Literal::String(s)) => Some(s.clone()),
+                _ => None,
+            })
+            .ok_or_else(|| {
+                ExecutionError::ValidationError("Missing :entity in role.assign".to_string())
+            })?;
+
+        let role = pairs
+            .get(&crate::Key::new("role"))
+            .and_then(|v| match v {
+                crate::Value::Literal(crate::Literal::String(s)) => Some(s.clone()),
+                _ => None,
+            })
+            .ok_or_else(|| {
+                ExecutionError::ValidationError("Missing :role in role.assign".to_string())
+            })?;
+
+        let cbu = pairs
+            .get(&crate::Key::new("cbu"))
+            .and_then(|v| match v {
+                crate::Value::Literal(crate::Literal::String(s)) => Some(s.clone()),
+                _ => None,
+            })
+            .ok_or_else(|| {
+                ExecutionError::ValidationError("Missing :cbu in role.assign".to_string())
+            })?;
+
+        // Store the role assignment as declarative state
+        let assignment = serde_json::json!({
+            "verb": "role.assign",
+            "entity": entity,
+            "role": role,
+            "cbu": cbu,
+            "period": pairs.get(&crate::Key::new("period")),
+            "evidence": pairs.get(&crate::Key::new("evidence")).unwrap_or(&crate::Value::List(vec![])),
+        });
+
+        // Update CBU graph state
+        let cbu_graph_key = format!("cbu_graph_{}", cbu);
+        let mut cbu_graph = context
+            .get_state(&cbu_graph_key)
+            .unwrap_or_else(|| serde_json::json!({"assignments": []}));
+
+        if let Some(assignments) = cbu_graph["assignments"].as_array_mut() {
+            assignments.push(assignment.clone());
+        }
+
+        context.set_state(&cbu_graph_key, cbu_graph);
+
+        Ok(assignment)
+    }
+
+    async fn validate(
+        &self,
+        verb: &str,
+        pairs: &std::collections::HashMap<crate::Key, crate::Value>,
+    ) -> Result<bool, String> {
+        // Validate required fields exist
+        if !pairs.contains_key(&crate::Key::new("entity")) {
+            return Err("role.assign requires :entity".to_string());
+        }
+        if !pairs.contains_key(&crate::Key::new("role")) {
+            return Err("role.assign requires :role".to_string());
+        }
+        if !pairs.contains_key(&crate::Key::new("cbu")) {
+            return Err("role.assign requires :cbu".to_string());
+        }
+        Ok(true)
+    }
+}
+
 /// Factory function to create all standard operation handlers
 pub fn create_standard_handlers() -> Vec<Arc<dyn OperationHandler>> {
     vec![
@@ -624,6 +791,8 @@ pub fn create_standard_handlers() -> Vec<Arc<dyn OperationHandler>> {
         Arc::new(DeclareEntityHandler),
         Arc::new(CreateEdgeHandler),
         Arc::new(CheckHandler),
+        Arc::new(UboOutcomeHandler),
+        Arc::new(RoleAssignHandler),
     ]
 }
 

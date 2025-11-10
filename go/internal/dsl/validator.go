@@ -90,13 +90,13 @@ func isNonVerb(token string) bool {
 
 // validateAttributes checks if the attribute UUIDs used in the DSL exist in the dictionary.
 func (v *Validator) validateAttributes(ctx context.Context, dsl string) error {
-    ids := ExtractAttributeIDs(dsl)
-    for _, id := range ids {
-        _, err := v.ds.GetDictionaryAttributeByID(ctx, id)
-        if err != nil {
-            return fmt.Errorf("attribute with ID %s not found in dictionary: %w", id, err)
-        }
-    }
+	ids := ExtractAttributeIDs(dsl)
+	for _, id := range ids {
+		_, err := v.ds.GetDictionaryAttributeByID(ctx, id)
+		if err != nil {
+			return fmt.Errorf("attribute with ID %s not found in dictionary: %w", id, err)
+		}
+	}
 
-    return nil
+	return nil
 }

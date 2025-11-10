@@ -4,12 +4,9 @@
 //! against business constraints, compliance requirements, and workflow rules.
 //! It follows a plugin architecture where rules can be registered dynamically.
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
-use uuid::Uuid;
 
 use super::{BusinessRule, DslState, ExecutionContext, RuleResult};
 use crate::data_dictionary::AttributeId;
@@ -158,7 +155,7 @@ impl BusinessRule for OwnershipLimitsRule {
                 .parameters
                 .get("type")
                 .and_then(|v| v.as_str())
-                .map_or(false, |t| t.contains("OWNERSHIP"))
+                .is_some_and(|t| t.contains("OWNERSHIP"))
     }
 
     async fn validate(
@@ -637,7 +634,7 @@ mod tests {
 
     fn create_test_context() -> ExecutionContext {
         ExecutionContext {
-            session_id: Uuid::new_v4(),
+            session_id: uuid::Uuid::new_v4(),
             business_unit_id: "TEST-001".to_string(),
             domain: "test".to_string(),
             executor: "test_user".to_string(),
@@ -744,7 +741,7 @@ mod tests {
     #[tokio::test]
     async fn test_business_rule_registry() {
         let mut registry = BusinessRuleRegistry::new();
-        registry.register(Box::new(OwnershipLimitsRule::new()));
+        registry.register(std::sync::Arc::new(OwnershipLimitsRule::new()));
 
         let context = create_test_context();
         let state = create_test_state();

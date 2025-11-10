@@ -1,17 +1,81 @@
     Blocking waiting for file lock on package cache
-    Updating crates.io index
-error: failed to select a version for `libsqlite3-sys`.
-    ... required by package `sqlx-sqlite v0.8.0`
-    ... which satisfies dependency `sqlx-sqlite = "=0.8.0"` of package `sqlx v0.8.0`
-    ... which satisfies dependency `sqlx = "^0.8"` of package `ob-poc v0.1.0 (/Users/adamtc007/Developer/ob-poc/rust)`
-    ... which satisfies path dependency `ob-poc` of package `ob-poc-web-server v0.1.0 (/Users/adamtc007/Developer/ob-poc/web-server)`
-versions that meet the requirements `^0.28.0` are: 0.28.0
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   0.209208750s  INFO prepare_target{force=false package_id=ob-poc-web-server v0.1.0 (/Users/adamtc007/Developer/ob-poc/web-server) target="ob-poc-web-server"}: cargo::core::compiler::fingerprint: fingerprint error for ob-poc-web-server v0.1.0 (/Users/adamtc007/Developer/ob-poc/web-server)/Check { test: false }/TargetInner { name: "ob-poc-web-server", doc: true, ..: with_path("/Users/adamtc007/Developer/ob-poc/web-server/src/main.rs", Edition2021) }
+   0.209231250s  INFO prepare_target{force=false package_id=ob-poc-web-server v0.1.0 (/Users/adamtc007/Developer/ob-poc/web-server) target="ob-poc-web-server"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/adamtc007/Developer/ob-poc/web-server/target/debug/.fingerprint/ob-poc-web-server-282a866602456617/bin-ob-poc-web-server`
 
-package `libsqlite3-sys` links to the native library `sqlite3`, but it conflicts with a previous package which links to `sqlite3` as well:
-package `libsqlite3-sys v0.26.0`
-    ... which satisfies dependency `libsqlite3-sys = "^0.26.0"` of package `sqlx-sqlite v0.7.0`
-    ... which satisfies dependency `sqlx-sqlite = "=0.7.0"` of package `sqlx v0.7.0`
-    ... which satisfies dependency `sqlx = "^0.7"` of package `ob-poc-web-server v0.1.0 (/Users/adamtc007/Developer/ob-poc/web-server)`
-Only one package in the dependency graph may specify the same links value. This helps ensure that only one copy of a native library is linked in the final binary. Try to adjust your dependencies so that only one package uses the `links = "sqlite3"` value. For more information, see https://doc.rust-lang.org/cargo/reference/resolver.html#links.
+Caused by:
+    No such file or directory (os error 2)
 
-failed to select a version for `libsqlite3-sys` which could resolve this conflict
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.221702208s  INFO prepare_target{force=false package_id=ob-poc v0.1.0 (/Users/adamtc007/Developer/ob-poc/rust) target="ob_poc"}: cargo::core::compiler::fingerprint: fingerprint error for ob-poc v0.1.0 (/Users/adamtc007/Developer/ob-poc/rust)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("ob_poc", ["lib"], "/Users/adamtc007/Developer/ob-poc/rust/src/lib.rs", Edition2021) }
+   0.221721042s  INFO prepare_target{force=false package_id=ob-poc v0.1.0 (/Users/adamtc007/Developer/ob-poc/rust) target="ob_poc"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/adamtc007/Developer/ob-poc/web-server/target/debug/.fingerprint/ob-poc-12fc85f5b2f570ca/lib-ob_poc`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: cargo::core::compiler::compile
+   8: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   9: cargo::ops::cargo_compile::compile_ws
+  10: cargo::ops::cargo_compile::compile_with_exec
+  11: cargo::ops::cargo_compile::compile
+  12: cargo::commands::check::exec
+  13: <cargo::cli::Exec>::exec
+  14: cargo::main
+  15: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  16: std::rt::lang_start::<()>::{closure#0}
+  17: std::rt::lang_start_internal
+  18: _main
+   0.246673583s  INFO prepare_target{force=false package_id=ob-poc-web-server v0.1.0 (/Users/adamtc007/Developer/ob-poc/web-server) target="ob-poc-web-server"}: cargo::core::compiler::fingerprint: fingerprint error for ob-poc-web-server v0.1.0 (/Users/adamtc007/Developer/ob-poc/web-server)/Check { test: true }/TargetInner { name: "ob-poc-web-server", doc: true, ..: with_path("/Users/adamtc007/Developer/ob-poc/web-server/src/main.rs", Edition2021) }
+   0.246687250s  INFO prepare_target{force=false package_id=ob-poc-web-server v0.1.0 (/Users/adamtc007/Developer/ob-poc/web-server) target="ob-poc-web-server"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/adamtc007/Developer/ob-poc/web-server/target/debug/.fingerprint/ob-poc-web-server-f6faa0a01f43ff3e/test-bin-ob-poc-web-server`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+    Checking ob-poc v0.1.0 (/Users/adamtc007/Developer/ob-poc/rust)
+error: could not compile `ob-poc` (lib) due to 62 previous errors

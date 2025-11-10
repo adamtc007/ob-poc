@@ -3,10 +3,10 @@ module dsl-ob-poc
 go 1.25.1
 
 require (
-    github.com/google/generative-ai-go v0.20.1
-    github.com/google/uuid v1.6.0
-    github.com/stretchr/testify v1.10.0
-    google.golang.org/api v0.254.0
+	github.com/google/generative-ai-go v0.20.1
+	github.com/google/uuid v1.6.0
+	github.com/stretchr/testify v1.10.0
+	google.golang.org/api v0.254.0
 )
 
 require (
@@ -24,6 +24,7 @@ require (
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
 	github.com/googleapis/gax-go/v2 v2.15.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/lib/pq v1.10.9 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect

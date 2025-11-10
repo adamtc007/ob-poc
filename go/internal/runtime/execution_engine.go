@@ -1,33 +1,33 @@
 package runtime
 
 import (
-    "context"
-    "encoding/json"
-    "fmt"
-    "regexp"
-    "strings"
-    "time"
+	"context"
+	"encoding/json"
+	"fmt"
+	"regexp"
+	"strings"
+	"time"
 
-    "dsl-ob-poc/internal/datastore"
+	"dsl-ob-poc/internal/datastore"
 )
 
 // ExecutionEngine orchestrates the execution of DSL actions
 type ExecutionEngine struct {
-    dataStore         datastore.DataStore
-    httpClient        *HTTPClient
-    attributeResolver *AttributeResolver
+	dataStore         datastore.DataStore
+	httpClient        *HTTPClient
+	attributeResolver *AttributeResolver
 }
 
 // NewExecutionEngine creates a new execution engine
 func NewExecutionEngine(_ interface{}, dataStore datastore.DataStore) (*ExecutionEngine, error) {
-    httpClient := NewHTTPClient()
-    attributeResolver := NewAttributeResolver(dataStore)
+	httpClient := NewHTTPClient()
+	attributeResolver := NewAttributeResolver(dataStore)
 
-    return &ExecutionEngine{
-        dataStore:         dataStore,
-        httpClient:        httpClient,
-        attributeResolver: attributeResolver,
-    }, nil
+	return &ExecutionEngine{
+		dataStore:         dataStore,
+		httpClient:        httpClient,
+		attributeResolver: attributeResolver,
+	}, nil
 }
 
 // ExecuteAction executes a single action based on execution request

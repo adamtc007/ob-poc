@@ -1,0 +1,99 @@
+## User
+
+check what supportin the dsl or ebnf there is for 'document' as an entity - I want  to create a documents library -all KYC documents and other onboarding doomain documents are catalogued - with contents (attributes) and who issues them and extended notes son what they contain - wher they are used etc for an agent to RAG - dont make code changes - just asses whts there
+
+## Assistant
+
+Of course. That's an excellent architectural consideration for building an agent-driven system. I will assess the current state of "document" as an entity within the DSL and EBNF without making any code changes.
+
+Here is my assessment of the existing support for a document library:
+
+### Executive Summary
+
+The DSL has good foundational support for handling documents, but it does so primarily by *referencing* them rather than formally *defining* them as first-class entities. A dedicated `(document ...)` verb for cataloging, which would form the core of a document library, does not currently exist.
+
+Instead, document interactions are handled in two main ways:
+1.  **As actions** via verbs like `kyc.collect_document`.
+2.  **As evidence** via the `:evidence` attribute on other entities like `edge`.
+
+This means the system is aware of documents and can link to them, but it lacks a centralized, descriptive catalog that an agent could easily query for RAG purposes.
+
+---
+
+### 1. EBNF Grammar and DSL Syntax Analysis
+
+I've reviewed the `DSL_GRAMMAR_EXPORT.ebnf` to see how documents are formally defined in the language.
+
+*   **No Dedicated `document` Verb**: There is no top-level verb like `(document ...)` or `(define-document ...)` that is analogous to `(entity ...)` or `(edge ...)`. This is the most significant finding; the DSL does not currently have a structure for defining a document and its rich attributes as a standalone entity.
+
+*   **Action-Oriented Verb**: The grammar explicitly defines a verb for interacting with documents within the KYC domain:
+    *   `kyc-verb = ... | "kyc.collect_document" | ...`
+    This verb treats "collecting a document" as an event in a workflow.
+
+*   **Evidence Attribute**: The concept of evidence, which is almost always a document, is present. The semantic constraints section for the `edge` verb mentions an optional `:evidence` attribute.
+    *   `(* edge: requires :from, :to, :type, optional :props, :evidence *)`
+    *   The `:evidence` attribute is defined as a `list` of `string` literals, implying it's a collection of document identifiers (e.g., UUIDs or file paths).
+
+### 2. Practical Usage in DSL Examples
+
+I've examined `zenith_capital_ubo_v3.dsl` to see how these grammar rules are applied in practice.
+
+*   **`kyc.collect_document` Usage**: The example file shows `kyc.collect_document` being used to record the event of a document being collected and verified.
+
+    ```/Users/adamtc007/Developer/ob-poc/rust/examples/zenith_capital_ubo_v3.dsl#L66-72
+    (kyc.collect_document
+      :target "company-zenith-spv-001"
+      :doc-type "certificate_incorporation"
+      :doc-id "doc-cayman-registry-001"
+      :status "VERIFIED"
+      :collected-at "2025-11-10T09:15:00Z")
+    ```
+    This provides a good audit trail but doesn't describe the document itself beyond its type and ID.
+
+*   **`:evidence` Usage**: The `edge` verb uses the `:evidence` attribute to link an ownership relationship to one or more document IDs.
+
+    ```/Users/adamtc007/Developer/ob-poc/rust/examples/zenith_capital_ubo_v3.dsl#L56-64
+      :props {
+        :percent 45.0
+        :share-class "Class A Units"
+        :voting-rights 45.0
+      }
+      :evidence ["doc-cayman-registry-001" "doc-partnership-agreement-001"])
+    ```
+    This is powerful for audit purposes but, again, treats the document as a pointer rather than a rich object.
+
+### 3. Gap Analysis for Your Requirements
+
+Here's how the current implementation stacks up against your goal of creating a rich document library for an agent:
+
+| Requirement | Current Support | Gap |
+| :--- | :--- | :--- |
+| **Catalog Documents** | **Partial**. Documents are referenced by ID, but not defined or cataloged in a central, descriptive way. | The core concept of a "document library" entity is missing. An agent can't query the DSL to learn *about* a document from its ID alone. |
+| **Contents (Attributes)** | **Limited**. The `kyc.collect_document` verb includes `:doc-type` and `:status`, but not a flexible map of attributes. | There is no standard way to store rich, arbitrary metadata about a document, such as expiration date, page count, or extracted key-value pairs. |
+| **Issuer Information** | **None**. There is no dedicated attribute for the issuing authority or person. | This is a critical piece of metadata for verification and would need to be added. |
+| **Extended Notes for RAG** | **None**. There is no field for free-text summaries or notes that a RAG agent could use for context. | This is a key requirement for your use case and is completely missing. |
+| **Usage Information** | **Implicit**. An agent could theoretically parse the entire DSL history to find all instances where a document ID appears in an `:evidence` list. | This is inefficient. There is no direct way to query, "Where is `doc-001` used as evidence?" |
+
+### Recommendations for a Path Forward
+
+While no code changes were requested, here is a high-level assessment of what would be needed to implement your vision:
+
+1.  **Introduce a New `document` Verb**:
+    *   A new verb, perhaps `(document.catalog ...)` or `(document.define ...)`, would be required.
+    *   This verb would serve as the foundational entry for any document in the library.
+
+2.  **Define a Rich Attribute Set**:
+    *   The new verb should support the attributes you need:
+        *   `:doc-id` (the primary key).
+        *   `:doc-type` (e.g., "passport", "articles_of_incorporation").
+        *   `:issuer` (e.g., "US Department of State", "Company House").
+        *   `:issued-at`, `:expires-at` (dates).
+        *   `:notes` (a long-form string for RAG content).
+        *   `:attributes` (a flexible `map` for storing other metadata like `{ :country "US", :passport-number "X123" }`).
+
+3.  **Update Other Verbs**:
+    *   The `kyc.collect_document` verb could be simplified to just reference a pre-defined document: `(kyc.collect_document :doc-id "doc-001" :status "VERIFIED")`.
+    *   The `:evidence` attribute would continue to function as it does now, linking business objects to the document library.
+
+This approach would create the structured, queryable document library you envision, making it a powerful tool for a RAG-based agent.
+

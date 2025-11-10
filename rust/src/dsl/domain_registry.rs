@@ -99,9 +99,6 @@ pub struct DomainRegistry {
 
     /// Domain routing rules for operation dispatching
     routing_rules: Vec<RoutingRule>,
-
-    /// Registry metadata
-    created_at: chrono::DateTime<chrono::Utc>,
 }
 
 impl DomainRegistry {
@@ -112,7 +109,6 @@ impl DomainRegistry {
             shared_vocabulary: DslVocabulary::default(),
             global_rules: Vec::new(),
             routing_rules: Vec::new(),
-            created_at: chrono::Utc::now(),
         }
     }
 

@@ -8,7 +8,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Proto compilation will be re-enabled in later phases when needed
 
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:warning=Build script completed - proto compilation disabled for Phase 1");
+    // Proto compilation disabled for Phase 1 - no warning needed
 
     Ok(())
 }

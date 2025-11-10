@@ -30,17 +30,17 @@ type ParsedRule struct {
 
 // CompiledRule represents a compiled grammar rule for efficient parsing
 type CompiledRule struct {
-	Pattern     *regexp.Regexp
+	Pattern      *regexp.Regexp
 	Alternatives []Alternative
-	IsTerminal  bool
-	IsOptional  bool
-	IsRepeating bool
+	IsTerminal   bool
+	IsOptional   bool
+	IsRepeating  bool
 }
 
 // Alternative represents one alternative in a rule definition
 type Alternative struct {
-	Tokens   []Token
-	Action   string // Optional action to take when this alternative matches
+	Tokens []Token
+	Action string // Optional action to take when this alternative matches
 }
 
 // Token represents a single token in a grammar rule
@@ -314,7 +314,7 @@ func (p *EBNFParser) tryAlternative(input string, alt Alternative, position int,
 		if !result.Success {
 			return &ParseResult{
 				Success: false,
-				Errors: result.Errors,
+				Errors:  result.Errors,
 			}
 		}
 
@@ -371,8 +371,8 @@ func (p *EBNFParser) matchToken(input string, token Token, position int) *ParseR
 func (p *EBNFParser) matchLiteral(input, literal string, position int) *ParseResult {
 	if strings.HasPrefix(input, literal) {
 		return &ParseResult{
-			Success: true,
-			Matched: literal,
+			Success:   true,
+			Matched:   literal,
 			Remaining: input[len(literal):],
 			AST: &ASTNode{
 				Type:     "literal",

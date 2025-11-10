@@ -23,6 +23,7 @@ use crate::dsl::{
     operations::DslOperation,
     DslEditError, DslEditResult,
 };
+use crate::{Key, Literal, Value};
 use async_trait::async_trait;
 use chrono::Utc;
 use serde_json::json;
@@ -117,6 +118,7 @@ impl KycDomainHandler {
         let customer_id = payload
             .get("customer_id")
             .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
             .ok_or_else(|| {
                 DslEditError::DomainValidationError("Missing customer_id in payload".to_string())
             })?;
@@ -124,14 +126,26 @@ impl KycDomainHandler {
         let verification_method = payload
             .get("method")
             .and_then(|v| v.as_str())
-            .unwrap_or("document_verification");
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "document_verification".to_string());
 
         let timestamp = common::generate_timestamp();
 
-        Ok(format!(
-            "(kyc.verify (customer.id \"{}\") (verification.method \"{}\") (verified.at \"{}\"))",
-            customer_id, verification_method, timestamp
-        ))
+        let mut attributes = std::collections::HashMap::new();
+        attributes.insert(
+            Key::new("customer-id"),
+            Value::Literal(Literal::String(customer_id)),
+        );
+        attributes.insert(
+            Key::new("method"),
+            Value::Literal(Literal::String(verification_method)),
+        );
+        attributes.insert(
+            Key::new("verified-at"),
+            Value::Literal(Literal::String(timestamp)),
+        );
+
+        Ok(common::create_verb_form_fragment("kyc.verify", &attributes))
     }
 
     /// Generate risk assessment DSL fragment
@@ -148,23 +162,33 @@ impl KycDomainHandler {
             })?;
 
         let default_factors = vec![];
-        let risk_factors = payload
+        let risk_factors_values: Vec<Value> = payload
             .get("risk_factors")
             .and_then(|v| v.as_array())
-            .unwrap_or(&default_factors);
-
-        let factors_str = risk_factors
+            .unwrap_or(&default_factors)
             .iter()
-            .filter_map(|f| f.as_str())
-            .map(|f| format!("\"{}\"", f))
-            .collect::<Vec<_>>()
-            .join(" ");
+            .filter_map(|v| {
+                v.as_str()
+                    .map(|s| Value::Literal(Literal::String(s.to_string())))
+            })
+            .collect();
 
         let timestamp = common::generate_timestamp();
 
-        Ok(format!(
-            "(kyc.assess_risk (risk.score {}) (risk.factors {}) (assessed.at \"{}\"))",
-            risk_score, factors_str, timestamp
+        let mut attributes = std::collections::HashMap::new();
+        attributes.insert(
+            Key::new("score"),
+            Value::Literal(Literal::Number(risk_score)),
+        );
+        attributes.insert(Key::new("factors"), Value::List(risk_factors_values));
+        attributes.insert(
+            Key::new("assessed-at"),
+            Value::Literal(Literal::String(timestamp)),
+        );
+
+        Ok(common::create_verb_form_fragment(
+            "kyc.assess_risk",
+            &attributes,
         ))
     }
 
@@ -174,60 +198,75 @@ impl KycDomainHandler {
         payload: &serde_json::Value,
         _context: &DomainContext,
     ) -> DslEditResult<String> {
-        let check_result = payload
-            .get("result")
+        let target_entity = payload
+            .get("target_entity")
             .and_then(|v| v.as_str())
-            .unwrap_or("CLEAR");
+            .map(|s| s.to_string())
+            .ok_or_else(|| {
+                DslEditError::DomainValidationError("Missing target_entity in payload".to_string())
+            })?;
 
-        let default_lists = vec![];
-        let lists_checked = payload
-            .get("lists_checked")
-            .and_then(|v| v.as_array())
-            .unwrap_or(&default_lists);
-
-        let lists_str = lists_checked
-            .iter()
-            .filter_map(|l| l.as_str())
-            .map(|l| format!("\"{}\"", l))
-            .collect::<Vec<_>>()
-            .join(" ");
+        let status = payload
+            .get("status")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "CLEARED".to_string());
 
         let timestamp = common::generate_timestamp();
 
-        Ok(format!(
-            "(kyc.check_sanctions (result \"{}\") (lists {}) (checked.at \"{}\"))",
-            check_result, lists_str, timestamp
+        let mut attributes = std::collections::HashMap::new();
+        attributes.insert(
+            Key::new("target"),
+            Value::Literal(Literal::String(target_entity)),
+        );
+        attributes.insert(Key::new("status"), Value::Literal(Literal::String(status)));
+        attributes.insert(
+            Key::new("screened-at"),
+            Value::Literal(Literal::String(timestamp)),
+        );
+        Ok(common::create_verb_form_fragment(
+            "kyc.screen_sanctions",
+            &attributes,
         ))
     }
 
-    /// Generate UBO discovery initiation DSL fragment
+    /// Generate UBO discovery DSL fragment
     async fn generate_ubo_discovery_dsl(
         &self,
         payload: &serde_json::Value,
         _context: &DomainContext,
     ) -> DslEditResult<String> {
-        let entity_id = payload
-            .get("entity_id")
+        let target_entity = payload
+            .get("target_entity")
             .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
             .ok_or_else(|| {
-                DslEditError::DomainValidationError("Missing entity_id in payload".to_string())
+                DslEditError::DomainValidationError("Missing target_entity in payload".to_string())
             })?;
 
         let threshold = payload
-            .get("threshold")
+            .get("ubo_threshold")
             .and_then(|v| v.as_f64())
             .unwrap_or(25.0);
 
-        let jurisdiction = payload
-            .get("jurisdiction")
-            .and_then(|v| v.as_str())
-            .unwrap_or("US");
-
         let timestamp = common::generate_timestamp();
 
-        Ok(format!(
-            "(kyc.initiate_ubo (entity.id \"{}\") (threshold {}) (jurisdiction \"{}\") (initiated.at \"{}\"))",
-            entity_id, threshold, jurisdiction, timestamp
+        let mut attributes = std::collections::HashMap::new();
+        attributes.insert(
+            Key::new("target"),
+            Value::Literal(Literal::String(target_entity)),
+        );
+        attributes.insert(
+            Key::new("threshold"),
+            Value::Literal(Literal::Number(threshold)),
+        );
+        attributes.insert(
+            Key::new("discovered-at"),
+            Value::Literal(Literal::String(timestamp)),
+        );
+        Ok(common::create_verb_form_fragment(
+            "ubo.calc", // This maps to the new ubo.calc verb
+            &attributes,
         ))
     }
 
@@ -237,21 +276,38 @@ impl KycDomainHandler {
         payload: &serde_json::Value,
         _context: &DomainContext,
     ) -> DslEditResult<String> {
-        let status = payload
+        let customer_id = payload
+            .get("customer_id")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .ok_or_else(|| {
+                DslEditError::DomainValidationError("Missing customer_id in payload".to_string())
+            })?;
+
+        let _status = payload
             .get("status")
             .and_then(|v| v.as_str())
-            .unwrap_or("APPROVED");
-
-        let notes = payload
-            .get("notes")
-            .and_then(|v| v.as_str())
-            .unwrap_or("KYC completed successfully");
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "COMPLETE".to_string());
 
         let timestamp = common::generate_timestamp();
 
-        Ok(format!(
-            "(kyc.complete (status \"{}\") (notes \"{}\") (completed.at \"{}\"))",
-            status, notes, timestamp
+        let mut attributes = std::collections::HashMap::new();
+        attributes.insert(
+            Key::new("customer-id"),
+            Value::Literal(Literal::String(customer_id)),
+        );
+        attributes.insert(
+            Key::new("method"),
+            Value::Literal(Literal::String("enhanced_due_diligence".to_string())),
+        );
+        attributes.insert(
+            Key::new("completed-at"),
+            Value::Literal(Literal::String(timestamp)),
+        );
+        Ok(common::create_verb_form_fragment(
+            "kyc.complete", // Assuming a kyc.complete verb for completion
+            &attributes,
         ))
     }
 }
@@ -288,9 +344,22 @@ impl DomainHandler for KycDomainHandler {
                 let timestamp = common::generate_timestamp();
                 let required = requirements.required;
 
-                Ok(format!(
-                    "(kyc.collect_document (type \"{}\") (required {}) (collected.at \"{}\"))",
-                    document_type, required, timestamp
+                let mut attributes = std::collections::HashMap::new();
+                attributes.insert(
+                    Key::new("type"),
+                    Value::Literal(Literal::String(document_type.clone())),
+                );
+                attributes.insert(
+                    Key::new("required"),
+                    Value::Literal(Literal::Boolean(required)),
+                );
+                attributes.insert(
+                    Key::new("collected-at"),
+                    Value::Literal(Literal::String(timestamp)),
+                );
+                Ok(common::create_verb_form_fragment(
+                    "kyc.collect_document",
+                    &attributes,
                 ))
             }
 
@@ -303,9 +372,22 @@ impl DomainHandler for KycDomainHandler {
                 let severity = format!("{:?}", criteria.severity);
                 let timestamp = common::generate_timestamp();
 
-                Ok(format!(
-                    "(kyc.validate (type \"{}\") (severity \"{}\") (validated.at \"{}\"))",
-                    validation_name, severity, timestamp
+                let mut attributes = std::collections::HashMap::new();
+                attributes.insert(
+                    Key::new("type"),
+                    Value::Literal(Literal::String(validation_name)),
+                );
+                attributes.insert(
+                    Key::new("severity"),
+                    Value::Literal(Literal::String(severity)),
+                );
+                attributes.insert(
+                    Key::new("validated-at"),
+                    Value::Literal(Literal::String(timestamp)),
+                );
+                Ok(common::create_verb_form_fragment(
+                    "kyc.validate",
+                    &attributes,
                 ))
             }
 
@@ -316,9 +398,22 @@ impl DomainHandler for KycDomainHandler {
             } => {
                 let timestamp = common::generate_timestamp();
 
-                Ok(format!(
-                    "(kyc.execute_step (workflow \"{}\") (step \"{}\") (executed.at \"{}\"))",
-                    workflow_id, step_id, timestamp
+                let mut attributes = std::collections::HashMap::new();
+                attributes.insert(
+                    Key::new("workflow"),
+                    Value::Literal(Literal::String(workflow_id.clone())),
+                );
+                attributes.insert(
+                    Key::new("step"),
+                    Value::Literal(Literal::String(step_id.clone())),
+                );
+                attributes.insert(
+                    Key::new("executed-at"),
+                    Value::Literal(Literal::String(timestamp)),
+                );
+                Ok(common::create_verb_form_fragment(
+                    "kyc.execute_step",
+                    &attributes,
                 ))
             }
 

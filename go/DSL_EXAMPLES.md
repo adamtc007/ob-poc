@@ -14,203 +14,225 @@ This document showcases real-world DSL examples that demonstrate the sophisticat
 ;; ════════════════════════════════════════════════════════════════════════════
 
 (case.create
-  (cbu.id "CBU-2024-001")
-  (nature-purpose "UCITS equity fund domiciled in Luxembourg")
-  (fund-name "European Growth Opportunities Fund")
-  (management-company "Premium Asset Management S.A.")
-  (depositary-preference "tier-1-global")
-)
+  :cbu-id "CBU-2024-001"
+  :nature-purpose "UCITS equity fund domiciled in Luxembourg"
+  :fund-name "European Growth Opportunities Fund"
+  :management-company "Premium Asset Management S.A."
+  :depositary-preference "tier-1-global")
 
 ;; ════════════════════════════════════════════════════════════════════════════
 ;; VERSION 2: Product Selection (ACCUMULATED)
 ;; ════════════════════════════════════════════════════════════════════════════
 
 (case.create
-  (cbu.id "CBU-2024-001")
-  (nature-purpose "UCITS equity fund domiciled in Luxembourg")
-  (fund-name "European Growth Opportunities Fund")
-  (management-company "Premium Asset Management S.A.")
-  (depositary-preference "tier-1-global")
-)
+  :cbu-id "CBU-2024-001"
+  :nature-purpose "UCITS equity fund domiciled in Luxembourg"
+  :fund-name "European Growth Opportunities Fund"
+  :management-company "Premium Asset Management S.A."
+  :depositary-preference "tier-1-global")
 
-(products.add "CUSTODY" "FUND_ACCOUNTING" "TRANSFER_AGENCY" "RISK_MANAGEMENT")
+(case.update
+  :id "CBU-2024-001"
+  :add-products ["CUSTODY", "FUND_ACCOUNTING", "TRANSFER_AGENCY", "RISK_MANAGEMENT"])
 
 ;; ════════════════════════════════════════════════════════════════════════════
 ;; VERSION 3: KYC Discovery (ACCUMULATED)
 ;; ════════════════════════════════════════════════════════════════════════════
 
 (case.create
-  (cbu.id "CBU-2024-001")
-  (nature-purpose "UCITS equity fund domiciled in Luxembourg")
-  (fund-name "European Growth Opportunities Fund")
-  (management-company "Premium Asset Management S.A.")
-  (depositary-preference "tier-1-global")
-)
+  :cbu-id "CBU-2024-001"
+  :nature-purpose "UCITS equity fund domiciled in Luxembourg"
+  :fund-name "European Growth Opportunities Fund"
+  :management-company "Premium Asset Management S.A."
+  :depositary-preference "tier-1-global")
 
-(products.add "CUSTODY" "FUND_ACCOUNTING" "TRANSFER_AGENCY" "RISK_MANAGEMENT")
+(case.update
+  :id "CBU-2024-001"
+  :add-products ["CUSTODY", "FUND_ACCOUNTING", "TRANSFER_AGENCY", "RISK_MANAGEMENT"])
 
-(kyc.start
-  (jurisdictions
-    (jurisdiction "LU" (primary true))
-    (jurisdiction "DE" (marketing true))
-    (jurisdiction "FR" (marketing true))
-  )
-  (documents
-    (document "CertificateOfIncorporation" (jurisdiction "LU"))
-    (document "ArticlesOfAssociation" (jurisdiction "LU"))
-    (document "ProspectusAndKIID" (language "EN,DE,FR"))
-    (document "RiskManagementPolicy")
-    (document "ConflictOfInterestPolicy")
-  )
-  (regulatory-approvals
-    (approval "CSSF-UCITS-License" (status "pending"))
-    (approval "BaFin-MarketingNotification" (status "required"))
-    (approval "AMF-MarketingNotification" (status "required"))
-  )
-)
+(kyc.verify
+  :customer-id "CBU-2024-001"
+  :method "enhanced_due_diligence"
+  :jurisdictions [
+    {:jurisdiction "LU", :primary true},
+    {:jurisdiction "DE", :marketing true},
+    {:jurisdiction "FR", :marketing true}
+  ]
+  :required-documents [
+    "CertificateOfIncorporation",
+    "ArticlesOfAssociation",
+    "ProspectusAndKIID",
+    "RiskManagementPolicy",
+    "ConflictOfInterestPolicy"
+  ]
+  :regulatory-approvals [
+    {:approval "CSSF-UCITS-License", :status "pending"},
+    {:approval "BaFin-MarketingNotification", :status "required"},
+    {:approval "AMF-MarketingNotification", :status "required"}
+  ])
 
 ;; ════════════════════════════════════════════════════════════════════════════
 ;; VERSION 4: Service Planning (ACCUMULATED)
 ;; ════════════════════════════════════════════════════════════════════════════
 
 (case.create
-  (cbu.id "CBU-2024-001")
-  (nature-purpose "UCITS equity fund domiciled in Luxembourg")
-  (fund-name "European Growth Opportunities Fund")
-  (management-company "Premium Asset Management S.A.")
-  (depositary-preference "tier-1-global")
-)
+  :cbu-id "CBU-2024-001"
+  :nature-purpose "UCITS equity fund domiciled in Luxembourg"
+  :fund-name "European Growth Opportunities Fund"
+  :management-company "Premium Asset Management S.A."
+  :depositary-preference "tier-1-global")
 
-(products.add "CUSTODY" "FUND_ACCOUNTING" "TRANSFER_AGENCY" "RISK_MANAGEMENT")
+(case.update
+  :id "CBU-2024-001"
+  :add-products ["CUSTODY", "FUND_ACCOUNTING", "TRANSFER_AGENCY", "RISK_MANAGEMENT"])
 
-(kyc.start
-  (jurisdictions
-    (jurisdiction "LU" (primary true))
-    (jurisdiction "DE" (marketing true))
-    (jurisdiction "FR" (marketing true))
-  )
-  (documents
-    (document "CertificateOfIncorporation" (jurisdiction "LU"))
-    (document "ArticlesOfAssociation" (jurisdiction "LU"))
-    (document "ProspectusAndKIID" (language "EN,DE,FR"))
-    (document "RiskManagementPolicy")
-    (document "ConflictOfInterestPolicy")
-  )
-  (regulatory-approvals
-    (approval "CSSF-UCITS-License" (status "pending"))
-    (approval "BaFin-MarketingNotification" (status "required"))
-    (approval "AMF-MarketingNotification" (status "required"))
-  )
-)
+(kyc.verify
+  :customer-id "CBU-2024-001"
+  :method "enhanced_due_diligence"
+  :jurisdictions [
+    {:jurisdiction "LU", :primary true},
+    {:jurisdiction "DE", :marketing true},
+    {:jurisdiction "FR", :marketing true}
+  ]
+  :required-documents [
+    "CertificateOfIncorporation",
+    "ArticlesOfAssociation",
+    "ProspectusAndKIID",
+    "RiskManagementPolicy",
+    "ConflictOfInterestPolicy"
+  ]
+  :regulatory-approvals [
+    {:approval "CSSF-UCITS-License", :status "pending"},
+    {:approval "BaFin-MarketingNotification", :status "required"},
+    {:approval "AMF-MarketingNotification", :status "required"}
+  ])
 
 (services.plan
-  (service "Settlement"
-    (sla "T+2")
-    (currencies "EUR" "USD" "GBP")
-    (markets "XETRA" "EURONEXT" "LSE")
-  )
-  (service "CorporateActions"
-    (automation-level "full")
-    (notification-channels "swift" "email" "portal")
-  )
-  (service "Reporting"
-    (frequency "daily")
-    (formats "XML" "CSV" "PDF")
-    (recipients "fund-manager" "depositary" "auditor")
-  )
-  (service "RiskMonitoring"
-    (real-time true)
-    (breach-notifications "immediate")
-    (regulatory-reports "ucits-kiid" "ucits-risk")
-  )
-)
+  :services [
+    {
+      :name "Settlement"
+      :sla "T+2"
+      :currencies ["EUR", "USD", "GBP"]
+      :markets ["XETRA", "EURONEXT", "LSE"]
+    },
+    {
+      :name "CorporateActions"
+      :automation-level "full"
+      :notification-channels ["swift", "email", "portal"]
+    },
+    {
+      :name "Reporting"
+      :frequency "daily"
+      :formats ["XML", "CSV", "PDF"]
+      :recipients ["fund-manager", "depositary", "auditor"]
+    },
+    {
+      :name "RiskMonitoring"
+      :real-time true
+      :breach-notifications "immediate"
+      :regulatory-reports ["ucits-kiid", "ucits-risk"]
+    }
+  ])
 
 ;; ════════════════════════════════════════════════════════════════════════════
-;; VERSION 5: Resource Provisioning (FINAL ACCUMULATED STATE)
+;; VERSION 5: Resource Provisioning (FINAL ACCUMULATED STATE - v3.0)
 ;; ════════════════════════════════════════════════════════════════════════════
 
 (case.create
-  (cbu.id "CBU-2024-001")
-  (nature-purpose "UCITS equity fund domiciled in Luxembourg")
-  (fund-name "European Growth Opportunities Fund")
-  (management-company "Premium Asset Management S.A.")
-  (depositary-preference "tier-1-global")
-)
+  :cbu-id "CBU-2024-001"
+  :nature-purpose "UCITS equity fund domiciled in Luxembourg"
+  :fund-name "European Growth Opportunities Fund"
+  :management-company "Premium Asset Management S.A."
+  :depositary-preference "tier-1-global")
 
-(products.add "CUSTODY" "FUND_ACCOUNTING" "TRANSFER_AGENCY" "RISK_MANAGEMENT")
+(case.update
+  :id "CBU-2024-001"
+  :add-products ["CUSTODY", "FUND_ACCOUNTING", "TRANSFER_AGENCY", "RISK_MANAGEMENT"])
 
-(kyc.start
-  (jurisdictions
-    (jurisdiction "LU" (primary true))
-    (jurisdiction "DE" (marketing true))
-    (jurisdiction "FR" (marketing true))
-  )
-  (documents
-    (document "CertificateOfIncorporation" (jurisdiction "LU"))
-    (document "ArticlesOfAssociation" (jurisdiction "LU"))
-    (document "ProspectusAndKIID" (language "EN,DE,FR"))
-    (document "RiskManagementPolicy")
-    (document "ConflictOfInterestPolicy")
-  )
-  (regulatory-approvals
-    (approval "CSSF-UCITS-License" (status "pending"))
-    (approval "BaFin-MarketingNotification" (status "required"))
-    (approval "AMF-MarketingNotification" (status "required"))
-  )
-)
+(kyc.verify
+  :customer-id "CBU-2024-001"
+  :method "enhanced_due_diligence"
+  :jurisdictions [
+    {:jurisdiction "LU", :primary true},
+    {:jurisdiction "DE", :marketing true},
+    {:jurisdiction "FR", :marketing true}
+  ]
+  :required-documents [
+    "CertificateOfIncorporation",
+    "ArticlesOfAssociation",
+    "ProspectusAndKIID",
+    "RiskManagementPolicy",
+    "ConflictOfInterestPolicy"
+  ]
+  :regulatory-approvals [
+    {:approval "CSSF-UCITS-License", :status "pending"},
+    {:approval "BaFin-MarketingNotification", :status "required"},
+    {:approval "AMF-MarketingNotification", :status "required"}
+  ])
 
 (services.plan
-  (service "Settlement"
-    (sla "T+2")
-    (currencies "EUR" "USD" "GBP")
-    (markets "XETRA" "EURONEXT" "LSE")
-  )
-  (service "CorporateActions"
-    (automation-level "full")
-    (notification-channels "swift" "email" "portal")
-  )
-  (service "Reporting"
-    (frequency "daily")
-    (formats "XML" "CSV" "PDF")
-    (recipients "fund-manager" "depositary" "auditor")
-  )
-  (service "RiskMonitoring"
-    (real-time true)
-    (breach-notifications "immediate")
-    (regulatory-reports "ucits-kiid" "ucits-risk")
-  )
-)
+  :services [
+    {
+      :name "Settlement"
+      :sla "T+2"
+      :currencies ["EUR", "USD", "GBP"]
+      :markets ["XETRA", "EURONEXT", "LSE"]
+    },
+    {
+      :name "CorporateActions"
+      :automation-level "full"
+      :notification-channels ["swift", "email", "portal"]
+    },
+    {
+      :name "Reporting"
+      :frequency "daily"
+      :formats ["XML", "CSV", "PDF"]
+      :recipients ["fund-manager", "depositary", "auditor"]
+    },
+    {
+      :name "RiskMonitoring"
+      :real-time true
+      :breach-notifications "immediate"
+      :regulatory-reports ["ucits-kiid", "ucits-risk"]
+    }
+  ])
 
 (resources.plan
-  (resource.create "CustodyAccount"
-    (owner "CustodyTech")
-    (account-structure "omnibus")
-    (var (attr-id @attr{8a5d1a77-e4b3-4c2d-9f1e-7a8b9c0d1e2f}))  ; custody.account_number
-    (currencies "EUR" "USD" "GBP")
-  )
-  (resource.create "FundAccountingLedger"
-    (owner "AccountingTech")
-    (base-currency "EUR")
-    (var (attr-id @attr{2c3d4e5f-6a7b-8c9d-0e1f-2a3b4c5d6e7f}))  ; accounting.fund_code
-  )
-  (resource.create "TransferAgencySystem"
-    (owner "TransferTech")
-    (share-classes "A-EUR" "A-USD" "I-EUR")
-    (var (attr-id @attr{6e7f8a9b-0c1d-2e3f-4a5b-6c7d8e9f0a1b}))  ; ta.fund_identifier
-  )
-  (resource.create "RiskSystem"
-    (owner "RiskTech")
-    (monitoring-frequency "real-time")
-    (var (attr-id @attr{0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d}))  ; risk.portfolio_id
-  )
-)
+  :resources [
+    {
+      :type "CustodyAccount"
+      :owner "CustodyTech"
+      :account-structure "omnibus"
+      :currencies ["EUR", "USD", "GBP"]
+      :attr-ref @attr{8a5d1a77-e4b3-4c2d-9f1e-7a8b9c0d1e2f}
+    },
+    {
+      :type "FundAccountingLedger"
+      :owner "AccountingTech"
+      :base-currency "EUR"
+      :attr-ref @attr{2c3d4e5f-6a7b-8c9d-0e1f-2a3b4c5d6e7f}
+    },
+    {
+      :type "TransferAgencySystem"
+      :owner "TransferTech"
+      :share-classes ["A-EUR", "A-USD", "I-EUR"]
+      :attr-ref @attr{6e7f8a9b-0c1d-2e3f-4a5b-6c7d8e9f0a1b}
+    },
+    {
+      :type "RiskSystem"
+      :owner "RiskTech"
+      :monitoring-frequency "real-time"
+      :attr-ref @attr{0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d}
+    }
+  ])
 
 (values.bind
-  (bind (attr-id @attr{8a5d1a77-e4b3-4c2d-9f1e-7a8b9c0d1e2f}) (value "CUST-EGOF-001"))
-  (bind (attr-id @attr{2c3d4e5f-6a7b-8c9d-0e1f-2a3b4c5d6e7f}) (value "FA-EGOF-LU-001"))
-  (bind (attr-id @attr{6e7f8a9b-0c1d-2e3f-4a5b-6c7d8e9f0a1b}) (value "TA-EGOF-LU"))
-  (bind (attr-id @attr{0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d}) (value "RISK-EGOF-001"))
-)
+  :bindings [
+    {:attr-id @attr{8a5d1a77-e4b3-4c2d-9f1e-7a8b9c0d1e2f}, :value "CUST-EGOF-001"},
+    {:attr-id @attr{2c3d4e5f-6a7b-8c9d-0e1f-2a3b4c5d6e7f}, :value "FA-EGOF-LU-001"},
+    {:attr-id @attr{6e7f8a9b-0c1d-2e3f-4a5b-6c7d8e9f0a1b}, :value "TA-EGOF-LU"},
+    {:attr-id @attr{0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d}, :value "RISK-EGOF-001"}
+  ])
 ```
 
 **Key Architectural Highlights:**
@@ -227,50 +249,49 @@ This document showcases real-world DSL examples that demonstrate the sophisticat
 
 ```lisp
 ;; ════════════════════════════════════════════════════════════════════════════
-;; COMPLEX CORPORATE STRUCTURE KYC/AML DSL
+;; COMPLEX CORPORATE STRUCTURE KYC/AML DSL (v3.0)
 ;; Client: Apex Holdings S.à r.l. (Luxembourg holding company)
 ;; Scenario: Multi-layered ownership requiring full UBO discovery
 ;; ════════════════════════════════════════════════════════════════════════════
 
-(kyc.entity-identification
-  (primary-entity
-    (legal-name "Apex Holdings S.à r.l.")
-    (legal-form "private limited liability company")
-    (jurisdiction "LU")
-    (registration-number "B123456")
-    (var (attr-id @attr{1a2b3c4d-ubo-entity-primary}))  ; entity.legal_name
-  )
-  (business-purpose "Investment holding company for European equities")
-  (risk-classification "medium-high")
-)
+(entity
+  :id "apex-holdings-sarl"
+  :label "Company"
+  :props {
+    :legal-name "Apex Holdings S.à r.l."
+    :legal-form "private limited liability company"
+    :jurisdiction "LU"
+    :registration-number "B123456"
+    :business-purpose "Investment holding company for European equities"
+    :risk-classification "medium-high"
+    :attr-ref @attr{1a2b3c4d-ubo-entity-primary}
+  })
 
 ;; ────────────────────────────────────────────────────────────────────────────
 ;; UBO DISCOVERY - OWNERSHIP LAYER 1
 ;; ────────────────────────────────────────────────────────────────────────────
 
-(ubo.ownership-structure
-  (ownership-layer 1)
-  (direct-shareholders
-    (shareholder
-      (name "Meridian Investment Fund III")
-      (type "corporate")
-      (jurisdiction "KY")  ; Cayman Islands
-      (ownership-percentage 65.0)
-      (voting-rights 65.0)
-      (var (attr-id @attr{2b3c4d5e-ubo-shareholder-1}))  ; shareholder.entity_name
-      (control-nature "direct-ownership")
-    )
-    (shareholder
-      (name "Baltic Family Office S.A.")
-      (type "corporate") 
-      (jurisdiction "CH")  ; Switzerland
-      (ownership-percentage 35.0)
-      (voting-rights 35.0)
-      (var (attr-id @attr{3c4d5e6f-ubo-shareholder-2}))  ; shareholder.entity_name
-      (control-nature "direct-ownership")
-    )
-  )
-)
+(edge
+  :from "meridian-investment-fund-iii"
+  :to "apex-holdings-sarl"
+  :type "HAS_OWNERSHIP"
+  :props {
+    :percent 65.0
+    :voting-rights 65.0
+    :control-nature "direct-ownership"
+    :attr-ref @attr{2b3c4d5e-ubo-shareholder-1}
+  })
+
+(edge
+  :from "baltic-family-office-sa"
+  :to "apex-holdings-sarl"
+  :type "HAS_OWNERSHIP"
+  :props {
+    :percent 35.0
+    :voting-rights 35.0
+    :control-nature "direct-ownership"
+    :attr-ref @attr{3c4d5e6f-ubo-shareholder-2}
+  })
 
 ;; ────────────────────────────────────────────────────────────────────────────
 ;; UBO DISCOVERY - OWNERSHIP LAYER 2 (Drill Down)
@@ -386,53 +407,55 @@ This document showcases real-world DSL examples that demonstrate the sophisticat
 ;; FINAL UBO ANALYSIS & REGULATORY CLASSIFICATION
 ;; ────────────────────────────────────────────────────────────────────────────
 
-(ubo.final-analysis
-  (calculation-method "aggregated-beneficial-ownership")
-  (regulatory-threshold 25.0)  ; EU 4th AML Directive
-  (ultimate-beneficial-owners
-    (ubo
-      (name "Henrik Andersson")
-      (jurisdiction "CH")
-      (total-beneficial-ownership 35.0)  ; 60% of 35% + 40% of 40% of 35%
-      (direct-ownership 21.0)          ; 60% of 35%
-      (indirect-ownership 14.0)        ; 40% of 40% of 35% through trust
-      (above-threshold true)
-      (var (attr-id @attr{5e6f7a8b-ubo-individual-1}))
-      (control-mechanisms "direct-ownership" "trust-beneficiary")
-    )
-    (ubo
-      (name "Marcus Wellington")
-      (jurisdiction "GB")
-      (total-beneficial-ownership 45.5)  ; 70% of 65%
-      (direct-ownership 45.5)
-      (indirect-ownership 0.0)
-      (above-threshold true)
-      (var (attr-id @attr{7a8b9c0d-ubo-individual-2}))
-      (control-mechanisms "direct-ownership")
-    )
-    (ubo
-      (name "Sarah Chen")
-      (jurisdiction "SG")
-      (total-beneficial-ownership 19.5)  ; 30% of 65%
-      (direct-ownership 19.5)
-      (indirect-ownership 0.0)
-      (above-threshold false)  ; Below 25% threshold
-      (var (attr-id @attr{8b9c0d1e-ubo-individual-3}))
-      (control-mechanisms "direct-ownership")
-    )
-    (ubo
-      (name "Astrid Andersson")
-      (jurisdiction "CH")
-      (total-beneficial-ownership 8.4)   ; 60% of 40% of 40% of 35%
-      (direct-ownership 0.0)
-      (indirect-ownership 8.4)
-      (above-threshold false)  ; Below 25% threshold
-      (var (attr-id @attr{9c0d1e2f-ubo-individual-4}))
-      (control-mechanisms "trust-beneficiary")
-    )
-  )
-  (reportable-ubos 2)  ; Only Henrik Andersson and Marcus Wellington
-)
+(ubo.outcome
+  :target "apex-holdings-sarl"
+  :at "2024-11-10T15:00:00Z"
+  :threshold 25.0
+  :calculation-method "aggregated-beneficial-ownership"
+  :regulatory-framework "EU4MLD"
+  :ubos [
+    {
+      :entity "henrik-andersson"
+      :jurisdiction "CH"
+      :effective-percent 35.0
+      :direct-ownership 21.0
+      :indirect-ownership 14.0
+      :above-threshold true
+      :control-mechanisms ["direct-ownership", "trust-beneficiary"]
+      :attr-ref @attr{5e6f7a8b-ubo-individual-1}
+    },
+    {
+      :entity "marcus-wellington"
+      :jurisdiction "GB"
+      :effective-percent 45.5
+      :direct-ownership 45.5
+      :indirect-ownership 0.0
+      :above-threshold true
+      :control-mechanisms ["direct-ownership"]
+      :attr-ref @attr{7a8b9c0d-ubo-individual-2}
+    },
+    {
+      :entity "sarah-chen"
+      :jurisdiction "SG"
+      :effective-percent 19.5
+      :direct-ownership 19.5
+      :indirect-ownership 0.0
+      :above-threshold false
+      :control-mechanisms ["direct-ownership"]
+      :attr-ref @attr{8b9c0d1e-ubo-individual-3}
+    },
+    {
+      :entity "astrid-andersson"
+      :jurisdiction "CH"
+      :effective-percent 8.4
+      :direct-ownership 0.0
+      :indirect-ownership 8.4
+      :above-threshold false
+      :control-mechanisms ["trust-beneficiary"]
+      :attr-ref @attr{9c0d1e2f-ubo-individual-4}
+    }
+  ]
+  :reportable-ubos 2)
 
 ;; ────────────────────────────────────────────────────────────────────────────
 ;; KYC DOCUMENT COLLECTION & VERIFICATION

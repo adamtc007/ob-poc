@@ -33,12 +33,9 @@ func (CaseManagementVerbs) Create(cbuID, naturePurpose string) string {
 	return fmt.Sprintf("(case.create (cbu.id %q) (nature-purpose %q))", cbuID, naturePurpose)
 }
 
-
-
 func (CaseManagementVerbs) Approve(approverID, timestamp string) string {
 	return fmt.Sprintf("(case.approve (approver.id %q) (timestamp %q))", approverID, timestamp)
 }
-
 
 // EntityIdentityVerbs defines entity registration and identity management
 type EntityIdentityVerbs struct{}
@@ -46,10 +43,6 @@ type EntityIdentityVerbs struct{}
 func (EntityIdentityVerbs) Register(entityType, jurisdiction string) string {
 	return fmt.Sprintf("(entity.register (type %q) (jurisdiction %q))", entityType, jurisdiction)
 }
-
-
-
-
 
 // ProductServiceVerbs defines product and service management operations
 type ProductServiceVerbs struct{}
