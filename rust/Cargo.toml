@@ -61,6 +61,86 @@ name = "test_dsl_direct_db"
 path = "src/bin/test_dsl_direct_db.rs"
 required-features = ["database", "binaries"]
 
+[[bin]]
+name = "onboarding_workflow_demo"
+path = "src/bin/onboarding_workflow_demo.rs"
+required-features = ["database"]
+
+[[bin]]
+name = "direct_db_test"
+path = "src/bin/direct_db_test.rs"
+required-features = ["database"]
+
+[[bin]]
+name = "dsl_manager_demo"
+path = "src/bin/dsl_manager_demo.rs"
+required-features = ["database"]
+
+[[bin]]
+name = "onboarding_e2e_demo"
+path = "src/bin/onboarding_e2e_demo.rs"
+required-features = ["database"]
+
+[[bin]]
+name = "simple_roundtrip_test"
+path = "src/bin/simple_roundtrip_test.rs"
+required-features = ["database"]
+
+[[bin]]
+name = "database_onboarding_demo"
+path = "src/bin/database_onboarding_demo.rs"
+required-features = ["database"]
+
+[[bin]]
+name = "standalone_db_demo"
+path = "src/bin/standalone_db_demo.rs"
+required-features = ["database"]
+
+[[bin]]
+name = "real_db_roundtrip_test"
+path = "src/bin/real_db_roundtrip_test.rs"
+required-features = ["database"]
+
+[[bin]]
+name = "simple_db_roundtrip"
+path = "src/bin/simple_db_roundtrip.rs"
+required-features = ["database"]
+
+[[bin]]
+name = "simple_db_test"
+path = "src/bin/simple_db_test.rs"
+required-features = ["database"]
+
+[[bin]]
+name = "dsl_manager_fixed_demo"
+path = "src/bin/dsl_manager_fixed_demo.rs"
+required-features = ["database"]
+
+[[bin]]
+name = "master_ob_roundtrip_test"
+path = "src/bin/master_ob_roundtrip_test.rs"
+required-features = ["database"]
+
+[[bin]]
+name = "dsl_manager_test"
+path = "src/bin/dsl_manager_test.rs"
+required-features = ["database"]
+
+[[bin]]
+name = "test_db_connection"
+path = "src/bin/test_db_connection.rs"
+required-features = ["database"]
+
+[[bin]]
+name = "test_dsl_manager_simple"
+path = "src/bin/test_dsl_manager_simple.rs"
+required-features = ["database"]
+
+[[bin]]
+name = "egui_dsl_visualizer"
+path = "src/bin/egui_dsl_visualizer.rs"
+required-features = ["visualizer"]
+
 [dependencies]
 # Core libraries
 anyhow = "1.0"
@@ -121,6 +201,7 @@ clap = { version = "4.4", features = ["derive"], optional = true }
 
 # Environment logging for CLI tools
 env_logger = { version = "0.10", optional = true }
+regex = "1.12.2"
 
 # Serialization/Deserialization
 # serde is already included above

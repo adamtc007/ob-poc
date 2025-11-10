@@ -136,9 +136,9 @@ pub mod database;
 #[cfg(feature = "database")]
 pub mod models;
 
-// DSL Manager - V3.1 aligned with proper type consolidation - TEMPORARILY DISABLED
-// #[cfg(feature = "database")]
-// pub mod dsl_manager;
+// DSL Manager - V3.1 aligned with proper type consolidation - STRING FORMATTING FIXED
+#[cfg(feature = "database")]
+pub mod dsl_manager;
 
 // REST API server for visualizer
 #[cfg(feature = "rest-api")]
@@ -159,6 +159,10 @@ pub mod domains;
 // pub mod execution;
 // #[cfg(feature = "database")]
 // pub mod grpc_server;
+
+// DSL Visualizer module (egui-based desktop application)
+#[cfg(feature = "visualizer")]
+pub mod visualizer;
 // #[cfg(feature = "database")]
 // pub mod services;
 

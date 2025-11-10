@@ -132,20 +132,20 @@ impl ToString for AstNodeType {
 }
 
 /// DSL Instance representation
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DslInstance {
     pub instance_id: Uuid,
     pub domain_name: String,
     pub business_reference: String,
     pub current_version: i32,
     pub status: InstanceStatus,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
     pub metadata: Option<JsonValue>,
 }
 
 /// DSL Instance Version representation
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DslInstanceVersion {
     pub version_id: Uuid,
     pub instance_id: Uuid,
@@ -154,13 +154,13 @@ pub struct DslInstanceVersion {
     pub operation_type: OperationType,
     pub compilation_status: CompilationStatus,
     pub ast_json: Option<JsonValue>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Option<DateTime<Utc>>,
     pub created_by: Option<String>,
     pub change_description: Option<String>,
 }
 
 /// AST Node representation
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct AstNode {
     pub node_id: Uuid,
     pub version_id: Uuid,
@@ -171,11 +171,11 @@ pub struct AstNode {
     pub position_index: Option<i32>,
     pub depth: i32,
     pub path: String,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Option<DateTime<Utc>>,
 }
 
 /// DSL Template representation
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DslTemplate {
     pub template_id: Uuid,
     pub template_name: String,
@@ -185,26 +185,26 @@ pub struct DslTemplate {
     pub variables: Option<JsonValue>,
     pub requirements: Option<JsonValue>,
     pub metadata: Option<JsonValue>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 /// DSL Business Reference representation
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DslBusinessReference {
     pub reference_id: Uuid,
     pub instance_id: Uuid,
     pub reference_type: String,
     pub reference_id_value: String,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Option<DateTime<Utc>>,
 }
 
 /// DSL Compilation Log representation
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DslCompilationLog {
     pub log_id: Uuid,
     pub version_id: Uuid,
-    pub compilation_start: DateTime<Utc>,
+    pub compilation_start: Option<DateTime<Utc>>,
     pub compilation_end: Option<DateTime<Utc>>,
     pub success: Option<bool>,
     pub error_message: Option<String>,
@@ -212,7 +212,7 @@ pub struct DslCompilationLog {
     pub node_count: Option<i32>,
     pub complexity_score: Option<f64>,
     pub performance_metrics: Option<JsonValue>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Option<DateTime<Utc>>,
 }
 
 /// Repository trait defining operations for DSL instances

@@ -199,6 +199,33 @@ pub struct DatabaseQuery {
     pub result_mapping: String,
 }
 
+/// V3.1 Compliance Report for DSL Manager health checks
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct V31ComplianceReport {
+    pub grammar_version: String,
+    pub parser_version: String,
+    pub verb_registry_count: usize,
+    pub supported_domains: Vec<String>,
+    pub template_compliance: HashMap<String, bool>,
+    pub overall_compliance: bool,
+    pub validation_errors: Vec<String>,
+    pub timestamp: DateTime<Utc>,
+}
+
+/// Convert between CompilationStatus types
+fn convert_compilation_status(
+    status: crate::database::dsl_instance_repository::CompilationStatus,
+) -> crate::models::domain_models::CompilationStatus {
+    use crate::database::dsl_instance_repository::CompilationStatus as RepoStatus;
+    use crate::models::domain_models::CompilationStatus as DomainStatus;
+
+    match status {
+        RepoStatus::Pending => DomainStatus::Draft,
+        RepoStatus::Success => DomainStatus::Compiled,
+        RepoStatus::Error => DomainStatus::Error,
+    }
+}
+
 /// Re-export DslInstance from database repository
 pub use crate::database::dsl_instance_repository::DslInstance;
 
@@ -259,7 +286,7 @@ impl DslManager {
         );
 
         // Load and validate template
-        let template = self.load_template(domain_name, &template_type).await?;
+        let template = self.load_template(domain_name, template_type).await?;
 
         // Validate template requirements
         self.validate_template_requirements(&template, &variables)
@@ -282,8 +309,8 @@ impl DslManager {
                 .unwrap_or_else(|| format!("auto-{}", instance_id)),
             current_version: 1,
             status: crate::database::dsl_instance_repository::InstanceStatus::Created,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            created_at: Some(Utc::now()),
+            updated_at: Some(Utc::now()),
             metadata: Some(variables.clone()),
         };
 
@@ -298,7 +325,7 @@ impl DslManager {
             compilation_status:
                 crate::database::dsl_instance_repository::CompilationStatus::Pending,
             ast_json: None,
-            created_at: Utc::now(),
+            created_at: Some(Utc::now()),
             created_by: Some(created_by.to_string()),
             change_description: Some(format!(
                 "Initial creation from template: {}",
@@ -327,7 +354,10 @@ impl DslManager {
         created_by: &str,
         change_description: Option<String>,
     ) -> DslResult<DslInstanceVersion> {
-        info!("[V3.1] Editing DSL instance: {} with incremental DSL", instance_id);
+        info!(
+            "[V3.1] Editing DSL instance: {} with incremental DSL",
+            instance_id
+        );
 
         // V3.1 COMPLIANCE: Validate incremental DSL before processing
         self.validate_dsl_content(incremental_dsl)?;
@@ -354,7 +384,7 @@ impl DslManager {
             compilation_status:
                 crate::database::dsl_instance_repository::CompilationStatus::Pending,
             ast_json: None,
-            created_at: Utc::now(),
+            created_at: Some(Utc::now()),
             created_by: Some(created_by.to_string()),
             change_description,
         };
@@ -367,7 +397,7 @@ impl DslManager {
 
         // Update instance metadata
         instance.current_version = new_version_number;
-        instance.updated_at = Utc::now();
+        instance.updated_at = Some(Utc::now());
         instance.status = if compiled_version.compilation_status
             == crate::database::dsl_instance_repository::CompilationStatus::Success
         {
@@ -427,7 +457,7 @@ impl DslManager {
         }
 
         // Load from file system
-        let template_file = self.get_template_file_path(domain_name, template_type);
+        let template_file = self.get_template_file_path(domain_name, &template_type);
         let template_content = tokio::fs::read_to_string(&template_file)
             .await
             .map_err(|e| DslError::TemplateError {
@@ -698,11 +728,12 @@ impl DslManager {
                 self.validate_v31_ast(&ast)?;
 
                 // Store AST as JSON
-                version.ast_json = Some(serde_json::to_string(&ast).map_err(|e| {
-                    DslError::SerializationError {
-                        message: format!("Failed to serialize V3.1 AST: {}", e),
-                    }
-                })?);
+                version.ast_json =
+                    Some(
+                        serde_json::to_value(&ast).map_err(|e| DslError::SerializationError {
+                            message: format!("Failed to serialize V3.1 AST: {}", e),
+                        })?,
+                    );
 
                 version.compilation_status =
                     crate::database::dsl_instance_repository::CompilationStatus::Success;
@@ -869,7 +900,10 @@ impl DslManager {
             }
         }
 
-        info!("[V3.1] ✅ AST validation PASSED - {} forms validated", ast.len());
+        info!(
+            "[V3.1] ✅ AST validation PASSED - {} forms validated",
+            ast.len()
+        );
         Ok(())
     }
 
@@ -891,7 +925,10 @@ impl DslManager {
             });
         }
 
-        info!("[V3.1] ✅ Template '{}' validation PASSED", template.template_id);
+        info!(
+            "[V3.1] ✅ Template '{}' validation PASSED",
+            template.template_id
+        );
         Ok(())
     }
 
@@ -946,10 +983,9 @@ impl DslManager {
         for template_type in v31_template_types {
             let template_result = self.load_template("test", template_type.clone()).await;
             let is_compliant = template_result.is_ok();
-            report.template_compliance.insert(
-                format!("{:?}", template_type),
-                is_compliant,
-            );
+            report
+                .template_compliance
+                .insert(format!("{:?}", template_type), is_compliant);
             if !is_compliant {
                 report.overall_compliance = false;
                 report.validation_errors.push(format!(
@@ -962,8 +998,10 @@ impl DslManager {
         if report.overall_compliance {
             info!("[V3.1] ✅ FULL COMPLIANCE - DSL Manager is V3.1 aligned");
         } else {
-            warn!("[V3.1] ⚠️ PARTIAL COMPLIANCE - {} validation errors found",
-                  report.validation_errors.len());
+            warn!(
+                "[V3.1] ⚠️ PARTIAL COMPLIANCE - {} validation errors found",
+                report.validation_errors.len()
+            );
         }
 
         Ok(report)
@@ -973,12 +1011,79 @@ impl DslManager {
     pub fn get_v31_verbs_by_domain(&self) -> HashMap<String, Vec<String>> {
         let mut verb_map = HashMap::new();
 
-        verb_map.insert("Document".to_string(), vec![
-            "document.catalog".to_string(),
-            "document.verify".to_string(),
-            "document.extract".to_string(),
-            "document.link".to_string(),
-            "
+        verb_map.insert(
+            "Document".to_string(),
+            vec![
+                "document.catalog".to_string(),
+                "document.verify".to_string(),
+                "document.extract".to_string(),
+                "document.link".to_string(),
+                "document.use".to_string(),
+                "document.amend".to_string(),
+                "document.expire".to_string(),
+                "document.query".to_string(),
+            ],
+        );
+
+        verb_map.insert(
+            "ISDA".to_string(),
+            vec![
+                "isda.establish_master".to_string(),
+                "isda.establish_csa".to_string(),
+                "isda.execute_trade".to_string(),
+                "isda.margin_call".to_string(),
+                "isda.post_collateral".to_string(),
+                "isda.value_portfolio".to_string(),
+                "isda.declare_termination_event".to_string(),
+                "isda.close_out".to_string(),
+                "isda.amend_agreement".to_string(),
+                "isda.novate_trade_eds".to_string(),
+                "isda.dispute".to_string(),
+                "isda.manage_netting_set".to_string(),
+            ],
+        );
+
+        verb_map.insert(
+            "KYC".to_string(),
+            vec![
+                "kyc.verify".to_string(),
+                "kyc.assess_risk".to_string(),
+                "kyc.collect_document".to_string(),
+                "kyc.screen_sanctions".to_string(),
+                "kyc.check_pep".to_string(),
+                "kyc.validate_address".to_string(),
+            ],
+        );
+
+        verb_map.insert(
+            "Compliance".to_string(),
+            vec![
+                "compliance.fatca_check".to_string(),
+                "compliance.crs_check".to_string(),
+                "compliance.aml_check".to_string(),
+                "compliance.generate_sar".to_string(),
+                "compliance.verify".to_string(),
+            ],
+        );
+
+        verb_map.insert(
+            "UBO".to_string(),
+            vec!["ubo.calc".to_string(), "ubo.outcome".to_string()],
+        );
+
+        verb_map.insert(
+            "Onboarding".to_string(),
+            vec![
+                "case.create".to_string(),
+                "products.add".to_string(),
+                "services.discover".to_string(),
+                "resources.discover".to_string(),
+                "onboarding.complete".to_string(),
+            ],
+        );
+
+        verb_map
+    }
 
     // ============================================================================
     // VISUALIZATION INTEGRATION (from V2)
@@ -1146,15 +1251,15 @@ impl DslManager {
     ) -> DslResult<()> {
         // Update instance metadata to include business request reference
         let mut instance = self.get_instance(instance_id).await?;
-        if let serde_json::Value::Object(ref mut map) = instance.metadata {
+        if let Some(serde_json::Value::Object(ref mut map)) = instance.metadata {
             map.insert(
                 "business_request_id".to_string(),
                 serde_json::Value::String(request_id.to_string()),
             );
         } else {
-            instance.metadata = serde_json::json!({
+            instance.metadata = Some(serde_json::json!({
                 "business_request_id": request_id.to_string()
-            });
+            }));
         }
         self.update_instance(&instance).await?;
 
@@ -1410,11 +1515,17 @@ impl DslManager {
         &self,
         version: &crate::database::dsl_instance_repository::DslInstanceVersion,
     ) -> DslResult<()> {
-        info!("[V3.1] Updating DSL instance version: {}", version.version_id);
+        info!(
+            "[V3.1] Updating DSL instance version: {}",
+            version.version_id
+        );
 
         // Update compilation status
         self.domain_repository
-            .update_compilation_status(&version.version_id, version.compilation_status.clone())
+            .update_compilation_status(
+                &version.version_id,
+                convert_compilation_status(version.compilation_status.clone()),
+            )
             .await
             .map_err(|e| {
                 DslError::DatabaseError(format!("Failed to update instance version: {}", e))
@@ -1511,7 +1622,7 @@ impl DslManager {
 
         // Get DSL.OB create template
         let ob_template = self
-            .load_template("onboarding", &TemplateType::CreateCbu)
+            .load_template("onboarding", TemplateType::CreateCbu)
             .await?;
 
         // Populate template with CBU ID and request details
@@ -1568,12 +1679,12 @@ impl DslManager {
         let ob_instance = DslInstance {
             instance_id: Uuid::new_v4(),
             domain_name: "onboarding".to_string(),
-            business_reference: Some(format!("OB-{}", ob_request_id)),
+            business_reference: format!("OB-{}", ob_request_id),
             current_version: 1,
             status: InstanceStatus::Created,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-            metadata: ob_variables_value.clone(),
+            created_at: Some(Utc::now()),
+            updated_at: Some(Utc::now()),
+            metadata: Some(ob_variables_value.clone()),
         };
 
         // Store DSL instance metadata (optional/no-op currently)
@@ -1607,11 +1718,12 @@ impl DslManager {
             instance_id: ob_instance.instance_id,
             version_number: created.version_number,
             dsl_content: dsl_content.clone(),
-            operation_type: OperationType::CreateFromTemplate(ob_template.template_id.clone()),
-            compilation_status: created.compilation_status,
+            operation_type: OperationType::CreateFromTemplate,
+            compilation_status:
+                crate::database::dsl_instance_repository::CompilationStatus::Success,
             ast_json: None,
-            created_at: created.created_at,
-            created_by: created_by.clone(),
+            created_at: Some(created.created_at),
+            created_by: Some(created_by.clone()),
             change_description: Some(format!("Initial OB request creation: {}", onboarding_name)),
         };
         let compiled_version = self.compile_and_store_ast(to_compile).await?;
@@ -1686,22 +1798,23 @@ impl DslManager {
         let prev = self.get_latest_ob_version_dsl(ob_request_id).await?;
         let quoted = products
             .iter()
-            .map(|p| format!("\"{}\"", p))
+            .map(|p| format!(r#""{}""#, p))
             .collect::<Vec<_>>()
             .join(" ");
         let fragment = format!(
-            "\n(products.select (products [{products}]) (selection.reason \"{reason}\") (selected.at \"{ts}\"))",
-            products = quoted,
-            reason = selection_reason,
-            ts = Utc::now().to_rfc3339()
+            r#"
+(products.select (products [{}]) (selection.reason "{}") (selected.at "{}"))"#,
+            quoted,
+            selection_reason,
+            Utc::now().to_rfc3339()
         );
-        let combined = format!("{}\n{}", prev, fragment);
+        let combined = format!("{}{}", prev, fragment);
         self.persist_ob_edit(
             ob_request_id,
             cbu_id,
             &combined,
             created_by,
-            "Add products".to_string(),
+            "Add products ".to_string(),
         )
         .await
     }
@@ -1715,21 +1828,29 @@ impl DslManager {
         created_by: &str,
     ) -> DslResult<DslInstanceVersion> {
         let prev = self.get_latest_ob_version_dsl(ob_request_id).await?;
-        let mut services_block = String::from("\n(services.discover\n");
+        let mut services_block = String::from(
+            r#"
+(services.discover
+"#,
+        );
         for p in products {
-            services_block.push_str(&format!("  (for.product \"{}\")\n", p));
+            services_block.push_str(&format!(
+                r#"  (for.product "{}")
+"#,
+                p
+            ));
         }
         services_block.push_str(&format!(
-            "  (discovered.at \"{}\"))",
+            r#"  (discovered.at "{}"))"#,
             Utc::now().to_rfc3339()
         ));
-        let combined = format!("{}\n{}", prev, services_block);
+        let combined = format!("{}{}", prev, services_block);
         self.persist_ob_edit(
             ob_request_id,
             cbu_id,
             &combined,
             created_by,
-            "Discover services".to_string(),
+            "Discover services ".to_string(),
         )
         .await
     }
@@ -1743,21 +1864,29 @@ impl DslManager {
         created_by: &str,
     ) -> DslResult<DslInstanceVersion> {
         let prev = self.get_latest_ob_version_dsl(ob_request_id).await?;
-        let mut resources_block = String::from("\n(resources.discover\n");
+        let mut resources_block = String::from(
+            r#"
+(resources.discover
+"#,
+        );
         for s in services {
-            resources_block.push_str(&format!("  (for.service \"{}\")\n", s));
+            resources_block.push_str(&format!(
+                r#"  (for.service "{}")
+"#,
+                s
+            ));
         }
         resources_block.push_str(&format!(
-            "  (discovered.at \"{}\"))",
+            r#"  (discovered.at "{}"))"#,
             Utc::now().to_rfc3339()
         ));
-        let combined = format!("{}\n{}", prev, resources_block);
+        let combined = format!("{}{}", prev, resources_block);
         self.persist_ob_edit(
             ob_request_id,
             cbu_id,
             &combined,
             created_by,
-            "Discover resources".to_string(),
+            "Discover resources ".to_string(),
         )
         .await
     }
@@ -1772,17 +1901,18 @@ impl DslManager {
     ) -> DslResult<DslInstanceVersion> {
         let prev = self.get_latest_ob_version_dsl(ob_request_id).await?;
         let fragment = format!(
-            "\n(onboarding.complete (completion.status \"SUCCESS\") (completion.notes \"{notes}\") (completed.at \"{ts}\"))",
-            notes = completion_notes,
-            ts = Utc::now().to_rfc3339()
+            r#"
+(onboarding.complete (completion.status "SUCCESS") (completion.notes "{}") (completed.at "{}"))"#,
+            completion_notes,
+            Utc::now().to_rfc3339()
         );
-        let combined = format!("{}\n{}", prev, fragment);
+        let combined = format!("{}{}", prev, fragment);
         self.persist_ob_edit(
             ob_request_id,
             cbu_id,
             &combined,
             created_by,
-            "Complete onboarding".to_string(),
+            "Complete onboarding ".to_string(),
         )
         .await
     }
@@ -1797,17 +1927,18 @@ impl DslManager {
     ) -> DslResult<DslInstanceVersion> {
         let prev = self.get_latest_ob_version_dsl(ob_request_id).await?;
         let fragment = format!(
-            "\n(onboarding.archive (archival.reason \"{reason}\") (archived.at \"{ts}\"))",
-            reason = reason,
-            ts = Utc::now().to_rfc3339()
+            r#"
+(onboarding.archive (archival.reason "{}") (archived.at "{}"))"#,
+            reason,
+            Utc::now().to_rfc3339()
         );
-        let combined = format!("{}\n{}", prev, fragment);
+        let combined = format!("{}{}", prev, fragment);
         self.persist_ob_edit(
             ob_request_id,
             cbu_id,
             &combined,
             created_by,
-            "Archive onboarding".to_string(),
+            "Archive onboarding ".to_string(),
         )
         .await
     }
@@ -1882,10 +2013,11 @@ impl DslManager {
             version_number: created.version_number,
             dsl_content: combined_dsl.to_string(),
             operation_type: OperationType::IncrementalEdit,
-            compilation_status: created.compilation_status,
+            compilation_status:
+                crate::database::dsl_instance_repository::CompilationStatus::Success,
             ast_json: None,
-            created_at: created.created_at,
-            created_by: created.created_by.unwrap_or_else(|| created_by.to_string()),
+            created_at: Some(created.created_at),
+            created_by: Some(created.created_by.unwrap_or_else(|| created_by.to_string())),
             change_description: created.change_description,
         };
 
@@ -1911,15 +2043,15 @@ impl DslManager {
 
         // Update sub-instance metadata to include parent reference
         let mut sub_instance = self.get_instance(sub_instance_id).await?;
-        if let serde_json::Value::Object(ref mut map) = sub_instance.metadata {
+        if let Some(serde_json::Value::Object(ref mut map)) = sub_instance.metadata {
             map.insert(
                 "parent_instance_id".to_string(),
                 serde_json::Value::String(parent_instance_id.to_string()),
             );
         } else {
-            sub_instance.metadata = serde_json::json!({
+            sub_instance.metadata = Some(serde_json::json!({
                 "parent_instance_id": parent_instance_id.to_string()
-            });
+            }));
         }
         self.update_instance(&sub_instance).await?;
 
@@ -1943,8 +2075,14 @@ impl DslManager {
             Ok(ast) => {
                 // Build AST JSON
                 let ast_json =
-                    serde_json::to_string(&ast).map_err(|e| DslError::SerializationError {
+                    serde_json::to_value(&ast).map_err(|e| DslError::SerializationError {
                         message: format!("Failed to serialize AST: {}", e),
+                    })?;
+
+                // Store JSON value and convert to string for storage
+                let ast_json_string =
+                    serde_json::to_string(&ast_json).map_err(|e| DslError::SerializationError {
+                        message: format!("Failed to convert AST to string: {}", e),
                     })?;
 
                 version.ast_json = Some(ast_json.clone());
@@ -1952,24 +2090,24 @@ impl DslManager {
                     crate::database::dsl_instance_repository::CompilationStatus::Success;
 
                 // Count AST nodes for metrics
-                let node_count = self.count_ast_nodes(&ast);
-                let complexity_score = self.calculate_complexity_score(&ast);
+                let node_count = ast.len();
+                let complexity_score = ast.len() as f32 * 1.5; // Simple complexity scoring
 
                 // Store AST in database with FK links back to DSL source
                 let _ast_id = self
                     .store_ast_with_fk_links(
                         version.version_id,
-                        &ast_json,
+                        &ast_json_string,
                         node_count,
                         complexity_score,
                     )
                     .await?;
 
                 let duration = start_time.elapsed();
+                let duration_ms = duration.as_millis();
                 info!(
-                    "Successfully compiled and stored AST for version: {} in {}ms",
-                    version.version_id,
-                    duration.as_millis()
+                    "Successfully compiled and stored AST for version: {} in {} ms ",
+                    version.version_id, duration_ms
                 );
             }
             Err(parse_error) => {
@@ -2397,13 +2535,13 @@ impl DslManager {
             sqlx::query_as::<_, DslInstance>(
                 r#"SELECT * FROM "ob-poc".dsl_instances
                    WHERE domain_name = $1
-                   ORDER BY created_at DESC"#,
+                   ORDER BY created_at DESC "#,
             )
             .bind(domain)
         } else {
             sqlx::query_as::<_, DslInstance>(
                 r#"SELECT * FROM "ob-poc".dsl_instances
-                   ORDER BY created_at DESC"#,
+                   ORDER BY created_at DESC "#,
             )
         };
 
@@ -2413,8 +2551,9 @@ impl DslManager {
             .map_err(|e| DslError::DatabaseError(e.to_string()))
     }
 
-    /// Delete DSL instance and all its versions (soft delete by status update)
-    pub async fn delete_instance(&self, instance_id: Uuid) -> DslResult<()> {
+    /// Archive (soft delete) a DSL instance
+    pub async fn archive_instance(&self, instance_id: &uuid::Uuid) -> DslResult<()> {
+        // Start transaction for atomic operation
         let mut tx = self
             .domain_repository
             .pool()
@@ -2428,8 +2567,8 @@ impl DslManager {
                SET status = $1, updated_at = $2
                WHERE instance_id = $3"#,
         )
-        .bind(InstanceStatus::Archived)
-        .bind(Utc::now())
+        .bind(crate::database::dsl_instance_repository::InstanceStatus::Archived)
+        .bind(chrono::Utc::now())
         .bind(instance_id)
         .execute(&mut *tx)
         .await
@@ -2438,6 +2577,7 @@ impl DslManager {
         tx.commit()
             .await
             .map_err(|e| DslError::DatabaseError(e.to_string()))?;
+
         Ok(())
     }
 }
@@ -2603,11 +2743,11 @@ pub struct CriticalPath {
 impl Default for StylingConfig {
     fn default() -> Self {
         let color_scheme = serde_json::json!({
-            "primary": "#2563eb",
-            "secondary": "#64748b",
-            "success": "#059669",
-            "warning": "#d97706",
-            "error": "#dc2626"
+            "primary": "blue",
+            "secondary": "gray",
+            "success": "green",
+            "warning": "orange",
+            "error": "red"
         });
 
         Self {
@@ -2699,8 +2839,8 @@ pub struct NodeStyling {
 impl Default for NodeStyling {
     fn default() -> Self {
         Self {
-            color: "#2563eb".to_string(),
-            border_color: "#1e40af".to_string(),
+            color: "blue".to_string(),
+            border_color: "darkblue".to_string(),
             border_width: 2.0,
             shape: "circle".to_string(),
             size: 10.0,
@@ -2720,7 +2860,7 @@ pub struct EdgeStyling {
 impl Default for EdgeStyling {
     fn default() -> Self {
         Self {
-            color: "#64748b".to_string(),
+            color: "gray".to_string(),
             width: 2.0,
             style: "solid".to_string(),
             arrow_type: "arrow".to_string(),
@@ -2778,39 +2918,5 @@ impl DslError {
     /// Template-related error
     pub fn template_error(message: String) -> Self {
         DslError::TemplateError { message }
-    }
-
-    /// Instance not found error
-    pub fn instance_not_found(instance_id: Uuid) -> Self {
-        DslError::NotFound {
-            message: format!("DSL instance not found: {}", instance_id),
-        }
-    }
-
-    /// Version not found error
-    pub fn version_not_found(version_id: Uuid) -> Self {
-        DslError::NotFound {
-            message: format!("DSL version not found: {}", version_id),
-        }
-    }
-
-    /// Compilation error
-    pub fn compilation_error(message: String) -> Self {
-        DslError::CompilationError { message }
-    }
-
-    /// Validation error
-    pub fn validation_error(message: String) -> Self {
-        DslError::ValidationError { message }
-    }
-
-    /// Serialization error
-    pub fn serialization_error(message: String) -> Self {
-        DslError::SerializationError { message }
-    }
-
-    /// Not implemented error
-    pub fn not_implemented(message: String) -> Self {
-        DslError::NotImplemented { message }
     }
 }
