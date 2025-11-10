@@ -12,6 +12,31 @@ path = "src/bin/egui_visualizer.rs"
 required-features = ["visualizer"]
 
 [[bin]]
+name = "egui_dsl_visualizer_v2"
+path = "src/bin/egui_dsl_visualizer_v2.rs"
+required-features = ["visualizer"]
+
+[[bin]]
+name = "egui_dsl_visualizer_mock"
+path = "src/bin/egui_dsl_visualizer_mock.rs"
+required-features = ["visualizer"]
+
+[[bin]]
+name = "egui_dsl_visualizer_db"
+path = "src/bin/egui_dsl_visualizer_db.rs"
+required-features = ["visualizer", "database"]
+
+[[bin]]
+name = "egui_dsl_visualizer_prod"
+path = "src/bin/egui_dsl_visualizer_prod.rs"
+required-features = ["visualizer", "database"]
+
+[[bin]]
+name = "egui_dsl_visualizer_simple"
+path = "src/bin/egui_dsl_visualizer_simple.rs"
+required-features = ["visualizer", "database"]
+
+[[bin]]
 name = "rest_api_server"
 path = "src/bin/rest_api_server.rs"
 required-features = ["rest-api"]
@@ -137,6 +162,16 @@ path = "src/bin/test_dsl_manager_simple.rs"
 required-features = ["database"]
 
 [[bin]]
+name = "seed_onboarding_data"
+path = "src/bin/seed_onboarding_data.rs"
+required-features = ["database"]
+
+[[bin]]
+name = "debug_dsl_instances"
+path = "src/bin/debug_dsl_instances.rs"
+required-features = ["database"]
+
+[[bin]]
 name = "egui_dsl_visualizer"
 path = "src/bin/egui_dsl_visualizer.rs"
 required-features = ["visualizer"]
@@ -228,7 +263,7 @@ prost-build = "0.12" # For generating Rust code from .proto files
 # Features for conditional compilation
 [features]
 default = []
-visualizer = ["dep:egui", "dep:eframe", "dep:egui_extras", "dep:urlencoding"]
+visualizer = ["dep:egui", "dep:eframe", "dep:egui_extras", "dep:urlencoding", "database"]
 rest-api = ["dep:axum", "dep:tower", "dep:tower-http", "database"]
 mock-api = ["dep:axum", "dep:tower", "dep:tower-http"]  # Mock API without database
 binaries = ["dep:clap", "dep:env_logger"]  # Only enable binaries when this feature is active

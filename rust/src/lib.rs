@@ -153,6 +153,10 @@ pub mod domains;
 // DSL Visualizer module (egui-based desktop application)
 #[cfg(feature = "visualizer")]
 pub mod visualizer;
+
+// UI module for egui components and state management
+#[cfg(feature = "visualizer")]
+pub mod ui;
 // #[cfg(feature = "database")]
 // pub mod services;
 
@@ -225,6 +229,14 @@ pub use rest_api::{RestApiConfig, RestApiServer};
 pub use mock_rest_api::{MockRestApiConfig, MockRestApiServer};
 
 // Legacy managers removed; consolidated manager is the single entry point
+
+// Re-export UI components (for egui visualizer)
+#[cfg(feature = "visualizer")]
+pub use ui::{
+    create_global_state_manager, AstNodeData, CbuData, DslContext, DslEntry, GlobalDslState,
+    GlobalDslStateManager, OperationStatus, RefreshData, RefreshRequest, ViewportId,
+    ViewportManager, ViewportRefreshError, ViewportRefreshHandler,
+};
 
 /// Version information
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
