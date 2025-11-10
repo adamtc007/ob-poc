@@ -53,8 +53,9 @@ enum AppState {
 /// Application mode
 #[derive(Debug, Clone, PartialEq)]
 enum AppMode {
-    ViewMode,   // Browse and view existing DSLs
-    CreateMode, // Create new DSL.Onboarding
+    ViewMode,     // Browse and view existing DSLs
+    CreateMode,   // Create new DSL.Onboarding
+    CreateKycMode, // Create new DSL.KYC linked to existing Onboarding
 }
 
 /// CBU data for creation picker
@@ -66,13 +67,25 @@ struct CbuData {
     nature_purpose: Option<String>,
 }
 
-/// Mock DSL creation result
+/// KYC creation form data
+#[derive(Debug, Clone)]
+struct KycFormData {
+    selected_onboarding_id: Option<String>,
+    kyc_type: String,
+    risk_level: String,
+    verification_method: String,
+    documentation_required: Vec<String>,
+    special_instructions: String,
+}
+
+/// Mock creation result
 #[derive(Debug, Clone)]
 struct MockCreationResult {
     instance_id: Uuid,
     version_id: Uuid,
     business_reference: String,
     created_at: String,
+    parent_instance_id: Option<Uuid>, // For KYC linking to parent Onboarding
 }
 
 /// Application state
@@ -121,6 +134,9 @@ struct DslVisualizerMockApp {
 
     /// All CBUs (before filtering)
     all_cbus: Vec<CbuData>,
+
+    /// KYC creation form data
+    kyc_form: KycFormData,
 }
 
 impl DslVisualizerMockApp {
@@ -147,6 +163,14 @@ impl DslVisualizerMockApp {
             creation_results: Vec::new(),
             pending_creation_result: None,
             all_cbus: Vec::new(),
+            kyc_form: KycFormData {
+                selected_onboarding_id: None,
+                kyc_type: "Enhanced Due Diligence".to_string(),
+                risk_level: "Medium".to_string(),
+                verification_method: "Document Review".to_string(),
+                documentation_required: vec!["Certificate of Incorporation".to_string()],
+                special_instructions: String::new(),
+            },
         };
 
         // Initialize with mock data
@@ -282,6 +306,102 @@ impl DslVisualizerMockApp {
         );
     }
 
+    /// Mock KYC creation process linked to parent Onboarding DSL
+    /// ⚠️ TODO: Replace with real KYC DSL generation and database persistence ⚠️
+    fn mock_create_kyc_case(&mut self) {
+        if let Some(parent_id) = &self.kyc_form.selected_onboarding_id {
+            if let Some(parent_entry) = self.dsl_entries.iter().find(|e| e.id == *parent_id) {
+                info!("🚀 Mock creating DSL.KYC for parent Onboarding: {}", parent_entry.name);
+
+                self.state = AppState::CreatingDsl {
+                    cbu_name: format!("KYC-{}", parent_entry.name),
+                };
+
+                // Generate KYC business reference linked to parent
+                let kyc_business_reference = format!(
+                    "KYC-{}-{}",
+                    parent_id.split('-').next().unwrap_or("UNKNOWN"),
+                    chrono::Utc::now().format("%Y%m%d")
+                );
+
+                let mock_result = MockCreationResult {
+                    instance_id: Uuid::new_v4(),
+                    version_id: Uuid::new_v4(),
+                    business_reference: kyc_business_reference.clone(),
+                    created_at: chrono::Utc::now().to_rfc3339(),
+                    parent_instance_id: Some(Uuid::parse_str(parent_id).unwrap_or_else(|_| Uuid::new_v4())),
+                };
+
+                self.pending_creation_result = Some(Ok(mock_result));
+                info!("✅ Mock KYC creation completed: {}", kyc_business_reference);
+            }
+        }
+    }
+
+    /// Generate mock KYC DSL content
+    /// ⚠️ TODO: Replace with real DSL generation using parent onboarding data ⚠️
+    fn generate_kyc_dsl_content(&self, parent_entry: &DslEntry) -> String {
+        format!(r#"
+;; KYC Case DSL - Linked to Parent Onboarding: {}
+;; Generated: {}
+;; Parent Instance ID: {}
+
+(define-kyc-case "{}"
+  :parent-onboarding-id "{}"
+  :kyc-type "{}"
+  :risk-level "{}"
+  :verification-method "{}"
+
+  (kyc.verify
+    :entity-name "{}"
+    :required-documents {}
+    :special-instructions "{}")
+
+  (compliance.check
+    :fatca-status "PENDING"
+    :aml-screening "REQUIRED"
+    :sanctions-check "REQUIRED")
+
+  (risk.assess
+    :methodology "STANDARD"
+    :factors ["JURISDICTION" "BUSINESS_NATURE" "OWNERSHIP_STRUCTURE"])
+
+  (document.collect
+    :categories {}
+    :retention-period "7-YEARS"))"#,
+            parent_entry.name,
+            chrono::Utc::now().to_rfc3339(),
+            parent_entry.id,
+            format!("KYC-{}", parent_entry.name.replace(" ", "-").to_uppercase()),
+            parent_entry.id,
+            self.kyc_form.kyc_type,
+            self.kyc_form.risk_level,
+            self.kyc_form.verification_method,
+            parent_entry.name,
+            format!("[{}]", self.kyc_form.documentation_required.iter()
+                .map(|d| format!("\"{}\"", d))
+                .collect::<Vec<_>>()
+                .join(" ")),
+            self.kyc_form.special_instructions,
+            format!("[{}]", self.kyc_form.documentation_required.iter()
+                .map(|d| format!("\"{}\"", d))
+                .collect::<Vec<_>>()
+                .join(" "))
+        )
+    }
+
+    /// Get available onboarding DSL entries for KYC creation
+    /// ⚠️ TODO: Replace with database query for active onboarding instances ⚠️
+    fn get_available_onboarding_entries(&self) -> Vec<&DslEntry> {
+        self.dsl_entries
+            .iter()
+            .filter(|entry| {
+                entry.domain == "onboarding"
+                && (entry.status == "active" || entry.status == "finalized")
+            })
+            .collect()
+    }
+
     /// Extract CBU name from DSL entry name
     /// ⚠️ TODO: Replace with proper CBU ID lookup from dsl_instance.business_reference ⚠️
     fn extract_cbu_name_from_dsl_entry(&self, entry_name: &str) -> Option<String> {
@@ -351,6 +471,7 @@ impl DslVisualizerMockApp {
                     version_id: Uuid::new_v4(),
                     business_reference: business_reference.clone(),
                     created_at: chrono::Utc::now().to_rfc3339(),
+                    parent_instance_id: None,
                 };
 
                 // Simulate success (you can change this to test error cases)
@@ -644,6 +765,242 @@ impl DslVisualizerMockApp {
                     ui.label(format!("Creating DSL for {}...", cbu_name));
                 });
             }
+
+            /// Render KYC creation form
+            /// ⚠️ TODO: Connect to real onboarding DSL instances and KYC repository ⚠️
+            fn render_kyc_creation_form(&mut self, ui: &mut egui::Ui) {
+                ui.heading("🔍 Create New DSL.KYC Case");
+                ui.separator();
+
+                // Parent Onboarding Picker
+                ui.group(|ui| {
+                    ui.heading("1. Select Parent Onboarding DSL");
+                    ui.label("ℹ️ KYC cases are linked to existing onboarding DSL instances");
+
+                    let available_onboarding = self.get_available_onboarding_entries();
+
+                    egui::ComboBox::from_label("Parent Onboarding DSL")
+                        .selected_text(
+                            self.kyc_form.selected_onboarding_id
+                                .as_ref()
+                                .and_then(|id| available_onboarding.iter().find(|e| e.id == *id))
+                                .map(|entry| entry.name.as_str())
+                                .unwrap_or("Select Onboarding DSL..."),
+                        )
+                        .show_ui(ui, |ui| {
+                            for entry in available_onboarding.iter() {
+                                let selected = self.kyc_form.selected_onboarding_id.as_ref() == Some(&entry.id);
+                                if ui.selectable_label(selected, format!("{} ({})", entry.name, entry.status)).clicked() {
+                                    self.kyc_form.selected_onboarding_id = Some(entry.id.clone());
+                                }
+                            }
+                        });
+
+                    if available_onboarding.is_empty() {
+                        ui.colored_label(
+                            egui::Color32::YELLOW,
+                            "⚠️ No active onboarding DSL instances available for KYC case creation",
+                        );
+                    }
+
+                    // Show selected onboarding details
+                    if let Some(selected_id) = &self.kyc_form.selected_onboarding_id {
+                        if let Some(parent_entry) = available_onboarding.iter().find(|e| e.id == *selected_id) {
+                            ui.separator();
+                            ui.group(|ui| {
+                                ui.label("Selected Onboarding DSL:");
+                                ui.strong(&parent_entry.name);
+                                ui.label(format!("Status: {}", parent_entry.status));
+                                ui.label(format!("Created: {}", parent_entry.created_at));
+                                ui.label(format!("Description: {}", parent_entry.description));
+                            });
+                        }
+                    }
+                });
+
+                ui.add_space(10.0);
+
+                // KYC Configuration
+                ui.group(|ui| {
+                    ui.heading("2. KYC Configuration");
+
+                    ui.horizontal(|ui| {
+                        ui.label("KYC Type:");
+                        egui::ComboBox::from_label("")
+                            .selected_text(&self.kyc_form.kyc_type)
+                            .show_ui(ui, |ui| {
+                                let kyc_types = ["Enhanced Due Diligence", "Standard Due Diligence", "Simplified Due Diligence", "Ongoing Monitoring"];
+                                for kyc_type in kyc_types {
+                                    let selected = self.kyc_form.kyc_type == kyc_type;
+                                    if ui.selectable_label(selected, kyc_type).clicked() {
+                                        self.kyc_form.kyc_type = kyc_type.to_string();
+                                    }
+                                }
+                            });
+                    });
+
+                    ui.horizontal(|ui| {
+                        ui.label("Risk Level:");
+                        egui::ComboBox::from_label("")
+                            .selected_text(&self.kyc_form.risk_level)
+                            .show_ui(ui, |ui| {
+                                let risk_levels = ["Low", "Medium", "High", "Very High"];
+                                for level in risk_levels {
+                                    let selected = self.kyc_form.risk_level == level;
+                                    if ui.selectable_label(selected, level).clicked() {
+                                        self.kyc_form.risk_level = level.to_string();
+                                    }
+                                }
+                            });
+                    });
+
+                    ui.horizontal(|ui| {
+                        ui.label("Verification Method:");
+                        egui::ComboBox::from_label("")
+                            .selected_text(&self.kyc_form.verification_method)
+                            .show_ui(ui, |ui| {
+                                let methods = ["Document Review", "Video Call", "In-Person Meeting", "Third-Party Verification"];
+                                for method in methods {
+                                    let selected = self.kyc_form.verification_method == method;
+                                    if ui.selectable_label(selected, method).clicked() {
+                                        self.kyc_form.verification_method = method.to_string();
+                                    }
+                                }
+                            });
+                    });
+
+                    ui.separator();
+                    ui.label("Required Documentation:");
+                    ui.horizontal_wrapped(|ui| {
+                        let mut docs_changed = false;
+                        let available_docs = [
+                            "Certificate of Incorporation",
+                            "Articles of Association",
+                            "Register of Directors",
+                            "Register of Shareholders",
+                            "Beneficial Ownership Declaration",
+                            "Financial Statements",
+                            "Bank References",
+                            "Regulatory Licenses",
+                        ];
+
+                        for doc in available_docs {
+                            let mut selected = self.kyc_form.documentation_required.contains(&doc.to_string());
+                            if ui.checkbox(&mut selected, doc).changed() {
+                                if selected {
+                                    if !self.kyc_form.documentation_required.contains(&doc.to_string()) {
+                                        self.kyc_form.documentation_required.push(doc.to_string());
+                                    }
+                                } else {
+                                    self.kyc_form.documentation_required.retain(|d| d != doc);
+                                }
+                                docs_changed = true;
+                            }
+                        }
+                    });
+
+                    ui.separator();
+                    ui.label("Special Instructions:");
+                    ui.text_edit_multiline(&mut self.kyc_form.special_instructions);
+                });
+
+                ui.add_space(10.0);
+
+                // Create Button
+                ui.group(|ui| {
+                    let can_create = self.kyc_form.selected_onboarding_id.is_some()
+                        && !self.kyc_form.documentation_required.is_empty();
+
+                    ui.add_enabled_ui(can_create, |ui| {
+                        if ui.button("🔍 Create DSL.KYC Case").clicked() {
+                            self.mock_create_kyc_case();
+                        }
+                    });
+
+                    if !can_create {
+                        ui.colored_label(
+                            egui::Color32::GRAY,
+                            "Select parent onboarding DSL and at least one required document"
+                        );
+                    }
+                });
+
+                // Show creation results for KYC
+                if let Some(result) = self.pending_creation_result.take() {
+                    match result {
+                        Ok(mock_result) => {
+                            self.state = AppState::Idle;
+                            info!(
+                                "✅ KYC DSL created successfully: instance_id={}, parent_id={:?}",
+                                mock_result.instance_id, mock_result.parent_instance_id
+                            );
+
+                            // Add to creation results
+                            self.creation_results.push(mock_result.clone());
+
+                            // Add new KYC entry to the list
+                            let parent_name = self.kyc_form.selected_onboarding_id
+                                .as_ref()
+                                .and_then(|id| self.dsl_entries.iter().find(|e| e.id == *id))
+                                .map(|e| e.name.clone())
+                                .unwrap_or_else(|| "Unknown".to_string());
+
+                            let new_entry = DslEntry {
+                                id: mock_result.instance_id.to_string(),
+                                name: format!("KYC-{}", parent_name),
+                                domain: "kyc".to_string(),
+                                version: 1,
+                                description: format!(
+                                    "{} KYC case for {} (Risk: {})",
+                                    self.kyc_form.kyc_type,
+                                    parent_name,
+                                    self.kyc_form.risk_level
+                                ),
+                                created_at: mock_result.created_at.clone(),
+                                status: "active".to_string(),
+                            };
+                            self.dsl_entries.push(new_entry);
+
+                            ui.separator();
+                            ui.colored_label(
+                                egui::Color32::GREEN,
+                                format!(
+                                    "✅ KYC DSL created successfully!\nBusiness Reference: {}\nInstance ID: {}\nParent Instance ID: {:?}",
+                                    mock_result.business_reference,
+                                    mock_result.instance_id,
+                                    mock_result.parent_instance_id
+                                ),
+                            );
+
+                            if ui.button("👁️ View Created KYC DSL").clicked() {
+                                self.app_mode = AppMode::ViewMode;
+                                // Auto-select the newly created KYC DSL
+                                if let Some(index) = self.dsl_entries.iter().position(|e| e.id == mock_result.instance_id.to_string()) {
+                                    self.selected_index = Some(index);
+                                    self.handle_dsl_selection(index);
+                                }
+                            }
+
+                            if ui.button("🔄 Reset Form").clicked() {
+                                self.kyc_form = KycFormData {
+                                    selected_onboarding_id: None,
+                                    kyc_type: "Enhanced Due Diligence".to_string(),
+                                    risk_level: "Medium".to_string(),
+                                    verification_method: "Document Review".to_string(),
+                                    documentation_required: vec!["Certificate of Incorporation".to_string()],
+                                    special_instructions: String::new(),
+                                };
+                                info!("🔄 KYC form reset");
+                            }
+                        }
+                        Err(error_msg) => {
+                            self.state = AppState::Error(error_msg.clone());
+                            ui.colored_label(egui::Color32::RED, format!("❌ Error: {}", error_msg));
+                        }
+                    }
+                    _ => {}
+                }
+            }
             AppState::Error(error_msg) => {
                 ui.separator();
                 ui.colored_label(
@@ -867,6 +1224,12 @@ impl eframe::App for DslVisualizerMockApp {
                         // Refresh available CBUs to ensure latest filtering
                         self.update_available_cbus();
                     }
+                    if ui
+                        .selectable_label(self.app_mode == AppMode::CreateKycMode, "🔍 Create KYC")
+                        .clicked()
+                    {
+                        self.app_mode = AppMode::CreateKycMode;
+                    }
                 });
 
                 ui.separator();
@@ -928,6 +1291,10 @@ impl eframe::App for DslVisualizerMockApp {
                 AppMode::CreateMode => {
                     // CREATE MODE - DSL creation form
                     self.render_creation_form(ui);
+                }
+                AppMode::CreateKycMode => {
+                    // CREATE KYC MODE - KYC creation form
+                    self.render_kyc_creation_form(ui);
                 }
             }
         });

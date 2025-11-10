@@ -24,9 +24,7 @@ ob-poc/
 │   ├── examples/      # Rust-specific examples
 │   ├── Cargo.toml     # Rust dependencies
 │   └── bacon.toml     # Auto-rebuild configuration
-├── go/                # Go implementation (original POC)
-│   └── ...            # Go source code and modules
-├── sql/               # Shared database schemas
+├── sql/               # Database schemas
 │   ├── 01_schema.sql  # PostgreSQL schema
 │   └── 02_seed_*.sql  # Seed data
 ├── docs/              # Shared documentation
@@ -208,8 +206,8 @@ Following Rich Hickey's EDN philosophy:
 
 ## Contributing
 
-1. Choose your implementation language (`rust/` or `go/`)
-2. Follow language-specific development workflows
+1. The project uses Rust as the primary implementation language
+2. Follow the Rust development workflow described above
 3. Update shared schemas in `/sql/` for database changes
 4. Update documentation for grammar or architecture changes
 5. Add cross-language examples for new features

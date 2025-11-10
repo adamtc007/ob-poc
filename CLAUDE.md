@@ -47,6 +47,9 @@ cargo build
 cargo run --bin cli examples/zenith_capital_ubo.dsl
 cargo test                   # Run all tests
 cargo clippy                 # Linting
+
+# DSL Agent operations
+cargo run --example dsl_agent_demo  # Run DSL Agent demonstration
 ```
 
 **Key Components:**
@@ -54,29 +57,7 @@ cargo clippy                 # Linting
 - **Database Integration**: PostgreSQL with soft schema JSON AST storage
 - **Graph Modeling**: Property graphs for ownership structures
 - **Domain Support**: KYC, onboarding, account opening workflows
-
-### Go Implementation (`/go/`)
-**Demo and mock system** - Retained for demonstrations; production orchestration moved to Rust.
-
-**Key Commands:**
-```bash
-# Build with experimental GC (60% better pause times)
-make build-greenteagc
-
-# Database operations (deprecated; use Rust backend)
-export DB_CONN_STRING="postgres://user:password@localhost:5432/db?sslmode=disable"
-make init-db
-
-# Development workflow
-make check                   # fmt, vet, lint
-make test-coverage          # Tests with coverage report
-make lint                   # golangci-lint with 20+ linters
-
-# DSL operations (demo only)
-./dsl-poc create --cbu="CBU-1234"
-./dsl-poc add-products --cbu="CBU-1234" --products="CUSTODY,FUND_ACCOUNTING"
-./dsl-poc history --cbu="CBU-1234"
-```
+- **DSL Agent**: AI-powered DSL generation, transformation, and validation
 
 ## Database Schema
 
@@ -170,21 +151,26 @@ cargo run --example parse_zenith   # Run example
 cargo doc --open                   # Generate and open docs
 ```
 
-### Go Development (Demo/Mock Mode)
+### Development Workflows
+
+#### Rust Development (Primary)
 ```bash
-cd go/
+cd rust/
 
-# Code quality pipeline
-make check              # fmt + vet + lint
-make test-coverage      # Tests with HTML coverage report
+# Quick development check
+./dev-check.sh
 
-# Build options
-make build-greenteagc   # Experimental GC (recommended)
-make build             # Standard build
+# Full development workflow with commit
+./dev-commit.sh "Your commit message"
 
-# Testing
-go test -v ./internal/cli -run TestHistoryCommand  # Single test
-make test                                          # All tests
+# Auto-rebuild on save
+bacon
+
+# Specific operations
+cargo test --lib                    # Unit tests only
+cargo test integration             # Integration tests
+cargo run --example parse_zenith   # Run example
+cargo doc --open                   # Generate and open docs
 ```
 
 ## Testing Strategy
@@ -194,11 +180,8 @@ make test                                          # All tests
 - **Integration Tests**: Database operations and end-to-end workflows
 - **Example Testing**: Validate DSL parsing with real-world examples
 - **Property Testing**: Grammar validation and AST generation
-
-### Go Testing (Demo System)
-- **Mock Testing**: Uses go-sqlmock for database operations
-- **CLI Testing**: Command implementations with various input combinations
-- **DSL Validation**: S-expression generation and parsing scenarios
+- **Agent Testing**: DSL v3.1 vocabulary validation and transformation
+- **Template Testing**: Multi-domain template generation and validation
 
 ## Key Features and Domains
 
@@ -219,13 +202,13 @@ make test                                          # All tests
 - **Privacy by Design**: Data governance embedded in AttributeID type system
 - **Regulatory Reporting**: Support for CRS, FATCA, and other compliance frameworks
 
-## AI Integration
+### AI Integration
 
-### Gemini AI Integration (Go Demo)
+### Gemini AI Integration (Rust Implementation)
 ```bash
-# Enable AI-assisted KYC discovery
+# Enable AI-assisted DSL operations
 export GEMINI_API_KEY="your-gemini-api-key"
-./dsl-poc discover-kyc --cbu="CBU-1234"
+cargo run --example dsl_agent_demo
 ```
 
 ### AI Safety Features
@@ -303,19 +286,16 @@ Following Rich Hickey's EDN philosophy:
 # Rust debugging
 RUST_LOG=debug cargo run --bin cli
 cargo test -- --nocapture              # See test output
-
-# Go debugging
-go test -v ./... -run FailingTest      # Verbose test output
-./dsl-poc --help                       # CLI help and commands
+RUST_LOG=debug cargo run --example dsl_agent_demo  # Debug DSL Agent
 ```
 
 ## Contributing Guidelines
 
-1. **Choose Implementation**: Use Rust for production features, Go for demos/mocks
+1. **Use Rust**: All production features and development should use the Rust implementation
 2. **Follow Patterns**: Implement DSL-as-State and AttributeID-as-Type patterns
 3. **Update Documentation**: Modify `/sql/` schemas and grammar definitions as needed
 4. **Test Thoroughly**: Add tests for new DSL verbs, domains, and integrations
-5. **Maintain Compatibility**: Ensure changes work across both language implementations
+5. **Maintain DSL v3.1 Compliance**: Ensure all changes support the full v3.1 vocabulary
 
 ## License
 

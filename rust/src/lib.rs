@@ -157,6 +157,12 @@ pub mod visualizer;
 // UI module for egui components and state management
 #[cfg(feature = "visualizer")]
 pub mod ui;
+
+// AI agents for DSL generation, transformation, and validation (v3.1 compatible)
+pub mod agents;
+
+// AI integration module for external AI services (Gemini, OpenAI, etc.)
+pub mod ai;
 // #[cfg(feature = "database")]
 // pub mod services;
 
