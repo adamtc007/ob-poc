@@ -260,7 +260,7 @@ impl DSLBrowserPanel {
                     let domains = self.get_available_domains();
                     let mut changed = false;
 
-                    egui::ComboBox::from_id_source("domain_filter")
+                    egui::ComboBox::from_id_salt("domain_filter")
                         .selected_text(if self.domain_filter.is_empty() {
                             "All Domains"
                         } else {
@@ -301,7 +301,7 @@ impl DSLBrowserPanel {
                     ui.label("Sort by:");
                     let mut sort_changed = false;
 
-                    egui::ComboBox::from_id_source("sort_by")
+                    egui::ComboBox::from_id_salt("sort_by")
                         .selected_text(format!("{:?}", self.sort_by))
                         .show_ui(ui, |ui| {
                             if ui
@@ -495,7 +495,7 @@ impl DSLBrowserPanel {
                             }
 
                             // Custom rendering
-                            ui.allocate_ui_at_rect(rect, |ui| {
+                            ui.allocate_new_ui(egui::UiBuilder::new().max_rect(rect), |ui| {
                                 self.render_dsl_entry(ui, entry, is_selected);
                             });
                         }

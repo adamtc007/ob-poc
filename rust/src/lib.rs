@@ -15,26 +15,16 @@
 //! # Quick Start
 //!
 //! ```rust
-//! use ob_poc::{parse_dsl, Program, DSLError};
-//! use ob_poc::ast::{Statement, Value};
+//! use ob_poc::parser::parse_program;
 //!
 //! // Parse a simple DSL program
 //! let dsl_code = r#"
-//!     (workflow "onboard-customer"
-//!         (properties
-//!             (description "Basic onboarding workflow for a customer")
-//!         )
-//!         (declare-entity "customer1" PERSON
-//!             (properties
-//!                 (legal-name "John Doe")
-//!             )
-//!         )
-//!     )
+//! (kyc.start :customer-id "CUST-001")
+//! (kyc.verify :status "approved")
 //! "#;
 //!
-//! let program = parse_dsl(dsl_code)?;
-//! assert_eq!(program.workflows.len(), 1);
-//! # Ok::<(), ob_poc::DSLError>(())
+//! let program = parse_program(dsl_code).unwrap();
+//! assert_eq!(program.len(), 2);
 //! ```
 //!
 //! # Architecture
@@ -314,10 +304,16 @@ impl DSLContext {
         let mut registry = DomainRegistry::new();
 
         // Register all available domains
-        if let Err(_) = registry.register_domain(Box::new(KycDomainHandler::new())) {
+        if registry
+            .register_domain(Box::new(KycDomainHandler::new()))
+            .is_err()
+        {
             log::warn!("Failed to register KYC domain");
         }
-        if let Err(_) = registry.register_domain(Box::new(OnboardingDomainHandler::new())) {
+        if registry
+            .register_domain(Box::new(OnboardingDomainHandler::new()))
+            .is_err()
+        {
             log::warn!("Failed to register Onboarding domain");
         }
 
