@@ -1,8 +1,8 @@
     Blocking waiting for file lock on package cache
     Blocking waiting for file lock on package cache
     Blocking waiting for file lock on package cache
-   0.171388166s  INFO prepare_target{force=false package_id=ob-poc-web-server v0.1.0 (/Users/adamtc007/Developer/ob-poc/web-server) target="ob-poc-web-server"}: cargo::core::compiler::fingerprint: fingerprint error for ob-poc-web-server v0.1.0 (/Users/adamtc007/Developer/ob-poc/web-server)/Check { test: false }/TargetInner { name: "ob-poc-web-server", doc: true, ..: with_path("/Users/adamtc007/Developer/ob-poc/web-server/src/main.rs", Edition2021) }
-   0.171409250s  INFO prepare_target{force=false package_id=ob-poc-web-server v0.1.0 (/Users/adamtc007/Developer/ob-poc/web-server) target="ob-poc-web-server"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/adamtc007/Developer/ob-poc/web-server/target/debug/.fingerprint/ob-poc-web-server-282a866602456617/bin-ob-poc-web-server`
+   0.160041166s  INFO prepare_target{force=false package_id=ob-poc-web-server v0.1.0 (/Users/adamtc007/Developer/ob-poc/web-server) target="ob-poc-web-server"}: cargo::core::compiler::fingerprint: fingerprint error for ob-poc-web-server v0.1.0 (/Users/adamtc007/Developer/ob-poc/web-server)/Check { test: false }/TargetInner { name: "ob-poc-web-server", doc: true, ..: with_path("/Users/adamtc007/Developer/ob-poc/web-server/src/main.rs", Edition2021) }
+   0.160063083s  INFO prepare_target{force=false package_id=ob-poc-web-server v0.1.0 (/Users/adamtc007/Developer/ob-poc/web-server) target="ob-poc-web-server"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/adamtc007/Developer/ob-poc/web-server/target/debug/.fingerprint/ob-poc-web-server-a9105f1520f5e758/bin-ob-poc-web-server`
 
 Caused by:
     No such file or directory (os error 2)
@@ -26,8 +26,8 @@ Stack backtrace:
   15: std::rt::lang_start::<()>::{closure#0}
   16: std::rt::lang_start_internal
   17: _main
-   0.177628833s  INFO prepare_target{force=false package_id=ob-poc v0.1.0 (/Users/adamtc007/Developer/ob-poc/rust) target="ob_poc"}: cargo::core::compiler::fingerprint: fingerprint error for ob-poc v0.1.0 (/Users/adamtc007/Developer/ob-poc/rust)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("ob_poc", ["lib"], "/Users/adamtc007/Developer/ob-poc/rust/src/lib.rs", Edition2021) }
-   0.177644541s  INFO prepare_target{force=false package_id=ob-poc v0.1.0 (/Users/adamtc007/Developer/ob-poc/rust) target="ob_poc"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/adamtc007/Developer/ob-poc/web-server/target/debug/.fingerprint/ob-poc-12fc85f5b2f570ca/lib-ob_poc`
+   0.166239208s  INFO prepare_target{force=false package_id=ob-poc v0.1.0 (/Users/adamtc007/Developer/ob-poc/rust) target="ob_poc"}: cargo::core::compiler::fingerprint: fingerprint error for ob-poc v0.1.0 (/Users/adamtc007/Developer/ob-poc/rust)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("ob_poc", ["lib"], "/Users/adamtc007/Developer/ob-poc/rust/src/lib.rs", Edition2021) }
+   0.166253125s  INFO prepare_target{force=false package_id=ob-poc v0.1.0 (/Users/adamtc007/Developer/ob-poc/rust) target="ob_poc"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/adamtc007/Developer/ob-poc/web-server/target/debug/.fingerprint/ob-poc-e53f8173c2235f94/lib-ob_poc`
 
 Caused by:
     No such file or directory (os error 2)
@@ -52,8 +52,8 @@ Stack backtrace:
   16: std::rt::lang_start::<()>::{closure#0}
   17: std::rt::lang_start_internal
   18: _main
-   0.188621875s  INFO prepare_target{force=false package_id=ob-poc-web-server v0.1.0 (/Users/adamtc007/Developer/ob-poc/web-server) target="ob-poc-web-server"}: cargo::core::compiler::fingerprint: fingerprint error for ob-poc-web-server v0.1.0 (/Users/adamtc007/Developer/ob-poc/web-server)/Check { test: true }/TargetInner { name: "ob-poc-web-server", doc: true, ..: with_path("/Users/adamtc007/Developer/ob-poc/web-server/src/main.rs", Edition2021) }
-   0.188631583s  INFO prepare_target{force=false package_id=ob-poc-web-server v0.1.0 (/Users/adamtc007/Developer/ob-poc/web-server) target="ob-poc-web-server"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/adamtc007/Developer/ob-poc/web-server/target/debug/.fingerprint/ob-poc-web-server-f6faa0a01f43ff3e/test-bin-ob-poc-web-server`
+   0.177587625s  INFO prepare_target{force=false package_id=ob-poc-web-server v0.1.0 (/Users/adamtc007/Developer/ob-poc/web-server) target="ob-poc-web-server"}: cargo::core::compiler::fingerprint: fingerprint error for ob-poc-web-server v0.1.0 (/Users/adamtc007/Developer/ob-poc/web-server)/Check { test: true }/TargetInner { name: "ob-poc-web-server", doc: true, ..: with_path("/Users/adamtc007/Developer/ob-poc/web-server/src/main.rs", Edition2021) }
+   0.177596250s  INFO prepare_target{force=false package_id=ob-poc-web-server v0.1.0 (/Users/adamtc007/Developer/ob-poc/web-server) target="ob-poc-web-server"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/adamtc007/Developer/ob-poc/web-server/target/debug/.fingerprint/ob-poc-web-server-93b7d9cd4e45ca58/test-bin-ob-poc-web-server`
 
 Caused by:
     No such file or directory (os error 2)
