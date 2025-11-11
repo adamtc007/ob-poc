@@ -412,7 +412,13 @@ fn map_data_create(
     input: &str,
 ) -> Result<CrudStatement, nom::Err<NomParseError<'_>>> {
     let asset = extract_string(&mut verb_form.pairs, "asset", input)?;
-    let values = extract_map(&mut verb_form.pairs, "values", input)?;
+    let key_value_map = extract_map(&mut verb_form.pairs, "values", input)?;
+
+    // Convert HashMap<Key, Value> to HashMap<String, Value>
+    let values = key_value_map
+        .into_iter()
+        .map(|(key, value)| (key.as_str(), value))
+        .collect();
 
     Ok(CrudStatement::DataCreate(DataCreate { asset, values }))
 }
@@ -422,13 +428,37 @@ fn map_data_read(
     input: &str,
 ) -> Result<CrudStatement, nom::Err<NomParseError<'_>>> {
     let asset = extract_string(&mut verb_form.pairs, "asset", input)?;
-    let where_clause = extract_map(&mut verb_form.pairs, "where", input).ok();
-    let select_fields = extract_list(&mut verb_form.pairs, "select", input).ok();
+    let where_map = extract_map(&mut verb_form.pairs, "where", input).ok();
+    let select_list = extract_list(&mut verb_form.pairs, "select", input).ok();
+
+    // Convert where clause from HashMap<Key, Value> to HashMap<String, Value>
+    let where_clause = where_map
+        .map(|map| {
+            map.into_iter()
+                .map(|(key, value)| (key.as_str(), value))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    // Convert select fields from Vec<Value> to Vec<String>
+    let select = select_list
+        .map(|list| {
+            list.into_iter()
+                .filter_map(|v| match v {
+                    Value::String(s) => Some(s),
+                    Value::Literal(Literal::String(s)) => Some(s),
+                    Value::Identifier(s) => Some(s),
+                    _ => None,
+                })
+                .collect()
+        })
+        .unwrap_or_default();
 
     Ok(CrudStatement::DataRead(DataRead {
         asset,
         where_clause,
-        select_fields,
+        select,
+        limit: None,
     }))
 }
 
@@ -437,8 +467,19 @@ fn map_data_update(
     input: &str,
 ) -> Result<CrudStatement, nom::Err<NomParseError<'_>>> {
     let asset = extract_string(&mut verb_form.pairs, "asset", input)?;
-    let where_clause = extract_map(&mut verb_form.pairs, "where", input)?;
-    let values = extract_map(&mut verb_form.pairs, "values", input)?;
+    let where_map = extract_map(&mut verb_form.pairs, "where", input)?;
+    let values_map = extract_map(&mut verb_form.pairs, "values", input)?;
+
+    // Convert both maps from HashMap<Key, Value> to HashMap<String, Value>
+    let where_clause = where_map
+        .into_iter()
+        .map(|(key, value)| (key.as_str(), value))
+        .collect();
+
+    let values = values_map
+        .into_iter()
+        .map(|(key, value)| (key.as_str(), value))
+        .collect();
 
     Ok(CrudStatement::DataUpdate(DataUpdate {
         asset,
@@ -453,7 +494,7 @@ fn map_complex_query(
     mut verb_form: VerbForm,
     input: &str,
 ) -> Result<CrudStatement, nom::Err<NomParseError<'_>>> {
-    let asset = extract_string(&mut verb_form.pairs, "asset", input)?;
+    let primary_asset = extract_string(&mut verb_form.pairs, "asset", input)?;
 
     // Optional joins
     let joins = if let Ok(join_list) = extract_list(&mut verb_form.pairs, "joins", input) {
@@ -462,8 +503,17 @@ fn map_complex_query(
         None
     };
 
-    // Optional filters
-    let filters = extract_map(&mut verb_form.pairs, "filters", input).ok();
+    // Optional conditions (was filters)
+    let conditions_map = extract_map(&mut verb_form.pairs, "filters", input)
+        .ok()
+        .or_else(|| extract_map(&mut verb_form.pairs, "conditions", input).ok())
+        .unwrap_or_default();
+
+    // Convert conditions from HashMap<Key, Value> to HashMap<String, Value>
+    let conditions = conditions_map
+        .into_iter()
+        .map(|(key, value)| (key.as_str(), value))
+        .collect();
 
     // Optional aggregation
     let aggregate = if let Ok(agg_map) = extract_map(&mut verb_form.pairs, "aggregate", input) {
@@ -472,8 +522,19 @@ fn map_complex_query(
         None
     };
 
-    // Optional select fields
-    let select_fields = extract_list(&mut verb_form.pairs, "select", input).ok();
+    // Convert select fields from Vec<Value> to Vec<String>
+    let select_fields = extract_list(&mut verb_form.pairs, "select", input)
+        .map(|list| {
+            list.into_iter()
+                .filter_map(|v| match v {
+                    Value::String(s) => Some(s),
+                    Value::Literal(Literal::String(s)) => Some(s),
+                    Value::Identifier(s) => Some(s),
+                    _ => None,
+                })
+                .collect()
+        })
+        .unwrap_or_default();
 
     // Optional ordering
     let order_by = if let Ok(order_list) = extract_list(&mut verb_form.pairs, "order-by", input) {
@@ -491,9 +552,9 @@ fn map_complex_query(
         .map(|n| n as u32);
 
     Ok(CrudStatement::ComplexQuery(ComplexQuery {
-        asset,
+        primary_asset,
         joins,
-        filters,
+        conditions,
         aggregate,
         select_fields,
         order_by,
@@ -507,20 +568,47 @@ fn map_conditional_update(
     input: &str,
 ) -> Result<CrudStatement, nom::Err<NomParseError<'_>>> {
     let asset = extract_string(&mut verb_form.pairs, "asset", input)?;
-    let where_clause = extract_map(&mut verb_form.pairs, "where", input)?;
-    let set_values = extract_map(&mut verb_form.pairs, "set", input)?;
+    let where_map = extract_map(&mut verb_form.pairs, "where", input)?;
+    let if_exists_map = extract_map(&mut verb_form.pairs, "if_exists", input).ok();
+    let if_not_exists_map = extract_map(&mut verb_form.pairs, "if_not_exists", input).ok();
+    let set_values_map = extract_map(&mut verb_form.pairs, "set", input)?;
+    let increment_values_map = extract_map(&mut verb_form.pairs, "increment", input).ok();
 
-    // Optional conditional clauses
-    let if_exists = extract_map(&mut verb_form.pairs, "if-exists", input).ok();
-    let if_not_exists = extract_map(&mut verb_form.pairs, "if-not-exists", input).ok();
-    let increment_values = extract_map(&mut verb_form.pairs, "increment", input).ok();
+    // Convert all maps from HashMap<Key, Value> to HashMap<String, Value>
+    let primary_condition = where_map
+        .into_iter()
+        .map(|(key, value)| (key.as_str(), value))
+        .collect();
+
+    let if_exists = if_exists_map.map(|map| {
+        map.into_iter()
+            .map(|(key, value)| (key.as_str(), value))
+            .collect()
+    });
+
+    let if_not_exists = if_not_exists_map.map(|map| {
+        map.into_iter()
+            .map(|(key, value)| (key.as_str(), value))
+            .collect()
+    });
+
+    let values = set_values_map
+        .into_iter()
+        .map(|(key, value)| (key.as_str(), value))
+        .collect();
+
+    let increment_values = increment_values_map.map(|map| {
+        map.into_iter()
+            .map(|(key, value)| (key.as_str(), value))
+            .collect()
+    });
 
     Ok(CrudStatement::ConditionalUpdate(ConditionalUpdate {
         asset,
-        where_clause,
+        primary_condition,
         if_exists,
         if_not_exists,
-        set_values,
+        values,
         increment_values,
     }))
 }
@@ -796,7 +884,13 @@ fn map_data_delete(
     input: &str,
 ) -> Result<CrudStatement, nom::Err<NomParseError<'_>>> {
     let asset = extract_string(&mut verb_form.pairs, "asset", input)?;
-    let where_clause = extract_map(&mut verb_form.pairs, "where", input)?;
+    let where_map = extract_map(&mut verb_form.pairs, "where", input)?;
+
+    // Convert where clause from HashMap<Key, Value> to HashMap<String, Value>
+    let where_clause = where_map
+        .into_iter()
+        .map(|(key, value)| (key.as_str(), value))
+        .collect();
 
     Ok(CrudStatement::DataDelete(DataDelete {
         asset,
@@ -883,20 +977,22 @@ mod crud_tests {
                 assert_eq!(create_op.asset, "cbu");
                 assert_eq!(create_op.values.len(), 2);
 
-                let name_key = Key {
+                let _name_key = Key {
                     parts: vec!["name".to_string()],
                 };
-                let desc_key = Key {
+                let _desc_key = Key {
                     parts: vec!["description".to_string()],
                 };
 
                 assert_eq!(
-                    create_op.values.get(&name_key),
-                    Some(&Value::Literal(Literal::String("Test CBU".to_string())))
+                    create_op.values.get("name"),
+                    Some(&Value::Literal(Literal::String("Test Corp".to_string())))
                 );
                 assert_eq!(
-                    create_op.values.get(&desc_key),
-                    Some(&Value::Literal(Literal::String("A test CBU".to_string())))
+                    create_op.values.get("description"),
+                    Some(&Value::Literal(Literal::String(
+                        "Test description".to_string()
+                    )))
                 );
             }
             _ => panic!("Expected CrudStatement::DataCreate, got {:?}", statement),
@@ -914,8 +1010,8 @@ mod crud_tests {
         match statement {
             CrudStatement::DataRead(read_op) => {
                 assert_eq!(read_op.asset, "cbu");
-                assert!(read_op.where_clause.is_some());
-                assert!(read_op.select_fields.is_some());
+                assert!(!read_op.where_clause.is_empty());
+                assert!(!read_op.select.is_empty());
             }
             _ => panic!("Expected CrudStatement::DataRead, got {:?}", statement),
         }
@@ -931,10 +1027,10 @@ mod crud_tests {
 
         match statement {
             CrudStatement::ComplexQuery(query) => {
-                assert_eq!(query.asset, "cbu");
+                assert_eq!(query.primary_asset, "cbu");
                 assert!(query.joins.is_some());
-                assert!(query.filters.is_some());
-                assert!(query.select_fields.is_some());
+                assert!(!query.conditions.is_empty());
+                assert!(!query.select_fields.is_empty());
                 assert_eq!(query.limit, Some(100));
             }
             _ => panic!("Expected CrudStatement::ComplexQuery, got {:?}", statement),
@@ -952,9 +1048,9 @@ mod crud_tests {
         match statement {
             CrudStatement::ConditionalUpdate(update) => {
                 assert_eq!(update.asset, "cbu");
-                assert!(!update.where_clause.is_empty());
+                assert!(!update.primary_condition.is_empty());
                 assert!(update.if_exists.is_some());
-                assert!(!update.set_values.is_empty());
+                assert!(!update.values.is_empty());
             }
             _ => panic!(
                 "Expected CrudStatement::ConditionalUpdate, got {:?}",

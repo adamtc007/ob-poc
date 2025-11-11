@@ -619,3 +619,14 @@ CREATE TABLE IF NOT EXISTS "ob-poc".orchestration_state_history (
 CREATE INDEX IF NOT EXISTS idx_orchestration_state_history_session ON "ob-poc".orchestration_state_history (orchestration_session_id);
 CREATE INDEX IF NOT EXISTS idx_orchestration_state_history_states ON "ob-poc".orchestration_state_history (from_state, to_state);
 CREATE INDEX IF NOT EXISTS idx_orchestration_state_history_created ON "ob-poc".orchestration_state_history (created_at);
+
+-- ============================================================================
+-- DOCUMENT LIBRARY SYSTEM
+-- ============================================================================
+
+-- ISO Asset Types for document validation
+-- Old document schema tables removed - now using EAV document system
+-- See sql/15_document_library_eav_schema.sql for new document tables
+
+-- Old document indexes removed - now using EAV document system
+-- See sql/15_document_library_eav_schema.sql for new document indexes

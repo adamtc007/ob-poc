@@ -6,10 +6,12 @@
 //! intelligent DSL editing suggestions.
 
 pub mod agentic_crud_service;
+pub mod agentic_document_service;
 pub mod crud_prompt_builder;
 pub mod gemini;
 pub mod openai;
 pub mod rag_system;
+pub mod unified_agentic_service;
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

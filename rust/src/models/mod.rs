@@ -6,6 +6,7 @@
 pub mod business_request_models;
 pub mod document_models;
 pub mod domain_models;
+pub mod entity_models;
 
 // Re-export commonly used types for convenience
 pub use domain_models::{
@@ -21,12 +22,24 @@ pub use business_request_models::{
 };
 
 pub use document_models::{
-    AiExtractionRequest, AiExtractionResult, ApiResponse, AssetSuitabilityCheck,
-    AttributeValidationError, BulkDocumentImport, BulkImportResult, DocumentAttributeStatistics,
-    DocumentCatalog, DocumentCatalogWithAttributes, DocumentDslIntegration, DocumentIssuer,
-    DocumentMappingSummary, DocumentRelationship, DocumentSearchRequest, DocumentSearchResponse,
-    DocumentStateSnapshot, DocumentType, DocumentTypeStatistics, DocumentUsage,
-    DocumentValidationResult, InvestmentMandateExtraction, InvestmentMandateValidation,
-    IsoAssetType, NewDocumentCatalog, NewDocumentIssuer, NewDocumentRelationship, NewDocumentType,
-    NewDocumentUsage, NewIsoAssetType, UpdateDocumentCatalog, UpdateDocumentType,
+    AiExtractionRequest, AiExtractionResult, ApiResponse, AttributeValue, BulkDocumentImport,
+    BulkImportResult, ConfidenceWarning, DocumentCatalog, DocumentCatalogWithMetadata,
+    DocumentDetails, DocumentDslContext, DocumentDslOperation, DocumentMetadata,
+    DocumentMetadataBatch, DocumentOperationType, DocumentRelationship, DocumentRelationshipType,
+    DocumentSearchRequest, DocumentSearchResponse, DocumentStatistics, DocumentSummary,
+    DocumentUsage, DocumentUsageContext, DocumentValidationResult, ExtractionStatus,
+    NewDocumentCatalog, NewDocumentMetadata, NewDocumentRelationship, NewDocumentUsage,
+    UpdateDocumentCatalog, ValidationError,
+};
+
+pub use entity_models::{
+    AgenticEntityCreateRequest, AgenticEntityCrudResponse, AgenticEntityDeleteRequest,
+    AgenticEntityReadRequest, AgenticEntityUpdateRequest, CbuEntityRole, CrudOperation,
+    CrudOperationType, DslExample, Entity, EntityAssetType, EntityCrudRule, EntityDetails,
+    EntityType, EntityWithDetails, EntityWithType, ExecutionStatus as EntityExecutionStatus,
+    LimitedCompany, Partnership, PartnershipControlMechanism,
+    PartnershipControlMechanismWithEntity, PartnershipInterest, PartnershipInterestWithEntity,
+    PartnershipWithRelationships, ProperPerson, RagEmbedding, Trust, TrustBeneficiaryClass,
+    TrustParty, TrustPartyWithEntity, TrustProtectorPower, TrustProtectorPowerWithParty,
+    TrustWithRelationships,
 };

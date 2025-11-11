@@ -71,6 +71,13 @@ pub enum Value {
     List(Vec<Value>),
     Map(HashMap<Key, Value>),
     AttrRef(String), // UUID string, e.g., "@attr{uuid-001}"
+    // Additional variants needed for CRUD operations
+    String(String),
+    Integer(i32),
+    Double(f64),
+    Boolean(bool),
+    Array(Vec<Value>),
+    Json(serde_json::Value),
 }
 
 // Helper for property maps, for consistency with old PropertyMap, but uses new Key/Value
@@ -108,38 +115,39 @@ pub enum CrudStatement {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DataCreate {
     pub asset: String,
-    pub values: PropertyMap,
+    pub values: HashMap<String, Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DataRead {
     pub asset: String,
-    pub where_clause: Option<PropertyMap>,
-    pub select_fields: Option<Vec<Value>>,
+    pub where_clause: HashMap<String, Value>,
+    pub select: Vec<String>,
+    pub limit: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DataUpdate {
     pub asset: String,
-    pub where_clause: PropertyMap,
-    pub values: PropertyMap,
+    pub where_clause: HashMap<String, Value>,
+    pub values: HashMap<String, Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DataDelete {
     pub asset: String,
-    pub where_clause: PropertyMap,
+    pub where_clause: HashMap<String, Value>,
 }
 
 // --- Phase 3: Advanced CRUD Structures ---
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ComplexQuery {
-    pub asset: String,
+    pub primary_asset: String,
     pub joins: Option<Vec<JoinClause>>,
-    pub filters: Option<PropertyMap>,
+    pub conditions: HashMap<String, Value>,
     pub aggregate: Option<AggregateClause>,
-    pub select_fields: Option<Vec<Value>>,
+    pub select_fields: Vec<String>,
     pub order_by: Option<Vec<OrderClause>>,
     pub limit: Option<u32>,
     pub offset: Option<u32>,
@@ -199,11 +207,11 @@ pub enum OrderDirection {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ConditionalUpdate {
     pub asset: String,
-    pub where_clause: PropertyMap,
-    pub if_exists: Option<PropertyMap>,
-    pub if_not_exists: Option<PropertyMap>,
-    pub set_values: PropertyMap,
-    pub increment_values: Option<PropertyMap>,
+    pub primary_condition: HashMap<String, Value>,
+    pub if_exists: Option<HashMap<String, Value>>,
+    pub if_not_exists: Option<HashMap<String, Value>>,
+    pub values: HashMap<String, Value>,
+    pub increment_values: Option<HashMap<String, Value>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

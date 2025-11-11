@@ -217,6 +217,140 @@ impl CrudPromptBuilder {
         })
     }
 
+    /// Builds entity create prompt with specific context
+    #[cfg(feature = "database")]
+    pub fn build_entity_create_prompt(
+        &self,
+        instruction: &str,
+        asset_type: &str,
+        context: &std::collections::HashMap<String, serde_json::Value>,
+        rag_context: &RetrievedContext,
+    ) -> Result<GeneratedPrompt> {
+        let enhanced_instruction = format!(
+            "CREATE ENTITY REQUEST:\n\
+            Entity Type: {}\n\
+            Instruction: {}\n\
+            Context Data: {}\n\n\
+            Generate a valid DSL CREATE statement for this entity.",
+            asset_type,
+            instruction,
+            serde_json::to_string_pretty(context).unwrap_or_else(|_| "{}".to_string())
+        );
+
+        let config = PromptConfig {
+            include_schemas: true,
+            include_grammar: true,
+            include_examples: true,
+            max_examples: 3,
+            include_confidence: true,
+        };
+
+        self.generate_prompt(rag_context, &enhanced_instruction, &config)
+    }
+
+    /// Builds entity read prompt with specific context
+    #[cfg(feature = "database")]
+    pub fn build_entity_read_prompt(
+        &self,
+        instruction: &str,
+        asset_types: &[String],
+        filters: &std::collections::HashMap<String, serde_json::Value>,
+        limit: Option<i32>,
+        rag_context: &RetrievedContext,
+    ) -> Result<GeneratedPrompt> {
+        let asset_types_str = asset_types.join(", ");
+
+        let enhanced_instruction = format!(
+            "READ ENTITY REQUEST:\n\
+            Entity Types: [{}]\n\
+            Instruction: {}\n\
+            Filters: {}\n\
+            Limit: {}\n\n\
+            Generate a valid DSL READ statement for these entities.",
+            asset_types_str,
+            instruction,
+            serde_json::to_string_pretty(filters).unwrap_or_else(|_| "{}".to_string()),
+            limit
+                .map(|l| l.to_string())
+                .unwrap_or_else(|| "default".to_string())
+        );
+
+        let config = PromptConfig {
+            include_schemas: true,
+            include_grammar: true,
+            include_examples: true,
+            max_examples: 2,
+            include_confidence: true,
+        };
+
+        self.generate_prompt(rag_context, &enhanced_instruction, &config)
+    }
+
+    /// Builds entity update prompt with specific context
+    #[cfg(feature = "database")]
+    pub fn build_entity_update_prompt(
+        &self,
+        instruction: &str,
+        asset_type: &str,
+        identifier: &std::collections::HashMap<String, serde_json::Value>,
+        updates: &std::collections::HashMap<String, serde_json::Value>,
+        rag_context: &RetrievedContext,
+    ) -> Result<GeneratedPrompt> {
+        let enhanced_instruction = format!(
+            "UPDATE ENTITY REQUEST:\n\
+            Entity Type: {}\n\
+            Instruction: {}\n\
+            Identifier: {}\n\
+            Updates: {}\n\n\
+            Generate a valid DSL UPDATE statement for this entity.",
+            asset_type,
+            instruction,
+            serde_json::to_string_pretty(identifier).unwrap_or_else(|_| "{}".to_string()),
+            serde_json::to_string_pretty(updates).unwrap_or_else(|_| "{}".to_string())
+        );
+
+        let config = PromptConfig {
+            include_schemas: true,
+            include_grammar: true,
+            include_examples: true,
+            max_examples: 2,
+            include_confidence: true,
+        };
+
+        self.generate_prompt(rag_context, &enhanced_instruction, &config)
+    }
+
+    /// Builds entity delete prompt with specific context
+    #[cfg(feature = "database")]
+    pub fn build_entity_delete_prompt(
+        &self,
+        instruction: &str,
+        asset_type: &str,
+        identifier: &std::collections::HashMap<String, serde_json::Value>,
+        rag_context: &RetrievedContext,
+    ) -> Result<GeneratedPrompt> {
+        let enhanced_instruction = format!(
+            "DELETE ENTITY REQUEST:\n\
+            Entity Type: {}\n\
+            Instruction: {}\n\
+            Identifier: {}\n\n\
+            Generate a valid DSL DELETE statement for this entity.",
+            asset_type,
+            instruction,
+            serde_json::to_string_pretty(identifier).unwrap_or_else(|_| "{}".to_string())
+        );
+
+        let config = PromptConfig {
+            include_schemas: true,
+            include_grammar: true,
+            include_examples: true,
+            max_examples: 2,
+            include_confidence: true,
+        };
+
+        self.generate_prompt(rag_context, &enhanced_instruction, &config)
+    }
+
     /// Builds the schema context section
     fn build_schema_section(&self, schemas: &[AssetSchemaInfo]) -> String {
         if schemas.is_empty() {

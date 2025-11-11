@@ -115,18 +115,6 @@ impl serde::Serialize for DSLError {
                 state.serialize_field("error", err)?;
                 state.end()
             }
-            DSLError::Runtime(err) => {
-                let mut state = serializer.serialize_struct("DSLError", 2)?;
-                state.serialize_field("type", "Runtime")?;
-                state.serialize_field("error", err)?;
-                state.end()
-            }
-            DSLError::Io(err) => {
-                let mut state = serializer.serialize_struct("DSLError", 2)?;
-                state.serialize_field("type", "Io")?;
-                state.serialize_field("error", &err.to_string())?;
-                state.end()
-            }
         }
     }
 }

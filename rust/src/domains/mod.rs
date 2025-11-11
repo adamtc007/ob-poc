@@ -195,7 +195,15 @@ pub mod common {
                 Literal::Uuid(s) => format!("\"{}\"", s), // UUIDs are strings
             },
             Value::Identifier(s) => s.clone(), // Identifiers are not quoted
+            Value::String(s) => format!("\"{}\"", s),
+            Value::Integer(i) => i.to_string(),
+            Value::Double(d) => d.to_string(),
+            Value::Boolean(b) => b.to_string(),
             Value::List(items) => {
+                let formatted_items: Vec<String> = items.iter().map(format_value_to_dsl).collect();
+                format!("[{}]", formatted_items.join(", "))
+            }
+            Value::Array(items) => {
                 let formatted_items: Vec<String> = items.iter().map(format_value_to_dsl).collect();
                 format!("[{}]", formatted_items.join(", "))
             }
@@ -206,6 +214,7 @@ pub mod common {
                     .collect();
                 format!("{{{}}}", formatted_pairs.join(", "))
             }
+            Value::Json(json_value) => format!("\"{}\"", json_value),
             Value::AttrRef(uuid_str) => format!("@attr{{{}}}", uuid_str),
         }
     }
