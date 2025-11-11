@@ -31,6 +31,18 @@ pub enum DSLError {
 
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
+
+    #[cfg(feature = "database")]
+    #[error("Database error: {0}")]
+    Database(#[from] crate::error_enhanced::DatabaseError),
+
+    #[cfg(feature = "database")]
+    #[error("Document processing error: {0}")]
+    DocumentProcessing(#[from] crate::error_enhanced::DocumentProcessingError),
+
+    #[cfg(feature = "database")]
+    #[error("DSL Manager error: {0}")]
+    DslManager(#[from] crate::error_enhanced::DslManagerError),
 }
 
 impl serde::Serialize for DSLError {
@@ -79,6 +91,39 @@ impl serde::Serialize for DSLError {
             DSLError::Serialization(err) => {
                 let mut state = serializer.serialize_struct("DSLError", 2)?;
                 state.serialize_field("type", "Serialization")?;
+                state.serialize_field("error", &err.to_string())?;
+                state.end()
+            }
+            #[cfg(feature = "database")]
+            DSLError::Database(err) => {
+                let mut state = serializer.serialize_struct("DSLError", 2)?;
+                state.serialize_field("type", "Database")?;
+                state.serialize_field("error", err)?;
+                state.end()
+            }
+            #[cfg(feature = "database")]
+            DSLError::DocumentProcessing(err) => {
+                let mut state = serializer.serialize_struct("DSLError", 2)?;
+                state.serialize_field("type", "DocumentProcessing")?;
+                state.serialize_field("error", err)?;
+                state.end()
+            }
+            #[cfg(feature = "database")]
+            DSLError::DslManager(err) => {
+                let mut state = serializer.serialize_struct("DSLError", 2)?;
+                state.serialize_field("type", "DslManager")?;
+                state.serialize_field("error", err)?;
+                state.end()
+            }
+            DSLError::Runtime(err) => {
+                let mut state = serializer.serialize_struct("DSLError", 2)?;
+                state.serialize_field("type", "Runtime")?;
+                state.serialize_field("error", err)?;
+                state.end()
+            }
+            DSLError::Io(err) => {
+                let mut state = serializer.serialize_struct("DSLError", 2)?;
+                state.serialize_field("type", "Io")?;
                 state.serialize_field("error", &err.to_string())?;
                 state.end()
             }

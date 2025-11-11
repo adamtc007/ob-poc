@@ -10,6 +10,7 @@ use tracing::{info, warn};
 
 pub mod business_request_repository;
 pub mod cbu_repository;
+pub mod document_attribute_repository;
 pub mod dsl_domain_repository;
 pub mod dsl_instance_repository;
 
@@ -18,6 +19,11 @@ pub use business_request_repository::{
     DslBusinessRequestRepository, DslBusinessRequestRepositoryTrait,
 };
 pub use cbu_repository::CbuRepository;
+pub use document_attribute_repository::{
+    AttributeExtractionSpec, AttributeUsageAnalysis, ConsolidatedAttribute,
+    CrossDocumentValidation, DataBridgeMetrics, DocumentAttributeMapping,
+    DocumentAttributeRepository, DocumentExtractionTemplate, DocumentType, MappingCoverageStats,
+};
 pub use dsl_domain_repository::{DslDomainRepository, DslDomainRepositoryTrait};
 pub use dsl_instance_repository::{DslInstanceRepository, PgDslInstanceRepository};
 
@@ -111,6 +117,11 @@ impl DatabaseManager {
         DslBusinessRequestRepository::new(self.pool.clone())
     }
 
+    /// Create a new document-attribute repository using this database connection
+    pub fn document_attribute_repository(&self) -> DocumentAttributeRepository {
+        DocumentAttributeRepository::new(self.pool.clone())
+    }
+
     /// Test database connectivity
     pub async fn test_connection(&self) -> Result<(), sqlx::Error> {
         sqlx::query("SELECT 1")
@@ -132,7 +143,8 @@ impl DatabaseManager {
             SELECT COUNT(*) as count
             FROM information_schema.tables
             WHERE table_schema = 'ob-poc'
-            AND table_name IN ('dsl_domains', 'dsl_versions', 'parsed_asts', 'dsl_execution_log')
+            AND table_name IN ('dsl_domains', 'dsl_versions', 'parsed_asts', 'dsl_execution_log',
+                               'consolidated_attributes', 'document_types', 'document_attribute_mappings')
             "#,
         )
         .fetch_one(&self.pool)
@@ -141,8 +153,8 @@ impl DatabaseManager {
 
         let count: i64 = tables_exist.get("count");
 
-        if count < 4 {
-            warn!("Expected database tables not found. Please run the migration script: sql/migrations/001_dsl_domain_architecture.sql");
+        if count < 7 {
+            warn!("Expected database tables not found. Please run migration scripts including document-attribute bridge tables");
             return Err(sqlx::migrate::MigrateError::VersionMissing(1));
         }
 

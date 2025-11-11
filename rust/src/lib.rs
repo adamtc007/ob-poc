@@ -115,6 +115,8 @@ pub type Program = Vec<Form>;
 pub mod ast;
 pub mod data_dictionary;
 pub mod error;
+#[cfg(feature = "database")]
+pub mod error_enhanced;
 pub mod grammar;
 pub mod parser;
 pub mod vocabulary;
@@ -129,6 +131,8 @@ pub mod models;
 // DSL Manager - V3.1 aligned with proper type consolidation - STRING FORMATTING FIXED
 #[cfg(feature = "database")]
 pub mod dsl_manager;
+#[cfg(feature = "database")]
+pub mod dsl_manager_enhanced;
 
 // REST API server for visualizer
 #[cfg(feature = "rest-api")]
