@@ -6,25 +6,7 @@ edition = "2021"
 
 # All deprecated binaries removed - agentic CRUD examples are the master
 
-[[example]]
-name = "crud_parser_demo"
-path = "examples/crud_parser_demo.rs"
-
-[[example]]
-name = "agentic_crud_phase2_demo"
-path = "examples/agentic_crud_phase2_demo.rs"
-
-[[example]]
-name = "phase2_summary_demo"
-path = "examples/phase2_summary_demo.rs"
-
-[[example]]
-name = "phase3_advanced_crud_demo"
-path = "examples/phase3_advanced_crud_demo.rs"
-
-[[example]]
-name = "phase3_core_demo"
-path = "examples/phase3_core_demo.rs"
+# All deprecated examples removed - only working examples remain
 
 [dependencies]
 # Core libraries
