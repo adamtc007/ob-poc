@@ -176,6 +176,26 @@ name = "egui_dsl_visualizer"
 path = "src/bin/egui_dsl_visualizer.rs"
 required-features = ["visualizer"]
 
+[[example]]
+name = "crud_parser_demo"
+path = "examples/crud_parser_demo.rs"
+
+[[example]]
+name = "agentic_crud_phase2_demo"
+path = "examples/agentic_crud_phase2_demo.rs"
+
+[[example]]
+name = "phase2_summary_demo"
+path = "examples/phase2_summary_demo.rs"
+
+[[example]]
+name = "phase3_advanced_crud_demo"
+path = "examples/phase3_advanced_crud_demo.rs"
+
+[[example]]
+name = "phase3_core_demo"
+path = "examples/phase3_core_demo.rs"
+
 [dependencies]
 # Core libraries
 anyhow = "1.0"

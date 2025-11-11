@@ -5,8 +5,11 @@
 //! with AI-powered features like natural language to DSL conversion and
 //! intelligent DSL editing suggestions.
 
+pub mod agentic_crud_service;
+pub mod crud_prompt_builder;
 pub mod gemini;
 pub mod openai;
+pub mod rag_system;
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

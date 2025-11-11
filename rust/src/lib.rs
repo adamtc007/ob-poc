@@ -90,6 +90,237 @@ pub enum Form {
 
 // Program is now a sequence of forms (workflow replaced by a specific verb form)
 pub type Program = Vec<Form>;
+
+// --- Agentic CRUD AST Structures ---
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum CrudStatement {
+    DataCreate(DataCreate),
+    DataRead(DataRead),
+    DataUpdate(DataUpdate),
+    DataDelete(DataDelete),
+    // Phase 3: Advanced operations
+    ComplexQuery(ComplexQuery),
+    ConditionalUpdate(ConditionalUpdate),
+    BatchOperation(BatchOperation),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DataCreate {
+    pub asset: String,
+    pub values: PropertyMap,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DataRead {
+    pub asset: String,
+    pub where_clause: Option<PropertyMap>,
+    pub select_fields: Option<Vec<Value>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DataUpdate {
+    pub asset: String,
+    pub where_clause: PropertyMap,
+    pub values: PropertyMap,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DataDelete {
+    pub asset: String,
+    pub where_clause: PropertyMap,
+}
+
+// --- Phase 3: Advanced CRUD Structures ---
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ComplexQuery {
+    pub asset: String,
+    pub joins: Option<Vec<JoinClause>>,
+    pub filters: Option<PropertyMap>,
+    pub aggregate: Option<AggregateClause>,
+    pub select_fields: Option<Vec<Value>>,
+    pub order_by: Option<Vec<OrderClause>>,
+    pub limit: Option<u32>,
+    pub offset: Option<u32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct JoinClause {
+    pub join_type: JoinType,
+    pub target_asset: String,
+    pub on_condition: PropertyMap,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum JoinType {
+    Inner,
+    Left,
+    Right,
+    Full,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AggregateClause {
+    pub operations: Vec<AggregateOperation>,
+    pub group_by: Option<Vec<String>>,
+    pub having: Option<PropertyMap>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AggregateOperation {
+    pub function: AggregateFunction,
+    pub field: String,
+    pub alias: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum AggregateFunction {
+    Count,
+    Sum,
+    Avg,
+    Min,
+    Max,
+    CountDistinct,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OrderClause {
+    pub field: String,
+    pub direction: OrderDirection,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum OrderDirection {
+    Asc,
+    Desc,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ConditionalUpdate {
+    pub asset: String,
+    pub where_clause: PropertyMap,
+    pub if_exists: Option<PropertyMap>,
+    pub if_not_exists: Option<PropertyMap>,
+    pub set_values: PropertyMap,
+    pub increment_values: Option<PropertyMap>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BatchOperation {
+    pub operations: Vec<CrudStatement>,
+    pub transaction_mode: TransactionMode,
+    pub rollback_strategy: RollbackStrategy,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum TransactionMode {
+    Atomic,
+    Sequential,
+    Parallel,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum RollbackStrategy {
+    FullRollback,
+    PartialRollback,
+    ContinueOnError,
+}
+
+// --- Transaction Management ---
+
+#[derive(Debug, Clone)]
+pub struct CrudTransaction {
+    pub operations: Vec<CrudStatement>,
+    pub rollback_strategy: RollbackStrategy,
+    pub atomic: bool,
+    pub timeout_seconds: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TransactionResult {
+    pub success: bool,
+    pub completed_operations: Vec<usize>,
+    pub failed_operations: Vec<(usize, String)>,
+    pub rollback_performed: bool,
+    pub total_duration_ms: u64,
+}
+
+// --- Validation Structures ---
+
+#[derive(Debug, Clone)]
+pub struct ValidationResult {
+    pub is_valid: bool,
+    pub errors: Vec<String>,
+    pub warnings: Vec<ValidationWarning>,
+    pub suggestions: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ValidationWarning {
+    pub code: String,
+    pub message: String,
+    pub field: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct IntegrityResult {
+    pub referential_integrity_ok: bool,
+    pub constraint_violations: Vec<ConstraintViolation>,
+    pub dependency_issues: Vec<DependencyIssue>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ConstraintViolation {
+    pub constraint_name: String,
+    pub violation_type: ConstraintType,
+    pub affected_records: Vec<String>,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ConstraintType {
+    ForeignKey,
+    Unique,
+    NotNull,
+    Check,
+    Custom,
+}
+
+#[derive(Debug, Clone)]
+pub struct DependencyIssue {
+    pub dependent_table: String,
+    pub dependency_type: DependencyType,
+    pub affected_count: u32,
+    pub resolution_hint: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum DependencyType {
+    Cascade,
+    Restrict,
+    SetNull,
+    SetDefault,
+}
+
+#[derive(Debug, Clone)]
+pub struct SimulationResult {
+    pub would_succeed: bool,
+    pub affected_records: u32,
+    pub estimated_duration_ms: u64,
+    pub resource_usage: ResourceUsage,
+    pub potential_issues: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ResourceUsage {
+    pub memory_kb: u64,
+    pub disk_operations: u32,
+    pub network_calls: u32,
+    pub cpu_time_ms: u64,
+}
+
+// --- End of Agentic CRUD AST Structures ---
 // - [`parser`] - nom-based parser with proper error handling
 // - [`grammar`] - EBNF grammar engine for extensible syntax
 // - [`error`] - Comprehensive error types with context
@@ -145,9 +376,9 @@ pub mod dsl;
 // Domain implementations for centralized DSL editing
 pub mod domains;
 
-// New modules for gRPC server and services - DISABLED UNTIL DSL+DB COMPLETE
-// #[cfg(feature = "database")]
-// pub mod execution;
+// New modules for gRPC server and services
+#[cfg(feature = "database")]
+pub mod execution;
 // #[cfg(feature = "database")]
 // pub mod grpc_server;
 
@@ -180,8 +411,8 @@ pub mod services;
 // Re-export key types and functions for public API
 // pub use ast::{Program, PropertyMap, Statement, Value, Workflow}; // Old AST re-exports commented out
 pub use error::{
-    DSLError, DSLResult, ErrorCollector, ErrorSeverity, GrammarError, ParseError, RuntimeError,
-    SourceLocation, ValidationError, VocabularyError,
+    DSLError, DSLResult, ErrorCollector, GrammarError, ParseError, RuntimeError, SourceLocation,
+    VocabularyError,
 };
 pub use grammar::{load_default_grammar, EBNFGrammar, EBNFParser, GrammarEngine};
 pub use parser::parse_program;
@@ -545,7 +776,11 @@ pub fn parse_and_validate(input: &str) -> Result<Program, ErrorCollector> {
     let program = match parse_dsl(input) {
         Ok(program) => program,
         Err(error) => {
-            collector.add_simple_error(error, SourceLocation::unknown(), ErrorSeverity::Fatal);
+            collector.add_simple_error(
+                error,
+                SourceLocation::unknown(),
+                crate::error::ErrorSeverity::Fatal,
+            );
             return Err(collector);
         }
     };

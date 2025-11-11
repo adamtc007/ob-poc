@@ -357,3 +357,630 @@ mod tests {
         }
     }
 }
+
+// --- Agentic CRUD Parser Functions ---
+
+use crate::{
+    AggregateClause, AggregateFunction, AggregateOperation, BatchOperation, ComplexQuery,
+    ConditionalUpdate, CrudStatement, DataCreate, DataDelete, DataRead, DataUpdate, JoinClause,
+    JoinType, OrderClause, OrderDirection, RollbackStrategy, TransactionMode,
+};
+
+/// Parses a complete agentic CRUD statement from a string.
+/// This is the main entry point for parsing `data.*` DSL commands.
+pub fn parse_crud_statement(input: &str) -> Result<CrudStatement, NomParseError<'_>> {
+    let (remaining, statement) = crud_statement_internal(input).finish()?;
+
+    if !remaining.trim().is_empty() {
+        return Err(VerboseError::from_error_kind(
+            remaining,
+            nom::error::ErrorKind::Eof,
+        ));
+    }
+
+    Ok(statement)
+}
+
+/// Internal parser that maps a VerbForm to a strongly-typed CrudStatement.
+fn crud_statement_internal(input: &str) -> ParseResult<'_, CrudStatement> {
+    let (remaining_input, verb_form) = parse_verb_form(input)?;
+
+    let statement = match verb_form.verb.as_str() {
+        "data.create" => map_data_create(verb_form, input)?,
+        "data.read" => map_data_read(verb_form, input)?,
+        "data.update" => map_data_update(verb_form, input)?,
+        "data.delete" => map_data_delete(verb_form, input)?,
+        // Phase 3: Advanced operations
+        "data.query" => map_complex_query(verb_form, input)?,
+        "data.conditional-update" => map_conditional_update(verb_form, input)?,
+        "data.batch" => map_batch_operation(verb_form, input)?,
+        _ => {
+            return Err(nom::Err::Error(VerboseError::from_error_kind(
+                input,
+                nom::error::ErrorKind::Tag,
+            )))
+        }
+    };
+
+    Ok((remaining_input, statement))
+}
+
+// --- Mappers from VerbForm to CrudStatement ---
+
+fn map_data_create(
+    mut verb_form: VerbForm,
+    input: &str,
+) -> Result<CrudStatement, nom::Err<NomParseError<'_>>> {
+    let asset = extract_string(&mut verb_form.pairs, "asset", input)?;
+    let values = extract_map(&mut verb_form.pairs, "values", input)?;
+
+    Ok(CrudStatement::DataCreate(DataCreate { asset, values }))
+}
+
+fn map_data_read(
+    mut verb_form: VerbForm,
+    input: &str,
+) -> Result<CrudStatement, nom::Err<NomParseError<'_>>> {
+    let asset = extract_string(&mut verb_form.pairs, "asset", input)?;
+    let where_clause = extract_map(&mut verb_form.pairs, "where", input).ok();
+    let select_fields = extract_list(&mut verb_form.pairs, "select", input).ok();
+
+    Ok(CrudStatement::DataRead(DataRead {
+        asset,
+        where_clause,
+        select_fields,
+    }))
+}
+
+fn map_data_update(
+    mut verb_form: VerbForm,
+    input: &str,
+) -> Result<CrudStatement, nom::Err<NomParseError<'_>>> {
+    let asset = extract_string(&mut verb_form.pairs, "asset", input)?;
+    let where_clause = extract_map(&mut verb_form.pairs, "where", input)?;
+    let values = extract_map(&mut verb_form.pairs, "values", input)?;
+
+    Ok(CrudStatement::DataUpdate(DataUpdate {
+        asset,
+        where_clause,
+        values,
+    }))
+}
+
+// --- Phase 3: Advanced CRUD Operation Mappers ---
+
+fn map_complex_query(
+    mut verb_form: VerbForm,
+    input: &str,
+) -> Result<CrudStatement, nom::Err<NomParseError<'_>>> {
+    let asset = extract_string(&mut verb_form.pairs, "asset", input)?;
+
+    // Optional joins
+    let joins = if let Ok(join_list) = extract_list(&mut verb_form.pairs, "joins", input) {
+        Some(parse_join_clauses(join_list)?)
+    } else {
+        None
+    };
+
+    // Optional filters
+    let filters = extract_map(&mut verb_form.pairs, "filters", input).ok();
+
+    // Optional aggregation
+    let aggregate = if let Ok(agg_map) = extract_map(&mut verb_form.pairs, "aggregate", input) {
+        Some(parse_aggregate_clause(agg_map)?)
+    } else {
+        None
+    };
+
+    // Optional select fields
+    let select_fields = extract_list(&mut verb_form.pairs, "select", input).ok();
+
+    // Optional ordering
+    let order_by = if let Ok(order_list) = extract_list(&mut verb_form.pairs, "order-by", input) {
+        Some(parse_order_clauses(order_list)?)
+    } else {
+        None
+    };
+
+    // Optional limit and offset
+    let limit = extract_number(&mut verb_form.pairs, "limit", input)
+        .ok()
+        .map(|n| n as u32);
+    let offset = extract_number(&mut verb_form.pairs, "offset", input)
+        .ok()
+        .map(|n| n as u32);
+
+    Ok(CrudStatement::ComplexQuery(ComplexQuery {
+        asset,
+        joins,
+        filters,
+        aggregate,
+        select_fields,
+        order_by,
+        limit,
+        offset,
+    }))
+}
+
+fn map_conditional_update(
+    mut verb_form: VerbForm,
+    input: &str,
+) -> Result<CrudStatement, nom::Err<NomParseError<'_>>> {
+    let asset = extract_string(&mut verb_form.pairs, "asset", input)?;
+    let where_clause = extract_map(&mut verb_form.pairs, "where", input)?;
+    let set_values = extract_map(&mut verb_form.pairs, "set", input)?;
+
+    // Optional conditional clauses
+    let if_exists = extract_map(&mut verb_form.pairs, "if-exists", input).ok();
+    let if_not_exists = extract_map(&mut verb_form.pairs, "if-not-exists", input).ok();
+    let increment_values = extract_map(&mut verb_form.pairs, "increment", input).ok();
+
+    Ok(CrudStatement::ConditionalUpdate(ConditionalUpdate {
+        asset,
+        where_clause,
+        if_exists,
+        if_not_exists,
+        set_values,
+        increment_values,
+    }))
+}
+
+fn map_batch_operation(
+    mut verb_form: VerbForm,
+    input: &str,
+) -> Result<CrudStatement, nom::Err<NomParseError<'_>>> {
+    let operations_list = extract_list(&mut verb_form.pairs, "operations", input)?;
+    let mut operations = Vec::new();
+
+    // Parse each operation in the batch
+    for operation_value in operations_list {
+        if let Value::Literal(Literal::String(op_str)) = operation_value {
+            let parsed_op = parse_crud_statement(&op_str).map_err(|_| {
+                nom::Err::Error(VerboseError::from_error_kind(
+                    input,
+                    nom::error::ErrorKind::Tag,
+                ))
+            })?;
+            operations.push(parsed_op);
+        }
+    }
+
+    // Parse transaction mode
+    let transaction_mode = if let Ok(mode_str) = extract_string(&mut verb_form.pairs, "mode", input)
+    {
+        match mode_str.as_str() {
+            "atomic" => TransactionMode::Atomic,
+            "sequential" => TransactionMode::Sequential,
+            "parallel" => TransactionMode::Parallel,
+            _ => TransactionMode::Sequential, // Default
+        }
+    } else {
+        TransactionMode::Sequential // Default
+    };
+
+    // Parse rollback strategy
+    let rollback_strategy =
+        if let Ok(strategy_str) = extract_string(&mut verb_form.pairs, "rollback", input) {
+            match strategy_str.as_str() {
+                "full" => RollbackStrategy::FullRollback,
+                "partial" => RollbackStrategy::PartialRollback,
+                "continue" => RollbackStrategy::ContinueOnError,
+                _ => RollbackStrategy::FullRollback, // Default
+            }
+        } else {
+            RollbackStrategy::FullRollback // Default
+        };
+
+    Ok(CrudStatement::BatchOperation(BatchOperation {
+        operations,
+        transaction_mode,
+        rollback_strategy,
+    }))
+}
+
+// Helper functions for parsing complex structures
+
+fn parse_join_clauses(
+    join_list: Vec<Value>,
+) -> Result<Vec<JoinClause>, nom::Err<NomParseError<'static>>> {
+    let mut joins = Vec::new();
+
+    for join_value in &join_list {
+        if let Value::Map(join_map) = join_value {
+            let join_type = if let Some(Value::Literal(Literal::String(join_type_str))) = join_map
+                .get(&Key {
+                    parts: vec!["type".to_string()],
+                }) {
+                match join_type_str.as_str() {
+                    "inner" => JoinType::Inner,
+                    "left" => JoinType::Left,
+                    "right" => JoinType::Right,
+                    "full" => JoinType::Full,
+                    _ => JoinType::Inner, // Default
+                }
+            } else {
+                JoinType::Inner // Default
+            };
+
+            let target_asset = if let Some(Value::Literal(Literal::String(asset))) =
+                join_map.get(&Key {
+                    parts: vec!["asset".to_string()],
+                }) {
+                asset.clone()
+            } else {
+                return Err(nom::Err::Error(VerboseError::from_error_kind(
+                    "",
+                    nom::error::ErrorKind::Tag,
+                )));
+            };
+
+            let on_condition = if let Some(Value::Map(on_map)) = join_map.get(&Key {
+                parts: vec!["on".to_string()],
+            }) {
+                on_map.clone()
+            } else {
+                PropertyMap::new()
+            };
+
+            joins.push(JoinClause {
+                join_type,
+                target_asset,
+                on_condition,
+            });
+        }
+    }
+
+    Ok(joins)
+}
+
+fn parse_aggregate_clause(
+    agg_map: PropertyMap,
+) -> Result<AggregateClause, nom::Err<NomParseError<'static>>> {
+    let mut operations = Vec::new();
+
+    // Parse aggregate operations
+    if let Some(Value::List(ops_list)) = agg_map.get(&Key {
+        parts: vec!["operations".to_string()],
+    }) {
+        for op_value in ops_list {
+            if let Value::Map(op_map) = op_value {
+                let function = if let Some(Value::Literal(Literal::String(func_str))) =
+                    op_map.get(&Key {
+                        parts: vec!["function".to_string()],
+                    }) {
+                    match func_str.as_str() {
+                        "count" => AggregateFunction::Count,
+                        "sum" => AggregateFunction::Sum,
+                        "avg" => AggregateFunction::Avg,
+                        "min" => AggregateFunction::Min,
+                        "max" => AggregateFunction::Max,
+                        "count-distinct" => AggregateFunction::CountDistinct,
+                        _ => AggregateFunction::Count, // Default
+                    }
+                } else {
+                    AggregateFunction::Count // Default
+                };
+
+                let field = if let Some(Value::Literal(Literal::String(field_str))) =
+                    op_map.get(&Key {
+                        parts: vec!["field".to_string()],
+                    }) {
+                    field_str.clone()
+                } else {
+                    "*".to_string() // Default for count
+                };
+
+                let alias = if let Some(Value::Literal(Literal::String(alias_str))) =
+                    op_map.get(&Key {
+                        parts: vec!["alias".to_string()],
+                    }) {
+                    Some(alias_str.clone())
+                } else {
+                    None
+                };
+
+                operations.push(AggregateOperation {
+                    function,
+                    field,
+                    alias,
+                });
+            }
+        }
+    }
+
+    // Parse group by
+    let group_by = if let Some(Value::List(group_list)) = agg_map.get(&Key {
+        parts: vec!["group-by".to_string()],
+    }) {
+        let mut group_fields = Vec::new();
+        for group_value in group_list {
+            if let Value::Literal(Literal::String(field)) = group_value {
+                group_fields.push(field.clone());
+            }
+        }
+        if group_fields.is_empty() {
+            None
+        } else {
+            Some(group_fields)
+        }
+    } else {
+        None
+    };
+
+    // Parse having clause
+    let having = if let Some(Value::Map(having_map)) = agg_map.get(&Key {
+        parts: vec!["having".to_string()],
+    }) {
+        Some(having_map.clone())
+    } else {
+        None
+    };
+
+    Ok(AggregateClause {
+        operations,
+        group_by,
+        having,
+    })
+}
+
+fn parse_order_clauses(
+    order_list: Vec<Value>,
+) -> Result<Vec<OrderClause>, nom::Err<NomParseError<'static>>> {
+    let mut orders = Vec::new();
+
+    for order_value in &order_list {
+        if let Value::Map(order_map) = order_value {
+            let field = if let Some(Value::Literal(Literal::String(field_str))) =
+                order_map.get(&Key {
+                    parts: vec!["field".to_string()],
+                }) {
+                field_str.clone()
+            } else {
+                continue; // Skip invalid order clause
+            };
+
+            let direction = if let Some(Value::Literal(Literal::String(dir_str))) =
+                order_map.get(&Key {
+                    parts: vec!["direction".to_string()],
+                }) {
+                match dir_str.as_str() {
+                    "desc" => OrderDirection::Desc,
+                    "asc" => OrderDirection::Asc,
+                    _ => OrderDirection::Asc, // Default
+                }
+            } else {
+                OrderDirection::Asc // Default
+            };
+
+            orders.push(OrderClause { field, direction });
+        }
+    }
+
+    Ok(orders)
+}
+
+// Helper function to extract number from VerbForm pairs
+fn extract_number<'a>(
+    pairs: &'a mut PropertyMap,
+    key: &'a str,
+    input: &'a str,
+) -> Result<i64, nom::Err<NomParseError<'a>>> {
+    let key_obj = Key {
+        parts: vec![key.to_string()],
+    };
+
+    if let Some(value) = pairs.remove(&key_obj) {
+        match value {
+            Value::Literal(Literal::Number(n)) => Ok(n as i64),
+            Value::Literal(Literal::String(s)) => s.parse::<i64>().map_err(|_| {
+                nom::Err::Error(VerboseError::from_error_kind(
+                    input,
+                    nom::error::ErrorKind::Tag,
+                ))
+            }),
+            _ => Err(nom::Err::Error(VerboseError::from_error_kind(
+                input,
+                nom::error::ErrorKind::Tag,
+            ))),
+        }
+    } else {
+        Err(nom::Err::Error(VerboseError::from_error_kind(
+            input,
+            nom::error::ErrorKind::Tag,
+        )))
+    }
+}
+
+fn map_data_delete(
+    mut verb_form: VerbForm,
+    input: &str,
+) -> Result<CrudStatement, nom::Err<NomParseError<'_>>> {
+    let asset = extract_string(&mut verb_form.pairs, "asset", input)?;
+    let where_clause = extract_map(&mut verb_form.pairs, "where", input)?;
+
+    Ok(CrudStatement::DataDelete(DataDelete {
+        asset,
+        where_clause,
+    }))
+}
+
+// --- Value Extraction Helpers ---
+
+fn extract_value<'a>(
+    map: &mut PropertyMap,
+    key_name: &str,
+    input: &'a str,
+) -> Result<Value, nom::Err<NomParseError<'a>>> {
+    let key = Key {
+        parts: vec![key_name.to_string()],
+    };
+    map.remove(&key).ok_or_else(|| {
+        nom::Err::Failure(VerboseError::from_error_kind(
+            input,
+            nom::error::ErrorKind::Verify,
+        ))
+    })
+}
+
+fn extract_string<'a>(
+    map: &mut PropertyMap,
+    key_name: &str,
+    input: &'a str,
+) -> Result<String, nom::Err<NomParseError<'a>>> {
+    match extract_value(map, key_name, input)? {
+        Value::Literal(Literal::String(s)) => Ok(s),
+        Value::Identifier(s) => Ok(s),
+        _ => Err(nom::Err::Failure(VerboseError::from_error_kind(
+            input,
+            nom::error::ErrorKind::Verify,
+        ))),
+    }
+}
+
+fn extract_map<'a>(
+    map: &mut PropertyMap,
+    key_name: &str,
+    input: &'a str,
+) -> Result<PropertyMap, nom::Err<NomParseError<'a>>> {
+    match extract_value(map, key_name, input)? {
+        Value::Map(m) => Ok(m),
+        _ => Err(nom::Err::Failure(VerboseError::from_error_kind(
+            input,
+            nom::error::ErrorKind::Verify,
+        ))),
+    }
+}
+
+fn extract_list<'a>(
+    map: &mut PropertyMap,
+    key_name: &str,
+    input: &'a str,
+) -> Result<Vec<Value>, nom::Err<NomParseError<'a>>> {
+    match extract_value(map, key_name, input)? {
+        Value::List(l) => Ok(l),
+        _ => Err(nom::Err::Failure(VerboseError::from_error_kind(
+            input,
+            nom::error::ErrorKind::Verify,
+        ))),
+    }
+}
+
+#[cfg(test)]
+mod crud_tests {
+    use super::*;
+
+    #[test]
+    fn test_data_create_parsing() {
+        let input =
+            r#"(data.create :asset "cbu" :values {:name "Test CBU" :description "A test CBU"})"#;
+        let result = parse_crud_statement(input);
+
+        assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+        let statement = result.unwrap();
+
+        match statement {
+            CrudStatement::DataCreate(create_op) => {
+                assert_eq!(create_op.asset, "cbu");
+                assert_eq!(create_op.values.len(), 2);
+
+                let name_key = Key {
+                    parts: vec!["name".to_string()],
+                };
+                let desc_key = Key {
+                    parts: vec!["description".to_string()],
+                };
+
+                assert_eq!(
+                    create_op.values.get(&name_key),
+                    Some(&Value::Literal(Literal::String("Test CBU".to_string())))
+                );
+                assert_eq!(
+                    create_op.values.get(&desc_key),
+                    Some(&Value::Literal(Literal::String("A test CBU".to_string())))
+                );
+            }
+            _ => panic!("Expected CrudStatement::DataCreate, got {:?}", statement),
+        }
+    }
+
+    #[test]
+    fn test_data_read_parsing() {
+        let input = r#"(data.read :asset "cbu" :where {:jurisdiction "US"} :select ["name" "description"])"#;
+        let result = parse_crud_statement(input);
+
+        assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+        let statement = result.unwrap();
+
+        match statement {
+            CrudStatement::DataRead(read_op) => {
+                assert_eq!(read_op.asset, "cbu");
+                assert!(read_op.where_clause.is_some());
+                assert!(read_op.select_fields.is_some());
+            }
+            _ => panic!("Expected CrudStatement::DataRead, got {:?}", statement),
+        }
+    }
+
+    #[test]
+    fn test_complex_query_parsing() {
+        let input = r#"(data.query :asset "cbu" :joins [{:type "left" :asset "entities" :on {:cbu_id "id"}}] :filters {:created_after "2024-01-01"} :select ["name" "entity_count"] :limit 100)"#;
+        let result = parse_crud_statement(input);
+
+        assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+        let statement = result.unwrap();
+
+        match statement {
+            CrudStatement::ComplexQuery(query) => {
+                assert_eq!(query.asset, "cbu");
+                assert!(query.joins.is_some());
+                assert!(query.filters.is_some());
+                assert!(query.select_fields.is_some());
+                assert_eq!(query.limit, Some(100));
+            }
+            _ => panic!("Expected CrudStatement::ComplexQuery, got {:?}", statement),
+        }
+    }
+
+    #[test]
+    fn test_conditional_update_parsing() {
+        let input = r#"(data.conditional-update :asset "cbu" :where {:name "Test"} :if-exists {:status "active"} :set {:description "Updated description"})"#;
+        let result = parse_crud_statement(input);
+
+        assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+        let statement = result.unwrap();
+
+        match statement {
+            CrudStatement::ConditionalUpdate(update) => {
+                assert_eq!(update.asset, "cbu");
+                assert!(!update.where_clause.is_empty());
+                assert!(update.if_exists.is_some());
+                assert!(!update.set_values.is_empty());
+            }
+            _ => panic!(
+                "Expected CrudStatement::ConditionalUpdate, got {:?}",
+                statement
+            ),
+        }
+    }
+
+    #[test]
+    fn test_batch_operation_parsing() {
+        let input = r#"(data.batch :operations ["(data.create :asset \"cbu\" :values {:name \"Test1\"})" "(data.create :asset \"cbu\" :values {:name \"Test2\"})"] :mode "atomic" :rollback "full")"#;
+        let result = parse_crud_statement(input);
+
+        assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+        let statement = result.unwrap();
+
+        match statement {
+            CrudStatement::BatchOperation(batch) => {
+                assert_eq!(batch.operations.len(), 2);
+                assert_eq!(batch.transaction_mode, TransactionMode::Atomic);
+                assert_eq!(batch.rollback_strategy, RollbackStrategy::FullRollback);
+            }
+            _ => panic!(
+                "Expected CrudStatement::BatchOperation, got {:?}",
+                statement
+            ),
+        }
+    }
+}

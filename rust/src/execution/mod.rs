@@ -12,6 +12,7 @@ use tokio::sync::RwLock;
 use uuid::Uuid;
 
 pub mod context;
+pub mod crud_executor;
 pub mod engine;
 pub mod integrations;
 pub mod operations;
