@@ -300,3 +300,11 @@ flamegraph.svg
 # Integration test artifacts
 integration-test-results/
 test-data/generated/
+
+# Additional build artifacts and cache directories
+web-server/target/
+phase6-web-client/node_modules/
+web-interface/node_modules/
+.sqlx/
+*/.sqlx/
+**/.sqlx/
