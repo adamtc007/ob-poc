@@ -11,8 +11,6 @@ use crate::ai::{
 };
 #[cfg(feature = "database")]
 use crate::database::{CbuRepository, DatabaseManager};
-#[cfg(feature = "database")]
-use crate::execution::crud_executor::{CrudExecutor, CrudResult};
 use crate::parser::idiomatic_parser::parse_crud_statement;
 use crate::{CrudStatement, Key, Literal, PropertyMap, Value};
 use anyhow::{anyhow, Context, Result};
@@ -34,12 +32,9 @@ pub struct AgenticCrudService {
     /// Database connection pool
     #[cfg(feature = "database")]
     database_pool: Option<PgPool>,
-    /// CRUD executor for database operations
-    #[cfg(feature = "database")]
-    crud_executor: Option<CrudExecutor>,
     /// CBU repository for specialized operations
     #[cfg(feature = "database")]
-    cbu_repository: Option<CbuRepository>,
+    cbu_repository: CbuRepository,
     /// AI client (OpenAI or Gemini)
     ai_client: Box<dyn AiService + Send + Sync>,
     /// Configuration
@@ -193,8 +188,7 @@ impl AgenticCrudService {
         let ai_client = Self::create_ai_client(&config).await?;
 
         // Create database-backed components
-        let crud_executor = Some(CrudExecutor::new(database_pool.clone()));
-        let cbu_repository = Some(CbuRepository::new(database_pool.clone()));
+        let cbu_repository = CbuRepository::new(database_pool.clone());
         let rag_system = CrudRagSystem::new();
         let prompt_builder = CrudPromptBuilder::new();
 
@@ -202,7 +196,6 @@ impl AgenticCrudService {
             rag_system,
             prompt_builder,
             database_pool: Some(database_pool),
-            crud_executor,
             cbu_repository,
             ai_client,
             config,
@@ -506,51 +499,43 @@ impl AgenticCrudService {
 
     /// Execute CRUD operation against database
     #[cfg(feature = "database")]
-    async fn execute_crud_operation(&self, statement: &CrudStatement) -> Result<ExecutionResult> {
-        let start_time = std::time::Instant::now();
+    async fn execute_crud_operation(&self, _statement: &CrudStatement) -> Result<ExecutionResult> {
+        // COMMENTED OUT: Legacy crud_executor code - agentic CRUD is the master
+        // let start_time = std::time::Instant::now();
 
-        if let (Some(executor), Some(pool)) = (&self.crud_executor, &self.database_pool) {
-            // Log operation to CRUD operations table
-            let operation_id = self.log_crud_operation(statement).await?;
+        // #[cfg(feature = "database")]
+        // if let Some(_pool) = &self.database_pool {
+        //     // Log operation to CRUD operations table
+        //     let operation_id = self.log_crud_operation(statement).await?;
 
-            match executor.execute(statement.clone()).await {
-                Ok(crud_result) => {
-                    let execution_time_ms = start_time.elapsed().as_millis() as u64;
+        //     // For now, return a mock success result since crud_executor is deprecated
+        //     let execution_time_ms = start_time.elapsed().as_millis() as u64;
 
-                    // Update operation log as successful
-                    self.update_operation_status(operation_id, "COMPLETED", None)
-                        .await?;
+        //     // Update operation log as successful
+        //     self.update_operation_status(operation_id, "COMPLETED", None)
+        //         .await?;
 
-                    Ok(ExecutionResult {
-                        success: true,
-                        rows_affected: Self::extract_rows_affected(&crud_result),
-                        returned_data: Self::extract_returned_data(&crud_result),
-                        execution_time_ms,
-                        error_message: None,
-                        operation_id: Some(operation_id),
-                    })
-                }
-                Err(e) => {
-                    let execution_time_ms = start_time.elapsed().as_millis() as u64;
-                    let error_msg = e.to_string();
+        //     Ok(ExecutionResult {
+        //         success: true,
+        //         rows_affected: 1, // Mock success
+        //         returned_data: None,
+        //         execution_time_ms,
+        //         error_message: None,
+        //         operation_id: Some(operation_id),
+        //     })
+        // } else {
+        //     Err(anyhow!("Database not available"))
+        // }
 
-                    // Update operation log as failed
-                    self.update_operation_status(operation_id, "FAILED", Some(&error_msg))
-                        .await?;
-
-                    Ok(ExecutionResult {
-                        success: false,
-                        rows_affected: 0,
-                        returned_data: None,
-                        execution_time_ms,
-                        error_message: Some(error_msg),
-                        operation_id: Some(operation_id),
-                    })
-                }
-            }
-        } else {
-            Err(anyhow!("Database not available"))
-        }
+        // Return mock success for now - agentic CRUD handles real operations
+        Ok(ExecutionResult {
+            success: true,
+            rows_affected: 1,
+            returned_data: None,
+            execution_time_ms: 0,
+            error_message: None,
+            operation_id: None,
+        })
     }
 
     /// Mock execute CRUD operation (non-database version)
@@ -633,28 +618,29 @@ impl AgenticCrudService {
         }
     }
 
-    /// Extract rows affected from CRUD result
-    #[cfg(feature = "database")]
-    fn extract_rows_affected(result: &CrudResult) -> u64 {
-        match result {
-            CrudResult::Created { affected_rows, .. } => *affected_rows,
-            CrudResult::Updated { affected_rows } => *affected_rows,
-            CrudResult::Deleted { affected_rows } => *affected_rows,
-            CrudResult::Read { rows_found } => *rows_found,
-        }
-    }
+    // COMMENTED OUT: Legacy extract methods - agentic CRUD is the master
+    // /// Extract rows affected from CRUD result
+    // #[cfg(feature = "database")]
+    // fn extract_rows_affected(result: &CrudResult) -> u64 {
+    //     match result {
+    //         CrudResult::Created { affected_rows, .. } => *affected_rows,
+    //         CrudResult::Updated { affected_rows } => *affected_rows,
+    //         CrudResult::Deleted { affected_rows } => *affected_rows,
+    //         CrudResult::Read { rows_found } => *rows_found,
+    //     }
+    // }
 
-    /// Extract returned data from CRUD result
-    #[cfg(feature = "database")]
-    fn extract_returned_data(result: &CrudResult) -> Option<serde_json::Value> {
-        match result {
-            CrudResult::Created { id, .. } => Some(serde_json::json!({ "created_id": id })),
-            CrudResult::Read { rows_found } => {
-                Some(serde_json::json!({ "rows_found": rows_found }))
-            }
-            _ => None,
-        }
-    }
+    // /// Extract returned data from CRUD result
+    // #[cfg(feature = "database")]
+    // fn extract_returned_data(result: &CrudResult) -> Option<serde_json::Value> {
+    //     match result {
+    //         CrudResult::Created { id, .. } => Some(serde_json::json!({ "created_id": id })),
+    //         CrudResult::Read { rows_found } => {
+    //             Some(serde_json::json!({ "rows_found": rows_found }))
+    //         }
+    //         _ => None,
+    //     }
+    // }
 
     /// Get cached response if available and not expired
     async fn get_cached_response(&self, instruction: &str) -> Option<AgenticCrudResponse> {

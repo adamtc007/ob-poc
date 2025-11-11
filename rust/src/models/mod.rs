@@ -25,11 +25,11 @@ pub use document_models::{
     AiExtractionRequest, AiExtractionResult, ApiResponse, AttributeValue, BulkDocumentImport,
     BulkImportResult, ConfidenceWarning, DocumentCatalog, DocumentCatalogWithMetadata,
     DocumentDetails, DocumentDslContext, DocumentDslOperation, DocumentMetadata,
-    DocumentMetadataBatch, DocumentOperationType, DocumentRelationship, DocumentRelationshipType,
-    DocumentSearchRequest, DocumentSearchResponse, DocumentStatistics, DocumentSummary,
-    DocumentUsage, DocumentUsageContext, DocumentValidationResult, ExtractionStatus,
-    NewDocumentCatalog, NewDocumentMetadata, NewDocumentRelationship, NewDocumentUsage,
-    UpdateDocumentCatalog, ValidationError,
+    DocumentMetadataBatch, DocumentRelationship, DocumentRelationshipType, DocumentSearchRequest,
+    DocumentSearchResponse, DocumentStatistics, DocumentSummary, DocumentUsage,
+    DocumentUsageContext, DocumentValidationResult, ExtractionStatus, NewDocumentCatalog,
+    NewDocumentMetadata, NewDocumentRelationship, NewDocumentUsage, UpdateDocumentCatalog,
+    ValidationError,
 };
 
 pub use entity_models::{

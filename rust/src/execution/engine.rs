@@ -19,7 +19,6 @@ use uuid::Uuid;
 use super::{
     context::SessionManager,
     integrations::{create_standard_integrations, IntegrationRegistry},
-    operations::create_standard_handlers,
     rules::{create_standard_rules, BusinessRuleRegistry},
     state::{InMemoryStateStore, PostgresStateStore},
     BusinessRule, DslExecutionEngine, DslState, ExecutionContext, ExecutionMessage,
@@ -68,12 +67,6 @@ impl ComprehensiveDslEngine {
 
     /// Initialize the engine with standard handlers, rules, and integrations
     pub async fn initialize(&self) -> Result<()> {
-        // Register standard operation handlers
-        let handlers = create_standard_handlers();
-        for handler in handlers {
-            self.execution_engine.register_handler(handler).await;
-        }
-
         // Register standard business rules
         let mut rules_registry = self.rules_registry.write().await;
         let rules = create_standard_rules();

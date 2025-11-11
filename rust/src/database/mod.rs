@@ -10,7 +10,6 @@ use tracing::{info, warn};
 
 pub mod business_request_repository;
 pub mod cbu_repository;
-pub mod document_service;
 pub mod dsl_domain_repository;
 
 // Re-export repository and trait for convenience
@@ -18,7 +17,6 @@ pub use business_request_repository::{
     DslBusinessRequestRepository, DslBusinessRequestRepositoryTrait,
 };
 pub use cbu_repository::CbuRepository;
-pub use document_service::DocumentDatabaseService;
 pub use dsl_domain_repository::{DslDomainRepository, DslDomainRepositoryTrait};
 
 /// Database configuration
@@ -104,11 +102,6 @@ impl DatabaseManager {
     /// Create a new DSL business request repository using this database connection
     pub fn business_request_repository(&self) -> DslBusinessRequestRepository {
         DslBusinessRequestRepository::new(self.pool.clone())
-    }
-
-    /// Create a new document database service using this database connection
-    pub fn document_service(&self) -> DocumentDatabaseService {
-        DocumentDatabaseService::new(self.pool.clone())
     }
 
     /// Test database connectivity

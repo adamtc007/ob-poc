@@ -12,10 +12,9 @@ use tokio::sync::RwLock;
 use uuid::Uuid;
 
 pub mod context;
-pub mod crud_executor;
 pub mod engine;
 pub mod integrations;
-pub mod operations;
+// pub mod operations; // Removed - operations module doesn't exist
 pub mod rules;
 pub mod state;
 

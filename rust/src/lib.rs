@@ -370,9 +370,7 @@ pub mod models;
 // DSL Manager - V3.1 aligned with proper type consolidation - STRING FORMATTING FIXED
 // Legacy DSL managers moved to deprecated/ - using services/document_service instead
 
-// REST API server for visualizer
-#[cfg(feature = "rest-api")]
-pub mod rest_api;
+// REST API server functionality removed - use SQL integration tests instead
 
 // Mock REST API server for testing without database
 #[cfg(any(feature = "rest-api", feature = "mock-api"))]
@@ -384,33 +382,21 @@ pub mod dsl;
 // Domain implementations for centralized DSL editing
 pub mod domains;
 
-// New modules for gRPC server and services
+// Execution module for DSL operations
 #[cfg(feature = "database")]
 pub mod execution;
-// #[cfg(feature = "database")]
-// pub mod grpc_server;
 
 // DSL Visualizer module (egui-based desktop application)
-#[cfg(feature = "visualizer")]
-pub mod visualizer;
+// Visualization components removed - agentic CRUD is the master interface
 
-// UI module for egui components and state management
-#[cfg(feature = "visualizer")]
-pub mod ui;
-
-// AI agents for DSL generation, transformation, and validation (v3.1 compatible)
-// pub mod agents; // Moved to deprecated/agents - legacy code with compilation issues
+// Legacy agents removed - functionality replaced by modern AI integration
 
 // AI integration module for external AI services (Gemini, OpenAI, etc.)
 pub mod ai;
 #[cfg(feature = "database")]
 pub mod services;
 
-// Generated protobuf modules - DISABLED UNTIL DSL+DB COMPLETE
-// #[cfg(feature = "database")]
-// pub mod proto;
-
-// Domain-specific visualization features (Phase 3) removed during consolidation
+// Protobuf and domain visualizations removed - functionality replaced by SQL integration
 
 // Deprecated modules moved to src/deprecated/ (not needed for Phase 1)
 // - proto/ - gRPC protobuf modules (for future web services)
@@ -449,12 +435,7 @@ pub use domains::{
     UboDomainHandler,
 };
 
-// Re-export gRPC server components - temporarily disabled for Phase 1
-// pub use grpc_server::{
-//     start_grpc_services, start_retrieval_service, start_transform_service, GrpcServerConfig,
-//     GrpcServerManager,
-// };
-// pub use services::{DslRetrievalServiceImpl, DslTransformServiceImpl};\n
+// gRPC server components kept behind API layer - not exposed at lib level
 // Re-export database and models
 #[cfg(feature = "database")]
 pub use database::{DatabaseConfig, DatabaseManager, DslDomainRepository};
@@ -463,23 +444,11 @@ pub use models::{
     CompilationStatus, DslDomain, DslVersion, ExecutionPhase, ExecutionStatus, ParsedAst,
 };
 
-// Re-export REST API components
-#[cfg(feature = "rest-api")]
-pub use rest_api::{RestApiConfig, RestApiServer};
-
-// Re-export Mock REST API components
-#[cfg(any(feature = "rest-api", feature = "mock-api"))]
-pub use mock_rest_api::{MockRestApiConfig, MockRestApiServer};
+// REST API components removed - protobuf API is behind the service layer
 
 // Legacy managers removed; consolidated manager is the single entry point
 
-// Re-export UI components (for egui visualizer)
-#[cfg(feature = "visualizer")]
-pub use ui::{
-    create_global_state_manager, AstNodeData, CbuData, DslContext, DslEntry, GlobalDslState,
-    GlobalDslStateManager, OperationStatus, RefreshData, RefreshRequest, ViewportId,
-    ViewportManager, ViewportRefreshError, ViewportRefreshHandler,
-};
+// UI components removed - agentic CRUD is the master interface
 
 /// Version information
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
