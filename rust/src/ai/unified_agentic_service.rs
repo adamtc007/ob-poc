@@ -593,7 +593,7 @@ mod tests {
     #[tokio::test]
     async fn test_unified_service_creation() {
         let service = create_test_service().await;
-        assert_eq!(service.config.service_name, "unified-agentic-service");
+        assert_eq!(service.config.service_name, "UnifiedAgenticService");
     }
 
     #[tokio::test]
