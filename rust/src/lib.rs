@@ -129,10 +129,7 @@ pub mod database;
 pub mod models;
 
 // DSL Manager - V3.1 aligned with proper type consolidation - STRING FORMATTING FIXED
-#[cfg(feature = "database")]
-pub mod dsl_manager;
-#[cfg(feature = "database")]
-pub mod dsl_manager_enhanced;
+// Legacy DSL managers moved to deprecated/ - using services/document_service instead
 
 // REST API server for visualizer
 #[cfg(feature = "rest-api")]
@@ -163,12 +160,12 @@ pub mod visualizer;
 pub mod ui;
 
 // AI agents for DSL generation, transformation, and validation (v3.1 compatible)
-pub mod agents;
+// pub mod agents; // Moved to deprecated/agents - legacy code with compilation issues
 
 // AI integration module for external AI services (Gemini, OpenAI, etc.)
 pub mod ai;
-// #[cfg(feature = "database")]
-// pub mod services;
+#[cfg(feature = "database")]
+pub mod services;
 
 // Generated protobuf modules - DISABLED UNTIL DSL+DB COMPLETE
 // #[cfg(feature = "database")]
@@ -221,10 +218,7 @@ pub use domains::{
 // pub use services::{DslRetrievalServiceImpl, DslTransformServiceImpl};\n
 // Re-export database and models
 #[cfg(feature = "database")]
-pub use database::{
-    DatabaseConfig, DatabaseManager, DslDomainRepository, DslInstanceRepository,
-    PgDslInstanceRepository,
-};
+pub use database::{DatabaseConfig, DatabaseManager, DslDomainRepository};
 #[cfg(feature = "database")]
 pub use models::{
     CompilationStatus, DslDomain, DslVersion, ExecutionPhase, ExecutionStatus, ParsedAst,

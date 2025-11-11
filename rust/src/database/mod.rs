@@ -10,22 +10,14 @@ use tracing::{info, warn};
 
 pub mod business_request_repository;
 pub mod cbu_repository;
-pub mod document_attribute_repository;
 pub mod dsl_domain_repository;
-pub mod dsl_instance_repository;
 
 // Re-export repository and trait for convenience
 pub use business_request_repository::{
     DslBusinessRequestRepository, DslBusinessRequestRepositoryTrait,
 };
 pub use cbu_repository::CbuRepository;
-pub use document_attribute_repository::{
-    AttributeExtractionSpec, AttributeUsageAnalysis, ConsolidatedAttribute,
-    CrossDocumentValidation, DataBridgeMetrics, DocumentAttributeMapping,
-    DocumentAttributeRepository, DocumentExtractionTemplate, DocumentType, MappingCoverageStats,
-};
 pub use dsl_domain_repository::{DslDomainRepository, DslDomainRepositoryTrait};
-pub use dsl_instance_repository::{DslInstanceRepository, PgDslInstanceRepository};
 
 /// Database configuration
 #[derive(Debug, Clone)]
@@ -107,19 +99,9 @@ impl DatabaseManager {
         DslDomainRepository::new(self.pool.clone())
     }
 
-    /// Create a new DSL instance repository using this database connection
-    pub fn dsl_instance_repository(&self) -> PgDslInstanceRepository {
-        PgDslInstanceRepository::new(self.pool.clone())
-    }
-
     /// Create a new DSL business request repository using this database connection
     pub fn business_request_repository(&self) -> DslBusinessRequestRepository {
         DslBusinessRequestRepository::new(self.pool.clone())
-    }
-
-    /// Create a new document-attribute repository using this database connection
-    pub fn document_attribute_repository(&self) -> DocumentAttributeRepository {
-        DocumentAttributeRepository::new(self.pool.clone())
     }
 
     /// Test database connectivity
@@ -144,7 +126,7 @@ impl DatabaseManager {
             FROM information_schema.tables
             WHERE table_schema = 'ob-poc'
             AND table_name IN ('dsl_domains', 'dsl_versions', 'parsed_asts', 'dsl_execution_log',
-                               'consolidated_attributes', 'document_types', 'document_attribute_mappings')
+                               'dictionary', 'document_types', 'iso_asset_types', 'document_catalog')
             "#,
         )
         .fetch_one(&self.pool)
@@ -153,7 +135,7 @@ impl DatabaseManager {
 
         let count: i64 = tables_exist.get("count");
 
-        if count < 7 {
+        if count < 8 {
             warn!("Expected database tables not found. Please run migration scripts including document-attribute bridge tables");
             return Err(sqlx::migrate::MigrateError::VersionMissing(1));
         }

@@ -6,6 +6,7 @@
 //! intelligent DSL editing suggestions.
 
 pub mod gemini;
+pub mod openai;
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -174,9 +175,7 @@ pub mod utils {
         // Look for confidence indicators in the response
         if response.contains("high confidence") || response.contains("very confident") {
             0.9
-        } else if response.contains("medium confidence") {
-            0.7
-        } else if response.contains("confident") {
+        } else if response.contains("medium confidence") || response.contains("confident") {
             0.7
         } else if response.contains("low confidence") || response.contains("uncertain") {
             0.5
