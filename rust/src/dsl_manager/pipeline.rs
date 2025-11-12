@@ -4,7 +4,7 @@
 //! including parse, normalize, validate, compile, and execute phases.
 
 use super::{compiler::Compiler, DslManagerError, DslManagerResult};
-use crate::{Form, Program};
+use crate::parser_ast::{Form, Program};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

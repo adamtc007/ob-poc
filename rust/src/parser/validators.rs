@@ -4,7 +4,7 @@
 //! supporting new semantics including link identity, append-only notes, and evidence linking.
 
 use crate::ast::types::{ErrorSeverity, SourceLocation, ValidationError, ValidationWarning};
-use crate::{Form, Key, PropertyMap, Value, VerbForm};
+use crate::parser_ast::{Form, Key, Literal, PropertyMap, Value, VerbForm};
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 
@@ -586,7 +586,7 @@ impl DslValidator {
         match pairs.get(&key_obj) {
             Some(Value::String(s)) => Ok(s.clone()),
             Some(Value::Identifier(s)) => Ok(s.clone()),
-            Some(Value::Literal(crate::Literal::String(s))) => Ok(s.clone()),
+            Some(Value::Literal(Literal::String(s))) => Ok(s.clone()),
             Some(_) => Err(ValidatorError::InvalidFieldType {
                 field: key.to_string(),
                 expected: "string".to_string(),
@@ -618,7 +618,7 @@ impl DslValidator {
         match pairs.get(&key_obj) {
             Some(Value::Double(n)) => Ok(*n),
             Some(Value::Integer(i)) => Ok(*i as f64),
-            Some(Value::Literal(crate::Literal::Number(n))) => Ok(*n),
+            Some(Value::Literal(Literal::Number(n))) => Ok(*n),
             Some(_) => Err(ValidatorError::InvalidFieldType {
                 field: key.to_string(),
                 expected: "number".to_string(),
@@ -640,7 +640,7 @@ impl Default for DslValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Form, VerbForm};
+    use crate::parser_ast::{Form, VerbForm};
     use std::collections::HashMap;
 
     fn create_test_entity_register(entity_id: &str, entity_type: &str) -> Form {

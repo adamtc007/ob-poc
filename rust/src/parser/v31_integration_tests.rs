@@ -7,7 +7,7 @@
 //! - V3.1 unified S-expression syntax
 
 use crate::parser::parse_program;
-use crate::{Form, Key, Literal, Value, VerbForm};
+use crate::parser_ast::{Form, Key, Literal, Value, VerbForm};
 
 #[cfg(test)]
 mod tests {

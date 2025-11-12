@@ -16,7 +16,7 @@ use nom::{
 
 use std::collections::HashMap;
 
-use crate::{Form, Key, Literal, Program, PropertyMap, Value, VerbForm};
+use crate::parser_ast::{Form, Key, Literal, Program, PropertyMap, Value, VerbForm};
 
 /// Parser error type with context information
 pub(crate) type NomParseError<'a> = VerboseError<&'a str>;
@@ -360,7 +360,7 @@ mod tests {
 
 // --- Agentic CRUD Parser Functions ---
 
-use crate::{
+use crate::parser_ast::{
     AggregateClause, AggregateFunction, AggregateOperation, BatchOperation, ComplexQuery,
     ConditionalUpdate, CrudStatement, DataCreate, DataDelete, DataRead, DataUpdate, JoinClause,
     JoinType, OrderClause, OrderDirection, RollbackStrategy, TransactionMode,

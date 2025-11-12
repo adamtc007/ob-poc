@@ -18,8 +18,9 @@ use crate::{
     dsl::{DomainHandler, DomainRegistry},
     parser::validators::{DslValidator, ValidationResult},
     parser::{parse_normalize_and_validate, parse_program, DslNormalizer},
+    parser::{Form, Program, VerbForm},
+    parser_ast::CrudStatement,
     vocabulary::VocabularyRegistry,
-    CrudStatement, Form, Program, VerbForm,
 };
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;

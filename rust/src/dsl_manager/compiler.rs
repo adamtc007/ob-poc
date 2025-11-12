@@ -4,7 +4,7 @@
 //! converting parsed and validated DSL into executable operations.
 
 use super::{DslManagerError, DslManagerResult};
-use crate::{Form, Program, VerbForm};
+use crate::parser_ast::{Form, Key, Program, Value, VerbForm};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -358,7 +358,7 @@ impl DatabaseCompilationStrategy {
             "type": "sql_update",
             "table": format!("\"{}\".cases", self.config.schema_name),
             "data": verb_form.pairs,
-            "where": {"case_id": verb_form.pairs.get(&crate::Key::new("case-id"))}
+            "where": {"case_id": verb_form.pairs.get(&Key::new("case-id"))}
         }))
     }
 
@@ -373,9 +373,9 @@ impl DatabaseCompilationStrategy {
             "data": {
                 "status": "APPROVED",
                 "approved_at": "NOW()",
-                "approved_by": verb_form.pairs.get(&crate::Key::new("approved-by"))
+                "approved_by": verb_form.pairs.get(&Key::new("approved-by"))
             },
-            "where": {"case_id": verb_form.pairs.get(&crate::Key::new("case-id"))}
+            "where": {"case_id": verb_form.pairs.get(&Key::new("case-id"))}
         }))
     }
 
@@ -451,9 +451,9 @@ impl DatabaseCompilationStrategy {
     ) -> DslManagerResult<serde_json::Value> {
         let asset = verb_form
             .pairs
-            .get(&crate::Key::new("asset"))
+            .get(&Key::new("asset"))
             .and_then(|v| {
-                if let crate::Value::String(s) = v {
+                if let Value::String(s) = v {
                     Some(s.clone())
                 } else {
                     None
@@ -464,7 +464,7 @@ impl DatabaseCompilationStrategy {
         Ok(serde_json::json!({
             "type": "crud_create",
             "asset": asset,
-            "data": verb_form.pairs.get(&crate::Key::new("values")),
+            "data": verb_form.pairs.get(&Key::new("values")),
             "table": format!("\"{}\".{}", self.config.schema_name, asset)
         }))
     }
@@ -476,9 +476,9 @@ impl DatabaseCompilationStrategy {
     ) -> DslManagerResult<serde_json::Value> {
         let asset = verb_form
             .pairs
-            .get(&crate::Key::new("asset"))
+            .get(&Key::new("asset"))
             .and_then(|v| {
-                if let crate::Value::String(s) = v {
+                if let Value::String(s) = v {
                     Some(s.clone())
                 } else {
                     None
@@ -489,9 +489,9 @@ impl DatabaseCompilationStrategy {
         Ok(serde_json::json!({
             "type": "crud_read",
             "asset": asset,
-            "where": verb_form.pairs.get(&crate::Key::new("where")),
-            "select": verb_form.pairs.get(&crate::Key::new("select")),
-            "limit": verb_form.pairs.get(&crate::Key::new("limit")),
+            "where": verb_form.pairs.get(&Key::new("where")),
+            "select": verb_form.pairs.get(&Key::new("select")),
+            "limit": verb_form.pairs.get(&Key::new("limit")),
             "table": format!("\"{}\".{}", self.config.schema_name, asset)
         }))
     }
@@ -503,9 +503,9 @@ impl DatabaseCompilationStrategy {
     ) -> DslManagerResult<serde_json::Value> {
         let asset = verb_form
             .pairs
-            .get(&crate::Key::new("asset"))
+            .get(&Key::new("asset"))
             .and_then(|v| {
-                if let crate::Value::String(s) = v {
+                if let Value::String(s) = v {
                     Some(s.clone())
                 } else {
                     None
@@ -516,8 +516,8 @@ impl DatabaseCompilationStrategy {
         Ok(serde_json::json!({
             "type": "crud_update",
             "asset": asset,
-            "where": verb_form.pairs.get(&crate::Key::new("where")),
-            "values": verb_form.pairs.get(&crate::Key::new("values")),
+            "where": verb_form.pairs.get(&Key::new("where")),
+            "values": verb_form.pairs.get(&Key::new("values")),
             "table": format!("\"{}\".{}", self.config.schema_name, asset)
         }))
     }
@@ -529,9 +529,9 @@ impl DatabaseCompilationStrategy {
     ) -> DslManagerResult<serde_json::Value> {
         let asset = verb_form
             .pairs
-            .get(&crate::Key::new("asset"))
+            .get(&Key::new("asset"))
             .and_then(|v| {
-                if let crate::Value::String(s) = v {
+                if let Value::String(s) = v {
                     Some(s.clone())
                 } else {
                     None
@@ -542,7 +542,7 @@ impl DatabaseCompilationStrategy {
         Ok(serde_json::json!({
             "type": "crud_delete",
             "asset": asset,
-            "where": verb_form.pairs.get(&crate::Key::new("where")),
+            "where": verb_form.pairs.get(&Key::new("where")),
             "table": format!("\"{}\".{}", self.config.schema_name, asset)
         }))
     }

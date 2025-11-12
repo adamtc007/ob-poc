@@ -29,19 +29,22 @@ pub mod pipeline;
 pub mod state;
 pub mod validation;
 
-// Re-export main types - TODO: Fix visibility issues and re-enable
-// pub use backend::{BackendOperation, BackendResult, DslBackend};
-// pub use compiler::{CompilationResult, DslCompiler, ExecutionContext};
-// pub use core::{
-//     AgenticCrudRequest, AiOnboardingRequest, AiOnboardingResponse, AiValidationResult,
-//     CanonicalDslResponse, CbuGenerator, ComprehensiveHealthStatus, DslInstanceSummary, DslManager,
-//     DslManagerConfig, ExecutionDetails, HealthMetrics,
-// };
-// pub use pipeline::{DslPipeline, DslPipelineStage, PipelineResult};
-// pub use state::{DslState, DslStateManager, StateChangeEvent};
-// pub use validation::{DslValidationEngine, ValidationLevel, ValidationReport};
+// Internal re-exports for crate-level coordination (pub(crate))
+pub(crate) use backend::{BackendOperation, BackendResult, DslBackend};
+pub(crate) use compiler::{CompilationResult, DslCompiler, ExecutionContext};
+pub(crate) use core::{
+    AgenticCrudRequest, AiOnboardingRequest, AiOnboardingResponse, AiValidationResult,
+    CanonicalDslResponse, CbuGenerator, ComprehensiveHealthStatus, DslInstanceSummary,
+    DslManagerConfig, ExecutionDetails, HealthMetrics,
+};
+pub(crate) use pipeline::{DslPipeline, DslPipelineStage, PipelineResult};
+pub(crate) use state::{DslState, DslStateManager, StateChangeEvent};
+pub(crate) use validation::{DslValidationEngine, ValidationLevel, ValidationReport};
 
-// Temporary: Only re-export core DslManager for now
+// Import parser types for internal use
+use crate::parser_ast::Program;
+
+// Public re-exports for external API
 pub use core::DslManager;
 
 /// DSL Manager error types
@@ -107,13 +110,13 @@ pub enum DslOperation {
 
     /// Validate parsed AST
     Validate {
-        ast: crate::Program,
+        ast: Program,
         validation_level: ValidationLevel,
     },
 
     /// Compile AST to executable form
     Compile {
-        ast: crate::Program,
+        ast: Program,
         execution_context: ExecutionContext,
     },
 
@@ -286,7 +289,7 @@ pub(crate) struct DslProcessingResult {
     /// Processing success status
     pub success: bool,
     /// Parsed and normalized AST (if successful)
-    pub ast: Option<crate::Program>,
+    pub ast: Option<Program>,
     /// Validation report
     pub validation_report: ValidationReport,
     /// Compilation result (if compiled)

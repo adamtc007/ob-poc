@@ -4,7 +4,7 @@
 //! This module performs pre-validation normalization to ensure backward compatibility
 //! while migrating the codebase to canonical verb and key naming conventions.
 
-use crate::{Form, Key, PropertyMap, Value, VerbForm};
+use crate::parser_ast::{Form, Key, Literal, PropertyMap, Value, VerbForm};
 use std::collections::HashMap;
 use thiserror::Error;
 
@@ -323,7 +323,7 @@ impl DslNormalizer {
         match pairs.get(&key_obj) {
             Some(Value::String(s)) => Ok(s.clone()),
             Some(Value::Identifier(s)) => Ok(s.clone()),
-            Some(Value::Literal(crate::Literal::String(s))) => Ok(s.clone()),
+            Some(Value::Literal(Literal::String(s))) => Ok(s.clone()),
             Some(_) => Err(NormalizationError::ValueTransformation {
                 message: format!("Expected string value for key '{}'", key),
             }),
@@ -343,7 +343,7 @@ impl DslNormalizer {
         match pairs.get(&key_obj) {
             Some(Value::Double(n)) => Ok(*n),
             Some(Value::Integer(i)) => Ok(*i as f64),
-            Some(Value::Literal(crate::Literal::Number(n))) => Ok(*n),
+            Some(Value::Literal(Literal::Number(n))) => Ok(*n),
             Some(_) => Err(NormalizationError::ValueTransformation {
                 message: format!("Expected numeric value for key '{}'", key),
             }),

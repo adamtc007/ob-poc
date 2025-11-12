@@ -125,7 +125,8 @@ impl UboDomainHandler {
         _context: &DomainContext,
     ) -> DslEditResult<String> {
         use super::common;
-        use crate::{Key, Literal, Value};
+        use crate::parser::{PropertyMap, Value};
+        use crate::parser_ast::{Key, Literal};
         use std::collections::HashMap;
 
         let entity_id = payload
@@ -189,7 +190,8 @@ impl UboDomainHandler {
         _context: &DomainContext,
     ) -> DslEditResult<String> {
         use super::common;
-        use crate::{Key, Literal, Value};
+        use crate::parser::{PropertyMap, Value};
+        use crate::parser_ast::{Key, Literal};
         use std::collections::HashMap;
 
         let from_entity = payload
@@ -265,7 +267,8 @@ impl UboDomainHandler {
         _context: &DomainContext,
     ) -> DslEditResult<String> {
         use super::common;
-        use crate::{Key, Literal, Value};
+        use crate::parser::{PropertyMap, Value};
+        use crate::parser_ast::{Key, Literal};
         use std::collections::HashMap;
 
         let target_entity = payload
@@ -342,7 +345,8 @@ impl UboDomainHandler {
         _context: &DomainContext,
     ) -> DslEditResult<String> {
         use super::common;
-        use crate::{Key, Literal, Value};
+        use crate::parser::{PropertyMap, Value};
+        use crate::parser_ast::{Key, Literal};
         use std::collections::HashMap;
 
         let entities = payload
@@ -407,7 +411,8 @@ impl UboDomainHandler {
         _context: &DomainContext,
     ) -> DslEditResult<String> {
         use super::common;
-        use crate::{Key, Literal, Value};
+        use crate::parser::{PropertyMap, Value};
+        use crate::parser_ast::{Key, Literal};
         use std::collections::HashMap;
 
         let compliance_framework = payload
@@ -476,7 +481,8 @@ impl UboDomainHandler {
         _context: &DomainContext,
     ) -> DslEditResult<String> {
         use super::common;
-        use crate::{Key, Literal, Value};
+        use crate::parser::{PropertyMap, Value};
+        use crate::parser_ast::{Key, Literal};
         use std::collections::HashMap;
 
         let identified_ubos = payload
@@ -557,7 +563,8 @@ impl DomainHandler for UboDomainHandler {
         context: &DomainContext,
     ) -> DslEditResult<String> {
         use super::common; // Ensure common is accessible
-        use crate::{Key, Literal, Value}; // Ensure Key, Literal, Value are accessible
+        use crate::parser::{PropertyMap, Value};
+        use crate::parser_ast::{Key, Literal}; // Ensure Key, Literal, Value are accessible
         use std::collections::HashMap; // Ensure HashMap is accessible
 
         match operation {

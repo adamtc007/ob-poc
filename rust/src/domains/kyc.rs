@@ -23,7 +23,8 @@ use crate::dsl::{
     operations::DslOperation,
     DslEditError, DslEditResult,
 };
-use crate::{Key, Literal, Value};
+use crate::parser::{PropertyMap, Value};
+use crate::parser_ast::{Key, Literal};
 use async_trait::async_trait;
 use chrono::Utc;
 use serde_json::json;

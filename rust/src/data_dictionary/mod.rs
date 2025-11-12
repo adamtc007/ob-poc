@@ -16,7 +16,6 @@ pub(crate) mod catalogue;
 pub mod validation;
 
 pub use attribute::*;
-pub(crate) use catalogue::*;
 
 // Re-export key types for convenience
 pub use attribute::AttributeId;

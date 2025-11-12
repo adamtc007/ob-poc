@@ -24,7 +24,8 @@ use crate::dsl::{
     operations::DslOperation,
     DslEditError, DslEditResult,
 };
-use crate::{Key, Literal, Value};
+use crate::parser::{PropertyMap, Value};
+use crate::parser_ast::{Key, Literal};
 use async_trait::async_trait;
 use chrono::Utc;
 use serde_json::json;
@@ -443,7 +444,8 @@ impl DomainHandler for OnboardingDomainHandler {
         context: &DomainContext,
     ) -> DslEditResult<String> {
         use super::common; // Ensure common is accessible
-        use crate::{Key, Literal, Value}; // Ensure Key, Literal, Value are accessible
+        use crate::parser::{PropertyMap, Value}; // Ensure parser types are accessible
+        use crate::parser_ast::{Key, Literal};
         use std::collections::HashMap;
 
         match operation {

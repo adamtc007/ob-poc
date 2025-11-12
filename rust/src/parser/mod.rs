@@ -3,21 +3,29 @@
 //! Pure V3.1 implementation with unified S-expression syntax for multi-domain workflows.
 //! Supports Document Library and ISDA domain verbs with AttributeID-as-Type pattern.
 
+// Internal implementation modules - hidden from external consumers
 #[cfg(test)]
-mod debug_test;
-pub mod idiomatic_parser;
-pub mod normalizer;
+pub(crate) mod debug_test;
+pub(crate) mod idiomatic_parser;
+pub(crate) mod normalizer;
 #[cfg(test)]
-mod phase5_integration_test;
+pub(crate) mod phase5_integration_test;
 #[cfg(test)]
-mod semantic_agent_integration_test;
-pub mod v31_integration_tests;
-pub mod validators;
+pub(crate) mod semantic_agent_integration_test;
+#[cfg(test)]
+pub(crate) mod v31_integration_tests;
+pub(crate) mod validators;
 
-use crate::{Form, Program};
+// Internal imports
 use nom::error::VerboseError;
+use validators::DslValidator;
+
+// PUBLIC FACADE - Only these items are accessible from outside the parser module
 pub use normalizer::DslNormalizer;
-use validators::{DslValidator, ValidationResult};
+pub use validators::ValidationResult;
+
+// Export AST types through the parser facade
+pub use crate::parser_ast::{Form, Program, PropertyMap, Value, VerbForm};
 
 // Re-export the main parsing functions for V3.1
 pub use idiomatic_parser::{
@@ -73,7 +81,7 @@ pub fn parse_normalize_and_validate(
 #[cfg(test)]
 mod v31_tests {
     use super::*;
-    use crate::{Form, Key, Literal, Value, VerbForm};
+    use crate::parser_ast::{Form, Key, Literal, Value, VerbForm};
 
     #[test]
     fn test_v31_document_catalog() {

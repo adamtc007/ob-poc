@@ -7,7 +7,7 @@
 use crate::parser::validators::{
     DslValidator, DslValidator as CoreDslValidator, ValidationResult as CoreValidationResult,
 };
-use crate::{Form, Program};
+use crate::parser_ast::{Form, Program, VerbForm};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use thiserror::Error;
@@ -547,7 +547,7 @@ impl DslValidationEngine {
     }
 
     /// Check if a form uses legacy v3.3 syntax
-    fn is_legacy_form(&self, verb_form: &crate::VerbForm) -> bool {
+    fn is_legacy_form(&self, verb_form: &VerbForm) -> bool {
         // Check for known legacy verbs
         matches!(
             verb_form.verb.as_str(),

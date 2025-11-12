@@ -4,7 +4,7 @@
 //! so we can align V3.1 EBNF, DSL examples, and NOM parser.
 
 use crate::parser::parse_program;
-use crate::{Form, Key, Literal, Value, VerbForm};
+use crate::parser_ast::{Form, Key, Literal, Value, VerbForm};;
 
 #[cfg(test)]
 mod debug_tests {

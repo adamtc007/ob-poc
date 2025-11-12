@@ -24,7 +24,7 @@ use crate::dsl::{
     DslEditError, DslEditResult,
 };
 use crate::parser::idiomatic_parser::{parse_form, parse_program as parse_program_internal};
-use crate::{Form, Program, VerbForm};
+use crate::parser_ast::{Form, Program, VerbForm};
 use std::collections::HashMap;
 use tracing::{debug, error, info, warn};
 

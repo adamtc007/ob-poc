@@ -72,7 +72,8 @@ pub(crate) enum DomainError {
 pub mod common {
     use super::*;
     use crate::dsl::domain_context::DomainContext;
-    use crate::{Key, Literal, Value}; // Import new AST types
+    use crate::parser::{PropertyMap, Value}; // Import new AST types
+    use crate::parser_ast::{Key, Literal};
     use chrono::Utc;
     use std::collections::HashMap;
     use uuid::Uuid;
