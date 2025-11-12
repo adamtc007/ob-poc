@@ -39,7 +39,6 @@ struct MockOperation {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum TransactionStatus {
-    Pending,
     InProgress,
     Completed,
     PartiallyCompleted,
@@ -51,21 +50,17 @@ enum TransactionStatus {
 #[derive(Debug, Clone, PartialEq)]
 enum OperationStatus {
     Pending,
-    Executing,
     Completed,
     Failed,
-    Skipped,
     RolledBack,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 enum EntityOperationType {
     Create,
-    Read,
     Update,
     Delete,
     Link,
-    Unlink,
 }
 
 #[derive(Debug, Clone)]
