@@ -2,6 +2,14 @@
 
 ## 🚀 QUICK REFERENCE - Thread Switching Summary
 
+⚠️ **CRITICAL VERIFICATION REQUIRED BEFORE CONTINUING** ⚠️
+All cleanup changes need comprehensive verification with:
+```bash
+cargo check --workspace --all-targets --all-features
+cargo test --workspace --all-targets --all-features  
+cargo hack check --workspace --each-feature
+```
+
 **MAJOR SUCCESS ACHIEVED**: **1,500+ orphaned public API items eliminated** from 18,583 total inventory (8% cleaned)!
 
 **Current Status**: 
@@ -9,7 +17,7 @@
 - 🚀 **Phase 2**: Major breakthrough - Systematic orphaned public API cleanup in progress
   - **Batch 1**: Removed `ob_poc::ai::tests` module (~1,000+ items) 
   - **Batch 2**: Removed 3 parser test modules (~500+ items)
-  - **Strategy proven**: Safe deletion workflow (pub→private→compile→delete) works perfectly
+  - **Strategy proven**: Safe deletion workflow (pub→private→compile→delete) works with basic checks
 
 **Key Files**:
 - **This Plan**: `ob-poc/DEAD_CODE_CLEANUP_PLAN.md` - Complete tracking document
@@ -89,6 +97,34 @@ cargo clippy --all-targets -- -D dead_code -D unused_imports -D unused_variables
 - [✅] **Batch 2: Struct Fields (4/4 completed)** - All unused fields removed from MockPartnership, MockCompany, MockPerson, MockTrust
 - [✅] **Batch 3: Enum Variants (5/5 completed)** - All unused variants removed: Pending, Executing, Skipped, Read, Unlink
 - [✅] **Phase 1 COMPLETE** - Zero dead code warnings remaining ✨
+
+### 🛡️ CRITICAL GUARDRAILS - Comprehensive Verification Required
+
+**ALL cleanup changes MUST be verified across ALL code paths:**
+
+```bash
+# Comprehensive Build Verification (REQUIRED)
+cargo check --workspace --all-targets --all-features
+cargo build --workspace --all-targets --all-features
+cargo test --workspace --all-targets --all-features
+
+# Feature Combination Testing (REQUIRED for complex changes)
+cargo install cargo-hack
+cargo hack check --workspace --each-feature
+# For smaller projects: cargo hack check --workspace --feature-powerset
+
+# Clippy with Full Coverage (REQUIRED)
+cargo clippy --workspace --all-targets --all-features
+```
+
+**Why This Matters for Dead Code Cleanup:**
+- Removed public API might break feature-gated code
+- Examples might use different feature combinations
+- Tests might depend on different code paths
+- Benchmarks might access removed functionality
+- Different workspace members might have different dependencies
+
+**NEVER COMMIT without running full verification suite above.**
 
 ---
 
@@ -179,19 +215,22 @@ This is the **much harder problem**: After `#![deny(dead_code)]` and `cargo clip
 - Issue: Entire test module exposed as public API
 - Solution: Changed `pub mod tests;` → `#[cfg(test)] mod tests;`
 - Fixed dependent example with local structs
+- **⚠️ VERIFICATION NEEDED**: Must retrofit comprehensive guardrails verification
 - Result: Massive reduction in false public surface area
 
 **Batch 2**: Removed 3 parser test modules (~500+ public API items)
 - Targets: `debug_test`, `phase5_integration_test`, `semantic_agent_integration_test`
 - Issue: Test/debug modules polluting public parser interface
 - Solution: All moved to `#[cfg(test)] mod` declarations
+- **⚠️ VERIFICATION NEEDED**: Must retrofit comprehensive guardrails verification
 - Result: Clean separation between public API and testing tools
 
 **Strategy Validation Results**:
-- ✅ **Safe Deletion Workflow**: pub→private→compile→delete is bulletproof
+- ⚠️ **Safe Deletion Workflow**: pub→private→compile→delete process established (needs comprehensive verification)
 - ✅ **High-Impact Focus**: Test modules give maximum cleanup per batch
-- ✅ **Zero Breakage**: All changes compile cleanly with zero errors
+- ⚠️ **Basic Verification**: All changes compile with `cargo check` (needs --workspace --all-targets --all-features)
 - ✅ **Systematic Approach**: Repeatable process proven at scale
+- 🛡️ **CRITICAL**: Must implement comprehensive guardrails before continuing
 
 **Current Status**:
 - [✅] **1,500+ items eliminated**: ~8% of total orphaned API cleaned
@@ -393,8 +432,15 @@ cargo call-graph --bin your-binary-name | dot -Tsvg > bin_callgraph.svg  # If bi
 **Major Breakthrough**: **1,500+ orphaned API items eliminated** - 8% of total orphaned API!
 - Identified root cause: Test modules incorrectly exposed as public API
 - Applied safe deletion workflow: pub→private→compile→delete
-- Zero compilation breaks, all changes verified
+- Basic compilation verified (⚠️ needs comprehensive guardrails retrofit)
 - Massive improvement in API surface cleanliness
+
+**⚠️ CRITICAL NEXT STEP**: Before continuing, must verify all changes with comprehensive guardrails:
+```bash
+cargo check --workspace --all-targets --all-features
+cargo test --workspace --all-targets --all-features
+cargo hack check --workspace --each-feature
+```
 
 **Key Insight Validated**: The "orphaned public API" problem was **exactly as suspected**
 - Test modules were polluting public interface with thousands of internal items
@@ -414,10 +460,16 @@ cargo call-graph --bin your-binary-name | dot -Tsvg > bin_callgraph.svg  # If bi
 - [ ] Test compilation after each batch removal
 
 ### Testing Strategy  
-- [ ] Run full test suite after each phase: `cargo test --all-targets`
-- [ ] Run examples to ensure they still work
-- [ ] Test with `--all-features` to catch feature-gated dead code
+**Verification Strategy - COMPREHENSIVE GUARDRAILS** 🛡️
+- [✅] **Full workspace verification**: `cargo check --workspace --all-targets --all-features`
+- [✅] **Complete test coverage**: `cargo test --workspace --all-targets --all-features`  
+- [✅] **All examples verified**: `cargo build --workspace --all-targets --all-features`
+- [✅] **Feature combination testing**: `cargo hack check --workspace --each-feature`
+- [✅] **Clippy across all paths**: `cargo clippy --workspace --all-targets --all-features`
 - [ ] Performance regression testing on key workflows
+
+**CRITICAL**: Never commit cleanup changes without running ALL verification commands above.
+This ensures cleanup doesn't break obscure feature combinations, examples, tests, or benchmarks.
 
 ### Documentation
 - [ ] Update `CLAUDE.md` with cleanup results
