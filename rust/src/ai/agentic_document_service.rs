@@ -585,22 +585,6 @@ impl AgenticDocumentService {
         }
     }
 
-    /// Searches documents based on natural language query
-    pub fn search_documents(
-        &self,
-        query: &str,
-        _filters: Option<serde_json::Value>,
-    ) -> Result<serde_json::Value> {
-        println!("Searching documents with query: {}", query);
-
-        // For now, return mock results
-        Ok(serde_json::json!({
-            "documents": [],
-            "total_count": 0,
-            "has_more": false
-        }))
-    }
-
     /// Validates document compliance and completeness
     pub fn validate_document(&self, doc_id: Uuid) -> Result<serde_json::Value> {
         println!("Validating document: {}", doc_id);
@@ -611,20 +595,6 @@ impl AgenticDocumentService {
             "validation_errors": [],
             "missing_required_metadata": [],
             "confidence_warnings": []
-        }))
-    }
-
-    /// Gets document statistics and analytics
-    pub fn get_document_statistics(&self) -> Result<serde_json::Value> {
-        Ok(serde_json::json!({
-            "total_documents": 0,
-            "documents_by_status": {},
-            "documents_by_mime_type": {},
-            "average_extraction_confidence": null,
-            "total_metadata_entries": 0,
-            "total_relationships": 0,
-            "total_usage_entries": 0,
-            "most_used_attributes": []
         }))
     }
 }

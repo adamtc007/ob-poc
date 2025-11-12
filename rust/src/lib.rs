@@ -750,30 +750,6 @@ pub async fn test_v3_dsl_comprehensive() -> DSLResult<()> {
     Ok(())
 }
 
-/// Parse and validate DSL with comprehensive error reporting
-pub fn parse_and_validate(input: &str) -> Result<Program, ErrorCollector> {
-    let mut collector = ErrorCollector::new();
-
-    let program = match parse_dsl(input) {
-        Ok(program) => program,
-        Err(error) => {
-            collector.add_simple_error(
-                error,
-                SourceLocation::unknown(),
-                crate::error::ErrorSeverity::Fatal,
-            );
-            return Err(collector);
-        }
-    };
-
-    // Old AST validation is removed. Semantic validation will be done by domain handlers.
-    if collector.has_errors() {
-        Err(collector)
-    } else {
-        Ok(program)
-    }
-}
-
 /// System information and diagnostics
 pub fn system_info() -> SystemInfo {
     SystemInfo {

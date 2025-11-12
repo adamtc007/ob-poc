@@ -189,36 +189,6 @@ impl DslStateManager {
         self.states.get(instance_id)
     }
 
-    /// Get state change history
-    pub fn get_change_history(&self, instance_id: &Uuid) -> Vec<&StateChangeEvent> {
-        self.change_history
-            .iter()
-            .filter(|event| &event.instance_id == instance_id)
-            .collect()
-    }
-
-    /// Get all active states
-    pub fn get_active_states(&self) -> Vec<&DslState> {
-        self.states
-            .values()
-            .filter(|state| state.status == StateStatus::Active)
-            .collect()
-    }
-
-    /// Archive a state
-    pub fn archive_state(
-        &mut self,
-        instance_id: Uuid,
-        user_id: String,
-    ) -> Result<(), StateManagerError> {
-        self.update_state(
-            instance_id,
-            StateStatus::Archived,
-            user_id,
-            Some("State archived".to_string()),
-        )
-    }
-
     /// Get state statistics
     pub fn get_statistics(&self) -> StateStatistics {
         let mut stats = StateStatistics::default();

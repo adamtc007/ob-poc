@@ -413,16 +413,6 @@ impl DslPipeline {
             metrics.max_time_ms = execution_time_ms;
         }
     }
-
-    /// Get stage metrics
-    pub fn get_stage_metrics(&self, stage_name: &str) -> Option<&StageMetrics> {
-        self.metrics.get(stage_name)
-    }
-
-    /// Get all metrics
-    pub fn get_all_metrics(&self) -> &HashMap<String, StageMetrics> {
-        &self.metrics
-    }
 }
 
 /// Standard DSL pipeline stages

@@ -165,33 +165,6 @@ impl GrammarEngine {
 
         Ok(())
     }
-
-    /// Generate a summary of the grammar
-    pub fn grammar_summary(&self) -> Option<GrammarSummary> {
-        self.active_grammar().map(|grammar| {
-            let mut terminal_count = 0;
-            let non_terminal_count = grammar.rules.len();
-            let mut optional_count = 0;
-            let mut repetition_count = 0;
-
-            for rule in grammar.rules.values() {
-                count_expression_features(
-                    &rule.expression,
-                    &mut terminal_count,
-                    &mut optional_count,
-                    &mut repetition_count,
-                );
-            }
-
-            GrammarSummary {
-                rule_count: non_terminal_count,
-                terminal_count,
-                optional_count,
-                repetition_count,
-                start_rule: grammar.start_rule.clone(),
-            }
-        })
-    }
 }
 
 fn count_expression_features(

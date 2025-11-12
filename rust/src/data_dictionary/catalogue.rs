@@ -10,20 +10,6 @@ impl AttributeCatalogue {
     pub fn new(dictionary: DataDictionary) -> Self {
         AttributeCatalogue { dictionary }
     }
-
-    pub fn find_related_attributes(&self, attr_id: &str) -> Vec<&AttributeDefinition> {
-        if let Some(attr) = self.dictionary.get_attribute(attr_id) {
-            let mut related = Vec::new();
-            for concept in &attr.semantic.related_concepts {
-                if let Some(related_attr) = self.dictionary.get_attribute(concept) {
-                    related.push(related_attr);
-                }
-            }
-            related
-        } else {
-            Vec::new()
-        }
-    }
 }
 
 fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {

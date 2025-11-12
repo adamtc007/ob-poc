@@ -193,11 +193,6 @@ impl VocabularyRegistry {
         self.registry.get(verb)
     }
 
-    /// List all registered verbs
-    pub fn list_verbs(&self) -> Vec<&String> {
-        self.registry.keys().collect()
-    }
-
     /// Get registry statistics
     pub fn get_stats(&self) -> RegistryStats {
         let total_verbs = self.registry.len();

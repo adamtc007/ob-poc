@@ -184,42 +184,6 @@ impl DomainRegistry {
         &self.shared_vocabulary
     }
 
-    /// Update shared vocabulary (affects all domains)
-    pub fn update_shared_vocabulary(&mut self, vocabulary: DslVocabulary) -> DslEditResult<()> {
-        // Validate compatibility with all registered domains
-        for (domain_name, handler) in &self.domains {
-            if !self.is_vocabulary_compatible(&vocabulary, handler.get_vocabulary()) {
-                return Err(DslEditError::DomainValidationError(format!(
-                    "Vocabulary update incompatible with domain: {}",
-                    domain_name
-                )));
-            }
-        }
-
-        self.shared_vocabulary = vocabulary;
-        log::info!("Updated shared DSL vocabulary");
-        Ok(())
-    }
-
-    /// Add a global validation rule
-    pub fn add_global_rule(&mut self, rule: ValidationRule) {
-        self.global_rules.push(rule);
-    }
-
-    /// Get all validation rules (global + domain-specific)
-    pub fn get_all_validation_rules(
-        &self,
-        domain_name: &str,
-    ) -> DslEditResult<Vec<ValidationRule>> {
-        let mut rules = self.global_rules.clone();
-
-        if let Ok(handler) = self.get_domain(domain_name) {
-            rules.extend_from_slice(handler.get_validation_rules());
-        }
-
-        Ok(rules)
-    }
-
     /// Perform health check on all domains
     pub async fn health_check_all(&self) -> HashMap<String, DomainHealthStatus> {
         let mut results = HashMap::new();

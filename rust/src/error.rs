@@ -424,36 +424,8 @@ impl ErrorCollector {
         !self.errors.is_empty()
     }
 
-    pub fn has_fatal_errors(&self) -> bool {
-        self.errors
-            .iter()
-            .any(|e| e.severity == ErrorSeverity::Fatal)
-    }
-
     pub fn error_count(&self) -> usize {
         self.errors.len()
-    }
-
-    pub fn warning_count(&self) -> usize {
-        self.errors
-            .iter()
-            .filter(|e| e.severity == ErrorSeverity::Warning)
-            .count()
-    }
-
-    pub fn fatal_error_count(&self) -> usize {
-        self.errors
-            .iter()
-            .filter(|e| e.severity == ErrorSeverity::Fatal)
-            .count()
-    }
-
-    pub fn into_result<T>(self, value: T) -> Result<T, Vec<ContextualError>> {
-        if self.has_errors() {
-            Err(self.errors)
-        } else {
-            Ok(value)
-        }
     }
 
     pub fn clear(&mut self) {

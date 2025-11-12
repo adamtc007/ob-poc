@@ -72,21 +72,9 @@ impl DomainContext {
         self
     }
 
-    /// Set state requirements
-    pub fn with_state_requirements(mut self, requirements: StateRequirements) -> Self {
-        self.state_requirements = requirements;
-        self
-    }
-
     /// Set domain version
     pub fn with_version(mut self, version: impl Into<String>) -> Self {
         self.domain_version = version.into();
-        self
-    }
-
-    /// Set request ID for audit trail
-    pub fn with_request_id(mut self, request_id: Uuid) -> Self {
-        self.request_id = Some(request_id);
         self
     }
 

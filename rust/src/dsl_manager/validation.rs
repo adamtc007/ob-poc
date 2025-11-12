@@ -298,11 +298,6 @@ impl DslValidationEngine {
         }
     }
 
-    /// Add a custom validation rule
-    pub fn add_custom_rule(&mut self, rule: ValidationRule) {
-        self.custom_rules.push(rule);
-    }
-
     /// Register a business rule
     pub fn register_business_rule(&mut self, rule: Box<dyn BusinessRule>) {
         self.business_rules.register(rule);
