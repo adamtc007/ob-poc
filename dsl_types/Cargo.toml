@@ -1,0 +1,27 @@
+[package]
+name = "dsl_types"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.91"
+description = "Pure DSL data structures - Level 1 foundation types with zero dependencies"
+
+# CRITICAL: Level 1 crate - MUST have ZERO dependencies except std
+# This crate provides pure data structures that all other crates depend on
+# Adding any dependencies here creates circular dependency risk
+
+[dependencies]
+# Core serialization - required for data interchange
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+# NO OTHER DEPENDENCIES ALLOWED
+# This crate must be the foundation that everything else builds on
+
+[lints]
+workspace = true
+
+[[example]]
+name = "type_showcase"
+path = "examples/type_showcase.rs"

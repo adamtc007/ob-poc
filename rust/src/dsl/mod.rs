@@ -94,6 +94,9 @@ pub use domain_registry::{DomainHandler, DomainRegistry, DslVocabulary};
 pub use operations::{DslOperation, OperationBuilder, OperationChain};
 pub use parsing_coordinator::{DomainDetection, ParseResult, ParsingCoordinator};
 
+// Import types from dsl_types crate (Level 1 foundation)
+pub use dsl_types::{ProcessingMetadata, SourceLocation, WarningSeverity};
+
 // Core DSL types and results
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -274,58 +277,11 @@ pub struct ValidationWarning {
     pub severity: WarningSeverity,
 }
 
-/// Source location in DSL content
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SourceLocation {
-    /// Line number (1-based)
-    pub line: usize,
-    /// Column number (1-based)
-    pub column: usize,
-    /// Character offset
-    pub offset: usize,
-    /// Length of the problematic span
-    pub length: usize,
-}
+// SourceLocation moved to dsl_types crate - import from there
 
-/// Warning severity levels
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum WarningSeverity {
-    /// Low priority suggestion
-    Info,
-    /// Recommended improvement
-    Warning,
-    /// Important issue that should be addressed
-    Important,
-    /// Critical issue that may cause problems
-    Critical,
-}
+// WarningSeverity moved to dsl_types crate - import from there
 
-/// Processing metadata
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProcessingMetadata {
-    /// Processing duration in milliseconds
-    pub duration_ms: u64,
-    /// Domain(s) detected/used
-    pub domains_involved: Vec<String>,
-    /// Operations performed
-    pub operations_performed: Vec<String>,
-    /// Processing timestamp
-    pub timestamp: String,
-    /// Additional context
-    pub context: HashMap<String, String>,
-}
-
-impl Default for ProcessingMetadata {
-    fn default() -> Self {
-        Self {
-            duration_ms: 0,
-            domains_involved: Vec::new(),
-            operations_performed: Vec::new(),
-            timestamp: chrono::Utc::now().to_rfc3339(),
-            context: HashMap::new(),
-        }
-    }
-}
+// ProcessingMetadata moved to dsl_types crate - import from there
 
 /// DSL result type for all operations
 pub type DslResult<T> = Result<T, DslError>;

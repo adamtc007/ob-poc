@@ -10,6 +10,9 @@ rust-version = "1.91"
 # All deprecated examples removed - only working examples remain
 
 [dependencies]
+# Workspace crates
+dsl_types = { path = "../dsl_types" }
+
 # Core libraries
 anyhow = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
