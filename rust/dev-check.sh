@@ -29,9 +29,15 @@ print_warn() {
     echo -e "  ${YELLOW}!${NC} $1"
 }
 
+# Check Rust version first
+rust_version=$(rustc --version | grep -oE '[0-9]+\.[0-9]+')
+if [[ "$rust_version" != "1.91" ]]; then
+    print_warn "Expected Rust 1.91, found $rust_version - using +1.91 toolchain"
+fi
+
 # Quick compile check
 print_check "compilation"
-if cargo check --quiet; then
+if cargo +1.91 check --quiet; then
     print_ok "Code compiles"
 else
     print_fail "Compilation errors found"
@@ -40,7 +46,7 @@ fi
 
 # Quick clippy check
 print_check "clippy (warnings only)"
-clippy_output=$(cargo clippy --features="visualizer,mock-api,binaries" 2>&1)
+clippy_output=$(cargo +1.91 clippy --features="visualizer,mock-api,binaries" 2>&1)
 warning_count=$(echo "$clippy_output" | grep -c "warning:" || true)
 
 if [ -z "$warning_count" ] || [ "$warning_count" -eq 0 ]; then
@@ -51,7 +57,7 @@ fi
 
 # Quick test check
 print_check "tests"
-if cargo test --quiet; then
+if cargo +1.91 test --quiet; then
     print_ok "Tests pass"
 else
     print_fail "Tests failing"
@@ -60,7 +66,7 @@ fi
 
 # Check if CLI binary works (skip if database not available)
 print_check "CLI binary"
-if cargo run --bin cli --features="database,binaries" --quiet -- --help 2>&1 | grep -q "Usage:" 2>/dev/null; then
+if cargo +1.91 run --bin cli --features="database,binaries" --quiet -- --help 2>&1 | grep -q "Usage:" 2>/dev/null; then
     print_ok "CLI binary runs"
 else
     print_warn "CLI binary requires database setup (skipping)"

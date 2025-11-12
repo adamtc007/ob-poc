@@ -36,6 +36,17 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Function to check Rust version
+check_rust_version() {
+    local rust_version=$(rustc --version | grep -oE '[0-9]+\.[0-9]+')
+    if [[ "$rust_version" != "1.91" ]]; then
+        echo -e "${YELLOW}⚠️  Warning: Expected Rust 1.91, found $rust_version${NC}"
+        echo -e "${BLUE}Consider running: rustup default 1.91${NC}"
+        return 1
+    fi
+    return 0
+}
+
 # Function to install a tool with error handling
 install_tool() {
     local tool="$1"
@@ -182,11 +193,12 @@ echo ""
 print_header "Tool Verification"
 
 VERIFICATION_COMMANDS=(
-    "cargo-machete:cargo machete --help"
-    "cargo-udeps:cargo udeps --help"
+    "cargo-machete:cargo +1.91 machete --help"
+    "cargo-udeps:cargo +1.91 udeps --help"
     "warnalyzer:warnalyzer --help"
-    "cargo-llvm-cov:cargo llvm-cov --help"
-    "cargo-hack:cargo hack --help"
+    "cargo-llvm-cov:cargo +1.91 llvm-cov --help"
+    "cargo-hack:cargo +1.91 hack --help"
+    "cargo-callgraph:cargo +1.91 callgraph --help"
 )
 
 ALL_WORKING=true

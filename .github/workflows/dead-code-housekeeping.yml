@@ -3,16 +3,16 @@ name: Dead Code Housekeeping
 on:
   pull_request:
     paths:
-      - '**/*.rs'
-      - '**/Cargo.toml'
-      - '**/Cargo.lock'
-      - '.github/workflows/dead-code-housekeeping.yml'
+      - "**/*.rs"
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
+      - ".github/workflows/dead-code-housekeeping.yml"
   push:
     branches: [main, master]
   workflow_dispatch:
     inputs:
       full_analysis:
-        description: 'Run full analysis including feature matrix'
+        description: "Run full analysis including feature matrix"
         required: false
         default: false
         type: boolean
@@ -30,14 +30,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history for git-based analysis
+          fetch-depth: 0 # Full history for git-based analysis
 
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: 1.91
           profile: minimal
-          components: llvm-tools-preview
+          components: rustfmt, clippy, llvm-tools-preview
           override: true
 
       - name: Cache Rust dependencies
@@ -58,10 +58,10 @@ jobs:
           echo "🔍 Analyzing dependencies..."
 
           # Fast scan
-          cargo machete > target/dead-code-reports/machete.txt 2>&1 || true
+          cargo +1.91 machete > target/dead-code-reports/machete.txt 2>&1 || true
 
           # Precise scan
-          cargo udeps --all-targets --workspace > target/dead-code-reports/udeps.txt 2>&1 || true
+          RUSTC_BOOTSTRAP=1 cargo +1.91 udeps --all-targets --workspace > target/dead-code-reports/udeps.txt 2>&1 || true
 
           echo "Dependencies analysis complete"
 
@@ -73,7 +73,7 @@ jobs:
 
           # Generate public API baseline if this is a library
           if find . -name "lib.rs" -type f | head -1 | grep -q .; then
-            cargo public-api --workspace > target/dead-code-reports/public-api-baseline.txt 2>&1 || echo "cargo-public-api not available"
+            cargo +1.91 public-api --workspace > target/dead-code-reports/public-api-baseline.txt 2>&1 || echo "cargo-public-api not available"
           fi
 
           echo "Public API analysis complete"
@@ -96,7 +96,7 @@ jobs:
           echo "📊 Generating call graph..."
 
           # Generate call graph
-          cargo callgraph --lib > target/dead-code-reports/callgraph.dot 2>&1 || true
+          cargo +1.91 callgraph --lib > target/dead-code-reports/callgraph.dot 2>&1 || true
 
           # Convert to SVG if dot is available
           if command -v dot >/dev/null 2>&1; then
@@ -110,7 +110,7 @@ jobs:
         run: |
           echo "🎯 Validating feature combinations..."
 
-          cargo hack check --workspace --each-feature > target/dead-code-reports/feature-matrix.txt 2>&1 || true
+          cargo +1.91 hack check --workspace --each-feature > target/dead-code-reports/feature-matrix.txt 2>&1 || true
 
           echo "Feature matrix validation complete"
 
@@ -119,10 +119,10 @@ jobs:
           echo "🔍 Running comprehensive lints..."
 
           # Standard clippy check
-          cargo clippy --workspace --all-targets --all-features -- -D warnings > target/dead-code-reports/clippy.txt 2>&1 || true
+          cargo +1.91 clippy --workspace --all-targets --all-features -- -D warnings > target/dead-code-reports/clippy.txt 2>&1 || true
 
           # Check for specific dead code patterns
-          cargo clippy --workspace --all-targets --all-features -- -W dead_code -W unused_imports -W unused_variables > target/dead-code-reports/dead-code-lints.txt 2>&1 || true
+          cargo +1.91 clippy --workspace --all-targets --all-features -- -W dead_code -W unused_imports -W unused_variables > target/dead-code-reports/dead-code-lints.txt 2>&1 || true
 
           echo "Lint analysis complete"
 
@@ -134,6 +134,7 @@ jobs:
           **Generated**: $(date)
           **Commit**: ${{ github.sha }}
           **Branch**: ${{ github.ref_name }}
+          **Rust Version**: 1.91
 
           ## Analysis Results
 

@@ -31,6 +31,12 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Check Rust version first
+rust_version=$(rustc --version | grep -oE '[0-9]+\.[0-9]+')
+if [[ "$rust_version" != "1.91" ]]; then
+    print_warning "Expected Rust 1.91, found $rust_version - using +1.91 toolchain"
+fi
+
 # Check if we're in a git repository
 if [ ! -d ".git" ]; then
     print_error "Not in a git repository!"
@@ -39,17 +45,17 @@ fi
 
 # Format code with rustfmt
 print_status "Running rustfmt..."
-if cargo fmt --check; then
+if cargo +1.91 fmt --check; then
     print_success "Code is properly formatted"
 else
     print_warning "Formatting code..."
-    cargo fmt
+    cargo +1.91 fmt
     print_success "Code formatted"
 fi
 
 # Run clippy
 print_status "Running clippy..."
-if cargo clippy --all-targets --all-features -- -D warnings; then
+if cargo +1.91 clippy --all-targets --all-features -- -D warnings; then
     print_success "Clippy passed with no warnings"
 else
     print_error "Clippy found issues. Please fix them before committing."
@@ -58,7 +64,7 @@ fi
 
 # Run tests
 print_status "Running tests..."
-if cargo test; then
+if cargo +1.91 test; then
     print_success "All tests passed"
 else
     print_error "Tests failed. Please fix them before committing."
@@ -67,7 +73,7 @@ fi
 
 # Build project
 print_status "Building project..."
-if cargo build; then
+if cargo +1.91 build; then
     print_success "Build successful"
 else
     print_error "Build failed. Please fix compilation errors."

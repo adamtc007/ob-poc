@@ -84,6 +84,13 @@ print_check() {
 # Change to rust directory where Cargo.toml exists
 cd "${RUST_DIR}"
 
+# Ensure we're using the correct Rust version
+echo -e "${BLUE}[INFO]${NC} Using Rust version: $(rustc --version)"
+if ! rustc --version | grep -q "1.91"; then
+    echo -e "${YELLOW}[WARNING]${NC} Expected Rust 1.91.x, but found: $(rustc --version)"
+    echo -e "${BLUE}[INFO]${NC} Consider running: rustup default 1.91"
+fi
+
 # Phase 1: Dependencies Analysis
 echo -e "${BLUE}📦 Phase 1: Dependencies Analysis${NC}"
 echo "----------------------------------------"
@@ -103,7 +110,7 @@ fi
 
 echo ""
 print_status "Precise dependency analysis (cargo-udeps)..."
-if cargo udeps --all-targets --workspace > "${REPORTS_DIR}/udeps-report.txt" 2>&1; then
+if RUSTC_BOOTSTRAP=1 cargo +1.91 udeps --all-targets --workspace > "${REPORTS_DIR}/udeps-report.txt" 2>&1; then
     print_success "Udeps analysis complete"
     if grep -q "unused dependencies" "${REPORTS_DIR}/udeps-report.txt"; then
         print_warning "Unused dependencies confirmed (see udeps-report.txt)"
@@ -125,7 +132,7 @@ print_status "Analyzing workspace-wide unused public API..."
 echo "🔍 Analyzing workspace-wide unused public API..."
 # Use cargo-workspace-unused-pub (working) as primary, warnalyzer as fallback
 if command_exists cargo-workspace-unused-pub; then
-    if cargo workspace-unused-pub > "${REPORTS_DIR}/warnalyzer.txt" 2>&1; then
+    if cargo +1.91 workspace-unused-pub > "${REPORTS_DIR}/warnalyzer.txt" 2>&1; then
         echo -e "${GREEN}✅ cargo-workspace-unused-pub analysis complete${NC}"
         if [ -s "${REPORTS_DIR}/warnalyzer.txt" ]; then
             unused_count=$(grep -c "pub fn\|pub struct\|pub enum\|pub mod" "${REPORTS_DIR}/warnalyzer.txt" 2>/dev/null || echo "0")
@@ -156,7 +163,7 @@ echo -e "${BLUE}📊 Phase 3: Call Graph Analysis${NC}"
 echo "------------------------------------"
 
 print_status "Generating call graph..."
-if cargo callgraph --lib > "${REPORTS_DIR}/callgraph.dot" 2>/dev/null; then
+if cargo +1.91 callgraph --lib > "${REPORTS_DIR}/callgraph.dot" 2>/dev/null; then
     print_success "Call graph generated"
     dot_lines=$(wc -l < "${REPORTS_DIR}/callgraph.dot" 2>/dev/null || echo "0")
     print_check "Call graph contains ${dot_lines} lines"
@@ -179,7 +186,7 @@ echo -e "${BLUE}📈 Phase 4: Coverage Analysis${NC}"
 echo "----------------------------------"
 
 print_status "Generating coverage report..."
-if cargo llvm-cov --workspace --all-features --html --output-dir "${REPORTS_DIR}/coverage" > "${REPORTS_DIR}/coverage_summary.txt" 2>&1; then
+if cargo +1.91 llvm-cov --workspace --all-features --html --output-dir "${REPORTS_DIR}/coverage" > "${REPORTS_DIR}/coverage_summary.txt" 2>&1; then
     print_success "Coverage analysis complete"
 
     # Extract summary if available
@@ -191,7 +198,7 @@ if cargo llvm-cov --workspace --all-features --html --output-dir "${REPORTS_DIR}
     echo "📊 HTML report: ${REPORTS_DIR}/coverage/index.html"
 
     # Also generate LCOV for tooling
-    if cargo llvm-cov --workspace --all-features --lcov --output-path "${REPORTS_DIR}/lcov.info" >/dev/null 2>&1; then
+    if cargo +1.91 llvm-cov --workspace --all-features --lcov --output-path "${REPORTS_DIR}/lcov.info" >/dev/null 2>&1; then
         echo "📊 LCOV report: ${REPORTS_DIR}/lcov.info"
     fi
 else
@@ -206,14 +213,14 @@ echo -e "${BLUE}🔧 Phase 5: Auto-Fix Safe Issues${NC}"
 echo "------------------------------------"
 
 print_status "Applying safe clippy fixes..."
-if cargo clippy --fix --all-targets --all-features --allow-dirty --allow-staged > "${REPORTS_DIR}/clippy-fix.log" 2>&1; then
+if cargo +1.91 clippy --fix --all-targets --all-features --allow-dirty --allow-staged > "${REPORTS_DIR}/clippy-fix.log" 2>&1; then
     print_success "Clippy auto-fixes applied"
 else
     print_warning "Some clippy fixes couldn't be applied (see clippy-fix.log)"
 fi
 
 print_status "Applying rustc fixes..."
-if cargo fix --all-targets --all-features --allow-dirty --allow-staged > "${REPORTS_DIR}/rustc-fix.log" 2>&1; then
+if cargo +1.91 fix --all-targets --all-features --allow-dirty --allow-staged > "${REPORTS_DIR}/rustc-fix.log" 2>&1; then
     print_success "Rustc auto-fixes applied"
 else
     print_warning "Some rustc fixes couldn't be applied (see rustc-fix.log)"
@@ -226,7 +233,7 @@ echo -e "${BLUE}✅ Phase 6: Final Validation${NC}"
 echo "-------------------------------"
 
 print_status "Validating workspace builds..."
-if cargo check --workspace --all-targets --all-features > "${REPORTS_DIR}/final-check.log" 2>&1; then
+if cargo +1.91 check --workspace --all-targets --all-features > "${REPORTS_DIR}/final-check.log" 2>&1; then
     print_success "Workspace builds successfully"
 else
     print_error "Workspace build failed after fixes"
@@ -235,7 +242,7 @@ else
 fi
 
 print_status "Running basic test suite..."
-if cargo test --workspace --lib > "${REPORTS_DIR}/final-test.log" 2>&1; then
+if cargo +1.91 test --workspace --lib > "${REPORTS_DIR}/final-test.log" 2>&1; then
     print_success "Core tests pass"
 else
     print_warning "Some tests failed (see final-test.log)"
@@ -244,7 +251,7 @@ fi
 # Feature matrix validation (optional, can be slow)
 if [ "${SKIP_FEATURE_MATRIX:-}" != "1" ]; then
     print_status "Validating feature combinations..."
-    if cargo hack check --workspace --each-feature > "${REPORTS_DIR}/feature-matrix.log" 2>&1; then
+    if cargo +1.91 hack check --workspace --each-feature > "${REPORTS_DIR}/feature-matrix.log" 2>&1; then
         print_success "All feature combinations build"
     else
         print_warning "Some feature combinations failed (see feature-matrix.log)"
