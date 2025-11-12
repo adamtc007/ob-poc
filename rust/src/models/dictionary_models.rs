@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 // Import types from dsl_types crate (Level 1 foundation)
-use dsl_types::{AttributeAssetType, AttributeOperationType};
+use dsl_types::{AttributeAssetType, AttributeOperationType, DictionaryExecutionStatus};
 
 /// Core dictionary attribute as stored in the database
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -183,42 +183,7 @@ pub struct AgenticAttributeDiscoverRequest {
     pub discovery_request: AttributeDiscoveryRequest,
 }
 
-/// Execution status for dictionary operations
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum DictionaryExecutionStatus {
-    Pending,
-    Executing,
-    Completed,
-    Failed,
-    RolledBack,
-}
-
-impl std::fmt::Display for DictionaryExecutionStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DictionaryExecutionStatus::Pending => write!(f, "pending"),
-            DictionaryExecutionStatus::Executing => write!(f, "executing"),
-            DictionaryExecutionStatus::Completed => write!(f, "completed"),
-            DictionaryExecutionStatus::Failed => write!(f, "failed"),
-            DictionaryExecutionStatus::RolledBack => write!(f, "rolledback"),
-        }
-    }
-}
-
-impl std::str::FromStr for DictionaryExecutionStatus {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "pending" => Ok(DictionaryExecutionStatus::Pending),
-            "executing" => Ok(DictionaryExecutionStatus::Executing),
-            "completed" => Ok(DictionaryExecutionStatus::Completed),
-            "failed" => Ok(DictionaryExecutionStatus::Failed),
-            "rolledback" => Ok(DictionaryExecutionStatus::RolledBack),
-            _ => Err(format!("Unknown dictionary execution status: {}", s)),
-        }
-    }
-}
+// DictionaryExecutionStatus moved to dsl_types crate - import from there
 
 /// Response from agentic attribute CRUD operations
 #[derive(Debug, Clone, Serialize, Deserialize)]

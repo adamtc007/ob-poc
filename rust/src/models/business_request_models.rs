@@ -10,6 +10,9 @@ use serde_json::Value;
 use sqlx::FromRow;
 use uuid::Uuid;
 
+// Import types from dsl_types crate (Level 1 foundation)
+use dsl_types::RequestStatus;
+
 // ============================================================================
 // CORE BUSINESS REQUEST MODELS
 // ============================================================================
@@ -235,46 +238,8 @@ pub struct RequestWorkflowHistory {
 // ============================================================================
 
 /// Request Status enumeration
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "request_status", rename_all = "UPPERCASE")]
-pub enum RequestStatus {
-    Draft,
-    InProgress,
-    Review,
-    Approved,
-    Completed,
-    Cancelled,
-    Error,
-}
-
-impl std::fmt::Display for RequestStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RequestStatus::Draft => write!(f, "DRAFT"),
-            RequestStatus::InProgress => write!(f, "IN_PROGRESS"),
-            RequestStatus::Review => write!(f, "REVIEW"),
-            RequestStatus::Approved => write!(f, "APPROVED"),
-            RequestStatus::Completed => write!(f, "COMPLETED"),
-            RequestStatus::Cancelled => write!(f, "CANCELLED"),
-            RequestStatus::Error => write!(f, "ERROR"),
-        }
-    }
-}
-
-impl From<String> for RequestStatus {
-    fn from(s: String) -> Self {
-        match s.to_uppercase().as_str() {
-            "DRAFT" => RequestStatus::Draft,
-            "IN_PROGRESS" => RequestStatus::InProgress,
-            "REVIEW" => RequestStatus::Review,
-            "APPROVED" => RequestStatus::Approved,
-            "COMPLETED" => RequestStatus::Completed,
-            "CANCELLED" => RequestStatus::Cancelled,
-            "ERROR" => RequestStatus::Error,
-            _ => RequestStatus::Draft, // Default fallback
-        }
-    }
-}
+// RequestStatus moved to dsl_types crate - import from there
+// Database integration (sqlx::Type) can be added later if needed
 
 /// Priority Level enumeration
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, Default)]
@@ -347,7 +312,11 @@ impl DslBusinessRequest {
 
 impl NewDslBusinessRequest {
     /// Create a new KYC case request
-    pub(crate) fn new_kyc_case(business_reference: String, client_id: String, created_by: String) -> Self {
+    pub(crate) fn new_kyc_case(
+        business_reference: String,
+        client_id: String,
+        created_by: String,
+    ) -> Self {
         Self {
             domain_name: "KYC".to_string(),
             business_reference,

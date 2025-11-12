@@ -636,6 +636,155 @@ impl AgentMetadata {
 }
 
 // ============================================================================
+// EXECUTION STATUS TYPES
+// ============================================================================
+
+/// Execution status for dictionary operations
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DictionaryExecutionStatus {
+    /// Operation is queued and waiting to execute
+    Pending,
+    /// Operation is currently executing
+    Executing,
+    /// Operation completed successfully
+    Completed,
+    /// Operation failed with error
+    Failed,
+    /// Operation was rolled back due to failure
+    RolledBack,
+}
+
+impl DictionaryExecutionStatus {
+    /// Get human-readable status name
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            DictionaryExecutionStatus::Pending => "pending",
+            DictionaryExecutionStatus::Executing => "executing",
+            DictionaryExecutionStatus::Completed => "completed",
+            DictionaryExecutionStatus::Failed => "failed",
+            DictionaryExecutionStatus::RolledBack => "rolled_back",
+        }
+    }
+
+    /// Check if this status represents a terminal state
+    pub fn is_terminal(&self) -> bool {
+        matches!(
+            self,
+            DictionaryExecutionStatus::Completed
+                | DictionaryExecutionStatus::Failed
+                | DictionaryExecutionStatus::RolledBack
+        )
+    }
+
+    /// Check if this status represents success
+    pub fn is_successful(&self) -> bool {
+        matches!(self, DictionaryExecutionStatus::Completed)
+    }
+}
+
+impl std::fmt::Display for DictionaryExecutionStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+impl std::str::FromStr for DictionaryExecutionStatus {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "pending" => Ok(DictionaryExecutionStatus::Pending),
+            "executing" => Ok(DictionaryExecutionStatus::Executing),
+            "completed" => Ok(DictionaryExecutionStatus::Completed),
+            "failed" => Ok(DictionaryExecutionStatus::Failed),
+            "rolled_back" | "rolledback" => Ok(DictionaryExecutionStatus::RolledBack),
+            _ => Err(format!("Unknown dictionary execution status: {}", s)),
+        }
+    }
+}
+
+/// Request status for business operations
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RequestStatus {
+    /// Request is in draft state
+    Draft,
+    /// Request is being processed
+    InProgress,
+    /// Request is under review
+    Review,
+    /// Request has been approved
+    Approved,
+    /// Request has been completed
+    Completed,
+    /// Request has been cancelled
+    Cancelled,
+    /// Request encountered an error
+    Error,
+}
+
+impl RequestStatus {
+    /// Get human-readable status name
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            RequestStatus::Draft => "draft",
+            RequestStatus::InProgress => "in_progress",
+            RequestStatus::Review => "review",
+            RequestStatus::Approved => "approved",
+            RequestStatus::Completed => "completed",
+            RequestStatus::Cancelled => "cancelled",
+            RequestStatus::Error => "error",
+        }
+    }
+
+    /// Check if this status allows transitions
+    pub fn can_transition(&self) -> bool {
+        !matches!(
+            self,
+            RequestStatus::Completed | RequestStatus::Cancelled | RequestStatus::Error
+        )
+    }
+
+    /// Check if this status represents success
+    pub fn is_successful(&self) -> bool {
+        matches!(self, RequestStatus::Completed)
+    }
+
+    /// Get all possible statuses
+    pub fn all() -> Vec<Self> {
+        vec![
+            Self::Draft,
+            Self::InProgress,
+            Self::Review,
+            Self::Approved,
+            Self::Completed,
+            Self::Cancelled,
+            Self::Error,
+        ]
+    }
+}
+
+impl std::fmt::Display for RequestStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+impl From<String> for RequestStatus {
+    fn from(s: String) -> Self {
+        match s.to_uppercase().as_str() {
+            "DRAFT" => RequestStatus::Draft,
+            "IN_PROGRESS" | "IN PROGRESS" => RequestStatus::InProgress,
+            "REVIEW" => RequestStatus::Review,
+            "APPROVED" => RequestStatus::Approved,
+            "COMPLETED" => RequestStatus::Completed,
+            "CANCELLED" => RequestStatus::Cancelled,
+            "ERROR" => RequestStatus::Error,
+            _ => RequestStatus::Draft, // Default fallback
+        }
+    }
+}
+
+// ============================================================================
 // UTILITY TYPES
 // ============================================================================
 
@@ -844,6 +993,54 @@ mod tests {
         assert_eq!(
             metadata_with_context.context.get("model"),
             Some(&"gpt-4".to_string())
+        );
+    }
+
+    #[test]
+    fn test_dictionary_execution_status() {
+        assert_eq!(DictionaryExecutionStatus::Pending.to_string(), "pending");
+        assert!(DictionaryExecutionStatus::Completed.is_terminal());
+        assert!(DictionaryExecutionStatus::Completed.is_successful());
+        assert!(!DictionaryExecutionStatus::Executing.is_terminal());
+        assert!(!DictionaryExecutionStatus::Failed.is_successful());
+
+        // Test FromStr implementation
+        assert_eq!(
+            "completed".parse::<DictionaryExecutionStatus>().unwrap(),
+            DictionaryExecutionStatus::Completed
+        );
+        assert_eq!(
+            "rolled_back".parse::<DictionaryExecutionStatus>().unwrap(),
+            DictionaryExecutionStatus::RolledBack
+        );
+        assert!("invalid".parse::<DictionaryExecutionStatus>().is_err());
+    }
+
+    #[test]
+    fn test_request_status() {
+        assert_eq!(RequestStatus::Draft.to_string(), "draft");
+        assert!(RequestStatus::Draft.can_transition());
+        assert!(!RequestStatus::Completed.can_transition());
+        assert!(RequestStatus::Completed.is_successful());
+        assert!(!RequestStatus::Error.is_successful());
+
+        let all_statuses = RequestStatus::all();
+        assert_eq!(all_statuses.len(), 7);
+        assert!(all_statuses.contains(&RequestStatus::Draft));
+        assert!(all_statuses.contains(&RequestStatus::Error));
+
+        // Test From<String> implementation
+        assert_eq!(
+            RequestStatus::from("COMPLETED".to_string()),
+            RequestStatus::Completed
+        );
+        assert_eq!(
+            RequestStatus::from("in_progress".to_string()),
+            RequestStatus::InProgress
+        );
+        assert_eq!(
+            RequestStatus::from("invalid".to_string()),
+            RequestStatus::Draft
         );
     }
 
