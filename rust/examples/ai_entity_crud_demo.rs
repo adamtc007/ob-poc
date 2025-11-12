@@ -193,38 +193,23 @@ struct MockEntityDatabase {
 
 #[derive(Debug, Clone)]
 struct MockPartnership {
-    id: Uuid,
     name: String,
-    partnership_type: String,
-    jurisdiction: String,
-    formation_date: String,
 }
 
 #[derive(Debug, Clone)]
 struct MockCompany {
-    id: Uuid,
     name: String,
-    registration_number: String,
-    jurisdiction: String,
-    incorporation_date: String,
 }
 
 #[derive(Debug, Clone)]
 struct MockPerson {
-    id: Uuid,
     first_name: String,
     last_name: String,
-    nationality: String,
-    date_of_birth: String,
 }
 
 #[derive(Debug, Clone)]
 struct MockTrust {
-    id: Uuid,
     name: String,
-    trust_type: String,
-    jurisdiction: String,
-    establishment_date: String,
 }
 
 impl MockEntityDatabase {
@@ -232,40 +217,21 @@ impl MockEntityDatabase {
         Self {
             partnerships: vec![
                 MockPartnership {
-                    id: Uuid::new_v4(),
                     name: "Quantum Capital Management LLP".to_string(),
-                    partnership_type: "Limited Liability".to_string(),
-                    jurisdiction: "US-DE".to_string(),
-                    formation_date: "2020-03-15".to_string(),
                 },
                 MockPartnership {
-                    id: Uuid::new_v4(),
                     name: "Meridian Investment Management LLP".to_string(),
-                    partnership_type: "Limited Liability".to_string(),
-                    jurisdiction: "US-NY".to_string(),
-                    formation_date: "2019-09-22".to_string(),
                 },
             ],
             companies: vec![MockCompany {
-                id: Uuid::new_v4(),
                 name: "American Growth Equity Fund Inc".to_string(),
-                registration_number: "DE-8765432".to_string(),
-                jurisdiction: "US-DE".to_string(),
-                incorporation_date: "2018-01-15".to_string(),
             }],
             persons: vec![MockPerson {
-                id: Uuid::new_v4(),
                 first_name: "Jane".to_string(),
                 last_name: "Doe".to_string(),
-                nationality: "US".to_string(),
-                date_of_birth: "1980-05-15".to_string(),
             }],
             trusts: vec![MockTrust {
-                id: Uuid::new_v4(),
-                name: "Family Heritage Trust".to_string(),
-                trust_type: "Discretionary".to_string(),
-                jurisdiction: "KY".to_string(),
-                establishment_date: "2021-11-30".to_string(),
+                name: "Heritage Family Trust".to_string(),
             }],
         }
     }
