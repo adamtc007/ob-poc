@@ -147,20 +147,6 @@ impl DomainRegistry {
         self.domains.keys().cloned().collect()
     }
 
-    /// Find domains that support a specific operation
-    pub fn find_domains_for_operation(&self, operation_type: &str) -> Vec<String> {
-        self.domains
-            .iter()
-            .filter_map(|(name, handler)| {
-                if handler.supports_operation(operation_type) {
-                    Some(name.clone())
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
     /// Route an operation to the appropriate domain
     pub async fn route_operation(
         &self,

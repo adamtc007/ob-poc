@@ -189,14 +189,6 @@ impl DslStateManager {
         self.states.get(instance_id)
     }
 
-    /// Get all states in a domain
-    pub fn get_states_by_domain(&self, domain: &str) -> Vec<&DslState> {
-        self.states
-            .values()
-            .filter(|state| state.domain == domain)
-            .collect()
-    }
-
     /// Get state change history
     pub fn get_change_history(&self, instance_id: &Uuid) -> Vec<&StateChangeEvent> {
         self.change_history

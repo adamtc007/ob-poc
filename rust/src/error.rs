@@ -379,10 +379,6 @@ impl ContextualError {
         self.context.push(context.into());
         self
     }
-
-    pub fn add_context(&mut self, context: impl Into<String>) {
-        self.context.push(context.into());
-    }
 }
 
 impl fmt::Display for ContextualError {
@@ -412,10 +408,6 @@ pub struct ErrorCollector {
 impl ErrorCollector {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn add_error(&mut self, error: ContextualError) {
-        self.errors.push(error);
     }
 
     pub fn add_simple_error(

@@ -212,11 +212,6 @@ impl CrudRagSystem {
         self.asset_schemas.get(asset_name)
     }
 
-    /// Gets all CRUD examples
-    pub fn get_all_examples(&self) -> &Vec<CrudExample> {
-        &self.examples
-    }
-
     /// Identifies relevant asset types from the query
     fn identify_relevant_assets(&self, query: &str) -> Vec<String> {
         let mut assets = Vec::new();

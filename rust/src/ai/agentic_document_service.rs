@@ -585,18 +585,6 @@ impl AgenticDocumentService {
         }
     }
 
-    /// Extracts metadata from a document using AI
-    pub fn extract_document_metadata(
-        &self,
-        doc_id: Uuid,
-        _extraction_request: serde_json::Value,
-    ) -> Result<serde_json::Value> {
-        println!("Extracting metadata from document: {}", doc_id);
-
-        let mock_client = MockDocumentAiClient::new();
-        mock_client.extract_document(doc_id)
-    }
-
     /// Searches documents based on natural language query
     pub fn search_documents(
         &self,

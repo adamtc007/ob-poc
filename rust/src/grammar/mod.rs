@@ -56,17 +56,6 @@ impl GrammarEngine {
         self.grammars.get(name)
     }
 
-    /// Set the active grammar
-    pub fn set_active_grammar(&mut self, name: impl Into<String>) -> Result<(), DSLError> {
-        let name = name.into();
-        if self.grammars.contains_key(&name) {
-            self.active_grammar = Some(name);
-            Ok(())
-        } else {
-            Err(DSLError::Grammar(GrammarError::RuleNotFound { rule: name }))
-        }
-    }
-
     /// Get the active grammar
     pub fn active_grammar(&self) -> Option<&EBNFGrammar> {
         self.active_grammar

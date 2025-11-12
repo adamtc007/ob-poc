@@ -158,16 +158,6 @@ impl DslManager {
         self.ai_service = Some(ai_service);
     }
 
-    /// Set RAG system for AI context
-    pub fn set_rag_system(&mut self, rag_system: Arc<CrudRagSystem>) {
-        self.rag_system = Some(rag_system);
-    }
-
-    /// Set prompt builder for AI requests
-    pub fn set_prompt_builder(&mut self, prompt_builder: Arc<CrudPromptBuilder>) {
-        self.prompt_builder = Some(prompt_builder);
-    }
-
     /// Main entry point for processing DSL operations
     /// **ALL DSL OPERATIONS MUST GO THROUGH THIS METHOD**
     pub async fn process_operation(

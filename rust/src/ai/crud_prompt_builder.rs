@@ -79,12 +79,6 @@ impl CrudPromptBuilder {
         }
     }
 
-    /// Sets the maximum context length
-    pub fn with_max_context_length(mut self, max_length: usize) -> Self {
-        self.max_context_length = max_length;
-        self
-    }
-
     /// Generates a complete prompt from RAG context and user request
     pub fn generate_prompt(
         &self,

@@ -1,0 +1,294 @@
+name: Dead Code Housekeeping
+
+on:
+  pull_request:
+    paths:
+      - '**/*.rs'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - '.github/workflows/dead-code-housekeeping.yml'
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      full_analysis:
+        description: 'Run full analysis including feature matrix'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  dead-code-analysis:
+    name: 🧹 Dead Code Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for git-based analysis
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+          components: llvm-tools-preview
+          override: true
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Install analysis tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hack,cargo-llvm-cov,cargo-udeps,cargo-machete,warnalyzer,cargo-callgraph
+
+      - name: Create reports directory
+        run: mkdir -p target/dead-code-reports
+
+      - name: Phase 1 - Dependency Analysis
+        run: |
+          echo "🔍 Analyzing dependencies..."
+
+          # Fast scan
+          cargo machete > target/dead-code-reports/machete.txt 2>&1 || true
+
+          # Precise scan
+          cargo udeps --all-targets --workspace > target/dead-code-reports/udeps.txt 2>&1 || true
+
+          echo "Dependencies analysis complete"
+
+      - name: Phase 2 - Public API Analysis
+        run: |
+          echo "🔍 Analyzing unused public API..."
+
+          warnalyzer --workspace > target/dead-code-reports/warnalyzer.json 2>&1 || true
+
+          # Generate public API baseline if this is a library
+          if find . -name "lib.rs" -type f | head -1 | grep -q .; then
+            cargo public-api --workspace > target/dead-code-reports/public-api-baseline.txt 2>&1 || echo "cargo-public-api not available"
+          fi
+
+          echo "Public API analysis complete"
+
+      - name: Phase 3 - Coverage Analysis
+        run: |
+          echo "📈 Generating coverage report..."
+
+          # Run tests with coverage
+          cargo llvm-cov --workspace --all-features --html --output-dir target/dead-code-reports/coverage || true
+          cargo llvm-cov --workspace --all-features --lcov --output-path target/dead-code-reports/coverage.lcov || true
+
+          # Generate summary
+          cargo llvm-cov --workspace --all-features --summary-only > target/dead-code-reports/coverage-summary.txt 2>&1 || true
+
+          echo "Coverage analysis complete"
+
+      - name: Phase 4 - Call Graph Analysis
+        run: |
+          echo "📊 Generating call graph..."
+
+          # Generate call graph
+          cargo callgraph --lib > target/dead-code-reports/callgraph.dot 2>&1 || true
+
+          # Convert to SVG if dot is available
+          if command -v dot >/dev/null 2>&1; then
+            dot -Tsvg target/dead-code-reports/callgraph.dot -o target/dead-code-reports/callgraph.svg 2>/dev/null || true
+          fi
+
+          echo "Call graph analysis complete"
+
+      - name: Phase 5 - Feature Matrix Validation
+        if: github.event.inputs.full_analysis == 'true' || github.event_name == 'workflow_dispatch'
+        run: |
+          echo "🎯 Validating feature combinations..."
+
+          cargo hack check --workspace --each-feature > target/dead-code-reports/feature-matrix.txt 2>&1 || true
+
+          echo "Feature matrix validation complete"
+
+      - name: Phase 6 - Lint Analysis
+        run: |
+          echo "🔍 Running comprehensive lints..."
+
+          # Standard clippy check
+          cargo clippy --workspace --all-targets --all-features -- -D warnings > target/dead-code-reports/clippy.txt 2>&1 || true
+
+          # Check for specific dead code patterns
+          cargo clippy --workspace --all-targets --all-features -- -W dead_code -W unused_imports -W unused_variables > target/dead-code-reports/dead-code-lints.txt 2>&1 || true
+
+          echo "Lint analysis complete"
+
+      - name: Generate Summary Report
+        run: |
+          cat > target/dead-code-reports/SUMMARY.md << 'EOF'
+          # Dead Code Analysis Summary
+
+          **Generated**: $(date)
+          **Commit**: ${{ github.sha }}
+          **Branch**: ${{ github.ref_name }}
+
+          ## Analysis Results
+
+          ### 📦 Dependencies
+          - See `machete.txt` for quick dependency scan
+          - See `udeps.txt` for precise unused dependency analysis
+
+          ### 🔍 Public API
+          - See `warnalyzer.json` for unused public API items
+          - See `public-api-baseline.txt` for current API surface
+
+          ### 📈 Coverage
+          - See `coverage/index.html` for detailed coverage report
+          - See `coverage-summary.txt` for summary statistics
+
+          ### 📊 Call Graph
+          - See `callgraph.svg` for visual call graph
+          - Look for disconnected subgraphs indicating orphaned code
+
+          ### 🎯 Feature Matrix
+          - See `feature-matrix.txt` for feature combination validation
+
+          ### 🔍 Lints
+          - See `clippy.txt` for general code quality issues
+          - See `dead-code-lints.txt` for dead code specific warnings
+
+          ## Next Steps
+
+          1. **Review unused dependencies** in `udeps.txt`
+          2. **Clean up orphaned public API** from `warnalyzer.json`
+          3. **Examine 0% coverage items** for deletion candidates
+          4. **Check call graph** for disconnected code islands
+          5. **Address lint warnings** in `clippy.txt`
+
+          ## Quick Metrics
+
+          EOF
+
+          # Add metrics if files exist
+          if [ -f target/dead-code-reports/warnalyzer.json ]; then
+            echo "- **Unused public API items**: $(jq '. | length' target/dead-code-reports/warnalyzer.json 2>/dev/null || echo 'N/A')" >> target/dead-code-reports/SUMMARY.md
+          fi
+
+          if [ -f target/dead-code-reports/udeps.txt ] && grep -q "unused dependencies" target/dead-code-reports/udeps.txt; then
+            echo "- **Unused dependencies**: Found (see udeps.txt)" >> target/dead-code-reports/SUMMARY.md
+          else
+            echo "- **Unused dependencies**: None detected" >> target/dead-code-reports/SUMMARY.md
+          fi
+
+          if [ -f target/dead-code-reports/coverage-summary.txt ]; then
+            coverage_line=$(grep "TOTAL" target/dead-code-reports/coverage-summary.txt | head -1 || echo "Coverage data not available")
+            echo "- **Test coverage**: $coverage_line" >> target/dead-code-reports/SUMMARY.md
+          fi
+
+      - name: Check for Critical Issues
+        id: check_issues
+        run: |
+          issues_found=false
+
+          # Check for unused dependencies
+          if [ -f target/dead-code-reports/udeps.txt ] && grep -q "unused dependencies" target/dead-code-reports/udeps.txt; then
+            echo "::warning::Unused dependencies detected - see udeps.txt"
+            issues_found=true
+          fi
+
+          # Check for large number of unused public APIs
+          if [ -f target/dead-code-reports/warnalyzer.json ]; then
+            unused_count=$(jq '. | length' target/dead-code-reports/warnalyzer.json 2>/dev/null || echo "0")
+            if [ "$unused_count" -gt 50 ]; then
+              echo "::warning::Large number of unused public API items ($unused_count) - see warnalyzer.json"
+              issues_found=true
+            fi
+          fi
+
+          # Check for compilation issues
+          if ! cargo check --workspace --all-targets --all-features; then
+            echo "::error::Workspace compilation failed"
+            exit 1
+          fi
+
+          echo "issues_found=$issues_found" >> $GITHUB_OUTPUT
+
+      - name: Upload Analysis Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: dead-code-analysis-${{ github.run_number }}
+          path: target/dead-code-reports/
+          retention-days: 30
+
+      - name: Comment PR Summary
+        if: github.event_name == 'pull_request' && steps.check_issues.outputs.issues_found == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            let summaryContent = '';
+            try {
+              summaryContent = fs.readFileSync('target/dead-code-reports/SUMMARY.md', 'utf8');
+            } catch (error) {
+              summaryContent = '❌ Summary report not generated';
+            }
+
+            const comment = `## 🧹 Dead Code Analysis Results
+
+            This PR triggers some dead code analysis findings. Please review:
+
+            ${summaryContent}
+
+            📁 **Full reports**: Check the \`dead-code-analysis-${{ github.run_number }}\` artifact
+
+            > 💡 **Tip**: Run \`./scripts/dead-code-sweep.sh\` locally for detailed analysis and fixes`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  validation:
+    name: ✅ Post-Analysis Validation
+    runs-on: ubuntu-latest
+    needs: dead-code-analysis
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Final Build Validation
+        run: |
+          echo "🏗️ Validating final workspace build..."
+          cargo check --workspace --all-targets --all-features
+
+      - name: Basic Test Suite
+        run: |
+          echo "🧪 Running basic test suite..."
+          cargo test --workspace --lib --bins
+
+      - name: Example Builds
+        run: |
+          echo "📝 Validating examples build..."
+          cargo build --workspace --examples || echo "Some examples failed to build"
+
+      - name: Benchmark Builds
+        run: |
+          echo "⚡ Validating benchmarks build..."
+          cargo build --workspace --benches || echo "Some benchmarks failed to build"

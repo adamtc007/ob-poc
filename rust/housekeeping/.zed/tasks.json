@@ -1,0 +1,21 @@
+{
+  "version": "1",
+  "tasks": [
+    {
+      "label": "Housekeeping: Sweep",
+      "command": "bash",
+      "args": [
+        "housekeeping/scripts/sweep.sh"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Housekeeping: Generate Report",
+      "command": "python3",
+      "args": [
+        "housekeeping/scripts/report.py"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}

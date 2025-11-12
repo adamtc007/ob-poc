@@ -188,15 +188,6 @@ impl VocabularyRegistry {
             .unwrap_or_default()
     }
 
-    /// Check if a verb is available for use
-    pub fn is_verb_available(&self, verb: &str) -> bool {
-        if let Some(entry) = self.registry.get(verb) {
-            entry.shared || !entry.deprecated
-        } else {
-            true // Verb doesn't exist, so it's available
-        }
-    }
-
     /// Get verb entry by fully-qualified name
     pub fn get_verb(&self, verb: &str) -> Option<&VerbRegistryEntry> {
         self.registry.get(verb)

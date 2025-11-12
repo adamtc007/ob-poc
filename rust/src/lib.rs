@@ -571,19 +571,9 @@ impl DSLContext {
         &self.grammar_engine
     }
 
-    /// Get mutable reference to the grammar engine
-    pub fn grammar_engine_mut(&mut self) -> &mut GrammarEngine {
-        &mut self.grammar_engine
-    }
-
     /// Get the current configuration
     pub fn config(&self) -> &DSLConfig {
         &self.config
-    }
-
-    /// Update configuration
-    pub fn update_config(&mut self, config: DSLConfig) {
-        self.config = config;
     }
 }
 

@@ -81,19 +81,8 @@ impl DataDictionary {
         }
     }
 
-    pub fn add_attribute(&mut self, attr: AttributeDefinition) {
-        self.attributes.insert(attr.attr_id.clone(), attr);
-    }
-
     pub fn get_attribute(&self, attr_id: &str) -> Option<&AttributeDefinition> {
         self.attributes.get(attr_id)
-    }
-
-    pub fn find_by_category(&self, category: &str) -> Vec<&AttributeDefinition> {
-        self.attributes
-            .values()
-            .filter(|a| a.ui_metadata.category == category)
-            .collect()
     }
 }
 

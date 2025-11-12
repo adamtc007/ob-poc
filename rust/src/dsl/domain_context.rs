@@ -72,12 +72,6 @@ impl DomainContext {
         self
     }
 
-    /// Set multiple business context values
-    pub fn with_contexts(mut self, contexts: HashMap<String, serde_json::Value>) -> Self {
-        self.business_context.extend(contexts);
-        self
-    }
-
     /// Set state requirements
     pub fn with_state_requirements(mut self, requirements: StateRequirements) -> Self {
         self.state_requirements = requirements;

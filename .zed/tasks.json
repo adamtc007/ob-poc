@@ -1,0 +1,188 @@
+{
+  "$schema": "https://zed.dev/schema/tasks.json",
+  "tasks": {
+    "dead-code-sweep": {
+      "label": "🧹 Dead Code Comprehensive Sweep",
+      "command": "bash",
+      "args": ["scripts/dead-code-sweep.sh"],
+      "cwd": "${ZED_WORKTREE_ROOT}",
+      "env": {
+        "RUST_BACKTRACE": "1"
+      },
+      "tags": ["cleanup", "analysis"],
+      "runInTerminal": true,
+      "hide": "never"
+    },
+    "unused-deps": {
+      "label": "📦 Check Unused Dependencies",
+      "command": "cargo",
+      "args": ["udeps", "--all-targets", "--workspace"],
+      "cwd": "${ZED_WORKTREE_ROOT}",
+      "tags": ["dependencies", "cleanup"]
+    },
+    "unused-deps-fast": {
+      "label": "📦 Quick Dependency Scan",
+      "command": "cargo",
+      "args": ["machete"],
+      "cwd": "${ZED_WORKTREE_ROOT}",
+      "tags": ["dependencies", "cleanup"]
+    },
+    "orphaned-api": {
+      "label": "🔍 Find Orphaned Public API",
+      "command": "warnalyzer",
+      "args": ["--workspace"],
+      "cwd": "${ZED_WORKTREE_ROOT}",
+      "tags": ["api", "cleanup"]
+    },
+    "generate-report": {
+      "label": "📊 Generate Ranked Report",
+      "command": "python3",
+      "args": ["scripts/generate-report.py"],
+      "cwd": "${ZED_WORKTREE_ROOT}",
+      "tags": ["analysis", "report"]
+    },
+    "install-tools": {
+      "label": "🛠️ Install Dead Code Analysis Tools",
+      "command": "bash",
+      "args": ["scripts/install-dead-code-tools.sh"],
+      "cwd": "${ZED_WORKTREE_ROOT}",
+      "tags": ["setup", "tools"],
+      "runInTerminal": true
+    },
+    "coverage-report": {
+      "label": "📈 Generate Coverage Report",
+      "command": "cargo",
+      "args": ["llvm-cov", "--workspace", "--all-features", "--html"],
+      "cwd": "${ZED_WORKTREE_ROOT}",
+      "tags": ["coverage", "analysis"]
+    },
+    "call-graph": {
+      "label": "📊 Generate Call Graph",
+      "command": "sh",
+      "args": [
+        "-c",
+        "cargo callgraph --lib > target/callgraph.dot && echo 'Call graph saved to target/callgraph.dot'"
+      ],
+      "cwd": "${ZED_WORKTREE_ROOT}",
+      "tags": ["analysis", "visualization"]
+    },
+    "clippy-fix": {
+      "label": "🔧 Apply Safe Clippy Fixes",
+      "command": "cargo",
+      "args": [
+        "clippy",
+        "--fix",
+        "--all-targets",
+        "--all-features",
+        "--allow-dirty",
+        "--allow-staged"
+      ],
+      "cwd": "${ZED_WORKTREE_ROOT}",
+      "tags": ["fix", "cleanup"]
+    },
+    "rustc-fix": {
+      "label": "🔧 Apply Rustc Fixes",
+      "command": "cargo",
+      "args": [
+        "fix",
+        "--all-targets",
+        "--all-features",
+        "--allow-dirty",
+        "--allow-staged"
+      ],
+      "cwd": "${ZED_WORKTREE_ROOT}",
+      "tags": ["fix", "cleanup"]
+    },
+    "feature-matrix": {
+      "label": "🎯 Validate Feature Matrix",
+      "command": "cargo",
+      "args": ["hack", "check", "--workspace", "--each-feature"],
+      "cwd": "${ZED_WORKTREE_ROOT}",
+      "tags": ["validation", "features"],
+      "runInTerminal": true
+    },
+    "build-all": {
+      "label": "🏗️ Build All Targets",
+      "command": "cargo",
+      "args": ["build", "--workspace", "--all-targets", "--all-features"],
+      "cwd": "${ZED_WORKTREE_ROOT}",
+      "tags": ["build", "validation"]
+    },
+    "test-all": {
+      "label": "🧪 Run All Tests",
+      "command": "cargo",
+      "args": ["test", "--workspace", "--all-targets", "--all-features"],
+      "cwd": "${ZED_WORKTREE_ROOT}",
+      "tags": ["test", "validation"]
+    },
+    "full-workflow": {
+      "label": "🎯 Complete Dead Code Analysis",
+      "command": "sh",
+      "args": [
+        "-c",
+        "./scripts/dead-code-sweep.sh && python3 scripts/generate-report.py && echo 'Analysis complete! Check target/housekeeping/housekeeping_report.md'"
+      ],
+      "cwd": "${ZED_WORKTREE_ROOT}",
+      "tags": ["workflow", "complete"],
+      "runInTerminal": true
+    },
+    "clean-reports": {
+      "label": "🗑️ Clean Analysis Reports",
+      "command": "rm",
+      "args": ["-rf", "target/dead-code-reports"],
+      "cwd": "${ZED_WORKTREE_ROOT}",
+      "tags": ["cleanup"]
+    },
+    "public-api-diff": {
+      "label": "📋 Public API Diff",
+      "command": "cargo",
+      "args": ["public-api", "--diff-git", "HEAD~1"],
+      "cwd": "${ZED_WORKTREE_ROOT}",
+      "tags": ["api", "diff"]
+    },
+    "semver-check": {
+      "label": "🔖 Semantic Version Check",
+      "command": "cargo",
+      "args": ["semver-checks"],
+      "cwd": "${ZED_WORKTREE_ROOT}",
+      "tags": ["semver", "validation"]
+    },
+    "unreachable-pub": {
+      "label": "🚫 Find Unreachable Public Items",
+      "command": "sh",
+      "args": [
+        "-c",
+        "find src -name '*.rs' -exec grep -l '#!\\[.*unreachable_pub' {} \\; || echo 'Add #![deny(unreachable_pub)] to crate roots first'"
+      ],
+      "cwd": "${ZED_WORKTREE_ROOT}",
+      "tags": ["lint", "api"]
+    },
+    "open-coverage": {
+      "label": "🌐 Open Coverage Report",
+      "command": "sh",
+      "args": [
+        "-c",
+        "open target/dead-code-reports/coverage/index.html || xdg-open target/dead-code-reports/coverage/index.html || echo 'Coverage report not found. Run coverage-report task first.'"
+      ],
+      "cwd": "${ZED_WORKTREE_ROOT}",
+      "tags": ["coverage", "view"]
+    },
+    "view-reports": {
+      "label": "📁 View All Reports",
+      "command": "ls",
+      "args": ["-la", "target/housekeeping/"],
+      "cwd": "${ZED_WORKTREE_ROOT}",
+      "tags": ["view", "reports"]
+    },
+    "open-report": {
+      "label": "📖 Open Ranked Report",
+      "command": "sh",
+      "args": [
+        "-c",
+        "open target/housekeeping/housekeeping_report.md || xdg-open target/housekeeping/housekeeping_report.md || echo 'Report not found. Run generate-report task first.'"
+      ],
+      "cwd": "${ZED_WORKTREE_ROOT}",
+      "tags": ["view", "report"]
+    }
+  }
+}
