@@ -341,6 +341,7 @@ impl AgenticCrudService {
                     applicable_grammar: Vec::new(),
                     similar_examples: Vec::new(),
                     confidence_score: 0.0,
+                    sources: vec![],
                 }
             }
         };
@@ -482,19 +483,23 @@ impl AgenticCrudService {
 
         let ai_request = AiDslRequest {
             instruction: request.instruction.clone(),
-            current_dsl: None,
-            context,
-            response_type: AiResponseType::GenerateDsl,
-            constraints: request.constraints.clone().unwrap_or_default(),
+            context: Some(context),
+            response_type: AiResponseType::DslGeneration,
+            temperature: Some(0.1),
+            max_tokens: Some(1000),
         };
 
+        // Send request to AI client
         let ai_response = self
             .ai_client
-            .request_dsl(ai_request)
+            .generate_dsl(ai_request)
             .await
             .context("AI DSL generation failed")?;
 
-        Ok((ai_response.dsl_content, ai_response.confidence))
+        Ok((
+            ai_response.generated_dsl,
+            ai_response.confidence.unwrap_or(0.5),
+        ))
     }
 
     /// Execute CRUD operation against database
@@ -794,19 +799,19 @@ impl MockAiClient {
 
         if instruction_lower.contains("create") || instruction_lower.contains("add") {
             self.responses.get("create").cloned().unwrap_or_else(|| {
-                r#"{"dsl_content": "(data.create :asset \"cbu\" :values {:name \"Mock CBU\"})", "explanation": "Created mock CBU", "confidence": 0.9, "changes": [], "warnings": [], "suggestions": []}"#.to_string()
+                r#"{"generated_dsl": "(data.create :asset \"cbu\" :values {:name \"Mock CBU\"})", "explanation": "Created mock CBU", "confidence": 0.9, "changes": [], "warnings": [], "suggestions": []}"#.to_string()
             })
         } else if instruction_lower.contains("update") || instruction_lower.contains("modify") {
             self.responses.get("update").cloned().unwrap_or_else(|| {
-                r#"{"dsl_content": "(data.update :asset \"cbu\" :where {:name \"Test\"} :values {:description \"Updated\"})", "explanation": "Updated mock CBU", "confidence": 0.9, "changes": [], "warnings": [], "suggestions": []}"#.to_string()
+                r#"{"generated_dsl": "(data.update :asset \"cbu\" :where {:name \"Test\"} :values {:description \"Updated\"})", "explanation": "Updated mock CBU", "confidence": 0.9, "changes": [], "warnings": [], "suggestions": []}"#.to_string()
             })
         } else if instruction_lower.contains("delete") || instruction_lower.contains("remove") {
             self.responses.get("delete").cloned().unwrap_or_else(|| {
-                r#"{"dsl_content": "(data.delete :asset \"cbu\" :where {:name \"Test\"})", "explanation": "Deleted mock CBU", "confidence": 0.9, "changes": [], "warnings": [], "suggestions": []}"#.to_string()
+                r#"{"generated_dsl": "(data.delete :asset \"cbu\" :where {:name \"Test\"})", "explanation": "Deleted mock CBU", "confidence": 0.9, "changes": [], "warnings": [], "suggestions": []}"#.to_string()
             })
         } else {
             self.responses.get("read").cloned().unwrap_or_else(|| {
-                r#"{"dsl_content": "(data.read :asset \"cbu\" :select [\"name\"])", "explanation": "Read mock CBUs", "confidence": 0.9, "changes": [], "warnings": [], "suggestions": []}"#.to_string()
+                r#"{"generated_dsl": "(data.read :asset \"cbu\" :select [\"name\"])", "explanation": "Read mock CBUs", "confidence": 0.9, "changes": [], "warnings": [], "suggestions": []}"#.to_string()
             })
         }
     }
@@ -814,7 +819,7 @@ impl MockAiClient {
 
 #[async_trait::async_trait]
 impl AiService for MockAiClient {
-    async fn request_dsl(
+    async fn generate_dsl(
         &self,
         request: AiDslRequest,
     ) -> crate::ai::AiResult<crate::ai::AiDslResponse> {
@@ -822,15 +827,15 @@ impl AiService for MockAiClient {
         let parsed = crate::ai::utils::parse_structured_response(&response_content)?;
 
         Ok(crate::ai::AiDslResponse {
-            dsl_content: parsed["dsl_content"].as_str().unwrap_or("").to_string(),
+            generated_dsl: parsed["generated_dsl"].as_str().unwrap_or("").to_string(),
             explanation: parsed["explanation"]
                 .as_str()
                 .unwrap_or("Mock response")
                 .to_string(),
-            confidence: parsed["confidence"].as_f64().unwrap_or(0.9),
-            changes: vec![],
-            warnings: vec![],
-            suggestions: vec![],
+            confidence: Some(parsed["confidence"].as_f64().unwrap_or(0.9)),
+            changes: Some(vec![]),
+            warnings: Some(vec![]),
+            suggestions: Some(vec![]),
         })
     }
 
@@ -882,8 +887,8 @@ mod tests {
         let config = ServiceConfig {
             ai_provider: AiProvider::Mock {
                 responses: [
-                    ("create".to_string(), r#"{"dsl_content": "(data.create :asset \"cbu\" :values {:name \"Test CBU\"})", "explanation": "Created test CBU", "confidence": 0.9, "changes": [], "warnings": [], "suggestions": []}"#.to_string()),
-                    ("read".to_string(), r#"{"dsl_content": "(data.read :asset \"cbu\" :select [\"name\"])", "explanation": "Read CBUs", "confidence": 0.9, "changes": [], "warnings": [], "suggestions": []}"#.to_string()),
+                    ("create".to_string(), r#"{"generated_dsl": "(data.create :asset \"cbu\" :values {:name \"Test CBU\"})", "explanation": "Created test CBU", "confidence": 0.9, "changes": [], "warnings": [], "suggestions": []}"#.to_string()),
+                    ("read".to_string(), r#"{"generated_dsl": "(data.read :asset \"cbu\" :select [\"name\"])", "explanation": "Read CBUs", "confidence": 0.9, "changes": [], "warnings": [], "suggestions": []}"#.to_string()),
                 ].iter().cloned().collect(),
             },
             model_config: ModelConfig::default(),

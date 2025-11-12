@@ -6,6 +6,7 @@
 //! intelligent DSL editing suggestions.
 
 pub mod agentic_crud_service;
+pub mod agentic_dictionary_service;
 pub mod agentic_document_service;
 pub mod crud_prompt_builder;
 pub mod gemini;
@@ -53,58 +54,58 @@ pub struct AiDslRequest {
     /// The instruction or question for the AI
     pub instruction: String,
 
-    /// Current DSL content (if any)
-    pub current_dsl: Option<String>,
-
-    /// Business context for the request
-    pub context: HashMap<String, String>,
+    /// Optional context for the request
+    pub context: Option<HashMap<String, String>>,
 
     /// Expected response type
     pub response_type: AiResponseType,
 
-    /// Additional constraints or requirements
-    pub constraints: Vec<String>,
+    /// Temperature for AI generation
+    pub temperature: Option<f64>,
+
+    /// Maximum tokens for response
+    pub max_tokens: Option<u32>,
 }
 
 /// Type of AI response expected
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AiResponseType {
     /// Generate new DSL from scratch
-    GenerateDsl,
+    DslGeneration,
 
     /// Transform existing DSL
-    TransformDsl,
+    DslTransformation,
 
     /// Validate DSL and provide feedback
-    ValidateDsl,
+    DslValidation,
 
     /// Explain DSL structure and meaning
-    ExplainDsl,
+    DslExplanation,
 
     /// Suggest improvements to DSL
-    SuggestImprovements,
+    DslSuggestions,
 }
 
 /// AI response containing DSL and metadata
 #[derive(Debug, Clone, Deserialize)]
 pub struct AiDslResponse {
     /// Generated or transformed DSL content
-    pub dsl_content: String,
+    pub generated_dsl: String,
 
     /// Explanation of what was done
     pub explanation: String,
 
     /// Confidence score (0.0 - 1.0)
-    pub confidence: f64,
+    pub confidence: Option<f64>,
 
     /// List of changes made (for transformations)
-    pub changes: Vec<String>,
+    pub changes: Option<Vec<String>>,
 
     /// Warnings or concerns about the DSL
-    pub warnings: Vec<String>,
+    pub warnings: Option<Vec<String>>,
 
     /// Suggestions for improvement
-    pub suggestions: Vec<String>,
+    pub suggestions: Option<Vec<String>>,
 }
 
 /// Errors that can occur during AI operations
@@ -138,8 +139,8 @@ pub type AiResult<T> = Result<T, AiError>;
 /// Trait for AI service implementations
 #[async_trait::async_trait]
 pub trait AiService {
-    /// Send a DSL request to the AI service
-    async fn request_dsl(&self, request: AiDslRequest) -> AiResult<AiDslResponse>;
+    /// Generate DSL from natural language instruction
+    async fn generate_dsl(&self, request: AiDslRequest) -> AiResult<AiDslResponse>;
 
     /// Check if the service is available
     async fn health_check(&self) -> AiResult<bool>;

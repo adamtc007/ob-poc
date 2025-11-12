@@ -349,7 +349,7 @@ RESPONSE FORMAT - Respond ONLY with valid JSON:
 
 #[async_trait::async_trait]
 impl AiService for GeminiClient {
-    async fn request_dsl(&self, request: AiDslRequest) -> AiResult<AiDslResponse> {
+    async fn generate_dsl(&self, request: AiDslRequest) -> AiResult<AiDslResponse> {
         info!("Processing DSL request: {:?}", request.response_type);
 
         let system_prompt = self.build_system_prompt(&request);

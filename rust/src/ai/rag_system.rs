@@ -76,6 +76,7 @@ pub struct RetrievedContext {
     pub applicable_grammar: Vec<VerbPattern>,
     pub similar_examples: Vec<CrudExample>,
     pub confidence_score: f64,
+    pub sources: Vec<String>,
 }
 
 impl CrudRagSystem {
@@ -124,6 +125,80 @@ impl CrudRagSystem {
             applicable_grammar,
             similar_examples,
             confidence_score,
+            sources: vec![
+                "Asset schema matching".to_string(),
+                "Operation type detection".to_string(),
+                "Similar example retrieval".to_string(),
+            ],
+        })
+    }
+
+    /// Retrieves context for a specific operation type and instruction
+    pub async fn retrieve_context_for_operation(
+        &self,
+        operation_verb: &str,
+        instruction: &str,
+    ) -> Result<RetrievedContext> {
+        // Extract asset type from operation verb (e.g., "attribute.create" -> "attribute")
+        let asset_type = if let Some(dot_pos) = operation_verb.find('.') {
+            &operation_verb[..dot_pos]
+        } else {
+            "unknown"
+        };
+
+        // Get schema for this asset type
+        let relevant_schemas = if let Some(schema) = self.asset_schemas.get(asset_type) {
+            vec![schema.clone()]
+        } else {
+            // Fallback to general context retrieval
+            return self.retrieve_context(instruction);
+        };
+
+        // Find applicable grammar patterns
+        let applicable_grammar: Vec<VerbPattern> = self
+            .grammar_rules
+            .verb_patterns
+            .values()
+            .filter(|pattern| {
+                pattern.verb.starts_with(asset_type)
+                    || pattern.verb.contains(&format!(
+                        ".{}",
+                        operation_verb.split('.').last().unwrap_or("")
+                    ))
+            })
+            .cloned()
+            .collect();
+
+        // Find examples for this asset type and operation
+        let similar_examples: Vec<CrudExample> = self
+            .examples
+            .iter()
+            .filter(|example| {
+                example.assets_used.contains(&asset_type.to_string())
+                    || example.dsl_output.contains(operation_verb)
+                    || self.calculate_similarity(
+                        &example.natural_language.to_lowercase(),
+                        &instruction.to_lowercase(),
+                    ) > 0.3
+            })
+            .take(3)
+            .cloned()
+            .collect();
+
+        // Calculate confidence
+        let confidence_score =
+            self.calculate_confidence(&relevant_schemas, &applicable_grammar, &similar_examples);
+
+        Ok(RetrievedContext {
+            relevant_schemas,
+            applicable_grammar,
+            similar_examples,
+            confidence_score,
+            sources: vec![
+                format!("Schema for {}", asset_type),
+                format!("Grammar patterns for {}", operation_verb),
+                format!("Examples for {} operations", asset_type),
+            ],
         })
     }
 

@@ -197,15 +197,15 @@ impl AiDslService {
         let ai_response = self.generate_onboarding_dsl(&request, &cbu_id).await?;
         info!(
             "AI DSL generation completed with confidence: {:.2}",
-            ai_response.confidence
+            ai_response.confidence.unwrap_or(0.5)
         );
 
         // Step 3: Validate generated DSL
-        self.validate_generated_dsl(&ai_response.dsl_content)?;
+        self.validate_generated_dsl(&ai_response.generated_dsl)?;
 
         // Step 4: Simulate DSL execution (no database dependency)
         let dsl_instance = self
-            .simulate_dsl_execution(&ai_response.dsl_content, &cbu_id)
+            .simulate_dsl_execution(&ai_response.generated_dsl, &cbu_id)
             .await?;
         info!(
             "DSL simulation completed, instance ID: {}",
@@ -217,9 +217,9 @@ impl AiDslService {
         Ok(AiOnboardingResponse {
             cbu_id,
             dsl_instance,
-            generated_dsl: ai_response.dsl_content,
+            generated_dsl: ai_response.generated_dsl,
             ai_explanation: ai_response.explanation,
-            ai_confidence: ai_response.confidence,
+            ai_confidence: ai_response.confidence.unwrap_or(0.5),
             execution_details: ExecutionDetails {
                 template_used: "onboarding".to_string(),
                 compilation_successful: true,
@@ -227,8 +227,8 @@ impl AiDslService {
                 storage_keys: None, // TODO: Get from DSL manager response
                 execution_time_ms: execution_time,
             },
-            warnings: ai_response.warnings,
-            suggestions: ai_response.suggestions,
+            warnings: ai_response.warnings.unwrap_or_default(),
+            suggestions: ai_response.suggestions.unwrap_or_default(),
         })
     }
 
@@ -262,21 +262,15 @@ impl AiDslService {
                 request.instruction,
                 request.services.join(", ")
             ),
-            current_dsl: None,
-            context,
-            response_type: AiResponseType::GenerateDsl,
-            constraints: vec![
-                "Use approved DSL v3.1 verbs only".to_string(),
-                "Include case.create with the provided CBU ID".to_string(),
-                "Add products.add for requested services".to_string(),
-                "Include kyc.start with appropriate jurisdictional requirements".to_string(),
-                "Generate syntactically correct S-expressions".to_string(),
-                "Include proper business context and metadata".to_string(),
-            ],
+
+            context: Some(context),
+            response_type: AiResponseType::DslGeneration,
+            temperature: Some(0.1),
+            max_tokens: Some(2000),
         };
 
         self.ai_client
-            .request_dsl(ai_request)
+            .generate_dsl(ai_request)
             .await
             .map_err(AiDslServiceError::AiError)
     }
@@ -367,23 +361,18 @@ impl AiDslService {
     /// Validate AI-generated DSL using AI validation
     pub async fn validate_dsl_with_ai(&self, dsl_content: &str) -> AiDslResult<ValidationResult> {
         let ai_request = AiDslRequest {
-            instruction: "Validate this DSL for syntax correctness, vocabulary compliance, and business logic".to_string(),
-            current_dsl: Some(dsl_content.to_string()),
-            context: HashMap::new(),
-            response_type: AiResponseType::ValidateDsl,
-            constraints: vec![
-                "Check S-expression syntax".to_string(),
-                "Validate against approved DSL v3.1 vocabulary".to_string(),
-                "Check business logic consistency".to_string(),
-                "Flag any issues or improvements".to_string(),
-            ],
+            instruction: format!("Validate this DSL for syntax correctness, vocabulary compliance, and business logic: {}", dsl_content),
+            context: Some(HashMap::new()),
+            response_type: AiResponseType::DslValidation,
+            temperature: Some(0.1),
+            max_tokens: Some(1000),
         };
 
-        match self.ai_client.request_dsl(ai_request).await {
+        match self.ai_client.generate_dsl(ai_request).await {
             Ok(response) => Ok(ValidationResult {
-                valid: response.warnings.is_empty(),
-                confidence: response.confidence,
-                issues: response.warnings,
+                valid: response.warnings.as_ref().map_or(true, |w| w.is_empty()),
+                confidence: response.confidence.unwrap_or(0.5),
+                issues: response.warnings.unwrap_or_default(),
                 suggestions: response.suggestions,
                 explanation: response.explanation,
             }),

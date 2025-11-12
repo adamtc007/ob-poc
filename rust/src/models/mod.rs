@@ -4,6 +4,7 @@
 //! DSL domains, versions, AST storage, and execution tracking in the database.
 
 pub mod business_request_models;
+pub mod dictionary_models;
 pub mod document_models;
 pub mod domain_models;
 pub mod entity_models;
@@ -30,6 +31,17 @@ pub use document_models::{
     DocumentUsageContext, DocumentValidationResult, ExtractionStatus, NewDocumentCatalog,
     NewDocumentMetadata, NewDocumentRelationship, NewDocumentUsage, UpdateDocumentCatalog,
     ValidationError,
+};
+
+pub use dictionary_models::{
+    AgenticAttributeCreateRequest, AgenticAttributeCrudResponse, AgenticAttributeDeleteRequest,
+    AgenticAttributeDiscoverRequest, AgenticAttributeReadRequest, AgenticAttributeSearchRequest,
+    AgenticAttributeUpdateRequest, AgenticAttributeValidateRequest, AttributeAssetType,
+    AttributeBatchItemResult, AttributeBatchRequest, AttributeBatchResult,
+    AttributeDiscoveryRequest, AttributeOperationType, AttributeSearchCriteria,
+    AttributeValidationRequest, AttributeValidationResult, DictionaryAttribute,
+    DictionaryAttributeWithMetadata, DictionaryExecutionStatus, DictionaryHealthCheck,
+    DictionaryStatistics, DiscoveredAttribute, NewDictionaryAttribute, UpdateDictionaryAttribute,
 };
 
 pub use entity_models::{
