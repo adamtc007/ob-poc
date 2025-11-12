@@ -13,11 +13,8 @@
 
 use anyhow::{Context, Result};
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
-use tokio::time::sleep;
-use tracing::{error, info, warn};
-use uuid::Uuid;
+
+use tracing::info;
 
 #[cfg(feature = "database")]
 use ob_poc::ai::agentic_dictionary_service::{AgenticDictionaryService, DictionaryServiceConfig};
@@ -550,18 +547,6 @@ async fn demonstrate_performance(db_manager: &DatabaseManager) -> Result<()> {
     info!("🎯 Performance test completed in {:?}", total_time);
 
     Ok(())
-}
-
-fn mask_database_url(url: &str) -> String {
-    if let Ok(parsed) = url::Url::parse(url) {
-        let mut masked = parsed.clone();
-        if parsed.password().is_some() {
-            let _ = masked.set_password(Some("***"));
-        }
-        masked.to_string()
-    } else {
-        "postgresql://***:***@localhost:5432/ob-poc".to_string()
-    }
 }
 
 #[cfg(feature = "database")]
