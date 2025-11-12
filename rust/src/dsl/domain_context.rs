@@ -61,7 +61,7 @@ impl DomainContext {
     }
 
     /// Set subdomain for fine-grained routing
-    pub fn with_subdomain(mut self, subdomain: impl Into<String>) -> Self {
+    pub(crate) fn with_subdomain(mut self, subdomain: impl Into<String>) -> Self {
         self.subdomain = Some(subdomain.into());
         self
     }
@@ -73,7 +73,7 @@ impl DomainContext {
     }
 
     /// Set domain version
-    pub fn with_version(mut self, version: impl Into<String>) -> Self {
+    pub(crate) fn with_version(mut self, version: impl Into<String>) -> Self {
         self.domain_version = version.into();
         self
     }
@@ -89,7 +89,7 @@ impl DomainContext {
     }
 
     /// Get required business context value by key
-    pub fn get_required_context<T>(&self, key: &str) -> Result<T, String>
+    pub(crate) fn get_required_context<T>(&self, key: &str) -> Result<T, String>
     where
         T: for<'de> Deserialize<'de>,
     {
@@ -98,7 +98,7 @@ impl DomainContext {
     }
 
     /// Get full domain identifier including subdomain
-    pub fn full_domain_name(&self) -> String {
+    pub(crate) fn full_domain_name(&self) -> String {
         match &self.subdomain {
             Some(sub) => format!("{}.{}", self.domain_name, sub),
             None => self.domain_name.clone(),
@@ -106,7 +106,7 @@ impl DomainContext {
     }
 
     /// Check if this context matches a domain pattern
-    pub fn matches_domain(&self, pattern: &str) -> bool {
+    pub(crate) fn matches_domain(&self, pattern: &str) -> bool {
         let full_name = self.full_domain_name();
 
         // Exact match
@@ -165,7 +165,7 @@ impl Default for StateRequirements {
 
 impl StateRequirements {
     /// Create permissive state requirements (no validation)
-    pub fn permissive() -> Self {
+    pub(crate) fn permissive() -> Self {
         Self {
             strict_validation: false,
             ..Default::default()
@@ -183,13 +183,13 @@ impl StateRequirements {
     }
 
     /// Add a state validation rule
-    pub fn with_rule(mut self, rule: StateValidationRule) -> Self {
+    pub(crate) fn with_rule(mut self, rule: StateValidationRule) -> Self {
         self.validation_rules.push(rule);
         self
     }
 
     /// Add transition metadata
-    pub fn with_metadata(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
+    pub(crate) fn with_metadata(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
         self.transition_metadata.insert(key.into(), value);
         self
     }
@@ -197,7 +197,7 @@ impl StateRequirements {
 
 /// State validation rule for custom domain logic
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StateValidationRule {
+pub(crate) struct StateValidationRule {
     /// Rule identifier
     pub rule_id: String,
 
@@ -213,7 +213,7 @@ pub struct StateValidationRule {
 
 /// Types of state validation rules
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum StateValidationRuleType {
+pub(crate) enum StateValidationRuleType {
     /// Require specific attribute to have a value
     RequireAttribute { attribute_id: Uuid },
 

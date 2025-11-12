@@ -9,13 +9,13 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Grammar storage manager for database operations
-pub struct GrammarStorage {
+pub(crate) struct GrammarStorage {
     db_pool: PgPool,
     cache: HashMap<String, GrammarRule>,
 }
 
 #[derive(Debug)]
-pub struct StorageOptions {
+pub(crate) struct StorageOptions {
     pub enable_caching: bool,
     pub cache_ttl_seconds: u64,
     pub batch_size: usize,
@@ -41,7 +41,7 @@ impl GrammarStorage {
     }
 
     /// Create with custom options
-    pub fn with_options(db_pool: PgPool, _options: StorageOptions) -> Self {
+    pub(crate) fn with_options(db_pool: PgPool, _options: StorageOptions) -> Self {
         Self::new(db_pool)
     }
 
@@ -94,7 +94,7 @@ impl GrammarStorage {
     }
 
     /// Get cache statistics
-    pub fn get_cache_stats(&self) -> CacheStats {
+    pub(crate) fn get_cache_stats(&self) -> CacheStats {
         CacheStats {
             entries: self.cache.len(),
             memory_usage_estimate: self.cache.len() * 1024, // Rough estimate
@@ -103,7 +103,7 @@ impl GrammarStorage {
 }
 
 #[derive(Debug)]
-pub struct CacheStats {
+pub(crate) struct CacheStats {
     pub entries: usize,
     pub memory_usage_estimate: usize,
 }

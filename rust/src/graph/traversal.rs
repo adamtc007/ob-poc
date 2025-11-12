@@ -3,7 +3,7 @@
 use super::*;
 use crate::ast::EdgeType;
 
-pub struct GraphTraversal<'a> {
+pub(crate) struct GraphTraversal<'a> {
     graph: &'a PropertyGraph,
 }
 
@@ -13,7 +13,7 @@ impl<'a> GraphTraversal<'a> {
     }
 
     /// Find all paths from target to terminal nodes (e.g., Person nodes)
-    pub fn find_ownership_paths(&self, start_node: &str, max_depth: usize) -> Vec<OwnershipPath> {
+    pub(crate) fn find_ownership_paths(&self, start_node: &str, max_depth: usize) -> Vec<OwnershipPath> {
         let mut paths = Vec::new();
         let mut current_path = Vec::new();
 
@@ -80,7 +80,7 @@ impl<'a> GraphTraversal<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct OwnershipPath {
+pub(crate) struct OwnershipPath {
     pub nodes: Vec<String>,
     pub effective_ownership: f64,
 }

@@ -18,7 +18,7 @@ use crate::data_dictionary::AttributeId;
 use crate::dsl::operations::ExecutableDslOperation as DslOperation;
 
 /// HTTP-based integration for REST APIs
-pub struct HttpIntegration {
+pub(crate) struct HttpIntegration {
     base_url: String,
     client: Client,
     headers: HashMap<String, String>,
@@ -37,16 +37,16 @@ impl HttpIntegration {
         })
     }
 
-    pub fn with_header(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+    pub(crate) fn with_header(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
         self.headers.insert(key.into(), value.into());
         self
     }
 
-    pub fn with_auth_token(self, token: impl Into<String>) -> Self {
+    pub(crate) fn with_auth_token(self, token: impl Into<String>) -> Self {
         self.with_header("Authorization", format!("Bearer {}", token.into()))
     }
 
-    pub fn with_api_key(self, key: impl Into<String>) -> Self {
+    pub(crate) fn with_api_key(self, key: impl Into<String>) -> Self {
         self.with_header("X-API-Key", key.into())
     }
 
@@ -148,7 +148,7 @@ impl ExternalIntegration for HttpIntegration {
 }
 
 /// Risk Engine Integration
-pub struct RiskEngineIntegration {
+pub(crate) struct RiskEngineIntegration {
     http: HttpIntegration,
 }
 
@@ -265,7 +265,7 @@ impl RiskEngineIntegration {
 }
 
 /// Document Store Integration
-pub struct DocumentStoreIntegration {
+pub(crate) struct DocumentStoreIntegration {
     http: HttpIntegration,
 }
 
@@ -366,7 +366,7 @@ impl DocumentStoreIntegration {
 }
 
 /// CRS (Common Reporting Standard) Compliance Integration
-pub struct CrsComplianceIntegration {
+pub(crate) struct CrsComplianceIntegration {
     http: HttpIntegration,
 }
 
@@ -477,7 +477,7 @@ impl CrsComplianceIntegration {
 }
 
 /// Mock Integration for Testing and Development
-pub struct MockIntegration {
+pub(crate) struct MockIntegration {
     name: String,
     responses: HashMap<String, Value>,
 }
@@ -525,7 +525,7 @@ impl MockIntegration {
         }
     }
 
-    pub fn with_response(mut self, key: impl Into<String>, response: Value) -> Self {
+    pub(crate) fn with_response(mut self, key: impl Into<String>, response: Value) -> Self {
         self.responses.insert(key.into(), response);
         self
     }
@@ -572,7 +572,7 @@ impl ExternalIntegration for MockIntegration {
 }
 
 /// Integration registry for managing multiple external integrations
-pub struct IntegrationRegistry {
+pub(crate) struct IntegrationRegistry {
     integrations: HashMap<String, std::sync::Arc<dyn ExternalIntegration>>,
 }
 
@@ -605,7 +605,7 @@ impl IntegrationRegistry {
         integration.execute(operation, context).await
     }
 
-    pub fn list_integrations(&self) -> Vec<&str> {
+    pub(crate) fn list_integrations(&self) -> Vec<&str> {
         self.integrations.keys().map(|k| k.as_str()).collect()
     }
 }
@@ -617,7 +617,7 @@ impl Default for IntegrationRegistry {
 }
 
 /// Factory function to create standard integrations for development
-pub fn create_standard_integrations() -> IntegrationRegistry {
+pub(crate) fn create_standard_integrations() -> IntegrationRegistry {
     let mut registry = IntegrationRegistry::new();
 
     // Add mock integrations for development
@@ -635,7 +635,7 @@ pub fn create_standard_integrations() -> IntegrationRegistry {
 }
 
 /// Factory function to create production integrations (requires environment variables)
-pub fn create_production_integrations() -> Result<IntegrationRegistry> {
+pub(crate) fn create_production_integrations() -> Result<IntegrationRegistry> {
     let mut registry = IntegrationRegistry::new();
 
     // Risk Engine Integration

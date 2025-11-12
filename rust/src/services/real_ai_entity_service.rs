@@ -15,7 +15,7 @@ use tokio::sync::{Mutex, Semaphore};
 use tracing::{debug, error, info, warn};
 
 /// Real AI Entity Service with production API integration
-pub struct RealAiEntityService {
+pub(crate) struct RealAiEntityService {
     /// HTTP client for API requests
     client: Client,
     /// OpenAI configuration and credentials
@@ -34,7 +34,7 @@ pub struct RealAiEntityService {
 
 /// OpenAI API configuration
 #[derive(Debug, Clone)]
-pub struct OpenAiConfig {
+pub(crate) struct OpenAiConfig {
     pub api_key: String,
     pub model: String,
     pub base_url: String,
@@ -45,7 +45,7 @@ pub struct OpenAiConfig {
 
 /// Gemini API configuration
 #[derive(Debug, Clone)]
-pub struct GeminiConfig {
+pub(crate) struct GeminiConfig {
     pub api_key: String,
     pub model: String,
     pub base_url: String,
@@ -56,7 +56,7 @@ pub struct GeminiConfig {
 
 /// AI service configuration
 #[derive(Debug, Clone)]
-pub struct AiServiceConfig {
+pub(crate) struct AiServiceConfig {
     /// Maximum concurrent requests
     pub max_concurrent_requests: usize,
     /// Request timeout in seconds
@@ -73,7 +73,7 @@ pub struct AiServiceConfig {
 
 /// Usage tracking for cost management
 #[derive(Debug, Default)]
-pub struct UsageTracker {
+pub(crate) struct UsageTracker {
     pub total_requests: u64,
     pub successful_requests: u64,
     pub failed_requests: u64,
@@ -93,7 +93,7 @@ pub enum AiProvider {
 
 /// AI request for entity DSL generation
 #[derive(Debug, Clone)]
-pub struct AiEntityRequest {
+pub(crate) struct AiEntityRequest {
     pub instruction: String,
     pub entity_type: String,
     pub context: HashMap<String, serde_json::Value>,
@@ -103,7 +103,7 @@ pub struct AiEntityRequest {
 
 /// AI response with generated DSL
 #[derive(Debug, Clone)]
-pub struct AiEntityResponse {
+pub(crate) struct AiEntityResponse {
     pub dsl_content: String,
     pub confidence: f64,
     pub provider_used: AiProvider,

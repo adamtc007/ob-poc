@@ -7,7 +7,7 @@
 
 // pub mod agentic_crud_service;  // Temporarily disabled due to gemini dependency
 pub mod agentic_dictionary_service;
-pub mod agentic_document_service;
+pub(crate) mod agentic_document_service;
 pub mod crud_prompt_builder;
 pub mod dsl_service;
 // pub mod gemini;  // Temporarily disabled due to API compatibility issues
@@ -180,7 +180,7 @@ pub mod utils {
     }
 
     /// Extract confidence score from AI response
-    pub fn extract_confidence(response: &str) -> f64 {
+    pub(crate) fn extract_confidence(response: &str) -> f64 {
         // Look for confidence indicators in the response
         if response.contains("high confidence") || response.contains("very confident") {
             0.9

@@ -324,7 +324,7 @@ impl CentralDslEditor {
 
 /// Configuration for the central DSL editor
 #[derive(Debug, Clone)]
-pub struct EditorConfig {
+pub(crate) struct EditorConfig {
     /// Whether to update instance metadata after each edit
     pub update_instance_metadata: bool,
 
@@ -355,7 +355,7 @@ impl Default for EditorConfig {
 
 /// Statistics and health information for the editor
 #[derive(Debug, Serialize, Deserialize)]
-pub struct EditorStats {
+pub(crate) struct EditorStats {
     pub total_domains: usize,
     pub healthy_domains: usize,
     pub operations_processed: u64,
@@ -366,7 +366,7 @@ pub struct EditorStats {
 
 /// Simplified DSL instance version for Phase 1
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SimpleDslInstanceVersion {
+pub(crate) struct SimpleDslInstanceVersion {
     pub version_id: Uuid,
     pub instance_id: Uuid,
     pub version_number: i32,

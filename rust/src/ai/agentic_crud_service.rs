@@ -25,7 +25,7 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 /// Agentic CRUD Service that orchestrates AI-powered CRUD operations via DSL Manager
-pub struct AgenticCrudService {
+pub(crate) struct AgenticCrudService {
     /// DSL Manager - Central gateway for ALL DSL operations
     dsl_manager: Arc<DslManager>,
     /// Database connection pool
@@ -99,7 +99,7 @@ pub struct AgenticCrudRequest {
 
 /// Response from agentic CRUD operation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgenticCrudResponse {
+pub(crate) struct AgenticCrudResponse {
     /// Generated DSL statement
     pub generated_dsl: String,
     /// Parsed CRUD statement (if successful)
@@ -120,7 +120,7 @@ pub struct AgenticCrudResponse {
 
 /// Metadata about AI generation process
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GenerationMetadata {
+pub(crate) struct GenerationMetadata {
     /// Time taken for RAG retrieval (ms)
     pub rag_time_ms: u64,
     /// Time taken for AI generation (ms)
@@ -754,7 +754,7 @@ pub struct HealthStatus {
 
 /// Service statistics
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ServiceStatistics {
+pub(crate) struct ServiceStatistics {
     pub total_operations: u64,
     pub successful_operations: u64,
     pub cache_size: u64,

@@ -6,10 +6,10 @@
 //! NOTE: All services now delegate to DSL Manager as the single entry point
 //! for DSL operations. This ensures proper lifecycle management and consistency.
 
-pub mod ai_dsl_service;
+pub(crate) mod ai_dsl_service;
 
 // Re-export service types for backwards compatibility
-pub use ai_dsl_service::{
+pub(crate) use ai_dsl_service::{
     AiDslService, AiOnboardingRequest, AiOnboardingResponse, CbuGenerator, DslInstanceSummary,
     ExecutionDetails, HealthCheckResult, ValidationResult,
 };

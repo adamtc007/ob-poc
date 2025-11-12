@@ -47,7 +47,7 @@ pub struct GeneratedPrompt {
 
 /// Metadata about prompt generation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PromptMetadata {
+pub(crate) struct PromptMetadata {
     /// RAG confidence score
     pub confidence_score: f64,
     /// Number of schemas included
@@ -71,7 +71,7 @@ impl CrudPromptBuilder {
     }
 
     /// Creates a new prompt builder with custom templates
-    pub fn with_templates(system_template: String, user_template: String) -> Self {
+    pub(crate) fn with_templates(system_template: String, user_template: String) -> Self {
         Self {
             system_template,
             user_template,
@@ -80,7 +80,7 @@ impl CrudPromptBuilder {
     }
 
     /// Generates a complete prompt from RAG context and user request
-    pub fn generate_prompt(
+    pub(crate) fn generate_prompt(
         &self,
         context: &RetrievedContext,
         user_request: &str,
@@ -213,7 +213,7 @@ impl CrudPromptBuilder {
 
     /// Builds entity create prompt with specific context
     #[cfg(feature = "database")]
-    pub fn build_entity_create_prompt(
+    pub(crate) fn build_entity_create_prompt(
         &self,
         instruction: &str,
         asset_type: &str,
@@ -244,7 +244,7 @@ impl CrudPromptBuilder {
 
     /// Builds entity read prompt with specific context
     #[cfg(feature = "database")]
-    pub fn build_entity_read_prompt(
+    pub(crate) fn build_entity_read_prompt(
         &self,
         instruction: &str,
         asset_types: &[String],
@@ -282,7 +282,7 @@ impl CrudPromptBuilder {
 
     /// Builds entity update prompt with specific context
     #[cfg(feature = "database")]
-    pub fn build_entity_update_prompt(
+    pub(crate) fn build_entity_update_prompt(
         &self,
         instruction: &str,
         asset_type: &str,
@@ -316,7 +316,7 @@ impl CrudPromptBuilder {
 
     /// Builds entity delete prompt with specific context
     #[cfg(feature = "database")]
-    pub fn build_entity_delete_prompt(
+    pub(crate) fn build_entity_delete_prompt(
         &self,
         instruction: &str,
         asset_type: &str,

@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use crate::{Form, Key, Literal, Program, PropertyMap, Value, VerbForm};
 
 /// Parser error type with context information
-pub type NomParseError<'a> = VerboseError<&'a str>;
+pub(crate) type NomParseError<'a> = VerboseError<&'a str>;
 pub type ParseResult<'a, T> = IResult<&'a str, T, NomParseError<'a>>;
 
 /// Parse a complete DSL program
@@ -60,7 +60,7 @@ fn parse_comment(input: &str) -> ParseResult<'_, String> {
 }
 
 /// Parse a verb form: (verb :key value ...)
-pub fn parse_verb_form(input: &str) -> ParseResult<'_, VerbForm> {
+pub fn parse_verb_form(input: &str) -> IResult<&str, VerbForm> {
     let (input, _) = char('(')(input)?;
     let (input, _) = multispace0(input)?; // Allow whitespace after '('
     let (input, verb) = parse_identifier(input)?; // Verb is an identifier
@@ -204,7 +204,7 @@ pub fn parse_list_value(input: &str) -> ParseResult<'_, Value> {
 }
 
 /// Parse map values: {key1: value1, key2: value2}
-pub fn parse_map_value(input: &str) -> ParseResult<'_, Value> {
+pub(crate) fn parse_map_value(input: &str) -> ParseResult<'_, Value> {
     let (input, _) = char('{')(input)?;
     let (input, _) = multispace0(input)?;
     let (input, pairs) = many0(|input| {

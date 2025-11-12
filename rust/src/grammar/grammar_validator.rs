@@ -7,19 +7,19 @@ use crate::ast::types::{ErrorSeverity, ValidationError, ValidationState};
 use crate::grammar::ebnf_parser::{EBNFError, EBNFRule};
 
 /// Validator for grammar operations
-pub struct GrammarValidator {
+pub(crate) struct GrammarValidator {
     validation_rules: Vec<GrammarValidationRule>,
 }
 
 #[derive(Debug, Clone)]
-pub struct GrammarValidationRule {
+pub(crate) struct GrammarValidationRule {
     pub rule_name: String,
     pub rule_type: GrammarValidationRuleType,
     pub validator: fn(&str) -> Result<(), ValidationError>,
 }
 
 #[derive(Debug, Clone)]
-pub enum GrammarValidationRuleType {
+pub(crate) enum GrammarValidationRuleType {
     Syntax,
     Semantic,
     Structure,
@@ -59,7 +59,7 @@ impl GrammarValidator {
     }
 
     /// Validate a grammar rule definition
-    pub fn validate_rule_definition(
+    pub(crate) fn validate_rule_definition(
         &self,
         rule_definition: &str,
     ) -> Result<GrammarValidationResult, EBNFError> {
@@ -88,7 +88,7 @@ impl GrammarValidator {
     }
 
     /// Validate a parsed EBNF rule
-    pub fn validate_parsed_rule(
+    pub(crate) fn validate_parsed_rule(
         &self,
         _rule: &EBNFRule,
     ) -> Result<GrammarValidationResult, EBNFError> {
@@ -260,7 +260,7 @@ impl GrammarValidator {
 }
 
 /// Result of grammar validation
-pub struct GrammarValidationResult {
+pub(crate) struct GrammarValidationResult {
     pub is_valid: bool,
     pub errors: Vec<ValidationError>,
     pub warnings: Vec<ValidationError>,
@@ -271,11 +271,11 @@ impl GrammarValidationResult {
         self.is_valid
     }
 
-    pub fn get_errors(&self) -> Vec<ValidationError> {
+    pub(crate) fn get_errors(&self) -> Vec<ValidationError> {
         self.errors.clone()
     }
 
-    pub fn get_warnings(&self) -> Vec<ValidationError> {
+    pub(crate) fn get_warnings(&self) -> Vec<ValidationError> {
         self.warnings.clone()
     }
 }

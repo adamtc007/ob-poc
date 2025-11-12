@@ -393,7 +393,7 @@ impl AiConfig {
     }
 
     /// Create configuration for GPT-4
-    pub fn gpt4() -> Self {
+    pub(crate) fn gpt4() -> Self {
         Self {
             api_key: std::env::var("OPENAI_API_KEY").unwrap_or_default(),
             model: "gpt-4".to_string(),

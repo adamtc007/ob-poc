@@ -291,12 +291,12 @@ pub enum RuntimeError {
 }
 
 /// Result type aliases for convenience
-pub type DSLResult<T> = Result<T, DSLError>;
+pub(crate) type DSLResult<T> = Result<T, DSLError>;
 pub type ParseResult<T> = Result<T, ParseError>;
-pub type GrammarResult<T> = Result<T, GrammarError>;
-pub type VocabularyResult<T> = Result<T, VocabularyError>;
+pub(crate) type GrammarResult<T> = Result<T, GrammarError>;
+pub(crate) type VocabularyResult<T> = Result<T, VocabularyError>;
 pub type ValidationResult<T> = Result<T, ValidationError>;
-pub type RuntimeResult<T> = Result<T, RuntimeError>;
+pub(crate) type RuntimeResult<T> = Result<T, RuntimeError>;
 
 /// Source location information for errors
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -358,7 +358,7 @@ impl fmt::Display for ErrorSeverity {
 
 /// Structured error with additional context
 #[derive(Debug, serde::Serialize)]
-pub struct ContextualError {
+pub(crate) struct ContextualError {
     pub error: DSLError,
     pub location: SourceLocation,
     pub severity: ErrorSeverity,
@@ -401,7 +401,7 @@ impl std::error::Error for ContextualError {
 
 /// Error collector for batch validation
 #[derive(Debug, Default, serde::Serialize)]
-pub struct ErrorCollector {
+pub(crate) struct ErrorCollector {
     pub errors: Vec<ContextualError>,
 }
 
@@ -410,7 +410,7 @@ impl ErrorCollector {
         Self::default()
     }
 
-    pub fn add_simple_error(
+    pub(crate) fn add_simple_error(
         &mut self,
         error: DSLError,
         location: SourceLocation,
@@ -420,11 +420,11 @@ impl ErrorCollector {
             .push(ContextualError::new(error, location, severity));
     }
 
-    pub fn has_errors(&self) -> bool {
+    pub(crate) fn has_errors(&self) -> bool {
         !self.errors.is_empty()
     }
 
-    pub fn error_count(&self) -> usize {
+    pub(crate) fn error_count(&self) -> usize {
         self.errors.len()
     }
 

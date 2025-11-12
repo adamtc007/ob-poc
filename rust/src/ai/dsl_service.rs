@@ -63,7 +63,7 @@ pub struct UboAnalysisRequest {
 
 /// Ownership link definition for UBO analysis
 #[derive(Debug, Clone, Serialize)]
-pub struct OwnershipLink {
+pub(crate) struct OwnershipLink {
     pub from_entity_name: String,
     pub to_entity_name: String,
     pub relationship_type: String,
@@ -73,7 +73,7 @@ pub struct OwnershipLink {
 
 /// Response from DSL generation
 #[derive(Debug, Clone, Deserialize)]
-pub struct DslGenerationResponse {
+pub(crate) struct DslGenerationResponse {
     /// Generated canonical DSL content
     pub generated_dsl: String,
     /// Template used for generation
@@ -92,7 +92,7 @@ pub struct DslGenerationResponse {
 
 /// Canonical DSL template structure
 #[derive(Debug, Clone)]
-pub struct KycDslTemplate {
+pub(crate) struct KycDslTemplate {
     /// Template name
     pub name: String,
     /// Template content with placeholders
@@ -520,7 +520,7 @@ Generate complete canonical DSL for UBO analysis:"#,
     ///
     /// Returns Ok(warnings) if validation passes with minor warnings,
     /// or Err(errors) if critical canonical form violations are found.
-    pub fn validate_canonical_dsl(&self, dsl_content: &str) -> Result<Vec<String>, Vec<String>> {
+    pub(crate) fn validate_canonical_dsl(&self, dsl_content: &str) -> Result<Vec<String>, Vec<String>> {
         let mut warnings = Vec::new();
         let mut errors = Vec::new();
 

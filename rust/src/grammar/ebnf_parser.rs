@@ -30,7 +30,7 @@ pub struct EBNFParser {
 
 /// Parsing context for EBNF rules
 #[derive(Debug, Clone)]
-pub struct ParsingContext {
+pub(crate) struct ParsingContext {
     pub current_rule: Option<String>,
     pub current_line: usize,
     pub current_column: usize,
@@ -50,7 +50,7 @@ pub struct EBNFRule {
 
 /// EBNF rule types
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum EBNFRuleType {
+pub(crate) enum EBNFRuleType {
     Production,
     Terminal,
     Lexical,
@@ -85,7 +85,7 @@ pub enum EBNFExpression {
 
 /// Symbol in the grammar
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EBNFSymbol {
+pub(crate) struct EBNFSymbol {
     pub name: String,
     pub symbol_type: SymbolType,
     pub definition: Option<EBNFExpression>,
@@ -94,7 +94,7 @@ pub struct EBNFSymbol {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum SymbolType {
+pub(crate) enum SymbolType {
     Terminal,
     NonTerminal,
     StartSymbol,
@@ -102,13 +102,13 @@ pub enum SymbolType {
 
 /// Compilation target for EBNF rules
 #[derive(Debug, Clone)]
-pub struct CompilationTarget {
+pub(crate) struct CompilationTarget {
     pub target_type: TargetType,
     pub options: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone)]
-pub enum TargetType {
+pub(crate) enum TargetType {
     Nom,   // Rust nom parser combinators
     Regex, // Regular expressions
     PEG,   // Parsing Expression Grammar
@@ -151,7 +151,7 @@ impl EBNFParser {
     }
 
     /// Parse an EBNF rule definition
-    pub fn parse_rule(&mut self, input: &str) -> Result<EBNFRule, EBNFError> {
+    pub(crate) fn parse_rule(&mut self, input: &str) -> Result<EBNFRule, EBNFError> {
         self.context.reset();
 
         let (remaining, (rule_name, definition)) =
@@ -443,7 +443,7 @@ impl EBNFParser {
     }
 
     /// Extract dependencies from a rule definition string
-    pub fn extract_dependencies(
+    pub(crate) fn extract_dependencies(
         &mut self,
         rule_definition: &str,
     ) -> Result<Vec<String>, EBNFError> {
@@ -453,7 +453,7 @@ impl EBNFParser {
     }
 
     /// Compile rule to executable form
-    pub fn compile_to_executable(&self, rule: &EBNFRule) -> Result<String, EBNFError> {
+    pub(crate) fn compile_to_executable(&self, rule: &EBNFRule) -> Result<String, EBNFError> {
         match &rule.rule_type {
             EBNFRuleType::Production => self.compile_to_nom_parser(rule),
             EBNFRuleType::Terminal => self.compile_to_regex(rule),
@@ -577,7 +577,7 @@ impl EBNFParser {
     }
 
     /// Validate that all rule dependencies exist
-    pub fn validate_rule_dependencies(
+    pub(crate) fn validate_rule_dependencies(
         &self,
         rule: &EBNFRule,
         available_rules: &HashSet<String>,
@@ -607,7 +607,7 @@ impl EBNFParser {
     }
 
     /// Check for left recursion in a rule
-    pub fn check_left_recursion(&self, rule: &EBNFRule) -> Result<(), EBNFError> {
+    pub(crate) fn check_left_recursion(&self, rule: &EBNFRule) -> Result<(), EBNFError> {
         let mut visited = HashSet::new();
         self.check_left_recursion_recursive(&rule.definition, &rule.name, &mut visited)
     }

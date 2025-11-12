@@ -134,7 +134,7 @@ pub trait DslBackend: Send + Sync {
 
 /// Database backend implementation
 #[cfg(feature = "database")]
-pub struct DatabaseBackend {
+pub(crate) struct DatabaseBackend {
     /// Database manager
     db_manager: crate::database::DatabaseManager,
     /// Backend configuration
@@ -143,7 +143,7 @@ pub struct DatabaseBackend {
 
 #[cfg(feature = "database")]
 #[derive(Debug, Clone)]
-pub struct DatabaseBackendConfig {
+pub(crate) struct DatabaseBackendConfig {
     /// Connection pool size
     pub pool_size: u32,
     /// Query timeout in seconds
@@ -177,7 +177,7 @@ impl DatabaseBackend {
     }
 
     /// Create with custom configuration
-    pub fn with_config(
+    pub(crate) fn with_config(
         db_manager: crate::database::DatabaseManager,
         config: DatabaseBackendConfig,
     ) -> Self {
@@ -448,7 +448,7 @@ impl DatabaseBackend {
 }
 
 /// Mock backend implementation for testing
-pub struct MockBackend {
+pub(crate) struct MockBackend {
     /// Mock data store
     instances: std::sync::Arc<tokio::sync::RwLock<HashMap<Uuid, MockInstance>>>,
     /// Configuration
@@ -456,7 +456,7 @@ pub struct MockBackend {
 }
 
 #[derive(Debug, Clone)]
-pub struct MockBackendConfig {
+pub(crate) struct MockBackendConfig {
     /// Simulate execution delay (milliseconds)
     pub simulate_delay_ms: u64,
     /// Simulate failures for testing
@@ -504,7 +504,7 @@ impl MockBackend {
     }
 
     /// Create with custom configuration
-    pub fn with_config(config: MockBackendConfig) -> Self {
+    pub(crate) fn with_config(config: MockBackendConfig) -> Self {
         Self {
             instances: std::sync::Arc::new(tokio::sync::RwLock::new(HashMap::new())),
             config,

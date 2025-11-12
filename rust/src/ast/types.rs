@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 /// Enhanced semantic information for DSL elements
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct SemanticInfo {
+pub(crate) struct SemanticInfo {
     pub source_location: SourceLocation,
     pub type_info: TypeInfo,
     pub validation_state: ValidationState,
@@ -25,7 +25,7 @@ pub struct SourceLocation {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct TypeInfo {
+pub(crate) struct TypeInfo {
     pub expected_type: DSLType,
     pub inferred_type: Option<DSLType>,
     pub constraints: Vec<TypeConstraint>,
@@ -33,7 +33,7 @@ pub struct TypeInfo {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum DSLType {
+pub(crate) enum DSLType {
     String {
         max_length: Option<usize>,
     },
@@ -71,7 +71,7 @@ pub enum DSLType {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum TypeConstraint {
+pub(crate) enum TypeConstraint {
     Required,
     Unique,
     MinLength(usize),
@@ -119,7 +119,7 @@ pub enum ErrorSeverity {
 
 /// Database integration metadata
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct DatabaseReference {
+pub(crate) struct DatabaseReference {
     pub table: String,
     pub column: Option<String>,
     pub reference_type: DbReferenceType,
@@ -128,7 +128,7 @@ pub struct DatabaseReference {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum DbReferenceType {
+pub(crate) enum DbReferenceType {
     GrammarRule,
     VocabularyVerb,
     DomainDefinition,
@@ -140,7 +140,7 @@ pub enum DbReferenceType {
 
 /// Enhanced Value type with semantic information
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum EnhancedValue {
+pub(crate) enum EnhancedValue {
     String {
         value: String,
         semantic: Option<SemanticInfo>,
@@ -202,7 +202,7 @@ pub struct GrammarRule {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum GrammarRuleType {
+pub(crate) enum GrammarRuleType {
     Production,
     Terminal,
     Lexical,
@@ -227,7 +227,7 @@ pub struct VocabularyVerb {
 
 /// DSL lifecycle state tracking
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct DSLState {
+pub(crate) struct DSLState {
     pub state_id: Uuid,
     pub dsl_version_id: Uuid,
     pub current_state: LifecycleState,
@@ -238,7 +238,7 @@ pub struct DSLState {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-pub enum LifecycleState {
+pub(crate) enum LifecycleState {
     #[default]
     Draft,
     Validating,
@@ -253,7 +253,7 @@ pub enum LifecycleState {
 }
 
 impl Value {
-    pub fn as_string(&self) -> Option<&str> {
+    pub(crate) fn as_string(&self) -> Option<&str> {
         match self {
             Value::String(s) => Some(s),
             _ => None,
@@ -267,19 +267,19 @@ impl Value {
         }
     }
 
-    pub fn as_map(&self) -> Option<&PropertyMap> {
+    pub(crate) fn as_map(&self) -> Option<&PropertyMap> {
         match self {
             Value::Map(m) => Some(m),
             _ => None,
         }
     }
 
-    pub fn is_null(&self) -> bool {
+    pub(crate) fn is_null(&self) -> bool {
         matches!(self, Value::Null)
     }
 
     /// Convert to enhanced value with semantic information
-    pub fn to_enhanced(&self, semantic: Option<SemanticInfo>) -> EnhancedValue {
+    pub(crate) fn to_enhanced(&self, semantic: Option<SemanticInfo>) -> EnhancedValue {
         match self {
             Value::String(s) => EnhancedValue::String {
                 value: s.clone(),
@@ -350,7 +350,7 @@ impl EnhancedValue {
         }
     }
 
-    pub fn get_semantic_info(&self) -> Option<&SemanticInfo> {
+    pub(crate) fn get_semantic_info(&self) -> Option<&SemanticInfo> {
         match self {
             EnhancedValue::String { semantic, .. }
             | EnhancedValue::Number { semantic, .. }
@@ -366,7 +366,7 @@ impl EnhancedValue {
         }
     }
 
-    pub fn set_semantic_info(&mut self, new_semantic: SemanticInfo) {
+    pub(crate) fn set_semantic_info(&mut self, new_semantic: SemanticInfo) {
         let semantic_ref = match self {
             EnhancedValue::String { semantic, .. }
             | EnhancedValue::Number { semantic, .. }

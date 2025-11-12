@@ -153,7 +153,7 @@ impl DslOperation {
     }
 
     /// Get the target ID that this operation affects
-    pub fn target_id(&self) -> &str {
+    pub(crate) fn target_id(&self) -> &str {
         match self {
             DslOperation::CreateEntity { entity_id, .. } => {
                 entity_id.as_deref().unwrap_or("unknown")
@@ -230,7 +230,7 @@ impl DslOperation {
     }
 
     /// Check if this operation requires specific permissions
-    pub fn required_permissions(&self) -> Vec<String> {
+    pub(crate) fn required_permissions(&self) -> Vec<String> {
         match self {
             DslOperation::CreateEntity { entity_type, .. } => {
                 vec![format!("entity.create.{}", entity_type)]
@@ -258,7 +258,7 @@ impl DslOperation {
 
 /// Service definition for adding services to entities
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ServiceDefinition {
+pub(crate) struct ServiceDefinition {
     pub name: String,
     pub service_type: String,
     pub configuration: HashMap<String, serde_json::Value>,
@@ -267,7 +267,7 @@ pub struct ServiceDefinition {
 
 /// SLA requirements for services
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SlaRequirements {
+pub(crate) struct SlaRequirements {
     pub response_time: Option<String>,
     pub availability: Option<f64>,
     pub throughput: Option<u64>,
@@ -276,7 +276,7 @@ pub struct SlaRequirements {
 
 /// Document requirements for collection operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DocumentRequirements {
+pub(crate) struct DocumentRequirements {
     pub required: bool,
     pub accepted_formats: Vec<String>,
     pub max_size_mb: Option<u64>,
@@ -286,7 +286,7 @@ pub struct DocumentRequirements {
 
 /// Types of validation operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ValidationType {
+pub(crate) enum ValidationType {
     AttributeValidation,
     StateValidation,
     BusinessRuleValidation,
@@ -297,7 +297,7 @@ pub enum ValidationType {
 
 /// Criteria for validation operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ValidationCriteria {
+pub(crate) struct ValidationCriteria {
     pub rules: Vec<String>,
     pub severity: ValidationSeverity,
     pub parameters: HashMap<String, serde_json::Value>,
@@ -314,7 +314,7 @@ pub enum ValidationSeverity {
 
 /// Notification content structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NotificationContent {
+pub(crate) struct NotificationContent {
     pub subject: String,
     pub body: String,
     pub template_id: Option<String>,
@@ -324,7 +324,7 @@ pub struct NotificationContent {
 
 /// Execution strategy for composite operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ExecutionStrategy {
+pub(crate) enum ExecutionStrategy {
     Sequential,
     Parallel,
     ConditionalSequential,
@@ -349,13 +349,13 @@ impl OperationBuilder {
     }
 
     /// Add a tag to the operation
-    pub fn with_tag(mut self, tag: impl Into<String>) -> Self {
+    pub(crate) fn with_tag(mut self, tag: impl Into<String>) -> Self {
         self.tags.push(tag.into());
         self
     }
 
     /// Add custom metadata
-    pub fn with_metadata(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
+    pub(crate) fn with_metadata(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
         self.custom_data.insert(key.into(), value);
         self
     }
@@ -375,7 +375,7 @@ impl OperationBuilder {
     }
 
     /// Build an AddProducts operation
-    pub fn add_products(self, target_id: impl Into<String>, products: Vec<String>) -> DslOperation {
+    pub(crate) fn add_products(self, target_id: impl Into<String>, products: Vec<String>) -> DslOperation {
         DslOperation::AddProducts {
             target_id: target_id.into(),
             products,
@@ -513,13 +513,13 @@ impl ExecutableDslOperation {
     }
 
     /// Add metadata to the operation
-    pub fn with_metadata(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
+    pub(crate) fn with_metadata(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
         self.metadata.insert(key.into(), value);
         self
     }
 
     /// Convert operation to DSL string representation
-    pub fn to_dsl_string(&self) -> String {
+    pub(crate) fn to_dsl_string(&self) -> String {
         match self.operation_type.as_str() {
             "validate" => {
                 let attr = self

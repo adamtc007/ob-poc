@@ -122,7 +122,7 @@ pub struct DslRequestWorkflowState {
 
 /// New Workflow State for creation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NewDslRequestWorkflowState {
+pub(crate) struct NewDslRequestWorkflowState {
     pub request_id: Uuid,
     pub workflow_state: String,
     pub state_description: Option<String>,
@@ -318,7 +318,7 @@ impl From<String> for PriorityLevel {
 
 impl DslBusinessRequest {
     /// Check if the request is in an active state
-    pub fn is_active(&self) -> bool {
+    pub(crate) fn is_active(&self) -> bool {
         !matches!(
             self.request_status,
             RequestStatus::Completed | RequestStatus::Cancelled
@@ -326,7 +326,7 @@ impl DslBusinessRequest {
     }
 
     /// Check if the request is overdue
-    pub fn is_overdue(&self) -> bool {
+    pub(crate) fn is_overdue(&self) -> bool {
         if let Some(due_date) = self.due_date {
             due_date < Utc::now() && self.is_active()
         } else {
@@ -335,19 +335,19 @@ impl DslBusinessRequest {
     }
 
     /// Get the age of the request in days
-    pub fn age_in_days(&self) -> i64 {
+    pub(crate) fn age_in_days(&self) -> i64 {
         (Utc::now() - self.created_at).num_days()
     }
 
     /// Check if the request requires urgent attention
-    pub fn requires_urgent_attention(&self) -> bool {
+    pub(crate) fn requires_urgent_attention(&self) -> bool {
         matches!(self.priority_level, PriorityLevel::Critical) || self.is_overdue()
     }
 }
 
 impl NewDslBusinessRequest {
     /// Create a new KYC case request
-    pub fn new_kyc_case(business_reference: String, client_id: String, created_by: String) -> Self {
+    pub(crate) fn new_kyc_case(business_reference: String, client_id: String, created_by: String) -> Self {
         Self {
             domain_name: "KYC".to_string(),
             business_reference,
@@ -364,7 +364,7 @@ impl NewDslBusinessRequest {
     }
 
     /// Create a new onboarding request
-    pub fn new_onboarding_request(
+    pub(crate) fn new_onboarding_request(
         business_reference: String,
         client_id: String,
         created_by: String,
@@ -385,7 +385,7 @@ impl NewDslBusinessRequest {
     }
 
     /// Create a new account opening request
-    pub fn new_account_opening(
+    pub(crate) fn new_account_opening(
         business_reference: String,
         client_id: String,
         created_by: String,
@@ -408,7 +408,7 @@ impl NewDslBusinessRequest {
 
 impl DslRequestWorkflowState {
     /// Calculate the duration spent in this state
-    pub fn duration_in_state(&self) -> chrono::Duration {
+    pub(crate) fn duration_in_state(&self) -> chrono::Duration {
         if let Some(exited_at) = self.exited_at {
             exited_at - self.entered_at
         } else {
@@ -417,12 +417,12 @@ impl DslRequestWorkflowState {
     }
 
     /// Get duration in hours as a float
-    pub fn duration_in_hours(&self) -> f64 {
+    pub(crate) fn duration_in_hours(&self) -> f64 {
         self.duration_in_state().num_milliseconds() as f64 / (1000.0 * 60.0 * 60.0)
     }
 
     /// Check if this state is taking longer than estimated
-    pub fn is_overdue(&self) -> bool {
+    pub(crate) fn is_overdue(&self) -> bool {
         if let Some(estimated_hours) = self.estimated_duration_hours {
             self.duration_in_hours() > estimated_hours as f64
         } else {
@@ -436,8 +436,8 @@ impl DslRequestWorkflowState {
 // ============================================================================
 
 /// Standard workflow states for different request types
-pub mod workflow_states {
-    pub const KYC_WORKFLOW: &[&str] = &[
+pub(crate) mod workflow_states {
+    pub(crate) const KYC_WORKFLOW: &[&str] = &[
         "initial_draft",
         "collecting_documents",
         "ubo_analysis",
@@ -446,7 +446,7 @@ pub mod workflow_states {
         "completed",
     ];
 
-    pub const ONBOARDING_WORKFLOW: &[&str] = &[
+    pub(crate) const ONBOARDING_WORKFLOW: &[&str] = &[
         "initial_draft",
         "identity_verification",
         "document_collection",
@@ -455,7 +455,7 @@ pub mod workflow_states {
         "completed",
     ];
 
-    pub const ACCOUNT_OPENING_WORKFLOW: &[&str] = &[
+    pub(crate) const ACCOUNT_OPENING_WORKFLOW: &[&str] = &[
         "initial_draft",
         "application_review",
         "document_verification",
@@ -466,9 +466,9 @@ pub mod workflow_states {
 }
 
 /// Standard request types
-pub mod request_types {
+pub(crate) mod request_types {
     pub const KYC_CASE: &str = "KYC_CASE";
-    pub const ONBOARDING_REQUEST: &str = "ONBOARDING_REQUEST";
-    pub const ACCOUNT_OPENING: &str = "ACCOUNT_OPENING";
-    pub const COMPLIANCE_REVIEW: &str = "COMPLIANCE_REVIEW";
+    pub(crate) const ONBOARDING_REQUEST: &str = "ONBOARDING_REQUEST";
+    pub(crate) const ACCOUNT_OPENING: &str = "ACCOUNT_OPENING";
+    pub(crate) const COMPLIANCE_REVIEW: &str = "COMPLIANCE_REVIEW";
 }

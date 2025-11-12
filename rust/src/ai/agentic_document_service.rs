@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Agentic Document Service for AI-powered document operations
-pub struct AgenticDocumentService {
+pub(crate) struct AgenticDocumentService {
     /// RAG system for document context retrieval
     rag_system: CrudRagSystem,
     /// Prompt builder for AI interaction
@@ -27,7 +27,7 @@ pub struct AgenticDocumentService {
 
 /// Configuration for the Agentic Document Service
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DocumentServiceConfig {
+pub(crate) struct DocumentServiceConfig {
     /// AI provider configuration
     pub ai_provider: DocumentAiProvider,
     /// AI model settings
@@ -46,7 +46,7 @@ pub struct DocumentServiceConfig {
 
 /// AI provider options for document operations
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum DocumentAiProvider {
+pub(crate) enum DocumentAiProvider {
     Mock {
         responses: HashMap<String, String>,
         extraction_results: HashMap<String, serde_json::Value>,
@@ -63,7 +63,7 @@ pub enum DocumentAiProvider {
 
 /// AI model configuration for document operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DocumentModelConfig {
+pub(crate) struct DocumentModelConfig {
     /// Temperature for AI generation (0.0-1.0)
     pub temperature: f64,
     /// Maximum tokens for document operations
@@ -76,7 +76,7 @@ pub struct DocumentModelConfig {
 
 /// Extraction-specific configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExtractionConfig {
+pub(crate) struct ExtractionConfig {
     /// Default confidence threshold for extractions
     pub default_confidence_threshold: f64,
     /// Maximum extraction retries
@@ -87,7 +87,7 @@ pub struct ExtractionConfig {
 
 /// Confidence thresholds for various operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConfidenceThresholds {
+pub(crate) struct ConfidenceThresholds {
     /// Minimum confidence for automatic processing
     pub auto_process: f64,
     /// Minimum confidence for validation
@@ -98,7 +98,7 @@ pub struct ConfidenceThresholds {
 
 /// Request for agentic document operation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgenticDocumentRequest {
+pub(crate) struct AgenticDocumentRequest {
     /// Natural language instruction
     pub instruction: String,
     /// Operation type hint
@@ -119,7 +119,7 @@ pub struct AgenticDocumentRequest {
 
 /// Document operation types
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum DocumentOperationType {
+pub(crate) enum DocumentOperationType {
     Catalog,  // Add new document to catalog
     Search,   // Search existing documents
     Extract,  // AI extraction from document
@@ -134,7 +134,7 @@ pub enum DocumentOperationType {
 
 /// Response from agentic document operation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgenticDocumentResponse {
+pub(crate) struct AgenticDocumentResponse {
     /// Generated DSL statement
     pub generated_dsl: String,
     /// Operation type detected/executed
@@ -157,7 +157,7 @@ pub struct AgenticDocumentResponse {
 
 /// Document operation result variants
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum DocumentOperationResult {
+pub(crate) enum DocumentOperationResult {
     Cataloged {
         doc_id: Uuid,
         metadata_entries: usize,
@@ -200,7 +200,7 @@ pub enum DocumentOperationResult {
 
 /// Metadata about document AI generation process
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DocumentGenerationMetadata {
+pub(crate) struct DocumentGenerationMetadata {
     /// Time for RAG context retrieval (ms)
     pub rag_time_ms: u64,
     /// Time for AI generation (ms)
@@ -220,7 +220,7 @@ pub struct DocumentGenerationMetadata {
 }
 
 /// Mock AI client for document operations
-pub struct MockDocumentAiClient {
+pub(crate) struct MockDocumentAiClient {
     responses: HashMap<String, String>,
     extraction_results: HashMap<String, serde_json::Value>,
 }
@@ -301,7 +301,7 @@ impl MockDocumentAiClient {
         }
     }
 
-    pub fn generate_document_dsl(
+    pub(crate) fn generate_document_dsl(
         &self,
         instruction: &str,
         operation_type: &DocumentOperationType,
@@ -327,7 +327,7 @@ impl MockDocumentAiClient {
         }
     }
 
-    pub fn extract_document(&self, _doc_id: Uuid) -> Result<serde_json::Value> {
+    pub(crate) fn extract_document(&self, _doc_id: Uuid) -> Result<serde_json::Value> {
         Ok(self
             .extraction_results
             .get("mock_extraction")
@@ -353,7 +353,7 @@ impl AgenticDocumentService {
     }
 
     /// Processes a natural language document request
-    pub fn process_document_request(
+    pub(crate) fn process_document_request(
         &self,
         request: AgenticDocumentRequest,
     ) -> Result<AgenticDocumentResponse> {

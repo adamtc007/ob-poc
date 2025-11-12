@@ -268,7 +268,7 @@ impl CbuRepository {
 }
 
 #[derive(Debug, Clone)]
-pub struct CbuParticipant {
+pub(crate) struct CbuParticipant {
     pub role_name: String,
     pub entity_type: String,
     pub entity_name: String,
@@ -277,7 +277,7 @@ pub struct CbuParticipant {
 
 /// Data structure for creating a new CBU
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CbuCreateData {
+pub(crate) struct CbuCreateData {
     pub name: String,
     pub description: Option<String>,
     pub nature_purpose: String,
@@ -290,7 +290,7 @@ pub struct CbuCreateData {
 
 /// Complete CBU data structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CbuData {
+pub(crate) struct CbuData {
     pub cbu_id: Uuid,
     pub name: String,
     pub description: Option<String>,

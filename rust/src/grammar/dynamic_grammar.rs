@@ -8,13 +8,13 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Dynamic grammar manager for runtime updates
-pub struct DynamicGrammarManager {
+pub(crate) struct DynamicGrammarManager {
     db_pool: PgPool,
     runtime_cache: HashMap<String, RuntimeGrammarRule>,
 }
 
 #[derive(Debug, Clone)]
-pub struct RuntimeGrammarRule {
+pub(crate) struct RuntimeGrammarRule {
     pub rule_id: Uuid,
     pub rule_name: String,
     pub compiled_form: String,

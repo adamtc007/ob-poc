@@ -96,7 +96,7 @@ impl CachedDictionaryOperation {
 /// Dictionary operation metadata
 #[cfg(feature = "database")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DictionaryOperationMetadata {
+pub(crate) struct DictionaryOperationMetadata {
     pub operation_start_time: chrono::DateTime<chrono::Utc>,
     pub ai_generation_time_ms: u64,
     pub parsing_time_ms: u64,
@@ -849,7 +849,7 @@ struct AiDslResponse {
 /// Cache statistics
 #[cfg(feature = "database")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CacheStats {
+pub(crate) struct CacheStats {
     pub total_entries: usize,
     pub active_entries: usize,
     pub expired_entries: usize,

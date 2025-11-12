@@ -71,7 +71,7 @@ pub struct DslCompiler {
 
 /// Compilation strategy trait for different target types
 #[async_trait]
-pub trait CompilationStrategy: Send + Sync {
+pub(crate) trait CompilationStrategy: Send + Sync {
     /// Strategy name
     fn name(&self) -> &str;
 
@@ -92,7 +92,7 @@ pub trait CompilationStrategy: Send + Sync {
 
 /// Compiler configuration
 #[derive(Debug, Clone)]
-pub struct CompilerConfig {
+pub(crate) struct CompilerConfig {
     /// Default target environment
     pub default_target: String,
     /// Enable optimization
@@ -131,14 +131,14 @@ impl DslCompiler {
     }
 
     /// Create with custom configuration
-    pub fn with_config(config: CompilerConfig) -> Self {
+    pub(crate) fn with_config(config: CompilerConfig) -> Self {
         let mut compiler = Self::new();
         compiler.config = config;
         compiler
     }
 
     /// Register a compilation strategy
-    pub fn register_strategy(&mut self, strategy: Box<dyn CompilationStrategy>) {
+    pub(crate) fn register_strategy(&mut self, strategy: Box<dyn CompilationStrategy>) {
         self.strategies
             .insert(strategy.name().to_string(), strategy);
     }
@@ -240,12 +240,12 @@ impl Compiler for DslCompiler {
 }
 
 /// Database compilation strategy
-pub struct DatabaseCompilationStrategy {
+pub(crate) struct DatabaseCompilationStrategy {
     config: DatabaseStrategyConfig,
 }
 
 #[derive(Debug, Clone)]
-pub struct DatabaseStrategyConfig {
+pub(crate) struct DatabaseStrategyConfig {
     pub schema_name: String,
     pub enable_transactions: bool,
     pub batch_size: usize,
@@ -572,7 +572,7 @@ impl DatabaseCompilationStrategy {
 }
 
 /// CRUD compilation strategy for agentic operations
-pub struct CrudCompilationStrategy;
+pub(crate) struct CrudCompilationStrategy;
 
 impl CrudCompilationStrategy {
     pub fn new() -> Self {
@@ -632,7 +632,7 @@ impl CompilationStrategy for CrudCompilationStrategy {
 }
 
 /// Mock compilation strategy for testing
-pub struct MockCompilationStrategy;
+pub(crate) struct MockCompilationStrategy;
 
 impl MockCompilationStrategy {
     pub fn new() -> Self {

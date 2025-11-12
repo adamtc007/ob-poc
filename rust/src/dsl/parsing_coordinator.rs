@@ -29,7 +29,7 @@ use std::collections::HashMap;
 use tracing::{debug, error, info, warn};
 
 /// Central coordinator for all DSL parsing operations
-pub struct ParsingCoordinator {
+pub(crate) struct ParsingCoordinator {
     /// Domain registry for handler lookup and routing
     domain_registry: DomainRegistry,
 
@@ -42,7 +42,7 @@ pub struct ParsingCoordinator {
 
 /// Statistics for parsing operations
 #[derive(Debug, Default)]
-pub struct ParsingStatistics {
+pub(crate) struct ParsingStatistics {
     pub total_parses: u64,
     pub successful_parses: u64,
     pub domain_routed_parses: u64,
@@ -271,7 +271,7 @@ impl ParsingCoordinator {
     }
 
     /// Reset parsing statistics
-    pub fn reset_statistics(&mut self) {
+    pub(crate) fn reset_statistics(&mut self) {
         self.parsing_stats = ParsingStatistics::default();
     }
 
@@ -297,7 +297,7 @@ impl ParsingCoordinator {
     }
 
     /// Parse a single form (for testing and incremental parsing)
-    pub fn parse_single_form(&self, input: &str) -> DslEditResult<Form> {
+    pub(crate) fn parse_single_form(&self, input: &str) -> DslEditResult<Form> {
         match parse_form(input) {
             Ok((_, form)) => Ok(form),
             Err(e) => Err(DslEditError::CompilationError(format!(

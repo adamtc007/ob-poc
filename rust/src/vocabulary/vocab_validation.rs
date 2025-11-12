@@ -7,7 +7,7 @@ use crate::ast::types::{ErrorSeverity, ValidationError, ValidationState};
 use crate::vocabulary::{VocabularyCreateRequest, VocabularyError};
 
 /// Validator for vocabulary operations
-pub struct VocabularyValidator {
+pub(crate) struct VocabularyValidator {
     validation_rules: Vec<ValidationRule>,
 }
 
@@ -53,7 +53,7 @@ impl VocabularyValidator {
     }
 
     /// Validate a vocabulary verb definition
-    pub fn validate_verb_definition(
+    pub(crate) fn validate_verb_definition(
         &self,
         request: &VocabularyCreateRequest,
     ) -> Result<ValidationResult, VocabularyError> {
@@ -144,11 +144,11 @@ impl ValidationResult {
         self.is_valid
     }
 
-    pub fn get_errors(&self) -> Vec<ValidationError> {
+    pub(crate) fn get_errors(&self) -> Vec<ValidationError> {
         self.errors.clone()
     }
 
-    pub fn get_warnings(&self) -> Vec<ValidationError> {
+    pub(crate) fn get_warnings(&self) -> Vec<ValidationError> {
         self.warnings.clone()
     }
 }

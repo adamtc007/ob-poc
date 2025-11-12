@@ -6,7 +6,7 @@
 
 // Create DslError mapping for database operations
 #[derive(Debug, thiserror::Error)]
-pub enum DslError {
+pub(crate) enum DslError {
     #[error("Not found: {message}")]
     NotFound { message: String },
     #[error("Validation error: {message}")]
@@ -34,7 +34,7 @@ use uuid::Uuid;
 
 /// Repository trait for DSL business request operations
 #[async_trait]
-pub trait DslBusinessRequestRepositoryTrait {
+pub(crate) trait DslBusinessRequestRepositoryTrait {
     // Business request CRUD operations
     async fn create_business_request(
         &self,
@@ -121,7 +121,7 @@ pub trait DslBusinessRequestRepositoryTrait {
 }
 
 /// Concrete implementation of the business request repository
-pub struct DslBusinessRequestRepository {
+pub(crate) struct DslBusinessRequestRepository {
     pool: PgPool,
 }
 
@@ -793,7 +793,7 @@ impl DslBusinessRequestRepositoryTrait for DslBusinessRequestRepository {
 
 /// Domain request statistics
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct DomainRequestStatistics {
+pub(crate) struct DomainRequestStatistics {
     pub domain_name: String,
     pub period_days: i32,
     pub total_requests: i32,

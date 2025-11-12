@@ -29,17 +29,20 @@ pub mod pipeline;
 pub mod state;
 pub mod validation;
 
-// Re-export main types
-pub use backend::{BackendOperation, BackendResult, DslBackend};
-pub use compiler::{CompilationResult, DslCompiler, ExecutionContext};
-pub use core::{
-    AgenticCrudRequest, AiOnboardingRequest, AiOnboardingResponse, AiValidationResult,
-    CanonicalDslResponse, CbuGenerator, ComprehensiveHealthStatus, DslInstanceSummary, DslManager,
-    DslManagerConfig, ExecutionDetails, HealthMetrics,
-};
-pub use pipeline::{DslPipeline, DslPipelineStage, PipelineResult};
-pub use state::{DslState, DslStateManager, StateChangeEvent};
-pub use validation::{DslValidationEngine, ValidationLevel, ValidationReport};
+// Re-export main types - TODO: Fix visibility issues and re-enable
+// pub use backend::{BackendOperation, BackendResult, DslBackend};
+// pub use compiler::{CompilationResult, DslCompiler, ExecutionContext};
+// pub use core::{
+//     AgenticCrudRequest, AiOnboardingRequest, AiOnboardingResponse, AiValidationResult,
+//     CanonicalDslResponse, CbuGenerator, ComprehensiveHealthStatus, DslInstanceSummary, DslManager,
+//     DslManagerConfig, ExecutionDetails, HealthMetrics,
+// };
+// pub use pipeline::{DslPipeline, DslPipelineStage, PipelineResult};
+// pub use state::{DslState, DslStateManager, StateChangeEvent};
+// pub use validation::{DslValidationEngine, ValidationLevel, ValidationReport};
+
+// Temporary: Only re-export core DslManager for now
+pub use core::DslManager;
 
 /// DSL Manager error types
 #[derive(Debug, Clone, thiserror::Error)]
@@ -195,7 +198,7 @@ impl DslManagerFactory {
     }
 
     /// Create a DSL Manager with custom configuration
-    pub fn with_config(config: DslManagerConfig) -> DslManager {
+    pub(crate) fn with_config(config: DslManagerConfig) -> DslManager {
         DslManager::new(config)
     }
 
@@ -279,7 +282,7 @@ impl Default for DslProcessingOptions {
 
 /// Unified DSL processing result
 #[derive(Debug)]
-pub struct DslProcessingResult {
+pub(crate) struct DslProcessingResult {
     /// Processing success status
     pub success: bool,
     /// Parsed and normalized AST (if successful)

@@ -15,7 +15,7 @@ use uuid::Uuid;
 
 /// AI DSL Service errors
 #[derive(Debug, thiserror::Error)]
-pub enum AiDslServiceError {
+pub(crate) enum AiDslServiceError {
     #[error("AI service error: {0}")]
     AiError(#[from] crate::ai::AiError),
 
@@ -33,7 +33,7 @@ pub enum AiDslServiceError {
 }
 
 /// Result type for AI DSL operations
-pub type AiDslResult<T> = Result<T, AiDslServiceError>;
+pub(crate) type AiDslResult<T> = Result<T, AiDslServiceError>;
 
 /// Request for AI-powered onboarding creation
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -174,7 +174,7 @@ impl AiDslService {
     }
 
     /// Create a new AI DSL service with custom AI client - now using DSL Manager
-    pub fn new_with_client(ai_client: Arc<dyn AiService + Send + Sync>) -> Self {
+    pub(crate) fn new_with_client(ai_client: Arc<dyn AiService + Send + Sync>) -> Self {
         let mut dsl_manager = DslManagerFactory::new();
         dsl_manager.set_ai_service(ai_client);
 
@@ -308,7 +308,7 @@ impl AiDslService {
 
 /// Health check result
 #[derive(Debug, Serialize, Deserialize)]
-pub struct HealthCheckResult {
+pub(crate) struct HealthCheckResult {
     pub ai_service_healthy: bool,
     pub dsl_manager_healthy: bool,
     pub database_healthy: bool,

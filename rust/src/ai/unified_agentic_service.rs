@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Unified Agentic Service for all CRUD operations
-pub struct UnifiedAgenticService {
+pub(crate) struct UnifiedAgenticService {
     /// CBU and general CRUD service
     crud_service: AgenticCrudService,
     /// Document-specific service
@@ -34,7 +34,7 @@ pub struct UnifiedAgenticService {
 
 /// Configuration for the unified service
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UnifiedServiceConfig {
+pub(crate) struct UnifiedServiceConfig {
     /// Service name
     pub service_name: String,
     /// AI provider configuration
@@ -49,7 +49,7 @@ pub struct UnifiedServiceConfig {
 
 /// AI provider configuration for unified service
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum UnifiedAiProvider {
+pub(crate) enum UnifiedAiProvider {
     Mock { responses: HashMap<String, String> },
     OpenAI { api_key: String, model: String },
     Gemini { api_key: String, model: String },
@@ -57,7 +57,7 @@ pub enum UnifiedAiProvider {
 
 /// Configuration for operation routing
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RoutingConfig {
+pub(crate) struct RoutingConfig {
     /// Keywords that trigger CBU operations
     pub cbu_keywords: Vec<String>,
     /// Keywords that trigger entity operations
@@ -70,7 +70,7 @@ pub struct RoutingConfig {
 
 /// Performance configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PerformanceConfig {
+pub(crate) struct PerformanceConfig {
     /// Maximum concurrent operations
     pub max_concurrent_operations: usize,
     /// Request timeout in seconds
@@ -96,7 +96,7 @@ pub enum OperationType {
 
 /// Unified request for any type of operation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UnifiedAgenticRequest {
+pub(crate) struct UnifiedAgenticRequest {
     /// Natural language instruction
     pub instruction: String,
     /// Suggested operation type (optional)
@@ -111,7 +111,7 @@ pub struct UnifiedAgenticRequest {
 
 /// Context information for unified operations
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct UnifiedContext {
+pub(crate) struct UnifiedContext {
     /// CBU ID if relevant
     pub cbu_id: Option<Uuid>,
     /// Entity ID if relevant
@@ -126,7 +126,7 @@ pub struct UnifiedContext {
 
 /// Unified response from any operation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UnifiedAgenticResponse {
+pub(crate) struct UnifiedAgenticResponse {
     /// Detected operation type
     pub operation_type: OperationType,
     /// Generated DSL statement
@@ -149,7 +149,7 @@ pub struct UnifiedAgenticResponse {
 
 /// Results from different operation types
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum UnifiedOperationResult {
+pub(crate) enum UnifiedOperationResult {
     /// CBU operation result
     CbuResult {
         operation: String,
@@ -180,7 +180,7 @@ pub enum UnifiedOperationResult {
 
 /// Processing metadata for unified operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UnifiedProcessingMetadata {
+pub(crate) struct UnifiedProcessingMetadata {
     /// Time for operation detection (ms)
     pub detection_time_ms: u64,
     /// Time for RAG retrieval (ms)
@@ -203,7 +203,7 @@ pub struct UnifiedProcessingMetadata {
 
 /// Statistics for the unified service
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UnifiedServiceStats {
+pub(crate) struct UnifiedServiceStats {
     /// Total requests processed
     pub total_requests: usize,
     /// Requests by operation type
@@ -504,7 +504,7 @@ impl UnifiedAgenticService {
     }
 
     /// Get available operation types
-    pub fn get_available_operations(&self) -> Vec<String> {
+    pub(crate) fn get_available_operations(&self) -> Vec<String> {
         vec![
             "CBU creation and management".to_string(),
             "Entity CRUD operations".to_string(),

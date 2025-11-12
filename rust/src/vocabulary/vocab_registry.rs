@@ -32,7 +32,7 @@ pub struct VocabularyRegistry {
 }
 
 /// Registry configuration options
-pub struct RegistryConfig {
+pub(crate) struct RegistryConfig {
     pub allow_shared_verbs: bool,
     pub enforce_domain_ownership: bool,
     pub auto_resolve_conflicts: bool,
@@ -41,7 +41,7 @@ pub struct RegistryConfig {
 
 /// Policy for handling deprecated verbs
 #[derive(Debug, Clone)]
-pub enum DeprecationPolicy {
+pub(crate) enum DeprecationPolicy {
     /// Immediately remove deprecated verbs
     Immediate,
     /// Grace period before removal
@@ -52,7 +52,7 @@ pub enum DeprecationPolicy {
 
 /// Registry statistics
 #[derive(Debug, Clone)]
-pub struct RegistryStats {
+pub(crate) struct RegistryStats {
     pub total_verbs: usize,
     pub shared_verbs: usize,
     pub domains: usize,
@@ -89,7 +89,7 @@ impl VocabularyRegistry {
     /// assert!(VocabularyRegistry::validate_verb_format("kyc.declare-entity").is_ok());
     /// assert!(VocabularyRegistry::validate_verb_format("invalid-verb").is_err());
     /// ```
-    pub fn validate_verb_format(verb: &str) -> Result<(String, String), VocabularyError> {
+    pub(crate) fn validate_verb_format(verb: &str) -> Result<(String, String), VocabularyError> {
         let parts: Vec<&str> = verb.split('.').collect();
 
         if parts.len() != 2 {
@@ -133,21 +133,21 @@ impl VocabularyRegistry {
     /// assert_eq!(VocabularyRegistry::extract_domain("kyc.declare-entity"), Some("kyc".to_string()));
     /// assert_eq!(VocabularyRegistry::extract_domain("invalid"), None);
     /// ```
-    pub fn extract_domain(verb: &str) -> Option<String> {
+    pub(crate) fn extract_domain(verb: &str) -> Option<String> {
         Self::validate_verb_format(verb)
             .map(|(domain, _)| domain)
             .ok()
     }
 
     /// Extract action from a fully-qualified verb
-    pub fn extract_action(verb: &str) -> Option<String> {
+    pub(crate) fn extract_action(verb: &str) -> Option<String> {
         Self::validate_verb_format(verb)
             .map(|(_, action)| action)
             .ok()
     }
 
     /// Register a new verb in the registry
-    pub fn register_verb(
+    pub(crate) fn register_verb(
         &mut self,
         verb: String,
         entry: VerbRegistryEntry,
@@ -176,12 +176,12 @@ impl VocabularyRegistry {
     }
 
     /// Get all shared verbs (replaces the removed shared_verbs HashMap)
-    pub fn get_shared_verbs(&self) -> Vec<&VerbRegistryEntry> {
+    pub(crate) fn get_shared_verbs(&self) -> Vec<&VerbRegistryEntry> {
         self.registry.values().filter(|e| e.shared).collect()
     }
 
     /// Get all verbs for a specific domain
-    pub fn get_domain_verbs(&self, domain: &str) -> Vec<&String> {
+    pub(crate) fn get_domain_verbs(&self, domain: &str) -> Vec<&String> {
         self.domain_ownership
             .get(domain)
             .map(|verbs| verbs.iter().collect())
@@ -189,12 +189,12 @@ impl VocabularyRegistry {
     }
 
     /// Get verb entry by fully-qualified name
-    pub fn get_verb(&self, verb: &str) -> Option<&VerbRegistryEntry> {
+    pub(crate) fn get_verb(&self, verb: &str) -> Option<&VerbRegistryEntry> {
         self.registry.get(verb)
     }
 
     /// Get registry statistics
-    pub fn get_stats(&self) -> RegistryStats {
+    pub(crate) fn get_stats(&self) -> RegistryStats {
         let total_verbs = self.registry.len();
         let shared_verbs = self.get_shared_verbs().len();
         let domains = self.domain_ownership.len();
@@ -209,12 +209,12 @@ impl VocabularyRegistry {
     }
 
     /// Get all domains
-    pub fn get_domains(&self) -> Vec<&String> {
+    pub(crate) fn get_domains(&self) -> Vec<&String> {
         self.domain_ownership.keys().collect()
     }
 
     /// Remove a verb from the registry
-    pub fn remove_verb(&mut self, verb: &str) -> Result<VerbRegistryEntry, VocabularyError> {
+    pub(crate) fn remove_verb(&mut self, verb: &str) -> Result<VerbRegistryEntry, VocabularyError> {
         let entry = self
             .registry
             .remove(verb)

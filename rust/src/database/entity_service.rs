@@ -13,7 +13,7 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 /// Comprehensive entity database service for all entity operations
-pub struct EntityDatabaseService {
+pub(crate) struct EntityDatabaseService {
     pool: PgPool,
 }
 
@@ -557,7 +557,7 @@ pub struct Trust {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct EntityLifecycleStatus {
+pub(crate) struct EntityLifecycleStatus {
     pub status_id: Uuid,
     pub entity_type: String,
     pub entity_id: Uuid,
@@ -588,7 +588,7 @@ pub struct EntityCrudRule {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct ProductMapping {
+pub(crate) struct ProductMapping {
     pub mapping_id: Uuid,
     pub entity_type_id: Uuid,
     pub product_id: Uuid,
@@ -603,27 +603,27 @@ pub struct ProductMapping {
 // ==========================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateEntityRequest {
+pub(crate) struct CreateEntityRequest {
     pub entity_type_id: Uuid,
     pub external_id: Option<String>,
     pub name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateEntityRequest {
+pub(crate) struct UpdateEntityRequest {
     pub external_id: Option<String>,
     pub name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateEntityTypeRequest {
+pub(crate) struct CreateEntityTypeRequest {
     pub name: String,
     pub description: Option<String>,
     pub table_name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateLimitedCompanyRequest {
+pub(crate) struct CreateLimitedCompanyRequest {
     pub company_name: String,
     pub registration_number: Option<String>,
     pub jurisdiction: Option<String>,
@@ -633,7 +633,7 @@ pub struct CreateLimitedCompanyRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreatePartnershipRequest {
+pub(crate) struct CreatePartnershipRequest {
     pub partnership_name: String,
     pub partnership_type: Option<String>,
     pub jurisdiction: Option<String>,
@@ -643,7 +643,7 @@ pub struct CreatePartnershipRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateProperPersonRequest {
+pub(crate) struct CreateProperPersonRequest {
     pub first_name: String,
     pub last_name: String,
     pub date_of_birth: Option<NaiveDate>,
@@ -653,7 +653,7 @@ pub struct CreateProperPersonRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateTrustRequest {
+pub(crate) struct CreateTrustRequest {
     pub trust_name: String,
     pub trust_type: Option<String>,
     pub governing_law: Option<String>,
@@ -663,7 +663,7 @@ pub struct CreateTrustRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EntityStatusUpdateRequest {
+pub(crate) struct EntityStatusUpdateRequest {
     pub entity_type: String,
     pub entity_id: Uuid,
     pub status_code: String,
@@ -676,7 +676,7 @@ pub struct EntityStatusUpdateRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EntitySearchCriteria {
+pub(crate) struct EntitySearchCriteria {
     pub name_pattern: Option<String>,
     pub entity_type_id: Option<Uuid>,
     pub external_id: Option<String>,

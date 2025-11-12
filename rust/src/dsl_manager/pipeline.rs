@@ -23,7 +23,7 @@ pub struct DslPipeline {
 
 /// Pipeline configuration
 #[derive(Debug, Clone)]
-pub struct PipelineConfig {
+pub(crate) struct PipelineConfig {
     /// Enable parallel stage execution where possible
     pub enable_parallel_execution: bool,
     /// Maximum pipeline execution time (ms)
@@ -78,7 +78,7 @@ pub trait DslPipelineStage: Send + Sync {
 
 /// Input to a pipeline stage
 #[derive(Debug, Clone)]
-pub struct PipelineStageInput {
+pub(crate) struct PipelineStageInput {
     /// DSL text (for parse stage)
     pub dsl_text: Option<String>,
     /// Parsed program (for post-parse stages)
@@ -95,7 +95,7 @@ pub struct PipelineStageInput {
 
 /// Output from a pipeline stage
 #[derive(Debug, Clone)]
-pub struct PipelineStageOutput {
+pub(crate) struct PipelineStageOutput {
     /// Stage execution success
     pub success: bool,
     /// Updated DSL text (if stage modifies it)
@@ -120,7 +120,7 @@ pub struct PipelineStageOutput {
 
 /// Pipeline execution context
 #[derive(Debug, Clone)]
-pub struct PipelineContext {
+pub(crate) struct PipelineContext {
     /// Request ID for tracking
     pub request_id: String,
     /// User ID
@@ -160,7 +160,7 @@ pub struct PipelineResult {
 
 /// Stage execution metrics
 #[derive(Debug, Default, Clone)]
-pub struct StageMetrics {
+pub(crate) struct StageMetrics {
     pub executions: u64,
     pub successes: u64,
     pub failures: u64,
@@ -181,7 +181,7 @@ impl DslPipeline {
     }
 
     /// Create with configuration
-    pub fn with_config(config: PipelineConfig) -> Self {
+    pub(crate) fn with_config(config: PipelineConfig) -> Self {
         Self {
             stages: Vec::new(),
             config,
@@ -190,7 +190,7 @@ impl DslPipeline {
     }
 
     /// Add a stage to the pipeline
-    pub fn add_stage(&mut self, stage: Box<dyn DslPipelineStage>) {
+    pub(crate) fn add_stage(&mut self, stage: Box<dyn DslPipelineStage>) {
         self.stages.push(stage);
     }
 
@@ -418,7 +418,7 @@ impl DslPipeline {
 /// Standard DSL pipeline stages
 ///
 /// Parse stage - converts DSL text to AST
-pub struct ParseStage {
+pub(crate) struct ParseStage {
     apply_normalization: bool,
 }
 
@@ -528,7 +528,7 @@ impl DslPipelineStage for ParseStage {
 }
 
 /// Validation stage - comprehensive validation of parsed AST
-pub struct ValidationStage;
+pub(crate) struct ValidationStage;
 
 #[async_trait]
 impl DslPipelineStage for ValidationStage {
@@ -602,7 +602,7 @@ impl DslPipelineStage for ValidationStage {
 }
 
 /// Compilation stage - compile AST to executable operations
-pub struct CompilationStage {
+pub(crate) struct CompilationStage {
     target: String,
 }
 

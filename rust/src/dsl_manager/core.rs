@@ -149,7 +149,7 @@ impl DslManager {
     }
 
     /// Set the backend for persistence operations
-    pub fn set_backend(&mut self, backend: Box<dyn super::DslBackend>) {
+    pub(crate) fn set_backend(&mut self, backend: Box<dyn super::DslBackend>) {
         self.backend = Some(backend);
     }
 
@@ -2216,7 +2216,7 @@ pub struct AgenticCrudRequest {
 
 /// Vocabulary validation result
 #[derive(Debug, Clone)]
-pub struct VocabularyValidationResult {
+pub(crate) struct VocabularyValidationResult {
     pub is_valid: bool,
     pub valid_verbs: Vec<String>,
     pub unknown_verbs: Vec<String>,
@@ -2226,7 +2226,7 @@ pub struct VocabularyValidationResult {
 
 /// DSL call chain for complex multi-step operations
 #[derive(Debug, Clone)]
-pub struct DslCallChain {
+pub(crate) struct DslCallChain {
     pub chain_id: String,
     pub steps: Vec<CallChainStep>,
     pub fail_fast: bool,
@@ -2235,7 +2235,7 @@ pub struct DslCallChain {
 
 /// Individual step in a call chain
 #[derive(Debug, Clone)]
-pub struct CallChainStep {
+pub(crate) struct CallChainStep {
     pub name: String,
     pub operation: CallChainOperation,
     pub delay_ms: Option<u64>,
@@ -2244,7 +2244,7 @@ pub struct CallChainStep {
 
 /// Types of operations in a call chain
 #[derive(Debug, Clone)]
-pub enum CallChainOperation {
+pub(crate) enum CallChainOperation {
     ParseAndValidate {
         dsl: String,
     },

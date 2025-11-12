@@ -2,7 +2,7 @@
 
 use super::*;
 
-pub struct AttributeCatalogue {
+pub(crate) struct AttributeCatalogue {
     dictionary: DataDictionary,
 }
 

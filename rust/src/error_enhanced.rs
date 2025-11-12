@@ -47,7 +47,7 @@ impl From<sqlx::Error> for DatabaseError {
 
 /// Document processing errors
 #[derive(Error, Debug, Clone, serde::Serialize)]
-pub enum DocumentProcessingError {
+pub(crate) enum DocumentProcessingError {
     #[error("Invalid document type: {document_type}")]
     InvalidDocumentType { document_type: String },
 
@@ -145,7 +145,7 @@ impl From<DocumentProcessingError> for DslManagerError {
 
 /// Consolidated error type for all operations
 #[derive(Error, Debug)]
-pub enum EnhancedError {
+pub(crate) enum EnhancedError {
     #[error("Database error: {0}")]
     Database(#[from] DatabaseError),
 
@@ -193,32 +193,32 @@ pub enum EnhancedError {
 }
 
 /// Result type aliases for convenience
-pub type DatabaseResult<T> = Result<T, DatabaseError>;
+pub(crate) type DatabaseResult<T> = Result<T, DatabaseError>;
 pub type DocumentResult<T> = Result<T, DocumentProcessingError>;
 pub type DslManagerResult<T> = Result<T, DslManagerError>;
-pub type EnhancedResult<T> = Result<T, EnhancedError>;
+pub(crate) type EnhancedResult<T> = Result<T, EnhancedError>;
 
 /// Helper functions for error creation
 impl DatabaseError {
-    pub fn connection_failed(message: impl Into<String>) -> Self {
+    pub(crate) fn connection_failed(message: impl Into<String>) -> Self {
         Self::ConnectionError {
             message: message.into(),
         }
     }
 
-    pub fn query_failed(message: impl Into<String>) -> Self {
+    pub(crate) fn query_failed(message: impl Into<String>) -> Self {
         Self::QueryError {
             message: message.into(),
         }
     }
 
-    pub fn not_found(message: impl Into<String>) -> Self {
+    pub(crate) fn not_found(message: impl Into<String>) -> Self {
         Self::NotFound {
             message: message.into(),
         }
     }
 
-    pub fn constraint_violation(message: impl Into<String>) -> Self {
+    pub(crate) fn constraint_violation(message: impl Into<String>) -> Self {
         Self::ConstraintViolation {
             message: message.into(),
         }
@@ -226,26 +226,26 @@ impl DatabaseError {
 }
 
 impl DocumentProcessingError {
-    pub fn invalid_document_type(document_type: impl Into<String>) -> Self {
+    pub(crate) fn invalid_document_type(document_type: impl Into<String>) -> Self {
         Self::InvalidDocumentType {
             document_type: document_type.into(),
         }
     }
 
-    pub fn extraction_failed(attribute: impl Into<String>, reason: impl Into<String>) -> Self {
+    pub(crate) fn extraction_failed(attribute: impl Into<String>, reason: impl Into<String>) -> Self {
         Self::ExtractionFailed {
             attribute: attribute.into(),
             reason: reason.into(),
         }
     }
 
-    pub fn missing_attribute(attribute: impl Into<String>) -> Self {
+    pub(crate) fn missing_attribute(attribute: impl Into<String>) -> Self {
         Self::MissingAttribute {
             attribute: attribute.into(),
         }
     }
 
-    pub fn ai_processing_failed(reason: impl Into<String>) -> Self {
+    pub(crate) fn ai_processing_failed(reason: impl Into<String>) -> Self {
         Self::AiProcessingFailed {
             reason: reason.into(),
         }
@@ -253,25 +253,25 @@ impl DocumentProcessingError {
 }
 
 impl DslManagerError {
-    pub fn compilation_failed(reason: impl Into<String>) -> Self {
+    pub(crate) fn compilation_failed(reason: impl Into<String>) -> Self {
         Self::CompilationFailed {
             reason: reason.into(),
         }
     }
 
-    pub fn instance_not_found(instance_id: impl Into<String>) -> Self {
+    pub(crate) fn instance_not_found(instance_id: impl Into<String>) -> Self {
         Self::InstanceNotFound {
             instance_id: instance_id.into(),
         }
     }
 
-    pub fn invalid_syntax(message: impl Into<String>) -> Self {
+    pub(crate) fn invalid_syntax(message: impl Into<String>) -> Self {
         Self::InvalidSyntax {
             message: message.into(),
         }
     }
 
-    pub fn workflow_execution_failed(stage: impl Into<String>) -> Self {
+    pub(crate) fn workflow_execution_failed(stage: impl Into<String>) -> Self {
         Self::WorkflowExecutionFailed {
             stage: stage.into(),
         }

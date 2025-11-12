@@ -44,7 +44,7 @@ impl BusinessRuleRegistry {
         Ok(results)
     }
 
-    pub fn get_blocking_violations<'a>(&self, results: &'a [RuleResult]) -> Vec<&'a RuleResult> {
+    pub(crate) fn get_blocking_violations<'a>(&self, results: &'a [RuleResult]) -> Vec<&'a RuleResult> {
         results.iter().filter(|r| !r.valid && r.blocking).collect()
     }
 }
@@ -56,7 +56,7 @@ impl Default for BusinessRuleRegistry {
 }
 
 /// Rule that validates required attributes are present before certain operations
-pub struct RequiredAttributesRule {
+pub(crate) struct RequiredAttributesRule {
     name: String,
     operation_types: Vec<String>,
     required_attributes: Vec<AttributeId>,
@@ -125,7 +125,7 @@ impl BusinessRule for RequiredAttributesRule {
 }
 
 /// Rule that validates ownership percentages don't exceed 100%
-pub struct OwnershipLimitsRule {
+pub(crate) struct OwnershipLimitsRule {
     name: String,
 }
 
@@ -240,7 +240,7 @@ impl OwnershipLimitsRule {
 }
 
 /// Rule that enforces compliance workflow sequences
-pub struct ComplianceWorkflowRule {
+pub(crate) struct ComplianceWorkflowRule {
     name: String,
     required_sequence: Vec<String>,
 }
@@ -253,7 +253,7 @@ impl ComplianceWorkflowRule {
         }
     }
 
-    pub fn kyc_workflow() -> Self {
+    pub(crate) fn kyc_workflow() -> Self {
         Self::new(
             "kyc_compliance_workflow",
             vec![
@@ -265,7 +265,7 @@ impl ComplianceWorkflowRule {
         )
     }
 
-    pub fn onboarding_workflow() -> Self {
+    pub(crate) fn onboarding_workflow() -> Self {
         Self::new(
             "onboarding_workflow",
             vec![
@@ -353,7 +353,7 @@ impl BusinessRule for ComplianceWorkflowRule {
 }
 
 /// Rule that validates data privacy and compliance classifications
-pub struct DataPrivacyRule {
+pub(crate) struct DataPrivacyRule {
     name: String,
     pii_attributes: Vec<AttributeId>,
     pci_attributes: Vec<AttributeId>,
@@ -375,7 +375,7 @@ impl DataPrivacyRule {
         }
     }
 
-    pub fn default_privacy_rule() -> Self {
+    pub(crate) fn default_privacy_rule() -> Self {
         Self::new(
             "data_privacy_compliance",
             vec![], // PII attributes would be loaded from data dictionary
@@ -495,7 +495,7 @@ impl DataPrivacyRule {
 }
 
 /// Rule that validates document evidence requirements
-pub struct DocumentEvidenceRule {
+pub(crate) struct DocumentEvidenceRule {
     name: String,
 }
 
@@ -615,7 +615,7 @@ impl DocumentEvidenceRule {
 }
 
 /// Factory function to create standard business rules
-pub fn create_standard_rules() -> Vec<Arc<dyn BusinessRule>> {
+pub(crate) fn create_standard_rules() -> Vec<Arc<dyn BusinessRule>> {
     vec![
         Arc::new(OwnershipLimitsRule::new()),
         Arc::new(ComplianceWorkflowRule::kyc_workflow()),

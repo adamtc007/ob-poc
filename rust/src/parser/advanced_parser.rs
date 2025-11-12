@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Enhanced parser with semantic analysis
-pub struct AdvancedParser {
+pub(crate) struct AdvancedParser {
     /// Current parsing context
     context: ParsingContext,
     /// Grammar rules cache
@@ -36,7 +36,7 @@ pub struct AdvancedParser {
 
 /// Parsing context for semantic analysis
 #[derive(Debug, Clone)]
-pub struct ParsingContext {
+pub(crate) struct ParsingContext {
     pub current_file: Option<String>,
     pub current_line: usize,
     pub current_column: usize,
@@ -47,7 +47,7 @@ pub struct ParsingContext {
 
 /// Parsing scope for variable resolution
 #[derive(Debug, Clone)]
-pub struct Scope {
+pub(crate) struct Scope {
     pub scope_id: Uuid,
     pub scope_type: ScopeType,
     pub variables: HashMap<String, VariableBinding>,
@@ -55,7 +55,7 @@ pub struct Scope {
 }
 
 #[derive(Debug, Clone)]
-pub enum ScopeType {
+pub(crate) enum ScopeType {
     Global,
     Workflow,
     Statement,
@@ -63,7 +63,7 @@ pub enum ScopeType {
 }
 
 #[derive(Debug, Clone)]
-pub struct VariableBinding {
+pub(crate) struct VariableBinding {
     pub name: String,
     pub value_type: DSLType,
     pub location: SourceLocation,
@@ -71,13 +71,13 @@ pub struct VariableBinding {
 }
 
 /// Type inference engine
-pub struct TypeInferrer {
+pub(crate) struct TypeInferrer {
     type_rules: HashMap<String, TypeRule>,
     constraint_solver: ConstraintSolver,
 }
 
 #[derive(Debug, Clone)]
-pub struct TypeRule {
+pub(crate) struct TypeRule {
     pub verb: String,
     pub parameter_types: Vec<DSLType>,
     pub return_type: DSLType,
@@ -85,12 +85,12 @@ pub struct TypeRule {
 }
 
 /// Constraint solver for type system
-pub struct ConstraintSolver {
+pub(crate) struct ConstraintSolver {
     constraints: Vec<TypeConstraint>,
 }
 
 /// Semantic validator
-pub struct SemanticValidator {
+pub(crate) struct SemanticValidator {
     validation_rules: Vec<ValidationRule>,
     database_constraints: Vec<DatabaseConstraint>,
 }
@@ -105,7 +105,7 @@ pub struct ValidationRule {
 }
 
 #[derive(Debug, Clone)]
-pub enum ValidationType {
+pub(crate) enum ValidationType {
     Syntax,
     Semantic,
     Business,
@@ -113,13 +113,13 @@ pub enum ValidationType {
 }
 
 #[derive(Debug, Clone)]
-pub struct ValidationCondition {
+pub(crate) struct ValidationCondition {
     pub expression: String,
     pub context_required: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
-pub struct DatabaseConstraint {
+pub(crate) struct DatabaseConstraint {
     pub table: String,
     pub column: Option<String>,
     pub constraint_type: ConstraintType,
@@ -127,7 +127,7 @@ pub struct DatabaseConstraint {
 }
 
 #[derive(Debug, Clone)]
-pub enum ConstraintType {
+pub(crate) enum ConstraintType {
     ForeignKey,
     Unique,
     Check,
@@ -145,7 +145,7 @@ pub struct ParseResult {
 }
 
 #[derive(Debug)]
-pub struct ValidationResults {
+pub(crate) struct ValidationResults {
     pub errors: Vec<ValidationError>,
     pub warnings: Vec<ValidationWarning>,
     pub info: Vec<String>,
@@ -153,7 +153,7 @@ pub struct ValidationResults {
 }
 
 #[derive(Debug)]
-pub struct TypeAnalysisResult {
+pub(crate) struct TypeAnalysisResult {
     pub type_mappings: HashMap<String, DSLType>,
     pub constraint_violations: Vec<ConstraintViolation>,
     pub inference_results: Vec<TypeInference>,
@@ -168,7 +168,7 @@ pub struct ConstraintViolation {
 }
 
 #[derive(Debug, Clone)]
-pub struct TypeInference {
+pub(crate) struct TypeInference {
     pub location: SourceLocation,
     pub inferred_type: DSLType,
     pub confidence: f64,
@@ -188,7 +188,7 @@ impl AdvancedParser {
     }
 
     /// Parse DSL with full semantic analysis
-    pub fn parse_with_semantics(&mut self, input: &str) -> Result<ParseResult, ParseError> {
+    pub(crate) fn parse_with_semantics(&mut self, input: &str) -> Result<ParseResult, ParseError> {
         // Phase 1: Basic syntax parsing
         let (remaining, mut program) = self
             .parse_program(input)
@@ -250,7 +250,7 @@ impl AdvancedParser {
     }
 
     /// Parse workflow with scope management
-    pub fn parse_workflow(&mut self, input: &str) -> IResult<&str, Workflow> {
+    pub(crate) fn parse_workflow(&mut self, input: &str) -> IResult<&str, Workflow> {
         let (input, _) = multispace0(input)?;
         let (input, _) = char('(')(input)?;
         let (input, _) = tag("workflow")(input)?;
@@ -295,7 +295,7 @@ impl AdvancedParser {
     }
 
     /// Parse statement with enhanced semantic tracking
-    pub fn parse_statement(&mut self, input: &str) -> IResult<&str, Statement> {
+    pub(crate) fn parse_statement(&mut self, input: &str) -> IResult<&str, Statement> {
         let statement_scope = self.context.enter_scope(ScopeType::Statement);
         let start_location = self.context.current_location();
 
@@ -318,7 +318,7 @@ impl AdvancedParser {
     }
 
     /// Parse declare entity with type validation
-    pub fn parse_declare_entity(&mut self, input: &str) -> IResult<&str, Statement> {
+    pub(crate) fn parse_declare_entity(&mut self, input: &str) -> IResult<&str, Statement> {
         let (input, _) = char('(')(input)?;
         let (input, _) = tag("declare-entity")(input)?;
         let (input, _) = space1(input)?;
@@ -356,7 +356,7 @@ impl AdvancedParser {
     }
 
     /// Parse entity label with validation
-    pub fn parse_entity_label(&mut self, input: &str) -> IResult<&str, EntityLabel> {
+    pub(crate) fn parse_entity_label(&mut self, input: &str) -> IResult<&str, EntityLabel> {
         let (input, label_str) = alt((
             tag("COMPANY"),
             tag("PERSON"),
@@ -385,7 +385,7 @@ impl AdvancedParser {
     }
 
     /// Parse properties with type inference
-    pub fn parse_properties(&mut self, input: &str) -> IResult<&str, PropertyMap> {
+    pub(crate) fn parse_properties(&mut self, input: &str) -> IResult<&str, PropertyMap> {
         let (input, _) = char('(')(input)?;
         let (input, _) = tag("properties")(input)?;
         let (input, _) = space0(input)?;
@@ -420,7 +420,7 @@ impl AdvancedParser {
     }
 
     /// Parse individual property with type checking
-    pub fn parse_property(&mut self, input: &str) -> IResult<&str, (String, Value)> {
+    pub(crate) fn parse_property(&mut self, input: &str) -> IResult<&str, (String, Value)> {
         let (input, _) = char('(')(input)?;
         let (input, key) = self.parse_identifier(input)?;
         let (input, _) = space1(input)?;

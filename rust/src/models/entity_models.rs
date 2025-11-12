@@ -37,7 +37,7 @@ pub struct EntityType {
 
 /// CBU to Entity role mapping
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct CbuEntityRole {
+pub(crate) struct CbuEntityRole {
     pub cbu_entity_role_id: Uuid,
     pub cbu_id: Uuid,
     pub entity_id: Uuid,
@@ -114,7 +114,7 @@ pub struct Trust {
 
 /// Trust party relationships
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct TrustParty {
+pub(crate) struct TrustParty {
     pub trust_party_id: Uuid,
     pub trust_id: Uuid,
     pub entity_id: Uuid,
@@ -129,7 +129,7 @@ pub struct TrustParty {
 
 /// Trust beneficiary classes
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct TrustBeneficiaryClass {
+pub(crate) struct TrustBeneficiaryClass {
     pub beneficiary_class_id: Uuid,
     pub trust_id: Uuid,
     pub class_name: String,
@@ -142,7 +142,7 @@ pub struct TrustBeneficiaryClass {
 
 /// Trust protector powers
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct TrustProtectorPower {
+pub(crate) struct TrustProtectorPower {
     pub protector_power_id: Uuid,
     pub trust_party_id: Uuid,
     pub power_type: String, // 'TRUSTEE_APPOINTMENT', 'TRUSTEE_REMOVAL', 'DISTRIBUTION_VETO'
@@ -157,7 +157,7 @@ pub struct TrustProtectorPower {
 
 /// Partnership interests and ownership
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct PartnershipInterest {
+pub(crate) struct PartnershipInterest {
     pub interest_id: Uuid,
     pub partnership_id: Uuid,
     pub entity_id: Uuid,
@@ -175,7 +175,7 @@ pub struct PartnershipInterest {
 
 /// Partnership control mechanisms
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct PartnershipControlMechanism {
+pub(crate) struct PartnershipControlMechanism {
     pub control_mechanism_id: Uuid,
     pub partnership_id: Uuid,
     pub entity_id: Uuid,
@@ -193,7 +193,7 @@ pub struct PartnershipControlMechanism {
 
 /// CRUD operation tracking
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct CrudOperation {
+pub(crate) struct CrudOperation {
     pub operation_id: Uuid,
     pub operation_type: String, // CREATE, READ, UPDATE, DELETE
     pub asset_type: String,     // CBU, ENTITY, PARTNERSHIP, etc.
@@ -217,7 +217,7 @@ pub struct CrudOperation {
 
 /// RAG embeddings for context retrieval
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct RagEmbedding {
+pub(crate) struct RagEmbedding {
     pub embedding_id: Uuid,
     pub content_type: String, // SCHEMA, EXAMPLE, ATTRIBUTE, RULE, GRAMMAR, VERB_PATTERN
     pub content_text: String,
@@ -234,7 +234,7 @@ pub struct RagEmbedding {
 
 /// DSL examples library
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct DslExample {
+pub(crate) struct DslExample {
     pub example_id: Uuid,
     pub title: String,
     pub description: Option<String>,
@@ -276,14 +276,14 @@ pub struct EntityCrudRule {
 
 /// Entity with its type information
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EntityWithType {
+pub(crate) struct EntityWithType {
     pub entity: Entity,
     pub entity_type: EntityType,
 }
 
 /// Entity with its specific type data (polymorphic)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EntityWithDetails {
+pub(crate) struct EntityWithDetails {
     pub entity: Entity,
     pub entity_type: EntityType,
     pub details: EntityDetails,
@@ -292,7 +292,7 @@ pub struct EntityWithDetails {
 /// Polymorphic entity details
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "entity_type", content = "data")]
-pub enum EntityDetails {
+pub(crate) enum EntityDetails {
     LimitedCompany(LimitedCompany),
     Partnership(Partnership),
     ProperPerson(ProperPerson),
@@ -301,7 +301,7 @@ pub enum EntityDetails {
 
 /// Trust with all its relationships
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TrustWithRelationships {
+pub(crate) struct TrustWithRelationships {
     pub trust: Trust,
     pub parties: Vec<TrustPartyWithEntity>,
     pub beneficiary_classes: Vec<TrustBeneficiaryClass>,
@@ -310,7 +310,7 @@ pub struct TrustWithRelationships {
 
 /// Trust party with entity information
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TrustPartyWithEntity {
+pub(crate) struct TrustPartyWithEntity {
     pub trust_party: TrustParty,
     pub entity: Entity,
     pub entity_details: Option<EntityDetails>,
@@ -318,7 +318,7 @@ pub struct TrustPartyWithEntity {
 
 /// Trust protector power with party information
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TrustProtectorPowerWithParty {
+pub(crate) struct TrustProtectorPowerWithParty {
     pub protector_power: TrustProtectorPower,
     pub trust_party: TrustParty,
     pub entity: Entity,
@@ -326,7 +326,7 @@ pub struct TrustProtectorPowerWithParty {
 
 /// Partnership with all its relationships
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PartnershipWithRelationships {
+pub(crate) struct PartnershipWithRelationships {
     pub partnership: Partnership,
     pub interests: Vec<PartnershipInterestWithEntity>,
     pub control_mechanisms: Vec<PartnershipControlMechanismWithEntity>,
@@ -334,7 +334,7 @@ pub struct PartnershipWithRelationships {
 
 /// Partnership interest with entity information
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PartnershipInterestWithEntity {
+pub(crate) struct PartnershipInterestWithEntity {
     pub interest: PartnershipInterest,
     pub entity: Entity,
     pub entity_details: Option<EntityDetails>,
@@ -342,7 +342,7 @@ pub struct PartnershipInterestWithEntity {
 
 /// Partnership control mechanism with entity information
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PartnershipControlMechanismWithEntity {
+pub(crate) struct PartnershipControlMechanismWithEntity {
     pub control_mechanism: PartnershipControlMechanism,
     pub entity: Entity,
     pub entity_details: Option<EntityDetails>,
@@ -407,7 +407,7 @@ impl std::str::FromStr for EntityAssetType {
 
 /// CRUD operation types
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum CrudOperationType {
+pub(crate) enum CrudOperationType {
     Create,
     Read,
     Update,
@@ -482,7 +482,7 @@ impl std::str::FromStr for ExecutionStatus {
 
 /// Request for creating an entity via agentic CRUD
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgenticEntityCreateRequest {
+pub(crate) struct AgenticEntityCreateRequest {
     pub instruction: String,
     pub asset_type: EntityAssetType,
     pub context: HashMap<String, serde_json::Value>,
@@ -493,7 +493,7 @@ pub struct AgenticEntityCreateRequest {
 
 /// Request for reading entities via agentic CRUD
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgenticEntityReadRequest {
+pub(crate) struct AgenticEntityReadRequest {
     pub instruction: String,
     pub asset_types: Vec<EntityAssetType>,
     pub filters: HashMap<String, serde_json::Value>,
@@ -503,7 +503,7 @@ pub struct AgenticEntityReadRequest {
 
 /// Request for updating entities via agentic CRUD
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgenticEntityUpdateRequest {
+pub(crate) struct AgenticEntityUpdateRequest {
     pub instruction: String,
     pub asset_type: EntityAssetType,
     pub identifier: HashMap<String, serde_json::Value>,
@@ -512,7 +512,7 @@ pub struct AgenticEntityUpdateRequest {
 
 /// Request for deleting entities via agentic CRUD
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgenticEntityDeleteRequest {
+pub(crate) struct AgenticEntityDeleteRequest {
     pub instruction: String,
     pub asset_type: EntityAssetType,
     pub identifier: HashMap<String, serde_json::Value>,
@@ -521,7 +521,7 @@ pub struct AgenticEntityDeleteRequest {
 
 /// Response from agentic entity CRUD operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgenticEntityCrudResponse {
+pub(crate) struct AgenticEntityCrudResponse {
     pub operation_id: Uuid,
     pub generated_dsl: String,
     pub execution_status: ExecutionStatus,

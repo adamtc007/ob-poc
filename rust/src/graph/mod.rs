@@ -9,13 +9,13 @@ pub mod traversal;
 use crate::ast::{EdgeType, EntityLabel};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PropertyGraph {
+pub(crate) struct PropertyGraph {
     pub nodes: HashMap<String, Node>,
     pub edges: Vec<Edge>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Node {
+pub(crate) struct Node {
     pub node_id: String,
     pub label: EntityLabel,
     pub properties: HashMap<String, serde_json::Value>,
@@ -39,23 +39,23 @@ impl PropertyGraph {
         }
     }
 
-    pub fn add_node(&mut self, node: Node) {
+    pub(crate) fn add_node(&mut self, node: Node) {
         self.nodes.insert(node.node_id.clone(), node);
     }
 
-    pub fn add_edge(&mut self, edge: Edge) {
+    pub(crate) fn add_edge(&mut self, edge: Edge) {
         self.edges.push(edge);
     }
 
-    pub fn get_node(&self, node_id: &str) -> Option<&Node> {
+    pub(crate) fn get_node(&self, node_id: &str) -> Option<&Node> {
         self.nodes.get(node_id)
     }
 
-    pub fn get_outgoing_edges(&self, node_id: &str) -> Vec<&Edge> {
+    pub(crate) fn get_outgoing_edges(&self, node_id: &str) -> Vec<&Edge> {
         self.edges.iter().filter(|e| e.from == node_id).collect()
     }
 
-    pub fn get_incoming_edges(&self, node_id: &str) -> Vec<&Edge> {
+    pub(crate) fn get_incoming_edges(&self, node_id: &str) -> Vec<&Edge> {
         self.edges.iter().filter(|e| e.to == node_id).collect()
     }
 }

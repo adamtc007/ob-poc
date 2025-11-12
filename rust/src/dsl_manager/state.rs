@@ -80,7 +80,7 @@ pub struct StateChangeEvent {
 
 /// Types of state changes
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum StateChangeType {
+pub(crate) enum StateChangeType {
     /// State was created
     Created,
     /// State was updated
@@ -151,7 +151,7 @@ impl DslStateManager {
     }
 
     /// Update DSL state
-    pub fn update_state(
+    pub(crate) fn update_state(
         &mut self,
         instance_id: Uuid,
         new_status: StateStatus,
@@ -212,7 +212,7 @@ impl DslStateManager {
 
 /// State manager error types
 #[derive(Debug, thiserror::Error)]
-pub enum StateManagerError {
+pub(crate) enum StateManagerError {
     #[error("State with ID {0} already exists")]
     StateAlreadyExists(Uuid),
 

@@ -25,7 +25,7 @@ async fn main() -> Result<()> {
 }
 
 /// Comprehensive demo for the unified agentic CRUD system
-pub struct UnifiedAgenticCrudDemo {
+pub(crate) struct UnifiedAgenticCrudDemo {
     service: UnifiedAgenticService,
     test_scenarios: Vec<TestScenario>,
 }

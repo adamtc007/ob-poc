@@ -17,14 +17,14 @@ use uuid::Uuid;
 
 /// CBU CRUD Manager for comprehensive CBU operations
 #[derive(Clone)]
-pub struct CbuCrudManager {
+pub(crate) struct CbuCrudManager {
     pool: PgPool,
     dictionary_service: DictionaryDatabaseService,
 }
 
 /// CBU creation request with full relationship setup
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CbuCreateRequest {
+pub(crate) struct CbuCreateRequest {
     pub name: String,
     pub description: Option<String>,
     pub nature_purpose: Option<String>,
@@ -39,7 +39,7 @@ pub struct CbuCreateRequest {
 
 /// Entity assignment to CBU with roles
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CbuEntityAssignment {
+pub(crate) struct CbuEntityAssignment {
     pub entity_id: Uuid,
     pub entity_type: String,
     pub roles: Vec<String>,
@@ -50,7 +50,7 @@ pub struct CbuEntityAssignment {
 
 /// Attribute assignment to CBU
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CbuAttributeAssignment {
+pub(crate) struct CbuAttributeAssignment {
     pub attribute_id: Uuid,
     pub value: Value,
     pub source: Option<Value>,
@@ -58,7 +58,7 @@ pub struct CbuAttributeAssignment {
 
 /// CBU search criteria
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CbuSearchCriteria {
+pub(crate) struct CbuSearchCriteria {
     pub jurisdictions: Option<Vec<String>>,
     pub entity_types: Option<Vec<String>>,
     pub product_types: Option<Vec<String>>,
@@ -73,7 +73,7 @@ pub struct CbuSearchCriteria {
 
 /// AUM (Assets Under Management) range filter
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AumRange {
+pub(crate) struct AumRange {
     pub min: Option<i64>,
     pub max: Option<i64>,
     pub currency: String,
@@ -81,7 +81,7 @@ pub struct AumRange {
 
 /// CBU update request with complex operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CbuUpdateRequest {
+pub(crate) struct CbuUpdateRequest {
     pub cbu_id: Uuid,
     pub basic_updates: Option<CbuBasicUpdates>,
     pub entity_operations: Vec<CbuEntityOperation>,
@@ -93,7 +93,7 @@ pub struct CbuUpdateRequest {
 
 /// Basic CBU field updates
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CbuBasicUpdates {
+pub(crate) struct CbuBasicUpdates {
     pub name: Option<String>,
     pub description: Option<String>,
     pub nature_purpose: Option<String>,
@@ -101,7 +101,7 @@ pub struct CbuBasicUpdates {
 
 /// Entity operations for CBU updates
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CbuEntityOperation {
+pub(crate) struct CbuEntityOperation {
     pub operation: String, // "add_entity", "update_roles", "update_ownership", "remove_entity"
     pub entity_id: Uuid,
     pub entity_type: Option<String>,
@@ -115,7 +115,7 @@ pub struct CbuEntityOperation {
 
 /// Attribute operations for CBU updates
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CbuAttributeOperation {
+pub(crate) struct CbuAttributeOperation {
     pub operation: String, // "set", "update", "remove", "append"
     pub attribute_id: Uuid,
     pub value: Option<Value>,
@@ -123,7 +123,7 @@ pub struct CbuAttributeOperation {
 
 /// Product operations for CBU updates
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CbuProductOperation {
+pub(crate) struct CbuProductOperation {
     pub operation: String, // "add", "remove", "update_status"
     pub products: Option<Vec<String>>,
     pub product: Option<String>,
@@ -133,7 +133,7 @@ pub struct CbuProductOperation {
 
 /// CBU deletion configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CbuDeleteRequest {
+pub(crate) struct CbuDeleteRequest {
     pub cbu_id: Uuid,
     pub deletion_strategy: DeletionStrategy,
     pub dependency_handling: DependencyHandling,
@@ -145,7 +145,7 @@ pub struct CbuDeleteRequest {
 
 /// Deletion strategies
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum DeletionStrategy {
+pub(crate) enum DeletionStrategy {
     SoftDelete,
     HardDelete,
     Archive,
@@ -153,7 +153,7 @@ pub enum DeletionStrategy {
 
 /// Dependency handling configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DependencyHandling {
+pub(crate) struct DependencyHandling {
     pub entity_references: String,
     pub document_references: String,
     pub ubo_calculations: String,
@@ -163,7 +163,7 @@ pub struct DependencyHandling {
 
 /// CBU creation result
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CbuCreationResult {
+pub(crate) struct CbuCreationResult {
     pub cbu_id: Uuid,
     pub session_id: Option<Uuid>,
     pub created_entities: usize,
@@ -175,7 +175,7 @@ pub struct CbuCreationResult {
 
 /// Complete CBU data with all relationships
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CbuCompleteData {
+pub(crate) struct CbuCompleteData {
     pub cbu: CbuRecord,
     pub entities: Vec<CbuEntityWithRoles>,
     pub attributes: Vec<CbuAttributeValue>,
@@ -188,7 +188,7 @@ pub struct CbuCompleteData {
 
 /// Core CBU record
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CbuRecord {
+pub(crate) struct CbuRecord {
     pub cbu_id: Uuid,
     pub name: String,
     pub description: Option<String>,
@@ -199,7 +199,7 @@ pub struct CbuRecord {
 
 /// CBU entity with roles
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CbuEntityWithRoles {
+pub(crate) struct CbuEntityWithRoles {
     pub entity_id: Uuid,
     pub entity_type: String,
     pub entity_name: String,
@@ -211,7 +211,7 @@ pub struct CbuEntityWithRoles {
 
 /// CBU attribute value with metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CbuAttributeValue {
+pub(crate) struct CbuAttributeValue {
     pub attribute_id: Uuid,
     pub attribute_name: String,
     pub value: Value,
@@ -222,7 +222,7 @@ pub struct CbuAttributeValue {
 
 /// UBO calculation record
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UboCalculation {
+pub(crate) struct UboCalculation {
     pub ubo_id: Uuid,
     pub subject_entity_id: Uuid,
     pub ubo_proper_person_id: Uuid,
@@ -235,7 +235,7 @@ pub struct UboCalculation {
 
 /// Product workflow status
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProductWorkflow {
+pub(crate) struct ProductWorkflow {
     pub workflow_id: Uuid,
     pub product_id: Uuid,
     pub entity_type: String,
@@ -246,7 +246,7 @@ pub struct ProductWorkflow {
 
 /// Orchestration session status
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OrchestrationStatus {
+pub(crate) struct OrchestrationStatus {
     pub session_id: Uuid,
     pub primary_domain: String,
     pub current_state: String,
@@ -257,7 +257,7 @@ pub struct OrchestrationStatus {
 
 /// Document association
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DocumentAssociation {
+pub(crate) struct DocumentAssociation {
     pub document_id: Uuid,
     pub document_type: String,
     pub relationship_type: String,
@@ -266,7 +266,7 @@ pub struct DocumentAssociation {
 
 /// Compliance status
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ComplianceStatus {
+pub(crate) struct ComplianceStatus {
     pub framework: String,
     pub status: String,
     pub last_reviewed: Option<DateTime<Utc>>,
@@ -275,7 +275,7 @@ pub struct ComplianceStatus {
 
 /// CBU operation errors
 #[derive(Debug, thiserror::Error)]
-pub enum CbuCrudError {
+pub(crate) enum CbuCrudError {
     #[error("CBU validation failed: {details}")]
     ValidationError { details: String },
 

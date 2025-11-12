@@ -15,7 +15,7 @@ use super::ExecutionContext;
 
 /// Builder for creating execution contexts
 #[derive(Debug, Clone)]
-pub struct ExecutionContextBuilder {
+pub(crate) struct ExecutionContextBuilder {
     session_id: Option<Uuid>,
     business_unit_id: Option<String>,
     domain: Option<String>,
@@ -40,13 +40,13 @@ impl ExecutionContextBuilder {
     }
 
     /// Set the session ID
-    pub fn with_session_id(mut self, session_id: Uuid) -> Self {
+    pub(crate) fn with_session_id(mut self, session_id: Uuid) -> Self {
         self.session_id = Some(session_id);
         self
     }
 
     /// Set the business unit ID
-    pub fn with_business_unit_id(mut self, business_unit_id: impl Into<String>) -> Self {
+    pub(crate) fn with_business_unit_id(mut self, business_unit_id: impl Into<String>) -> Self {
         self.business_unit_id = Some(business_unit_id.into());
         self
     }
@@ -58,13 +58,13 @@ impl ExecutionContextBuilder {
     }
 
     /// Set the executor
-    pub fn with_executor(mut self, executor: impl Into<String>) -> Self {
+    pub(crate) fn with_executor(mut self, executor: impl Into<String>) -> Self {
         self.executor = Some(executor.into());
         self
     }
 
     /// Set the start time
-    pub fn with_started_at(mut self, started_at: DateTime<Utc>) -> Self {
+    pub(crate) fn with_started_at(mut self, started_at: DateTime<Utc>) -> Self {
         self.started_at = Some(started_at);
         self
     }
@@ -76,25 +76,25 @@ impl ExecutionContextBuilder {
     }
 
     /// Add multiple environment variables
-    pub fn with_env_map(mut self, env_map: HashMap<String, Value>) -> Self {
+    pub(crate) fn with_env_map(mut self, env_map: HashMap<String, Value>) -> Self {
         self.environment.extend(env_map);
         self
     }
 
     /// Add an available integration
-    pub fn with_integration(mut self, integration_name: impl Into<String>) -> Self {
+    pub(crate) fn with_integration(mut self, integration_name: impl Into<String>) -> Self {
         self.integrations.push(integration_name.into());
         self
     }
 
     /// Add multiple integrations
-    pub fn with_integrations(mut self, integrations: Vec<String>) -> Self {
+    pub(crate) fn with_integrations(mut self, integrations: Vec<String>) -> Self {
         self.integrations.extend(integrations);
         self
     }
 
     /// Enable compliance mode with required environment flags
-    pub fn with_compliance_mode(mut self, compliance_types: &[ComplianceType]) -> Self {
+    pub(crate) fn with_compliance_mode(mut self, compliance_types: &[ComplianceType]) -> Self {
         for compliance_type in compliance_types {
             match compliance_type {
                 ComplianceType::PII => {
@@ -156,7 +156,7 @@ impl Default for ExecutionContextBuilder {
 
 /// Supported compliance types
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ComplianceType {
+pub(crate) enum ComplianceType {
     PII,  // Personally Identifiable Information
     PCI,  // Payment Card Industry
     PHI,  // Protected Health Information
@@ -165,11 +165,11 @@ pub enum ComplianceType {
 }
 
 /// Environment validator for execution contexts
-pub struct EnvironmentValidator;
+pub(crate) struct EnvironmentValidator;
 
 impl EnvironmentValidator {
     /// Validate that required environment variables are present
-    pub fn validate_required_env(context: &ExecutionContext, required_vars: &[&str]) -> Result<()> {
+    pub(crate) fn validate_required_env(context: &ExecutionContext, required_vars: &[&str]) -> Result<()> {
         let missing_vars: Vec<&str> = required_vars
             .iter()
             .filter(|&var| !context.environment.contains_key(*var))
@@ -187,7 +187,7 @@ impl EnvironmentValidator {
     }
 
     /// Validate compliance environment settings
-    pub fn validate_compliance_env(
+    pub(crate) fn validate_compliance_env(
         context: &ExecutionContext,
         required_compliance: &[ComplianceType],
     ) -> Result<()> {
@@ -223,7 +223,7 @@ impl EnvironmentValidator {
     }
 
     /// Validate that required integrations are available
-    pub fn validate_integrations(
+    pub(crate) fn validate_integrations(
         context: &ExecutionContext,
         required_integrations: &[&str],
     ) -> Result<()> {
@@ -245,11 +245,11 @@ impl EnvironmentValidator {
 }
 
 /// Session management utilities
-pub struct SessionManager;
+pub(crate) struct SessionManager;
 
 impl SessionManager {
     /// Create a new session context for a business unit
-    pub fn create_session(
+    pub(crate) fn create_session(
         business_unit_id: impl Into<String>,
         domain: impl Into<String>,
         executor: impl Into<String>,
@@ -263,7 +263,7 @@ impl SessionManager {
     }
 
     /// Create a KYC session with appropriate compliance settings
-    pub fn create_kyc_session(
+    pub(crate) fn create_kyc_session(
         business_unit_id: impl Into<String>,
         executor: impl Into<String>,
         integrations: Vec<String>,
@@ -280,7 +280,7 @@ impl SessionManager {
     }
 
     /// Create an onboarding session
-    pub fn create_onboarding_session(
+    pub(crate) fn create_onboarding_session(
         business_unit_id: impl Into<String>,
         executor: impl Into<String>,
         integrations: Vec<String>,
@@ -297,7 +297,7 @@ impl SessionManager {
     }
 
     /// Create a UBO discovery session
-    pub fn create_ubo_session(
+    pub(crate) fn create_ubo_session(
         business_unit_id: impl Into<String>,
         executor: impl Into<String>,
         integrations: Vec<String>,
@@ -319,7 +319,7 @@ impl SessionManager {
     }
 
     /// Extend an existing session with additional environment variables
-    pub fn extend_session(
+    pub(crate) fn extend_session(
         mut context: ExecutionContext,
         additional_env: HashMap<String, Value>,
         additional_integrations: Vec<String>,
@@ -331,11 +331,11 @@ impl SessionManager {
 }
 
 /// Context utilities for common operations
-pub struct ContextUtils;
+pub(crate) struct ContextUtils;
 
 impl ContextUtils {
     /// Check if context is in a specific mode
-    pub fn is_mode_enabled(context: &ExecutionContext, mode: &str) -> bool {
+    pub(crate) fn is_mode_enabled(context: &ExecutionContext, mode: &str) -> bool {
         context
             .environment
             .get(mode)
@@ -344,7 +344,7 @@ impl ContextUtils {
     }
 
     /// Get environment variable as string
-    pub fn get_env_string(context: &ExecutionContext, key: &str) -> Option<String> {
+    pub(crate) fn get_env_string(context: &ExecutionContext, key: &str) -> Option<String> {
         context
             .environment
             .get(key)
@@ -353,27 +353,27 @@ impl ContextUtils {
     }
 
     /// Get environment variable as boolean
-    pub fn get_env_bool(context: &ExecutionContext, key: &str) -> Option<bool> {
+    pub(crate) fn get_env_bool(context: &ExecutionContext, key: &str) -> Option<bool> {
         context.environment.get(key).and_then(|v| v.as_bool())
     }
 
     /// Get environment variable as number
-    pub fn get_env_number(context: &ExecutionContext, key: &str) -> Option<f64> {
+    pub(crate) fn get_env_number(context: &ExecutionContext, key: &str) -> Option<f64> {
         context.environment.get(key).and_then(|v| v.as_f64())
     }
 
     /// Check if integration is available
-    pub fn has_integration(context: &ExecutionContext, integration_name: &str) -> bool {
+    pub(crate) fn has_integration(context: &ExecutionContext, integration_name: &str) -> bool {
         context.integrations.contains(&integration_name.to_string())
     }
 
     /// Get session duration
-    pub fn session_duration(context: &ExecutionContext) -> chrono::Duration {
+    pub(crate) fn session_duration(context: &ExecutionContext) -> chrono::Duration {
         Utc::now() - context.started_at
     }
 
     /// Create a child context for sub-operations
-    pub fn create_child_context(
+    pub(crate) fn create_child_context(
         parent: &ExecutionContext,
         sub_operation_type: &str,
     ) -> ExecutionContext {
@@ -399,7 +399,7 @@ impl ContextUtils {
     }
 
     /// Serialize context for logging/audit
-    pub fn serialize_for_audit(context: &ExecutionContext) -> Result<String> {
+    pub(crate) fn serialize_for_audit(context: &ExecutionContext) -> Result<String> {
         let audit_data = serde_json::json!({
             "session_id": context.session_id,
             "business_unit_id": context.business_unit_id,

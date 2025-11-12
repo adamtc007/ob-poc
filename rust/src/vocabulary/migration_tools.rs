@@ -11,14 +11,14 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Migration manager for vocabulary changes
-pub struct VocabularyMigrationManager {
+pub(crate) struct VocabularyMigrationManager {
     migration_rules: Vec<MigrationRule>,
     version_mappings: HashMap<String, String>,
 }
 
 /// Migration rule for vocabulary transformation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MigrationRule {
+pub(crate) struct MigrationRule {
     pub rule_id: Uuid,
     pub rule_name: String,
     pub from_version: String,
@@ -29,7 +29,7 @@ pub struct MigrationRule {
 
 /// Transformation types for vocabulary migration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum VocabularyTransformation {
+pub(crate) enum VocabularyTransformation {
     /// Rename a verb
     Rename { old_verb: String, new_verb: String },
     /// Move verb to different domain
@@ -63,7 +63,7 @@ pub enum VocabularyTransformation {
 
 /// Migration plan containing all transformations
 #[derive(Debug)]
-pub struct MigrationPlan {
+pub(crate) struct MigrationPlan {
     pub plan_id: Uuid,
     pub from_version: String,
     pub to_version: String,
@@ -73,7 +73,7 @@ pub struct MigrationPlan {
 
 /// Impact assessment for migration
 #[derive(Debug)]
-pub struct MigrationImpact {
+pub(crate) struct MigrationImpact {
     pub affected_verbs: usize,
     pub breaking_changes: usize,
     pub deprecated_verbs: usize,
@@ -83,7 +83,7 @@ pub struct MigrationImpact {
 
 /// Migration result tracking
 #[derive(Debug)]
-pub struct MigrationResult {
+pub(crate) struct MigrationResult {
     pub success: bool,
     pub completed_transformations: Vec<String>,
     pub failed_transformations: Vec<(String, String)>, // transformation, error
@@ -101,14 +101,14 @@ impl VocabularyMigrationManager {
     }
 
     /// Add a migration rule
-    pub fn add_migration_rule(&mut self, rule: MigrationRule) {
+    pub(crate) fn add_migration_rule(&mut self, rule: MigrationRule) {
         self.migration_rules.push(rule);
         self.version_mappings
             .insert(rule.from_version.clone(), rule.to_version.clone());
     }
 
     /// Create migration plan between versions
-    pub fn create_migration_plan(
+    pub(crate) fn create_migration_plan(
         &self,
         from_version: &str,
         to_version: &str,
@@ -434,7 +434,7 @@ impl VocabularyMigrationManager {
     }
 
     /// Validate migration plan
-    pub fn validate_migration_plan(
+    pub(crate) fn validate_migration_plan(
         &self,
         plan: &MigrationPlan,
     ) -> Result<Vec<String>, VocabularyError> {

@@ -21,7 +21,7 @@ pub struct CrudRagSystem {
 
 /// Information about an asset type for RAG context
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AssetSchemaInfo {
+pub(crate) struct AssetSchemaInfo {
     pub asset_name: String,
     pub table_name: String,
     pub description: String,
@@ -31,7 +31,7 @@ pub struct AssetSchemaInfo {
 
 /// Information about a field in an asset
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FieldInfo {
+pub(crate) struct FieldInfo {
     pub field_name: String,
     pub db_column: String,
     pub data_type: String,
@@ -42,7 +42,7 @@ pub struct FieldInfo {
 
 /// CRUD grammar rules and patterns
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GrammarRules {
+pub(crate) struct GrammarRules {
     pub ebnf_grammar: String,
     pub verb_patterns: HashMap<String, VerbPattern>,
     pub common_mistakes: Vec<String>,
@@ -50,7 +50,7 @@ pub struct GrammarRules {
 
 /// Pattern information for a specific CRUD verb
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerbPattern {
+pub(crate) struct VerbPattern {
     pub verb: String,
     pub description: String,
     pub required_fields: Vec<String>,
@@ -60,7 +60,7 @@ pub struct VerbPattern {
 
 /// Example mapping from natural language to DSL
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CrudExample {
+pub(crate) struct CrudExample {
     pub id: String,
     pub category: String,
     pub natural_language: String,
@@ -203,12 +203,12 @@ impl CrudRagSystem {
     }
 
     /// Gets all available asset types
-    pub fn get_available_assets(&self) -> Vec<String> {
+    pub(crate) fn get_available_assets(&self) -> Vec<String> {
         self.asset_schemas.keys().cloned().collect()
     }
 
     /// Gets schema information for a specific asset
-    pub fn get_asset_schema(&self, asset_name: &str) -> Option<&AssetSchemaInfo> {
+    pub(crate) fn get_asset_schema(&self, asset_name: &str) -> Option<&AssetSchemaInfo> {
         self.asset_schemas.get(asset_name)
     }
 

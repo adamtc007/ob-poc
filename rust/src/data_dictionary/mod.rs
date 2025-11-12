@@ -12,11 +12,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub mod attribute;
-pub mod catalogue;
+pub(crate) mod catalogue;
 pub mod validation;
 
 pub use attribute::*;
-pub use catalogue::*;
+pub(crate) use catalogue::*;
 
 // Re-export key types for convenience
 pub use attribute::AttributeId;
@@ -42,14 +42,14 @@ pub trait DictionaryService: Send + Sync {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DataDictionary {
+pub(crate) struct DataDictionary {
     pub attributes: HashMap<String, AttributeDefinition>,
     pub categories: Vec<CategoryDefinition>,
     pub relationships: Vec<AttributeRelationship>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CategoryDefinition {
+pub(crate) struct CategoryDefinition {
     pub category_id: String,
     pub display_name: String,
     pub description: String,
@@ -57,7 +57,7 @@ pub struct CategoryDefinition {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AttributeRelationship {
+pub(crate) struct AttributeRelationship {
     pub from_attr: String,
     pub to_attr: String,
     pub relationship_type: RelationshipType,
@@ -81,7 +81,7 @@ impl DataDictionary {
         }
     }
 
-    pub fn get_attribute(&self, attr_id: &str) -> Option<&AttributeDefinition> {
+    pub(crate) fn get_attribute(&self, attr_id: &str) -> Option<&AttributeDefinition> {
         self.attributes.get(attr_id)
     }
 }

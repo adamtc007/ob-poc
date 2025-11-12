@@ -31,7 +31,7 @@ pub use onboarding::OnboardingDomainHandler;
 pub use ubo::UboDomainHandler;
 
 /// Register all standard domains with the domain registry
-pub fn register_all_domains(
+pub(crate) fn register_all_domains(
     registry: &mut crate::dsl::domain_registry::DomainRegistry,
 ) -> Result<(), crate::dsl::DslEditError> {
     registry.register_domain(Box::new(OnboardingDomainHandler::new()))?;
@@ -41,13 +41,13 @@ pub fn register_all_domains(
 }
 
 /// Get list of all available domain names
-pub fn available_domains() -> Vec<&'static str> {
+pub(crate) fn available_domains() -> Vec<&'static str> {
     vec!["onboarding", "kyc", "ubo"]
 }
 
 /// Domain-specific error types that can occur during domain operations
 #[derive(Debug, thiserror::Error)]
-pub enum DomainError {
+pub(crate) enum DomainError {
     #[error("Invalid state transition in domain '{domain}': {from} -> {to}")]
     InvalidStateTransition {
         domain: String,
@@ -83,17 +83,17 @@ pub mod common {
     }
 
     /// Generate unique operation ID
-    pub fn generate_operation_id() -> String {
+    pub(crate) fn generate_operation_id() -> String {
         Uuid::new_v4().to_string()
     }
 
     /// Extract CBU ID from domain context if available
-    pub fn extract_cbu_id(context: &DomainContext) -> Option<String> {
+    pub(crate) fn extract_cbu_id(context: &DomainContext) -> Option<String> {
         context.get_context::<String>("cbu_id")
     }
 
     /// Extract entity ID from domain context if available
-    pub fn extract_entity_id(context: &DomainContext) -> Option<String> {
+    pub(crate) fn extract_entity_id(context: &DomainContext) -> Option<String> {
         context.get_context::<String>("entity_id")
     }
 
@@ -162,7 +162,7 @@ pub mod common {
     }
 
     /// Legacy wrapper function for compatibility
-    pub fn wrap_dsl_fragment(
+    pub(crate) fn wrap_dsl_fragment(
         verb: &str,
         attrs: &std::collections::HashMap<String, serde_json::Value>,
     ) -> String {

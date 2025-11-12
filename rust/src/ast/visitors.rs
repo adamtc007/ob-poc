@@ -2,14 +2,14 @@
 
 use super::*;
 
-pub trait StatementVisitor {
+pub(crate) trait StatementVisitor {
     fn visit_declare_entity(&mut self, entity: &DeclareEntity);
     fn visit_obtain_document(&mut self, doc: &ObtainDocument);
     fn visit_create_edge(&mut self, edge: &CreateEdge);
     fn visit_calculate_ubo(&mut self, calc: &CalculateUbo);
 }
 
-pub trait AstWalker {
+pub(crate) trait AstWalker {
     fn walk_program(&mut self, program: &Program) {
         for workflow in &program.workflows {
             self.walk_workflow(workflow);

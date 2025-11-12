@@ -16,7 +16,7 @@ use uuid::Uuid;
 
 /// Central document catalog entry - stores file metadata and AI extraction results
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct DocumentCatalog {
+pub(crate) struct DocumentCatalog {
     pub doc_id: Uuid,
     pub file_hash_sha256: String,
     pub storage_key: String,
@@ -32,7 +32,7 @@ pub struct DocumentCatalog {
 
 /// New document catalog entry for creation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NewDocumentCatalog {
+pub(crate) struct NewDocumentCatalog {
     pub file_hash_sha256: String,
     pub storage_key: String,
     pub file_size_bytes: Option<i64>,
@@ -44,7 +44,7 @@ pub struct NewDocumentCatalog {
 
 /// Update document catalog entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateDocumentCatalog {
+pub(crate) struct UpdateDocumentCatalog {
     pub extracted_data: Option<serde_json::Value>,
     pub extraction_status: Option<String>,
     pub extraction_confidence: Option<f64>,
@@ -57,7 +57,7 @@ pub struct UpdateDocumentCatalog {
 
 /// Document metadata entry - links documents to dictionary attributes
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct DocumentMetadata {
+pub(crate) struct DocumentMetadata {
     pub doc_id: Uuid,
     pub attribute_id: Uuid,
     pub value: serde_json::Value,
@@ -66,7 +66,7 @@ pub struct DocumentMetadata {
 
 /// New document metadata entry for creation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NewDocumentMetadata {
+pub(crate) struct NewDocumentMetadata {
     pub doc_id: Uuid,
     pub attribute_id: Uuid,
     pub value: serde_json::Value,
@@ -74,7 +74,7 @@ pub struct NewDocumentMetadata {
 
 /// Batch metadata update for a document
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DocumentMetadataBatch {
+pub(crate) struct DocumentMetadataBatch {
     pub doc_id: Uuid,
     pub metadata: Vec<AttributeValue>,
 }
@@ -92,7 +92,7 @@ pub struct AttributeValue {
 
 /// Document-to-document relationships
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct DocumentRelationship {
+pub(crate) struct DocumentRelationship {
     pub relationship_id: Uuid,
     pub primary_doc_id: Uuid,
     pub related_doc_id: Uuid,
@@ -102,7 +102,7 @@ pub struct DocumentRelationship {
 
 /// New document relationship for creation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NewDocumentRelationship {
+pub(crate) struct NewDocumentRelationship {
     pub primary_doc_id: Uuid,
     pub related_doc_id: Uuid,
     pub relationship_type: String,
@@ -110,7 +110,7 @@ pub struct NewDocumentRelationship {
 
 /// Common relationship types
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum DocumentRelationshipType {
+pub(crate) enum DocumentRelationshipType {
     Amends,
     Supersedes,
     IsTranslationOf,
@@ -153,7 +153,7 @@ pub struct DocumentUsage {
 
 /// New document usage for creation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NewDocumentUsage {
+pub(crate) struct NewDocumentUsage {
     pub doc_id: Uuid,
     pub cbu_id: Uuid,
     pub entity_id: Option<Uuid>,
@@ -162,7 +162,7 @@ pub struct NewDocumentUsage {
 
 /// Common usage contexts
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum DocumentUsageContext {
+pub(crate) enum DocumentUsageContext {
     EvidenceOfAddress,
     EvidenceOfIdentity,
     EvidenceOfIncome,
@@ -198,7 +198,7 @@ impl DocumentUsageContext {
 
 /// Document with aggregated metadata (matches the view)
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct DocumentCatalogWithMetadata {
+pub(crate) struct DocumentCatalogWithMetadata {
     pub doc_id: Uuid,
     pub file_hash_sha256: String,
     pub storage_key: String,
@@ -215,7 +215,7 @@ pub struct DocumentCatalogWithMetadata {
 
 /// Full document details with relationships and usage
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DocumentDetails {
+pub(crate) struct DocumentDetails {
     pub catalog: DocumentCatalog,
     pub metadata: Vec<DocumentMetadata>,
     pub relationships: Vec<DocumentRelationship>,
@@ -224,7 +224,7 @@ pub struct DocumentDetails {
 
 /// Document summary for listings
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DocumentSummary {
+pub(crate) struct DocumentSummary {
     pub doc_id: Uuid,
     pub storage_key: String,
     pub mime_type: Option<String>,
@@ -242,7 +242,7 @@ pub struct DocumentSummary {
 
 /// Document search request
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DocumentSearchRequest {
+pub(crate) struct DocumentSearchRequest {
     /// Full-text search query
     pub query: Option<String>,
     /// Filter by specific attribute values
@@ -267,7 +267,7 @@ pub struct DocumentSearchRequest {
 
 /// Document search response
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DocumentSearchResponse {
+pub(crate) struct DocumentSearchResponse {
     pub documents: Vec<DocumentCatalogWithMetadata>,
     pub total_count: i64,
     pub has_more: bool,
@@ -279,7 +279,7 @@ pub struct DocumentSearchResponse {
 
 /// AI extraction request
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AiExtractionRequest {
+pub(crate) struct AiExtractionRequest {
     pub doc_id: Uuid,
     pub extraction_method: String,
     pub confidence_threshold: Option<f64>,
@@ -289,7 +289,7 @@ pub struct AiExtractionRequest {
 
 /// AI extraction result
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AiExtractionResult {
+pub(crate) struct AiExtractionResult {
     pub doc_id: Uuid,
     pub extracted_data: serde_json::Value,
     pub extraction_confidence: f64,
@@ -303,7 +303,7 @@ pub struct AiExtractionResult {
 
 /// Extraction status tracking
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ExtractionStatus {
+pub(crate) enum ExtractionStatus {
     Pending,
     InProgress,
     Completed,
@@ -329,7 +329,7 @@ impl ExtractionStatus {
 
 /// Bulk document import request
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BulkDocumentImport {
+pub(crate) struct BulkDocumentImport {
     pub documents: Vec<NewDocumentCatalog>,
     pub metadata_batches: Vec<DocumentMetadataBatch>,
     pub skip_duplicates: bool,
@@ -338,7 +338,7 @@ pub struct BulkDocumentImport {
 
 /// Bulk import result
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BulkImportResult {
+pub(crate) struct BulkImportResult {
     pub total_processed: usize,
     pub successful_imports: usize,
     pub failed_imports: usize,
@@ -353,7 +353,7 @@ pub struct BulkImportResult {
 
 /// Document statistics
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DocumentStatistics {
+pub(crate) struct DocumentStatistics {
     pub total_documents: i64,
     pub documents_by_status: HashMap<String, i64>,
     pub documents_by_mime_type: HashMap<String, i64>,
@@ -366,7 +366,7 @@ pub struct DocumentStatistics {
 
 /// Attribute usage statistics
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AttributeUsageStats {
+pub(crate) struct AttributeUsageStats {
     pub attribute_id: Uuid,
     pub attribute_name: String,
     pub usage_count: i64,
@@ -379,7 +379,7 @@ pub struct AttributeUsageStats {
 
 /// DSL verb execution context for document operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DocumentDslContext {
+pub(crate) struct DocumentDslContext {
     pub operation_type: DocumentDslOperation,
     pub doc_id: Option<Uuid>,
     pub cbu_id: Option<Uuid>,
@@ -390,7 +390,7 @@ pub struct DocumentDslContext {
 
 /// Document DSL operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum DocumentDslOperation {
+pub(crate) enum DocumentDslOperation {
     Catalog,
     Verify,
     Extract,
@@ -422,7 +422,7 @@ impl DocumentDslOperation {
 
 /// Standard API response wrapper
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ApiResponse<T> {
+pub(crate) struct ApiResponse<T> {
     pub success: bool,
     pub data: Option<T>,
     pub message: Option<String>,
@@ -458,7 +458,7 @@ impl<T> ApiResponse<T> {
 
 /// Document validation result
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DocumentValidationResult {
+pub(crate) struct DocumentValidationResult {
     pub is_valid: bool,
     pub doc_id: Uuid,
     pub validation_errors: Vec<ValidationError>,
@@ -477,7 +477,7 @@ pub struct ValidationError {
 
 /// Confidence warning
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConfidenceWarning {
+pub(crate) struct ConfidenceWarning {
     pub attribute_id: Uuid,
     pub current_confidence: f64,
     pub threshold: f64,
@@ -526,7 +526,7 @@ impl Default for DocumentSearchRequest {
 
 impl DocumentCatalog {
     /// Check if document has been successfully extracted
-    pub fn is_extracted(&self) -> bool {
+    pub(crate) fn is_extracted(&self) -> bool {
         self.extraction_status == "COMPLETED" && self.extracted_data.is_some()
     }
 
@@ -536,14 +536,14 @@ impl DocumentCatalog {
     }
 
     /// Check if extraction confidence meets threshold
-    pub fn meets_confidence_threshold(&self, threshold: f64) -> bool {
+    pub(crate) fn meets_confidence_threshold(&self, threshold: f64) -> bool {
         self.confidence() >= threshold
     }
 }
 
 impl DocumentMetadata {
     /// Convert value to string representation
-    pub fn value_as_string(&self) -> String {
+    pub(crate) fn value_as_string(&self) -> String {
         match &self.value {
             serde_json::Value::String(s) => s.clone(),
             serde_json::Value::Number(n) => n.to_string(),
@@ -553,7 +553,7 @@ impl DocumentMetadata {
     }
 
     /// Check if value matches a string pattern
-    pub fn value_matches(&self, pattern: &str) -> bool {
+    pub(crate) fn value_matches(&self, pattern: &str) -> bool {
         self.value_as_string()
             .to_lowercase()
             .contains(&pattern.to_lowercase())

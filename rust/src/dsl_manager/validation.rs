@@ -100,7 +100,7 @@ impl Default for ValidationReport {
 
 /// Manager-specific validation results
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ManagerValidationResult {
+pub(crate) struct ManagerValidationResult {
     /// Operation-level validations
     pub operation_validations: Vec<OperationValidation>,
     /// Cross-form validations
@@ -113,7 +113,7 @@ pub struct ManagerValidationResult {
 
 /// V3.3 normalization validation results
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NormalizationValidationResult {
+pub(crate) struct NormalizationValidationResult {
     /// Whether normalization was required
     pub normalization_required: bool,
     /// Number of legacy forms normalized
@@ -126,7 +126,7 @@ pub struct NormalizationValidationResult {
 
 /// Individual operation validation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OperationValidation {
+pub(crate) struct OperationValidation {
     pub operation_name: String,
     pub is_valid: bool,
     pub errors: Vec<String>,
@@ -136,7 +136,7 @@ pub struct OperationValidation {
 
 /// Cross-form validation (relationships between forms)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CrossFormValidation {
+pub(crate) struct CrossFormValidation {
     pub validation_name: String,
     pub forms_involved: Vec<String>,
     pub is_valid: bool,
@@ -156,7 +156,7 @@ pub struct BusinessRuleValidation {
 
 /// Resource validation (database, external services, etc.)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceValidation {
+pub(crate) struct ResourceValidation {
     pub resource_name: String,
     pub resource_type: String,
     pub is_available: bool,
@@ -166,7 +166,7 @@ pub struct ResourceValidation {
 
 /// Validation performance metrics
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ValidationMetrics {
+pub(crate) struct ValidationMetrics {
     pub syntax_validation_ms: u64,
     pub semantic_validation_ms: u64,
     pub business_rule_validation_ms: u64,
@@ -230,7 +230,7 @@ pub trait BusinessRule: Send + Sync {
 
 /// Validation configuration
 #[derive(Debug, Clone)]
-pub struct ValidationConfig {
+pub(crate) struct ValidationConfig {
     /// Enable normalization validation
     pub validate_normalization: bool,
     /// Enable resource validation
@@ -289,7 +289,7 @@ impl DslValidationEngine {
     }
 
     /// Create with custom configuration
-    pub fn with_config(config: ValidationConfig) -> Self {
+    pub(crate) fn with_config(config: ValidationConfig) -> Self {
         Self {
             core_validator: CoreDslValidator::new(),
             custom_rules: Vec::new(),
@@ -299,7 +299,7 @@ impl DslValidationEngine {
     }
 
     /// Register a business rule
-    pub fn register_business_rule(&mut self, rule: Box<dyn BusinessRule>) {
+    pub(crate) fn register_business_rule(&mut self, rule: Box<dyn BusinessRule>) {
         self.business_rules.register(rule);
     }
 
@@ -584,7 +584,7 @@ impl BusinessRuleRegistry {
         self.rules.insert(rule.name().to_string(), rule);
     }
 
-    pub fn get_rule(&self, name: &str) -> Option<&Box<dyn BusinessRule>> {
+    pub(crate) fn get_rule(&self, name: &str) -> Option<&Box<dyn BusinessRule>> {
         self.rules.get(name)
     }
 }
@@ -620,7 +620,7 @@ impl Default for NormalizationValidationResult {
 
 impl ValidationReport {
     /// Get all errors from the validation report
-    pub fn get_all_errors(&self) -> Vec<String> {
+    pub(crate) fn get_all_errors(&self) -> Vec<String> {
         let mut errors = Vec::new();
 
         // Core validation errors
@@ -658,7 +658,7 @@ impl ValidationReport {
     }
 
     /// Get all warnings from the validation report
-    pub fn get_all_warnings(&self) -> Vec<String> {
+    pub(crate) fn get_all_warnings(&self) -> Vec<String> {
         let mut warnings = Vec::new();
 
         // Core validation warnings
@@ -693,7 +693,7 @@ impl ValidationReport {
 }
 
 // Example business rule implementations
-pub struct KycCaseBusinessRule;
+pub(crate) struct KycCaseBusinessRule;
 
 impl BusinessRule for KycCaseBusinessRule {
     fn name(&self) -> &str {
@@ -716,7 +716,7 @@ impl BusinessRule for KycCaseBusinessRule {
     }
 }
 
-pub struct UboComplianceBusinessRule;
+pub(crate) struct UboComplianceBusinessRule;
 
 impl BusinessRule for UboComplianceBusinessRule {
     fn name(&self) -> &str {

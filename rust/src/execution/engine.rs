@@ -27,7 +27,7 @@ use super::{
 use crate::dsl::operations::ExecutableDslOperation as DslOperation;
 
 /// Comprehensive DSL execution engine with all components
-pub struct ComprehensiveDslEngine {
+pub(crate) struct ComprehensiveDslEngine {
     /// Core execution engine
     execution_engine: DslExecutionEngine,
     /// Business rules registry
@@ -38,7 +38,7 @@ pub struct ComprehensiveDslEngine {
 
 impl ComprehensiveDslEngine {
     /// Create a new comprehensive DSL engine with in-memory storage
-    pub fn new_with_memory_store() -> Self {
+    pub(crate) fn new_with_memory_store() -> Self {
         let state_store = Arc::new(InMemoryStateStore::new());
         let execution_engine = DslExecutionEngine::new(state_store);
         let rules_registry = Arc::new(RwLock::new(BusinessRuleRegistry::new()));
@@ -52,7 +52,7 @@ impl ComprehensiveDslEngine {
     }
 
     /// Create a new comprehensive DSL engine with PostgreSQL storage
-    pub fn new_with_postgres_store(pool: sqlx::PgPool) -> Self {
+    pub(crate) fn new_with_postgres_store(pool: sqlx::PgPool) -> Self {
         let state_store = Arc::new(PostgresStateStore::new(pool));
         let execution_engine = DslExecutionEngine::new(state_store);
         let rules_registry = Arc::new(RwLock::new(BusinessRuleRegistry::new()));
@@ -321,7 +321,7 @@ impl ComprehensiveDslEngine {
 
 /// Result of batch execution
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct BatchExecutionResult {
+pub(crate) struct BatchExecutionResult {
     pub results: Vec<ExecutionResult>,
     pub total_operations: usize,
     pub successful_operations: usize,
@@ -332,7 +332,7 @@ pub struct BatchExecutionResult {
 
 /// Result of workflow execution
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct WorkflowExecutionResult {
+pub(crate) struct WorkflowExecutionResult {
     pub workflow_type: WorkflowType,
     pub business_unit_id: String,
     pub batch_result: BatchExecutionResult,
@@ -342,7 +342,7 @@ pub struct WorkflowExecutionResult {
 
 /// Supported workflow types
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum WorkflowType {
+pub(crate) enum WorkflowType {
     KYC,
     Onboarding,
     UBO,
@@ -351,7 +351,7 @@ pub enum WorkflowType {
 
 /// Workflow execution status
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum WorkflowStatus {
+pub(crate) enum WorkflowStatus {
     Initialized,
     InProgress,
     Completed,
@@ -366,7 +366,7 @@ struct ValidationSummary {
 }
 
 /// Engine builder for customizing engine configuration
-pub struct EngineBuilder {
+pub(crate) struct EngineBuilder {
     use_postgres: bool,
     postgres_pool: Option<sqlx::PgPool>,
     custom_handlers: Vec<Arc<dyn OperationHandler>>,
@@ -387,26 +387,26 @@ impl EngineBuilder {
     }
 
     /// Use PostgreSQL for state storage
-    pub fn with_postgres(mut self, pool: sqlx::PgPool) -> Self {
+    pub(crate) fn with_postgres(mut self, pool: sqlx::PgPool) -> Self {
         self.use_postgres = true;
         self.postgres_pool = Some(pool);
         self
     }
 
     /// Add a custom operation handler
-    pub fn with_handler(mut self, handler: Arc<dyn OperationHandler>) -> Self {
+    pub(crate) fn with_handler(mut self, handler: Arc<dyn OperationHandler>) -> Self {
         self.custom_handlers.push(handler);
         self
     }
 
     /// Add a custom business rule
-    pub fn with_rule(mut self, rule: Arc<dyn BusinessRule>) -> Self {
+    pub(crate) fn with_rule(mut self, rule: Arc<dyn BusinessRule>) -> Self {
         self.custom_rules.push(rule);
         self
     }
 
     /// Add a custom integration
-    pub fn with_integration(mut self, integration: Arc<dyn ExternalIntegration>) -> Self {
+    pub(crate) fn with_integration(mut self, integration: Arc<dyn ExternalIntegration>) -> Self {
         self.custom_integrations.push(integration);
         self
     }

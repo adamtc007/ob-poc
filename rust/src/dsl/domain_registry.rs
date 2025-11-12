@@ -180,7 +180,7 @@ impl DomainRegistry {
     }
 
     /// Get the shared vocabulary
-    pub fn shared_vocabulary(&self) -> &DslVocabulary {
+    pub(crate) fn shared_vocabulary(&self) -> &DslVocabulary {
         &self.shared_vocabulary
     }
 
@@ -314,7 +314,7 @@ pub enum ValidationSeverity {
 
 /// Routing rule for operation dispatching
 #[derive(Debug, Clone)]
-pub struct RoutingRule {
+pub(crate) struct RoutingRule {
     pub rule_id: String,
     pub target_domain: String,
     pub operation_patterns: Vec<String>,

@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum NormalizationError {
+pub(crate) enum NormalizationError {
     #[error("Failed to transform UBO link: {message}")]
     UboLinkTransformation { message: String },
 
@@ -85,7 +85,7 @@ impl DslNormalizer {
     }
 
     /// Main normalization entry point - normalizes a complete program
-    pub fn normalize_program(&self, program: &mut [Form]) -> Result<(), NormalizationError> {
+    pub(crate) fn normalize_program(&self, program: &mut [Form]) -> Result<(), NormalizationError> {
         for form in program.iter_mut() {
             if let Form::Verb(verb_form) = form {
                 self.normalize_verb_form(verb_form)?;

@@ -91,7 +91,7 @@ pub struct ExecutionResult {
 
 /// Messages generated during execution
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExecutionMessage {
+pub(crate) struct ExecutionMessage {
     pub level: MessageLevel,
     pub message: String,
     pub context: Option<String>,
@@ -99,7 +99,7 @@ pub struct ExecutionMessage {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum MessageLevel {
+pub(crate) enum MessageLevel {
     Debug,
     Info,
     Warning,
@@ -133,7 +133,7 @@ pub trait BusinessRule: Send + Sync {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RuleResult {
+pub(crate) struct RuleResult {
     pub valid: bool,
     pub message: Option<String>,
     pub blocking: bool, // If true, execution cannot continue
@@ -141,7 +141,7 @@ pub struct RuleResult {
 }
 
 /// Main DSL execution engine
-pub struct DslExecutionEngine {
+pub(crate) struct DslExecutionEngine {
     /// External system integrations
     integrations: Arc<RwLock<HashMap<String, Arc<dyn ExternalIntegration>>>>,
     /// Business rules
@@ -154,7 +154,7 @@ pub struct DslExecutionEngine {
 
 /// Trait for handling specific DSL operations
 #[async_trait::async_trait]
-pub trait OperationHandler: Send + Sync {
+pub(crate) trait OperationHandler: Send + Sync {
     fn handles(&self) -> &str; // Operation type this handler supports
     async fn execute(
         &self,
@@ -364,7 +364,7 @@ impl DslExecutionEngine {
 
 impl DslState {
     /// Apply a new operation to the state, creating a new version
-    pub fn apply_operation(&self, operation: DslOperation) -> Self {
+    pub(crate) fn apply_operation(&self, operation: DslOperation) -> Self {
         let mut new_operations = self.operations.clone();
         new_operations.push(operation.clone());
 
@@ -420,7 +420,7 @@ impl DslState {
     }
 
     /// Get the accumulated DSL document as a string
-    pub fn to_dsl_document(&self) -> String {
+    pub(crate) fn to_dsl_document(&self) -> String {
         self.operations
             .iter()
             .map(|op| op.to_dsl_string())
@@ -429,7 +429,7 @@ impl DslState {
     }
 
     /// Rebuild state from operations (event sourcing)
-    pub fn rebuild_from_operations(
+    pub(crate) fn rebuild_from_operations(
         business_unit_id: String,
         operations: Vec<DslOperation>,
         domain: String,

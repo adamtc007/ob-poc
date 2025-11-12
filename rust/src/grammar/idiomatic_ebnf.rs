@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 
 /// EBNF parser error type with context information
 pub type EBNFError<'a> = VerboseError<&'a str>;
-pub type EBNFResult<'a, T> = IResult<&'a str, T, EBNFError<'a>>;
+pub(crate) type EBNFResult<'a, T> = IResult<&'a str, T, EBNFError<'a>>;
 
 /// EBNF Grammar representation
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -74,7 +74,7 @@ impl EBNFParser {
     }
 
     /// Parse a complete EBNF grammar
-    pub fn parse_grammar(&self, input: &str) -> Result<EBNFGrammar, String> {
+    pub(crate) fn parse_grammar(&self, input: &str) -> Result<EBNFGrammar, String> {
         let (remaining, rules) = grammar(input)
             .finish()
             .map_err(|e| format!("Parse error: {:?}", e))?;

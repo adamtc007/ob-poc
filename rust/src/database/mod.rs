@@ -8,24 +8,24 @@ use sqlx::{postgres::PgPoolOptions, PgPool};
 use std::time::Duration;
 use tracing::{info, warn};
 
-pub mod business_request_repository;
-pub mod cbu_crud_manager;
-pub mod cbu_repository;
+pub(crate) mod business_request_repository;
+pub(crate) mod cbu_crud_manager;
+pub(crate) mod cbu_repository;
 pub mod dictionary_service;
-pub mod dsl_domain_repository;
-pub mod entity_service;
+pub(crate) mod dsl_domain_repository;
+pub(crate) mod entity_service;
 
 // Re-export repository and trait for convenience
-pub use business_request_repository::{
+pub(crate) use business_request_repository::{
     DslBusinessRequestRepository, DslBusinessRequestRepositoryTrait,
 };
-pub use cbu_crud_manager::{
+pub(crate) use cbu_crud_manager::{
     CbuCompleteData, CbuCreateRequest, CbuCrudManager, CbuDeleteRequest, CbuUpdateRequest,
 };
-pub use cbu_repository::CbuRepository;
+pub(crate) use cbu_repository::CbuRepository;
 pub use dictionary_service::DictionaryDatabaseService;
-pub use dsl_domain_repository::{DslDomainRepository, DslDomainRepositoryTrait};
-pub use entity_service::EntityDatabaseService;
+pub(crate) use dsl_domain_repository::{DslDomainRepository, DslDomainRepositoryTrait};
+pub(crate) use entity_service::EntityDatabaseService;
 
 /// Database configuration
 #[derive(Debug, Clone)]
@@ -103,12 +103,12 @@ impl DatabaseManager {
     }
 
     /// Create a new DSL domain repository using this database connection
-    pub fn dsl_repository(&self) -> DslDomainRepository {
+    pub(crate) fn dsl_repository(&self) -> DslDomainRepository {
         DslDomainRepository::new(self.pool.clone())
     }
 
     /// Create a new DSL business request repository using this database connection
-    pub fn business_request_repository(&self) -> DslBusinessRequestRepository {
+    pub(crate) fn business_request_repository(&self) -> DslBusinessRequestRepository {
         DslBusinessRequestRepository::new(self.pool.clone())
     }
 
@@ -118,7 +118,7 @@ impl DatabaseManager {
     }
 
     /// Create a new entity database service using this database connection
-    pub fn entity_service(&self) -> EntityDatabaseService {
+    pub(crate) fn entity_service(&self) -> EntityDatabaseService {
         EntityDatabaseService::new(self.pool.clone())
     }
 
@@ -164,7 +164,7 @@ impl DatabaseManager {
     }
 
     /// Get database connection statistics
-    pub fn connection_stats(&self) -> ConnectionStats {
+    pub(crate) fn connection_stats(&self) -> ConnectionStats {
         ConnectionStats {
             size: self.pool.size(),
             num_idle: self.pool.num_idle() as u32,
@@ -180,7 +180,7 @@ impl DatabaseManager {
 
 /// Database connection statistics
 #[derive(Debug, Clone)]
-pub struct ConnectionStats {
+pub(crate) struct ConnectionStats {
     pub size: u32,
     pub num_idle: u32,
 }

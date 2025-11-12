@@ -3,13 +3,13 @@
 //! This module provides idiomatic Rust implementations for EBNF grammar parsing,
 //! validation, and compilation with strong typing and proper error handling.
 
-pub mod idiomatic_ebnf;
+pub(crate) mod idiomatic_ebnf;
 
 use crate::error::{DSLError, GrammarError};
 use std::collections::HashMap;
 
 // Re-export the main types
-pub use idiomatic_ebnf::{EBNFExpression, EBNFGrammar, EBNFParser, EBNFRule};
+pub(crate) use idiomatic_ebnf::{EBNFExpression, EBNFGrammar, EBNFParser, EBNFRule};
 
 /// Grammar engine for managing DSL grammars
 #[derive(Debug, Default)]
@@ -27,7 +27,7 @@ impl GrammarEngine {
     }
 
     /// Load a grammar from EBNF source
-    pub fn load_grammar(&mut self, name: impl Into<String>, source: &str) -> Result<(), DSLError> {
+    pub(crate) fn load_grammar(&mut self, name: impl Into<String>, source: &str) -> Result<(), DSLError> {
         let parser = EBNFParser::new();
         let grammar = parser
             .parse_grammar(source)
@@ -52,12 +52,12 @@ impl GrammarEngine {
     }
 
     /// Get a grammar by name
-    pub fn get_grammar(&self, name: &str) -> Option<&EBNFGrammar> {
+    pub(crate) fn get_grammar(&self, name: &str) -> Option<&EBNFGrammar> {
         self.grammars.get(name)
     }
 
     /// Get the active grammar
-    pub fn active_grammar(&self) -> Option<&EBNFGrammar> {
+    pub(crate) fn active_grammar(&self) -> Option<&EBNFGrammar> {
         self.active_grammar
             .as_ref()
             .and_then(|name| self.grammars.get(name))
@@ -81,14 +81,14 @@ impl GrammarEngine {
     }
 
     /// Get all rule names from the active grammar
-    pub fn rule_names(&self) -> Vec<String> {
+    pub(crate) fn rule_names(&self) -> Vec<String> {
         self.active_grammar()
             .map(|g| g.rules.keys().cloned().collect())
             .unwrap_or_default()
     }
 
     /// Check for circular dependencies in the active grammar
-    pub fn check_circular_dependencies(&self) -> Result<(), DSLError> {
+    pub(crate) fn check_circular_dependencies(&self) -> Result<(), DSLError> {
         let grammar = self.active_grammar().ok_or_else(|| {
             DSLError::Grammar(GrammarError::CompilationError {
                 message: "No active grammar".to_string(),
@@ -199,7 +199,7 @@ fn count_expression_features(
 
 /// Summary information about a grammar
 #[derive(Debug, Clone)]
-pub struct GrammarSummary {
+pub(crate) struct GrammarSummary {
     pub rule_count: usize,
     pub terminal_count: usize,
     pub optional_count: usize,
@@ -208,7 +208,7 @@ pub struct GrammarSummary {
 }
 
 /// Load the default DSL grammar
-pub fn load_default_grammar() -> Result<GrammarEngine, DSLError> {
+pub(crate) fn load_default_grammar() -> Result<GrammarEngine, DSLError> {
     let mut engine = GrammarEngine::new();
 
     let default_grammar = r#"

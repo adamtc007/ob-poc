@@ -176,7 +176,7 @@ pub struct DomainStatistics {
 
 /// Version history entry for change tracking
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VersionHistoryEntry {
+pub(crate) struct VersionHistoryEntry {
     pub version_number: i32,
     pub change_description: Option<String>,
     pub created_by: Option<String>,
@@ -189,7 +189,7 @@ pub struct VersionHistoryEntry {
 
 impl DslDomain {
     /// Check if domain is active and can accept new versions
-    pub fn can_accept_versions(&self) -> bool {
+    pub(crate) fn can_accept_versions(&self) -> bool {
         self.active
     }
 
@@ -201,7 +201,7 @@ impl DslDomain {
 
 impl DslVersion {
     /// Check if this version is ready for compilation
-    pub fn can_compile(&self) -> bool {
+    pub(crate) fn can_compile(&self) -> bool {
         matches!(
             self.compilation_status,
             CompilationStatus::Draft | CompilationStatus::Error
@@ -209,7 +209,7 @@ impl DslVersion {
     }
 
     /// Check if this version is compiled and ready for execution
-    pub fn can_execute(&self) -> bool {
+    pub(crate) fn can_execute(&self) -> bool {
         matches!(
             self.compilation_status,
             CompilationStatus::Compiled | CompilationStatus::Active
@@ -239,7 +239,7 @@ impl ParsedAst {
     }
 
     /// Calculate AST size estimate in bytes
-    pub fn estimated_size_bytes(&self) -> usize {
+    pub(crate) fn estimated_size_bytes(&self) -> usize {
         serde_json::to_string(&self.ast_json)
             .map(|s| s.len())
             .unwrap_or(0)
@@ -248,12 +248,12 @@ impl ParsedAst {
 
 impl DslExecutionLog {
     /// Check if execution is still running
-    pub fn is_running(&self) -> bool {
+    pub(crate) fn is_running(&self) -> bool {
         matches!(self.status, ExecutionStatus::InProgress)
     }
 
     /// Check if execution completed successfully
-    pub fn is_successful(&self) -> bool {
+    pub(crate) fn is_successful(&self) -> bool {
         matches!(self.status, ExecutionStatus::Success)
     }
 

@@ -302,7 +302,7 @@ pub struct DictionaryAttributeWithMetadata {
 
 /// Batch operation request for attributes
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AttributeBatchRequest {
+pub(crate) struct AttributeBatchRequest {
     pub operation_type: AttributeOperationType,
     pub attributes: Vec<NewDictionaryAttribute>,
     pub transaction_id: Option<Uuid>,
@@ -310,7 +310,7 @@ pub struct AttributeBatchRequest {
 
 /// Batch operation result for attributes
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AttributeBatchResult {
+pub(crate) struct AttributeBatchResult {
     pub transaction_id: Uuid,
     pub total_requested: i32,
     pub successful: i32,
@@ -321,7 +321,7 @@ pub struct AttributeBatchResult {
 
 /// Individual batch item result
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AttributeBatchItemResult {
+pub(crate) struct AttributeBatchItemResult {
     pub index: i32,
     pub success: bool,
     pub attribute_id: Option<Uuid>,

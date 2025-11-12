@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub mod types;
-pub mod visitors;
+pub(crate) mod visitors;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Program {
@@ -88,7 +88,7 @@ pub struct ObtainDocument {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ParallelObtain {
+pub(crate) struct ParallelObtain {
     pub documents: Vec<ObtainDocument>,
 }
 
@@ -114,7 +114,7 @@ pub enum EdgeType {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct SolicitAttribute {
+pub(crate) struct SolicitAttribute {
     pub attr_id: String,
     pub from: String,
     pub value_type: String,
@@ -122,7 +122,7 @@ pub struct SolicitAttribute {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CalculateUbo {
+pub(crate) struct CalculateUbo {
     pub target: String,
     pub algorithm: String,
     pub max_depth: usize,
@@ -132,7 +132,7 @@ pub struct CalculateUbo {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ResolveConflict {
+pub(crate) struct ResolveConflict {
     pub node: String,
     pub property: String,
     pub strategy: WaterfallStrategy,
@@ -140,19 +140,19 @@ pub struct ResolveConflict {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct WaterfallStrategy {
+pub(crate) struct WaterfallStrategy {
     pub priorities: Vec<SourcePriority>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct SourcePriority {
+pub(crate) struct SourcePriority {
     pub source_type: SourceType,
     pub name: String,
     pub confidence: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum SourceType {
+pub(crate) enum SourceType {
     PrimarySource,
     GovernmentRegistry,
     ThirdPartyService,
@@ -160,7 +160,7 @@ pub enum SourceType {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct GenerateReport {
+pub(crate) struct GenerateReport {
     pub target: String,
     pub status: String,
     pub identified_ubos: Vec<PropertyMap>,
@@ -169,7 +169,7 @@ pub struct GenerateReport {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ScheduleMonitoring {
+pub(crate) struct ScheduleMonitoring {
     pub target: String,
     pub frequency: String,
     pub triggers: Vec<PropertyMap>,
@@ -191,7 +191,7 @@ pub enum Value {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ValueWithSource {
+pub(crate) struct ValueWithSource {
     pub value: Box<Value>,
     pub source: String,
     pub confidence: Option<f64>,

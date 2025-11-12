@@ -3,7 +3,7 @@
 use super::traversal::OwnershipPath;
 
 #[derive(Debug, Clone)]
-pub struct UboProng {
+pub(crate) struct UboProng {
     pub prong_id: String,
     pub path: Vec<String>,
     pub ownership_percent: f64,
@@ -13,7 +13,7 @@ pub struct UboProng {
 }
 
 #[derive(Debug, Clone)]
-pub enum ProngStatus {
+pub(crate) enum ProngStatus {
     Identified,
     BelowThreshold,
     BlockedBlindTrust,
@@ -22,13 +22,13 @@ pub enum ProngStatus {
 }
 
 #[derive(Debug, Clone)]
-pub enum ProngType {
+pub(crate) enum ProngType {
     Ownership,
     Control,
     Mixed,
 }
 
-pub fn analyze_prongs(paths: Vec<OwnershipPath>, threshold: f64) -> Vec<UboProng> {
+pub(crate) fn analyze_prongs(paths: Vec<OwnershipPath>, threshold: f64) -> Vec<UboProng> {
     paths
         .into_iter()
         .enumerate()

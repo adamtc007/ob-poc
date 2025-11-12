@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 /// Repository trait for DSL domain operations
 #[async_trait]
-pub trait DslDomainRepositoryTrait {
+pub(crate) trait DslDomainRepositoryTrait {
     // Domain management
     async fn get_domain_by_name(&self, name: &str) -> Result<Option<DslDomain>, DslError>;
     async fn get_domain_by_id(&self, domain_id: &Uuid) -> Result<Option<DslDomain>, DslError>;
@@ -679,7 +679,7 @@ impl DslDomainRepositoryTrait for DslDomainRepository {
 
 /// Additional request types for new operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NewDslDomain {
+pub(crate) struct NewDslDomain {
     pub domain_name: String,
     pub description: Option<String>,
     pub base_grammar_version: String,
@@ -688,7 +688,7 @@ pub struct NewDslDomain {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NewExecutionLog {
+pub(crate) struct NewExecutionLog {
     pub version_id: Uuid,
     pub cbu_id: Option<String>,
     pub execution_phase: ExecutionPhase,
@@ -702,7 +702,7 @@ pub struct NewExecutionLog {
 
 /// Repository-specific errors
 #[derive(Debug, thiserror::Error)]
-pub enum DslError {
+pub(crate) enum DslError {
     #[error("DSL not found: {id}")]
     NotFound { id: String },
 
@@ -731,7 +731,7 @@ pub enum DslError {
     DomainMismatch { expected: String, found: String },
 }
 
-pub type DslResult<T> = Result<T, DslError>;
+pub(crate) type DslResult<T> = Result<T, DslError>;
 
 #[cfg(test)]
 mod tests {

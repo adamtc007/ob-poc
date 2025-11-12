@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum ValidatorError {
+pub(crate) enum ValidatorError {
     #[error("Missing required field: {field}")]
     MissingRequiredField { field: String },
 

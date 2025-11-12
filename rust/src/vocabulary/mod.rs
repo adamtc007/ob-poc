@@ -3,16 +3,16 @@
 //! This module provides vocabulary management with domain-prefixed verb conventions,
 //! following idiomatic Rust patterns for clean architecture and type safety.
 
-pub mod vocab_registry;
+pub(crate) mod vocab_registry;
 
 // Re-export the clean vocabulary registry
-pub use vocab_registry::{DeprecationPolicy, RegistryConfig, RegistryStats, VocabularyRegistry};
+pub(crate) use vocab_registry::{DeprecationPolicy, RegistryConfig, RegistryStats, VocabularyRegistry};
 
 use serde::{Deserialize, Serialize};
 
 /// Registry entry for vocabulary verbs with domain-prefixed convention
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerbRegistryEntry {
+pub(crate) struct VerbRegistryEntry {
     /// Fully-qualified verb name (e.g., "kyc.declare-entity")
     pub verb_name: String,
     /// Domain extracted from verb name (e.g., "kyc")
@@ -57,7 +57,7 @@ impl VerbRegistryEntry {
     }
 
     /// Set the version for this verb
-    pub fn with_version(mut self, version: impl Into<String>) -> Self {
+    pub(crate) fn with_version(mut self, version: impl Into<String>) -> Self {
         self.version = version.into();
         self
     }
