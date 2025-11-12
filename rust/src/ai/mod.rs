@@ -13,7 +13,8 @@ pub mod dsl_service;
 // pub mod gemini;  // Temporarily disabled due to API compatibility issues
 pub mod openai;
 pub mod rag_system;
-pub mod tests;
+#[cfg(test)]
+mod tests;
 // pub mod unified_agentic_service;  // Temporarily disabled due to agentic_crud_service dependency
 
 use serde::{Deserialize, Serialize};

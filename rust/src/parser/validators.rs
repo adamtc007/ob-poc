@@ -59,7 +59,7 @@ struct CaseInfo {
     notes: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct ValidationResult {
     pub is_valid: bool,
     pub errors: Vec<ValidationError>,

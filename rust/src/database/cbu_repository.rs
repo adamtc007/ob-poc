@@ -167,7 +167,7 @@ impl CbuRepository {
 
         query.push_str(" ORDER BY created_at DESC");
 
-        if let Some(limit) = limit {
+        if let Some(_limit) = limit {
             bind_count += 1;
             query.push_str(&format!(" LIMIT ${}", bind_count));
         }

@@ -329,7 +329,7 @@ impl EntityDatabaseService {
         .bind(status_id)
         .bind(request.entity_type)
         .bind(request.entity_id)
-        .bind(request.status_code)
+        .bind(&request.status_code)
         .bind(request.status_description)
         .bind(request.effective_date)
         .bind(request.end_date)

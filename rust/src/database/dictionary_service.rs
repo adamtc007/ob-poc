@@ -113,8 +113,7 @@ impl DictionaryDatabaseService {
             || updates.source.is_some()
             || updates.sink.is_some()
         {
-            let result = sqlx::query_as!(
-                DictionaryAttribute,
+            let result = sqlx::query!(
                 r#"
                 UPDATE "ob-poc".dictionary
                 SET name = COALESCE($1, name),
@@ -129,19 +128,33 @@ impl DictionaryDatabaseService {
                 WHERE attribute_id = $9
                 RETURNING attribute_id, name, long_description, group_id, mask, domain, vector, source, sink, created_at, updated_at
                 "#,
-                updates.name,
-                updates.long_description,
-                updates.group_id,
-                updates.mask,
-                updates.domain,
-                updates.vector,
-                updates.source,
-                updates.sink,
+                updates.name as Option<String>,
+                updates.long_description as Option<String>,
+                updates.group_id as Option<String>,
+                updates.mask as Option<String>,
+                updates.domain as Option<String>,
+                updates.vector as Option<String>,
+                updates.source as Option<serde_json::Value>,
+                updates.sink as Option<serde_json::Value>,
                 attribute_id
             )
             .fetch_optional(&self.pool)
             .await
             .context("Failed to update dictionary attribute")?;
+
+            let result = result.map(|row| DictionaryAttribute {
+                attribute_id: row.attribute_id,
+                name: row.name,
+                long_description: row.long_description,
+                group_id: row.group_id,
+                mask: row.mask.unwrap_or_else(|| "string".to_string()),
+                domain: row.domain,
+                vector: row.vector,
+                source: row.source,
+                sink: row.sink,
+                created_at: row.created_at,
+                updated_at: row.updated_at,
+            });
 
             if let Some(ref attr) = result {
                 info!(
@@ -196,8 +209,7 @@ impl DictionaryDatabaseService {
             &criteria.mask,
         ) {
             (Some(name_pattern), Some(group_id), Some(domain), Some(mask)) => {
-                let results = sqlx::query_as!(
-                    DictionaryAttribute,
+                let rows = sqlx::query!(
                     r#"
                     SELECT attribute_id, name, long_description, group_id, mask, domain, vector, source, sink, created_at, updated_at
                     FROM "ob-poc".dictionary
@@ -209,17 +221,33 @@ impl DictionaryDatabaseService {
                     group_id,
                     domain,
                     mask,
-                    criteria.limit.unwrap_or(50) as i32,
+                    criteria.limit.unwrap_or(100) as i32,
                     criteria.offset.unwrap_or(0) as i32
                 )
                 .fetch_all(&self.pool)
                 .await
-                .context("Failed to search dictionary attributes")?;
+                .context("Failed to search dictionary attributes by name pattern")?;
+
+                let results = rows
+                    .into_iter()
+                    .map(|row| DictionaryAttribute {
+                        attribute_id: row.attribute_id,
+                        name: row.name,
+                        long_description: row.long_description,
+                        group_id: row.group_id,
+                        mask: row.mask.unwrap_or_else(|| "string".to_string()),
+                        domain: row.domain,
+                        vector: row.vector,
+                        source: row.source,
+                        sink: row.sink,
+                        created_at: row.created_at,
+                        updated_at: row.updated_at,
+                    })
+                    .collect();
                 Ok(results)
             }
             (Some(name_pattern), Some(group_id), None, None) => {
-                let results = sqlx::query_as!(
-                    DictionaryAttribute,
+                let rows = sqlx::query!(
                     r#"
                     SELECT attribute_id, name, long_description, group_id, mask, domain, vector, source, sink, created_at, updated_at
                     FROM "ob-poc".dictionary
@@ -229,17 +257,33 @@ impl DictionaryDatabaseService {
                     "#,
                     format!("%{}%", name_pattern),
                     group_id,
-                    criteria.limit.unwrap_or(50) as i32,
+                    criteria.limit.unwrap_or(100) as i32,
                     criteria.offset.unwrap_or(0) as i32
                 )
                 .fetch_all(&self.pool)
                 .await
-                .context("Failed to search dictionary attributes")?;
+                .context("Failed to list all dictionary attributes")?;
+
+                let results = rows
+                    .into_iter()
+                    .map(|row| DictionaryAttribute {
+                        attribute_id: row.attribute_id,
+                        name: row.name,
+                        long_description: row.long_description,
+                        group_id: row.group_id,
+                        mask: row.mask.unwrap_or_else(|| "string".to_string()),
+                        domain: row.domain,
+                        vector: row.vector,
+                        source: row.source,
+                        sink: row.sink,
+                        created_at: row.created_at,
+                        updated_at: row.updated_at,
+                    })
+                    .collect();
                 Ok(results)
             }
             (Some(name_pattern), None, None, None) => {
-                let results = sqlx::query_as!(
-                    DictionaryAttribute,
+                let rows = sqlx::query!(
                     r#"
                     SELECT attribute_id, name, long_description, group_id, mask, domain, vector, source, sink, created_at, updated_at
                     FROM "ob-poc".dictionary
@@ -253,13 +297,29 @@ impl DictionaryDatabaseService {
                 )
                 .fetch_all(&self.pool)
                 .await
-                .context("Failed to search dictionary attributes")?;
+                .context("Failed to list all dictionary attributes")?;
+
+                let results = rows
+                    .into_iter()
+                    .map(|row| DictionaryAttribute {
+                        attribute_id: row.attribute_id,
+                        name: row.name,
+                        long_description: row.long_description,
+                        group_id: row.group_id,
+                        mask: row.mask.unwrap_or_else(|| "string".to_string()),
+                        domain: row.domain,
+                        vector: row.vector,
+                        source: row.source,
+                        sink: row.sink,
+                        created_at: row.created_at,
+                        updated_at: row.updated_at,
+                    })
+                    .collect();
                 Ok(results)
             }
             _ => {
                 // Default case - return all with limit
-                let results = sqlx::query_as!(
-                    DictionaryAttribute,
+                let rows = sqlx::query!(
                     r#"
                     SELECT attribute_id, name, long_description, group_id, mask, domain, vector, source, sink, created_at, updated_at
                     FROM "ob-poc".dictionary
@@ -271,7 +331,24 @@ impl DictionaryDatabaseService {
                 )
                 .fetch_all(&self.pool)
                 .await
-                .context("Failed to search dictionary attributes")?;
+                .context("Failed to search dictionary attributes by name")?;
+
+                let results = rows
+                    .into_iter()
+                    .map(|row| DictionaryAttribute {
+                        attribute_id: row.attribute_id,
+                        name: row.name,
+                        long_description: row.long_description,
+                        group_id: row.group_id,
+                        mask: row.mask.unwrap_or_else(|| "string".to_string()),
+                        domain: row.domain,
+                        vector: row.vector,
+                        source: row.source,
+                        sink: row.sink,
+                        created_at: row.created_at,
+                        updated_at: row.updated_at,
+                    })
+                    .collect();
                 Ok(results)
             }
         }

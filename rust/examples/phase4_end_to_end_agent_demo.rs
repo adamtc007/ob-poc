@@ -12,13 +12,44 @@
 //! This proves the complete implementation: Agent Intent → Canonical DSL → Validated Execution
 
 use ob_poc::ai::dsl_service::{AiDslService, KycCaseRequest, UboAnalysisRequest};
-use ob_poc::ai::tests::end_to_end_agent_tests::{
-    AgentTestResults, CanonicalComplianceResults, PerformanceMetrics,
-};
 use ob_poc::parser::parse_normalize_and_validate;
 use std::collections::HashMap;
 use std::time::Instant;
 use tokio;
+
+// Local test result structs (previously imported from private test module)
+#[derive(Debug, Clone)]
+struct AgentTestResults {
+    test_name: String,
+    generation_success: bool,
+    parsing_success: bool,
+    normalization_success: bool,
+    validation_success: bool,
+    canonical_compliance: CanonicalComplianceResults,
+    performance_metrics: PerformanceMetrics,
+    errors: Vec<String>,
+    warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+struct CanonicalComplianceResults {
+    canonical_verb_ratio: f64,
+    canonical_key_ratio: f64,
+    proper_structure_ratio: f64,
+    normalization_changes: usize,
+    validation_success_rate: f64,
+}
+
+#[derive(Debug, Clone)]
+struct PerformanceMetrics {
+    generation_time_ms: u64,
+    parsing_time_ms: u64,
+    normalization_time_ms: u64,
+    validation_time_ms: u64,
+    total_time_ms: u64,
+    dsl_length_chars: usize,
+    ast_statement_count: usize,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

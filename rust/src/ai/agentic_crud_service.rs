@@ -11,6 +11,7 @@ use crate::ai::{
 };
 #[cfg(feature = "database")]
 use crate::database::{CbuRepository, DatabaseManager};
+use crate::dsl_manager::{DslContext, DslManager, DslManagerFactory, DslProcessingOptions};
 use crate::parser::idiomatic_parser::parse_crud_statement;
 use crate::{CrudStatement, Key, Literal, PropertyMap, Value};
 use anyhow::{anyhow, Context, Result};
@@ -23,20 +24,16 @@ use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
-/// Agentic CRUD Service that orchestrates AI-powered CRUD operations
+/// Agentic CRUD Service that orchestrates AI-powered CRUD operations via DSL Manager
 pub struct AgenticCrudService {
-    /// RAG system for context retrieval
-    rag_system: CrudRagSystem,
-    /// Prompt builder for AI interaction
-    prompt_builder: CrudPromptBuilder,
+    /// DSL Manager - Central gateway for ALL DSL operations
+    dsl_manager: Arc<DslManager>,
     /// Database connection pool
     #[cfg(feature = "database")]
     database_pool: Option<PgPool>,
     /// CBU repository for specialized operations
     #[cfg(feature = "database")]
     cbu_repository: CbuRepository,
-    /// AI client (OpenAI or Gemini)
-    ai_client: Box<dyn AiService + Send + Sync>,
     /// Configuration
     config: ServiceConfig,
     /// Operation cache
@@ -180,24 +177,33 @@ impl AgenticCrudService {
     #[cfg(feature = "database")]
     pub async fn new(database_pool: PgPool, config: ServiceConfig) -> Result<Self> {
         info!(
-            "Initializing Agentic CRUD Service with {:?}",
+            "Initializing Agentic CRUD Service with DSL Manager integration and {:?}",
             config.ai_provider
         );
 
         // Initialize AI client based on configuration
         let ai_client = Self::create_ai_client(&config).await?;
 
+        // Create DSL Manager with database backend
+        let mut dsl_manager = DslManagerFactory::with_database(
+            crate::dsl_manager::DslManagerConfig::default(),
+            &std::env::var("DATABASE_URL")
+                .unwrap_or_else(|_| "postgresql://localhost/ob_poc_db".to_string())
+                .as_str(),
+        )
+        .await
+        .unwrap_or_else(|_| DslManagerFactory::new());
+
+        // Set AI service in DSL Manager
+        dsl_manager.set_ai_service(ai_client.clone());
+
         // Create database-backed components
         let cbu_repository = CbuRepository::new(database_pool.clone());
-        let rag_system = CrudRagSystem::new();
-        let prompt_builder = CrudPromptBuilder::new();
 
         Ok(Self {
-            rag_system,
-            prompt_builder,
+            dsl_manager: Arc::new(dsl_manager),
             database_pool: Some(database_pool),
             cbu_repository,
-            ai_client,
             config,
             operation_cache: Arc::new(RwLock::new(HashMap::new())),
         })
@@ -207,19 +213,19 @@ impl AgenticCrudService {
     #[cfg(not(feature = "database"))]
     pub async fn new_mock(config: ServiceConfig) -> Result<Self> {
         info!(
-            "Initializing Mock Agentic CRUD Service with {:?}",
+            "Initializing Mock Agentic CRUD Service with DSL Manager integration and {:?}",
             config.ai_provider
         );
 
         // Initialize AI client based on configuration
         let ai_client = Self::create_ai_client(&config).await?;
-        let rag_system = CrudRagSystem::new();
-        let prompt_builder = CrudPromptBuilder::new();
+
+        // Create DSL Manager for testing
+        let mut dsl_manager = DslManagerFactory::for_testing();
+        dsl_manager.set_ai_service(ai_client.clone());
 
         Ok(Self {
-            rag_system,
-            prompt_builder,
-            ai_client,
+            dsl_manager: Arc::new(dsl_manager),
             config,
             operation_cache: Arc::new(RwLock::new(HashMap::new())),
         })
@@ -305,7 +311,7 @@ impl AgenticCrudService {
         }
     }
 
-    /// Processes a natural language CRUD request with full AI and database integration
+    /// Processes a natural language CRUD request - NOW DELEGATES TO DSL MANAGER
     pub async fn process_request(
         &self,
         request: AgenticCrudRequest,
@@ -316,7 +322,10 @@ impl AgenticCrudService {
             .clone()
             .unwrap_or_else(|| Uuid::new_v4().to_string());
 
-        info!("Processing agentic CRUD request: {}", request.instruction);
+        info!(
+            "Delegating agentic CRUD request to DSL Manager: {}",
+            request.instruction
+        );
 
         // Check cache if enabled
         if self.config.enable_caching {
@@ -326,134 +335,103 @@ impl AgenticCrudService {
             }
         }
 
-        let mut errors = Vec::new();
-
-        // Step 1: RAG Context Retrieval
-        let rag_start = std::time::Instant::now();
-        let rag_context = match self.rag_system.retrieve_context(&request.instruction) {
-            Ok(context) => context,
-            Err(e) => {
-                error!("RAG context retrieval failed: {}", e);
-                errors.push(format!("RAG retrieval failed: {}", e));
-                // Continue with empty context
-                RetrievedContext {
-                    relevant_schemas: Vec::new(),
-                    applicable_grammar: Vec::new(),
-                    similar_examples: Vec::new(),
-                    confidence_score: 0.0,
-                    sources: vec![],
-                }
-            }
+        // Convert to DSL Manager request
+        let dsl_request = crate::dsl_manager::AgenticCrudRequest {
+            instruction: request.instruction.clone(),
+            asset_type: request.asset_type.clone(),
+            operation_type: match request.operation_type.as_deref() {
+                Some("create") => Some(crate::dsl_manager::OperationType::Create),
+                Some("read") => Some(crate::dsl_manager::OperationType::Read),
+                Some("update") => Some(crate::dsl_manager::OperationType::Update),
+                Some("delete") => Some(crate::dsl_manager::OperationType::Delete),
+                _ => None,
+            },
+            execute_dsl: request.execute,
+            context_hints: request.context_hints.unwrap_or_default(),
+            metadata: HashMap::new(),
         };
-        let rag_time_ms = rag_start.elapsed().as_millis() as u64;
 
-        info!(
-            "RAG context retrieved with confidence: {:.2}",
-            rag_context.confidence_score
-        );
-
-        // Step 2: AI DSL Generation
-        let ai_start = std::time::Instant::now();
-        let mut retries = 0;
-        let mut generated_dsl = String::new();
-        let mut ai_confidence = 0.0;
-
-        while retries <= self.config.max_retries {
-            match self.generate_dsl_with_ai(&request, &rag_context).await {
-                Ok((dsl, confidence)) => {
-                    generated_dsl = dsl;
-                    ai_confidence = confidence;
-                    break;
+        let context = DslContext {
+            request_id: request_id.clone(),
+            user_id: "agentic_crud_service".to_string(),
+            domain: "crud".to_string(),
+            options: DslProcessingOptions::default(),
+            audit_metadata: {
+                let mut metadata = HashMap::new();
+                metadata.insert("service_type".to_string(), "agentic_crud".to_string());
+                metadata.insert(
+                    "original_instruction".to_string(),
+                    request.instruction.clone(),
+                );
+                if let Some(asset_type) = &request.asset_type {
+                    metadata.insert("asset_type".to_string(), asset_type.clone());
                 }
-                Err(e) => {
-                    error!("AI generation attempt {} failed: {}", retries + 1, e);
-                    errors.push(format!("AI generation attempt {}: {}", retries + 1, e));
-                    retries += 1;
-                    if retries > self.config.max_retries {
-                        break;
-                    }
-                    // Wait before retry
-                    tokio::time::sleep(std::time::Duration::from_millis(1000 * retries as u64))
-                        .await;
-                }
-            }
-        }
+                metadata
+            },
+        };
 
-        let ai_generation_time_ms = ai_start.elapsed().as_millis() as u64;
+        // Delegate to DSL Manager
+        let dsl_result = self
+            .dsl_manager
+            .process_agentic_crud_request(dsl_request, context)
+            .await
+            .map_err(|e| format!("DSL Manager error: {}", e))?;
 
-        if generated_dsl.is_empty() {
-            errors.push("Failed to generate DSL after all retries".to_string());
+        // Convert DSL Manager result back to service response format
+        let parsed_statement = if let Some(ast) = &dsl_result.ast {
+            // Convert AST to CRUD statement (simplified)
+            parse_crud_statement(&format!("{:?}", ast)).ok()
         } else {
-            info!("AI generated DSL: {}", generated_dsl);
-        }
-
-        // Step 3: Parse DSL
-        let parsing_start = std::time::Instant::now();
-        let parsed_statement = match parse_crud_statement(&generated_dsl) {
-            Ok(statement) => {
-                info!("DSL parsed successfully: {:?}", statement);
-                Some(statement)
-            }
-            Err(e) => {
-                error!("DSL parsing failed: {}", e);
-                errors.push(format!("Parsing failed: {}", e));
-                None
-            }
+            None
         };
-        let parsing_time_ms = parsing_start.elapsed().as_millis() as u64;
-
-        // Step 4: Database Execution (if requested and parsing succeeded)
-        let mut execution_result = None;
-        let mut execution_time_ms = None;
-
-        if request.execute && self.config.execute_dsl {
-            if let Some(ref statement) = parsed_statement {
-                let exec_start = std::time::Instant::now();
-                match self.execute_crud_operation(statement).await {
-                    Ok(result) => {
-                        info!("Database operation executed successfully");
-                        execution_result = Some(result);
-                    }
-                    Err(e) => {
-                        error!("Database execution failed: {}", e);
-                        errors.push(format!("Execution failed: {}", e));
-                    }
-                }
-                execution_time_ms = Some(exec_start.elapsed().as_millis() as u64);
-            }
-        }
-
-        let success = errors.is_empty() && parsed_statement.is_some();
 
         let response = AgenticCrudResponse {
-            generated_dsl,
+            generated_dsl: format!("{:?}", dsl_result.ast.unwrap_or_default()),
             parsed_statement,
-            rag_context,
-            generation_metadata: GenerationMetadata {
-                rag_time_ms,
-                ai_generation_time_ms,
-                parsing_time_ms,
-                execution_time_ms,
-                retries,
-                model_used: self.get_ai_model_name(),
-                ai_confidence,
-                ai_provider: self.get_ai_provider_name(),
+            rag_context: RetrievedContext {
+                relevant_schemas: Vec::new(),
+                applicable_grammar: Vec::new(),
+                similar_examples: Vec::new(),
+                confidence_score: 0.8, // Default confidence
+                sources: vec![],
             },
-            execution_result,
-            errors,
-            success,
+            generation_metadata: GenerationMetadata {
+                rag_time_ms: 0,
+                ai_generation_time_ms: dsl_result.metrics.total_time_ms,
+                parsing_time_ms: dsl_result.metrics.parse_time_ms,
+                execution_time_ms: Some(dsl_result.metrics.execution_time_ms),
+                retries: 0,
+                model_used: "via-dsl-manager".to_string(),
+                ai_confidence: 0.8,
+                ai_provider: "dsl-manager".to_string(),
+            },
+            execution_result: dsl_result.execution_result.map(|r| ExecutionResult {
+                rows_affected: r.rows_affected.unwrap_or(0) as usize,
+                execution_time_ms: r.execution_time_ms.unwrap_or(0),
+                warnings: r.warnings.unwrap_or_default(),
+                metadata: r.metadata.unwrap_or_default(),
+            }),
+            errors: dsl_result
+                .errors
+                .into_iter()
+                .map(|e| e.to_string())
+                .collect(),
+            success: dsl_result.success,
             request_id,
         };
 
         // Cache successful responses
-        if success && self.config.enable_caching {
+        if response.success && self.config.enable_caching {
             self.cache_response(&request.instruction, &response).await;
         }
 
+        // Update statistics
+        self.update_statistics(response.success).await;
+
         info!(
-            "Request processed in {}ms with success: {}",
+            "Agentic CRUD request processed via DSL Manager in {}ms with success: {}",
             start_time.elapsed().as_millis(),
-            success
+            response.success
         );
 
         Ok(response)

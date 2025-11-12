@@ -1,0 +1,8 @@
+warning: fields `id`, `partnership_type`, and `formation_date` are never read
+warning: fields `id`, `jurisdiction`, and `incorporation_date` are never read
+warning: fields `id` and `date_of_birth` are never read
+warning: fields `id` and `establishment_date` are never read
+warning: function `mask_database_url` is never used
+warning: variant `Pending` is never constructed
+warning: variants `Executing` and `Skipped` are never constructed
+warning: variants `Read` and `Unlink` are never constructed

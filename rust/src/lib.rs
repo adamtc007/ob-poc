@@ -8,6 +8,11 @@
 //! - Strong typing with compile-time guarantees
 //! - Zero-copy parsing where possible
 //! - Comprehensive error handling with detailed context
+
+#![deny(dead_code)]
+#![deny(unused_imports)]
+#![deny(unused_variables)]
+#![warn(missing_docs)]
 //! - nom-based parser combinators
 //! - EBNF grammar support
 //! - Modular, extensible architecture
@@ -373,8 +378,7 @@ pub mod models;
 // REST API server functionality removed - use SQL integration tests instead
 
 // Mock REST API server for testing without database
-#[cfg(any(feature = "rest-api", feature = "mock-api"))]
-pub mod mock_rest_api;
+// pub mod mock_rest_api; // Removed - dead code
 
 // Central DSL system with domain context switching
 pub mod dsl;
@@ -396,6 +400,9 @@ pub mod ai;
 #[cfg(feature = "database")]
 pub mod services;
 
+// DSL Manager - Central gateway for ALL DSL operations
+pub mod dsl_manager;
+
 // Protobuf and domain visualizations removed - functionality replaced by SQL integration
 
 // Deprecated modules moved to src/deprecated/ (not needed for Phase 1)
@@ -411,21 +418,28 @@ pub use error::{
 pub use grammar::{load_default_grammar, EBNFGrammar, EBNFParser, GrammarEngine};
 pub use parser::parse_program;
 
-// Re-export consolidated DSL manager (main interface) - temporarily disabled for Phase 1
-// pub use dsl_manager::{
-//     ASTVisualization, CbuInfo, DomainVisualizationOptions, DslError as DslManagerError,
-//     DslInstance, DslInstanceVersion, DslManager, DslResult, DslStorageKeys, DslTemplate,
-//     InstanceStatus, KycCaseCreationResult, OnboardingRequestCreationResult,
-//     OnboardingSessionRecord, OperationType, TemplateType, VisualEdge, VisualNode,
-//     VisualizationOptions, VisualizationStatistics,
-// };
+// Re-export DSL Manager - Central gateway for ALL DSL operations
+pub use dsl_manager::{
+    backend::{BackendOperation, BackendResult, DslBackend},
+    compiler::{CompilationResult, DslCompiler, ExecutionContext},
+    core::{
+        AgenticCrudRequest, DslCallChain, DslManager, DslManagerConfig, VocabularyValidationResult,
+    },
+    pipeline::{DslPipeline, DslPipelineStage, PipelineResult},
+    state::{DslState, DslStateManager, StateChangeEvent},
+    validation::{
+        DslValidationEngine, ValidationLevel, ValidationReport, ValidationRule, ValidationSeverity,
+    },
+    DslManagerError, DslManagerResult, DslOperation as DslManagerOperation, ProcessingMetrics,
+    TransactionMode as DslManagerTransactionMode,
+};
 
 // Re-export central DSL system components
 pub use dsl::{
     central_editor::{CentralDslEditor, EditorConfig, EditorStats},
     domain_context::{DomainContext, OperationMetadata, OperationPriority, StateRequirements},
     domain_registry::{DomainHandler, DomainRegistry, DslVocabulary, StateTransition},
-    operations::{DslOperation, OperationBuilder},
+    operations::{DslOperation as CoreDslOperation, OperationBuilder},
     DslEditError, DslEditResult,
 };
 

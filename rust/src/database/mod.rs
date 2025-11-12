@@ -9,6 +9,7 @@ use std::time::Duration;
 use tracing::{info, warn};
 
 pub mod business_request_repository;
+pub mod cbu_crud_manager;
 pub mod cbu_repository;
 pub mod dictionary_service;
 pub mod dsl_domain_repository;
@@ -17,6 +18,9 @@ pub mod entity_service;
 // Re-export repository and trait for convenience
 pub use business_request_repository::{
     DslBusinessRequestRepository, DslBusinessRequestRepositoryTrait,
+};
+pub use cbu_crud_manager::{
+    CbuCompleteData, CbuCreateRequest, CbuCrudManager, CbuDeleteRequest, CbuUpdateRequest,
 };
 pub use cbu_repository::CbuRepository;
 pub use dictionary_service::DictionaryDatabaseService;

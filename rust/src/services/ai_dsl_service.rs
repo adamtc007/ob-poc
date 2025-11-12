@@ -1,15 +1,14 @@
 //! AI-Powered DSL Service
 //!
-//! This service combines AI-generated DSL with actual DSL execution through the DSL Manager.
-//! It provides end-to-end onboarding workflows where business requirements are converted
-//! to DSL via AI, then executed to create actual onboarding instances.
+//! This service now acts as a high-level API that delegates to the DSL Manager.
+//! ALL DSL operations go through the DSL Manager as the single entry point.
+//! This service provides backwards compatibility while ensuring proper DSL lifecycle management.
 
-use crate::ai::{openai::OpenAiClient, AiConfig, AiDslRequest, AiResponseType, AiService};
-use crate::parser::parse_program;
+use crate::ai::{openai::OpenAiClient, AiConfig, AiService};
+use crate::dsl_manager::{DslContext, DslManager, DslManagerFactory, DslProcessingOptions};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
@@ -124,7 +123,7 @@ impl CbuGenerator {
             &sanitized_name
         };
 
-        let timestamp = Utc::now().format("%m%d").to_string();
+        let _timestamp = Utc::now().format("%m%d").to_string();
         let random_suffix: u16 = (Utc::now().timestamp_subsec_millis() % 1000) as u16;
 
         format!(
@@ -155,229 +154,155 @@ impl CbuGenerator {
     }
 }
 
-/// AI-powered DSL Service
+/// AI-powered DSL Service - Now delegates to DSL Manager
 pub struct AiDslService {
-    ai_client: Arc<dyn AiService + Send + Sync>,
+    dsl_manager: Arc<DslManager>,
 }
 
 impl AiDslService {
-    /// Create a new AI DSL service with OpenAI client
+    /// Create a new AI DSL service with OpenAI client - now using DSL Manager
     pub async fn new_with_openai(ai_config: Option<AiConfig>) -> AiDslResult<Self> {
         let config = ai_config.unwrap_or_else(AiConfig::openai);
         let ai_client = Arc::new(OpenAiClient::new(config)?);
 
-        Ok(Self { ai_client })
+        let mut dsl_manager = DslManagerFactory::new();
+        dsl_manager.set_ai_service(ai_client);
+
+        Ok(Self {
+            dsl_manager: Arc::new(dsl_manager),
+        })
     }
 
-    /// Create a new AI DSL service with custom AI client
+    /// Create a new AI DSL service with custom AI client - now using DSL Manager
     pub fn new_with_client(ai_client: Arc<dyn AiService + Send + Sync>) -> Self {
-        Self { ai_client }
+        let mut dsl_manager = DslManagerFactory::new();
+        dsl_manager.set_ai_service(ai_client);
+
+        Self {
+            dsl_manager: Arc::new(dsl_manager),
+        }
     }
 
-    /// Create complete onboarding workflow using AI
+    /// Create complete onboarding workflow using AI - NOW DELEGATES TO DSL MANAGER
     pub async fn create_ai_onboarding(
         &self,
         request: AiOnboardingRequest,
     ) -> AiDslResult<AiOnboardingResponse> {
-        let start_time = std::time::Instant::now();
         info!(
-            "Starting AI-powered onboarding for client: {}",
+            "Delegating AI-powered onboarding to DSL Manager for client: {}",
             request.client_name
         );
 
-        // Step 1: Generate CBU ID
-        let cbu_id = CbuGenerator::generate_cbu_id(
-            &request.client_name,
-            &request.jurisdiction,
-            &request.entity_type,
-        );
-        info!("Generated CBU ID: {}", cbu_id);
-
-        // Step 2: Use AI to generate DSL
-        let ai_response = self.generate_onboarding_dsl(&request, &cbu_id).await?;
-        info!(
-            "AI DSL generation completed with confidence: {:.2}",
-            ai_response.confidence.unwrap_or(0.5)
-        );
-
-        // Step 3: Validate generated DSL
-        self.validate_generated_dsl(&ai_response.generated_dsl)?;
-
-        // Step 4: Simulate DSL execution (no database dependency)
-        let dsl_instance = self
-            .simulate_dsl_execution(&ai_response.generated_dsl, &cbu_id)
-            .await?;
-        info!(
-            "DSL simulation completed, instance ID: {}",
-            dsl_instance.instance_id
-        );
-
-        let execution_time = start_time.elapsed().as_millis() as u64;
-
-        Ok(AiOnboardingResponse {
-            cbu_id,
-            dsl_instance,
-            generated_dsl: ai_response.generated_dsl,
-            ai_explanation: ai_response.explanation,
-            ai_confidence: ai_response.confidence.unwrap_or(0.5),
-            execution_details: ExecutionDetails {
-                template_used: "onboarding".to_string(),
-                compilation_successful: true,
-                validation_passed: true,
-                storage_keys: None, // TODO: Get from DSL manager response
-                execution_time_ms: execution_time,
-            },
-            warnings: ai_response.warnings.unwrap_or_default(),
-            suggestions: ai_response.suggestions.unwrap_or_default(),
-        })
-    }
-
-    /// Generate DSL using AI
-    async fn generate_onboarding_dsl(
-        &self,
-        request: &AiOnboardingRequest,
-        cbu_id: &str,
-    ) -> AiDslResult<crate::ai::AiDslResponse> {
-        debug!("Generating DSL for CBU: {}", cbu_id);
-
-        let mut context = request.context.clone();
-        context.insert("cbu_id".to_string(), cbu_id.to_string());
-        context.insert("client_name".to_string(), request.client_name.clone());
-        context.insert("jurisdiction".to_string(), request.jurisdiction.clone());
-        context.insert("entity_type".to_string(), request.entity_type.clone());
-
-        // Add services context
-        if !request.services.is_empty() {
-            context.insert("services".to_string(), request.services.join(", "));
-        }
-
-        if let Some(compliance_level) = &request.compliance_level {
-            context.insert("compliance_level".to_string(), compliance_level.clone());
-        }
-
-        let ai_request = AiDslRequest {
-            instruction: format!(
-                "Create a complete onboarding DSL for client '{}'. {}. Services needed: {}",
-                request.client_name,
-                request.instruction,
-                request.services.join(", ")
-            ),
-
-            context: Some(context),
-            response_type: AiResponseType::DslGeneration,
-            temperature: Some(0.1),
-            max_tokens: Some(2000),
+        // Convert to DSL Manager types
+        let dsl_request = crate::dsl_manager::AiOnboardingRequest {
+            instruction: request.instruction,
+            client_name: request.client_name,
+            jurisdiction: request.jurisdiction,
+            entity_type: request.entity_type,
+            services: request.services,
+            compliance_level: request.compliance_level,
+            context: request.context,
+            ai_provider: request.ai_provider,
         };
 
-        self.ai_client
-            .generate_dsl(ai_request)
-            .await
-            .map_err(AiDslServiceError::AiError)
-    }
-
-    /// Validate generated DSL syntax
-    fn validate_generated_dsl(&self, dsl_content: &str) -> AiDslResult<()> {
-        debug!("Validating generated DSL syntax");
-
-        // Parse DSL to check syntax
-        match parse_program(dsl_content) {
-            Ok(forms) => {
-                if forms.is_empty() {
-                    return Err(AiDslServiceError::ValidationError(
-                        "Generated DSL is empty".to_string(),
-                    ));
-                }
-
-                // Check for required case.create verb
-                let has_case_create = forms.iter().any(|form| {
-                    if let crate::Form::Verb(verb_form) = form {
-                        verb_form.verb == "case.create"
-                    } else {
-                        false
-                    }
-                });
-
-                if !has_case_create {
-                    return Err(AiDslServiceError::ValidationError(
-                        "Generated DSL missing required case.create verb".to_string(),
-                    ));
-                }
-
-                info!("DSL validation passed: {} forms found", forms.len());
-                Ok(())
-            }
-            Err(e) => Err(AiDslServiceError::ParsingError(format!(
-                "Failed to parse generated DSL: {:?}",
-                e
-            ))),
-        }
-    }
-
-    /// Simulate DSL execution (for demo without database)
-    async fn simulate_dsl_execution(
-        &self,
-        _dsl_content: &str,
-        cbu_id: &str,
-    ) -> AiDslResult<DslInstanceSummary> {
-        debug!("Simulating DSL execution for CBU: {}", cbu_id);
-
-        // Simulate creating a DSL instance
-        let instance_id = format!("instance-{}", Uuid::new_v4().to_string());
-        info!("Simulated DSL instance creation: {}", instance_id);
-
-        Ok(DslInstanceSummary {
-            instance_id,
+        let context = DslContext {
+            request_id: Uuid::new_v4().to_string(),
+            user_id: "ai_dsl_service".to_string(),
             domain: "onboarding".to_string(),
-            status: "active".to_string(),
-            created_at: Utc::now(),
-            current_version: 1,
+            options: DslProcessingOptions::default(),
+            audit_metadata: HashMap::new(),
+        };
+
+        // Delegate to DSL Manager
+        let dsl_response = self
+            .dsl_manager
+            .process_ai_onboarding(dsl_request, context)
+            .await
+            .map_err(|e| AiDslServiceError::ValidationError(format!("DSL Manager error: {}", e)))?;
+
+        // Convert response back to service types
+        Ok(AiOnboardingResponse {
+            cbu_id: dsl_response.cbu_id,
+            dsl_instance: DslInstanceSummary {
+                instance_id: dsl_response.dsl_instance.instance_id,
+                domain: dsl_response.dsl_instance.domain,
+                status: dsl_response.dsl_instance.status,
+                created_at: dsl_response.dsl_instance.created_at,
+                current_version: dsl_response.dsl_instance.current_version,
+            },
+            generated_dsl: dsl_response.generated_dsl,
+            ai_explanation: dsl_response.ai_explanation,
+            ai_confidence: dsl_response.ai_confidence,
+            execution_details: ExecutionDetails {
+                template_used: dsl_response.execution_details.template_used,
+                compilation_successful: dsl_response.execution_details.compilation_successful,
+                validation_passed: dsl_response.execution_details.validation_passed,
+                storage_keys: dsl_response.execution_details.storage_keys,
+                execution_time_ms: dsl_response.execution_details.execution_time_ms,
+            },
+            warnings: dsl_response.warnings,
+            suggestions: dsl_response.suggestions,
         })
     }
 
-    /// Health check for AI service
+    // These methods are now handled by DSL Manager internally
+    // Keeping this comment as a marker that functionality moved to DSL Manager
+
+    /// Health check for AI service - NOW DELEGATES TO DSL MANAGER
     pub async fn health_check(&self) -> AiDslResult<HealthCheckResult> {
-        let mut result = HealthCheckResult {
-            ai_service_healthy: false,
-            dsl_manager_healthy: true, // Simulated
-            database_healthy: true,    // Simulated
-            overall_healthy: false,
-        };
+        info!("Delegating health check to DSL Manager");
 
-        // Check AI service
-        match self.ai_client.health_check().await {
-            Ok(healthy) => result.ai_service_healthy = healthy,
-            Err(e) => warn!("AI service health check failed: {}", e),
-        }
+        let dsl_health = self
+            .dsl_manager
+            .comprehensive_health_check()
+            .await
+            .map_err(|e| {
+                AiDslServiceError::ValidationError(format!(
+                    "DSL Manager health check failed: {}",
+                    e
+                ))
+            })?;
 
-        result.overall_healthy = result.ai_service_healthy;
-        Ok(result)
+        Ok(HealthCheckResult {
+            ai_service_healthy: dsl_health.ai_service_healthy,
+            dsl_manager_healthy: dsl_health.dsl_manager_healthy,
+            database_healthy: dsl_health.backend_healthy,
+            overall_healthy: dsl_health.overall_healthy,
+        })
     }
 
-    /// Generate test CBU IDs
+    /// Generate test CBU IDs - NOW DELEGATES TO DSL MANAGER
     pub fn generate_test_cbus(&self, count: usize) -> Vec<String> {
-        CbuGenerator::generate_test_cbu_ids(count)
+        self.dsl_manager.generate_test_cbu_ids(count)
     }
 
-    /// Validate AI-generated DSL using AI validation
+    /// Validate AI-generated DSL using AI validation - NOW DELEGATES TO DSL MANAGER
     pub async fn validate_dsl_with_ai(&self, dsl_content: &str) -> AiDslResult<ValidationResult> {
-        let ai_request = AiDslRequest {
-            instruction: format!("Validate this DSL for syntax correctness, vocabulary compliance, and business logic: {}", dsl_content),
-            context: Some(HashMap::new()),
-            response_type: AiResponseType::DslValidation,
-            temperature: Some(0.1),
-            max_tokens: Some(1000),
+        info!("Delegating DSL validation to DSL Manager");
+
+        let context = DslContext {
+            request_id: Uuid::new_v4().to_string(),
+            user_id: "ai_dsl_service".to_string(),
+            domain: "validation".to_string(),
+            options: DslProcessingOptions::default(),
+            audit_metadata: HashMap::new(),
         };
 
-        match self.ai_client.generate_dsl(ai_request).await {
-            Ok(response) => Ok(ValidationResult {
-                valid: response.warnings.as_ref().map_or(true, |w| w.is_empty()),
-                confidence: response.confidence.unwrap_or(0.5),
-                issues: response.warnings.unwrap_or_default(),
-                suggestions: response.suggestions,
-                explanation: response.explanation,
-            }),
-            Err(e) => Err(AiDslServiceError::AiError(e)),
-        }
+        let validation_result = self
+            .dsl_manager
+            .validate_dsl_with_ai(dsl_content, context)
+            .await
+            .map_err(|e| {
+                AiDslServiceError::ValidationError(format!("DSL Manager validation error: {}", e))
+            })?;
+
+        Ok(ValidationResult {
+            valid: validation_result.valid,
+            confidence: validation_result.ai_confidence,
+            issues: validation_result.ai_issues,
+            suggestions: validation_result.ai_suggestions,
+            explanation: validation_result.ai_explanation,
+        })
     }
 }
 
