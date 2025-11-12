@@ -8,6 +8,9 @@ use sqlx::FromRow;
 use std::collections::HashMap;
 use uuid::Uuid;
 
+// Import types from dsl_types crate (Level 1 foundation)
+use dsl_types::AttributeOperationType;
+
 /// Core dictionary attribute as stored in the database
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct DictionaryAttribute {
@@ -97,30 +100,7 @@ pub struct DiscoveredAttribute {
 }
 
 /// Types of operations supported for attributes
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum AttributeOperationType {
-    Create,
-    Read,
-    Update,
-    Delete,
-    Search,
-    Validate,
-    Discover,
-}
-
-impl std::fmt::Display for AttributeOperationType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AttributeOperationType::Create => write!(f, "create"),
-            AttributeOperationType::Read => write!(f, "read"),
-            AttributeOperationType::Update => write!(f, "update"),
-            AttributeOperationType::Delete => write!(f, "delete"),
-            AttributeOperationType::Search => write!(f, "search"),
-            AttributeOperationType::Validate => write!(f, "validate"),
-            AttributeOperationType::Discover => write!(f, "discover"),
-        }
-    }
-}
+// AttributeOperationType moved to dsl_types crate - import from there
 
 impl std::str::FromStr for AttributeOperationType {
     type Err = String;

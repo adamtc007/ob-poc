@@ -8,6 +8,9 @@ use crate::ai::rag_system::{AssetSchemaInfo, CrudExample, RetrievedContext, Verb
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
+// Import types from dsl_types crate (Level 1 foundation)
+use dsl_types::PromptConfig;
+
 /// Builder for constructing AI prompts for CRUD DSL generation
 #[derive(Debug, Clone)]
 pub struct CrudPromptBuilder {
@@ -19,20 +22,7 @@ pub struct CrudPromptBuilder {
     max_context_length: usize,
 }
 
-/// Configuration for prompt generation
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PromptConfig {
-    /// Include schema information in the prompt
-    pub include_schemas: bool,
-    /// Include grammar rules in the prompt
-    pub include_grammar: bool,
-    /// Include examples in the prompt
-    pub include_examples: bool,
-    /// Maximum number of examples to include
-    pub max_examples: usize,
-    /// Whether to include confidence information
-    pub include_confidence: bool,
-}
+// PromptConfig moved to dsl_types crate - import from there
 
 /// Generated prompt for AI model
 #[derive(Debug, Clone, Serialize, Deserialize)]

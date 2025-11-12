@@ -358,6 +358,111 @@ impl std::fmt::Display for ErrorSeverity {
 }
 
 // ============================================================================
+// OPERATION TYPES
+// ============================================================================
+
+/// Attribute operation types for data dictionary operations
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AttributeOperationType {
+    Create,
+    Read,
+    Update,
+    Delete,
+    Search,
+    Validate,
+    Discover,
+}
+
+impl AttributeOperationType {
+    /// Get human-readable operation name
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AttributeOperationType::Create => "create",
+            AttributeOperationType::Read => "read",
+            AttributeOperationType::Update => "update",
+            AttributeOperationType::Delete => "delete",
+            AttributeOperationType::Search => "search",
+            AttributeOperationType::Validate => "validate",
+            AttributeOperationType::Discover => "discover",
+        }
+    }
+
+    /// Get all available operation types
+    pub fn all() -> Vec<Self> {
+        vec![
+            Self::Create,
+            Self::Read,
+            Self::Update,
+            Self::Delete,
+            Self::Search,
+            Self::Validate,
+            Self::Discover,
+        ]
+    }
+}
+
+impl std::fmt::Display for AttributeOperationType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+// ============================================================================
+// CONFIGURATION TYPES
+// ============================================================================
+
+/// Configuration for AI prompt generation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromptConfig {
+    /// Include schema information in the prompt
+    pub include_schemas: bool,
+    /// Include grammar rules in the prompt
+    pub include_grammar: bool,
+    /// Include examples in the prompt
+    pub include_examples: bool,
+    /// Maximum number of examples to include
+    pub max_examples: usize,
+    /// Whether to include confidence information
+    pub include_confidence: bool,
+}
+
+impl Default for PromptConfig {
+    fn default() -> Self {
+        Self {
+            include_schemas: true,
+            include_grammar: true,
+            include_examples: true,
+            max_examples: 3,
+            include_confidence: false,
+        }
+    }
+}
+
+impl PromptConfig {
+    /// Create a minimal prompt configuration
+    pub fn minimal() -> Self {
+        Self {
+            include_schemas: false,
+            include_grammar: false,
+            include_examples: false,
+            max_examples: 0,
+            include_confidence: false,
+        }
+    }
+
+    /// Create a comprehensive prompt configuration
+    pub fn comprehensive() -> Self {
+        Self {
+            include_schemas: true,
+            include_grammar: true,
+            include_examples: true,
+            max_examples: 5,
+            include_confidence: true,
+        }
+    }
+}
+
+// ============================================================================
 // UTILITY TYPES
 // ============================================================================
 
@@ -482,6 +587,39 @@ mod tests {
         assert_eq!(ErrorSeverity::Info.to_string(), "info");
         assert_eq!(ErrorSeverity::Fatal.to_string(), "fatal");
         assert_eq!(ErrorSeverity::Error.emoji(), "❌");
+    }
+
+    #[test]
+    fn test_attribute_operation_type() {
+        assert_eq!(AttributeOperationType::Create.to_string(), "create");
+        assert_eq!(AttributeOperationType::Delete.as_str(), "delete");
+
+        let all_ops = AttributeOperationType::all();
+        assert_eq!(all_ops.len(), 7);
+        assert!(all_ops.contains(&AttributeOperationType::Create));
+        assert!(all_ops.contains(&AttributeOperationType::Discover));
+    }
+
+    #[test]
+    fn test_prompt_config_default() {
+        let config = PromptConfig::default();
+        assert!(config.include_schemas);
+        assert!(config.include_grammar);
+        assert!(config.include_examples);
+        assert_eq!(config.max_examples, 3);
+        assert!(!config.include_confidence);
+    }
+
+    #[test]
+    fn test_prompt_config_variants() {
+        let minimal = PromptConfig::minimal();
+        assert!(!minimal.include_schemas);
+        assert_eq!(minimal.max_examples, 0);
+
+        let comprehensive = PromptConfig::comprehensive();
+        assert!(comprehensive.include_schemas);
+        assert_eq!(comprehensive.max_examples, 5);
+        assert!(comprehensive.include_confidence);
     }
 
     #[test]
