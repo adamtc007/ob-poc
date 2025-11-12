@@ -220,6 +220,144 @@ impl ValidationMetadata {
 }
 
 // ============================================================================
+// VALIDATION ERROR AND WARNING TYPES
+// ============================================================================
+
+/// DSL validation error for tracking validation failures
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidationError {
+    /// Error code
+    pub code: String,
+    /// Human-readable message
+    pub message: String,
+    /// Source location (if available)
+    pub location: Option<SourceLocation>,
+    /// Suggested fix
+    pub suggestion: Option<String>,
+}
+
+impl ValidationError {
+    /// Create a new validation error
+    pub fn new(code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            code: code.into(),
+            message: message.into(),
+            location: None,
+            suggestion: None,
+        }
+    }
+
+    /// Create validation error with location
+    pub fn with_location(
+        code: impl Into<String>,
+        message: impl Into<String>,
+        location: SourceLocation,
+    ) -> Self {
+        Self {
+            code: code.into(),
+            message: message.into(),
+            location: Some(location),
+            suggestion: None,
+        }
+    }
+
+    /// Add a suggested fix to the error
+    pub fn with_suggestion(mut self, suggestion: impl Into<String>) -> Self {
+        self.suggestion = Some(suggestion.into());
+        self
+    }
+}
+
+/// DSL validation warning for non-fatal validation issues
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidationWarning {
+    /// Warning code
+    pub code: String,
+    /// Human-readable message
+    pub message: String,
+    /// Source location (if available)
+    pub location: Option<SourceLocation>,
+    /// Severity level
+    pub severity: WarningSeverity,
+}
+
+impl ValidationWarning {
+    /// Create a new validation warning
+    pub fn new(
+        code: impl Into<String>,
+        message: impl Into<String>,
+        severity: WarningSeverity,
+    ) -> Self {
+        Self {
+            code: code.into(),
+            message: message.into(),
+            location: None,
+            severity,
+        }
+    }
+
+    /// Create warning with location
+    pub fn with_location(
+        code: impl Into<String>,
+        message: impl Into<String>,
+        severity: WarningSeverity,
+        location: SourceLocation,
+    ) -> Self {
+        Self {
+            code: code.into(),
+            message: message.into(),
+            location: Some(location),
+            severity,
+        }
+    }
+}
+
+// ============================================================================
+// ERROR SEVERITY LEVELS
+// ============================================================================
+
+/// Error severity levels for consistent error classification
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum ErrorSeverity {
+    /// Informational message
+    Info,
+    /// Warning that should be noted
+    Warning,
+    /// Error that prevents operation
+    Error,
+    /// Fatal error that stops execution
+    Fatal,
+}
+
+impl ErrorSeverity {
+    /// Get human-readable severity name
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ErrorSeverity::Info => "info",
+            ErrorSeverity::Warning => "warning",
+            ErrorSeverity::Error => "error",
+            ErrorSeverity::Fatal => "fatal",
+        }
+    }
+
+    /// Get emoji representation for display
+    pub fn emoji(&self) -> &'static str {
+        match self {
+            ErrorSeverity::Info => "ℹ️",
+            ErrorSeverity::Warning => "⚠️",
+            ErrorSeverity::Error => "❌",
+            ErrorSeverity::Fatal => "💀",
+        }
+    }
+}
+
+impl std::fmt::Display for ErrorSeverity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+// ============================================================================
 // UTILITY TYPES
 // ============================================================================
 
@@ -307,6 +445,43 @@ mod tests {
         let namespaced_id = DslId::with_namespace("test-123", "kyc");
         assert_eq!(namespaced_id.namespace, Some("kyc".to_string()));
         assert_eq!(namespaced_id.full_id(), "kyc:test-123");
+    }
+
+    #[test]
+    fn test_validation_error_creation() {
+        let error = ValidationError::new("TEST001", "Test error message");
+        assert_eq!(error.code, "TEST001");
+        assert_eq!(error.message, "Test error message");
+        assert!(error.location.is_none());
+        assert!(error.suggestion.is_none());
+
+        let error_with_suggestion = error.with_suggestion("Try this fix");
+        assert_eq!(
+            error_with_suggestion.suggestion,
+            Some("Try this fix".to_string())
+        );
+    }
+
+    #[test]
+    fn test_validation_warning_creation() {
+        let warning = ValidationWarning::new("WARN001", "Test warning", WarningSeverity::Warning);
+        assert_eq!(warning.code, "WARN001");
+        assert_eq!(warning.message, "Test warning");
+        assert_eq!(warning.severity, WarningSeverity::Warning);
+    }
+
+    #[test]
+    fn test_error_severity_ordering() {
+        assert!(ErrorSeverity::Info < ErrorSeverity::Warning);
+        assert!(ErrorSeverity::Warning < ErrorSeverity::Error);
+        assert!(ErrorSeverity::Error < ErrorSeverity::Fatal);
+    }
+
+    #[test]
+    fn test_error_severity_display() {
+        assert_eq!(ErrorSeverity::Info.to_string(), "info");
+        assert_eq!(ErrorSeverity::Fatal.to_string(), "fatal");
+        assert_eq!(ErrorSeverity::Error.emoji(), "❌");
     }
 
     #[test]

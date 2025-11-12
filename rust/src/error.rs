@@ -8,6 +8,9 @@ use std::fmt;
 use nom::error::VerboseError;
 use thiserror::Error;
 
+// Import types from dsl_types crate (Level 1 foundation)
+use dsl_types::{ErrorSeverity, SourceLocation};
+
 /// Main error type for the DSL system
 #[derive(Error, Debug)]
 pub enum DSLError {
@@ -298,63 +301,10 @@ pub(crate) type VocabularyResult<T> = Result<T, VocabularyError>;
 pub type ValidationResult<T> = Result<T, ValidationError>;
 pub(crate) type RuntimeResult<T> = Result<T, RuntimeError>;
 
-/// Source location information for errors
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
-pub struct SourceLocation {
-    pub file: Option<String>,
-    pub line: usize,
-    pub column: usize,
-    pub offset: usize,
-}
-
-impl SourceLocation {
-    pub fn new(file: Option<String>, line: usize, column: usize, offset: usize) -> Self {
-        Self {
-            file,
-            line,
-            column,
-            offset,
-        }
-    }
-
-    pub fn unknown() -> Self {
-        Self {
-            file: None,
-            line: 0,
-            column: 0,
-            offset: 0,
-        }
-    }
-}
-
-impl fmt::Display for SourceLocation {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.file {
-            Some(file) => write!(f, "{}:{}:{}", file, self.line, self.column),
-            None => write!(f, "{}:{}", self.line, self.column),
-        }
-    }
-}
+// SourceLocation moved to dsl_types crate - import from there
 
 /// Error severity levels
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
-pub enum ErrorSeverity {
-    Info,
-    Warning,
-    Error,
-    Fatal,
-}
-
-impl fmt::Display for ErrorSeverity {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ErrorSeverity::Info => write!(f, "INFO"),
-            ErrorSeverity::Warning => write!(f, "WARNING"),
-            ErrorSeverity::Error => write!(f, "ERROR"),
-            ErrorSeverity::Fatal => write!(f, "FATAL"),
-        }
-    }
-}
+// ErrorSeverity moved to dsl_types crate - import from there
 
 /// Structured error with additional context
 #[derive(Debug, serde::Serialize)]

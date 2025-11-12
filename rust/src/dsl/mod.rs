@@ -95,7 +95,9 @@ pub use operations::{DslOperation, OperationBuilder, OperationChain};
 pub use parsing_coordinator::{DomainDetection, ParseResult, ParsingCoordinator};
 
 // Import types from dsl_types crate (Level 1 foundation)
-pub use dsl_types::{ProcessingMetadata, SourceLocation, WarningSeverity};
+pub use dsl_types::{
+    ProcessingMetadata, SourceLocation, ValidationError, ValidationWarning, WarningSeverity,
+};
 
 // Core DSL types and results
 use serde::{Deserialize, Serialize};
@@ -251,31 +253,7 @@ pub struct VocabularyValidation {
     pub attribute_compliance: f64,
 }
 
-/// DSL validation error
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ValidationError {
-    /// Error code
-    pub code: String,
-    /// Human-readable message
-    pub message: String,
-    /// Source location (if available)
-    pub location: Option<SourceLocation>,
-    /// Suggested fix
-    pub suggestion: Option<String>,
-}
-
-/// DSL validation warning
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ValidationWarning {
-    /// Warning code
-    pub code: String,
-    /// Human-readable message
-    pub message: String,
-    /// Source location (if available)
-    pub location: Option<SourceLocation>,
-    /// Severity level
-    pub severity: WarningSeverity,
-}
+// ValidationError and ValidationWarning moved to dsl_types crate - import from there
 
 // SourceLocation moved to dsl_types crate - import from there
 
