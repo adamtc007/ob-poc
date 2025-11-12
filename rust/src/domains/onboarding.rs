@@ -32,6 +32,7 @@ use serde_json::json;
 use std::collections::HashMap;
 
 /// Onboarding domain handler implementation
+#[derive(Debug)]
 pub struct OnboardingDomainHandler {
     vocabulary: DslVocabulary,
     state_transitions: Vec<StateTransition>,

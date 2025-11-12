@@ -104,7 +104,7 @@ pub use dsl_types::{
 // Core DSL types and results
 
 /// High-level DSL processor - the main entry point for DSL operations
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DslProcessor {
     editor: CentralDslEditor,
     registry: DomainRegistry,

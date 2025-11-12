@@ -17,7 +17,7 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 /// Database service for dictionary operations
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DictionaryDatabaseService {
     pool: PgPool,
 }

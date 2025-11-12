@@ -45,7 +45,7 @@ pub use crate::ai::agentic_dictionary_service::{
 
 // DSL Generation and Management Agent
 #[cfg(feature = "database")]
-pub use crate::ai::dsl_service::{AiDslService, KycCaseRequest, OwnershipLink, UboAnalysisRequest};
+pub use crate::ai::dsl_service::{AiDslService, KycCaseRequest, UboAnalysisRequest};
 
 // Document Processing Agent (when available)
 // #[cfg(feature = "database")]

@@ -31,6 +31,7 @@ use serde_json::json;
 use std::collections::HashMap;
 
 /// KYC domain handler implementation
+#[derive(Debug)]
 pub struct KycDomainHandler {
     vocabulary: DslVocabulary,
     state_transitions: Vec<StateTransition>,

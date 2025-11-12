@@ -19,7 +19,7 @@ pub(crate) use domain_models::{
 pub(crate) use business_request_models::{
     ActiveBusinessRequestView, BusinessRequestSummary, DslBusinessRequest, DslRequestType,
     DslRequestWorkflowState, NewDslBusinessRequest, NewDslRequestWorkflowState, PriorityLevel,
-    RequestStatus, RequestWorkflowHistory, UpdateDslBusinessRequest,
+    RequestWorkflowHistory, UpdateDslBusinessRequest,
 };
 
 pub(crate) use document_models::{
@@ -36,11 +36,9 @@ pub(crate) use document_models::{
 pub use dictionary_models::{
     AgenticAttributeCreateRequest, AgenticAttributeCrudResponse, AgenticAttributeDeleteRequest,
     AgenticAttributeDiscoverRequest, AgenticAttributeReadRequest, AgenticAttributeSearchRequest,
-    AgenticAttributeUpdateRequest, AgenticAttributeValidateRequest, AttributeAssetType,
-    AttributeBatchItemResult, AttributeBatchRequest, AttributeBatchResult,
-    AttributeDiscoveryRequest, AttributeOperationType, AttributeSearchCriteria,
-    AttributeValidationRequest, AttributeValidationResult, DictionaryAttribute,
-    DictionaryAttributeWithMetadata, DictionaryExecutionStatus, DictionaryHealthCheck,
+    AgenticAttributeUpdateRequest, AgenticAttributeValidateRequest, AttributeDiscoveryRequest,
+    AttributeSearchCriteria, AttributeValidationRequest, AttributeValidationResult,
+    DictionaryAttribute, DictionaryAttributeWithMetadata, DictionaryHealthCheck,
     DictionaryStatistics, DiscoveredAttribute, NewDictionaryAttribute, UpdateDictionaryAttribute,
 };
 

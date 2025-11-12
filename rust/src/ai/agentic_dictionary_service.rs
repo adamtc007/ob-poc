@@ -13,11 +13,11 @@ use crate::dsl_manager::{DslContext, DslManager, DslManagerFactory, DslProcessin
 use crate::models::{
     AgenticAttributeCreateRequest, AgenticAttributeCrudResponse, AgenticAttributeDeleteRequest,
     AgenticAttributeDiscoverRequest, AgenticAttributeReadRequest, AgenticAttributeSearchRequest,
-    AgenticAttributeUpdateRequest, AgenticAttributeValidateRequest, AttributeAssetType,
-    AttributeDiscoveryRequest, AttributeOperationType, AttributeSearchCriteria,
-    AttributeValidationRequest, DictionaryAttribute, DictionaryExecutionStatus,
+    AgenticAttributeUpdateRequest, AgenticAttributeValidateRequest, AttributeDiscoveryRequest,
+    AttributeSearchCriteria, AttributeValidationRequest, DictionaryAttribute,
     NewDictionaryAttribute, UpdateDictionaryAttribute,
 };
+use dsl_types::{AttributeAssetType, AttributeOperationType, DictionaryExecutionStatus};
 // Simplified parsing for now - in full implementation would use proper DSL parsing
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -153,7 +153,7 @@ impl AgenticDictionaryService {
         }
 
         // Convert to DSL Manager request
-        let dsl_request = crate::AgenticCrudRequest {
+        let dsl_request = crate::dsl_manager::AgenticCrudRequest {
             instruction: request.instruction.clone(),
             asset_type: Some("dictionary".to_string()),
             operation_type: Some("Create".to_string()),
@@ -662,7 +662,7 @@ impl AgenticDictionaryService {
         };
 
         // Convert AiDslRequest to AgenticCrudRequest
-        let crud_request = crate::AgenticCrudRequest {
+        let crud_request = crate::dsl_manager::AgenticCrudRequest {
             instruction: ai_request.instruction.clone(),
             asset_type: Some("dictionary".to_string()),
             operation_type: Some("Create".to_string()),

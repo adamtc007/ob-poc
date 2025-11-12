@@ -29,6 +29,7 @@ use serde_json::json;
 use std::collections::HashMap;
 
 /// UBO domain handler implementation
+#[derive(Debug)]
 pub struct UboDomainHandler {
     vocabulary: DslVocabulary,
     state_transitions: Vec<StateTransition>,

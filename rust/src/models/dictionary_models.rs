@@ -102,22 +102,7 @@ pub struct DiscoveredAttribute {
 /// Types of operations supported for attributes
 // AttributeOperationType moved to dsl_types crate - import from there
 
-impl std::str::FromStr for AttributeOperationType {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "create" => Ok(AttributeOperationType::Create),
-            "read" => Ok(AttributeOperationType::Read),
-            "update" => Ok(AttributeOperationType::Update),
-            "delete" => Ok(AttributeOperationType::Delete),
-            "search" => Ok(AttributeOperationType::Search),
-            "validate" => Ok(AttributeOperationType::Validate),
-            "discover" => Ok(AttributeOperationType::Discover),
-            _ => Err(format!("Unknown attribute operation type: {}", s)),
-        }
-    }
-}
+// FromStr implementation for AttributeOperationType moved to dsl_types crate
 
 // AttributeAssetType moved to dsl_types crate - import from there
 // All implementations moved with the type

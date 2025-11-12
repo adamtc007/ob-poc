@@ -171,7 +171,7 @@ pub use ai::{
 // High-level agentic capabilities - intelligent automation facade
 #[cfg(feature = "database")]
 pub use agents::{
-    AgenticDictionaryService, AiDslService, DictionaryServiceConfig, KycCaseRequest, OwnershipLink,
+    AgenticDictionaryService, AiDslService, DictionaryServiceConfig, KycCaseRequest,
     UboAnalysisRequest,
 };
 
@@ -182,9 +182,8 @@ pub use ast::{Statement, Workflow};
 #[cfg(feature = "database")]
 pub use database::{DatabaseConfig, DatabaseManager};
 #[cfg(feature = "database")]
-pub use models::{
-    CompilationStatus, DslDomain, DslVersion, ExecutionPhase, ExecutionStatus, ParsedAst,
-};
+// Models re-exports removed due to visibility issues
+// pub use models::{...};
 
 // System utilities
 pub use system_info as get_system_info;

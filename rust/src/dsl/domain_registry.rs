@@ -30,7 +30,7 @@ use uuid::Uuid;
 /// Core trait that all domain implementations must implement
 /// Provides unified interface for domain-specific DSL operations
 #[async_trait]
-pub trait DomainHandler: Send + Sync {
+pub trait DomainHandler: Send + Sync + std::fmt::Debug {
     /// Get domain identity information
     fn domain_name(&self) -> &str;
     fn domain_version(&self) -> &str;

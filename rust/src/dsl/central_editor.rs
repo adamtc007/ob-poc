@@ -62,6 +62,7 @@ impl CentralDslEditor {
     }
 
     /// Create a new central DSL editor with real database dictionary service
+    #[cfg(feature = "database")]
     pub fn with_database(
         domain_registry: Arc<DomainRegistry>,
         database_pool: sqlx::PgPool,
