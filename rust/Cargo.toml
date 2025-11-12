@@ -30,16 +30,7 @@ nom = "7.1"
 # Database integration (optional for Phase 1)
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "macros", "bigdecimal"], optional = true }
 
-# REST API server (kept for protobuf API)
-axum = { version = "0.7", optional = true }
-tower = { version = "0.4", optional = true }
-tower-http = { version = "0.5", features = ["cors"], optional = true }
 
-# gRPC and Protobuf
-tonic = { version = "0.14", features = ["codegen", "transport"] }
-tonic-web = "0.12"
-prost = "0.12" # Added prost dependency
-prost-derive = "0.12"
 
 # Async runtime and utilities
 tokio = { version = "1", features = ["full"] }
@@ -49,6 +40,7 @@ reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
 
 
 regex = "1.12.2"
+rand = "0.8"
 
 # Serialization/Deserialization
 # serde is already included above
@@ -63,19 +55,12 @@ regex = "1.12.2"
 [dev-dependencies]
 # All dev dependencies removed - agentic CRUD tests use standard test framework
 
-# Additional dependencies for Phase 2 execution engine
-prost-types = "0.12"
 
-# Protobuf compilation (build-dependencies)
-[build-dependencies]
-tonic-build = "0.14" # For generating Rust code from .proto files
-prost-build = "0.12" # For generating Rust code from .proto files
 
 # Features for conditional compilation
 [features]
 default = []
-rest-api = ["dep:axum", "dep:tower", "dep:tower-http", "database"]
-mock-api = ["dep:axum", "dep:tower", "dep:tower-http"]  # Mock API without database
+
 database = ["dep:sqlx"]  # Only enable database functionality when needed
 
 
