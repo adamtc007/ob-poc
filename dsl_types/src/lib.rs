@@ -785,6 +785,298 @@ impl From<String> for RequestStatus {
 }
 
 // ============================================================================
+// DSL PROCESSING AND VALIDATION TYPES - BATCH 6
+// ============================================================================
+
+/// Result of DSL processing operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProcessingResult {
+    /// Processing success status
+    pub success: bool,
+    /// Processed DSL content
+    pub processed_dsl: String,
+    /// Validation report
+    pub validation_report: ValidationReport,
+    /// Processing metadata
+    pub metadata: ProcessingMetadata,
+}
+
+impl ProcessingResult {
+    /// Create a new processing result
+    pub fn new(processed_dsl: String, validation_report: ValidationReport) -> Self {
+        Self {
+            success: validation_report.is_valid,
+            processed_dsl,
+            validation_report,
+            metadata: ProcessingMetadata::default(),
+        }
+    }
+
+    /// Create successful processing result
+    pub fn success(processed_dsl: String) -> Self {
+        Self {
+            success: true,
+            processed_dsl,
+            validation_report: ValidationReport::valid(),
+            metadata: ProcessingMetadata::default(),
+        }
+    }
+
+    /// Create failed processing result
+    pub fn failure(errors: Vec<ValidationError>) -> Self {
+        Self {
+            success: false,
+            processed_dsl: String::new(),
+            validation_report: ValidationReport::with_errors(errors),
+            metadata: ProcessingMetadata::default(),
+        }
+    }
+
+    /// Check if processing was successful
+    pub fn is_successful(&self) -> bool {
+        self.success && self.validation_report.is_valid
+    }
+}
+
+/// DSL validation report
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidationReport {
+    /// Overall validation status
+    pub is_valid: bool,
+    /// Domain validation results
+    pub domain_validations: HashMap<String, DomainValidation>,
+    /// Vocabulary compliance
+    pub vocabulary_compliance: VocabularyValidation,
+    /// Validation errors
+    pub errors: Vec<ValidationError>,
+    /// Validation warnings
+    pub warnings: Vec<ValidationWarning>,
+}
+
+impl ValidationReport {
+    /// Create a new validation report
+    pub fn new() -> Self {
+        Self {
+            is_valid: true,
+            domain_validations: HashMap::new(),
+            vocabulary_compliance: VocabularyValidation::default(),
+            errors: Vec::new(),
+            warnings: Vec::new(),
+        }
+    }
+
+    /// Create a valid validation report
+    pub fn valid() -> Self {
+        Self {
+            is_valid: true,
+            domain_validations: HashMap::new(),
+            vocabulary_compliance: VocabularyValidation::compliant(),
+            errors: Vec::new(),
+            warnings: Vec::new(),
+        }
+    }
+
+    /// Create validation report with errors
+    pub fn with_errors(errors: Vec<ValidationError>) -> Self {
+        Self {
+            is_valid: errors.is_empty(),
+            domain_validations: HashMap::new(),
+            vocabulary_compliance: VocabularyValidation::default(),
+            errors,
+            warnings: Vec::new(),
+        }
+    }
+
+    /// Add a validation error
+    pub fn add_error(&mut self, error: ValidationError) {
+        self.errors.push(error);
+        self.is_valid = false;
+    }
+
+    /// Add a validation warning
+    pub fn add_warning(&mut self, warning: ValidationWarning) {
+        self.warnings.push(warning);
+    }
+
+    /// Add domain validation result
+    pub fn add_domain_validation(&mut self, domain: String, validation: DomainValidation) {
+        if !validation.valid {
+            self.is_valid = false;
+        }
+        self.domain_validations.insert(domain, validation);
+    }
+
+    /// Get total error count
+    pub fn error_count(&self) -> usize {
+        self.errors.len()
+    }
+
+    /// Get total warning count
+    pub fn warning_count(&self) -> usize {
+        self.warnings.len()
+    }
+
+    /// Check if report has any issues
+    pub fn has_issues(&self) -> bool {
+        !self.errors.is_empty() || !self.warnings.is_empty()
+    }
+}
+
+impl Default for ValidationReport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Domain-specific validation result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DomainValidation {
+    /// Domain identifier
+    pub domain: String,
+    /// Validation success
+    pub valid: bool,
+    /// Domain-specific rules validated
+    pub rules_checked: Vec<String>,
+    /// Domain compliance score (0.0 - 1.0)
+    pub compliance_score: f64,
+}
+
+impl DomainValidation {
+    /// Create a new domain validation
+    pub fn new(domain: impl Into<String>) -> Self {
+        Self {
+            domain: domain.into(),
+            valid: true,
+            rules_checked: Vec::new(),
+            compliance_score: 1.0,
+        }
+    }
+
+    /// Create successful domain validation
+    pub fn success(domain: impl Into<String>, rules_checked: Vec<String>) -> Self {
+        Self {
+            domain: domain.into(),
+            valid: true,
+            rules_checked,
+            compliance_score: 1.0,
+        }
+    }
+
+    /// Create failed domain validation
+    pub fn failure(domain: impl Into<String>, compliance_score: f64) -> Self {
+        Self {
+            domain: domain.into(),
+            valid: false,
+            rules_checked: Vec::new(),
+            compliance_score: compliance_score.clamp(0.0, 1.0),
+        }
+    }
+
+    /// Add checked rule
+    pub fn add_rule(&mut self, rule: impl Into<String>) {
+        self.rules_checked.push(rule.into());
+    }
+
+    /// Set compliance score
+    pub fn set_compliance(&mut self, score: f64) {
+        self.compliance_score = score.clamp(0.0, 1.0);
+        if score < 1.0 {
+            self.valid = false;
+        }
+    }
+
+    /// Get compliance percentage
+    pub fn compliance_percentage(&self) -> u8 {
+        (self.compliance_score * 100.0) as u8
+    }
+}
+
+/// Vocabulary validation result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VocabularyValidation {
+    /// All verbs are approved
+    pub all_verbs_approved: bool,
+    /// Approved verbs used
+    pub approved_verbs: Vec<String>,
+    /// Unknown/unapproved verbs
+    pub unknown_verbs: Vec<String>,
+    /// AttributeID compliance
+    pub attribute_compliance: f64,
+}
+
+impl VocabularyValidation {
+    /// Create new vocabulary validation
+    pub fn new() -> Self {
+        Self {
+            all_verbs_approved: true,
+            approved_verbs: Vec::new(),
+            unknown_verbs: Vec::new(),
+            attribute_compliance: 1.0,
+        }
+    }
+
+    /// Create compliant vocabulary validation
+    pub fn compliant() -> Self {
+        Self {
+            all_verbs_approved: true,
+            approved_verbs: Vec::new(),
+            unknown_verbs: Vec::new(),
+            attribute_compliance: 1.0,
+        }
+    }
+
+    /// Create non-compliant vocabulary validation
+    pub fn non_compliant(unknown_verbs: Vec<String>) -> Self {
+        Self {
+            all_verbs_approved: false,
+            approved_verbs: Vec::new(),
+            unknown_verbs,
+            attribute_compliance: 0.0,
+        }
+    }
+
+    /// Add approved verb
+    pub fn add_approved_verb(&mut self, verb: impl Into<String>) {
+        self.approved_verbs.push(verb.into());
+    }
+
+    /// Add unknown verb
+    pub fn add_unknown_verb(&mut self, verb: impl Into<String>) {
+        self.unknown_verbs.push(verb.into());
+        self.all_verbs_approved = false;
+    }
+
+    /// Set attribute compliance score
+    pub fn set_attribute_compliance(&mut self, score: f64) {
+        self.attribute_compliance = score.clamp(0.0, 1.0);
+    }
+
+    /// Get overall vocabulary score (0.0 - 1.0)
+    pub fn overall_score(&self) -> f64 {
+        if !self.all_verbs_approved {
+            return 0.0;
+        }
+        self.attribute_compliance
+    }
+
+    /// Check if vocabulary is fully compliant
+    pub fn is_compliant(&self) -> bool {
+        self.all_verbs_approved && self.attribute_compliance >= 1.0
+    }
+
+    /// Get compliance percentage
+    pub fn compliance_percentage(&self) -> u8 {
+        (self.overall_score() * 100.0) as u8
+    }
+}
+
+impl Default for VocabularyValidation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ============================================================================
 // UTILITY TYPES
 // ============================================================================
 
@@ -1045,10 +1337,148 @@ mod tests {
     }
 
     #[test]
+    fn test_processing_result() {
+        let validation_report = ValidationReport::valid();
+        let result = ProcessingResult::new("processed dsl".to_string(), validation_report);
+        assert!(result.success);
+        assert!(result.is_successful());
+        assert_eq!(result.processed_dsl, "processed dsl");
+
+        let success_result = ProcessingResult::success("success dsl".to_string());
+        assert!(success_result.success);
+        assert!(success_result.is_successful());
+
+        let error = ValidationError::new("TEST001", "Test error");
+        let failure_result = ProcessingResult::failure(vec![error]);
+        assert!(!failure_result.success);
+        assert!(!failure_result.is_successful());
+        assert_eq!(failure_result.error_count(), 1);
+    }
+
+    #[test]
+    fn test_validation_report() {
+        let mut report = ValidationReport::new();
+        assert!(report.is_valid);
+        assert_eq!(report.error_count(), 0);
+        assert_eq!(report.warning_count(), 0);
+        assert!(!report.has_issues());
+
+        let error = ValidationError::new("TEST001", "Test error");
+        report.add_error(error);
+        assert!(!report.is_valid);
+        assert_eq!(report.error_count(), 1);
+        assert!(report.has_issues());
+
+        let warning = ValidationWarning::new("WARN001", "Test warning", WarningSeverity::Warning);
+        report.add_warning(warning);
+        assert_eq!(report.warning_count(), 1);
+
+        let domain_validation = DomainValidation::success("kyc", vec!["rule1".to_string()]);
+        report.add_domain_validation("kyc".to_string(), domain_validation);
+        assert_eq!(report.domain_validations.len(), 1);
+    }
+
+    #[test]
+    fn test_validation_report_constructors() {
+        let valid_report = ValidationReport::valid();
+        assert!(valid_report.is_valid);
+        assert!(valid_report.vocabulary_compliance.is_compliant());
+
+        let error = ValidationError::new("ERR001", "Test error");
+        let error_report = ValidationReport::with_errors(vec![error]);
+        assert!(!error_report.is_valid);
+        assert_eq!(error_report.error_count(), 1);
+    }
+
+    #[test]
+    fn test_domain_validation() {
+        let mut validation = DomainValidation::new("kyc");
+        assert!(validation.valid);
+        assert_eq!(validation.domain, "kyc");
+        assert_eq!(validation.compliance_score, 1.0);
+        assert_eq!(validation.compliance_percentage(), 100);
+
+        validation.add_rule("rule1");
+        validation.add_rule("rule2");
+        assert_eq!(validation.rules_checked.len(), 2);
+
+        validation.set_compliance(0.85);
+        assert!(!validation.valid);
+        assert_eq!(validation.compliance_percentage(), 85);
+
+        let success_validation = DomainValidation::success("ubo", vec!["rule1".to_string()]);
+        assert!(success_validation.valid);
+        assert_eq!(success_validation.rules_checked.len(), 1);
+
+        let failure_validation = DomainValidation::failure("onboarding", 0.5);
+        assert!(!failure_validation.valid);
+        assert_eq!(failure_validation.compliance_score, 0.5);
+    }
+
+    #[test]
+    fn test_vocabulary_validation() {
+        let mut validation = VocabularyValidation::new();
+        assert!(validation.all_verbs_approved);
+        assert_eq!(validation.attribute_compliance, 1.0);
+        assert_eq!(validation.overall_score(), 1.0);
+        assert!(validation.is_compliant());
+        assert_eq!(validation.compliance_percentage(), 100);
+
+        validation.add_approved_verb("kyc.start");
+        validation.add_approved_verb("ubo.collect");
+        assert_eq!(validation.approved_verbs.len(), 2);
+
+        validation.add_unknown_verb("invalid.verb");
+        assert!(!validation.all_verbs_approved);
+        assert_eq!(validation.unknown_verbs.len(), 1);
+        assert_eq!(validation.overall_score(), 0.0);
+        assert!(!validation.is_compliant());
+
+        let compliant_validation = VocabularyValidation::compliant();
+        assert!(compliant_validation.is_compliant());
+
+        let non_compliant_validation =
+            VocabularyValidation::non_compliant(vec!["bad.verb".to_string()]);
+        assert!(!non_compliant_validation.all_verbs_approved);
+        assert_eq!(non_compliant_validation.unknown_verbs.len(), 1);
+        assert!(!non_compliant_validation.is_compliant());
+    }
+
+    #[test]
+    fn test_vocabulary_validation_scoring() {
+        let mut validation = VocabularyValidation::new();
+
+        // Test with approved verbs but lower attribute compliance
+        validation.set_attribute_compliance(0.7);
+        assert_eq!(validation.overall_score(), 0.7);
+        assert_eq!(validation.compliance_percentage(), 70);
+
+        // Test with unknown verbs - should always return 0.0
+        validation.add_unknown_verb("unknown");
+        assert_eq!(validation.overall_score(), 0.0);
+        assert_eq!(validation.compliance_percentage(), 0);
+    }
+
+    #[test]
     fn test_serialization() {
         let loc = SourceLocation::new(1, 1, 0, 5);
         let json = serde_json::to_string(&loc).unwrap();
         let deserialized: SourceLocation = serde_json::from_str(&json).unwrap();
         assert_eq!(loc, deserialized);
+
+        // Test validation types serialization
+        let report = ValidationReport::valid();
+        let report_json = serde_json::to_string(&report).unwrap();
+        let deserialized_report: ValidationReport = serde_json::from_str(&report_json).unwrap();
+        assert_eq!(report.is_valid, deserialized_report.is_valid);
+
+        let validation = VocabularyValidation::compliant();
+        let validation_json = serde_json::to_string(&validation).unwrap();
+        let deserialized_validation: VocabularyValidation =
+            serde_json::from_str(&validation_json).unwrap();
+        assert_eq!(
+            validation.all_verbs_approved,
+            deserialized_validation.all_verbs_approved
+        );
     }
 }

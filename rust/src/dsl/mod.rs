@@ -88,7 +88,7 @@ pub(crate) mod validation;
 // ============================================================================
 
 // Re-export essential DSL processing capabilities
-pub use central_editor::{CentralDslEditor, DslEditError, DslEditResult};
+pub use central_editor::CentralDslEditor;
 pub use domain_context::{DomainContext, OperationMetadata, OperationPriority};
 pub use domain_registry::{DomainHandler, DomainRegistry, DslVocabulary};
 pub use operations::{DslOperation, OperationBuilder, OperationChain};
@@ -96,13 +96,13 @@ pub use parsing_coordinator::{DomainDetection, ParseResult, ParsingCoordinator};
 
 // Import types from dsl_types crate (Level 1 foundation)
 pub use dsl_types::{
-    ProcessingMetadata, SourceLocation, ValidationError, ValidationWarning, WarningSeverity,
+    DomainValidation, ProcessingMetadata, ProcessingResult, PromptConfig, SourceLocation,
+    ValidationError, ValidationReport, ValidationWarning, VocabularyValidation, WarningSeverity,
 };
 
 // Core DSL types and results
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use uuid::Uuid;
 
 /// High-level DSL processor - the main entry point for DSL operations
 #[derive(Debug, Clone)]
@@ -199,70 +199,21 @@ impl Default for DslProcessor {
     }
 }
 
-/// Result of DSL processing operations
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProcessingResult {
-    /// Processing success status
-    pub success: bool,
-    /// Processed DSL content
-    pub processed_dsl: String,
-    /// Validation report
-    pub validation_report: ValidationReport,
-    /// Processing metadata
-    pub metadata: ProcessingMetadata,
-}
+// ProcessingResult, ValidationReport, DomainValidation, and VocabularyValidation
+// are now imported from dsl_types crate (see imports above)
 
-/// DSL validation report
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ValidationReport {
-    /// Overall validation status
-    pub is_valid: bool,
-    /// Domain validation results
-    pub domain_validations: HashMap<String, DomainValidation>,
-    /// Vocabulary compliance
-    pub vocabulary_compliance: VocabularyValidation,
-    /// Validation errors
-    pub errors: Vec<ValidationError>,
-    /// Validation warnings
-    pub warnings: Vec<ValidationWarning>,
-}
-
-/// Domain-specific validation result
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DomainValidation {
-    /// Domain identifier
-    pub domain: String,
-    /// Validation success
-    pub valid: bool,
-    /// Domain-specific rules validated
-    pub rules_checked: Vec<String>,
-    /// Domain compliance score (0.0 - 1.0)
-    pub compliance_score: f64,
-}
-
-/// Vocabulary validation result
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VocabularyValidation {
-    /// All verbs are approved
-    pub all_verbs_approved: bool,
-    /// Approved verbs used
-    pub approved_verbs: Vec<String>,
-    /// Unknown/unapproved verbs
-    pub unknown_verbs: Vec<String>,
-    /// AttributeID compliance
-    pub attribute_compliance: f64,
-}
-
-// ValidationError and ValidationWarning moved to dsl_types crate - import from there
-
-// SourceLocation moved to dsl_types crate - import from there
-
-// WarningSeverity moved to dsl_types crate - import from there
-
-// ProcessingMetadata moved to dsl_types crate - import from there
+// ValidationError, ValidationWarning, SourceLocation, WarningSeverity, ProcessingMetadata,
+// ProcessingResult, ValidationReport, DomainValidation, and VocabularyValidation
+// are all imported from dsl_types crate (see imports above)
 
 /// DSL result type for all operations
 pub type DslResult<T> = Result<T, DslError>;
+
+/// Type alias for backward compatibility
+pub type DslEditResult<T> = DslResult<T>;
+
+/// Type alias for backward compatibility
+pub type DslEditError = DslError;
 
 /// Comprehensive DSL error types
 #[derive(Debug, thiserror::Error)]
@@ -293,16 +244,14 @@ pub enum DslError {
 // CONVENIENCE FUNCTIONS - High-Level DSL Operations
 // ============================================================================
 
-/// Quick DSL validation function
-pub fn validate_dsl(dsl_content: &str) -> DslResult<ValidationReport> {
+/// Quick DSL validation function (async)
+pub async fn validate_dsl(dsl_content: &str) -> DslResult<ValidationReport> {
     let processor = DslProcessor::new();
     let context = DomainContext::auto_detect(); // Auto-detect from content
 
     // Extract just validation from full processing
-    futures::executor::block_on(async {
-        let result = processor.process_dsl(dsl_content, context).await?;
-        Ok(result.validation_report)
-    })
+    let result = processor.process_dsl(dsl_content, context).await?;
+    Ok(result.validation_report)
 }
 
 /// Quick DSL normalization function
@@ -364,9 +313,12 @@ mod tests {
         assert!(matches!(error, DslError::ValidationError { .. }));
     }
 
-    #[test]
-    fn test_convenience_functions() {
+    #[tokio::test]
+    async fn test_convenience_functions() {
         let domains = detect_domains("(kyc.start :case-id \"test\")");
         assert!(domains.is_ok());
+
+        let validation = validate_dsl("(kyc.start :case-id \"test\")").await;
+        assert!(validation.is_ok());
     }
 }

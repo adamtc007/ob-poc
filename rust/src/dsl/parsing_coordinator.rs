@@ -29,7 +29,7 @@ use std::collections::HashMap;
 use tracing::{debug, error, info, warn};
 
 /// Central coordinator for all DSL parsing operations
-pub(crate) struct ParsingCoordinator {
+pub struct ParsingCoordinator {
     /// Domain registry for handler lookup and routing
     domain_registry: DomainRegistry,
 
