@@ -463,6 +463,179 @@ impl PromptConfig {
 }
 
 // ============================================================================
+// TRANSACTION MANAGEMENT TYPES
+// ============================================================================
+
+/// Transaction execution modes for batch operations
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TransactionMode {
+    /// All operations must succeed or all fail (ACID compliance)
+    Atomic,
+    /// Operations executed one after another, stopping on first failure
+    Sequential,
+    /// Operations executed concurrently where possible
+    Parallel,
+}
+
+impl TransactionMode {
+    /// Get human-readable mode name
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            TransactionMode::Atomic => "atomic",
+            TransactionMode::Sequential => "sequential",
+            TransactionMode::Parallel => "parallel",
+        }
+    }
+
+    /// Check if this mode guarantees ACID properties
+    pub fn is_acid_compliant(&self) -> bool {
+        matches!(self, TransactionMode::Atomic)
+    }
+}
+
+impl std::fmt::Display for TransactionMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+/// Rollback strategies for failed operations
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RollbackStrategy {
+    /// Roll back all operations on any failure
+    FullRollback,
+    /// Roll back only completed operations, leave failed ones
+    PartialRollback,
+    /// Continue processing remaining operations despite failures
+    ContinueOnError,
+}
+
+impl RollbackStrategy {
+    /// Get human-readable strategy name
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            RollbackStrategy::FullRollback => "full_rollback",
+            RollbackStrategy::PartialRollback => "partial_rollback",
+            RollbackStrategy::ContinueOnError => "continue_on_error",
+        }
+    }
+
+    /// Check if this strategy provides strong consistency guarantees
+    pub fn is_strongly_consistent(&self) -> bool {
+        matches!(self, RollbackStrategy::FullRollback)
+    }
+}
+
+impl std::fmt::Display for RollbackStrategy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+// ============================================================================
+// ASSET TYPE CLASSIFICATIONS
+// ============================================================================
+
+/// Asset type enumeration for attribute classification
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AttributeAssetType {
+    /// Standard attribute type
+    Attribute,
+}
+
+impl AttributeAssetType {
+    /// Get the database table name for this asset type
+    pub fn table_name(&self) -> &'static str {
+        match self {
+            AttributeAssetType::Attribute => "dictionary",
+        }
+    }
+
+    /// Get the human-readable asset name
+    pub fn asset_name(&self) -> &'static str {
+        match self {
+            AttributeAssetType::Attribute => "attribute",
+        }
+    }
+
+    /// Get all available asset types
+    pub fn all() -> Vec<Self> {
+        vec![Self::Attribute]
+    }
+}
+
+impl std::fmt::Display for AttributeAssetType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.asset_name())
+    }
+}
+
+impl std::str::FromStr for AttributeAssetType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "attribute" => Ok(AttributeAssetType::Attribute),
+            _ => Err(format!("Unknown attribute asset type: {}", s)),
+        }
+    }
+}
+
+// ============================================================================
+// AGENT METADATA TYPES
+// ============================================================================
+
+/// Agent operation metadata for tracking AI agent operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentMetadata {
+    /// Agent identifier
+    pub agent_id: String,
+    /// Operation type
+    pub operation: String,
+    /// Processing duration (milliseconds)
+    pub duration_ms: u64,
+    /// Confidence score (0.0 - 1.0)
+    pub confidence: f64,
+    /// Additional context
+    pub context: HashMap<String, String>,
+}
+
+impl AgentMetadata {
+    /// Create new agent metadata
+    pub fn new(agent_id: impl Into<String>, operation: impl Into<String>) -> Self {
+        Self {
+            agent_id: agent_id.into(),
+            operation: operation.into(),
+            duration_ms: 0,
+            confidence: 0.0,
+            context: HashMap::new(),
+        }
+    }
+
+    /// Set processing duration
+    pub fn with_duration(mut self, duration_ms: u64) -> Self {
+        self.duration_ms = duration_ms;
+        self
+    }
+
+    /// Set confidence score
+    pub fn with_confidence(mut self, confidence: f64) -> Self {
+        self.confidence = confidence.clamp(0.0, 1.0);
+        self
+    }
+
+    /// Add context data
+    pub fn add_context(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.context.insert(key.into(), value.into());
+    }
+
+    /// Get confidence as percentage
+    pub fn confidence_percentage(&self) -> u8 {
+        (self.confidence * 100.0) as u8
+    }
+}
+
+// ============================================================================
 // UTILITY TYPES
 // ============================================================================
 
@@ -620,6 +793,58 @@ mod tests {
         assert!(comprehensive.include_schemas);
         assert_eq!(comprehensive.max_examples, 5);
         assert!(comprehensive.include_confidence);
+    }
+
+    #[test]
+    fn test_transaction_mode() {
+        assert_eq!(TransactionMode::Atomic.to_string(), "atomic");
+        assert!(TransactionMode::Atomic.is_acid_compliant());
+        assert!(!TransactionMode::Parallel.is_acid_compliant());
+    }
+
+    #[test]
+    fn test_rollback_strategy() {
+        assert_eq!(RollbackStrategy::FullRollback.to_string(), "full_rollback");
+        assert!(RollbackStrategy::FullRollback.is_strongly_consistent());
+        assert!(!RollbackStrategy::ContinueOnError.is_strongly_consistent());
+    }
+
+    #[test]
+    fn test_attribute_asset_type() {
+        assert_eq!(AttributeAssetType::Attribute.to_string(), "attribute");
+        assert_eq!(AttributeAssetType::Attribute.table_name(), "dictionary");
+
+        let all_types = AttributeAssetType::all();
+        assert_eq!(all_types.len(), 1);
+        assert!(all_types.contains(&AttributeAssetType::Attribute));
+
+        // Test FromStr implementation
+        assert_eq!(
+            "attribute".parse::<AttributeAssetType>().unwrap(),
+            AttributeAssetType::Attribute
+        );
+        assert!("invalid".parse::<AttributeAssetType>().is_err());
+    }
+
+    #[test]
+    fn test_agent_metadata() {
+        let metadata = AgentMetadata::new("test-agent", "dsl_generation");
+        assert_eq!(metadata.agent_id, "test-agent");
+        assert_eq!(metadata.operation, "dsl_generation");
+        assert_eq!(metadata.duration_ms, 0);
+        assert_eq!(metadata.confidence, 0.0);
+
+        let metadata_with_confidence = metadata.with_confidence(0.85);
+        assert_eq!(metadata_with_confidence.confidence, 0.85);
+        assert_eq!(metadata_with_confidence.confidence_percentage(), 85);
+
+        let mut metadata_with_context = metadata_with_confidence.with_duration(1500);
+        metadata_with_context.add_context("model", "gpt-4");
+        assert_eq!(metadata_with_context.duration_ms, 1500);
+        assert_eq!(
+            metadata_with_context.context.get("model"),
+            Some(&"gpt-4".to_string())
+        );
     }
 
     #[test]

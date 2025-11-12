@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 // Import types from dsl_types crate (Level 1 foundation)
-use dsl_types::AttributeOperationType;
+use dsl_types::{AttributeAssetType, AttributeOperationType};
 
 /// Core dictionary attribute as stored in the database
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -119,42 +119,8 @@ impl std::str::FromStr for AttributeOperationType {
     }
 }
 
-/// Asset type enumeration for attributes
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum AttributeAssetType {
-    Attribute,
-}
-
-impl AttributeAssetType {
-    pub fn table_name(&self) -> &'static str {
-        match self {
-            AttributeAssetType::Attribute => "dictionary",
-        }
-    }
-
-    pub fn asset_name(&self) -> &'static str {
-        match self {
-            AttributeAssetType::Attribute => "attribute",
-        }
-    }
-}
-
-impl std::fmt::Display for AttributeAssetType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.asset_name())
-    }
-}
-
-impl std::str::FromStr for AttributeAssetType {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "attribute" => Ok(AttributeAssetType::Attribute),
-            _ => Err(format!("Unknown attribute asset type: {}", s)),
-        }
-    }
-}
+// AttributeAssetType moved to dsl_types crate - import from there
+// All implementations moved with the type
 
 /// Request for creating attributes via agentic CRUD
 #[derive(Debug, Clone, Serialize, Deserialize)]

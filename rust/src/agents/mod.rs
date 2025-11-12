@@ -62,6 +62,9 @@ pub use crate::ai::dsl_service::{AiDslService, KycCaseRequest, OwnershipLink, Ub
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+// Import types from dsl_types crate (Level 1 foundation)
+use dsl_types::AgentMetadata;
+
 /// High-level agent coordination result
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentResult<T> {
@@ -75,20 +78,7 @@ pub struct AgentResult<T> {
     pub metadata: AgentMetadata,
 }
 
-/// Agent operation metadata
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentMetadata {
-    /// Agent identifier
-    pub agent_id: String,
-    /// Operation type
-    pub operation: String,
-    /// Processing duration (milliseconds)
-    pub duration_ms: u64,
-    /// Confidence score (0.0 - 1.0)
-    pub confidence: f64,
-    /// Additional context
-    pub context: HashMap<String, String>,
-}
+// AgentMetadata moved to dsl_types crate - import from there
 
 /// Agent capability enumeration
 #[derive(Debug, Clone, Serialize, Deserialize)]

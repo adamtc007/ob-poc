@@ -11,6 +11,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+// Import types from dsl_types crate (Level 1 foundation)
+use dsl_types::{RollbackStrategy, TransactionMode};
+
 // ============================================================================
 // PUBLIC FACADE - Core AST Types for External Consumers
 // ============================================================================
@@ -202,19 +205,7 @@ pub struct BatchOperation {
     pub rollback_strategy: RollbackStrategy,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum TransactionMode {
-    Atomic,
-    Sequential,
-    Parallel,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum RollbackStrategy {
-    FullRollback,
-    PartialRollback,
-    ContinueOnError,
-}
+// TransactionMode and RollbackStrategy moved to dsl_types crate - import from there
 
 // --- Transaction Management ---
 
