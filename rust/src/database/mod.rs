@@ -12,6 +12,7 @@ pub mod business_request_repository;
 pub mod cbu_repository;
 pub mod dictionary_service;
 pub mod dsl_domain_repository;
+pub mod entity_service;
 
 // Re-export repository and trait for convenience
 pub use business_request_repository::{
@@ -20,6 +21,7 @@ pub use business_request_repository::{
 pub use cbu_repository::CbuRepository;
 pub use dictionary_service::DictionaryDatabaseService;
 pub use dsl_domain_repository::{DslDomainRepository, DslDomainRepositoryTrait};
+pub use entity_service::EntityDatabaseService;
 
 /// Database configuration
 #[derive(Debug, Clone)]
@@ -111,6 +113,11 @@ impl DatabaseManager {
         DictionaryDatabaseService::new(self.pool.clone())
     }
 
+    /// Create a new entity database service using this database connection
+    pub fn entity_service(&self) -> EntityDatabaseService {
+        EntityDatabaseService::new(self.pool.clone())
+    }
+
     /// Test database connectivity
     pub async fn test_connection(&self) -> Result<(), sqlx::Error> {
         sqlx::query("SELECT 1")
@@ -133,7 +140,8 @@ impl DatabaseManager {
             FROM information_schema.tables
             WHERE table_schema = 'ob-poc'
             AND table_name IN ('dsl_domains', 'dsl_versions', 'parsed_asts', 'dsl_execution_log',
-                               'dictionary', 'document_catalog', 'document_metadata', 'document_relationships', 'document_types')
+                               'dictionary', 'document_catalog', 'document_metadata', 'document_relationships', 'document_types',
+                               'entities', 'entity_types', 'entity_limited_companies', 'entity_partnerships', 'entity_proper_persons', 'entity_trusts')
             "#,
         )
         .fetch_one(&self.pool)
@@ -142,7 +150,7 @@ impl DatabaseManager {
 
         let count: i64 = tables_exist.get("count");
 
-        if count < 9 {
+        if count < 15 {
             warn!("Expected database tables not found. Please run migration scripts including essential agentic CRUD tables");
             return Err(sqlx::migrate::MigrateError::VersionMissing(1));
         }
