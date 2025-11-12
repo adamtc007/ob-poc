@@ -164,25 +164,25 @@ RESPONSE FORMAT - Respond ONLY with valid JSON:
 }"#;
 
         match request.response_type {
-            AiResponseType::GenerateDsl => {
+            AiResponseType::DslGeneration => {
                 format!(
                     "{}\n\nTASK: Generate new DSL based on the instruction.",
                     base_prompt
                 )
             }
-            AiResponseType::TransformDsl => {
+            AiResponseType::DslTransformation => {
                 format!("{}\n\nTASK: Transform the existing DSL according to the instruction while preserving correct syntax and semantics.", base_prompt)
             }
-            AiResponseType::ValidateDsl => {
+            AiResponseType::DslValidation => {
                 format!("{}\n\nTASK: Validate the DSL and provide feedback on correctness, compliance, and improvements.", base_prompt)
             }
-            AiResponseType::ExplainDsl => {
+            AiResponseType::DslExplanation => {
                 format!(
                     "{}\n\nTASK: Explain the DSL structure, meaning, and business logic.",
                     base_prompt
                 )
             }
-            AiResponseType::SuggestImprovements => {
+            AiResponseType::DslSuggestions => {
                 format!("{}\n\nTASK: Analyze the DSL and suggest improvements for better structure, compliance, or functionality.", base_prompt)
             }
         }
@@ -192,21 +192,26 @@ RESPONSE FORMAT - Respond ONLY with valid JSON:
     fn build_user_prompt(&self, request: &AiDslRequest) -> String {
         let mut prompt = format!("INSTRUCTION: {}\n", request.instruction);
 
-        if let Some(current_dsl) = &request.current_dsl {
-            prompt.push_str(&format!("\nCURRENT DSL:\n{}\n", current_dsl));
-        }
-
-        if !request.context.is_empty() {
-            prompt.push_str("\nBUSINESS CONTEXT:\n");
-            for (key, value) in &request.context {
-                prompt.push_str(&format!("- {}: {}\n", key, value));
+        // Note: current_dsl field removed from AiDslRequest - context should be used instead
+        if let Some(context) = &request.context {
+            if let Some(current_dsl) = context.get("current_dsl") {
+                prompt.push_str(&format!("\nCURRENT DSL:\n{}\n", current_dsl));
             }
         }
 
-        if !request.constraints.is_empty() {
-            prompt.push_str("\nCONSTRAINTS:\n");
-            for constraint in &request.constraints {
-                prompt.push_str(&format!("- {}\n", constraint));
+        if let Some(context) = &request.context {
+            if !context.is_empty() {
+                prompt.push_str("\nBUSINESS CONTEXT:\n");
+                for (key, value) in context {
+                    prompt.push_str(&format!("- {}: {}\n", key, value));
+                }
+            }
+        }
+
+        // Note: constraints field removed from AiDslRequest - use context instead
+        if let Some(context) = &request.context {
+            if let Some(constraints_str) = context.get("constraints") {
+                prompt.push_str(&format!("\nCONSTRAINTS:\n{}\n", constraints_str));
             }
         }
 
@@ -223,30 +228,36 @@ RESPONSE FORMAT - Respond ONLY with valid JSON:
         let parsed = super::utils::parse_structured_response(&cleaned)?;
 
         Ok(AiDslResponse {
-            dsl_content: parsed["dsl_content"].as_str().unwrap_or("").to_string(),
+            generated_dsl: parsed["dsl_content"].as_str().unwrap_or("").to_string(),
             explanation: parsed["explanation"]
                 .as_str()
                 .unwrap_or("AI operation completed")
                 .to_string(),
-            confidence: parsed["confidence"].as_f64().unwrap_or(0.8),
-            changes: parsed["changes"]
-                .as_array()
-                .unwrap_or(&Vec::new())
-                .iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect(),
-            warnings: parsed["warnings"]
-                .as_array()
-                .unwrap_or(&Vec::new())
-                .iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect(),
-            suggestions: parsed["suggestions"]
-                .as_array()
-                .unwrap_or(&Vec::new())
-                .iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect(),
+            confidence: Some(parsed["confidence"].as_f64().unwrap_or(0.8)),
+            changes: Some(
+                parsed["changes"]
+                    .as_array()
+                    .unwrap_or(&Vec::new())
+                    .iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect(),
+            ),
+            warnings: Some(
+                parsed["warnings"]
+                    .as_array()
+                    .unwrap_or(&Vec::new())
+                    .iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect(),
+            ),
+            suggestions: Some(
+                parsed["suggestions"]
+                    .as_array()
+                    .unwrap_or(&Vec::new())
+                    .iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect(),
+            ),
         })
     }
 }
@@ -430,10 +441,10 @@ mod tests {
 
         let request = AiDslRequest {
             instruction: "Test".to_string(),
-            current_dsl: None,
-            context: HashMap::new(),
-            response_type: AiResponseType::GenerateDsl,
-            constraints: vec![],
+            context: Some(HashMap::new()),
+            response_type: AiResponseType::DslGeneration,
+            temperature: None,
+            max_tokens: None,
         };
 
         let prompt = client.build_system_prompt(&request);
@@ -450,12 +461,16 @@ mod tests {
         let mut context = HashMap::new();
         context.insert("entity_type".to_string(), "hedge_fund".to_string());
 
+        let mut context_with_constraints = context;
+        context_with_constraints
+            .insert("constraints".to_string(), "Use approved verbs".to_string());
+
         let request = AiDslRequest {
             instruction: "Create onboarding DSL".to_string(),
-            current_dsl: None,
-            context,
-            response_type: AiResponseType::GenerateDsl,
-            constraints: vec!["Use approved verbs".to_string()],
+            context: Some(context_with_constraints),
+            response_type: AiResponseType::DslGeneration,
+            temperature: None,
+            max_tokens: None,
         };
 
         let prompt = client.build_user_prompt(&request);

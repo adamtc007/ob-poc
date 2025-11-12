@@ -545,6 +545,7 @@ mod tests {
                 assets_used: vec!["cbu".to_string()],
             }],
             confidence_score: 0.95,
+            sources: vec!["test_schema".to_string(), "test_grammar".to_string()],
         }
     }
 

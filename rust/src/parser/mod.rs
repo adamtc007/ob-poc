@@ -5,12 +5,16 @@
 
 pub mod debug_test;
 pub mod idiomatic_parser;
+pub mod normalizer;
 pub mod phase5_integration_test;
 pub mod semantic_agent_integration_test;
 pub mod v31_integration_tests;
+pub mod validators;
 
 use crate::{Form, Program};
 use nom::error::VerboseError;
+pub use normalizer::DslNormalizer;
+use validators::{DslValidator, ValidationResult};
 
 // Re-export the main parsing functions for V3.1
 pub use idiomatic_parser::{
@@ -24,6 +28,43 @@ pub use idiomatic_parser::{
 /// Supports all domains: Document, ISDA, KYC, UBO, Onboarding, Compliance, Graph
 pub fn parse_program(input: &str) -> Result<Program, VerboseError<&str>> {
     idiomatic_parser::parse_program(input)
+}
+
+/// Parse and normalize DSL program (applies alias transformations)
+///
+/// This function parses DSL input and applies alias normalization to transform
+/// legacy verb/key forms into canonical v3.1 forms before returning the AST.
+pub fn parse_and_normalize(input: &str) -> Result<Program, Box<dyn std::error::Error>> {
+    // Step 1: Parse using existing parser
+    let mut program =
+        idiomatic_parser::parse_program(input).map_err(|e| format!("Parse error: {:?}", e))?;
+
+    // Step 2: Apply normalization
+    let normalizer = DslNormalizer::new();
+    normalizer
+        .normalize_program(&mut program)
+        .map_err(|e| format!("Normalization error: {}", e))?;
+
+    Ok(program)
+}
+
+/// Parse, normalize, and validate DSL program (complete pipeline)
+///
+/// This function performs the complete DSL processing pipeline:
+/// 1. Parse DSL input into AST
+/// 2. Apply alias normalization (legacy → canonical)
+/// 3. Validate with enhanced semantics (link identity, evidence linking, etc.)
+pub fn parse_normalize_and_validate(
+    input: &str,
+) -> Result<(Program, ValidationResult), Box<dyn std::error::Error>> {
+    // Step 1: Parse and normalize
+    let program = parse_and_normalize(input)?;
+
+    // Step 2: Enhanced validation
+    let mut validator = DslValidator::new();
+    let validation_result = validator.validate_program(&program);
+
+    Ok((program, validation_result))
 }
 
 #[cfg(test)]

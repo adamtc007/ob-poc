@@ -5,14 +5,16 @@
 //! with AI-powered features like natural language to DSL conversion and
 //! intelligent DSL editing suggestions.
 
-pub mod agentic_crud_service;
+// pub mod agentic_crud_service;  // Temporarily disabled due to gemini dependency
 pub mod agentic_dictionary_service;
 pub mod agentic_document_service;
 pub mod crud_prompt_builder;
-pub mod gemini;
+pub mod dsl_service;
+// pub mod gemini;  // Temporarily disabled due to API compatibility issues
 pub mod openai;
 pub mod rag_system;
-pub mod unified_agentic_service;
+pub mod tests;
+// pub mod unified_agentic_service;  // Temporarily disabled due to agentic_crud_service dependency
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -210,51 +212,5 @@ pub mod utils {
                 "suggestions": []
             }))
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_ai_config_default() {
-        let config = AiConfig::default();
-        assert_eq!(config.model, "gemini-2.5-flash-preview-09-2025");
-        assert_eq!(config.timeout_seconds, 30);
-        assert_eq!(config.max_tokens, Some(8192));
-    }
-
-    #[test]
-    fn test_clean_dsl_response() {
-        let markdown_response = "```dsl\n(case.create :cbu-id \"test\")\n```";
-        let cleaned = utils::clean_dsl_response(markdown_response);
-        assert_eq!(cleaned, "(case.create :cbu-id \"test\")");
-
-        let plain_response = "(products.add \"CUSTODY\")";
-        let cleaned = utils::clean_dsl_response(plain_response);
-        assert_eq!(cleaned, "(products.add \"CUSTODY\")");
-    }
-
-    #[test]
-    fn test_extract_confidence() {
-        assert_eq!(
-            utils::extract_confidence("I'm very confident this is correct"),
-            0.9
-        );
-        assert_eq!(
-            utils::extract_confidence("I'm confident in this solution"),
-            0.7
-        );
-        assert_eq!(utils::extract_confidence("I'm uncertain about this"), 0.5);
-        assert_eq!(utils::extract_confidence("Here's the DSL"), 0.8);
-    }
-
-    #[test]
-    fn test_parse_structured_response() {
-        let json_response = r#"{"dsl_content": "(test)", "confidence": 0.95}"#;
-        let parsed = utils::parse_structured_response(json_response).unwrap();
-        assert_eq!(parsed["dsl_content"], "(test)");
-        assert_eq!(parsed["confidence"], 0.95);
     }
 }
