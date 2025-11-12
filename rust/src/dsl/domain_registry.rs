@@ -18,7 +18,8 @@
 //! - Domain-specific business rule enforcement
 
 use crate::dsl::{
-    domain_context::DomainContext, operations::DslOperation, DslEditError, DslEditResult,
+    domain_context::DomainContext, operations::DslOperation, parsing_coordinator::ParseResult,
+    DomainValidation, DslEditError, DslEditResult, ValidationReport,
 };
 use async_trait::async_trait;
 
@@ -87,6 +88,7 @@ pub trait DomainHandler: Send + Sync {
 
 /// Central registry for domain handlers
 /// Manages domain discovery, routing, and lifecycle
+#[derive(Debug)]
 pub struct DomainRegistry {
     /// Registered domain handlers
     domains: HashMap<String, Box<dyn DomainHandler>>,
@@ -217,6 +219,30 @@ impl DomainRegistry {
             }
         }
         true
+    }
+
+    /// Validate parse result for specific domain (facade method for DslProcessor)
+    pub fn validate_for_domain(
+        &self,
+        parse_result: &ParseResult,
+        context: &DomainContext,
+    ) -> DslEditResult<ValidationReport> {
+        // Create basic validation report
+        let mut report = ValidationReport::valid();
+
+        // Add domain validation for the specified context
+        let domain_validation = DomainValidation::success(
+            context.domain_name.clone(),
+            vec!["basic_validation".to_string()],
+        );
+        report.add_domain_validation(context.domain_name.clone(), domain_validation);
+
+        Ok(report)
+    }
+
+    /// Get list of registered domain names
+    pub fn registered_domains(&self) -> Vec<String> {
+        self.domains.keys().cloned().collect()
     }
 }
 

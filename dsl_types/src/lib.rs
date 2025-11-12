@@ -61,7 +61,7 @@ impl SourceLocation {
         }
     }
 
-    /// Create source location with a source name
+    /// Create a source location with source name
     pub fn with_source(
         line: usize,
         column: usize,
@@ -84,6 +84,12 @@ impl SourceLocation {
             Some(name) => format!("{}:{}:{}", name, self.line, self.column),
             None => format!("{}:{}", self.line, self.column),
         }
+    }
+}
+
+impl std::fmt::Display for SourceLocation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.description())
     }
 }
 

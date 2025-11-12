@@ -29,6 +29,7 @@ use std::collections::HashMap;
 use tracing::{debug, error, info, warn};
 
 /// Central coordinator for all DSL parsing operations
+#[derive(Debug)]
 pub struct ParsingCoordinator {
     /// Domain registry for handler lookup and routing
     domain_registry: DomainRegistry,
@@ -362,6 +363,38 @@ impl ParsingCoordinator {
         }
 
         Ok(warnings)
+    }
+
+    /// Parse DSL with domain awareness (facade method for DslProcessor)
+    pub async fn parse_with_domains(&mut self, dsl_content: &str) -> DslEditResult<ParseResult> {
+        // Delegate to existing parse_dsl method
+        self.parse_dsl(dsl_content).await
+    }
+
+    /// Normalize legacy DSL to current version (facade method)
+    pub fn normalize_to_current_version(&self, legacy_dsl: &str) -> DslEditResult<String> {
+        // For now, return as-is (normalization logic to be implemented)
+        Ok(legacy_dsl.to_string())
+    }
+
+    /// Detect domains from DSL content (facade method)
+    pub fn detect_domains_from_content(&self, dsl_content: &str) -> DslEditResult<Vec<String>> {
+        // Basic domain detection from verb prefixes
+        let mut domains = Vec::new();
+        for line in dsl_content.lines() {
+            if let Some(verb_start) = line.find('(') {
+                if let Some(verb_end) = line[verb_start + 1..].find(char::is_whitespace) {
+                    let verb = &line[verb_start + 1..verb_start + 1 + verb_end];
+                    if let Some(dot_pos) = verb.find('.') {
+                        let domain = &verb[..dot_pos];
+                        if !domains.contains(&domain.to_string()) {
+                            domains.push(domain.to_string());
+                        }
+                    }
+                }
+            }
+        }
+        Ok(domains)
     }
 }
 

@@ -19,7 +19,10 @@
 
 use crate::{
     dsl::{
-        domain_context::DomainContext, domain_registry::DomainRegistry, operations::DslOperation,
+        domain_context::DomainContext,
+        domain_registry::DomainRegistry,
+        operations::{DslOperation, OperationChain},
+        parsing_coordinator::ParseResult,
         DslEditError, DslEditResult,
     },
     parser::parse_program,
@@ -32,6 +35,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 /// Central DSL Editor - replaces all domain-specific edit functions
+#[derive(Debug)]
 pub struct CentralDslEditor {
     /// Domain registry for handler lookup and routing
     domain_registry: Arc<DomainRegistry>,
@@ -319,6 +323,93 @@ impl CentralDslEditor {
             last_operation: None,
             domain_health,
         }
+    }
+
+    /// Process DSL with domain context (facade method for DslProcessor)
+    pub async fn process_with_context(
+        &self,
+        parse_result: ParseResult,
+        context: DomainContext,
+    ) -> DslEditResult<String> {
+        // For now, return a simple processed result
+        // In full implementation, this would apply domain-specific transformations
+        Ok(format!("Processed DSL for domain: {}", context.domain_name))
+    }
+
+    /// Generate DSL for a specific operation (facade method)
+    pub async fn generate_dsl_for_operation(
+        &self,
+        operation: DslOperation,
+        context: DomainContext,
+    ) -> DslEditResult<String> {
+        // Basic DSL generation based on operation type
+        let (operation_name, operation_id) = match &operation {
+            DslOperation::CreateEntity { metadata, .. } => {
+                ("create", metadata.operation_id.to_string())
+            }
+            DslOperation::UpdateEntity { metadata, .. } => {
+                ("update", metadata.operation_id.to_string())
+            }
+            DslOperation::AddProducts { metadata, .. } => {
+                ("add_products", metadata.operation_id.to_string())
+            }
+            DslOperation::AddServices { metadata, .. } => {
+                ("add_services", metadata.operation_id.to_string())
+            }
+            DslOperation::UpdateAttribute { metadata, .. } => {
+                ("update_attribute", metadata.operation_id.to_string())
+            }
+            DslOperation::TransitionState { metadata, .. } => {
+                ("transition_state", metadata.operation_id.to_string())
+            }
+            DslOperation::CollectDocument { metadata, .. } => {
+                ("collect_document", metadata.operation_id.to_string())
+            }
+            DslOperation::CreateRelationship { metadata, .. } => {
+                ("create_relationship", metadata.operation_id.to_string())
+            }
+            DslOperation::ValidateData { metadata, .. } => {
+                ("validate_data", metadata.operation_id.to_string())
+            }
+            DslOperation::ExecuteWorkflowStep { metadata, .. } => {
+                ("execute_workflow_step", metadata.operation_id.to_string())
+            }
+            DslOperation::SendNotification { metadata, .. } => {
+                ("send_notification", metadata.operation_id.to_string())
+            }
+            DslOperation::DomainSpecific {
+                operation_type,
+                metadata,
+                ..
+            } => (operation_type.as_str(), metadata.operation_id.to_string()),
+            DslOperation::Composite { metadata, .. } => {
+                ("composite", metadata.operation_id.to_string())
+            }
+        };
+
+        Ok(format!(
+            "({}.{} :context \"{}\")",
+            context.domain_name, operation_name, operation_id
+        ))
+    }
+
+    /// Execute operation chain (facade method)
+    pub async fn execute_operation_chain(
+        &self,
+        chain: OperationChain,
+        context: DomainContext,
+    ) -> DslEditResult<String> {
+        // Execute operations in sequence and combine results
+        let mut results = Vec::new();
+
+        for operation in chain.operations {
+            let result = self
+                .generate_dsl_for_operation(operation, context.clone())
+                .await?;
+            results.push(result);
+        }
+
+        Ok(results.join("\n\n"))
     }
 }
 
