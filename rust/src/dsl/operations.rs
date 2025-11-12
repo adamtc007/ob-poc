@@ -355,7 +355,11 @@ impl OperationBuilder {
     }
 
     /// Add custom metadata
-    pub(crate) fn with_metadata(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
+    pub(crate) fn with_metadata(
+        mut self,
+        key: impl Into<String>,
+        value: serde_json::Value,
+    ) -> Self {
         self.custom_data.insert(key.into(), value);
         self
     }
@@ -375,7 +379,11 @@ impl OperationBuilder {
     }
 
     /// Build an AddProducts operation
-    pub(crate) fn add_products(self, target_id: impl Into<String>, products: Vec<String>) -> DslOperation {
+    pub(crate) fn add_products(
+        self,
+        target_id: impl Into<String>,
+        products: Vec<String>,
+    ) -> DslOperation {
         DslOperation::AddProducts {
             target_id: target_id.into(),
             products,
@@ -513,7 +521,11 @@ impl ExecutableDslOperation {
     }
 
     /// Add metadata to the operation
-    pub(crate) fn with_metadata(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
+    pub(crate) fn with_metadata(
+        mut self,
+        key: impl Into<String>,
+        value: serde_json::Value,
+    ) -> Self {
         self.metadata.insert(key.into(), value);
         self
     }
@@ -605,5 +617,56 @@ impl ExecutableDslOperation {
                 )
             }
         }
+    }
+}
+
+/// Chain of DSL operations that should be executed together
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OperationChain {
+    /// Chain identifier
+    pub chain_id: Uuid,
+    /// Operations in execution order
+    pub operations: Vec<DslOperation>,
+    /// Chain metadata
+    pub metadata: OperationMetadata,
+    /// Whether the chain should be atomic (all-or-nothing)
+    pub atomic: bool,
+}
+
+impl OperationChain {
+    /// Create a new operation chain
+    pub fn new() -> Self {
+        Self {
+            chain_id: Uuid::new_v4(),
+            operations: Vec::new(),
+            metadata: OperationMetadata::default(),
+            atomic: true,
+        }
+    }
+
+    /// Add an operation to the chain
+    pub fn add_operation(&mut self, operation: DslOperation) {
+        self.operations.push(operation);
+    }
+
+    /// Set whether the chain should be atomic
+    pub fn set_atomic(&mut self, atomic: bool) {
+        self.atomic = atomic;
+    }
+
+    /// Get the number of operations in the chain
+    pub fn len(&self) -> usize {
+        self.operations.len()
+    }
+
+    /// Check if the chain is empty
+    pub fn is_empty(&self) -> bool {
+        self.operations.is_empty()
+    }
+}
+
+impl Default for OperationChain {
+    fn default() -> Self {
+        Self::new()
     }
 }

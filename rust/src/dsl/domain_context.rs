@@ -60,6 +60,12 @@ impl DomainContext {
         Self::new("ubo")
     }
 
+    /// Auto-detect domain from DSL content patterns
+    pub fn auto_detect() -> Self {
+        // Default to kyc for now - could be enhanced to analyze DSL content
+        Self::kyc()
+    }
+
     /// Set subdomain for fine-grained routing
     pub(crate) fn with_subdomain(mut self, subdomain: impl Into<String>) -> Self {
         self.subdomain = Some(subdomain.into());
@@ -189,7 +195,11 @@ impl StateRequirements {
     }
 
     /// Add transition metadata
-    pub(crate) fn with_metadata(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
+    pub(crate) fn with_metadata(
+        mut self,
+        key: impl Into<String>,
+        value: serde_json::Value,
+    ) -> Self {
         self.transition_metadata.insert(key.into(), value);
         self
     }

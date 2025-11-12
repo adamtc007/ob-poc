@@ -20,26 +20,34 @@
 //! - EBNF grammar support
 //! - Modular, extensible architecture
 //!
-//! # Quick Start
+//! # Quick Start - DSL-First Approach
 //!
 //! ```rust
-//! use ob_poc::parser::parse_program;
+//! use ob_poc::dsl::{DslProcessor, DomainContext};
 //!
-//! // Parse a simple DSL program
+//! // Process DSL with domain awareness - THE CORE CAPABILITY
+//! let processor = DslProcessor::new();
+//! let context = DomainContext::kyc();
+//!
 //! let dsl_code = r#"
 //! (kyc.start :customer-id "CUST-001")
 //! (kyc.verify :status "approved")
 //! "#;
 //!
-//! let program = parse_program(dsl_code).unwrap();
-//! assert_eq!(program.len(), 2);
+//! let result = processor.process_dsl(dsl_code, context).await?;
+//! assert!(result.success);
 //! ```
 //!
-//! # Architecture
+//! # Architecture - DSL-Centric Design
 //!
-//! The system is organized into several key modules:
+//! This is a **DSL-first application** where everything serves DSL processing:
 //!
-//! - [`ast`] - Abstract Syntax Tree definitions with strong typing
+//! - **[`dsl`]** - 🎯 **THE CORE**: Domain-aware DSL processing, validation, operations
+//! - [`parser`] - Low-level parsing infrastructure (serves DSL)
+//! - [`ai`] - AI clients and services (generate/work with DSL)
+//! - [`agents`] - High-level AI automation (manipulate DSL)
+//! - [`data_dictionary`] - Attribute definitions (define DSL vocabulary)
+//! - [`database`] - Persistence layer (store DSL instances)
 
 // Internal imports for functions no longer in public re-exports
 use crate::error::DSLResult;
@@ -109,16 +117,17 @@ pub(crate) mod parser_ast;
 // Mock REST API server for testing without database
 // pub mod mock_rest_api; // Removed - dead code
 
-// Central DSL system with domain context switching
-// AI integration - low-level AI clients and services
+// 🎯 DSL CORE - The primary capability of the entire application
+pub mod dsl;
+
+// AI integration - low-level AI clients and services (serves DSL)
 pub mod ai;
 
-// Agentic capabilities - high-level intelligent automation
+// Agentic capabilities - high-level intelligent automation (serves DSL)
 pub mod agents;
 
-// DSL system components
+// Supporting DSL infrastructure
 pub(crate) mod domains;
-pub(crate) mod dsl;
 
 // Database services (when enabled)
 #[cfg(feature = "database")]
@@ -136,14 +145,21 @@ pub(crate) mod dsl_manager;
 // - grpc/ - gRPC service implementations (for future web services)
 
 // ============================================================================
-// MINIMAL PUBLIC API - Facade Pattern
-// Based on actual usage in examples/ - only expose what external consumers need
+// PRIMARY PUBLIC API - DSL-First Architecture
+// DSL is the CORE CAPABILITY - everything else serves DSL processing
 // ============================================================================
 
-// Core parsing - primary entry point for DSL processing
+// 🎯 DSL CORE - The Heart of the Application (Primary Interface)
+pub use dsl::{
+    detect_domains, normalize_legacy_dsl, validate_dsl, CentralDslEditor, DomainContext,
+    DomainRegistry, DslOperation, DslProcessor, DslResult, OperationBuilder, ProcessingResult,
+    ValidationReport,
+};
+
+// Core parsing infrastructure (serves DSL)
 pub use parser::{parse_normalize_and_validate, parse_program};
 
-// Error types that external code must handle
+// Essential error types
 pub use error::{DSLError, ParseError};
 
 // Low-level AI integration - clients and core services

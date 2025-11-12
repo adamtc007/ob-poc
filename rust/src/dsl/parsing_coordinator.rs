@@ -51,6 +51,30 @@ pub(crate) struct ParsingStatistics {
     pub domain_routing_errors: u64,
 }
 
+/// Domain detection result from DSL content analysis
+#[derive(Debug, Clone)]
+pub struct DomainDetection {
+    /// Primary detected domain
+    pub primary_domain: String,
+    /// Secondary domains detected
+    pub secondary_domains: Vec<String>,
+    /// Confidence score for detection (0.0 - 1.0)
+    pub confidence: f64,
+    /// Verbs that led to domain detection
+    pub detected_verbs: Vec<String>,
+}
+
+impl DomainDetection {
+    pub fn new(primary_domain: String) -> Self {
+        Self {
+            primary_domain,
+            secondary_domains: Vec::new(),
+            confidence: 1.0,
+            detected_verbs: Vec::new(),
+        }
+    }
+}
+
 /// Enhanced parsing result with domain context
 #[derive(Debug)]
 pub struct ParseResult {
