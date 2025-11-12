@@ -16,6 +16,9 @@ serde_json = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 
+# Error handling - required for DslError enum
+thiserror = { workspace = true }
+
 # NO OTHER DEPENDENCIES ALLOWED
 # This crate must be the foundation that everything else builds on
 

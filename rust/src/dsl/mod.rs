@@ -96,13 +96,12 @@ pub use parsing_coordinator::{DomainDetection, ParseResult, ParsingCoordinator};
 
 // Import types from dsl_types crate (Level 1 foundation)
 pub use dsl_types::{
-    DomainValidation, ProcessingMetadata, ProcessingResult, PromptConfig, SourceLocation,
-    ValidationError, ValidationReport, ValidationWarning, VocabularyValidation, WarningSeverity,
+    DomainValidation, DslError, DslResult, ProcessingMetadata, ProcessingResult, PromptConfig,
+    SourceLocation, ValidationError, ValidationReport, ValidationWarning, VocabularyValidation,
+    WarningSeverity,
 };
 
 // Core DSL types and results
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// High-level DSL processor - the main entry point for DSL operations
 #[derive(Debug, Clone)]
@@ -199,46 +198,18 @@ impl Default for DslProcessor {
     }
 }
 
-// ProcessingResult, ValidationReport, DomainValidation, and VocabularyValidation
-// are now imported from dsl_types crate (see imports above)
+// ProcessingResult, ValidationReport, DomainValidation, VocabularyValidation, DslError,
+// and DslResult are now imported from dsl_types crate (see imports above)
 
 // ValidationError, ValidationWarning, SourceLocation, WarningSeverity, ProcessingMetadata,
-// ProcessingResult, ValidationReport, DomainValidation, and VocabularyValidation
-// are all imported from dsl_types crate (see imports above)
-
-/// DSL result type for all operations
-pub type DslResult<T> = Result<T, DslError>;
+// ProcessingResult, ValidationReport, DomainValidation, VocabularyValidation, DslError,
+// and DslResult are all imported from dsl_types crate (see imports above)
 
 /// Type alias for backward compatibility
 pub type DslEditResult<T> = DslResult<T>;
 
 /// Type alias for backward compatibility
 pub type DslEditError = DslError;
-
-/// Comprehensive DSL error types
-#[derive(Debug, thiserror::Error)]
-pub enum DslError {
-    #[error("Parse error: {message} at {location:?}")]
-    ParseError {
-        message: String,
-        location: Option<SourceLocation>,
-    },
-
-    #[error("Validation failed: {errors:?}")]
-    ValidationError { errors: Vec<ValidationError> },
-
-    #[error("Domain error in {domain}: {message}")]
-    DomainError { domain: String, message: String },
-
-    #[error("Operation failed: {operation} - {reason}")]
-    OperationError { operation: String, reason: String },
-
-    #[error("Configuration error: {details}")]
-    ConfigurationError { details: String },
-
-    #[error("Internal processing error: {details}")]
-    InternalError { details: String },
-}
 
 // ============================================================================
 // CONVENIENCE FUNCTIONS - High-Level DSL Operations

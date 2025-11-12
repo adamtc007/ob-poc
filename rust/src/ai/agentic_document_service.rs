@@ -4,8 +4,9 @@
 //! document catalog system. It enables natural language document management operations
 //! that are translated to DSL and executed against the AttributeID-as-Type schema.
 
-use crate::ai::crud_prompt_builder::{CrudPromptBuilder, GeneratedPrompt, PromptConfig};
+use crate::ai::crud_prompt_builder::{CrudPromptBuilder, GeneratedPrompt};
 use crate::ai::rag_system::{CrudRagSystem, RetrievedContext};
+use crate::dsl::PromptConfig;
 #[cfg(feature = "database")]
 use crate::models::document_models::*;
 use crate::parser::idiomatic_parser::parse_crud_statement;

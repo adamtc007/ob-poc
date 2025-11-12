@@ -1077,6 +1077,137 @@ impl Default for VocabularyValidation {
 }
 
 // ============================================================================
+// DSL ERROR TYPES - BATCH 7
+// ============================================================================
+
+/// Comprehensive DSL error types matching all expected variants in codebase
+#[derive(Debug, thiserror::Error)]
+pub enum DslError {
+    // Single-string constructor variants (most common pattern)
+    #[error("Domain validation error: {0}")]
+    DomainValidationError(String),
+
+    #[error("Grammar validation error: {0}")]
+    GrammarValidationError(String),
+
+    #[error("Dictionary validation error: {0}")]
+    DictionaryValidationError(String),
+
+    #[error("Compilation error: {0}")]
+    CompilationError(String),
+
+    #[error("Domain not found: {0}")]
+    DomainNotFound(String),
+
+    // Two-string constructor variants
+    #[error("Unsupported operation '{0}' in domain '{1}'")]
+    UnsupportedOperation(String, String),
+
+    // Structured error variants (from original enum)
+    #[error("Parse error: {message} at {location:?}")]
+    ParseError {
+        message: String,
+        location: Option<SourceLocation>,
+    },
+
+    #[error("Validation failed: {errors:?}")]
+    ValidationError { errors: Vec<ValidationError> },
+
+    #[error("Domain error in {domain}: {message}")]
+    DomainError { domain: String, message: String },
+
+    #[error("Operation failed: {operation} - {reason}")]
+    OperationError { operation: String, reason: String },
+
+    #[error("Configuration error: {details}")]
+    ConfigurationError { details: String },
+
+    #[error("Internal processing error: {details}")]
+    InternalError { details: String },
+}
+
+impl DslError {
+    /// Create a domain validation error
+    pub fn domain_validation(message: impl Into<String>) -> Self {
+        Self::DomainValidationError(message.into())
+    }
+
+    /// Create a grammar validation error
+    pub fn grammar_validation(message: impl Into<String>) -> Self {
+        Self::GrammarValidationError(message.into())
+    }
+
+    /// Create a dictionary validation error
+    pub fn dictionary_validation(message: impl Into<String>) -> Self {
+        Self::DictionaryValidationError(message.into())
+    }
+
+    /// Create a compilation error
+    pub fn compilation(message: impl Into<String>) -> Self {
+        Self::CompilationError(message.into())
+    }
+
+    /// Create an unsupported operation error
+    pub fn unsupported_operation(operation: impl Into<String>, domain: impl Into<String>) -> Self {
+        Self::UnsupportedOperation(operation.into(), domain.into())
+    }
+
+    /// Create a domain not found error
+    pub fn domain_not_found(domain: impl Into<String>) -> Self {
+        Self::DomainNotFound(domain.into())
+    }
+
+    /// Create a parse error with location
+    pub fn parse_with_location(
+        message: impl Into<String>,
+        location: Option<SourceLocation>,
+    ) -> Self {
+        Self::ParseError {
+            message: message.into(),
+            location,
+        }
+    }
+
+    /// Create a validation error with multiple validation errors
+    pub fn validation_with_errors(errors: Vec<ValidationError>) -> Self {
+        Self::ValidationError { errors }
+    }
+
+    /// Create a domain error
+    pub fn domain(domain: impl Into<String>, message: impl Into<String>) -> Self {
+        Self::DomainError {
+            domain: domain.into(),
+            message: message.into(),
+        }
+    }
+
+    /// Create an operation error
+    pub fn operation(operation: impl Into<String>, reason: impl Into<String>) -> Self {
+        Self::OperationError {
+            operation: operation.into(),
+            reason: reason.into(),
+        }
+    }
+
+    /// Create a configuration error
+    pub fn configuration(details: impl Into<String>) -> Self {
+        Self::ConfigurationError {
+            details: details.into(),
+        }
+    }
+
+    /// Create an internal error
+    pub fn internal(details: impl Into<String>) -> Self {
+        Self::InternalError {
+            details: details.into(),
+        }
+    }
+}
+
+/// DSL result type for all operations
+pub type DslResult<T> = Result<T, DslError>;
+
+// ============================================================================
 // UTILITY TYPES
 // ============================================================================
 
@@ -1457,6 +1588,82 @@ mod tests {
         validation.add_unknown_verb("unknown");
         assert_eq!(validation.overall_score(), 0.0);
         assert_eq!(validation.compliance_percentage(), 0);
+    }
+
+    #[test]
+    fn test_dsl_error_creation() {
+        // Test single-string constructor variants
+        let domain_error = DslError::domain_validation("Invalid customer ID");
+        assert!(matches!(domain_error, DslError::DomainValidationError(_)));
+
+        let grammar_error = DslError::grammar_validation("Syntax error at line 5");
+        assert!(matches!(grammar_error, DslError::GrammarValidationError(_)));
+
+        let dict_error = DslError::dictionary_validation("Unknown attribute UUID");
+        assert!(matches!(dict_error, DslError::DictionaryValidationError(_)));
+
+        let comp_error = DslError::compilation("Failed to parse DSL");
+        assert!(matches!(comp_error, DslError::CompilationError(_)));
+
+        // Test two-string constructor variants
+        let unsupported_error = DslError::unsupported_operation("invalid.verb", "kyc");
+        assert!(matches!(
+            unsupported_error,
+            DslError::UnsupportedOperation(_, _)
+        ));
+
+        let domain_not_found = DslError::domain_not_found("nonexistent_domain");
+        assert!(matches!(domain_not_found, DslError::DomainNotFound(_)));
+
+        // Test structured error variants
+        let parse_error =
+            DslError::parse_with_location("Parse failure", Some(SourceLocation::new(1, 1, 0, 5)));
+        assert!(matches!(parse_error, DslError::ParseError { .. }));
+
+        let validation_error = DslError::validation_with_errors(vec![ValidationError::new(
+            "ERR001",
+            "Test validation error",
+        )]);
+        assert!(matches!(validation_error, DslError::ValidationError { .. }));
+
+        let domain_err = DslError::domain("kyc", "Domain-specific error");
+        assert!(matches!(domain_err, DslError::DomainError { .. }));
+
+        let op_error = DslError::operation("kyc.start", "Operation failed");
+        assert!(matches!(op_error, DslError::OperationError { .. }));
+
+        let config_error = DslError::configuration("Invalid configuration");
+        assert!(matches!(config_error, DslError::ConfigurationError { .. }));
+
+        let internal_error = DslError::internal("Internal processing failed");
+        assert!(matches!(internal_error, DslError::InternalError { .. }));
+    }
+
+    #[test]
+    fn test_dsl_error_display() {
+        let error = DslError::domain_validation("Test domain validation error");
+        let error_string = error.to_string();
+        assert!(error_string.contains("Domain validation error"));
+        assert!(error_string.contains("Test domain validation error"));
+
+        let unsupported = DslError::unsupported_operation("test.verb", "test_domain");
+        let unsupported_string = unsupported.to_string();
+        assert!(unsupported_string.contains("Unsupported operation"));
+        assert!(unsupported_string.contains("test.verb"));
+        assert!(unsupported_string.contains("test_domain"));
+    }
+
+    #[test]
+    fn test_dsl_result_type() {
+        let success: DslResult<String> = Ok("success".to_string());
+        assert!(success.is_ok());
+
+        let failure: DslResult<String> = Err(DslError::compilation("Test compilation error"));
+        assert!(failure.is_err());
+
+        if let Err(error) = failure {
+            assert!(matches!(error, DslError::CompilationError(_)));
+        }
     }
 
     #[test]
