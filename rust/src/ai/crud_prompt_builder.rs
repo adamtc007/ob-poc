@@ -480,18 +480,6 @@ impl Default for CrudPromptBuilder {
     }
 }
 
-impl Default for PromptConfig {
-    fn default() -> Self {
-        Self {
-            include_schemas: true,
-            include_grammar: true,
-            include_examples: true,
-            max_examples: 3,
-            include_confidence: false,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

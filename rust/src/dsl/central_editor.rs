@@ -481,7 +481,7 @@ pub trait DomainRepository: Send + Sync {
 
 /// Dictionary service trait for attribute validation (Phase 1 simplified)
 #[async_trait]
-pub trait DictionaryService: Send + Sync {
+pub trait DictionaryService: Send + Sync + std::fmt::Debug {
     async fn validate_dsl_attributes(&self, dsl: &str) -> Result<(), String>;
 }
 

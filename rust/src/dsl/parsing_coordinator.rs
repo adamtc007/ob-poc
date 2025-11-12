@@ -140,14 +140,13 @@ impl ParsingCoordinator {
     }
 
     /// Main parsing entry point - parses DSL and routes to appropriate domain
-    pub async fn parse_dsl(&mut self, input: &str) -> DslEditResult<ParseResult> {
-        self.parsing_stats.total_parses += 1;
+    pub async fn parse_dsl(&self, input: &str) -> DslEditResult<ParseResult> {
+        // Note: Statistics tracking removed to avoid mutable access requirement
 
         // First, try basic AST parsing
         let program = match parse_program_internal(input) {
             Ok(program) => program,
             Err(parse_error) => {
-                self.parsing_stats.parse_errors += 1;
                 error!("Basic AST parsing failed: {:?}", parse_error);
                 return Err(DslEditError::CompilationError(format!(
                     "Failed to parse DSL: {:?}",
@@ -170,7 +169,7 @@ impl ParsingCoordinator {
             match self.domain_registry.get_domain(&domain_name) {
                 Ok(domain_handler) => {
                     debug!("Routing parsing to domain: {}", domain_name);
-                    self.parsing_stats.domain_routed_parses += 1;
+                    // Statistics tracking removed to avoid mutable access requirement
                     handler_used = Some(domain_name.clone());
 
                     // Extract domain context from parsed DSL
@@ -193,20 +192,20 @@ impl ParsingCoordinator {
                     }
                 }
                 Err(e) => {
-                    self.parsing_stats.domain_routing_errors += 1;
+                    // Statistics tracking removed
                     warn!("Failed to get domain handler for {}: {:?}", domain_name, e);
                     warnings.push(format!("Domain routing failed for {}: {}", domain_name, e));
                 }
             }
         } else {
             debug!("No domain detected, using generic parsing");
-            self.parsing_stats.fallback_parses += 1;
+            // Statistics tracking removed
         }
 
         // Perform final validation
         self.validate_program_structure(&program)?;
 
-        self.parsing_stats.successful_parses += 1;
+        // Statistics tracking removed
 
         Ok(ParseResult {
             program,
@@ -366,7 +365,7 @@ impl ParsingCoordinator {
     }
 
     /// Parse DSL with domain awareness (facade method for DslProcessor)
-    pub async fn parse_with_domains(&mut self, dsl_content: &str) -> DslEditResult<ParseResult> {
+    pub async fn parse_with_domains(&self, dsl_content: &str) -> DslEditResult<ParseResult> {
         // Delegate to existing parse_dsl method
         self.parse_dsl(dsl_content).await
     }

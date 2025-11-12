@@ -1214,6 +1214,312 @@ impl DslError {
 pub type DslResult<T> = Result<T, DslError>;
 
 // ============================================================================
+// AI SERVICE TYPES - BATCH 8 (PHASE 2.3)
+// ============================================================================
+
+/// AI service configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AiConfig {
+    /// API key for the AI service
+    pub api_key: String,
+
+    /// Model name/version to use
+    pub model: String,
+
+    /// Maximum tokens in response
+    pub max_tokens: Option<u32>,
+
+    /// Temperature for response generation (0.0 - 1.0)
+    pub temperature: Option<f32>,
+
+    /// Request timeout in seconds
+    pub timeout_seconds: u64,
+}
+
+impl Default for AiConfig {
+    fn default() -> Self {
+        Self {
+            api_key: std::env::var("AI_API_KEY").unwrap_or_default(),
+            model: "default-model".to_string(),
+            max_tokens: Some(8192),
+            temperature: Some(0.1),
+            timeout_seconds: 30,
+        }
+    }
+}
+
+impl AiConfig {
+    /// Create new AI configuration
+    pub fn new(api_key: impl Into<String>, model: impl Into<String>) -> Self {
+        Self {
+            api_key: api_key.into(),
+            model: model.into(),
+            max_tokens: Some(8192),
+            temperature: Some(0.1),
+            timeout_seconds: 30,
+        }
+    }
+
+    /// Set maximum tokens
+    pub fn with_max_tokens(mut self, max_tokens: u32) -> Self {
+        self.max_tokens = Some(max_tokens);
+        self
+    }
+
+    /// Set temperature
+    pub fn with_temperature(mut self, temperature: f32) -> Self {
+        self.temperature = Some(temperature);
+        self
+    }
+
+    /// Set timeout
+    pub fn with_timeout(mut self, timeout_seconds: u64) -> Self {
+        self.timeout_seconds = timeout_seconds;
+        self
+    }
+}
+
+/// AI request for DSL operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AiDslRequest {
+    /// The instruction or question for the AI
+    pub instruction: String,
+
+    /// Optional context for the request
+    pub context: Option<HashMap<String, String>>,
+
+    /// Expected response type
+    pub response_type: AiResponseType,
+
+    /// Temperature for AI generation
+    pub temperature: Option<f64>,
+
+    /// Maximum tokens for response
+    pub max_tokens: Option<u32>,
+}
+
+impl AiDslRequest {
+    /// Create new AI DSL request
+    pub fn new(instruction: impl Into<String>, response_type: AiResponseType) -> Self {
+        Self {
+            instruction: instruction.into(),
+            context: None,
+            response_type,
+            temperature: None,
+            max_tokens: None,
+        }
+    }
+
+    /// Add context to the request
+    pub fn with_context(mut self, context: HashMap<String, String>) -> Self {
+        self.context = Some(context);
+        self
+    }
+
+    /// Set temperature
+    pub fn with_temperature(mut self, temperature: f64) -> Self {
+        self.temperature = Some(temperature);
+        self
+    }
+
+    /// Set maximum tokens
+    pub fn with_max_tokens(mut self, max_tokens: u32) -> Self {
+        self.max_tokens = Some(max_tokens);
+        self
+    }
+}
+
+/// Type of AI response expected
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AiResponseType {
+    /// Generate new DSL from scratch
+    DslGeneration,
+
+    /// Transform existing DSL
+    DslTransformation,
+
+    /// Validate DSL and provide feedback
+    DslValidation,
+
+    /// Explain DSL structure and meaning
+    DslExplanation,
+
+    /// Suggest improvements to DSL
+    DslSuggestions,
+}
+
+impl AiResponseType {
+    /// Get string representation
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::DslGeneration => "dsl_generation",
+            Self::DslTransformation => "dsl_transformation",
+            Self::DslValidation => "dsl_validation",
+            Self::DslExplanation => "dsl_explanation",
+            Self::DslSuggestions => "dsl_suggestions",
+        }
+    }
+
+    /// Get all response types
+    pub fn all() -> Vec<Self> {
+        vec![
+            Self::DslGeneration,
+            Self::DslTransformation,
+            Self::DslValidation,
+            Self::DslExplanation,
+            Self::DslSuggestions,
+        ]
+    }
+}
+
+impl std::fmt::Display for AiResponseType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+/// AI response containing DSL and metadata
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AiDslResponse {
+    /// Generated or transformed DSL content
+    pub generated_dsl: String,
+
+    /// Explanation of what was done
+    pub explanation: String,
+
+    /// Confidence score (0.0 - 1.0)
+    pub confidence: Option<f64>,
+
+    /// List of changes made (for transformations)
+    pub changes: Option<Vec<String>>,
+
+    /// Warnings or concerns about the DSL
+    pub warnings: Option<Vec<String>>,
+
+    /// Suggestions for improvement
+    pub suggestions: Option<Vec<String>>,
+}
+
+impl AiDslResponse {
+    /// Create new AI DSL response
+    pub fn new(generated_dsl: impl Into<String>, explanation: impl Into<String>) -> Self {
+        Self {
+            generated_dsl: generated_dsl.into(),
+            explanation: explanation.into(),
+            confidence: None,
+            changes: None,
+            warnings: None,
+            suggestions: None,
+        }
+    }
+
+    /// Set confidence score
+    pub fn with_confidence(mut self, confidence: f64) -> Self {
+        self.confidence = Some(confidence.clamp(0.0, 1.0));
+        self
+    }
+
+    /// Add changes list
+    pub fn with_changes(mut self, changes: Vec<String>) -> Self {
+        self.changes = Some(changes);
+        self
+    }
+
+    /// Add warnings
+    pub fn with_warnings(mut self, warnings: Vec<String>) -> Self {
+        self.warnings = Some(warnings);
+        self
+    }
+
+    /// Add suggestions
+    pub fn with_suggestions(mut self, suggestions: Vec<String>) -> Self {
+        self.suggestions = Some(suggestions);
+        self
+    }
+
+    /// Check if response has warnings
+    pub fn has_warnings(&self) -> bool {
+        self.warnings.as_ref().map_or(false, |w| !w.is_empty())
+    }
+
+    /// Check if response has suggestions
+    pub fn has_suggestions(&self) -> bool {
+        self.suggestions.as_ref().map_or(false, |s| !s.is_empty())
+    }
+
+    /// Get confidence percentage
+    pub fn confidence_percentage(&self) -> u8 {
+        self.confidence.unwrap_or(0.0) as u8 * 100
+    }
+}
+
+/// Errors that can occur during AI operations
+#[derive(Debug, thiserror::Error)]
+pub enum AiError {
+    #[error("HTTP request failed: {0}")]
+    HttpError(String),
+
+    #[error("JSON parsing error: {0}")]
+    JsonError(String),
+
+    #[error("API error: {0}")]
+    ApiError(String),
+
+    #[error("Authentication error: missing or invalid API key")]
+    AuthenticationError,
+
+    #[error("Rate limit exceeded")]
+    RateLimitError,
+
+    #[error("AI service timeout")]
+    TimeoutError,
+
+    #[error("Invalid response format: {0}")]
+    InvalidResponse(String),
+
+    #[error("Configuration error: {0}")]
+    ConfigurationError(String),
+
+    #[error("Network error: {0}")]
+    NetworkError(String),
+}
+
+impl AiError {
+    /// Create HTTP error
+    pub fn http(message: impl Into<String>) -> Self {
+        Self::HttpError(message.into())
+    }
+
+    /// Create JSON error
+    pub fn json(message: impl Into<String>) -> Self {
+        Self::JsonError(message.into())
+    }
+
+    /// Create API error
+    pub fn api(message: impl Into<String>) -> Self {
+        Self::ApiError(message.into())
+    }
+
+    /// Create invalid response error
+    pub fn invalid_response(message: impl Into<String>) -> Self {
+        Self::InvalidResponse(message.into())
+    }
+
+    /// Create configuration error
+    pub fn configuration(message: impl Into<String>) -> Self {
+        Self::ConfigurationError(message.into())
+    }
+
+    /// Create network error
+    pub fn network(message: impl Into<String>) -> Self {
+        Self::NetworkError(message.into())
+    }
+}
+
+/// Result type for AI operations
+pub type AiResult<T> = Result<T, AiError>;
+
+// ============================================================================
 // UTILITY TYPES
 // ============================================================================
 
@@ -1673,6 +1979,105 @@ mod tests {
     }
 
     #[test]
+    fn test_ai_config() {
+        let config = AiConfig::new("test-key", "test-model");
+        assert_eq!(config.api_key, "test-key");
+        assert_eq!(config.model, "test-model");
+        assert_eq!(config.max_tokens, Some(8192));
+        assert_eq!(config.timeout_seconds, 30);
+
+        let custom_config = config
+            .with_max_tokens(4096)
+            .with_temperature(0.5)
+            .with_timeout(60);
+        assert_eq!(custom_config.max_tokens, Some(4096));
+        assert_eq!(custom_config.temperature, Some(0.5));
+        assert_eq!(custom_config.timeout_seconds, 60);
+    }
+
+    #[test]
+    fn test_ai_dsl_request() {
+        let request = AiDslRequest::new("Generate KYC DSL", AiResponseType::DslGeneration);
+        assert_eq!(request.instruction, "Generate KYC DSL");
+        assert_eq!(request.response_type, AiResponseType::DslGeneration);
+        assert!(request.context.is_none());
+
+        let mut context = HashMap::new();
+        context.insert("domain".to_string(), "kyc".to_string());
+
+        let enhanced_request = request
+            .with_context(context)
+            .with_temperature(0.7)
+            .with_max_tokens(2048);
+        assert!(enhanced_request.context.is_some());
+        assert_eq!(enhanced_request.temperature, Some(0.7));
+        assert_eq!(enhanced_request.max_tokens, Some(2048));
+    }
+
+    #[test]
+    fn test_ai_response_type() {
+        assert_eq!(AiResponseType::DslGeneration.as_str(), "dsl_generation");
+        assert_eq!(AiResponseType::DslValidation.to_string(), "dsl_validation");
+
+        let all_types = AiResponseType::all();
+        assert_eq!(all_types.len(), 5);
+        assert!(all_types.contains(&AiResponseType::DslGeneration));
+        assert!(all_types.contains(&AiResponseType::DslSuggestions));
+    }
+
+    #[test]
+    fn test_ai_dsl_response() {
+        let response = AiDslResponse::new("(kyc.start)", "Generated KYC start DSL");
+        assert_eq!(response.generated_dsl, "(kyc.start)");
+        assert_eq!(response.explanation, "Generated KYC start DSL");
+        assert!(response.confidence.is_none());
+
+        let enhanced_response = response
+            .with_confidence(0.95)
+            .with_changes(vec!["Added KYC namespace".to_string()])
+            .with_warnings(vec!["Consider adding customer ID".to_string()])
+            .with_suggestions(vec!["Add validation step".to_string()]);
+
+        assert_eq!(enhanced_response.confidence, Some(0.95));
+        assert!(enhanced_response.has_warnings());
+        assert!(enhanced_response.has_suggestions());
+        assert_eq!(enhanced_response.confidence_percentage(), 95);
+        assert_eq!(enhanced_response.changes.as_ref().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_ai_error_creation() {
+        let http_error = AiError::http("Connection failed");
+        assert!(matches!(http_error, AiError::HttpError(_)));
+
+        let json_error = AiError::json("Invalid JSON response");
+        assert!(matches!(json_error, AiError::JsonError(_)));
+
+        let api_error = AiError::api("Rate limit exceeded");
+        assert!(matches!(api_error, AiError::ApiError(_)));
+
+        let config_error = AiError::configuration("Missing API key");
+        assert!(matches!(config_error, AiError::ConfigurationError(_)));
+
+        // Test error display
+        let error_msg = format!("{}", http_error);
+        assert!(error_msg.contains("HTTP request failed"));
+    }
+
+    #[test]
+    fn test_ai_result_type() {
+        let success: AiResult<String> = Ok("Generated DSL".to_string());
+        assert!(success.is_ok());
+
+        let failure: AiResult<String> = Err(AiError::AuthenticationError);
+        assert!(failure.is_err());
+
+        if let Err(error) = failure {
+            assert!(matches!(error, AiError::AuthenticationError));
+        }
+    }
+
+    #[test]
     fn test_serialization() {
         let loc = SourceLocation::new(1, 1, 0, 5);
         let json = serde_json::to_string(&loc).unwrap();
@@ -1692,6 +2097,20 @@ mod tests {
         assert_eq!(
             validation.all_verbs_approved,
             deserialized_validation.all_verbs_approved
+        );
+
+        // Test AI types serialization
+        let ai_request = AiDslRequest::new("test", AiResponseType::DslGeneration);
+        let request_json = serde_json::to_string(&ai_request).unwrap();
+        let deserialized_request: AiDslRequest = serde_json::from_str(&request_json).unwrap();
+        assert_eq!(ai_request.instruction, deserialized_request.instruction);
+
+        let ai_response = AiDslResponse::new("(test)", "Generated test DSL");
+        let response_json = serde_json::to_string(&ai_response).unwrap();
+        let deserialized_response: AiDslResponse = serde_json::from_str(&response_json).unwrap();
+        assert_eq!(
+            ai_response.generated_dsl,
+            deserialized_response.generated_dsl
         );
     }
 }

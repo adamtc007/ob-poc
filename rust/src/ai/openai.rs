@@ -374,16 +374,19 @@ impl AiService for OpenAiClient {
         Ok(response.status().is_success())
     }
 
-    fn config(&self) -> &AiConfig {
-        &self.config
+    fn service_name(&self) -> &str {
+        "openai"
+    }
+
+    fn supported_response_types(&self) -> Vec<AiResponseType> {
+        AiResponseType::all()
     }
 }
 
-// Update AiConfig default to use OpenAI settings
-impl AiConfig {
+impl OpenAiClient {
     /// Create configuration for OpenAI
-    pub fn openai() -> Self {
-        Self {
+    pub fn default_config() -> AiConfig {
+        AiConfig {
             api_key: std::env::var("OPENAI_API_KEY").unwrap_or_default(),
             model: "gpt-3.5-turbo".to_string(),
             max_tokens: Some(2048),

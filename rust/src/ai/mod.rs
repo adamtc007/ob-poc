@@ -20,124 +20,8 @@ mod tests;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// AI service configuration
-#[derive(Debug, Clone)]
-pub struct AiConfig {
-    /// API key for the AI service
-    pub api_key: String,
-
-    /// Model name/version to use
-    pub model: String,
-
-    /// Maximum tokens in response
-    pub max_tokens: Option<u32>,
-
-    /// Temperature for response generation (0.0 - 1.0)
-    pub temperature: Option<f32>,
-
-    /// Request timeout in seconds
-    pub timeout_seconds: u64,
-}
-
-impl Default for AiConfig {
-    fn default() -> Self {
-        Self {
-            api_key: std::env::var("GEMINI_API_KEY").unwrap_or_default(),
-            model: "gemini-2.5-flash-preview-09-2025".to_string(),
-            max_tokens: Some(8192),
-            temperature: Some(0.1),
-            timeout_seconds: 30,
-        }
-    }
-}
-
-/// AI request for DSL operations
-#[derive(Debug, Clone, Serialize)]
-pub struct AiDslRequest {
-    /// The instruction or question for the AI
-    pub instruction: String,
-
-    /// Optional context for the request
-    pub context: Option<HashMap<String, String>>,
-
-    /// Expected response type
-    pub response_type: AiResponseType,
-
-    /// Temperature for AI generation
-    pub temperature: Option<f64>,
-
-    /// Maximum tokens for response
-    pub max_tokens: Option<u32>,
-}
-
-/// Type of AI response expected
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum AiResponseType {
-    /// Generate new DSL from scratch
-    DslGeneration,
-
-    /// Transform existing DSL
-    DslTransformation,
-
-    /// Validate DSL and provide feedback
-    DslValidation,
-
-    /// Explain DSL structure and meaning
-    DslExplanation,
-
-    /// Suggest improvements to DSL
-    DslSuggestions,
-}
-
-/// AI response containing DSL and metadata
-#[derive(Debug, Clone, Deserialize)]
-pub struct AiDslResponse {
-    /// Generated or transformed DSL content
-    pub generated_dsl: String,
-
-    /// Explanation of what was done
-    pub explanation: String,
-
-    /// Confidence score (0.0 - 1.0)
-    pub confidence: Option<f64>,
-
-    /// List of changes made (for transformations)
-    pub changes: Option<Vec<String>>,
-
-    /// Warnings or concerns about the DSL
-    pub warnings: Option<Vec<String>>,
-
-    /// Suggestions for improvement
-    pub suggestions: Option<Vec<String>>,
-}
-
-/// Errors that can occur during AI operations
-#[derive(Debug, thiserror::Error)]
-pub enum AiError {
-    #[error("HTTP request failed: {0}")]
-    HttpError(#[from] reqwest::Error),
-
-    #[error("JSON parsing error: {0}")]
-    JsonError(#[from] serde_json::Error),
-
-    #[error("API error: {0}")]
-    ApiError(String),
-
-    #[error("Authentication error: missing or invalid API key")]
-    AuthenticationError,
-
-    #[error("Rate limit exceeded")]
-    RateLimitError,
-
-    #[error("AI service timeout")]
-    TimeoutError,
-
-    #[error("Invalid response format: {0}")]
-    InvalidResponse(String),
-}
-
-/// Result type for AI operations
-pub type AiResult<T> = Result<T, AiError>;
+// Import AI types from dsl_types crate (Level 1 foundation)
+pub use dsl_types::{AiConfig, AiDslRequest, AiDslResponse, AiError, AiResponseType, AiResult};
 
 /// Trait for AI service implementations
 #[async_trait::async_trait]
@@ -148,8 +32,11 @@ pub trait AiService {
     /// Check if the service is available
     async fn health_check(&self) -> AiResult<bool>;
 
-    /// Get service configuration
-    fn config(&self) -> &AiConfig;
+    /// Get service name for identification
+    fn service_name(&self) -> &str;
+
+    /// Get supported response types
+    fn supported_response_types(&self) -> Vec<AiResponseType>;
 }
 
 /// Utility functions for AI integration
