@@ -3,11 +3,14 @@
 //! Pure V3.1 implementation with unified S-expression syntax for multi-domain workflows.
 //! Supports Document Library and ISDA domain verbs with AttributeID-as-Type pattern.
 
-pub mod debug_test;
+#[cfg(test)]
+mod debug_test;
 pub mod idiomatic_parser;
 pub mod normalizer;
-pub mod phase5_integration_test;
-pub mod semantic_agent_integration_test;
+#[cfg(test)]
+mod phase5_integration_test;
+#[cfg(test)]
+mod semantic_agent_integration_test;
 pub mod v31_integration_tests;
 pub mod validators;
 
