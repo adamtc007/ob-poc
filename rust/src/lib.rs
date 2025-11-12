@@ -287,7 +287,7 @@ impl DSLContext {
         }
 
         // Create parsing coordinator
-        let mut coordinator = ParsingCoordinator::new(registry);
+        let coordinator = ParsingCoordinator::new(registry);
 
         // Parse with domain awareness
         coordinator.parse_dsl(input).await.map_err(|e| {

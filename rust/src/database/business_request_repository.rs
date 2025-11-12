@@ -27,6 +27,7 @@ impl From<crate::error::DSLError> for DslError {
 }
 use crate::models::business_request_models::*;
 use async_trait::async_trait;
+use dsl_types::RequestStatus;
 use serde_json::Value;
 use sqlx::{PgPool, Row};
 use tracing::{debug, error, info};

@@ -24,7 +24,3 @@ thiserror = { workspace = true }
 
 [lints]
 workspace = true
-
-[[example]]
-name = "type_showcase"
-path = "examples/type_showcase.rs"

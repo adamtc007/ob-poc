@@ -61,6 +61,21 @@ impl CentralDslEditor {
         }
     }
 
+    /// Create a new central DSL editor with real database dictionary service
+    pub fn with_database(
+        domain_registry: Arc<DomainRegistry>,
+        database_pool: sqlx::PgPool,
+    ) -> Self {
+        use crate::database::DictionaryDatabaseService;
+        let dictionary_service = Arc::new(DictionaryDatabaseService::new(database_pool));
+
+        Self {
+            domain_registry,
+            dictionary_service,
+            config: EditorConfig::default(),
+        }
+    }
+
     /// Universal DSL edit function with domain context switching
     /// This replaces all domain-specific functions like persist_ob_edit, associate_cbu, etc.
     pub async fn edit_dsl(
@@ -328,7 +343,7 @@ impl CentralDslEditor {
     /// Process DSL with domain context (facade method for DslProcessor)
     pub async fn process_with_context(
         &self,
-        parse_result: ParseResult,
+        _parse_result: ParseResult,
         context: DomainContext,
     ) -> DslEditResult<String> {
         // For now, return a simple processed result

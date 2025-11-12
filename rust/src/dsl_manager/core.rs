@@ -2311,6 +2311,7 @@ pub struct HealthMetrics {
     pub cache_entries: usize,
 }
 
+#[derive(Debug)]
 struct MockDictionaryService;
 
 #[async_trait::async_trait]

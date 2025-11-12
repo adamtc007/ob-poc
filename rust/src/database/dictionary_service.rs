@@ -9,6 +9,7 @@ use crate::models::dictionary_models::{
     DictionaryStatistics, DiscoveredAttribute, NewDictionaryAttribute, UpdateDictionaryAttribute,
 };
 use anyhow::{anyhow, Context, Result};
+use async_trait::async_trait;
 use serde_json::Value as JsonValue;
 use sqlx::{PgPool, Row};
 use std::collections::HashMap;
@@ -749,6 +750,34 @@ impl DictionaryDatabaseService {
             .context("Failed to get attribute count")?;
 
         Ok(count)
+    }
+}
+
+/// Implement the simplified DictionaryService trait for CentralDslEditor
+#[async_trait]
+impl crate::dsl::central_editor::DictionaryService for DictionaryDatabaseService {
+    async fn validate_dsl_attributes(&self, dsl: &str) -> Result<(), String> {
+        // Basic validation - check if any AttributeIDs in the DSL exist in our dictionary
+        // This is a simplified implementation - could be enhanced to parse DSL and validate each AttributeID
+
+        // For now, just check that we can connect to the database and have attributes
+        match self.get_statistics().await {
+            Ok(stats) => {
+                if stats.total_attributes > 0 {
+                    debug!(
+                        "Dictionary validation passed: {} attributes available",
+                        stats.total_attributes
+                    );
+                    Ok(())
+                } else {
+                    Err("Dictionary is empty - no attributes available for validation".to_string())
+                }
+            }
+            Err(e) => {
+                error!("Dictionary validation failed: {}", e);
+                Err(format!("Dictionary database error: {}", e))
+            }
+        }
     }
 }
 

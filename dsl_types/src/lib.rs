@@ -1330,7 +1330,7 @@ impl AiDslRequest {
 }
 
 /// Type of AI response expected
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AiResponseType {
     /// Generate new DSL from scratch
     DslGeneration,
@@ -1439,12 +1439,12 @@ impl AiDslResponse {
 
     /// Check if response has warnings
     pub fn has_warnings(&self) -> bool {
-        self.warnings.as_ref().map_or(false, |w| !w.is_empty())
+        self.warnings.as_ref().is_some_and(|w| !w.is_empty())
     }
 
     /// Check if response has suggestions
     pub fn has_suggestions(&self) -> bool {
-        self.suggestions.as_ref().map_or(false, |s| !s.is_empty())
+        self.suggestions.as_ref().is_some_and(|s| !s.is_empty())
     }
 
     /// Get confidence percentage
@@ -1795,7 +1795,7 @@ mod tests {
         let failure_result = ProcessingResult::failure(vec![error]);
         assert!(!failure_result.success);
         assert!(!failure_result.is_successful());
-        assert_eq!(failure_result.error_count(), 1);
+        assert_eq!(failure_result.validation_report.error_count(), 1);
     }
 
     #[test]
