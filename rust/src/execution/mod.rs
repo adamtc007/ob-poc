@@ -351,12 +351,14 @@ impl DslExecutionEngine {
         let handlers = self.operation_handlers.read().await;
 
         // Find handler for this operation type
-        let handler = handlers.get(&operation.operation_type).ok_or_else(|| {
-            anyhow::anyhow!(
-                "No handler registered for operation type: {}",
-                operation.operation_type
-            )
-        })?;
+        let handler = handlers
+            .get(operation.operation_type.as_str())
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "No handler registered for operation type: {}",
+                    operation.operation_type.as_str()
+                )
+            })?;
 
         handler.execute(operation, state, context).await
     }

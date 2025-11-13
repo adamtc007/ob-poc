@@ -1,0 +1,45 @@
+{
+  "assistant": {
+    "default_model": {
+      "provider": "copilot_chat",
+      "model": "gpt-4o"
+    },
+    "version": "2"
+  },
+  "features": {
+    "copilot": true
+  },
+  "show_copilot_suggestions": true,
+  "copilot": {
+    "disabled_globs": [],
+    "enable_completions": true,
+    "enable_chat": true
+  },
+  "language_models": {
+    "copilot_chat": {
+      "available_models": [
+        {
+          "name": "gpt-4o",
+          "display_name": "GPT-4o",
+          "provider": "copilot_chat",
+          "max_tokens": 128000
+        },
+        {
+          "name": "gpt-4",
+          "display_name": "GPT-4",
+          "provider": "copilot_chat",
+          "max_tokens": 8192
+        },
+        {
+          "name": "gpt-3.5-turbo",
+          "display_name": "GPT-3.5 Turbo",
+          "provider": "copilot_chat",
+          "max_tokens": 4096
+        }
+      ]
+    }
+  },
+  "inline_completions": {
+    "provider": "copilot"
+  }
+}

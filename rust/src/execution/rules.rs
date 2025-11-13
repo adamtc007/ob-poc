@@ -44,7 +44,10 @@ impl BusinessRuleRegistry {
         Ok(results)
     }
 
-    pub(crate) fn get_blocking_violations<'a>(&self, results: &'a [RuleResult]) -> Vec<&'a RuleResult> {
+    pub(crate) fn get_blocking_violations<'a>(
+        &self,
+        results: &'a [RuleResult],
+    ) -> Vec<&'a RuleResult> {
         results.iter().filter(|r| !r.valid && r.blocking).collect()
     }
 }
@@ -222,7 +225,7 @@ impl OwnershipLimitsRule {
 
         // Look through all operations to find existing ownership edges to this entity
         for operation in &state.operations {
-            if operation.operation_type == "create-edge" {
+            if operation.operation_type.matches_str("create-edge") {
                 if let Some(to) = operation.parameters.get("to").and_then(|v| v.as_str()) {
                     if to == entity {
                         if let Some(props) = operation.parameters.get("properties") {
@@ -596,7 +599,7 @@ impl DocumentEvidenceRule {
         // In a real implementation, this would check the document store
         // For now, we'll check if the document was referenced in previous operations
         for operation in &state.operations {
-            if operation.operation_type == "collect" {
+            if operation.operation_type.matches_str("collect") {
                 if let Some(value) = operation.parameters.get("value") {
                     if let Some(obj) = value.as_object() {
                         if let Some(document_id) = obj.get("document_id") {
@@ -624,4 +627,3 @@ pub(crate) fn create_standard_rules() -> Vec<Arc<dyn BusinessRule>> {
         Arc::new(DocumentEvidenceRule::new()),
     ]
 }
-

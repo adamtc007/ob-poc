@@ -287,12 +287,12 @@ impl AiDslService {
         let response_time = start_time.elapsed().as_millis() as u64;
 
         let result = HealthCheckResult {
-            healthy: dsl_manager_health.system_operational,
+            healthy: dsl_manager_health,
             ai_service_available: false, // AI module not available
-            dsl_manager_available: dsl_manager_health.system_operational,
+            dsl_manager_available: dsl_manager_health,
             database_available: self.dsl_manager.has_database(),
             response_time_ms: response_time,
-            message: if dsl_manager_health.system_operational {
+            message: if dsl_manager_health {
                 "Service healthy - DSL Manager operational".to_string()
             } else {
                 "Service degraded - DSL Manager issues".to_string()

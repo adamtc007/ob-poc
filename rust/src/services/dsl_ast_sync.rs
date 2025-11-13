@@ -544,7 +544,8 @@ impl DslAstSyncService {
                         updated_at = $5
                 "#;
 
-                let ast_json = request.ast_data.as_ref().unwrap_or(&"{}".to_string());
+                let default_json = "{}".to_string();
+                let ast_json = request.ast_data.as_ref().unwrap_or(&default_json);
                 let snapshot_json =
                     serde_json::to_value(&request.domain_snapshot).unwrap_or_default();
 

@@ -15,7 +15,7 @@ use std::time::Duration;
 
 use super::{ExecutionContext, ExternalIntegration};
 use crate::data_dictionary::AttributeId;
-use crate::dsl::operations::ExecutableDslOperation as DslOperation;
+use crate::dsl::operations::{DslOperationType, ExecutableDslOperation as DslOperation};
 
 /// HTTP-based integration for REST APIs
 pub(crate) struct HttpIntegration {
@@ -143,7 +143,7 @@ impl ExternalIntegration for HttpIntegration {
     async fn validate(&self, operation: &DslOperation) -> Result<bool> {
         // Basic validation - check if the operation type is supported
         // Specific integrations should override this
-        Ok(!operation.operation_type.is_empty())
+        Ok(operation.operation_type != DslOperationType::Unknown)
     }
 }
 
@@ -240,13 +240,14 @@ impl RiskEngineIntegration {
         _context: &ExecutionContext,
     ) -> Result<Value> {
         let value = operation
-            .parameters
+            .context
+            .context_data
             .get("value")
             .cloned()
             .unwrap_or_default();
 
         let validation_request = serde_json::json!({
-            "attribute_id": operation.parameters.get("attribute_id"),
+            "attribute_id": operation.context.context_data.get("attribute_id"),
             "value": value,
             "validation_type": "risk_assessment"
         });
@@ -436,7 +437,7 @@ impl CrsComplianceIntegration {
     ) -> Result<Value> {
         let check_payload = serde_json::json!({
             "entity_id": context.business_unit_id,
-            "attribute_id": operation.parameters.get("attribute_id"),
+            "attribute_id": operation.context.context_data.get("attribute_id"),
             "expected_value": operation.parameters.get("equals"),
             "check_type": "compliance_status"
         });
@@ -552,7 +553,7 @@ impl ExternalIntegration for MockIntegration {
         }
 
         // For other operations, try to find a matching response
-        if let Some(response) = self.responses.get(&operation.operation_type) {
+        if let Some(response) = self.responses.get(operation.operation_type.as_str()) {
             return Ok(response.clone());
         }
 
@@ -670,4 +671,3 @@ pub(crate) fn create_production_integrations() -> Result<IntegrationRegistry> {
 
     Ok(registry)
 }
-

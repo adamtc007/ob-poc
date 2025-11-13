@@ -28,12 +28,15 @@ pub struct ExecutableDslOperation {
     /// Context for execution
     pub context: OperationContext,
 
+    /// Parameters extracted from DSL content
+    pub parameters: HashMap<String, serde_json::Value>,
+
     /// Metadata associated with the operation
     pub metadata: HashMap<String, String>,
 }
 
 /// Types of DSL operations supported
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum DslOperationType {
     /// Case management operations
     CaseCreate,
@@ -112,12 +115,14 @@ impl ExecutableDslOperation {
     /// Create a new executable DSL operation
     pub fn new(dsl_content: String, context: OperationContext) -> Self {
         let operation_type = Self::determine_operation_type(&dsl_content);
+        let parameters = Self::extract_parameters(&dsl_content);
 
         Self {
             operation_id: Uuid::new_v4(),
             dsl_content,
             operation_type,
             context,
+            parameters,
             metadata: HashMap::new(),
         }
     }
@@ -175,6 +180,78 @@ impl ExecutableDslOperation {
     pub fn with_cbu_id(mut self, cbu_id: String) -> Self {
         self.context.cbu_id = Some(cbu_id);
         self
+    }
+
+    /// Extract parameters from DSL content
+    fn extract_parameters(dsl_content: &str) -> HashMap<String, serde_json::Value> {
+        let mut parameters = HashMap::new();
+
+        // Simple parameter extraction from DSL content
+        // This is a basic implementation - could be enhanced with proper parsing
+        for line in dsl_content.lines() {
+            let line = line.trim();
+            if line.contains(":") {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                for i in 0..parts.len() - 1 {
+                    if parts[i].starts_with(':') {
+                        let key = parts[i].trim_start_matches(':');
+                        if i + 1 < parts.len() {
+                            let value = parts[i + 1].trim_matches('"');
+                            parameters.insert(
+                                key.to_string(),
+                                serde_json::Value::String(value.to_string()),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        parameters
+    }
+}
+
+impl DslOperationType {
+    /// Convert operation type to string representation
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            DslOperationType::CaseCreate => "case.create",
+            DslOperationType::CaseUpdate => "case.update",
+            DslOperationType::CaseClose => "case.close",
+            DslOperationType::EntityRegister => "entity.register",
+            DslOperationType::EntityUpdate => "entity.update",
+            DslOperationType::EntityLink => "entity.link",
+            DslOperationType::KycStart => "kyc.start",
+            DslOperationType::KycCollect => "kyc.collect",
+            DslOperationType::KycVerify => "kyc.verify",
+            DslOperationType::UboCollect => "ubo.collect",
+            DslOperationType::UboResolve => "ubo.resolve",
+            DslOperationType::UboCalculate => "ubo.calc",
+            DslOperationType::DocumentCatalog => "document.catalog",
+            DslOperationType::DocumentVerify => "document.verify",
+            DslOperationType::DocumentExtract => "document.extract",
+            DslOperationType::Unknown => "unknown",
+        }
+    }
+
+    /// Check if operation type matches a string
+    pub fn matches_str(&self, s: &str) -> bool {
+        match s {
+            "create-edge" => matches!(self, DslOperationType::EntityLink),
+            "collect" => matches!(
+                self,
+                DslOperationType::KycCollect | DslOperationType::UboCollect
+            ),
+            "validate" => matches!(self, DslOperationType::KycVerify),
+            "check" => false, // No compliance operations in current enum
+            _ => self.as_str() == s,
+        }
+    }
+}
+
+impl std::fmt::Display for DslOperationType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
     }
 }
 
