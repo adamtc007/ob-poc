@@ -43,7 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create DSL Manager for orchestration
     let manager_config = CleanManagerConfig::default();
-    let dsl_manager = CleanDslManager::new(manager_config);
+    let dsl_manager = CleanDslManager::new();
 
     info!("📊 Phase 5 Demo: Testing orchestration performance monitoring");
 

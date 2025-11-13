@@ -21,8 +21,8 @@ use ob_poc::{
         DslOrchestrationInterface, DslPipelineProcessor, OrchestrationContext,
         OrchestrationOperation, OrchestrationOperationType,
     },
-    dsl_manager::{CleanDslManager, CleanManagerConfig},
-    dsl_visualizer::DslVisualizer,
+    dsl_manager::CleanDslManager,
+    dsl_visualizer::{DslVisualizer, StateResult},
 };
 
 use std::collections::HashMap;
@@ -43,7 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Step 1: Initialize Core Components
     info!("🏗️  Step 1: Initializing core components...");
     let dsl_processor = DslPipelineProcessor::new();
-    let dsl_manager = CleanDslManager::new(CleanManagerConfig::default());
+    let mut dsl_manager = CleanDslManager::new();
     let visualizer = DslVisualizer::new();
     info!("✅ Components initialized successfully");
 
@@ -53,7 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Step 3: Test DSL Manager Processing
     info!("📝 Step 3: Testing DSL Manager processing...");
-    test_dsl_manager_processing(&dsl_manager).await?;
+    test_dsl_manager_processing(&mut dsl_manager).await?;
 
     // Step 4: Test Visualization Pipeline
     info!("🎨 Step 4: Testing visualization pipeline...");
@@ -104,7 +104,7 @@ async fn test_orchestration_interface(
 }
 
 async fn test_dsl_manager_processing(
-    manager: &CleanDslManager,
+    manager: &mut CleanDslManager,
 ) -> Result<(), Box<dyn std::error::Error>> {
     info!("  Testing DSL Manager processing...");
 
@@ -165,21 +165,34 @@ async fn test_visualization_pipeline(
 
     let mut successful = 0;
 
-    for (name, dsl) in test_visualizations {
+    for (name, _dsl) in &test_visualizations {
         let mut context = HashMap::new();
         context.insert("test_name".to_string(), name.to_string());
         context.insert("source".to_string(), "orchestration_demo".to_string());
 
-        match visualizer.visualize_dsl(dsl, context).await {
-            Ok(viz_result) => {
+        // Create a mock StateResult for visualization
+        let state_result = StateResult {
+            success: true,
+            case_id: format!("TEST-{}", name.replace(" ", "-")),
+            version_number: 1,
+            snapshot_id: "demo-snapshot".to_string(),
+            errors: vec![],
+            processing_time_ms: 10,
+        };
+
+        match visualizer.generate_visualization(&state_result).await {
+            viz_result if viz_result.success => {
                 successful += 1;
                 info!(
-                    "    ✅ Visualization '{}': {} elements, chart type: {}",
-                    name, viz_result.element_count, viz_result.chart_type
+                    "    ✅ Visualization '{}': Success - {} bytes generated",
+                    name, viz_result.output_size_bytes
                 );
             }
-            Err(e) => {
-                warn!("    ⚠️  Visualization '{}' failed: {}", name, e);
+            viz_result => {
+                warn!(
+                    "    ❌ Visualization '{}' failed: {:?}",
+                    name, viz_result.errors
+                );
             }
         }
     }
@@ -261,17 +274,26 @@ async fn test_full_pipeline_integration(
         orchestration_result.operation_id.clone(),
     );
 
-    let dsl_for_viz = "(integration.result :success true :components-tested 3)";
-    match visualizer.visualize_dsl(dsl_for_viz, viz_context).await {
-        Ok(viz_result) => {
-            info!(
-                "    ✅ Visualization step: {} elements created",
-                viz_result.element_count
-            );
-        }
-        Err(e) => {
-            warn!("    ⚠️  Visualization step failed: {}", e);
-        }
+    // Create a mock StateResult for integration test visualization
+    let integration_state_result = StateResult {
+        success: true,
+        case_id: "integration-test".to_string(),
+        version_number: 1,
+        snapshot_id: "integration-snapshot".to_string(),
+        errors: vec![],
+        processing_time_ms: 10,
+    };
+
+    let viz_result = visualizer
+        .generate_visualization(&integration_state_result)
+        .await;
+    if viz_result.success {
+        info!(
+            "    ✅ Visualization step: Success - {} bytes generated",
+            viz_result.output_size_bytes
+        );
+    } else {
+        warn!("    ⚠️  Visualization step failed: {:?}", viz_result.errors);
     }
 
     let total_time = integration_start.elapsed();

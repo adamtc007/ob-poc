@@ -22,7 +22,7 @@
 use crate::db_state_manager::DbStateManager;
 use crate::dsl::{
     DslOrchestrationInterface, DslPipelineProcessor, DslPipelineResult, OrchestrationContext,
-    OrchestrationOperation, OrchestrationOperationType, PipelineConfig,
+    OrchestrationOperation, OrchestrationOperationType,
 };
 use crate::dsl_manager::dsl_crud::{
     DslCrudManager, DslLoadRequest, DslSaveRequest, OperationContext,
@@ -460,7 +460,7 @@ impl CleanDslManager {
     pub async fn process_agent_dsl_generation(
         &mut self,
         instruction: String,
-        context_data: std::collections::HashMap<String, String>,
+        _context_data: std::collections::HashMap<String, String>,
     ) -> Result<CallChainResult, DslManagerError> {
         if self.config.enable_detailed_logging {
             println!("🤖 DSL Manager: Processing agent DSL generation request");
@@ -480,20 +480,20 @@ impl CleanDslManager {
                             .get("client_name")
                             .cloned()
                             .unwrap_or("Unknown Client".to_string()),
-                        jurisdiction: context_data
+                        jurisdiction: _context_data
                             .get("jurisdiction")
                             .cloned()
                             .unwrap_or("US".to_string()),
-                        entity_type: context_data
+                        entity_type: _context_data
                             .get("entity_type")
                             .cloned()
                             .unwrap_or("CORP".to_string()),
-                        services: context_data
+                        services: _context_data
                             .get("services")
                             .map(|s| s.split(',').map(|s| s.trim().to_string()).collect())
                             .unwrap_or_else(|| vec!["KYC".to_string()]),
                         context_hints: vec![],
-                        metadata: context_data.clone(),
+                        metadata: _context_data.clone(),
                     };
 
                     // Generate DSL using AI service

@@ -67,7 +67,7 @@ impl Default for WorkflowDemoConfig {
         let onboarding_request_id = Uuid::new_v4();
 
         Self {
-            case_id,
+            case_id: case_id.clone(),
             onboarding_request_id,
             initial_dsl: format!(
                 r#"
