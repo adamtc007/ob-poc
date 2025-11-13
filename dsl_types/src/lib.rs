@@ -1449,7 +1449,7 @@ impl AiDslResponse {
 
     /// Get confidence percentage
     pub fn confidence_percentage(&self) -> u8 {
-        self.confidence.unwrap_or(0.0) as u8 * 100
+        (self.confidence.unwrap_or(0.0) * 100.0) as u8
     }
 }
 
