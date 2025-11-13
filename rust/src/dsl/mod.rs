@@ -20,6 +20,9 @@ pub mod pipeline_processor;
 // Orchestration interface for DSL Manager to DSL Mod communication
 pub mod orchestration_interface;
 
+// DSL operations definitions
+pub mod operations;
+
 // Re-export the pipeline processor components
 pub use pipeline_processor::{
     DomainSnapshot, DslPipelineProcessor, DslPipelineResult, PipelineConfig, ProcessingMetrics,
@@ -32,3 +35,6 @@ pub use orchestration_interface::{
     OrchestrationOperation, OrchestrationOperationType, OrchestrationResult, ParseResult,
     ProcessingOptions, SessionInfo, TransformationResult, TransformationType, ValidationReport,
 };
+
+// Re-export operations components
+pub use operations::{DslOperationType, ExecutableDslOperation, OperationContext, OperationResult};

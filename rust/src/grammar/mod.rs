@@ -9,7 +9,7 @@ use crate::error::{DSLError, GrammarError};
 use std::collections::HashMap;
 
 // Re-export the main types
-pub(crate) use idiomatic_ebnf::{EBNFExpression, EBNFGrammar, EBNFParser, EBNFRule};
+pub(crate) use idiomatic_ebnf::{EBNFExpression, EBNFGrammar, EBNFParser};
 
 /// Grammar engine for managing DSL grammars
 #[derive(Debug, Default)]
@@ -27,7 +27,11 @@ impl GrammarEngine {
     }
 
     /// Load a grammar from EBNF source
-    pub(crate) fn load_grammar(&mut self, name: impl Into<String>, source: &str) -> Result<(), DSLError> {
+    pub(crate) fn load_grammar(
+        &mut self,
+        name: impl Into<String>,
+        source: &str,
+    ) -> Result<(), DSLError> {
         let parser = EBNFParser::new();
         let grammar = parser
             .parse_grammar(source)
@@ -260,4 +264,3 @@ pub(crate) fn load_default_grammar() -> Result<GrammarEngine, DSLError> {
     engine.load_grammar("dsl", default_grammar)?;
     Ok(engine)
 }
-

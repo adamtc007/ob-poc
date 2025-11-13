@@ -12,11 +12,16 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::error::{DSLError, DSLResult};
+use crate::error::DSLResult;
 
 /// Interface for DSL Manager to orchestrate DSL operations
 #[async_trait]
 pub trait DslOrchestrationInterface {
+    /// Get current performance metrics
+    async fn get_orchestration_metrics(&self) -> DSLResult<OrchestrationMetrics>;
+
+    /// Reset performance metrics
+    async fn reset_orchestration_metrics(&self) -> DSLResult<()>;
     /// Process DSL operation from DSL Manager
     async fn process_orchestrated_operation(
         &self,
@@ -204,6 +209,20 @@ pub struct OrchestrationMetrics {
     pub memory_usage_bytes: usize,
     /// CPU usage percentage
     pub cpu_usage_percent: f32,
+    /// Peak memory usage during operation
+    pub peak_memory_bytes: usize,
+    /// Database operation count
+    pub database_operations_count: u32,
+    /// Cache hit rate (0.0 to 1.0)
+    pub cache_hit_rate: f64,
+    /// Error rate (0.0 to 1.0)
+    pub error_rate: f64,
+    /// Throughput (operations per second)
+    pub operations_per_second: f64,
+    /// Concurrent operations count
+    pub concurrent_operations: u32,
+    /// Queue depth for pending operations
+    pub queue_depth: u32,
 }
 
 /// Validation report from orchestrated validation
@@ -576,6 +595,101 @@ impl OrchestrationOperation {
     }
 }
 
+impl OrchestrationMetrics {
+    /// Create new metrics instance
+    pub fn new() -> Self {
+        Self {
+            total_operations: 0,
+            successful_operations: 0,
+            failed_operations: 0,
+            average_processing_time_ms: 0.0,
+            orchestration_latency_ms: 0.0,
+            memory_usage_bytes: 0,
+            cpu_usage_percent: 0.0,
+            peak_memory_bytes: 0,
+            database_operations_count: 0,
+            cache_hit_rate: 0.0,
+            error_rate: 0.0,
+            operations_per_second: 0.0,
+            concurrent_operations: 0,
+            queue_depth: 0,
+        }
+    }
+
+    /// Update metrics with operation result
+    pub fn update_with_operation(&mut self, success: bool, processing_time_ms: u64, db_ops: u32) {
+        self.total_operations += 1;
+
+        if success {
+            self.successful_operations += 1;
+        } else {
+            self.failed_operations += 1;
+        }
+
+        // Update average processing time using incremental formula
+        let new_average = (self.average_processing_time_ms * (self.total_operations - 1) as f64
+            + processing_time_ms as f64)
+            / self.total_operations as f64;
+        self.average_processing_time_ms = new_average;
+
+        self.database_operations_count += db_ops;
+        self.error_rate = self.failed_operations as f64 / self.total_operations as f64;
+
+        // Update throughput (simple approximation)
+        if self.average_processing_time_ms > 0.0 {
+            self.operations_per_second = 1000.0 / self.average_processing_time_ms;
+        }
+    }
+
+    /// Update system resource metrics
+    pub fn update_system_metrics(&mut self, memory_bytes: usize, cpu_percent: f32) {
+        self.memory_usage_bytes = memory_bytes;
+        self.cpu_usage_percent = cpu_percent;
+
+        if memory_bytes > self.peak_memory_bytes {
+            self.peak_memory_bytes = memory_bytes;
+        }
+    }
+
+    /// Update cache metrics
+    pub fn update_cache_metrics(&mut self, hit_rate: f64) {
+        self.cache_hit_rate = hit_rate.clamp(0.0, 1.0);
+    }
+
+    /// Update concurrency metrics
+    pub fn update_concurrency(&mut self, active_ops: u32, queue_size: u32) {
+        self.concurrent_operations = active_ops;
+        self.queue_depth = queue_size;
+    }
+
+    /// Update latency metrics
+    pub fn update_latency(&mut self, latency_ms: f64) {
+        self.orchestration_latency_ms = latency_ms;
+    }
+
+    /// Get performance summary as a formatted string
+    pub fn performance_summary(&self) -> String {
+        format!(
+            "Orchestration Metrics: {} total ops, {:.1}% success rate, {:.2}ms avg time, {:.1} ops/sec",
+            self.total_operations,
+            (self.successful_operations as f64 / self.total_operations.max(1) as f64) * 100.0,
+            self.average_processing_time_ms,
+            self.operations_per_second
+        )
+    }
+
+    /// Reset all metrics to initial state
+    pub fn reset(&mut self) {
+        *self = Self::new();
+    }
+}
+
+impl Default for OrchestrationMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OrchestrationResult {
     /// Create a successful orchestration result
     pub fn success(operation_id: String, processing_time_ms: u64) -> Self {
@@ -627,20 +741,6 @@ impl OrchestrationResult {
     pub fn add_step_result(mut self, step: StepResult) -> Self {
         self.step_results.push(step);
         self
-    }
-}
-
-impl Default for OrchestrationMetrics {
-    fn default() -> Self {
-        Self {
-            total_operations: 0,
-            successful_operations: 0,
-            failed_operations: 0,
-            average_processing_time_ms: 0.0,
-            orchestration_latency_ms: 0.0,
-            memory_usage_bytes: 0,
-            cpu_usage_percent: 0.0,
-        }
     }
 }
 

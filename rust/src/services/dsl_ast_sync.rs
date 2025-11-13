@@ -24,7 +24,8 @@
 //! - Rollback capabilities for failed transactions
 
 use crate::db_state_manager::StoredDslState;
-use crate::dsl::{AstSyncMetadata, DomainSnapshot, DslSyncMetadata};
+use crate::dsl::pipeline_processor::{AstSyncMetadata, DslSyncMetadata};
+use crate::dsl::DomainSnapshot;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;

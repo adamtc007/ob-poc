@@ -14,7 +14,7 @@ use nom::{
     Finish, IResult,
 };
 
-use crate::parser_ast::{Form, Key, Literal, Program, PropertyMap, Value, VerbForm};
+use crate::parser_ast::{Form, Key, Literal, Program, Value, VerbForm};
 
 /// Parser error type with context information
 pub(crate) type NomParseError<'a> = VerboseError<&'a str>;
@@ -262,4 +262,3 @@ fn none_of(chars: &'static str) -> impl Fn(&str) -> ParseResult<char> {
         }
     }
 }
-

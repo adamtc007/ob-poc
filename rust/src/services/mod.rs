@@ -6,6 +6,7 @@
 //! NOTE: All services now delegate to DSL Manager as the single entry point
 //! for DSL operations. This ensures proper lifecycle management and consistency.
 
+// AI DSL service - using proper facade imports
 pub(crate) mod ai_dsl_service;
 pub mod dsl_ast_sync;
 pub mod dsl_lifecycle;
@@ -13,7 +14,7 @@ pub mod dsl_lifecycle;
 // Re-export service types for backwards compatibility
 pub(crate) use ai_dsl_service::{
     AiDslService, AiOnboardingRequest, AiOnboardingResponse, CbuGenerator, DslInstanceSummary,
-    ExecutionDetails, HealthCheckResult, ValidationResult,
+    ExecutionDetails, HealthCheckResult,
 };
 
 // DSL/AST sync service - master sync endpoints
@@ -28,7 +29,12 @@ pub use dsl_lifecycle::{
 };
 
 // Re-export DSL Manager types for direct access when needed
-pub use crate::dsl_manager::{DslContext, DslManager, DslManagerFactory, DslProcessingOptions};
+pub use crate::dsl_manager::{
+    CallChainResult, CleanDslManager, DslManagerError, IncrementalResult,
+};
+
+// Re-export ValidationResult from ai_dsl_service to avoid conflicts
+pub use ai_dsl_service::ValidationResult;
 
 /// Master sync service factory for DSL/AST table synchronization
 pub fn create_sync_service() -> DslAstSyncService {

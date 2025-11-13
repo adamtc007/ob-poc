@@ -6,7 +6,7 @@
 pub(crate) mod vocab_registry;
 
 // Re-export the clean vocabulary registry
-pub(crate) use vocab_registry::{DeprecationPolicy, RegistryConfig, RegistryStats, VocabularyRegistry};
+// pub use verb_registry::{DeprecationPolicy, RegistryConfig, RegistryStats, VocabularyRegistry};
 
 use serde::{Deserialize, Serialize};
 
@@ -62,4 +62,3 @@ impl VerbRegistryEntry {
         self
     }
 }
-

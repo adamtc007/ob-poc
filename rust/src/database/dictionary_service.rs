@@ -766,32 +766,3 @@ impl DictionaryDatabaseService {
         Ok(count)
     }
 }
-
-/// Implement the simplified DictionaryService trait for CentralDslEditor
-#[async_trait]
-impl crate::dsl::central_editor::DictionaryService for DictionaryDatabaseService {
-    async fn validate_dsl_attributes(&self, _dsl: &str) -> Result<(), String> {
-        // Basic validation - check if any AttributeIDs in the DSL exist in our dictionary
-        // This is a simplified implementation - could be enhanced to parse DSL and validate each AttributeID
-
-        // For now, just check that we can connect to the database and have attributes
-        match self.get_statistics().await {
-            Ok(stats) => {
-                if stats.total_attributes > 0 {
-                    debug!(
-                        "Dictionary validation passed: {} attributes available",
-                        stats.total_attributes
-                    );
-                    Ok(())
-                } else {
-                    Err("Dictionary is empty - no attributes available for validation".to_string())
-                }
-            }
-            Err(e) => {
-                error!("Dictionary validation failed: {}", e);
-                Err(format!("Dictionary database error: {}", e))
-            }
-        }
-    }
-}
-

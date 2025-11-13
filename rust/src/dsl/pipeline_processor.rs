@@ -23,6 +23,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Instant;
+use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
 use crate::dsl::orchestration_interface::{
@@ -30,7 +31,7 @@ use crate::dsl::orchestration_interface::{
     OrchestrationOperation, OrchestrationResult, ParseResult, TransformationResult,
     TransformationType, ValidationReport,
 };
-use crate::error::{DSLError, DSLResult};
+use crate::error::DSLResult;
 
 /// DSL Pipeline Processor implementing the clean 4-step pipeline
 pub struct DslPipelineProcessor {
@@ -43,6 +44,9 @@ pub struct DslPipelineProcessor {
     /// Database service for actual database operations
     #[cfg(feature = "database")]
     database_service: Option<crate::database::DictionaryDatabaseService>,
+    /// Phase 5: Orchestration metrics for performance monitoring
+    orchestration_metrics:
+        std::sync::Arc<std::sync::Mutex<crate::dsl::orchestration_interface::OrchestrationMetrics>>,
 }
 
 /// Configuration for the DSL Pipeline Processor
@@ -86,7 +90,7 @@ struct StepProcessors {
 }
 
 /// Performance metrics for pipeline processing
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct ProcessingMetrics {
     /// Total processing time in milliseconds
     pub total_time_ms: u64,
@@ -98,6 +102,19 @@ pub struct ProcessingMetrics {
     pub success_rate: f64,
     /// Average processing time
     pub avg_processing_time_ms: u64,
+}
+
+impl ProcessingMetrics {
+    /// Create new processing metrics instance
+    pub fn new() -> Self {
+        Self {
+            total_time_ms: 0,
+            step_times_ms: Vec::new(),
+            operations_processed: 0,
+            success_rate: 0.0,
+            avg_processing_time_ms: 0,
+        }
+    }
 }
 
 /// Result from DSL pipeline processing
@@ -254,6 +271,7 @@ struct AstParser;
 impl AstParser {
     async fn parse_and_validate(&self, dsl_content: &str) -> StepResult {
         let start_time = Instant::now();
+        debug!("Executing Step 1: DSL Change validation");
         let mut step_data = HashMap::new();
         let mut errors = Vec::new();
         let mut warnings = Vec::new();
@@ -362,8 +380,10 @@ impl AstParser {
 struct DomainSnapshotter;
 
 impl DomainSnapshotter {
-    async fn create_snapshot(&self, dsl_content: &str, case_id: &str) -> StepResult {
+    #[instrument(skip(self, dsl_content))]
+    async fn create_snapshot(&self, dsl_content: &str, _case_id: &str) -> StepResult {
         let start_time = Instant::now();
+        debug!("Executing Step 2: AST Parse/Validate");
         let mut step_data = HashMap::new();
         let errors = Vec::new();
         let warnings = Vec::new();
@@ -520,9 +540,12 @@ impl DslPipelineProcessor {
                 domain_snapshotter: DomainSnapshotter,
                 dual_committer: AstDualCommitter,
             },
-            metrics: ProcessingMetrics::default(),
+            metrics: ProcessingMetrics::new(),
             #[cfg(feature = "database")]
             database_service: None,
+            orchestration_metrics: std::sync::Arc::new(std::sync::Mutex::new(
+                crate::dsl::orchestration_interface::OrchestrationMetrics::new(),
+            )),
         }
     }
 
@@ -539,6 +562,9 @@ impl DslPipelineProcessor {
             },
             metrics: ProcessingMetrics::default(),
             database_service: Some(database_service),
+            orchestration_metrics: std::sync::Arc::new(std::sync::Mutex::new(
+                crate::dsl::orchestration_interface::OrchestrationMetrics::new(),
+            )),
         }
     }
 
@@ -555,6 +581,9 @@ impl DslPipelineProcessor {
             metrics: ProcessingMetrics::default(),
             #[cfg(feature = "database")]
             database_service: None,
+            orchestration_metrics: std::sync::Arc::new(std::sync::Mutex::new(
+                crate::dsl::orchestration_interface::OrchestrationMetrics::new(),
+            )),
         }
     }
 
@@ -574,6 +603,9 @@ impl DslPipelineProcessor {
             },
             metrics: ProcessingMetrics::default(),
             database_service: Some(database_service),
+            orchestration_metrics: std::sync::Arc::new(std::sync::Mutex::new(
+                crate::dsl::orchestration_interface::OrchestrationMetrics::new(),
+            )),
         }
     }
 
@@ -959,16 +991,130 @@ impl DslPipelineProcessor {
     pub fn database_service(&self) -> Option<()> {
         None
     }
+    /// Execute database operations based on DSL content
+    async fn execute_database_operations(
+        &self,
+        dsl_content: &str,
+        context: &OrchestrationContext,
+    ) -> DSLResult<Vec<crate::dsl::orchestration_interface::DatabaseOperation>> {
+        use crate::dsl::orchestration_interface::DatabaseOperation;
+
+        #[cfg(feature = "database")]
+        {
+            if let Some(db_service) = &self.database_service {
+                return self
+                    .execute_with_database(dsl_content, context, db_service)
+                    .await;
+            }
+        }
+
+        // Mock execution without database or when database feature is disabled
+        let operation_type = if dsl_content.contains("case.create") {
+            "CREATE_CASE"
+        } else if dsl_content.contains("case.update") {
+            "UPDATE_CASE"
+        } else if dsl_content.contains("entity.register") {
+            "CREATE_ENTITY"
+        } else if dsl_content.contains("kyc.start") {
+            "START_KYC"
+        } else {
+            "MOCK_EXECUTE"
+        };
+
+        Ok(vec![DatabaseOperation {
+            operation_type: operation_type.to_string(),
+            target: format!(
+                "case:{}",
+                context
+                    .case_id
+                    .clone()
+                    .unwrap_or_else(|| "UNKNOWN".to_string())
+            ),
+            affected_count: 1,
+            success: true,
+            error: None,
+        }])
+    }
+
+    /// Execute DSL with actual database operations
+    #[cfg(feature = "database")]
+    async fn execute_with_database(
+        &self,
+        dsl_content: &str,
+        context: &OrchestrationContext,
+        db_service: &crate::database::DictionaryDatabaseService,
+    ) -> DSLResult<Vec<crate::dsl::orchestration_interface::DatabaseOperation>> {
+        use crate::dsl::orchestration_interface::DatabaseOperation;
+        let mut operations = Vec::new();
+
+        // Parse DSL to determine what database operations to perform
+        let operation_type = if dsl_content.contains("case.create") {
+            "CREATE_CASE"
+        } else if dsl_content.contains("case.update") {
+            "UPDATE_CASE"
+        } else if dsl_content.contains("entity.register") {
+            "CREATE_ENTITY"
+        } else if dsl_content.contains("kyc.start") {
+            "START_KYC"
+        } else {
+            "UNKNOWN_OPERATION"
+        };
+
+        // For now, create a mock database operation representing the DSL execution
+        operations.push(DatabaseOperation {
+            operation_type: operation_type.to_string(),
+            target: format!(
+                "{}:{}",
+                context.domain,
+                context.case_id.clone().unwrap_or_default()
+            ),
+            affected_count: 1,
+            success: true,
+            error: None,
+        });
+
+        // In a real implementation, you would:
+        // 1. Parse the DSL content completely
+        // 2. Extract entity data, attributes, relationships
+        // 3. Validate against the dictionary using db_service
+        // 4. Perform actual database inserts/updates
+        // 5. Record the operations performed
+
+        Ok(operations)
+    }
 }
 
 // Implementation of DslOrchestrationInterface for DslPipelineProcessor
 #[async_trait]
 impl DslOrchestrationInterface for DslPipelineProcessor {
+    #[instrument(skip(self))]
+    async fn get_orchestration_metrics(
+        &self,
+    ) -> DSLResult<crate::dsl::orchestration_interface::OrchestrationMetrics> {
+        info!("Retrieving orchestration metrics");
+        let metrics = self.orchestration_metrics.lock().unwrap().clone();
+        debug!("Current metrics: {}", metrics.performance_summary());
+        Ok(metrics)
+    }
+
+    #[instrument(skip(self))]
+    async fn reset_orchestration_metrics(&self) -> DSLResult<()> {
+        info!("Resetting orchestration metrics");
+        self.orchestration_metrics.lock().unwrap().reset();
+        debug!("Orchestration metrics reset successfully");
+        Ok(())
+    }
+
+    #[instrument(skip(self, operation), fields(operation_id = %operation.operation_id, operation_type = ?operation.operation_type))]
     async fn process_orchestrated_operation(
         &self,
         operation: OrchestrationOperation,
     ) -> DSLResult<OrchestrationResult> {
         let start_time = Instant::now();
+        info!(
+            "Processing orchestrated operation: {} (type: {:?})",
+            operation.operation_id, operation.operation_type
+        );
 
         let result = match operation.operation_type {
             crate::dsl::orchestration_interface::OrchestrationOperationType::Parse => {
@@ -1065,13 +1211,27 @@ impl DslOrchestrationInterface for DslPipelineProcessor {
             }
         };
 
+        // Phase 5: Update orchestration metrics
+        let processing_time = start_time.elapsed().as_millis() as u64;
+        let success = result.success;
+        {
+            let mut metrics = self.orchestration_metrics.lock().unwrap();
+            metrics.update_with_operation(success, processing_time, 1); // Assuming 1 DB op for simplicity
+            metrics.update_latency(processing_time as f64);
+        }
+
+        info!(
+            "Operation {} completed in {}ms with success: {}",
+            operation.operation_id, processing_time, success
+        );
         Ok(result)
     }
 
+    #[instrument(skip(self, dsl_content, _context))]
     async fn validate_orchestrated_dsl(
         &self,
         dsl_content: &str,
-        context: OrchestrationContext,
+        _context: OrchestrationContext,
     ) -> DSLResult<ValidationReport> {
         let start_time = Instant::now();
 
@@ -1113,19 +1273,23 @@ impl DslOrchestrationInterface for DslPipelineProcessor {
         Ok(report)
     }
 
+    #[instrument(skip(self, dsl_content, _context))]
     async fn execute_orchestrated_dsl(
         &self,
         dsl_content: &str,
-        context: OrchestrationContext,
+        _context: OrchestrationContext,
     ) -> DSLResult<ExecutionResult> {
         let start_time = Instant::now();
 
         // Extract case ID from DSL content (basic implementation)
-        let case_id = context.case_id.unwrap_or_else(|| "UNKNOWN".to_string());
+        let case_id = _context
+            .case_id
+            .clone()
+            .unwrap_or_else(|| "UNKNOWN".to_string());
 
         // Check if database connectivity is available
         let database_operations = self
-            .execute_database_operations(dsl_content, &context)
+            .execute_database_operations(dsl_content, &_context)
             .await?;
 
         let result = ExecutionResult {
@@ -1141,102 +1305,11 @@ impl DslOrchestrationInterface for DslPipelineProcessor {
         Ok(result)
     }
 
-    /// Execute database operations based on DSL content
-    async fn execute_database_operations(
-        &self,
-        dsl_content: &str,
-        context: &OrchestrationContext,
-    ) -> DSLResult<Vec<crate::dsl::orchestration_interface::DatabaseOperation>> {
-        use crate::dsl::orchestration_interface::DatabaseOperation;
-
-        #[cfg(feature = "database")]
-        {
-            if let Some(db_service) = &self.database_service {
-                return self
-                    .execute_with_database(dsl_content, context, db_service)
-                    .await;
-            }
-        }
-
-        // Mock execution without database or when database feature is disabled
-        let operation_type = if dsl_content.contains("case.create") {
-            "CREATE_CASE"
-        } else if dsl_content.contains("case.update") {
-            "UPDATE_CASE"
-        } else if dsl_content.contains("entity.register") {
-            "CREATE_ENTITY"
-        } else if dsl_content.contains("kyc.start") {
-            "START_KYC"
-        } else {
-            "MOCK_EXECUTE"
-        };
-
-        Ok(vec![DatabaseOperation {
-            operation_type: operation_type.to_string(),
-            target: format!(
-                "case:{}",
-                context
-                    .case_id
-                    .clone()
-                    .unwrap_or_else(|| "UNKNOWN".to_string())
-            ),
-            affected_count: 1,
-            success: true,
-            error: None,
-        }])
-    }
-
-    /// Execute DSL with actual database operations
-    #[cfg(feature = "database")]
-    async fn execute_with_database(
-        &self,
-        dsl_content: &str,
-        context: &OrchestrationContext,
-        db_service: &crate::database::DictionaryDatabaseService,
-    ) -> DSLResult<Vec<crate::dsl::orchestration_interface::DatabaseOperation>> {
-        use crate::dsl::orchestration_interface::DatabaseOperation;
-        let mut operations = Vec::new();
-
-        // Parse DSL to determine what database operations to perform
-        let operation_type = if dsl_content.contains("case.create") {
-            "CREATE_CASE"
-        } else if dsl_content.contains("case.update") {
-            "UPDATE_CASE"
-        } else if dsl_content.contains("entity.register") {
-            "CREATE_ENTITY"
-        } else if dsl_content.contains("kyc.start") {
-            "START_KYC"
-        } else {
-            "UNKNOWN_OPERATION"
-        };
-
-        // For now, create a mock database operation representing the DSL execution
-        operations.push(DatabaseOperation {
-            operation_type: operation_type.to_string(),
-            target: format!(
-                "{}:{}",
-                context.domain,
-                context.case_id.clone().unwrap_or_default()
-            ),
-            affected_count: 1,
-            success: true,
-            error: None,
-        });
-
-        // In a real implementation, you would:
-        // 1. Parse the DSL content completely
-        // 2. Extract entity data, attributes, relationships
-        // 3. Validate against the dictionary using db_service
-        // 4. Perform actual database inserts/updates
-        // 5. Record the operations performed
-
-        Ok(operations)
-    }
-
+    #[instrument(skip(self, dsl_content, _context))]
     async fn parse_orchestrated_dsl(
         &self,
         dsl_content: &str,
-        context: OrchestrationContext,
+        _context: OrchestrationContext,
     ) -> DSLResult<ParseResult> {
         let start_time = Instant::now();
 
@@ -1272,13 +1345,15 @@ impl DslOrchestrationInterface for DslPipelineProcessor {
         Ok(result)
     }
 
+    #[instrument(skip(self, dsl_content, _context), fields(transform_type = ?transform_type))]
     async fn transform_orchestrated_dsl(
         &self,
         dsl_content: &str,
         transform_type: TransformationType,
-        context: OrchestrationContext,
+        _context: OrchestrationContext,
     ) -> DSLResult<TransformationResult> {
         let start_time = Instant::now();
+        info!("Transforming DSL to {:?}", transform_type);
 
         let transformed_content = match transform_type {
             TransformationType::ToJson => Some(format!(r#"{{"dsl": "{}"}}"#, dsl_content)),
@@ -1299,10 +1374,16 @@ impl DslOrchestrationInterface for DslPipelineProcessor {
             transformation_time_ms: start_time.elapsed().as_millis() as u64,
         };
 
+        info!(
+            "DSL transformation completed in {}ms",
+            result.transformation_time_ms
+        );
         Ok(result)
     }
 
+    #[instrument(skip(self))]
     async fn orchestration_health_check(&self) -> DSLResult<HealthStatus> {
+        debug!("Performing orchestration health check");
         let health = HealthStatus {
             healthy: true,
             components: HashMap::new(),
@@ -1319,6 +1400,10 @@ impl DslOrchestrationInterface for DslPipelineProcessor {
                 .as_secs(),
         };
 
+        info!(
+            "Health check completed - system healthy: {}",
+            health.healthy
+        );
         Ok(health)
     }
 }

@@ -380,7 +380,7 @@ impl DbStateManager {
         println!("🏥 DB State Manager: Performing health check");
 
         // Check in-memory store
-        let store_healthy = !self.state_store.is_empty() || true; // Always healthy for empty stores
+        let store_healthy = true; // Always healthy - empty stores are valid initial state
 
         // Check database connection if available
         #[cfg(feature = "database")]

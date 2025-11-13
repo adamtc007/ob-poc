@@ -37,15 +37,15 @@ pub enum DSLError {
 
     #[cfg(feature = "database")]
     #[error("Database error: {0}")]
-    Database(#[from] crate::error_enhanced::DatabaseError),
+    Database(String),
 
     #[cfg(feature = "database")]
     #[error("Document processing error: {0}")]
-    DocumentProcessing(#[from] crate::error_enhanced::DocumentProcessingError),
+    DocumentProcessing(String),
 
     #[cfg(feature = "database")]
     #[error("DSL Manager error: {0}")]
-    DslManager(#[from] crate::error_enhanced::DslManagerError),
+    DslManager(String),
 }
 
 impl serde::Serialize for DSLError {
@@ -303,7 +303,7 @@ pub(crate) type RuntimeResult<T> = Result<T, RuntimeError>;
 
 // SourceLocation moved to dsl_types crate - import from there
 
-/// Error severity levels
+// Error severity levels
 // ErrorSeverity moved to dsl_types crate - import from there
 
 /// Structured error with additional context
@@ -425,4 +425,3 @@ macro_rules! validation_error {
         $crate::error::ValidationError::$variant { $($field: $value),* }
     };
 }
-
