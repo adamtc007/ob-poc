@@ -23,6 +23,9 @@ pub mod orchestration_interface;
 // DSL operations definitions
 pub mod operations;
 
+// DSL Generation Domain Library (Phase 1.5)
+pub mod generation;
+
 // Re-export the pipeline processor components
 pub use pipeline_processor::{
     DomainSnapshot, DslPipelineProcessor, DslPipelineResult, PipelineConfig, ProcessingMetrics,
@@ -38,3 +41,9 @@ pub use orchestration_interface::{
 
 // Re-export operations components
 pub use operations::{DslOperationType, ExecutableDslOperation, OperationContext, OperationResult};
+
+// Re-export generation components
+pub use generation::{
+    AiGenerator, DslGenerator, GenerationFactory, GenerationRequest, GenerationResponse,
+    GenerationResult, GeneratorType, HybridGenerator, TemplateGenerator,
+};

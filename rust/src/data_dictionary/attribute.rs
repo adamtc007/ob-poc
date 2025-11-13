@@ -70,7 +70,7 @@ pub struct AttributeDefinition {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum DataType {
+pub enum DataType {
     String,
     Numeric,
     Integer,
@@ -96,7 +96,7 @@ pub struct Constraints {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SemanticMetadata {
+pub struct SemanticMetadata {
     /// Deep English description for RAG
     pub description: String,
 
@@ -114,7 +114,7 @@ pub(crate) struct SemanticMetadata {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct EmbeddingInfo {
+pub struct EmbeddingInfo {
     pub vector: Option<Vec<f32>>, // Actual vector (3072-dim for text-embedding-3-large)
     pub model: String,
     pub dimension: usize,
@@ -122,7 +122,7 @@ pub(crate) struct EmbeddingInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct UiMetadata {
+pub struct UiMetadata {
     pub category: String,
     pub subcategory: String,
     pub display_order: u32,
@@ -142,7 +142,7 @@ pub(crate) enum Importance {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct DataSources {
+pub struct DataSources {
     pub primary: Option<SourceDefinition>,
     pub secondary: Option<SourceDefinition>,
     pub tertiary: Option<SourceDefinition>,
@@ -164,7 +164,7 @@ pub(crate) enum SourceType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct DataSinks {
+pub struct DataSinks {
     pub operational: Option<SinkDefinition>,
     pub master: Option<SinkDefinition>,
     pub archive: Option<SinkDefinition>,
@@ -189,7 +189,7 @@ pub(crate) enum SinkType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct VerificationRules {
+pub struct VerificationRules {
     pub required_confidence: f64,
     pub requires_human_review: bool,
     pub review_trigger: Option<String>,

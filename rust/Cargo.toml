@@ -19,6 +19,7 @@ chrono = { version = "0.4", features = ["serde"] }
 log = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+serde_yaml = "0.9"
 thiserror = "1.0"
 uuid = { version = "1.4", features = ["v4", "serde"] }
 
@@ -42,6 +43,8 @@ tokio = { version = "1", features = ["full"] }
 # HTTP client for external integrations
 reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
 
+# Testing utilities (used in lib code for generation tests)
+tempfile = "3.0"
 
 regex = "1.12.2"
 rand = "0.8"
@@ -57,7 +60,6 @@ rand = "0.8"
 
 # Testing
 [dev-dependencies]
-# All dev dependencies removed - agentic CRUD tests use standard test framework
 
 
 

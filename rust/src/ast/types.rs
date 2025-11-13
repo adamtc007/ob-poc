@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 /// Enhanced semantic information for DSL elements
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub(crate) struct SemanticInfo {
     pub source_location: SourceLocation,
     pub type_info: TypeInfo,
@@ -25,6 +26,7 @@ pub struct SourceLocation {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub(crate) struct TypeInfo {
     pub expected_type: DSLType,
     pub inferred_type: Option<DSLType>,
@@ -33,6 +35,7 @@ pub(crate) struct TypeInfo {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub(crate) enum DSLType {
     String {
         max_length: Option<usize>,
@@ -71,6 +74,7 @@ pub(crate) enum DSLType {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub(crate) enum TypeConstraint {
     Required,
     Unique,
@@ -89,8 +93,12 @@ pub enum ValidationState {
     #[default]
     Pending,
     Valid,
-    Invalid { errors: Vec<ValidationError> },
-    Warning { warnings: Vec<ValidationWarning> },
+    Invalid {
+        errors: Vec<ValidationError>,
+    },
+    Warning {
+        warnings: Vec<ValidationWarning>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -119,6 +127,7 @@ pub enum ErrorSeverity {
 
 /// Database integration metadata
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub(crate) struct DatabaseReference {
     pub table: String,
     pub column: Option<String>,
@@ -128,6 +137,7 @@ pub(crate) struct DatabaseReference {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub(crate) enum DbReferenceType {
     GrammarRule,
     VocabularyVerb,
@@ -140,6 +150,7 @@ pub(crate) enum DbReferenceType {
 
 /// Enhanced Value type with semantic information
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub(crate) enum EnhancedValue {
     String {
         value: String,
@@ -202,7 +213,7 @@ pub struct GrammarRule {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) enum GrammarRuleType {
+pub enum GrammarRuleType {
     Production,
     Terminal,
     Lexical,
@@ -227,6 +238,7 @@ pub struct VocabularyVerb {
 
 /// DSL lifecycle state tracking
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub(crate) struct DSLState {
     pub state_id: Uuid,
     pub dsl_version_id: Uuid,
@@ -238,6 +250,7 @@ pub(crate) struct DSLState {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[allow(dead_code)]
 pub(crate) enum LifecycleState {
     #[default]
     Draft,
@@ -253,6 +266,7 @@ pub(crate) enum LifecycleState {
 }
 
 impl Value {
+    #[allow(dead_code)]
     pub(crate) fn as_string(&self) -> Option<&str> {
         match self {
             Value::String(s) => Some(s),
@@ -267,6 +281,7 @@ impl Value {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn as_map(&self) -> Option<&PropertyMap> {
         match self {
             Value::Map(m) => Some(m),
@@ -274,11 +289,13 @@ impl Value {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn is_null(&self) -> bool {
         matches!(self, Value::Null)
     }
 
     /// Convert to enhanced value with semantic information
+    #[allow(dead_code)]
     pub(crate) fn to_enhanced(&self, semantic: Option<SemanticInfo>) -> EnhancedValue {
         match self {
             Value::String(s) => EnhancedValue::String {
@@ -326,6 +343,7 @@ impl Value {
 
 impl EnhancedValue {
     /// Extract the underlying value without semantic information
+    #[allow(dead_code)]
     pub fn extract_value(&self) -> Value {
         match self {
             EnhancedValue::String { value, .. } => Value::String(value.clone()),
@@ -350,6 +368,7 @@ impl EnhancedValue {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn get_semantic_info(&self) -> Option<&SemanticInfo> {
         match self {
             EnhancedValue::String { semantic, .. }
@@ -366,6 +385,7 @@ impl EnhancedValue {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn set_semantic_info(&mut self, new_semantic: SemanticInfo) {
         let semantic_ref = match self {
             EnhancedValue::String { semantic, .. }
@@ -385,4 +405,3 @@ impl EnhancedValue {
 }
 
 // duplicate LifecycleState removed during clippy cleanup
-

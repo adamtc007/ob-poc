@@ -126,7 +126,7 @@ pub struct DataDelete {
 // ============================================================================
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct ComplexQuery {
+pub struct ComplexQuery {
     pub primary_asset: String,
     pub joins: Option<Vec<JoinClause>>,
     pub conditions: HashMap<String, Value>,
@@ -138,14 +138,14 @@ pub(crate) struct ComplexQuery {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct JoinClause {
+pub struct JoinClause {
     pub join_type: JoinType,
     pub target_asset: String,
     pub on_condition: PropertyMap,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) enum JoinType {
+pub enum JoinType {
     Inner,
     Left,
     Right,
@@ -153,21 +153,21 @@ pub(crate) enum JoinType {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct AggregateClause {
+pub struct AggregateClause {
     pub operations: Vec<AggregateOperation>,
     pub group_by: Option<Vec<String>>,
     pub having: Option<PropertyMap>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct AggregateOperation {
+pub struct AggregateOperation {
     pub function: AggregateFunction,
     pub field: String,
     pub alias: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) enum AggregateFunction {
+pub enum AggregateFunction {
     Count,
     Sum,
     Avg,
@@ -177,19 +177,19 @@ pub(crate) enum AggregateFunction {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct OrderClause {
+pub struct OrderClause {
     pub field: String,
     pub direction: OrderDirection,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) enum OrderDirection {
+pub enum OrderDirection {
     Asc,
     Desc,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct ConditionalUpdate {
+pub struct ConditionalUpdate {
     pub asset: String,
     pub primary_condition: HashMap<String, Value>,
     pub if_exists: Option<HashMap<String, Value>>,
@@ -210,6 +210,7 @@ pub struct BatchOperation {
 // --- Transaction Management ---
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) struct CrudTransaction {
     pub operations: Vec<CrudStatement>,
     pub rollback_strategy: RollbackStrategy,
@@ -218,6 +219,7 @@ pub(crate) struct CrudTransaction {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub(crate) struct TransactionResult {
     pub success: bool,
     pub completed_operations: Vec<usize>,
@@ -244,6 +246,7 @@ pub struct ValidationWarning {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) struct IntegrityResult {
     pub referential_integrity_ok: bool,
     pub constraint_violations: Vec<ConstraintViolation>,
@@ -259,7 +262,7 @@ pub struct ConstraintViolation {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum ConstraintType {
+pub enum ConstraintType {
     ForeignKey,
     Unique,
     NotNull,
@@ -268,6 +271,7 @@ pub(crate) enum ConstraintType {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) struct DependencyIssue {
     pub dependent_table: String,
     pub dependency_type: DependencyType,
@@ -275,8 +279,9 @@ pub(crate) struct DependencyIssue {
     pub resolution_hint: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) enum DependencyType {
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[allow(dead_code)]
+pub enum DependencyType {
     Cascade,
     Restrict,
     SetNull,
@@ -284,6 +289,7 @@ pub(crate) enum DependencyType {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) struct SimulationResult {
     pub would_succeed: bool,
     pub affected_records: u32,
@@ -293,6 +299,7 @@ pub(crate) struct SimulationResult {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) struct ResourceUsage {
     pub memory_kb: u64,
     pub disk_operations: u32,

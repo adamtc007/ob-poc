@@ -28,6 +28,11 @@ impl DictionaryDatabaseService {
         Self { pool }
     }
 
+    /// Get a reference to the connection pool
+    pub fn pool(&self) -> &PgPool {
+        &self.pool
+    }
+
     /// Create a mock dictionary database service for testing
     pub fn new_mock() -> Self {
         // This creates a mock service that will fail on actual database operations

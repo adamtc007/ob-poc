@@ -15,7 +15,6 @@
 //! The DSL Visualizer is the final component in the call chain:
 //! DSL Manager → DSL Mod → DB State Manager → **DSL Visualizer**
 
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// DSL Visualizer for generating output and visualizations

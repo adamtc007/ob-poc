@@ -262,6 +262,10 @@ impl DbStateManager {
         // Sync to DSL and AST tables - critical sync points
         let sync_result = self.sync_to_tables(&stored_state, dsl_result).await;
 
+        if !sync_result {
+            eprintln!("⚠️  Warning: Failed to sync state to database tables");
+        }
+
         if persist_result {
             println!(
                 "✅ DB State Manager: Successfully saved state version {}",
@@ -484,7 +488,7 @@ impl DbStateManager {
     }
 
     /// Sync to DSL table - maintains accumulated DSL state
-    async fn sync_to_dsl_table(&self, state: &StoredDslState) -> bool {
+    async fn sync_to_dsl_table(&self, _state: &StoredDslState) -> bool {
         #[cfg(feature = "database")]
         {
             if let Some(ref _database) = self.database {
@@ -507,7 +511,7 @@ impl DbStateManager {
     }
 
     /// Sync to AST table - maintains parsed representations
-    async fn sync_to_ast_table(&self, state: &StoredDslState, dsl_result: &DslModResult) -> bool {
+    async fn sync_to_ast_table(&self, _state: &StoredDslState, _dsl_result: &DslModResult) -> bool {
         #[cfg(feature = "database")]
         {
             if let Some(ref _database) = self.database {

@@ -296,10 +296,7 @@ pub enum RuntimeError {
 /// Result type aliases for convenience
 pub(crate) type DSLResult<T> = Result<T, DSLError>;
 pub type ParseResult<T> = Result<T, ParseError>;
-pub(crate) type GrammarResult<T> = Result<T, GrammarError>;
-pub(crate) type VocabularyResult<T> = Result<T, VocabularyError>;
 pub type ValidationResult<T> = Result<T, ValidationError>;
-pub(crate) type RuntimeResult<T> = Result<T, RuntimeError>;
 
 // SourceLocation moved to dsl_types crate - import from there
 
@@ -308,6 +305,7 @@ pub(crate) type RuntimeResult<T> = Result<T, RuntimeError>;
 
 /// Structured error with additional context
 #[derive(Debug, serde::Serialize)]
+#[allow(dead_code)]
 pub(crate) struct ContextualError {
     pub error: DSLError,
     pub location: SourceLocation,
@@ -315,7 +313,9 @@ pub(crate) struct ContextualError {
     pub context: Vec<String>,
 }
 
+#[allow(dead_code)]
 impl ContextualError {
+    #[allow(dead_code)]
     pub fn new(error: DSLError, location: SourceLocation, severity: ErrorSeverity) -> Self {
         Self {
             error,
@@ -325,6 +325,7 @@ impl ContextualError {
         }
     }
 
+    #[allow(dead_code)]
     pub fn with_context(mut self, context: impl Into<String>) -> Self {
         self.context.push(context.into());
         self
@@ -351,15 +352,19 @@ impl std::error::Error for ContextualError {
 
 /// Error collector for batch validation
 #[derive(Debug, Default, serde::Serialize)]
+#[allow(dead_code)]
 pub(crate) struct ErrorCollector {
     pub errors: Vec<ContextualError>,
 }
 
+#[allow(dead_code)]
 impl ErrorCollector {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[allow(dead_code)]
     pub(crate) fn add_simple_error(
         &mut self,
         error: DSLError,
@@ -370,14 +375,17 @@ impl ErrorCollector {
             .push(ContextualError::new(error, location, severity));
     }
 
+    #[allow(dead_code)]
     pub(crate) fn has_errors(&self) -> bool {
         !self.errors.is_empty()
     }
 
+    #[allow(dead_code)]
     pub(crate) fn error_count(&self) -> usize {
         self.errors.len()
     }
 
+    #[allow(dead_code)]
     pub fn clear(&mut self) {
         self.errors.clear();
     }

@@ -88,7 +88,7 @@ pub struct ObtainDocument {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct ParallelObtain {
+pub struct ParallelObtain {
     pub documents: Vec<ObtainDocument>,
 }
 
@@ -114,7 +114,7 @@ pub enum EdgeType {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct SolicitAttribute {
+pub struct SolicitAttribute {
     pub attr_id: String,
     pub from: String,
     pub value_type: String,
@@ -122,6 +122,7 @@ pub(crate) struct SolicitAttribute {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub(crate) struct CalculateUbo {
     pub target: String,
     pub algorithm: String,
@@ -132,7 +133,7 @@ pub(crate) struct CalculateUbo {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct ResolveConflict {
+pub struct ResolveConflict {
     pub node: String,
     pub property: String,
     pub strategy: WaterfallStrategy,
@@ -140,19 +141,19 @@ pub(crate) struct ResolveConflict {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct WaterfallStrategy {
+pub struct WaterfallStrategy {
     pub priorities: Vec<SourcePriority>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct SourcePriority {
+pub struct SourcePriority {
     pub source_type: SourceType,
     pub name: String,
     pub confidence: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub(crate) enum SourceType {
+pub enum SourceType {
     PrimarySource,
     GovernmentRegistry,
     ThirdPartyService,
@@ -160,7 +161,7 @@ pub(crate) enum SourceType {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct GenerateReport {
+pub struct GenerateReport {
     pub target: String,
     pub status: String,
     pub identified_ubos: Vec<PropertyMap>,
@@ -169,7 +170,7 @@ pub(crate) struct GenerateReport {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct ScheduleMonitoring {
+pub struct ScheduleMonitoring {
     pub target: String,
     pub frequency: String,
     pub triggers: Vec<PropertyMap>,
@@ -191,7 +192,7 @@ pub enum Value {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct ValueWithSource {
+pub struct ValueWithSource {
     pub value: Box<Value>,
     pub source: String,
     pub confidence: Option<f64>,

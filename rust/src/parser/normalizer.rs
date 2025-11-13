@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
+#[allow(dead_code)]
 pub(crate) enum NormalizationError {
     #[error("Failed to transform UBO link: {message}")]
     UboLinkTransformation { message: String },
@@ -25,7 +26,9 @@ pub(crate) enum NormalizationError {
 
 /// DSL Normalizer for transforming legacy aliases to canonical forms
 pub struct DslNormalizer {
+    #[allow(dead_code)]
     verb_aliases: HashMap<String, String>,
+    #[allow(dead_code)]
     key_aliases: HashMap<String, String>,
 }
 
@@ -85,6 +88,7 @@ impl DslNormalizer {
     }
 
     /// Main normalization entry point - normalizes a complete program
+    #[allow(dead_code)]
     pub(crate) fn normalize_program(&self, program: &mut [Form]) -> Result<(), NormalizationError> {
         for form in program.iter_mut() {
             if let Form::Verb(verb_form) = form {
@@ -95,6 +99,7 @@ impl DslNormalizer {
     }
 
     /// Normalize a single verb form
+    #[allow(dead_code)]
     fn normalize_verb_form(&self, form: &mut VerbForm) -> Result<(), NormalizationError> {
         let original_verb = form.verb.clone();
 
@@ -119,6 +124,7 @@ impl DslNormalizer {
     }
 
     /// Apply key aliases to all keys in the property map
+    #[allow(dead_code)]
     fn normalize_keys(&self, pairs: &mut PropertyMap) -> Result<(), NormalizationError> {
         let mut new_pairs = HashMap::new();
 
@@ -359,4 +365,3 @@ impl Default for DslNormalizer {
         Self::new()
     }
 }
-

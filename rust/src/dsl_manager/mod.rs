@@ -7,11 +7,16 @@
 //! DSL Manager → DSL Mod → DB State Manager → DSL Visualizer
 
 pub mod clean_manager;
+pub mod dsl_crud;
 
 // Public re-exports for external API
 pub use clean_manager::{
     AiResult, CallChainResult, CallChainSteps, CleanDslManager, CleanManagerConfig,
     IncrementalResult, ValidationResult,
+};
+pub use dsl_crud::{
+    generate_dsl_save_crud_statements, DslCrudError, DslCrudManager, DslLoadRequest, DslLoadResult,
+    DslSaveRequest, DslSaveResult, OperationContext,
 };
 
 /// DSL Manager error types
