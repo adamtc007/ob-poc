@@ -78,6 +78,7 @@ pub enum GenerationOperationType {
 
 /// Context data for DSL generation
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct GenerationContext {
     /// Client Business Unit ID
     pub cbu_id: Option<String>,
@@ -288,19 +289,6 @@ impl Default for GenerationOptions {
     }
 }
 
-impl Default for GenerationContext {
-    fn default() -> Self {
-        Self {
-            cbu_id: None,
-            case_id: None,
-            entity_data: HashMap::new(),
-            domain: None,
-            instruction: None,
-            template_variables: HashMap::new(),
-            orchestration_context: None,
-        }
-    }
-}
 
 impl GenerationRequest {
     /// Create a new generation request

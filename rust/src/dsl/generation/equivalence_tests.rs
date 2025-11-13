@@ -89,6 +89,12 @@ pub struct MockAiService {
     simulated_delay_ms: u64,
 }
 
+impl Default for MockAiService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MockAiService {
     /// Create a new mock AI service with default responses
     pub fn new() -> Self {
@@ -487,14 +493,13 @@ pub fn assert_equivalent_dsl(
             if template_response.dsl_content.trim() != ai_response.dsl_content.trim() {
                 errors.push("DSL content is not exactly identical".to_string());
             }
-        } else if config.semantic_comparison {
-            if !comparison.semantic_equivalent {
+        } else if config.semantic_comparison
+            && !comparison.semantic_equivalent {
                 errors.push(format!(
                     "DSL content is not semantically equivalent (similarity: {:.2})",
                     comparison.content_similarity
                 ));
             }
-        }
 
         // Check confidence scores
         if let (Some(template_conf), Some(ai_conf)) = (

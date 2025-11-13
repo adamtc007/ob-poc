@@ -354,16 +354,14 @@ impl AstParser {
     }
 
     fn count_verbs(&self, dsl_content: &str) -> usize {
-        let verb_patterns = vec![
-            "case.",
+        let verb_patterns = ["case.",
             "kyc.",
             "entity.",
             "ubo.",
             "products.",
             "services.",
             "document.",
-            "isda.",
-        ];
+            "isda."];
         verb_patterns
             .iter()
             .map(|pattern| dsl_content.matches(pattern).count())

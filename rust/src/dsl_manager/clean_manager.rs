@@ -24,14 +24,13 @@ use crate::database::{DslDomainRepository, DslDomainRepositoryTrait};
 use crate::db_state_manager::DbStateManager;
 use crate::dsl::{
     DslOrchestrationInterface, DslPipelineProcessor, DslPipelineResult, OrchestrationContext,
-    OrchestrationOperation, OrchestrationOperationType, PipelineConfig,
+    OrchestrationOperation, OrchestrationOperationType,
 };
 use crate::dsl_manager::DslManagerError;
 use crate::dsl_visualizer::DslVisualizer;
 #[cfg(feature = "database")]
 use crate::models::domain_models::{NewDslVersion, NewParsedAst};
 
-use std::collections::HashMap;
 use std::time::Instant;
 use uuid::Uuid;
 
@@ -184,6 +183,12 @@ pub struct AiResult {
     pub processing_time_ms: u64,
     /// Flag indicating this was AI-generated
     pub ai_generated: bool,
+}
+
+impl Default for CleanDslManager {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CleanDslManager {
@@ -1137,23 +1142,23 @@ impl CleanDslManager {
     async fn mock_ai_generation(&self, instruction: &str) -> String {
         // Mock AI generation - replace with real AI service integration
         if instruction.to_lowercase().contains("onboarding") {
-            return format!(
+            format!(
                 r#"(case.create :case-id "{}" :case-type "ONBOARDING" :instruction "{}")"#,
                 CleanDslManager::generate_case_id(),
                 instruction
-            );
+            )
         } else if instruction.to_lowercase().contains("kyc") {
-            return format!(
+            format!(
                 r#"(kyc.collect :case-id "{}" :collection-type "ENHANCED" :instruction "{}")"#,
                 CleanDslManager::generate_case_id(),
                 instruction
-            );
+            )
         } else {
-            return format!(
+            format!(
                 r#"(case.create :case-id "{}" :case-type "GENERAL" :instruction "{}")"#,
                 CleanDslManager::generate_case_id(),
                 instruction
-            );
+            )
         }
     }
 
@@ -1167,7 +1172,7 @@ impl CleanDslManager {
         let case_id = dsl_content
             .split(":case-id")
             .nth(1)
-            .and_then(|s| s.trim().split_whitespace().next())
+            .and_then(|s| s.split_whitespace().next())
             .unwrap_or("UNKNOWN")
             .trim_matches('"')
             .to_string();

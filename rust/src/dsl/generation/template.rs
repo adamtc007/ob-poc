@@ -277,8 +277,8 @@ impl TemplateGenerator {
         }
 
         // Check for unresolved placeholders if strict validation is enabled
-        if self.config.strict_validation {
-            if content.contains("{{") && content.contains("}}") {
+        if self.config.strict_validation
+            && content.contains("{{") && content.contains("}}") {
                 let unresolved: Vec<String> = content
                     .split("{{")
                     .skip(1)
@@ -290,7 +290,6 @@ impl TemplateGenerator {
                     warn!("Unresolved template variables: {:?}", unresolved);
                 }
             }
-        }
 
         Ok(content)
     }

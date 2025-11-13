@@ -564,7 +564,7 @@ impl DslGenerator for HybridGenerator {
         // Combine metadata from both generators
         let mut supported_operations = template_meta.supported_operations;
         supported_operations.extend(ai_meta.supported_operations);
-        supported_operations.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+        supported_operations.sort_by_key(|a| a.to_string());
         supported_operations.dedup();
 
         let mut capabilities = template_meta.capabilities;
