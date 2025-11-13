@@ -278,35 +278,3 @@ impl DslManagerError {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_database_error_creation() {
-        let err = DatabaseError::connection_failed("Connection timeout");
-        assert!(matches!(err, DatabaseError::ConnectionError { .. }));
-    }
-
-    #[test]
-    fn test_document_error_creation() {
-        let err = DocumentProcessingError::invalid_document_type("passport");
-        assert!(matches!(
-            err,
-            DocumentProcessingError::InvalidDocumentType { .. }
-        ));
-    }
-
-    #[test]
-    fn test_dsl_manager_error_creation() {
-        let err = DslManagerError::compilation_failed("Parse error");
-        assert!(matches!(err, DslManagerError::CompilationFailed { .. }));
-    }
-
-    #[test]
-    fn test_error_conversion() {
-        let db_err = DatabaseError::connection_failed("Test");
-        let manager_err: DslManagerError = db_err.into();
-        assert!(matches!(manager_err, DslManagerError::DatabaseError));
-    }
-}

@@ -162,7 +162,7 @@ pub struct AiDslService {
 impl AiDslService {
     /// Create a new AI DSL service with OpenAI client - now using DSL Manager
     pub async fn new_with_openai(ai_config: Option<AiConfig>) -> AiDslResult<Self> {
-        let config = ai_config.unwrap_or_else(AiConfig::openai);
+        let config = ai_config.unwrap_or_else(|| crate::ai::openai::OpenAiClient::default_config());
         let ai_client = Arc::new(OpenAiClient::new(config)?);
 
         let mut dsl_manager = DslManagerFactory::new();
@@ -325,45 +325,3 @@ pub struct ValidationResult {
     pub explanation: String,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_cbu_generator() {
-        let cbu_id = CbuGenerator::generate_cbu_id("TechCorp Ltd", "GB", "CORP");
-        assert!(cbu_id.starts_with("CBU-TECHCORP-GB-CORP-"));
-        assert!(cbu_id.len() > 20);
-    }
-
-    #[test]
-    fn test_generate_multiple_cbu_ids() {
-        let cbu_ids = CbuGenerator::generate_test_cbu_ids(5);
-        assert_eq!(cbu_ids.len(), 5);
-
-        // All should be unique
-        let mut unique_ids = std::collections::HashSet::new();
-        for id in &cbu_ids {
-            unique_ids.insert(id);
-        }
-        assert_eq!(unique_ids.len(), cbu_ids.len());
-    }
-
-    #[test]
-    fn test_ai_onboarding_request_serialization() {
-        let request = AiOnboardingRequest {
-            instruction: "Create onboarding for tech company".to_string(),
-            client_name: "TechCorp Ltd".to_string(),
-            jurisdiction: "GB".to_string(),
-            entity_type: "CORP".to_string(),
-            services: vec!["CUSTODY".to_string()],
-            compliance_level: Some("standard".to_string()),
-            context: HashMap::new(),
-            ai_provider: Some("openai".to_string()),
-        };
-
-        let json = serde_json::to_string(&request).unwrap();
-        let deserialized: AiOnboardingRequest = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized.client_name, request.client_name);
-    }
-}

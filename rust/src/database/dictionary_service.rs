@@ -28,6 +28,20 @@ impl DictionaryDatabaseService {
         Self { pool }
     }
 
+    /// Create a mock dictionary database service for testing
+    pub fn new_mock() -> Self {
+        // This creates a mock service that will fail on actual database operations
+        // but is useful for type checking and basic initialization
+        use std::str::FromStr;
+        let mock_url = "postgresql://mock:mock@localhost/mock";
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .max_connections(1)
+            .connect_lazy(&mock_url)
+            .expect("Mock pool creation failed");
+
+        Self { pool }
+    }
+
     /// Create a new dictionary attribute
     pub async fn create_attribute(
         &self,
@@ -756,7 +770,7 @@ impl DictionaryDatabaseService {
 /// Implement the simplified DictionaryService trait for CentralDslEditor
 #[async_trait]
 impl crate::dsl::central_editor::DictionaryService for DictionaryDatabaseService {
-    async fn validate_dsl_attributes(&self, dsl: &str) -> Result<(), String> {
+    async fn validate_dsl_attributes(&self, _dsl: &str) -> Result<(), String> {
         // Basic validation - check if any AttributeIDs in the DSL exist in our dictionary
         // This is a simplified implementation - could be enhanced to parse DSL and validate each AttributeID
 
@@ -781,23 +795,3 @@ impl crate::dsl::central_editor::DictionaryService for DictionaryDatabaseService
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use sqlx::PgPool;
-
-    async fn setup_test_pool() -> PgPool {
-        // This would be setup with a test database
-        todo!("Setup test database pool")
-    }
-
-    #[tokio::test]
-    async fn test_create_attribute() {
-        // Test implementation would go here
-    }
-
-    #[tokio::test]
-    async fn test_search_attributes() {
-        // Test implementation would go here
-    }
-}

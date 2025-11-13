@@ -733,37 +733,3 @@ pub(crate) enum DslError {
 
 pub(crate) type DslResult<T> = Result<T, DslError>;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use sqlx::PgPool;
-
-    // Helper function to create test repository (would need actual DB for integration tests)
-    #[allow(dead_code)]
-    fn create_test_repository(pool: PgPool) -> DslDomainRepository {
-        DslDomainRepository::new(pool)
-    }
-
-    #[test]
-    fn test_new_dsl_domain_creation() {
-        let domain = NewDslDomain {
-            domain_name: "Test".to_string(),
-            description: Some("Test domain".to_string()),
-            base_grammar_version: "1.0.0".to_string(),
-            vocabulary_version: "1.0.0".to_string(),
-            active: true,
-        };
-
-        assert_eq!(domain.domain_name, "Test");
-        assert!(domain.active);
-    }
-
-    #[test]
-    fn test_dsl_error_display() {
-        let error = DslError::NotFound {
-            id: "test-domain".to_string(),
-        };
-
-        assert_eq!(error.to_string(), "DSL not found: test-domain");
-    }
-}

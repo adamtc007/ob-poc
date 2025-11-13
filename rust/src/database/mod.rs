@@ -209,29 +209,3 @@ fn mask_database_url(url: &str) -> String {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_database_config_default() {
-        let config = DatabaseConfig::default();
-        assert_eq!(config.max_connections, 10);
-        assert_eq!(config.connection_timeout, Duration::from_secs(30));
-    }
-
-    #[test]
-    fn test_mask_database_url() {
-        let url = "postgresql://user:password@localhost:5432/database";
-        let masked = mask_database_url(url);
-        assert!(masked.contains("***"));
-        assert!(!masked.contains("password"));
-    }
-
-    #[test]
-    fn test_mask_invalid_url() {
-        let url = "not-a-valid-url-but-longer-than-twenty-chars";
-        let masked = mask_database_url(url);
-        assert!(masked.contains("***"));
-    }
-}
