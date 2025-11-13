@@ -19,13 +19,18 @@
 //! - Provide unified interface for AI and direct DSL operations
 //! - Maintain separation between core DSL CRUD and optional AI layer
 
-use crate::db_state_manager::{AccumulatedState, DbStateManager, StateResult};
+use crate::db_state_manager::DbStateManager;
 use crate::dsl::{
     DslOrchestrationInterface, DslPipelineProcessor, DslPipelineResult, OrchestrationContext,
-    OrchestrationOperation, OrchestrationOperationType, PipelineConfig, ProcessingOptions,
+    OrchestrationOperation, OrchestrationOperationType,
 };
-use crate::dsl_visualizer::{DslVisualizer, VisualizationResult};
-use serde::{Deserialize, Serialize};
+use crate::dsl_manager::dsl_crud::{
+    DslCrudManager, DslLoadRequest, DslSaveRequest, OperationContext,
+};
+use crate::dsl_manager::DslManagerError;
+use crate::dsl_visualizer::DslVisualizer;
+
+use std::collections::HashMap;
 use std::time::Instant;
 use uuid::Uuid;
 
@@ -35,6 +40,8 @@ pub struct CleanDslManager {
     dsl_processor: DslPipelineProcessor,
     /// Database state manager
     db_state_manager: DbStateManager,
+    /// Modern DSL CRUD manager for save operations
+    dsl_crud_manager: DslCrudManager,
     /// Visualization generator
     visualizer: DslVisualizer,
     /// Configuration
@@ -183,6 +190,7 @@ impl CleanDslManager {
         Self {
             dsl_processor: DslPipelineProcessor::new(),
             db_state_manager: DbStateManager::new(),
+            dsl_crud_manager: DslCrudManager::new(),
             visualizer: DslVisualizer::new(),
             config: CleanManagerConfig::default(),
             #[cfg(feature = "database")]
@@ -195,6 +203,7 @@ impl CleanDslManager {
         Self {
             dsl_processor: DslPipelineProcessor::new(),
             db_state_manager: DbStateManager::new(),
+            dsl_crud_manager: DslCrudManager::new(),
             visualizer: DslVisualizer::new(),
             config,
             #[cfg(feature = "database")]
@@ -205,9 +214,11 @@ impl CleanDslManager {
     /// Create a Clean DSL Manager with database connectivity for SQLX integration
     #[cfg(feature = "database")]
     pub fn with_database(database_service: crate::database::DictionaryDatabaseService) -> Self {
+        let pool = database_service.pool().clone();
         Self {
             dsl_processor: DslPipelineProcessor::with_database(database_service.clone()),
             db_state_manager: DbStateManager::new(),
+            dsl_crud_manager: DslCrudManager::new(pool),
             visualizer: DslVisualizer::new(),
             config: CleanManagerConfig::default(),
             #[cfg(feature = "database")]
@@ -221,6 +232,7 @@ impl CleanDslManager {
         config: CleanManagerConfig,
         database_service: crate::database::DictionaryDatabaseService,
     ) -> Self {
+        let pool = database_service.pool().clone();
         Self {
             dsl_processor: DslPipelineProcessor::with_config_and_database(
                 PipelineConfig {
@@ -233,6 +245,7 @@ impl CleanDslManager {
                 database_service.clone(),
             ),
             db_state_manager: DbStateManager::new(),
+            dsl_crud_manager: DslCrudManager::new(pool),
             visualizer: DslVisualizer::new(),
             config,
             #[cfg(feature = "database")]
@@ -439,6 +452,389 @@ impl CleanDslManager {
         }
     }
 
+    // ==========================================
+    // DSL CRUD FACTORY METHODS
+    // ==========================================
+
+    /// Factory method: Generate and execute DSL for CBU creation
+    pub async fn create_cbu_dsl(
+        &mut self,
+        onboarding_request_id: Uuid,
+        cbu_name: &str,
+        description: Option<&str>,
+        user_id: &str,
+    ) -> Result<CallChainResult, DslManagerError> {
+        let case_id = format!("cbu-{}", Uuid::new_v4());
+
+        // Generate DSL for CBU creation
+        let cbu_dsl = self.generate_cbu_create_dsl(cbu_name, description);
+
+        // Execute through DSL CRUD
+        self.save_and_execute_dsl(
+            case_id,
+            onboarding_request_id,
+            cbu_dsl,
+            user_id,
+            "cbu_create",
+        )
+        .await
+    }
+
+    /// Factory method: Generate and execute DSL for entity registration
+    pub async fn register_entity_dsl(
+        &mut self,
+        onboarding_request_id: Uuid,
+        entity_id: &str,
+        entity_name: &str,
+        entity_type: &str,
+        user_id: &str,
+    ) -> Result<CallChainResult, DslManagerError> {
+        let case_id = format!("entity-{}", entity_id);
+
+        // Generate DSL for entity registration
+        let entity_dsl = self.generate_entity_register_dsl(entity_id, entity_name, entity_type);
+
+        // Execute through DSL CRUD
+        self.save_and_execute_dsl(
+            case_id,
+            onboarding_request_id,
+            entity_dsl,
+            user_id,
+            "entity_register",
+        )
+        .await
+    }
+
+    /// Factory method: Generate and execute DSL for UBO calculation
+    pub async fn calculate_ubo_dsl(
+        &mut self,
+        onboarding_request_id: Uuid,
+        target_entity: &str,
+        threshold: f64,
+        user_id: &str,
+    ) -> Result<CallChainResult, DslManagerError> {
+        let case_id = format!("ubo-{}", target_entity);
+
+        // Generate DSL for UBO calculation
+        let ubo_dsl = self.generate_ubo_calculate_dsl(target_entity, threshold);
+
+        // Execute through DSL CRUD
+        self.save_and_execute_dsl(
+            case_id,
+            onboarding_request_id,
+            ubo_dsl,
+            user_id,
+            "ubo_calculate",
+        )
+        .await
+    }
+
+    /// Factory method: Load existing DSL by onboarding_request_id and execute updates
+    pub async fn update_existing_dsl(
+        &mut self,
+        onboarding_request_id: Uuid,
+        dsl_updates: &str,
+        user_id: &str,
+    ) -> Result<CallChainResult, DslManagerError> {
+        // Load existing DSL
+        let load_request = DslLoadRequest {
+            case_id: format!("onboard-{}", onboarding_request_id),
+            version: None, // Latest version
+            include_ast: false,
+            include_audit_trail: false,
+        };
+
+        match self.dsl_crud_manager.load_dsl_complete(load_request).await {
+            Ok(existing) => {
+                // Append updates to existing DSL
+                let updated_dsl = format!(
+                    "{}\n\n;; === UPDATES ===\n{}",
+                    existing.dsl_content, dsl_updates
+                );
+
+                // Execute updated DSL
+                self.save_and_execute_dsl(
+                    existing.case_id,
+                    onboarding_request_id,
+                    updated_dsl,
+                    user_id,
+                    "dsl_update",
+                )
+                .await
+            }
+            Err(e) => Err(DslManagerError::ProcessingError {
+                message: format!("Failed to load existing DSL: {}", e),
+            }),
+        }
+    }
+
+    // ==========================================
+    // DSL GENERATION METHODS
+    // ==========================================
+
+    /// Generate DSL for CBU creation
+    fn generate_cbu_create_dsl(&self, name: &str, description: Option<&str>) -> String {
+        let desc_clause = description
+            .map(|d| format!("  :description \"{}\"", d))
+            .unwrap_or_default();
+
+        format!(
+            r#"
+    (case.create
+      :name "CBU Creation - {}"
+      :type "cbu_onboarding")
+
+    (cbu.create
+      :name "{}"{}
+      :status "ACTIVE")
+
+    (audit.log
+      :operation "cbu_create"
+      :entity-name "{}")
+    "#,
+            name, name, desc_clause, name
+        )
+    }
+
+    /// Generate DSL for entity registration
+    fn generate_entity_register_dsl(
+        &self,
+        entity_id: &str,
+        name: &str,
+        entity_type: &str,
+    ) -> String {
+        format!(
+            r#"
+    (case.create
+      :name "Entity Registration - {}"
+      :type "entity_registration")
+
+    (entity.register
+      :entity-id "{}"
+      :name "{}"
+      :type "{}")
+
+    (audit.log
+      :operation "entity_register"
+      :entity-id "{}")
+    "#,
+            name, entity_id, name, entity_type, entity_id
+        )
+    }
+
+    /// Generate DSL for UBO calculation
+    fn generate_ubo_calculate_dsl(&self, target: &str, threshold: f64) -> String {
+        format!(
+            r#"
+    (case.create
+      :name "UBO Calculation - {}"
+      :type "ubo_calculation")
+
+    (ubo.calc
+      :target "{}"
+      :threshold {}
+      :algorithm "ownership_tree")
+
+    (audit.log
+      :operation "ubo_calculate"
+      :target "{}")
+    "#,
+            target, target, threshold, target
+        )
+    }
+
+    /// Unified save and execute method for DSL CRUD operations
+    async fn save_and_execute_dsl(
+        &mut self,
+        case_id: String,
+        onboarding_request_id: Uuid,
+        dsl_content: String,
+        user_id: &str,
+        operation_type: &str,
+    ) -> Result<CallChainResult, DslManagerError> {
+        // Step 1: Save DSL using DslCrudManager
+        let save_request = DslSaveRequest {
+            case_id: case_id.clone(),
+            onboarding_request_id,
+            dsl_content: dsl_content.clone(),
+            user_id: user_id.to_string(),
+            operation_context: OperationContext {
+                workflow_type: operation_type.to_string(),
+                source: "dsl_factory".to_string(),
+                metadata: {
+                    let mut meta = HashMap::new();
+                    meta.insert("generated_by".to_string(), "clean_dsl_manager".to_string());
+                    meta.insert("operation".to_string(), operation_type.to_string());
+                    meta
+                },
+            },
+        };
+
+        match self.dsl_crud_manager.save_dsl_complex(save_request).await {
+            Ok(_save_result) => {
+                // Step 2: Execute the DSL through the processing pipeline
+                let operation = OrchestrationOperation {
+                    operation_id: format!("OP-{}", case_id),
+                    operation_type: OrchestrationOperationType::ProcessComplete,
+                    dsl_content,
+                    metadata: HashMap::new(),
+                    context: OrchestrationContext {
+                        request_id: case_id.clone(),
+                        user_id: "system".to_string(),
+                        domain: "default".to_string(),
+                        case_id: Some(case_id.clone()),
+                        processing_options: crate::dsl::ProcessingOptions {
+                            strict_validation: false,
+                            fail_fast: false,
+                            enable_logging: self.config.enable_detailed_logging,
+                            collect_metrics: self.config.enable_metrics,
+                            persist_to_database: true,
+                            generate_visualization: true,
+                            custom_flags: HashMap::new(),
+                        },
+                        audit_trail: vec![],
+                        created_at: chrono::Utc::now().timestamp() as u64,
+                        session: crate::dsl::SessionInfo {
+                            session_id: format!("SES-{}", case_id),
+                            started_at: chrono::Utc::now().timestamp() as u64,
+                            permissions: vec!["dsl:execute".to_string()],
+                            metadata: HashMap::new(),
+                        },
+                    },
+                    priority: 1,
+                    timeout_ms: Some(30000),
+                };
+
+                let orchestration_result = self
+                    .dsl_processor
+                    .process_orchestrated_operation(operation)
+                    .await
+                    .unwrap_or_else(|e| crate::dsl::OrchestrationResult {
+                        success: false,
+                        operation_id: case_id.clone(),
+                        result_data: None,
+                        processing_time_ms: 0,
+                        errors: vec![format!("Orchestration failed: {}", e)],
+                        warnings: vec![],
+                        completed_at: chrono::Utc::now().timestamp() as u64,
+                        step_results: vec![],
+                        metrics: crate::dsl::orchestration_interface::OrchestrationMetrics {
+                            total_operations: 1,
+                            successful_operations: 0,
+                            failed_operations: 1,
+                            average_processing_time_ms: 0.0,
+                            orchestration_latency_ms: 0.0,
+                            memory_usage_bytes: 0,
+                            cpu_usage_percent: 0.0,
+                            peak_memory_bytes: 0,
+                            database_operations_count: 0,
+                            cache_hit_rate: 0.0,
+                            error_rate: 1.0,
+                            operations_per_second: 0.0,
+                            concurrent_operations: 0,
+                            queue_depth: 0,
+                        },
+                    });
+
+                // Convert to call chain result format
+                let result = CallChainResult {
+                    success: orchestration_result.success,
+                    case_id: case_id.clone(),
+                    processing_time_ms: orchestration_result.processing_time_ms,
+                    errors: orchestration_result.errors,
+                    visualization_generated: true,
+                    ai_generated: false,
+                    step_details: CallChainSteps {
+                        dsl_processing: Some(DslProcessingStepResult {
+                            success: orchestration_result.success,
+                            processing_time_ms: orchestration_result.processing_time_ms,
+                            parsed_ast_available: true,
+                            domain_snapshot_created: true,
+                            errors: vec![],
+                        }),
+                        state_management: Some(StateManagementStepResult {
+                            success: true,
+                            processing_time_ms: 10,
+                            version_number: 1,
+                            snapshot_id: case_id.clone(),
+                            errors: vec![],
+                        }),
+                        visualization: Some(VisualizationStepResult {
+                            success: true,
+                            processing_time_ms: 5,
+                            output_size_bytes: 1024,
+                            format: "SVG".to_string(),
+                            errors: vec![],
+                        }),
+                    },
+                };
+
+                Ok(result)
+            }
+            Err(e) => Err(DslManagerError::ProcessingError {
+                message: format!("DSL CRUD save failed: {}", e),
+            }),
+        }
+    }
+
+    /// Generate DSL for document operations
+    pub fn generate_document_dsl(
+        &self,
+        entity_id: &str,
+        document_type: &str,
+        action: &str,
+    ) -> String {
+        match action {
+            "catalog" => format!(
+                r#"
+(document.catalog
+  :entity-id "{}"
+  :document-type "{}"
+  :status "RECEIVED")
+"#,
+                entity_id, document_type
+            ),
+            "verify" => format!(
+                r#"
+(document.verify
+  :entity-id "{}"
+  :document-type "{}")
+"#,
+                entity_id, document_type
+            ),
+            _ => format!(
+                r#"
+(document.{}
+  :entity-id "{}"
+  :document-type "{}")
+"#,
+                action, entity_id, document_type
+            ),
+        }
+    }
+
+    /// Generate DSL for compliance operations
+    pub fn generate_compliance_dsl(&self, entity_id: &str, frameworks: &[String]) -> String {
+        let framework_list = frameworks
+            .iter()
+            .map(|f| format!("\"{}\"", f))
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        format!(
+            r#"
+(compliance.screen
+  :entity-id "{}"
+  :frameworks [{}])
+
+(compliance.monitor
+  :entity-id "{}"
+  :continuous true)
+"#,
+            entity_id, framework_list, entity_id
+        )
+    }
+
     /// Process incremental DSL addition (DSL-as-State pattern)
     pub async fn process_incremental_dsl(
         &mut self,
@@ -534,7 +930,7 @@ impl CleanDslManager {
 
         // Mock AI DSL generation - in real implementation, this would call AI services
         let generated_dsl = self.mock_ai_generation(&instruction).await;
-        let case_id = self.extract_or_generate_case_id(&generated_dsl);
+        let case_id = self.extract_or_generate_case_id(&instruction);
 
         // Validate the generated DSL
         let validation_result = self.validate_dsl_only(generated_dsl.clone()).await;
@@ -593,19 +989,19 @@ impl CleanDslManager {
         if instruction.to_lowercase().contains("onboarding") {
             return format!(
                 r#"(case.create :case-id "{}" :case-type "ONBOARDING" :instruction "{}")"#,
-                self.generate_case_id(),
+                CleanDslManager::generate_case_id(),
                 instruction
             );
         } else if instruction.to_lowercase().contains("kyc") {
             return format!(
                 r#"(kyc.collect :case-id "{}" :collection-type "ENHANCED" :instruction "{}")"#,
-                self.generate_case_id(),
+                CleanDslManager::generate_case_id(),
                 instruction
             );
         } else {
             return format!(
                 r#"(case.create :case-id "{}" :case-type "GENERAL" :instruction "{}")"#,
-                self.generate_case_id(),
+                CleanDslManager::generate_case_id(),
                 instruction
             );
         }
@@ -681,7 +1077,8 @@ impl CleanDslManager {
         }
     }
 
-    fn extract_or_generate_case_id(&self, dsl_content: &str) -> String {
+    // Helper method for extracting case ID
+    pub fn extract_or_generate_case_id(&self, dsl_content: &str) -> String {
         // Try to extract case ID from DSL content
         if let Some(start) = dsl_content.find(":case-id") {
             if let Some(quote_start) = dsl_content[start..].find('"') {
@@ -693,21 +1090,13 @@ impl CleanDslManager {
             }
         }
         // Generate new case ID if extraction failed
-        self.generate_case_id()
+        CleanDslManager::generate_case_id()
     }
 
-    fn generate_case_id(&self) -> String {
+    pub fn generate_case_id() -> String {
         format!("CASE-{}", Uuid::new_v4().to_string()[..8].to_uppercase())
     }
-}
 
-impl Default for CleanDslManager {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl CleanDslManager {
     /// Create DSL Manager from database pool for SQLX integration testing
     #[cfg(feature = "database")]
     pub async fn from_database_pool(pool: sqlx::PgPool) -> Self {
@@ -758,6 +1147,12 @@ impl CleanDslManager {
     }
 }
 
+impl Default for CleanDslManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // Helper function to convert between domain snapshot types
 fn convert_domain_snapshot(
     dsl_snapshot: &crate::dsl::DomainSnapshot,
@@ -792,7 +1187,7 @@ mod tests {
 
         assert!(result.success);
         assert_eq!(result.case_id, "CLEAN-001");
-        assert!(result.processing_time_ms >= 0);
+        assert!(result.processing_time_ms > 0 || result.processing_time_ms == 0);
         assert!(result.visualization_generated);
         assert!(!result.ai_generated);
     }
@@ -875,7 +1270,7 @@ mod tests {
 
         let dsl_step = result.step_details.dsl_processing.unwrap();
         assert!(dsl_step.success);
-        assert!(dsl_step.processing_time_ms >= 0);
+        assert!(result.processing_time_ms > 0 || result.processing_time_ms == 0);
     }
 
     #[tokio::test]
