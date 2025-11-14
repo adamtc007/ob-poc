@@ -325,3 +325,4 @@ public_api_inventory.txt
 uuid-*.tar.gz
 *.tar.gz
 !sql/**/*.tar.gz  # Allow SQL backup archives if needed
+*.bak*
