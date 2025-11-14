@@ -231,6 +231,8 @@ impl DslLifecycleService {
         let start_time = Instant::now();
         let session_id = request
             .session_id
+            .as_ref()
+            .map(|s| s.clone())
             .unwrap_or_else(|| self.generate_session_id());
 
         if self.config.enable_lifecycle_logging {
@@ -286,8 +288,8 @@ impl DslLifecycleService {
                 generated_ast: None,
                 result_phase: LifecyclePhase::Validation,
                 total_time_ms: start_time.elapsed().as_millis() as u64,
-                errors: pipeline_result.errors,
                 feedback: self.generate_validation_feedback(&pipeline_result),
+                errors: pipeline_result.errors,
                 metrics: LifecycleMetrics {
                     ast_generation_time_ms: ast_time,
                     validation_time_ms: ast_time, // Combined in pipeline
@@ -456,7 +458,8 @@ impl DslLifecycleService {
     // Private helper methods
 
     fn generate_session_id(&self) -> String {
-        format!("sess_{}", Uuid::new_v4().to_string()[..8])
+        let uuid_str = Uuid::new_v4().to_string();
+        format!("sess_{}", &uuid_str[..8])
     }
 
     fn get_or_create_session(&self, request: &DslChangeRequest, session_id: &str) -> EditSession {

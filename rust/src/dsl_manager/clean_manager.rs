@@ -24,12 +24,13 @@ use crate::database::{DslDomainRepository, DslDomainRepositoryTrait};
 use crate::db_state_manager::DbStateManager;
 use crate::dsl::{
     DslOrchestrationInterface, DslPipelineProcessor, DslPipelineResult, OrchestrationContext,
-    OrchestrationOperation, OrchestrationOperationType,
+    OrchestrationOperation, OrchestrationOperationType, PipelineConfig,
 };
 use crate::dsl_manager::DslManagerError;
 use crate::dsl_visualizer::DslVisualizer;
 #[cfg(feature = "database")]
 use crate::models::domain_models::{NewDslVersion, NewParsedAst};
+use std::collections::HashMap;
 
 use std::time::Instant;
 use uuid::Uuid;
@@ -222,8 +223,7 @@ impl CleanDslManager {
 
     /// Create a Clean DSL Manager with database connectivity for SQLX integration
     #[cfg(feature = "database")]
-    pub fn with_database(database_service: crate::database::DictionaryDatabaseService) -> Self {
-        let pool = database_service.pool().clone();
+    pub fn with_database(database_service: DslDomainRepository) -> Self {
         Self {
             dsl_processor: DslPipelineProcessor::with_database(database_service.clone()),
             db_state_manager: DbStateManager::new(),
@@ -240,9 +240,8 @@ impl CleanDslManager {
     #[cfg(feature = "database")]
     pub fn with_config_and_database(
         config: CleanManagerConfig,
-        database_service: crate::database::DictionaryDatabaseService,
+        database_service: DslDomainRepository,
     ) -> Self {
-        let pool = database_service.pool().clone();
         Self {
             dsl_processor: DslPipelineProcessor::with_config_and_database(
                 PipelineConfig {
@@ -278,7 +277,7 @@ impl CleanDslManager {
 
     /// Get a reference to the database service if available
     #[cfg(feature = "database")]
-    pub fn database_service(&self) -> Option<&crate::database::DictionaryDatabaseService> {
+    pub fn database_service(&self) -> Option<&DslDomainRepository> {
         self.database_service.as_ref()
     }
 
@@ -1255,7 +1254,7 @@ impl CleanDslManager {
     /// Create DSL Manager from database pool for SQLX integration testing
     #[cfg(feature = "database")]
     pub async fn from_database_pool(pool: sqlx::PgPool) -> Self {
-        let database_service = crate::database::DictionaryDatabaseService::new(pool);
+        let database_service = DslDomainRepository::new(pool);
         Self::with_database(database_service)
     }
 

@@ -12,11 +12,13 @@ use tokio::sync::RwLock;
 use uuid::Uuid;
 
 pub mod context;
+pub mod dsl_executor;
 pub mod engine;
 pub mod integrations;
 // pub mod operations; // Removed - operations module doesn't exist
 pub mod rules;
 pub mod state;
+pub mod value_binder;
 
 use crate::data_dictionary::AttributeId;
 use crate::dsl::operations::ExecutableDslOperation as DslOperation;
@@ -425,7 +427,8 @@ impl DslState {
     pub(crate) fn to_dsl_document(&self) -> String {
         self.operations
             .iter()
-            .map(|op| op.to_dsl_string())
+            .map(|op| &op.dsl_content)
+            .cloned()
             .collect::<Vec<_>>()
             .join("\n\n")
     }

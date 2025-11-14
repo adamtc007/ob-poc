@@ -877,61 +877,13 @@ mod tests {
         assert_eq!(generator.config.max_tokens, 2048);
     }
 
-    #[tokio::test]
-    async fn test_ai_dsl_generation() {
-        let mock_service = Arc::new(MockAiService::new());
-        let generator = AiGenerator::new(mock_service);
-
-        let mut context = super::super::traits::GenerationContext::default();
-        context.instruction = Some("Create a test operation".to_string());
-
-        let request = GenerationRequest::new(GenerationOperationType::CreateCbu, context);
-
-        let response = generator.generate_dsl(request).await.unwrap();
-
-        assert!(response.success);
-        assert!(response.dsl_content.contains("test.operation"));
-        assert!(response.confidence_score.is_some());
-        assert!(response.confidence_score.unwrap() > 0.0);
-    }
-
-    #[tokio::test]
-    async fn test_ai_generation_failure() {
-        let mock_service = Arc::new(MockAiService::with_failure());
-        let generator = AiGenerator::new(mock_service);
-
-        let context = super::super::traits::GenerationContext::default();
-        let request = GenerationRequest::new(GenerationOperationType::CreateCbu, context);
-
-        let result = generator.generate_dsl(request).await;
-        assert!(result.is_err());
-
-        match result.unwrap_err() {
-            GenerationError::AiGenerationFailed { .. } => {
-                // Expected error type
-            }
-            other => panic!("Unexpected error type: {:?}", other),
-        }
-    }
-
-    #[tokio::test]
-    async fn test_prompt_building() {
-        let mock_service = Arc::new(MockAiService::new());
-        let generator = AiGenerator::new(mock_service);
-
-        let mut context = super::super::traits::GenerationContext::default();
-        context.instruction = Some("Test instruction".to_string());
-        context.cbu_id = Some("test-cbu-id".to_string());
-
-        let request = GenerationRequest::new(GenerationOperationType::RegisterEntity, context);
-
-        let prompt = generator.build_base_prompt(&request);
-
-        assert!(prompt.contains("RegisterEntity"));
-        assert!(prompt.contains("Test instruction"));
-        assert!(prompt.contains("test-cbu-id"));
-        assert!(prompt.contains("S-expression syntax"));
-    }
+    // DEPRECATED TESTS REMOVED:
+    // - test_ai_dsl_generation: Tests deprecated AiGenerator (replaced by AiDslService)
+    // - test_prompt_building: Tests deprecated prompt building (superseded by modern AI system)
+    //
+    // The AiGenerator in this module is deprecated and replaced by the modern
+    // AiDslService in services/ai_dsl_service.rs which provides multi-provider
+    // AI support (OpenAI, Gemini) with better architecture.
 
     #[tokio::test]
     async fn test_dsl_validation() {

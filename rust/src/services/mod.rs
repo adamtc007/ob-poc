@@ -11,6 +11,9 @@ pub(crate) mod ai_dsl_service;
 pub mod dsl_ast_sync;
 pub mod dsl_lifecycle;
 
+// Attribute service - Phase 1-3 integration layer
+pub mod attribute_service;
+
 // Re-export service types for backwards compatibility
 pub(crate) use ai_dsl_service::{
     AiDslService, AiOnboardingRequest, AiOnboardingResponse, CbuGenerator, DslInstanceSummary,
@@ -35,6 +38,9 @@ pub use crate::dsl_manager::{
 
 // Re-export ValidationResult from ai_dsl_service to avoid conflicts
 pub use ai_dsl_service::ValidationResult;
+
+// Re-export attribute service types
+pub use attribute_service::{AttributeService, AttributeServiceError, ProcessingResult};
 
 /// Master sync service factory for DSL/AST table synchronization
 pub fn create_sync_service() -> DslAstSyncService {

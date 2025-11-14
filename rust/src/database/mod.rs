@@ -8,6 +8,7 @@ use sqlx::{postgres::PgPoolOptions, PgPool};
 use std::time::Duration;
 use tracing::{info, warn};
 
+pub mod attribute_repository;
 pub(crate) mod business_request_repository;
 pub(crate) mod cbu_crud_manager;
 pub(crate) mod cbu_repository;
@@ -16,6 +17,7 @@ pub(crate) mod dsl_domain_repository;
 pub(crate) mod entity_service;
 
 // Re-export repository and trait for convenience
+pub use attribute_repository::{AttributeRepository, RepositoryError as AttributeRepositoryError};
 pub(crate) use business_request_repository::{
     DslBusinessRequestRepository, DslBusinessRequestRepositoryTrait,
 };
@@ -208,4 +210,3 @@ fn mask_database_url(url: &str) -> String {
         }
     }
 }
-

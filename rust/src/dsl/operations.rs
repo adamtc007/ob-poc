@@ -255,6 +255,18 @@ impl std::fmt::Display for DslOperationType {
     }
 }
 
+impl PartialEq<str> for DslOperationType {
+    fn eq(&self, other: &str) -> bool {
+        self.as_str() == other
+    }
+}
+
+impl PartialEq<&str> for DslOperationType {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
 impl Default for OperationContext {
     fn default() -> Self {
         Self {

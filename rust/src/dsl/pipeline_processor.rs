@@ -43,7 +43,7 @@ pub struct DslPipelineProcessor {
     metrics: ProcessingMetrics,
     /// Database service for actual database operations
     #[cfg(feature = "database")]
-    database_service: Option<crate::database::DictionaryDatabaseService>,
+    database_service: Option<crate::database::DslDomainRepository>,
     /// Phase 5: Orchestration metrics for performance monitoring
     orchestration_metrics:
         std::sync::Arc<std::sync::Mutex<crate::dsl::orchestration_interface::OrchestrationMetrics>>,
@@ -354,14 +354,16 @@ impl AstParser {
     }
 
     fn count_verbs(&self, dsl_content: &str) -> usize {
-        let verb_patterns = ["case.",
+        let verb_patterns = [
+            "case.",
             "kyc.",
             "entity.",
             "ubo.",
             "products.",
             "services.",
             "document.",
-            "isda."];
+            "isda.",
+        ];
         verb_patterns
             .iter()
             .map(|pattern| dsl_content.matches(pattern).count())
@@ -549,7 +551,7 @@ impl DslPipelineProcessor {
 
     /// Create a new DSL Pipeline Processor with database connectivity
     #[cfg(feature = "database")]
-    pub fn with_database(database_service: crate::database::DictionaryDatabaseService) -> Self {
+    pub fn with_database(database_service: crate::database::DslDomainRepository) -> Self {
         Self {
             config: PipelineConfig::default(),
             step_processors: StepProcessors {
@@ -589,7 +591,7 @@ impl DslPipelineProcessor {
     #[cfg(feature = "database")]
     pub fn with_config_and_database(
         config: PipelineConfig,
-        database_service: crate::database::DictionaryDatabaseService,
+        database_service: crate::database::DslDomainRepository,
     ) -> Self {
         Self {
             config,
@@ -980,7 +982,7 @@ impl DslPipelineProcessor {
 
     /// Get a reference to the database service if available
     #[cfg(feature = "database")]
-    pub fn database_service(&self) -> Option<&crate::database::DictionaryDatabaseService> {
+    pub fn database_service(&self) -> Option<&crate::database::DslDomainRepository> {
         self.database_service.as_ref()
     }
 
@@ -1040,7 +1042,7 @@ impl DslPipelineProcessor {
         &self,
         dsl_content: &str,
         context: &OrchestrationContext,
-        db_service: &crate::database::DictionaryDatabaseService,
+        db_service: &crate::database::DslDomainRepository,
     ) -> DSLResult<Vec<crate::dsl::orchestration_interface::DatabaseOperation>> {
         use crate::dsl::orchestration_interface::DatabaseOperation;
         let mut operations = Vec::new();

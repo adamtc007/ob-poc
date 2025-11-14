@@ -86,7 +86,9 @@ impl BusinessRule for RequiredAttributesRule {
     }
 
     fn applies_to(&self, operation: &DslOperation) -> bool {
-        self.operation_types.contains(&operation.operation_type)
+        self.operation_types
+            .iter()
+            .any(|t| t == operation.operation_type.as_str())
     }
 
     async fn validate(
@@ -288,7 +290,9 @@ impl BusinessRule for ComplianceWorkflowRule {
     }
 
     fn applies_to(&self, operation: &DslOperation) -> bool {
-        self.required_sequence.contains(&operation.operation_type)
+        self.required_sequence
+            .iter()
+            .any(|t| t == operation.operation_type.as_str())
     }
 
     async fn validate(
@@ -300,7 +304,7 @@ impl BusinessRule for ComplianceWorkflowRule {
         let current_operation_index = self
             .required_sequence
             .iter()
-            .position(|op| op == &operation.operation_type);
+            .position(|op| op == operation.operation_type.as_str());
 
         if let Some(current_index) = current_operation_index {
             // Check if all previous steps in the sequence have been completed
@@ -311,7 +315,7 @@ impl BusinessRule for ComplianceWorkflowRule {
                     let step_completed = state
                         .operations
                         .iter()
-                        .any(|op| &op.operation_type == required_op);
+                        .any(|op| op.operation_type.as_str() == required_op);
 
                     if !step_completed {
                         missing_steps.push(required_op.clone());

@@ -12,6 +12,12 @@
 //! - **Entity**: Entity registration and classification
 //! - **Products**: Product and service provisioning
 //! - **Documents**: Document management and verification
+//!
+//! ## Typed Attributes
+//! - **attributes**: Type-safe attribute system with compile-time validation
+
+// New typed attribute system
+pub mod attributes;
 
 // Domain modules will be implemented as needed
 // For now, providing stub implementations

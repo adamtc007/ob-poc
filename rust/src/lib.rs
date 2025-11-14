@@ -34,6 +34,10 @@ pub mod grammar;
 pub mod data_dictionary;
 pub mod vocabulary;
 
+// Macro system for reducing boilerplate
+#[macro_use]
+pub mod macros;
+
 // Domain handlers for business logic
 pub mod domains;
 

@@ -1,0 +1,560 @@
+# Attribute Dictionary Refactoring Plan
+## ob-poc KYC/Onboarding Platform
+
+**Document Version:** 1.0  
+**Date:** November 14, 2025  
+**Status:** Implementation Ready
+
+---
+
+## Executive Summary
+
+This plan outlines the refactoring of the attribute dictionary implementation in the ob-poc platform, transitioning from UUID-based AttributeIDs to a fully integrated type-safe pattern that properly integrates with the DSL parser. Currently, only 15% of the AttributeID-as-Type pattern is functional, and this refactoring will complete the implementation to achieve 100% type safety and DSL integration.
+
+---
+
+## Current State Analysis
+
+### Problems with Current Implementation
+1. **UUID-based AttributeIDs**: Lack compile-time type safety and semantic meaning
+2. **Incomplete Type Pattern**: Only 15% of AttributeID-as-Type pattern implemented
+3. **DSL Integration Gap**: Attribute dictionary not properly integrated with nom parser combinators
+4. **Runtime Validation**: Type checking happens at runtime instead of compile time
+5. **Schema Mismatch**: PostgreSQL schema doesn't align with Rust type system
+
+### Existing Components
+- **DSL Parser**: Rust implementation using nom parser combinators
+- **Attribute Storage**: PostgreSQL tables with UUID primary keys
+- **Vector Store**: Qdrant integration for semantic search
+- **Form.io Integration**: Dynamic form generation from attributes
+
+---
+
+## Target Architecture
+
+### Core Design Principles
+1. **Type-First Design**: Every attribute has a strongly-typed Rust representation
+2. **DSL Native**: Attributes are first-class citizens in the DSL
+3. **Compile-Time Safety**: Invalid attribute usage caught during compilation
+4. **Zero-Cost Abstractions**: Type safety without runtime overhead
+
+### New Type System Structure
+```rust
+// Instead of: AttributeId(UUID)
+// We'll have: typed attribute enums and traits
+
+pub trait AttributeType: Send + Sync {
+    type Value: Serialize + DeserializeOwned;
+    const CATEGORY: AttributeCategory;
+    const NAME: &'static str;
+}
+
+pub enum AttributeCategory {
+    Identity,
+    Financial,
+    Compliance,
+    Document,
+    Risk,
+}
+```
+
+---
+
+## Phase 1: Foundation (Week 1)
+
+### 1.1 Create New Type Definitions
+**File:** `src/domain/attributes/types.rs`
+
+```rust
+// Core trait definition
+pub trait AttributeType {
+    type Value: Serialize + DeserializeOwned + Clone + Debug;
+    const ID: &'static str;
+    const CATEGORY: AttributeCategory;
+    const VALIDATION: ValidationRules;
+    
+    fn validate(value: &Self::Value) -> Result<(), ValidationError>;
+    fn to_dsl_token() -> DslToken;
+}
+
+// Concrete attribute types
+pub struct FirstName;
+impl AttributeType for FirstName {
+    type Value = String;
+    const ID: &'static str = "attr.identity.first_name";
+    const CATEGORY: AttributeCategory = AttributeCategory::Identity;
+    // ...
+}
+```
+
+### 1.2 Database Schema Migration
+**File:** `migrations/001_attribute_types.sql`
+
+```sql
+-- Create attribute registry table
+CREATE TABLE attribute_registry (
+    id TEXT PRIMARY KEY,  -- e.g., "attr.identity.first_name"
+    category TEXT NOT NULL,
+    value_type TEXT NOT NULL,  -- "string", "number", "date", etc.
+    validation_rules JSONB,
+    metadata JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create attribute values table with proper typing
+CREATE TABLE attribute_values (
+    id SERIAL PRIMARY KEY,
+    entity_id UUID NOT NULL,
+    attribute_id TEXT NOT NULL REFERENCES attribute_registry(id),
+    value_text TEXT,
+    value_number NUMERIC,
+    value_date DATE,
+    value_json JSONB,
+    value_binary BYTEA,
+    effective_from TIMESTAMPTZ DEFAULT NOW(),
+    effective_to TIMESTAMPTZ,
+    CONSTRAINT check_single_value CHECK (
+        (value_text IS NOT NULL)::int +
+        (value_number IS NOT NULL)::int +
+        (value_date IS NOT NULL)::int +
+        (value_json IS NOT NULL)::int +
+        (value_binary IS NOT NULL)::int = 1
+    )
+);
+
+-- Index for efficient queries
+CREATE INDEX idx_attribute_values_entity ON attribute_values(entity_id);
+CREATE INDEX idx_attribute_values_attribute ON attribute_values(attribute_id);
+```
+
+---
+
+## Phase 2: DSL Integration (Week 2)
+
+### 2.1 Extend DSL Grammar
+**File:** `src/dsl/grammar.rs`
+
+```rust
+// Add attribute references to DSL
+pub enum DslExpression {
+    // Existing variants...
+    AttributeRef(TypedAttributeRef),
+    AttributeAssignment {
+        attribute: TypedAttributeRef,
+        value: Box<DslExpression>,
+    },
+    AttributeValidation {
+        attribute: TypedAttributeRef,
+        rules: Vec<ValidationRule>,
+    },
+}
+
+pub struct TypedAttributeRef {
+    pub id: &'static str,
+    pub type_marker: PhantomData<dyn AttributeType>,
+}
+```
+
+### 2.2 Update Parser Combinators
+**File:** `src/dsl/parser.rs`
+
+```rust
+use nom::{
+    branch::alt,
+    bytes::complete::{tag, take_while1},
+    character::complete::{char, multispace0},
+    combinator::{map, recognize},
+    sequence::{delimited, preceded, tuple},
+    IResult,
+};
+
+// Parse attribute references
+fn parse_attribute_ref(input: &str) -> IResult<&str, TypedAttributeRef> {
+    preceded(
+        char('@'),
+        map(
+            take_while1(|c: char| c.is_alphanumeric() || c == '.' || c == '_'),
+            |s: &str| {
+                // Lookup attribute in registry
+                TypedAttributeRef::from_string(s)
+            }
+        )
+    )(input)
+}
+
+// Parse attribute assignment
+fn parse_attribute_assignment(input: &str) -> IResult<&str, DslExpression> {
+    map(
+        tuple((
+            parse_attribute_ref,
+            delimited(multispace0, tag("="), multispace0),
+            parse_expression,
+        )),
+        |(attr, _, value)| DslExpression::AttributeAssignment {
+            attribute: attr,
+            value: Box::new(value),
+        }
+    )(input)
+}
+```
+
+---
+
+## Phase 3: Type-Safe Repository Pattern (Week 3)
+
+### 3.1 Implement Typed Repository
+**File:** `src/repository/attributes.rs`
+
+```rust
+pub struct AttributeRepository {
+    pool: Arc<PgPool>,
+    cache: Arc<RwLock<HashMap<String, AttributeMetadata>>>,
+}
+
+impl AttributeRepository {
+    pub async fn get<T: AttributeType>(
+        &self,
+        entity_id: Uuid,
+    ) -> Result<Option<T::Value>> {
+        let query = sqlx::query!(
+            r#"
+            SELECT value_text, value_number, value_date, value_json, value_binary
+            FROM attribute_values
+            WHERE entity_id = $1 AND attribute_id = $2
+            AND effective_to IS NULL
+            ORDER BY effective_from DESC
+            LIMIT 1
+            "#,
+            entity_id,
+            T::ID
+        );
+        
+        let row = query.fetch_optional(&*self.pool).await?;
+        
+        match row {
+            Some(r) => Ok(Some(Self::deserialize_value::<T>(r)?)),
+            None => Ok(None),
+        }
+    }
+    
+    pub async fn set<T: AttributeType>(
+        &self,
+        entity_id: Uuid,
+        value: T::Value,
+    ) -> Result<()> {
+        T::validate(&value)?;
+        
+        let serialized = Self::serialize_value::<T>(value)?;
+        
+        // Insert with proper type column
+        // ...
+    }
+}
+```
+
+### 3.2 Create Attribute Macro
+**File:** `src/macros/attributes.rs`
+
+```rust
+#[macro_export]
+macro_rules! define_attribute {
+    (
+        $name:ident,
+        category = $category:expr,
+        value_type = $value_type:ty,
+        validation = $validation:expr
+    ) => {
+        pub struct $name;
+        
+        impl AttributeType for $name {
+            type Value = $value_type;
+            const ID: &'static str = concat!("attr.", stringify!($category), ".", stringify!($name));
+            const CATEGORY: AttributeCategory = $category;
+            const VALIDATION: ValidationRules = $validation;
+            
+            fn validate(value: &Self::Value) -> Result<(), ValidationError> {
+                $validation.validate(value)
+            }
+            
+            fn to_dsl_token() -> DslToken {
+                DslToken::Attribute(Self::ID)
+            }
+        }
+    };
+}
+
+// Usage:
+define_attribute!(
+    LegalEntityName,
+    category = AttributeCategory::Identity,
+    value_type = String,
+    validation = ValidationRules::new()
+        .min_length(1)
+        .max_length(255)
+        .pattern(r"^[A-Za-z0-9\s\-\.,'&]+$")
+);
+```
+
+---
+
+## Phase 4: Migration and Testing (Week 4)
+
+### 4.1 Data Migration Script
+**File:** `src/bin/migrate_attributes.rs`
+
+```rust
+async fn migrate_attributes(pool: &PgPool) -> Result<()> {
+    // 1. Read existing UUID-based attributes
+    let old_attributes = sqlx::query!(
+        "SELECT id, name, type, metadata FROM attributes_old"
+    )
+    .fetch_all(pool)
+    .await?;
+    
+    // 2. Map to new type system
+    for attr in old_attributes {
+        let new_id = format!("attr.{}.{}", 
+            determine_category(&attr.metadata),
+            attr.name.to_lowercase()
+        );
+        
+        // 3. Insert into new registry
+        sqlx::query!(
+            r#"
+            INSERT INTO attribute_registry (id, category, value_type, validation_rules, metadata)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (id) DO UPDATE
+            SET metadata = EXCLUDED.metadata
+            "#,
+            new_id,
+            category,
+            value_type,
+            validation_rules,
+            attr.metadata
+        )
+        .execute(pool)
+        .await?;
+    }
+    
+    // 4. Migrate attribute values
+    // ...
+}
+```
+
+### 4.2 Test Suite
+**File:** `tests/attribute_refactor.rs`
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[tokio::test]
+    async fn test_typed_attribute_storage() {
+        let repo = AttributeRepository::new(test_pool()).await;
+        let entity_id = Uuid::new_v4();
+        
+        // Set typed attribute
+        repo.set::<FirstName>(entity_id, "John".to_string()).await.unwrap();
+        
+        // Get typed attribute
+        let name = repo.get::<FirstName>(entity_id).await.unwrap();
+        assert_eq!(name, Some("John".to_string()));
+    }
+    
+    #[test]
+    fn test_dsl_attribute_parsing() {
+        let input = "@attr.identity.first_name = \"John\"";
+        let result = parse_attribute_assignment(input).unwrap();
+        
+        match result.1 {
+            DslExpression::AttributeAssignment { attribute, value } => {
+                assert_eq!(attribute.id, "attr.identity.first_name");
+            }
+            _ => panic!("Expected AttributeAssignment"),
+        }
+    }
+    
+    #[test]
+    fn test_attribute_validation() {
+        assert!(FirstName::validate(&"John".to_string()).is_ok());
+        assert!(FirstName::validate(&"".to_string()).is_err());
+        assert!(FirstName::validate(&"A".repeat(256)).is_err());
+    }
+}
+```
+
+---
+
+## Phase 5: Integration Points (Week 5-6)
+
+### 5.1 Form.io Integration Update
+**File:** `src/integrations/formio.rs`
+
+```rust
+impl FormioAdapter {
+    pub fn generate_schema_from_attributes(
+        attributes: Vec<Box<dyn AttributeType>>
+    ) -> FormioSchema {
+        let components = attributes
+            .into_iter()
+            .map(|attr| self.attribute_to_component(attr))
+            .collect();
+            
+        FormioSchema { components }
+    }
+    
+    fn attribute_to_component(&self, attr: Box<dyn AttributeType>) -> Component {
+        Component {
+            key: attr.id(),
+            type: match attr.value_type() {
+                ValueType::String => "textfield",
+                ValueType::Number => "number",
+                ValueType::Date => "datetime",
+                ValueType::Json => "textarea",
+                _ => "textfield",
+            },
+            label: attr.display_name(),
+            validate: attr.validation_rules().to_formio(),
+            // ...
+        }
+    }
+}
+```
+
+### 5.2 Qdrant Vector Store Update
+**File:** `src/integrations/qdrant.rs`
+
+```rust
+impl VectorStoreAdapter {
+    pub async fn index_attribute<T: AttributeType>(
+        &self,
+        entity_id: Uuid,
+        value: &T::Value,
+    ) -> Result<()> {
+        let embedding = self.generate_embedding(
+            &format!("{}: {:?}", T::ID, value)
+        ).await?;
+        
+        let point = PointStruct {
+            id: PointId::from(entity_id.to_string()),
+            vector: embedding,
+            payload: json!({
+                "attribute_id": T::ID,
+                "category": T::CATEGORY.to_string(),
+                "entity_id": entity_id.to_string(),
+                "value": serde_json::to_value(value)?,
+            }),
+        };
+        
+        self.client
+            .upsert_points("attributes", vec![point])
+            .await?;
+            
+        Ok(())
+    }
+}
+```
+
+---
+
+## Implementation Checklist
+
+### Week 1: Foundation
+- [ ] Create `src/domain/attributes/types.rs` with core traits
+- [ ] Define all KYC attribute types using macros
+- [ ] Create database migration scripts
+- [ ] Run migration on development database
+- [ ] Set up attribute registry population script
+
+### Week 2: DSL Integration  
+- [ ] Update DSL grammar to include attribute references
+- [ ] Implement nom parsers for attribute expressions
+- [ ] Add attribute validation rules to DSL
+- [ ] Create DSL test cases for attribute operations
+- [ ] Update DSL documentation
+
+### Week 3: Repository Pattern
+- [ ] Implement typed repository methods
+- [ ] Create attribute caching layer
+- [ ] Add transaction support for attribute updates
+- [ ] Implement audit trail for attribute changes
+- [ ] Create repository test suite
+
+### Week 4: Migration
+- [ ] Create UUID to typed-ID mapping
+- [ ] Write data migration scripts
+- [ ] Test migration on staging data
+- [ ] Create rollback procedures
+- [ ] Document migration process
+
+### Week 5: Integration Updates
+- [ ] Update Form.io adapter
+- [ ] Update Qdrant indexing
+- [ ] Update gRPC service definitions
+- [ ] Update GraphQL schema if applicable
+- [ ] Test all integration points
+
+### Week 6: Final Testing & Deployment
+- [ ] Run full integration tests
+- [ ] Performance benchmarking
+- [ ] Load testing with new type system
+- [ ] Documentation updates
+- [ ] Production deployment plan
+
+---
+
+## Risk Mitigation
+
+### High-Risk Areas
+1. **Data Migration**: Keep parallel systems running during transition
+2. **DSL Breaking Changes**: Provide compatibility layer for old DSL
+3. **Performance Impact**: Benchmark before and after, optimize hot paths
+4. **Type Explosion**: Use macro generation to manage boilerplate
+
+### Rollback Strategy
+1. Keep old UUID tables intact during migration
+2. Implement feature flags for gradual rollout
+3. Maintain backwards compatibility in API layer
+4. Create automated rollback scripts
+
+---
+
+## Success Metrics
+
+- **Type Coverage**: 100% of attributes using new type system
+- **Compile-Time Safety**: Zero runtime type errors in production
+- **DSL Integration**: All attribute operations expressible in DSL
+- **Performance**: < 10ms for attribute lookups (p99)
+- **Migration Success**: Zero data loss, < 1 hour downtime
+
+---
+
+## Next Steps
+
+1. Review this plan with the team
+2. Set up feature branch: `feature/attribute-dictionary-refactor`
+3. Create tracking issues for each phase
+4. Begin Phase 1 implementation
+5. Schedule weekly progress reviews
+
+---
+
+## Notes for Claude Agent Implementation
+
+When using Claude agent in Zed to implement these changes:
+
+1. **Start with Phase 1**: Focus on creating the type system first
+2. **Test Incrementally**: Write tests before implementing each component
+3. **Use Bacon**: Keep bacon running for continuous compilation feedback
+4. **Commit Often**: Make small, atomic commits for each completed component
+5. **Reference This Doc**: Keep this plan open as you work through implementation
+
+Key files to focus on:
+- `src/domain/attributes/types.rs` (new)
+- `src/dsl/parser.rs` (modify)
+- `src/repository/attributes.rs` (new)
+- `migrations/001_attribute_types.sql` (new)
+
+Remember: The goal is type safety at compile time, not runtime validation!

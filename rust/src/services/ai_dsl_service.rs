@@ -161,7 +161,7 @@ impl AiDslService {
     /// Create AI DSL service with database connectivity
     #[cfg(feature = "database")]
     pub async fn new_with_database(
-        database_service: crate::database::DictionaryDatabaseService,
+        database_service: crate::database::DslDomainRepository,
     ) -> AiDslResult<Self> {
         let dsl_manager = CleanDslManager::with_database(database_service);
 

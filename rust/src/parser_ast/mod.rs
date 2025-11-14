@@ -10,6 +10,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use uuid::Uuid;
 
 // Import types from dsl_types crate (Level 1 foundation)
 pub use dsl_types::{RollbackStrategy, TransactionMode};
@@ -50,7 +51,8 @@ pub enum Value {
     Identifier(String), // For unquoted symbols
     List(Vec<Value>),
     Map(HashMap<Key, Value>),
-    AttrRef(String), // UUID string, e.g., "@attr{uuid-001}"
+    AttrRef(String), // Semantic ID reference, e.g., "@attr.identity.first_name"
+    AttrUuid(Uuid),  // UUID-based reference, e.g., "@attr{3020d46f-...}"
     // Additional variants needed for CRUD operations
     String(String),
     Integer(i32),

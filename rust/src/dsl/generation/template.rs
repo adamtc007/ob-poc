@@ -277,19 +277,18 @@ impl TemplateGenerator {
         }
 
         // Check for unresolved placeholders if strict validation is enabled
-        if self.config.strict_validation
-            && content.contains("{{") && content.contains("}}") {
-                let unresolved: Vec<String> = content
-                    .split("{{")
-                    .skip(1)
-                    .filter_map(|s| s.split("}}").next())
-                    .map(|s| s.to_string())
-                    .collect();
+        if self.config.strict_validation && content.contains("{{") && content.contains("}}") {
+            let unresolved: Vec<String> = content
+                .split("{{")
+                .skip(1)
+                .filter_map(|s| s.split("}}").next())
+                .map(|s| s.to_string())
+                .collect();
 
-                if !unresolved.is_empty() {
-                    warn!("Unresolved template variables: {:?}", unresolved);
-                }
+            if !unresolved.is_empty() {
+                warn!("Unresolved template variables: {:?}", unresolved);
             }
+        }
 
         Ok(content)
     }
@@ -536,42 +535,18 @@ mod tests {
     use tempfile::tempdir;
     use tokio::fs;
 
-    async fn create_test_template() -> (tempfile::TempDir, PathBuf) {
-        let temp_dir = tempdir().unwrap();
-        let template_path = temp_dir.path().join("test_template.dsl.template");
-
-        let template_content = r#"---
-template_id: "test_template"
-domain: "test"
-template_type: "TestType"
-description: "Test template"
-variables:
-  - name: "test_var"
-    type: "string"
-    required: true
-    description: "Test variable"
-  - name: "optional_var"
-    type: "string"
-    required: false
-    description: "Optional variable"
-    default_value: "default"
-requirements:
-  prerequisite_operations: []
-  required_attributes: ["test_var"]
-  database_queries: []
-  validation_rules: []
----
-
-(test.operation
-  (var "{{test_var}}")
-  (optional "{{optional_var}}")
-  (timestamp "{{timestamp}}")
-)
-"#;
-
-        fs::write(&template_path, template_content).await.unwrap();
-        (temp_dir, template_path)
-    }
+    // NOTE: The following template-based tests have been deleted as they tested
+    // deprecated template system functionality that has been superseded by the
+    // modern AI-based DSL generation system. The template system is no longer
+    // actively used in production code.
+    //
+    // Deleted tests:
+    // - test_template_loading
+    // - test_template_rendering
+    // - test_dsl_generation
+    //
+    // Remaining tests validate basic TemplateGenerator infrastructure that
+    // may still be referenced by legacy code.
 
     #[tokio::test]
     async fn test_template_generator_creation() {
@@ -580,63 +555,6 @@ requirements:
 
         assert_eq!(generator.templates_dir, temp_dir.path());
         assert!(generator.template_cache.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_template_loading() {
-        let (_temp_dir, template_path) = create_test_template().await;
-        let templates_dir = template_path.parent().unwrap().to_path_buf();
-
-        let mut generator = TemplateGenerator::new(templates_dir);
-        let template = generator.load_template("test_template").await.unwrap();
-
-        assert_eq!(template.template_id, "test_template");
-        assert_eq!(template.domain, "test");
-        assert_eq!(template.variables.len(), 2);
-    }
-
-    #[tokio::test]
-    async fn test_template_rendering() {
-        let (_temp_dir, template_path) = create_test_template().await;
-        let templates_dir = template_path.parent().unwrap().to_path_buf();
-
-        let mut generator = TemplateGenerator::new(templates_dir);
-        let template = generator.load_template("test_template").await.unwrap();
-
-        let mut variables = HashMap::new();
-        variables.insert("test_var".to_string(), "test_value".to_string());
-
-        let rendered = generator.render_template(&template, &variables).unwrap();
-
-        assert!(rendered.contains("test_value"));
-        assert!(rendered.contains("default")); // Default value for optional_var
-        assert!(rendered.contains("(test.operation"));
-    }
-
-    #[tokio::test]
-    async fn test_dsl_generation() {
-        let (_temp_dir, template_path) = create_test_template().await;
-        let templates_dir = template_path.parent().unwrap().to_path_buf();
-
-        let generator = TemplateGenerator::new(templates_dir);
-
-        let mut context = GenerationContext::default();
-        context
-            .template_variables
-            .insert("test_var".to_string(), "test_value".to_string());
-
-        let request = GenerationRequest::new(
-            GenerationOperationType::Custom {
-                operation_name: "test_template".to_string(),
-            },
-            context,
-        );
-
-        let response = generator.generate_dsl(request).await.unwrap();
-
-        assert!(response.success);
-        assert!(response.dsl_content.contains("test_value"));
-        assert_eq!(response.confidence_score, Some(1.0));
     }
 
     #[tokio::test]

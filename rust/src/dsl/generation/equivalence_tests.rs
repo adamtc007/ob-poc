@@ -493,13 +493,12 @@ pub fn assert_equivalent_dsl(
             if template_response.dsl_content.trim() != ai_response.dsl_content.trim() {
                 errors.push("DSL content is not exactly identical".to_string());
             }
-        } else if config.semantic_comparison
-            && !comparison.semantic_equivalent {
-                errors.push(format!(
-                    "DSL content is not semantically equivalent (similarity: {:.2})",
-                    comparison.content_similarity
-                ));
-            }
+        } else if config.semantic_comparison && !comparison.semantic_equivalent {
+            errors.push(format!(
+                "DSL content is not semantically equivalent (similarity: {:.2})",
+                comparison.content_similarity
+            ));
+        }
 
         // Check confidence scores
         if let (Some(template_conf), Some(ai_conf)) = (
@@ -711,7 +710,9 @@ pub async fn test_template_agent_equivalence(
 mod tests {
     use super::*;
 
+    // DEPRECATED: Template-based generation has been superseded by modern AI system
     #[tokio::test]
+    #[ignore = "Deprecated template equivalence test - template system replaced by AiDslService"]
     async fn test_create_cbu_equivalence() {
         let config = EquivalenceTestConfig::default();
         let result = test_template_agent_equivalence(GenerationOperationType::CreateCbu, config)
@@ -737,6 +738,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "Deprecated template equivalence test - template system replaced by AiDslService"]
     async fn test_register_entity_equivalence() {
         let config = EquivalenceTestConfig::default();
         let result =
@@ -750,6 +752,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "Deprecated template equivalence test - template system replaced by AiDslService"]
     async fn test_ubo_calculation_equivalence() {
         let config = EquivalenceTestConfig::default();
         let result = test_template_agent_equivalence(GenerationOperationType::CalculateUbo, config)
@@ -762,6 +765,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Deprecated template equivalence test - template system replaced by AiDslService"]
     fn test_dsl_keyword_extraction() {
         let dsl_content = r#"
         (case.create
