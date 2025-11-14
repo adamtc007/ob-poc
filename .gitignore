@@ -308,3 +308,20 @@ web-interface/node_modules/
 .sqlx/
 */.sqlx/
 **/.sqlx/
+
+# ==============================================================================
+# Code Intelligence and API Analysis
+# ==============================================================================
+
+# SCIP (SCIP Code Intelligence Protocol) index files
+*.scip
+index.scip
+
+# Public API inventory files (generated)
+public_api_inventory.txt
+**/public_api_inventory.txt
+
+# Archive files that should not be in source control
+uuid-*.tar.gz
+*.tar.gz
+!sql/**/*.tar.gz  # Allow SQL backup archives if needed
