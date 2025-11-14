@@ -61,6 +61,10 @@ pub mod dsl_visualizer;
 #[cfg(feature = "database")]
 pub mod services;
 
+// REST API Layer for agentic operations
+#[cfg(feature = "database")]
+pub mod api;
+
 // Public re-exports for the clean architecture
 pub use db_state_manager::{AccumulatedState, DbStateManager, StateResult};
 pub use dsl::{

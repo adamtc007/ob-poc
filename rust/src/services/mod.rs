@@ -14,6 +14,17 @@ pub mod dsl_lifecycle;
 // Attribute service - Phase 1-3 integration layer
 pub mod attribute_service;
 
+// Document extraction and attribute resolution services
+pub mod attribute_executor;
+pub mod document_catalog_source;
+pub mod extraction_service;
+
+// Agentic DSL CRUD - Natural Language → DSL → Database
+pub mod agentic_dsl_crud;
+
+// Complete Agentic System - Entity, Role, and CBU Management
+pub mod agentic_complete;
+
 // Re-export service types for backwards compatibility
 pub(crate) use ai_dsl_service::{
     AiDslService, AiOnboardingRequest, AiOnboardingResponse, CbuGenerator, DslInstanceSummary,
@@ -41,6 +52,18 @@ pub use ai_dsl_service::ValidationResult;
 
 // Re-export attribute service types
 pub use attribute_service::{AttributeService, AttributeServiceError, ProcessingResult};
+
+// Re-export extraction and resolution types
+pub use attribute_executor::{
+    AttributeDictionary, AttributeExecutor, AttributeSink, DatabaseSink, ExecutorError,
+};
+pub use document_catalog_source::{
+    ApiDataSource, AttributeSource, DocumentCatalogSource, FormDataSource, SourceError,
+};
+pub use extraction_service::{
+    ExtractionError, ExtractionMetadata, ExtractionService, MockExtractionService,
+    OcrExtractionService,
+};
 
 /// Master sync service factory for DSL/AST table synchronization
 pub fn create_sync_service() -> DslAstSyncService {

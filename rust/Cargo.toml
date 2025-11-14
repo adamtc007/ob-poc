@@ -44,6 +44,11 @@ tokio = { version = "1", features = ["full"] }
 # HTTP client for external integrations
 reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
 
+# REST API framework (optional for server)
+axum = { version = "0.7", optional = true }
+tower = { version = "0.4", optional = true }
+tower-http = { version = "0.5", features = ["cors", "trace"], optional = true }
+
 # Testing utilities (used in lib code for generation tests)
 tempfile = "3.0"
 
@@ -69,6 +74,7 @@ rand = "0.8"
 default = []
 
 database = ["dep:sqlx", "dep:bigdecimal"]  # Only enable database functionality when needed
+server = ["database", "dep:axum", "dep:tower", "dep:tower-http"]  # REST API server with database
 
 
 

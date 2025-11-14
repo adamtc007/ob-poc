@@ -53,6 +53,8 @@ pub enum Value {
     Map(HashMap<Key, Value>),
     AttrRef(String), // Semantic ID reference, e.g., "@attr.identity.first_name"
     AttrUuid(Uuid),  // UUID-based reference, e.g., "@attr{3020d46f-...}"
+    AttrUuidWithSource(Uuid, String), // UUID with source hint, e.g., "@attr{uuid}:doc"
+    AttrRefWithSource(String, String), // Semantic ID with source hint, e.g., "@attr.identity.name:doc"
     // Additional variants needed for CRUD operations
     String(String),
     Integer(i32),

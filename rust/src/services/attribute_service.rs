@@ -334,6 +334,16 @@ impl AttributeService {
                 "type": "attr_uuid",
                 "uuid": uuid.to_string()
             }),
+            Value::AttrUuidWithSource(uuid, source) => serde_json::json!({
+                "type": "attr_uuid_with_source",
+                "uuid": uuid.to_string(),
+                "source": source
+            }),
+            Value::AttrRefWithSource(attr_id, source) => serde_json::json!({
+                "type": "attr_ref_with_source",
+                "id": attr_id,
+                "source": source
+            }),
             Value::Literal(lit) => match lit {
                 crate::parser_ast::Literal::String(s) => serde_json::json!(s),
                 crate::parser_ast::Literal::Number(n) => serde_json::json!(n),

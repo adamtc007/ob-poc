@@ -220,11 +220,34 @@ pub(crate) fn parse_map_value(input: &str) -> ParseResult<'_, Value> {
 
 /// Parse an attribute reference: @attr{uuid} or @attr.category.name
 /// Implements Phase 1: UUID-based and semantic attribute references
+/// Also supports source hints: @attr{uuid}:doc or @attr.category.name:form
 fn parse_attr_ref(input: &str) -> ParseResult<'_, Value> {
     alt((
-        parse_attr_uuid,     // Try UUID format first: @attr{uuid}
-        parse_attr_semantic, // Fall back to semantic format: @attr.category.name
+        parse_attr_uuid_with_source,     // Try UUID with source hint first
+        parse_attr_uuid,                 // Then UUID without source
+        parse_attr_semantic_with_source, // Then semantic with source hint
+        parse_attr_semantic,             // Finally semantic without source
     ))(input)
+}
+
+/// Parse UUID-based attribute reference with source hint: @attr{uuid}:source
+/// Example: @attr{3020d46f-472c-5437-9647-1b0682c35935}:doc
+fn parse_attr_uuid_with_source(input: &str) -> ParseResult<'_, Value> {
+    let (input, _) = tag("@attr{")(input)?;
+    let (input, uuid_str) = take_while1(|c: char| c.is_ascii_hexdigit() || c == '-')(input)?;
+    let (input, _) = char('}')(input)?;
+    let (input, _) = char(':')(input)?;
+    let (input, source) = take_while1(|c: char| c.is_alphabetic())(input)?;
+
+    // Parse the UUID string into a proper Uuid type
+    let uuid = uuid::Uuid::parse_str(uuid_str).map_err(|_| {
+        nom::Err::Error(VerboseError::from_error_kind(
+            input,
+            nom::error::ErrorKind::Verify,
+        ))
+    })?;
+
+    Ok((input, Value::AttrUuidWithSource(uuid, source.to_string())))
 }
 
 /// Parse UUID-based attribute reference: @attr{uuid}
@@ -243,6 +266,15 @@ fn parse_attr_uuid(input: &str) -> ParseResult<'_, Value> {
     })?;
 
     Ok((input, Value::AttrUuid(uuid)))
+}
+
+/// Parse semantic attribute reference with source hint: @attr.category.name:source
+/// Example: @attr.identity.first_name:form
+fn parse_attr_semantic_with_source(input: &str) -> ParseResult<'_, Value> {
+    let (input, attr_id) = parse_string_attr_ref(input)?;
+    let (input, _) = char(':')(input)?;
+    let (input, source) = take_while1(|c: char| c.is_alphabetic())(input)?;
+    Ok((input, Value::AttrRefWithSource(attr_id, source.to_string())))
 }
 
 /// Parse semantic attribute reference: @attr.category.name
