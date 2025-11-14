@@ -29,7 +29,7 @@ use crate::dsl::{
 use crate::dsl_manager::DslManagerError;
 use crate::dsl_visualizer::DslVisualizer;
 #[cfg(feature = "database")]
-use crate::models::domain_models::{NewDslVersion, NewParsedAst};
+use crate::models::domain_models::NewDslVersion;
 use std::collections::HashMap;
 
 use std::time::Instant;

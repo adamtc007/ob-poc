@@ -11,16 +11,14 @@ description = "Pure DSL data structures - Level 1 foundation types with zero dep
 
 [dependencies]
 # Core serialization - required for data interchange
-serde = { workspace = true }
-serde_json = { workspace = true }
-uuid = { workspace = true }
-chrono = { workspace = true }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+uuid = { version = "1.4", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
 
 # Error handling - required for DslError enum
-thiserror = { workspace = true }
+thiserror = "1.0"
 
 # NO OTHER DEPENDENCIES ALLOWED
 # This crate must be the foundation that everything else builds on
 
-[lints]
-workspace = true

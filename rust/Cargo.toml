@@ -55,6 +55,10 @@ tempfile = "3.0"
 regex = "1.12.2"
 rand = "0.8"
 
+# For attribute API endpoints
+base64 = "0.22"
+sha2 = "0.10"
+
 # Serialization/Deserialization
 # serde is already included above
 
@@ -68,6 +72,12 @@ rand = "0.8"
 [dev-dependencies]
 
 
+
+# Binary configuration
+[[bin]]
+name = "agentic_server"
+path = "src/bin/agentic_server.rs"
+required-features = ["server"]
 
 # Features for conditional compilation
 [features]

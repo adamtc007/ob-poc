@@ -4,12 +4,11 @@
 //! and sinks, implementing fallback logic and validation.
 
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::domains::attributes::execution_context::{ExecutionContext, ValueSource};
+use crate::domains::attributes::execution_context::ExecutionContext;
 // Note: ObPocError removed - not available in current error module
 use super::document_catalog_source::{AttributeSource, SourceError};
 

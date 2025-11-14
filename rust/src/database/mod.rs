@@ -3,12 +3,17 @@
 //! This module provides database connection management, connection pooling,
 //! and configuration for the DSL architecture.
 
+// Allow unused code - many repository methods are not yet used by the agentic system
+#![allow(dead_code)]
+#![allow(unused_imports)]
+
 use sqlx::Row;
 use sqlx::{postgres::PgPoolOptions, PgPool};
 use std::time::Duration;
 use tracing::{info, warn};
 
-pub mod attribute_repository;
+// Temporarily disabled - requires attribute_values_typed table from migration
+// pub mod attribute_repository;
 pub(crate) mod business_request_repository;
 pub(crate) mod cbu_crud_manager;
 pub(crate) mod cbu_repository;
@@ -17,14 +22,8 @@ pub(crate) mod dsl_domain_repository;
 pub(crate) mod entity_service;
 
 // Re-export repository and trait for convenience
-pub use attribute_repository::{AttributeRepository, RepositoryError as AttributeRepositoryError};
-pub(crate) use business_request_repository::{
-    DslBusinessRequestRepository, DslBusinessRequestRepositoryTrait,
-};
-pub(crate) use cbu_crud_manager::{
-    CbuCompleteData, CbuCreateRequest, CbuCrudManager, CbuDeleteRequest, CbuUpdateRequest,
-};
-pub(crate) use cbu_repository::CbuRepository;
+// pub use attribute_repository::{AttributeRepository, RepositoryError as AttributeRepositoryError};
+pub(crate) use business_request_repository::DslBusinessRequestRepository;
 pub use dictionary_service::DictionaryDatabaseService;
 pub(crate) use dsl_domain_repository::{DslDomainRepository, DslDomainRepositoryTrait};
 pub(crate) use entity_service::EntityDatabaseService;

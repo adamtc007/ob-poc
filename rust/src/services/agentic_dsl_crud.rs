@@ -2,8 +2,7 @@
 // Drop this into Zed Claude and say: "Implement this agentic DSL CRUD system"
 // This creates Natural Language → DSL → Database operations for CBU management
 
-use anyhow::{Context, Result};
-use async_trait::async_trait;
+use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
@@ -157,8 +156,8 @@ impl DslParser {
         let mut updates = HashMap::new();
         // Parse SET clauses - simplified
         if let Some(set_pos) = input.find("set") {
-            let set_part = &input[set_pos + 3..];
-            // Add parsing logic for "field = value" pairs
+            let _set_part = &input[set_pos + 3..];
+            // TODO: Add parsing logic for "field = value" pairs from _set_part
             updates.insert("updated_at".to_string(), Utc::now().to_rfc3339());
         }
 
@@ -195,6 +194,7 @@ impl DslParser {
 // ============================================================================
 
 pub struct AiDslGenerator {
+    #[allow(dead_code)]
     pool: PgPool,
 }
 
@@ -473,6 +473,11 @@ impl AgenticCbuService {
         }
     }
 
+    /// Execute a CRUD statement directly (for use by CompleteAgenticService)
+    pub async fn execute_statement(&self, statement: &CrudStatement) -> Result<ExecutionResult> {
+        self.executor.execute(statement).await
+    }
+
     /// Main entry point: Natural language → Result
     pub async fn process_instruction(&self, instruction: &str) -> Result<ExecutionResult> {
         println!("📝 Instruction: {}", instruction);
@@ -568,7 +573,7 @@ pub async fn run_demo(pool: PgPool) -> Result<()> {
         "Connect entity {} to CBU {} as role {}",
         entity_id, cbu_id, role_id
     );
-    let result3 = service.process_instruction(&instruction3).await?;
+    let _result3 = service.process_instruction(&instruction3).await?;
 
     println!("\n✅ All demos completed successfully!");
     Ok(())

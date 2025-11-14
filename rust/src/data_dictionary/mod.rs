@@ -7,6 +7,10 @@
 //! - Data lineage (sources and sinks)
 //! - Validation rules
 
+// Allow unused code - this is legacy data dictionary implementation
+#![allow(dead_code)]
+#![allow(unused_imports)]
+
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -24,20 +28,28 @@ pub use attribute::AttributeId;
 #[async_trait]
 pub trait DictionaryService: Send + Sync {
     /// Validate DSL attributes against the data dictionary
-    async fn validate_dsl_attributes(&self, dsl: &str) -> Result<(), String>;
+    /// Returns the list of AttributeIds found in the DSL
+    async fn validate_dsl_attributes(&self, dsl: &str) -> Result<Vec<AttributeId>, String>;
 
-    /// Get attribute definition by ID
+    /// Get attribute definition by ID - NOW USES AttributeId!
     async fn get_attribute(
         &self,
-        attribute_id: &str,
+        attribute_id: &AttributeId,
     ) -> Result<Option<AttributeDefinition>, String>;
 
-    /// Validate attribute value against its definition
+    /// Validate attribute value against its definition - NOW USES AttributeId!
     async fn validate_attribute_value(
         &self,
-        attribute_id: &str,
+        attribute_id: &AttributeId,
         value: &serde_json::Value,
     ) -> Result<(), String>;
+
+    /// Extract attributes from a document
+    async fn extract_attributes_from_document(
+        &self,
+        doc_id: uuid::Uuid,
+        cbu_id: uuid::Uuid,
+    ) -> Result<Vec<AttributeId>, String>;
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

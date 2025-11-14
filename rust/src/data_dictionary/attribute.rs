@@ -4,8 +4,9 @@ use super::*;
 use uuid::Uuid;
 
 /// Unique identifier for attributes in the data dictionary
+/// This MUST be used everywhere instead of String or raw UUID
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct AttributeId(Uuid);
+pub struct AttributeId(pub Uuid);
 
 impl Default for AttributeId {
     fn default() -> Self {
@@ -20,8 +21,18 @@ impl AttributeId {
     }
 
     /// Create an AttributeId from a UUID
-    pub(crate) fn from_uuid(uuid: Uuid) -> Self {
+    pub fn from_uuid(uuid: Uuid) -> Self {
         Self(uuid)
+    }
+
+    /// Get the inner UUID reference
+    pub fn as_uuid(&self) -> &Uuid {
+        &self.0
+    }
+
+    /// Parse AttributeId from string
+    pub fn from_str(s: &str) -> Result<Self, uuid::Error> {
+        Ok(Self(Uuid::parse_str(s)?))
     }
 }
 
@@ -40,6 +51,34 @@ impl From<Uuid> for AttributeId {
 impl From<AttributeId> for Uuid {
     fn from(attr_id: AttributeId) -> Self {
         attr_id.0
+    }
+}
+
+// CRITICAL: sqlx Type trait implementations for database operations
+#[cfg(feature = "database")]
+impl sqlx::Type<sqlx::Postgres> for AttributeId {
+    fn type_info() -> sqlx::postgres::PgTypeInfo {
+        <Uuid as sqlx::Type<sqlx::Postgres>>::type_info()
+    }
+}
+
+#[cfg(feature = "database")]
+impl<'r> sqlx::Decode<'r, sqlx::Postgres> for AttributeId {
+    fn decode(
+        value: <sqlx::Postgres as sqlx::Database>::ValueRef<'r>,
+    ) -> Result<Self, sqlx::error::BoxDynError> {
+        let uuid = <Uuid as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
+        Ok(AttributeId(uuid))
+    }
+}
+
+#[cfg(feature = "database")]
+impl<'q> sqlx::Encode<'q, sqlx::Postgres> for AttributeId {
+    fn encode_by_ref(
+        &self,
+        buf: &mut <sqlx::Postgres as sqlx::Database>::ArgumentBuffer<'q>,
+    ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
+        self.0.encode_by_ref(buf)
     }
 }
 

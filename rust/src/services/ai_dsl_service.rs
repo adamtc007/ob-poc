@@ -4,11 +4,10 @@
 //! ALL DSL operations go through the DSL Manager as the single entry point.
 //! This service provides backwards compatibility while ensuring proper DSL lifecycle management.
 
-use crate::dsl_manager::{CallChainResult, CleanDslManager, DslManagerError};
+use crate::dsl_manager::CleanDslManager;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 

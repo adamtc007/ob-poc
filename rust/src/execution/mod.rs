@@ -4,6 +4,11 @@
 //! into actual business logic execution. It follows the DSL-as-State pattern where
 //! accumulated DSL documents represent the current state of business processes.
 
+// Allow dead code - this is an experimental execution engine implementation
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
+
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -12,7 +17,8 @@ use tokio::sync::RwLock;
 use uuid::Uuid;
 
 pub mod context;
-pub mod dsl_executor;
+// Temporarily disabled - requires AttributeService which depends on attribute_values_typed table
+// pub mod dsl_executor;
 pub mod engine;
 pub mod integrations;
 // pub mod operations; // Removed - operations module doesn't exist

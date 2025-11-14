@@ -61,9 +61,12 @@ pub mod dsl_visualizer;
 #[cfg(feature = "database")]
 pub mod services;
 
-// REST API Layer for agentic operations
-#[cfg(feature = "database")]
+// REST API Layer for agentic operations (requires server feature)
+#[cfg(feature = "server")]
 pub mod api;
+
+// Test harness for end-to-end testing
+pub mod test_harness;
 
 // Public re-exports for the clean architecture
 pub use db_state_manager::{AccumulatedState, DbStateManager, StateResult};

@@ -3,6 +3,10 @@
 //! This module provides idiomatic Rust implementations for EBNF grammar parsing,
 //! validation, and compilation with strong typing and proper error handling.
 
+// Allow unused code - this is experimental EBNF grammar implementation
+#![allow(dead_code)]
+#![allow(unused_imports)]
+
 pub(crate) mod idiomatic_ebnf;
 
 use crate::error::{DSLError, GrammarError};

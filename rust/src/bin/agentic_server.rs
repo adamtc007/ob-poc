@@ -29,13 +29,13 @@
 //! curl http://localhost:3000/api/health
 //! ```
 
-use axum::Server;
 use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
+use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
-use ob_poc::api::create_agentic_router;
+use ob_poc::api::{create_agentic_router, create_attribute_router};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -58,8 +58,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("✅ Database connection established");
 
-    // Create router with CORS and tracing
-    let app = create_agentic_router(pool)
+    // Create routers and merge them
+    let app = create_agentic_router(pool.clone())
+        .merge(create_attribute_router(pool))
         .layer(
             CorsLayer::new()
                 .allow_origin(Any)
@@ -72,14 +73,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     println!("\n🌐 Server running on http://{}", addr);
     println!("\n📖 Available endpoints:");
-    println!("  POST   http://localhost:3000/api/agentic/execute");
-    println!("  POST   http://localhost:3000/api/agentic/setup");
-    println!("  GET    http://localhost:3000/api/agentic/tree/:cbu_id");
-    println!("  GET    http://localhost:3000/api/health");
+    println!("  Agentic Operations:");
+    println!("    POST   http://localhost:3000/api/agentic/execute");
+    println!("    POST   http://localhost:3000/api/agentic/setup");
+    println!("    GET    http://localhost:3000/api/agentic/tree/:cbu_id");
+    println!("    GET    http://localhost:3000/api/health");
+    println!("\n  Attribute Dictionary:");
+    println!("    POST   http://localhost:3000/api/documents/upload");
+    println!("    POST   http://localhost:3000/api/attributes/validate-dsl");
+    println!("    POST   http://localhost:3000/api/attributes/validate-value");
+    println!("    GET    http://localhost:3000/api/attributes/:cbu_id");
+    println!("    GET    http://localhost:3000/api/attributes/document/:doc_id");
+    println!("    GET    http://localhost:3000/api/attributes/health");
     println!("\n✨ Press Ctrl+C to stop\n");
 
-    // Start server
-    Server::bind(&addr).serve(app.into_make_service()).await?;
+    // Start server (Axum 0.7+ style)
+    let listener = TcpListener::bind(&addr).await?;
+    axum::serve(listener, app).await?;
 
     Ok(())
 }

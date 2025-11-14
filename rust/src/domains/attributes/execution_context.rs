@@ -62,7 +62,7 @@ impl ExecutionContext {
         self.attribute_values.insert(uuid, value);
         self.attribute_sources
             .entry(uuid)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(source);
     }
 

@@ -28,7 +28,6 @@ use crate::dsl::pipeline_processor::{AstSyncMetadata, DslSyncMetadata};
 use crate::dsl::DomainSnapshot;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use uuid::Uuid;
 
 #[cfg(feature = "database")]
 use sqlx::{PgPool, Row};

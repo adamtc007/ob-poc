@@ -77,7 +77,7 @@ impl AttributeValidator {
     pub fn validate_verb_form(&self, verb_form: &VerbForm) -> Result<(), Vec<ValidationError>> {
         let mut errors = Vec::new();
 
-        for (_key, value) in &verb_form.pairs {
+        for value in verb_form.pairs.values() {
             self.collect_attr_ref_errors(value, &mut errors);
         }
 

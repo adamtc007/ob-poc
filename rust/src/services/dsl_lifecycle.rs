@@ -23,7 +23,6 @@
 
 use crate::db_state_manager::DbStateManager;
 use crate::dsl::{DslPipelineProcessor, DslPipelineResult};
-use crate::parser::{parse_normalize_and_validate, ExecutionResult};
 use crate::services::DslAstSyncService;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -230,9 +229,7 @@ impl DslLifecycleService {
     pub async fn process_dsl_change(&mut self, request: DslChangeRequest) -> DslChangeResult {
         let start_time = Instant::now();
         let session_id = request
-            .session_id
-            .as_ref()
-            .map(|s| s.clone())
+            .session_id.clone()
             .unwrap_or_else(|| self.generate_session_id());
 
         if self.config.enable_lifecycle_logging {

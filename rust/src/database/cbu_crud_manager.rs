@@ -852,8 +852,8 @@ impl CbuCrudManager {
                 name: r.name,
                 description: r.description,
                 nature_purpose: r.nature_purpose,
-                created_at: r.created_at.unwrap_or_else(|| Utc::now()),
-                updated_at: r.updated_at.unwrap_or_else(|| Utc::now()),
+                created_at: r.created_at.unwrap_or_else(Utc::now),
+                updated_at: r.updated_at.unwrap_or_else(Utc::now),
             }),
             None => Err(CbuCrudError::CbuNotFound { cbu_id }),
         }
@@ -888,7 +888,7 @@ impl CbuCrudManager {
                 roles: row.roles.unwrap_or_default(),
                 jurisdiction: None,         // Would need additional join
                 ownership_percentage: None, // Would need additional join
-                created_at: row.created_at.unwrap_or_else(|| Utc::now()),
+                created_at: row.created_at.unwrap_or_else(Utc::now),
             });
         }
 
@@ -922,7 +922,7 @@ impl CbuCrudManager {
                 value: row.value,
                 source: row.source,
                 state: row.state,
-                observed_at: row.observed_at.unwrap_or_else(|| Utc::now()),
+                observed_at: row.observed_at.unwrap_or_else(Utc::now),
             });
         }
 
@@ -958,7 +958,7 @@ impl CbuCrudManager {
                     .map(|p| p.to_string().parse::<f64>().unwrap_or(0.0)),
                 control_type: row.control_type,
                 regulatory_framework: row.regulatory_framework,
-                calculated_at: row.created_at.unwrap_or_else(|| Utc::now()),
+                calculated_at: row.created_at.unwrap_or_else(Utc::now),
             });
         }
 
@@ -983,8 +983,8 @@ impl CbuCrudManager {
                 product_id: row.product_id,
                 entity_type: row.entity_type,
                 status: row.status,
-                created_at: row.created_at.unwrap_or_else(|| Utc::now()),
-                updated_at: row.updated_at.unwrap_or_else(|| Utc::now()),
+                created_at: row.created_at.unwrap_or_else(Utc::now),
+                updated_at: row.updated_at.unwrap_or_else(Utc::now),
             });
         }
 
@@ -1007,8 +1007,8 @@ impl CbuCrudManager {
             primary_domain: r.primary_domain,
             current_state: r.current_state.unwrap_or_else(|| "UNKNOWN".to_string()),
             workflow_type: r.workflow_type.unwrap_or_else(|| "ONBOARDING".to_string()),
-            created_at: r.created_at.unwrap_or_else(|| Utc::now()),
-            last_activity: r.last_activity.unwrap_or_else(|| Utc::now()),
+            created_at: r.created_at.unwrap_or_else(Utc::now),
+            last_activity: r.last_activity.unwrap_or_else(Utc::now),
         }))
     }
 

@@ -8,17 +8,13 @@
 //! This fills the missing pieces identified in the end-to-end analysis.
 
 use anyhow::{Context, Result};
-use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{FromRow, PgPool};
+use sqlx::PgPool;
 use std::collections::HashMap;
 use uuid::Uuid;
 
 // Import existing agentic DSL CRUD
-use super::agentic_dsl_crud::{
-    AgenticCbuService, ConnectEntity, CreateCbu, CrudStatement, DslParser, ReadCbu,
-};
+use super::agentic_dsl_crud::{AgenticCbuService, ConnectEntity, CrudStatement, DslParser};
 
 // ============================================================================
 // Extended AST Types for Entity and Role Operations
@@ -185,6 +181,11 @@ impl CompleteAgenticService {
         }
     }
 
+    /// Get reference to the database pool
+    pub fn pool(&self) -> &PgPool {
+        &self.pool
+    }
+
     /// Execute any extended statement (entity, role, CBU, connection)
     pub async fn execute(
         &self,
@@ -208,8 +209,8 @@ impl CompleteAgenticService {
 
     /// Execute base CBU operations
     async fn execute_base(&self, statement: CrudStatement) -> Result<CompleteExecutionResult> {
-        // Use the base service's execute method
-        let result = self.base_service.execute(&statement).await?;
+        // Use the base service's execute_statement method
+        let result = self.base_service.execute_statement(&statement).await?;
 
         // Determine entity type from statement
         let entity_type = match statement {
@@ -237,10 +238,17 @@ impl CompleteAgenticService {
         // For base operations, delegate to base service
         match statement {
             CrudStatement::CreateCbu(_) | CrudStatement::ConnectEntity(_) => {
-                let result = self.base_service.execute(&statement).await?;
+                let result = self.base_service.execute_statement(&statement).await?;
+
+                let entity_type = match statement {
+                    CrudStatement::CreateCbu(_) => "CBU",
+                    CrudStatement::ConnectEntity(_) => "Connection",
+                    _ => "Unknown",
+                };
+
                 Ok(CompleteExecutionResult {
                     success: result.success,
-                    entity_type: result.entity_type,
+                    entity_type: entity_type.to_string(),
                     entity_id: result.entity_id,
                     message: result.message,
                     data: result.data,
@@ -364,6 +372,7 @@ impl CompleteAgenticService {
     }
 
     /// Helper: Read CBU details
+    #[allow(dead_code)]
     async fn read_cbu(&self, cbu_id: Uuid) -> Result<serde_json::Value> {
         let cbu = sqlx::query!(
             r#"
@@ -388,6 +397,7 @@ impl CompleteAgenticService {
     }
 
     /// Helper: Update CBU
+    #[allow(dead_code)]
     async fn update_cbu(&self, cbu_id: Uuid, updates: &HashMap<String, String>) -> Result<()> {
         // Simplified update - in production, build dynamic SQL
         for (key, value) in updates {
@@ -464,7 +474,10 @@ impl CompleteAgenticService {
             cbu_id,
             role_id,
         });
-        let connect_result = self.base_service.execute(&connect_statement).await?;
+        let connect_result = self
+            .base_service
+            .execute_statement(&connect_statement)
+            .await?;
         let connection_id = connect_result
             .entity_id
             .context("Failed to get connection ID")?;

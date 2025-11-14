@@ -8,8 +8,8 @@
 //!
 //! Uses the Phase 0 UUID constants and provides caching for performance.
 
-use super::types::{AttributeMetadata, AttributeType};
-use super::uuid_constants::{build_uuid_map, uuid_to_semantic};
+use super::types::AttributeMetadata;
+use super::uuid_constants::build_uuid_map;
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -99,7 +99,7 @@ impl AttributeResolver {
         self.uuid_map
             .get(uuid)
             .cloned()
-            .ok_or_else(|| ResolutionError::UuidNotFound(*uuid))
+            .ok_or(ResolutionError::UuidNotFound(*uuid))
     }
 
     /// Resolve semantic ID to UUID

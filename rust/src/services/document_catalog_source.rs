@@ -4,15 +4,14 @@
 //! from uploaded documents via extraction services.
 
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::sync::Arc;
 use std::time::Instant;
 use uuid::Uuid;
 
-use crate::domains::attributes::execution_context::{ExecutionContext, ValueSource};
+use crate::domains::attributes::execution_context::ExecutionContext;
 // Note: ObPocError removed - not available in current error module
-use super::extraction_service::{ExtractionResult, ExtractionService};
+use super::extraction_service::ExtractionService;
 
 /// Result type for source operations
 pub type SourceResult<T> = Result<T, SourceError>;
@@ -295,6 +294,7 @@ impl AttributeSource for DocumentCatalogSource {
 
 /// Form data source (placeholder for future implementation)
 pub struct FormDataSource {
+    #[allow(dead_code)]
     pool: PgPool,
 }
 

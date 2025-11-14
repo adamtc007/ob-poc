@@ -321,13 +321,25 @@ ob-poc/
    - Source tracking (DocumentExtraction, UserInput, ThirdPartyApi, Calculation, Default)
    - Hybrid format support for both UUIDs and semantic IDs
 
+- **Test Suite Health**: Fixed 11 failing tests → 140 passing tests
 ### 🔄 Recent Achievements
+- **Document-Attribute Integration Complete (2025-11-14)**: Full document extraction and resolution system
+  - Extraction Service Layer: OCR, NLP, and mock implementations
+  - Document Catalog Source: Multi-source attribute resolution with fallback
+  - Attribute Executor: Orchestrates sources, validation, and sinks
+  - DSL Parser Extension: Support for `@attr{uuid}:source` hint syntax
+  - Audit Logging: Complete extraction tracking via `attribute_extraction_log`
+  - Example Demo: Comprehensive document extraction workflow demonstration
 - **UUID Migration Complete (2025-11-14)**: Full UUID-based attribute system with 4 phases
   - Phase 0: Database schema + UUID constants (59 attributes)
   - Phase 1: Parser support for UUID syntax (17 tests)
   - Phase 2: Runtime resolution layer (11 tests, bidirectional mapping)
   - Phase 3: Value binding during execution (5 tests, source tracking)
 - **Test Suite Health**: Fixed 11 failing tests → 140 passing tests
+- **Deprecated Code Cleanup**: Removed 8,000+ lines of dead code
+- **AI Agent Modernization**: Replaced monolithic agents with multi-provider system
+- **Architecture Consolidation**: Unified codebase with clear separation of concerns
+- **Production Readiness**: Comprehensive testing and error handling
 - **Deprecated Code Cleanup**: Removed 8,000+ lines of dead code
 - **AI Agent Modernization**: Replaced monolithic agents with multi-provider system
 - **Architecture Consolidation**: Unified codebase with clear separation of concerns
@@ -358,3 +370,62 @@ MIT License - Internal POC development
 **Last Updated**: 2025-11-14
 **Architecture**: Clean, modern, and ready for enterprise deployment.
 **UUID Migration**: Complete - All 4 phases implemented and tested (140 passing tests).
+### ✅ Document Extraction & Attribute Resolution (2025-11-14)
+
+**Complete document-to-attribute integration system:**
+
+1. **Extraction Service Architecture**
+   - `ExtractionService` trait: Pluggable extraction backends
+   - `OcrExtractionService`: Production OCR implementation
+   - `MockExtractionService`: Fast testing without external dependencies
+   - Batch extraction support for efficiency
+   - Confidence scoring and metadata tracking
+
+2. **Multi-Source Attribute Resolution**
+   - `DocumentCatalogSource` (Priority: 100): Extract from uploaded documents
+   - `FormDataSource` (Priority: 50): User-provided form data
+   - `ApiDataSource` (Priority: 10): Third-party API fallback
+   - Automatic fallback chain: Document → Form → API
+   - Smart caching to avoid re-extraction
+
+3. **Attribute Executor**
+   - Orchestrates multiple sources with priority ordering
+   - Dictionary-based validation (type checking, format validation)
+   - Multi-sink persistence (database, cache, audit log)
+   - Batch resolution for performance
+   - Complete error handling and recovery
+
+4. **DSL Source Hints**
+   ```lisp
+   ;; Specify attribute sources in DSL
+   (kyc.collect 
+     :name @attr{3020d46f-472c-5437-9647-1b0682c35935}:doc
+     :email @attr.contact.email:form
+     :score @attr.financial.credit_score:api)
+   ```
+
+5. **Audit Trail**
+   - `attribute_extraction_log` table tracks all attempts
+   - Success/failure rates for monitoring
+   - Processing time metrics
+   - Extraction method tracking (OCR, NLP, AI, manual)
+   - Error details for debugging
+
+6. **Database Schema**
+   - `document_catalog`: Document storage and metadata
+   - `document_metadata`: Cached extracted attribute values
+   - `attribute_extraction_log`: Comprehensive audit log
+   - Optimized indexes for common query patterns
+
+**Example Usage:**
+```bash
+cargo run --example document_extraction_demo --features database
+```
+
+**Architecture:**
+```
+Upload Document → Extract Attributes → Cache → Resolve in DSL → Persist → Audit Log
+                      ↓                  ↓           ↓
+                  [OCR/NLP/AI]    [Validation]  [DB Sink]
+```
+
