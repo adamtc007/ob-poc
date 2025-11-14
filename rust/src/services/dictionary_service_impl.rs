@@ -58,10 +58,10 @@ impl DictionaryService for DictionaryServiceImpl {
                 name,
                 long_description,
                 mask,
-                group_id,
-                domain,
                 source,
-                sink
+                sink,
+                group_id,
+                domain
             FROM "ob-poc".dictionary
             WHERE attribute_id = $1
             "#,
@@ -71,14 +71,56 @@ impl DictionaryService for DictionaryServiceImpl {
         .await
         .map_err(|e| format!("Database error: {}", e))?;
 
-        // For now, return a simplified version since AttributeDefinition has many fields
-        // In a full implementation, we'd map all the fields properly
-        if record.is_some() {
-            // TODO: Properly construct AttributeDefinition from database record
-            return Err("AttributeDefinition mapping not yet implemented".to_string());
-        }
+        if let Some(rec) = record {
+            use crate::data_dictionary::{SinkConfig, SourceConfig};
+            use sqlx::types::Json;
 
-        Ok(None)
+            // Parse source configuration from JSONB
+            let source_config = if let Some(source_json) = rec.source {
+                match serde_json::from_value::<SourceConfig>(source_json) {
+                    Ok(config) => Some(Json(config)),
+                    Err(_) => {
+                        // Provide default if parsing fails
+                        Some(Json(SourceConfig {
+                            source_type: "document".to_string(),
+                            extraction_rules: vec![],
+                            priority: 0,
+                        }))
+                    }
+                }
+            } else {
+                None
+            };
+
+            // Parse sink configuration from JSONB
+            let sink_config = if let Some(sink_json) = rec.sink {
+                match serde_json::from_value::<SinkConfig>(sink_json) {
+                    Ok(config) => Some(Json(config)),
+                    Err(_) => {
+                        // Provide default if parsing fails
+                        Some(Json(SinkConfig {
+                            sink_type: "database".to_string(),
+                            destinations: vec![],
+                        }))
+                    }
+                }
+            } else {
+                None
+            };
+
+            Ok(Some(AttributeDefinition {
+                attribute_id: AttributeId::from_uuid(rec.attribute_id),
+                name: rec.name,
+                long_description: rec.long_description,
+                data_type: rec.mask.unwrap_or_else(|| "string".to_string()),
+                source_config,
+                sink_config,
+                group_id: Some(rec.group_id),
+                domain: rec.domain,
+            }))
+        } else {
+            Ok(None)
+        }
     }
 
     async fn validate_attribute_value(

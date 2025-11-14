@@ -1,6 +1,7 @@
 //! Attribute definition with complete metadata
 
 use super::*;
+use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Unique identifier for attributes in the data dictionary
@@ -82,8 +83,55 @@ impl<'q> sqlx::Encode<'q, sqlx::Postgres> for AttributeId {
     }
 }
 
+// New simplified AttributeDefinition aligned with actual database schema
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg(feature = "database")]
 pub struct AttributeDefinition {
+    pub attribute_id: AttributeId,
+    pub name: String,
+    pub long_description: Option<String>,
+    pub data_type: String, // Maps to 'mask' column in DB
+    pub source_config: Option<sqlx::types::Json<SourceConfig>>,
+    pub sink_config: Option<sqlx::types::Json<SinkConfig>>,
+    pub group_id: Option<String>,
+    pub domain: Option<String>,
+}
+
+// Configuration for attribute sources
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SourceConfig {
+    pub source_type: String, // 'document', 'api', 'form', 'database'
+    pub extraction_rules: Vec<ExtractionRule>,
+    pub priority: i32,
+}
+
+// Configuration for attribute sinks
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SinkConfig {
+    pub sink_type: String, // 'database', 'webhook', 'cache', 'api'
+    pub destinations: Vec<SinkDestination>,
+}
+
+// Rules for extracting attribute values
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtractionRule {
+    pub method: String, // 'regex', 'nlp', 'ocr', 'xpath'
+    pub pattern: String,
+    pub confidence_threshold: f32,
+}
+
+// Destination configuration for sinks
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SinkDestination {
+    pub url: Option<String>,
+    pub table: Option<String>,
+    pub format: String,
+}
+
+// Legacy AttributeDefinition structure (kept for backward compatibility)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg(not(feature = "database"))]
+pub struct AttributeDefinitionLegacy {
     pub attr_id: String,
     pub display_name: String,
     pub data_type: DataType,

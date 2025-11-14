@@ -24,6 +24,20 @@ pub mod extraction_service;
 #[cfg(feature = "database")]
 pub mod dictionary_service_impl;
 
+// Document extraction service - Phase 10
+#[cfg(feature = "database")]
+pub mod document_extraction_service;
+
+// Source/Sink execution services - Phase 10
+#[cfg(feature = "database")]
+pub mod source_executor;
+
+#[cfg(feature = "database")]
+pub mod sink_executor;
+
+#[cfg(feature = "database")]
+pub mod attribute_lifecycle;
+
 // Agentic DSL CRUD - Natural Language → DSL → Database
 pub mod agentic_dsl_crud;
 
@@ -70,6 +84,20 @@ pub use extraction_service::{
 // Re-export dictionary service
 #[cfg(feature = "database")]
 pub use dictionary_service_impl::DictionaryServiceImpl;
+
+// Re-export document extraction service
+#[cfg(feature = "database")]
+pub use document_extraction_service::DocumentExtractionService;
+
+// Re-export source/sink execution services
+#[cfg(feature = "database")]
+pub use source_executor::{CompositeSourceExecutor, SourceExecutor};
+
+#[cfg(feature = "database")]
+pub use sink_executor::{CompositeSinkExecutor, SinkExecutor};
+
+#[cfg(feature = "database")]
+pub use attribute_lifecycle::AttributeLifecycleService;
 
 /// Master sync service factory for DSL/AST table synchronization
 pub fn create_sync_service() -> DslAstSyncService {
