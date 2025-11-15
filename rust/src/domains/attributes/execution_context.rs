@@ -19,6 +19,15 @@ pub struct ExecutionContext {
 
     /// Source tracking: UUID → Source information
     pub attribute_sources: HashMap<Uuid, Vec<ValueSource>>,
+
+    /// CBU ID for this execution context
+    pub cbu_id: Option<Uuid>,
+
+    /// Entity ID for attribute storage
+    pub entity_id: Option<Uuid>,
+
+    /// Current document being processed (for document operations)
+    pub current_document_id: Option<Uuid>,
 }
 
 /// Describes where an attribute value came from
@@ -54,16 +63,48 @@ impl ExecutionContext {
             resolver: AttributeResolver::new(),
             attribute_values: HashMap::new(),
             attribute_sources: HashMap::new(),
+            cbu_id: None,
+            entity_id: None,
+            current_document_id: None,
         }
+    }
+
+    /// Create a new execution context with CBU and entity IDs
+    pub fn with_ids(cbu_id: Uuid, entity_id: Uuid) -> Self {
+        Self {
+            resolver: AttributeResolver::new(),
+            attribute_values: HashMap::new(),
+            attribute_sources: HashMap::new(),
+            cbu_id: Some(cbu_id),
+            entity_id: Some(entity_id),
+            current_document_id: None,
+        }
+    }
+
+    /// Set the current document ID
+    pub fn set_document(&mut self, document_id: Uuid) {
+        self.current_document_id = Some(document_id);
+    }
+
+    /// Get the CBU ID
+    pub fn cbu_id(&self) -> Option<Uuid> {
+        self.cbu_id
+    }
+
+    /// Get the entity ID
+    pub fn entity_id(&self) -> Option<Uuid> {
+        self.entity_id
+    }
+
+    /// Get the current document ID
+    pub fn document_id(&self) -> Option<Uuid> {
+        self.current_document_id
     }
 
     /// Bind an attribute value
     pub fn bind_value(&mut self, uuid: Uuid, value: serde_json::Value, source: ValueSource) {
         self.attribute_values.insert(uuid, value);
-        self.attribute_sources
-            .entry(uuid)
-            .or_default()
-            .push(source);
+        self.attribute_sources.entry(uuid).or_default().push(source);
     }
 
     /// Get a bound attribute value

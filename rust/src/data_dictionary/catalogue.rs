@@ -2,10 +2,12 @@
 
 use super::*;
 
+#[cfg(feature = "database")]
 pub(crate) struct AttributeCatalogue {
     dictionary: DataDictionary,
 }
 
+#[cfg(feature = "database")]
 impl AttributeCatalogue {
     pub fn new(dictionary: DataDictionary) -> Self {
         AttributeCatalogue { dictionary }

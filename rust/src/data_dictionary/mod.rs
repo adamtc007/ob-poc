@@ -24,6 +24,10 @@ pub use attribute::*;
 // Re-export key types for convenience
 pub use attribute::AttributeId;
 
+// Re-export AttributeDefinition when database feature is enabled
+#[cfg(feature = "database")]
+pub use attribute::AttributeDefinition;
+
 /// Service trait for dictionary validation and lookup
 #[async_trait]
 pub trait DictionaryService: Send + Sync {
@@ -32,6 +36,7 @@ pub trait DictionaryService: Send + Sync {
     async fn validate_dsl_attributes(&self, dsl: &str) -> Result<Vec<AttributeId>, String>;
 
     /// Get attribute definition by ID - NOW USES AttributeId!
+    #[cfg(feature = "database")]
     async fn get_attribute(
         &self,
         attribute_id: &AttributeId,
@@ -53,6 +58,7 @@ pub trait DictionaryService: Send + Sync {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg(feature = "database")]
 pub(crate) struct DataDictionary {
     pub attributes: HashMap<String, AttributeDefinition>,
     pub categories: Vec<CategoryDefinition>,
@@ -83,6 +89,7 @@ pub enum RelationshipType {
     MutuallyExclusive,
 }
 
+#[cfg(feature = "database")]
 impl DataDictionary {
     pub fn new() -> Self {
         DataDictionary {
@@ -97,6 +104,7 @@ impl DataDictionary {
     }
 }
 
+#[cfg(feature = "database")]
 impl Default for DataDictionary {
     fn default() -> Self {
         Self::new()

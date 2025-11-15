@@ -17,6 +17,8 @@ use tokio::sync::RwLock;
 use uuid::Uuid;
 
 pub mod context;
+#[cfg(feature = "database")]
+pub mod document_extraction_handler;
 // Temporarily disabled - requires AttributeService which depends on attribute_values_typed table
 // pub mod dsl_executor;
 pub mod engine;

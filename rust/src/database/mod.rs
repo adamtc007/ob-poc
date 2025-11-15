@@ -18,6 +18,7 @@ pub(crate) mod business_request_repository;
 pub(crate) mod cbu_crud_manager;
 pub(crate) mod cbu_repository;
 pub mod dictionary_service;
+pub mod document_type_repository;
 pub(crate) mod dsl_domain_repository;
 pub(crate) mod entity_service;
 

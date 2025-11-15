@@ -72,10 +72,10 @@ impl DocumentCatalogSource {
         // First, check if we already have extracted metadata
         let existing_doc = sqlx::query_scalar::<_, Uuid>(
             r#"
-            SELECT doc_id
+            SELECT dm.doc_id
             FROM "ob-poc".document_metadata dm
-            JOIN "ob-poc".document_usage du ON dm.doc_id = du.doc_id
-            WHERE du.cbu_id = $1
+            JOIN "ob-poc".document_catalog dc ON dm.doc_id = dc.doc_id
+            WHERE dc.cbu_id = $1
             AND dm.attribute_id = $2
             ORDER BY dm.created_at DESC
             LIMIT 1
@@ -93,12 +93,12 @@ impl DocumentCatalogSource {
         // If no existing extraction, find suitable document by catalog
         let doc_id = sqlx::query_scalar::<_, Uuid>(
             r#"
-            SELECT dc.doc_id
-            FROM "ob-poc".document_catalog dc
-            JOIN "ob-poc".document_usage du ON dc.doc_id = du.doc_id
-            WHERE du.cbu_id = $1
-            AND dc.extraction_status IN ('PENDING', 'COMPLETED')
-            ORDER BY dc.last_extracted_at DESC NULLS LAST, dc.created_at DESC
+            SELECT doc_id
+            FROM "ob-poc".document_catalog
+            WHERE cbu_id = $1
+            AND extraction_status IN ('PENDING', 'COMPLETED')
+            AND document_type_id IS NOT NULL
+            ORDER BY last_extracted_at DESC NULLS LAST, created_at DESC
             LIMIT 1
             "#,
         )

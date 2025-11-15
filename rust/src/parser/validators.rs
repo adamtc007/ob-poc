@@ -184,6 +184,7 @@ impl DslValidator {
             "case.create" => self.validate_case_create(form, &mut result)?,
             "entity.register" => self.validate_entity_register(form, &mut result)?,
             "document.catalog" => self.validate_document_catalog(form, &mut result)?,
+            "document.extract" => self.validate_document_extract(form, &mut result)?,
             _ => {
                 // Unknown verb - add warning
                 result.warnings.push(ValidationWarning {
@@ -576,6 +577,80 @@ impl DslValidator {
         Ok(())
     }
 
+    /// Validate document.extract form
+    /// Syntax: (document.extract :document-id @doc{uuid} :attributes [@attr{uuid1} @attr{uuid2}])
+    fn validate_document_extract(
+        &self,
+        form: &VerbForm,
+        result: &mut ValidationResult,
+    ) -> Result<(), ValidatorError> {
+        // Validate document-id parameter (required)
+        let _document_id = self.extract_value(&form.pairs, "document-id")?;
+
+        // Validate attributes parameter (required, should be a list)
+        let attributes_value = self.extract_value(&form.pairs, "attributes")?;
+
+        match attributes_value {
+            Value::List(attrs) | Value::Array(attrs) => {
+                if attrs.is_empty() {
+                    result.warnings.push(ValidationWarning {
+                        code: "EMPTY_ATTRIBUTE_LIST".to_string(),
+                        message:
+                            "document.extract should specify at least one attribute to extract"
+                                .to_string(),
+                        location: None,
+                        auto_fix: None,
+                    });
+                }
+
+                // Validate each attribute reference
+                for (idx, attr) in attrs.iter().enumerate() {
+                    match attr {
+                        Value::AttrUuid(_)
+                        | Value::AttrRef(_)
+                        | Value::AttrUuidWithSource(_, _)
+                        | Value::AttrRefWithSource(_, _) => {
+                            // Valid attribute reference
+                        }
+                        _ => {
+                            result.warnings.push(ValidationWarning {
+                                code: "INVALID_ATTRIBUTE_REFERENCE".to_string(),
+                                message: format!(
+                                    "Attribute at index {} is not a valid attribute reference (should be @attr{{uuid}} or @attr.semantic.id)",
+                                    idx
+                                ),
+                                location: None,
+                                auto_fix: None,
+                            });
+                        }
+                    }
+                }
+            }
+            _ => {
+                return Err(ValidatorError::InvalidFieldType {
+                    field: "attributes".to_string(),
+                    expected: "list of attribute references".to_string(),
+                    actual: "other".to_string(),
+                });
+            }
+        }
+
+        // Optional: entity-id parameter for storing extracted values
+        if self.extract_value(&form.pairs, "entity-id").is_err() {
+            result.warnings.push(ValidationWarning {
+                code: "MISSING_ENTITY_ID".to_string(),
+                message: "document.extract without :entity-id will extract but not store values"
+                    .to_string(),
+                location: None,
+                auto_fix: Some(
+                    "Add :entity-id parameter to store extracted attributes".to_string(),
+                ),
+            });
+        }
+
+        Ok(())
+    }
+
     /// Helper to extract string value from property map
     fn extract_string_value(
         &self,
@@ -636,4 +711,3 @@ impl Default for DslValidator {
         Self::new()
     }
 }
-

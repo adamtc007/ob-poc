@@ -18,6 +18,7 @@ pub mod dsl_lifecycle;
 // Document extraction and attribute resolution services
 pub mod attribute_executor;
 pub mod document_catalog_source;
+pub mod document_type_detector;
 pub mod extraction_service;
 
 // Dictionary service implementation
@@ -27,6 +28,10 @@ pub mod dictionary_service_impl;
 // Document extraction service - Phase 10
 #[cfg(feature = "database")]
 pub mod document_extraction_service;
+
+// Real document extraction service - Phase 4 (Document Attribution Plan)
+#[cfg(feature = "database")]
+pub mod real_document_extraction_service;
 
 // Source/Sink execution services - Phase 10
 #[cfg(feature = "database")]
@@ -76,6 +81,7 @@ pub use attribute_executor::{
 pub use document_catalog_source::{
     ApiDataSource, AttributeSource, DocumentCatalogSource, FormDataSource, SourceError,
 };
+pub use document_type_detector::DocumentTypeDetector;
 pub use extraction_service::{
     ExtractionError, ExtractionMetadata, ExtractionService, MockExtractionService,
     OcrExtractionService,
@@ -88,6 +94,12 @@ pub use dictionary_service_impl::DictionaryServiceImpl;
 // Re-export document extraction service
 #[cfg(feature = "database")]
 pub use document_extraction_service::DocumentExtractionService;
+
+// Re-export real document extraction service
+#[cfg(feature = "database")]
+pub use real_document_extraction_service::{
+    ExtractionError as RealExtractionError, ExtractionResult, RealDocumentExtractionService,
+};
 
 // Re-export source/sink execution services
 #[cfg(feature = "database")]

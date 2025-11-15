@@ -28,6 +28,8 @@ pub(crate) struct DocumentCatalog {
     pub last_extracted_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub cbu_id: Option<Uuid>,
+    pub document_type_id: Option<Uuid>,
 }
 
 /// New document catalog entry for creation
@@ -40,6 +42,8 @@ pub(crate) struct NewDocumentCatalog {
     pub extracted_data: Option<serde_json::Value>,
     pub extraction_status: Option<String>,
     pub extraction_confidence: Option<f64>,
+    pub cbu_id: Option<Uuid>,
+    pub document_type_id: Option<Uuid>,
 }
 
 /// Update document catalog entry
@@ -210,6 +214,8 @@ pub(crate) struct DocumentCatalogWithMetadata {
     pub last_extracted_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub cbu_id: Option<Uuid>,
+    pub document_type_id: Option<Uuid>,
     pub metadata: serde_json::Value, // Aggregated metadata as JSONB
 }
 
@@ -498,6 +504,8 @@ impl Default for NewDocumentCatalog {
             extracted_data: None,
             extraction_status: Some("PENDING".to_string()),
             extraction_confidence: None,
+            cbu_id: None,
+            document_type_id: None,
         }
     }
 }

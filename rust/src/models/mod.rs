@@ -10,6 +10,7 @@
 pub(crate) mod business_request_models;
 pub mod dictionary_models;
 pub(crate) mod document_models;
+pub mod document_type_models;
 pub(crate) mod domain_models;
 pub(crate) mod entity_models;
 
