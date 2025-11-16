@@ -19,11 +19,11 @@ pub enum AllocationStrategy {
 }
 
 #[derive(Debug, Clone)]
-struct ResourceStats {
-    current_load: f64,
-    max_capacity: f64,
-    average_response_time: f64,
-    success_rate: f64,
+pub struct ResourceStats {
+    pub current_load: f64,
+    pub max_capacity: f64,
+    pub average_response_time: f64,
+    pub success_rate: f64,
 }
 
 impl Default for ResourceStats {

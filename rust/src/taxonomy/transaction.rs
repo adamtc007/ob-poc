@@ -18,8 +18,8 @@ impl<'a> TaxonomyTransaction<'a> {
         Ok(Self { tx })
     }
 
-    /// Get a reference to the underlying transaction
-    pub fn as_mut(&mut self) -> &mut Transaction<'a, Postgres> {
+    /// Get a mutable reference to the underlying transaction
+    pub fn transaction_mut(&mut self) -> &mut Transaction<'a, Postgres> {
         &mut self.tx
     }
 

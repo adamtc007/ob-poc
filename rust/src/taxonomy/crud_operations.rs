@@ -49,12 +49,17 @@ impl TaxonomyCrudOperations {
 
         self.log_crud_operation(
             &mut tx,
-            "CREATE",
-            "product",
-            Some(product_id),
-            &format!("create product {} ({})", create.name, create.product_code),
-            true,
-            None,
+            CrudLogEntry {
+                operation_type: "CREATE",
+                entity_type: "product",
+                entity_id: Some(product_id),
+                natural_language_input: &format!(
+                    "create product {} ({})",
+                    create.name, create.product_code
+                ),
+                success: true,
+                error_message: None,
+            },
         )
         .await?;
 
@@ -105,12 +110,14 @@ impl TaxonomyCrudOperations {
 
         self.log_crud_operation(
             &mut tx,
-            "UPDATE",
-            "product",
-            Some(product.product_id),
-            &format!("update product {}", product.product_id),
-            true,
-            None,
+            CrudLogEntry {
+                operation_type: "UPDATE",
+                entity_type: "product",
+                entity_id: Some(product.product_id),
+                natural_language_input: &format!("update product {}", product.product_id),
+                success: true,
+                error_message: None,
+            },
         )
         .await?;
 
@@ -144,12 +151,14 @@ impl TaxonomyCrudOperations {
 
         self.log_crud_operation(
             &mut tx,
-            "DELETE",
-            "product",
-            Some(product.product_id),
-            &format!("delete product {} (soft: {})", product.product_id, soft),
-            true,
-            None,
+            CrudLogEntry {
+                operation_type: "DELETE",
+                entity_type: "product",
+                entity_id: Some(product.product_id),
+                natural_language_input: &format!("delete product {} (soft: {})", product.product_id, soft),
+                success: true,
+                error_message: None,
+            },
         )
         .await?;
 
@@ -224,12 +233,14 @@ impl TaxonomyCrudOperations {
 
         self.log_crud_operation(
             &mut tx,
-            "CREATE",
-            "service",
-            Some(service_id),
-            &format!("create service {} ({})", create.name, create.service_code),
-            true,
-            None,
+            CrudLogEntry {
+                operation_type: "CREATE",
+                entity_type: "service",
+                entity_id: Some(service_id),
+                natural_language_input: &format!("create service {} ({})", create.name, create.service_code),
+                success: true,
+                error_message: None,
+            },
         )
         .await?;
 
@@ -285,12 +296,14 @@ impl TaxonomyCrudOperations {
 
         self.log_crud_operation(
             &mut tx,
-            "CREATE",
-            "onboarding",
-            Some(request_id),
-            &format!("create onboarding for CBU {}", create.cbu_id),
-            true,
-            None,
+            CrudLogEntry {
+                operation_type: "CREATE",
+                entity_type: "onboarding",
+                entity_id: Some(request_id),
+                natural_language_input: &format!("create onboarding for CBU {}", create.cbu_id),
+                success: true,
+                error_message: None,
+            },
         )
         .await?;
 
@@ -333,12 +346,14 @@ impl TaxonomyCrudOperations {
 
         self.log_crud_operation(
             &mut tx,
-            "UPDATE",
-            "onboarding",
-            Some(add.onboarding_id),
-            &format!("add products {:?} to onboarding", add.product_codes),
-            true,
-            None,
+            CrudLogEntry {
+                operation_type: "UPDATE",
+                entity_type: "onboarding",
+                entity_id: Some(add.onboarding_id),
+                natural_language_input: &format!("add products {:?} to onboarding", add.product_codes),
+                success: true,
+                error_message: None,
+            },
         )
         .await?;
 
@@ -378,12 +393,14 @@ impl TaxonomyCrudOperations {
 
         self.log_crud_operation(
             &mut tx,
-            "UPDATE",
-            "service_config",
-            Some(config_id),
-            &format!("configure service {} for onboarding", config.service_code),
-            true,
-            None,
+            CrudLogEntry {
+                operation_type: "UPDATE",
+                entity_type: "service_config",
+                entity_id: Some(config_id),
+                natural_language_input: &format!("configure service {} for onboarding", config.service_code),
+                success: true,
+                error_message: None,
+            },
         )
         .await?;
 
@@ -457,12 +474,7 @@ impl TaxonomyCrudOperations {
     async fn log_crud_operation(
         &self,
         tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-        operation_type: &str,
-        entity_type: &str,
-        entity_id: Option<Uuid>,
-        natural_language_input: &str,
-        success: bool,
-        error_message: Option<&str>,
+        log: CrudLogEntry<'_>,
     ) -> Result<()> {
         sqlx::query!(
             r#"
@@ -471,16 +483,25 @@ impl TaxonomyCrudOperations {
              success, error_message, user_id, created_at)
             VALUES ($1, $2, $3, $4, $5, $6, 'system', NOW())
             "#,
-            operation_type,
-            entity_type,
-            entity_id,
-            natural_language_input,
-            success,
-            error_message
+            log.operation_type,
+            log.entity_type,
+            log.entity_id,
+            log.natural_language_input,
+            log.success,
+            log.error_message
         )
         .execute(&mut **tx)
         .await?;
 
         Ok(())
     }
+}
+
+struct CrudLogEntry<'a> {
+    operation_type: &'a str,
+    entity_type: &'a str,
+    entity_id: Option<Uuid>,
+    natural_language_input: &'a str,
+    success: bool,
+    error_message: Option<&'a str>,
 }
