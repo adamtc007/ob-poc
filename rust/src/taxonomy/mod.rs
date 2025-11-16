@@ -8,10 +8,15 @@
 //! - Caching layer
 //! - Audit logging
 //! - Enhanced resource allocation strategies
+//! - Natural language CRUD operations
+//! - DSL parsing and execution
 
 pub mod allocator;
 pub mod audit;
 pub mod cache;
+pub mod crud_ast;
+pub mod crud_operations;
+pub mod dsl_parser;
 pub mod manager;
 pub mod operations;
 pub mod recovery;
@@ -21,6 +26,9 @@ pub mod validation;
 pub use allocator::{AllocationStrategy, ResourceAllocator};
 pub use audit::{AuditEntry, AuditLogger, AuditRecord};
 pub use cache::{CacheStats, ServiceDiscoveryCache};
+pub use crud_ast::TaxonomyCrudStatement;
+pub use crud_operations::TaxonomyCrudOperations;
+pub use dsl_parser::TaxonomyDslParser;
 pub use manager::TaxonomyDslManager;
 pub use operations::{DslOperation, DslResult};
 pub use recovery::{CompensationHandler, RecoveryStrategy};

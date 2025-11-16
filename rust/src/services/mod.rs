@@ -49,6 +49,10 @@ pub mod agentic_dsl_crud;
 // Complete Agentic System - Entity, Role, and CBU Management
 pub mod agentic_complete;
 
+// Taxonomy CRUD Service - Natural Language → Taxonomy Operations
+#[cfg(feature = "database")]
+pub mod taxonomy_crud;
+
 // Re-export service types for backwards compatibility
 
 // DSL/AST sync service - master sync endpoints
