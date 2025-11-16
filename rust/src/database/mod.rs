@@ -21,6 +21,7 @@ pub mod dictionary_service;
 pub mod document_type_repository;
 pub(crate) mod dsl_domain_repository;
 pub(crate) mod entity_service;
+pub mod taxonomy_repository;
 
 // Re-export repository and trait for convenience
 // pub use attribute_repository::{AttributeRepository, RepositoryError as AttributeRepositoryError};
@@ -28,6 +29,7 @@ pub(crate) use business_request_repository::DslBusinessRequestRepository;
 pub use dictionary_service::DictionaryDatabaseService;
 pub(crate) use dsl_domain_repository::{DslDomainRepository, DslDomainRepositoryTrait};
 pub(crate) use entity_service::EntityDatabaseService;
+pub use taxonomy_repository::TaxonomyRepository;
 
 /// Database configuration
 #[derive(Debug, Clone)]
@@ -122,6 +124,11 @@ impl DatabaseManager {
     /// Create a new entity database service using this database connection
     pub(crate) fn entity_service(&self) -> EntityDatabaseService {
         EntityDatabaseService::new(self.pool.clone())
+    }
+
+    /// Create a new taxonomy repository using this database connection
+    pub fn taxonomy_repository(&self) -> TaxonomyRepository {
+        TaxonomyRepository::new(self.pool.clone())
     }
 
     /// Test database connectivity

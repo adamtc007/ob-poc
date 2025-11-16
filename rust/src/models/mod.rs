@@ -13,6 +13,7 @@ pub(crate) mod document_models;
 pub mod document_type_models;
 pub(crate) mod domain_models;
 pub(crate) mod entity_models;
+pub mod taxonomy;
 
 // Re-export commonly used types for convenience
 

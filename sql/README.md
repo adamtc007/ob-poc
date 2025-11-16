@@ -1,174 +1,236 @@
-# OB-POC Database Schema
+# SQL Directory - OB-POC Database Schema
 
-This directory contains the complete PostgreSQL schema for the OB-POC (Ultimate Beneficial Ownership - Proof of Concept) system.
+**Last Updated:** 2025-11-16  
+**Schema Version:** 3.0 (Consolidated)
 
-## Quick Start
+## 📁 Directory Structure
 
-To set up a new database from scratch:
-
-```bash
-# 1. Create the complete schema (tables, indexes, constraints, functions)
-psql -d your_database -f 00_master_schema.sql
-
-# 2. Load seed data (optional but recommended)
-psql -d your_database -f 01_seed_data.sql
+```
+sql/
+├── README.md                              # This file
+├── 00_MASTER_SCHEMA_CONSOLIDATED.sql      # ✅ CURRENT: Complete schema (67 tables)
+├── 01_SEED_DATA_CONSOLIDATED.sql          # ✅ CURRENT: Essential seed data
+├── CURRENT_SCHEMA_DUMP.sql                # Auto-generated from live DB
+├── migrations/                            # Active migrations
+│   ├── 009_complete_taxonomy.sql          # Taxonomy system (2025-11-16)
+│   └── 010_seed_taxonomy_data.sql         # Taxonomy seed data
+├── refactor-migrations/                   # Document attribute refactoring
+│   ├── 001_document_attribute_mappings.sql
+│   └── 002_seed_document_mappings.sql
+└── archive/                               # Historical/deprecated files
+    ├── 00_master_schema_OLD.sql
+    ├── 01_seed_data_OLD.sql
+    └── migrations/                        # Old migration history
 ```
 
-## Files
+## 🚀 Quick Start
 
-### Active Scripts
+### Fresh Database Setup
+```bash
+# 1. Create schema with all tables
+psql $DATABASE_URL -f 00_MASTER_SCHEMA_CONSOLIDATED.sql
 
-- **00_master_schema.sql** - Complete schema definition
-  - Generated directly from production database using `pg_dump`
-  - Contains all 57 tables with complete structure
-  - Includes all indexes, constraints, and foreign keys
-  - Includes all functions and stored procedures
-  - This is the single source of truth for schema structure
+# 2. Load seed data
+psql $DATABASE_URL -f 01_SEED_DATA_CONSOLIDATED.sql
 
-- **01_seed_data.sql** - Reference data and sample data
-  - Dictionary attributes (76+ common financial attributes)
-  - Sample CBUs (Client Business Units)
-  - Entity types and roles
-  - Essential reference data for development and testing
+# 3. Verify
+psql $DATABASE_URL -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'ob-poc';"
+```
 
-### Archive
+### Expected Result
+- **67 tables** created in `ob-poc` schema
+- **Essential seed data** loaded (entity types, roles, products, services, etc.)
 
-The `archive/` directory contains historical migration scripts and old schema files. These are kept for reference only and should not be executed on new databases.
+## 📊 Schema Overview
 
-## Schema Overview
+### Database Statistics
+| Category | Count | Description |
+|----------|-------|-------------|
+| **Total Tables** | 67 | Complete production schema |
+| **Entity Types** | 6 | Person, Company, Partnership, Trust, etc. |
+| **Products** | 3 | Custody, Prime Brokerage, Fund Admin |
+| **Services** | 4 | Settlement, Safekeeping, Corporate Actions, Reporting |
+| **Resources** | 3 | DTCC, Euroclear, APAC Clearinghouse |
+| **DSL Domains** | 8 | case, kyc, entity, products, services, etc. |
 
-The ob-poc schema contains **57 tables** organized into functional areas:
+### Major Table Groups
 
-### Core Business Objects
+#### 1. **Core CBU** (4 tables)
 - `cbus` - Client Business Units
-- `entities` - Legal entities (companies, partnerships, trusts, persons)
-- `entity_proper_persons`, `entity_limited_companies`, `entity_partnerships`, `entity_trusts` - Entity type specializations
-- `products`, `services` - Product and service definitions
-- `ubo_registry` - Ultimate beneficial ownership tracking
+- `cbu_creation_log` - CBU creation audit trail
+- `roles` - Business roles
+- `cbu_entity_roles` - Entity-role assignments
 
-### DSL Engine
-- `dsl_instances` - DSL document instances
-- `dsl_versions` - Version history
-- `parsed_asts` - Compiled AST storage
-- `dsl_execution_log` - Execution audit trail
-- `dsl_domains`, `domain_vocabularies`, `verb_registry` - DSL grammar and vocabulary
-
-### Attribute System
+#### 2. **Attributes & Dictionary** (5 tables)
 - `dictionary` - Universal attribute dictionary
-- `attribute_registry` - Attribute type registry (UUID-based)
+- `attribute_registry` - Attribute definitions
 - `attribute_values` - Runtime attribute values
 - `attribute_values_typed` - Typed attribute storage
+- Document attribute mappings
 
-### Document Management
-- `document_catalog` - Document storage and metadata
-- `document_metadata` - Cached extracted values
+#### 3. **Entities** (16 tables)
+- `entities` - Core entity table
+- `entity_types` - Entity classifications
+- `entity_proper_persons` - Individual persons
+- `entity_limited_companies` - Companies
+- `entity_partnerships` - Partnerships  
+- `entity_trusts` - Trust structures
+- `ubo_registry` - Ultimate beneficial ownership
+- Supporting tables for relationships, validation, lifecycle
+
+#### 4. **Products & Services** (14 tables)
+- `products` - Product catalog
+- `services` - Service catalog
+- `product_services` - Product-service mappings
+- `prod_resources` - Production resources
+- `service_option_definitions` - Service options
+- `service_option_choices` - Option values
+- `service_resource_capabilities` - Resource capabilities
+- `resource_attribute_requirements` - Attribute requirements
+- Supporting tables for workflows, requirements
+
+#### 5. **Onboarding Workflow** (5 tables)
+- `onboarding_requests` - Workflow state machine
+- `onboarding_products` - Product selections
+- `onboarding_service_configs` - Service configurations
+- `onboarding_resource_allocations` - Resource assignments
+- `service_discovery_cache` - Performance cache
+
+#### 6. **Documents** (7 tables)
+- `document_catalog` - Document repository
 - `document_types` - Document classifications
-- `document_relationships` - Document linkage
+- `document_metadata` - Extracted metadata
+- `document_relationships` - Document links
+- `document_attribute_mappings` - Type-attribute mappings
 
-### Orchestration & Workflow
-- `orchestration_sessions` - Workflow session tracking
-- `orchestration_tasks` - Task management
-- `orchestration_state_history` - State transitions
-- `orchestration_domain_sessions` - Domain-specific sessions
+#### 7. **DSL Management** (7 tables)
+- `dsl_domains` - Domain definitions
+- `dsl_versions` - Version control
+- `dsl_instances` - DSL instances
+- `parsed_asts` - Compiled ASTs
+- `dsl_execution_log` - Execution history
+- `dsl_examples` - Example DSLs
+- `dsl_ob` - DSL objects
 
-### Supporting Tables
-- `grammar_rules` - DSL grammar definitions
-- `master_jurisdictions` - Jurisdiction reference data
-- `master_entity_xref` - Entity cross-references
-- `schema_changes` - Schema migration history
-- `rag_embeddings` - AI/RAG vector storage
-- Various relationship and mapping tables
+#### 8. **Vocabularies & Grammar** (4 tables)
+- `domain_vocabularies` - Domain verbs
+- `verb_registry` - Verb definitions
+- `vocabulary_audit` - Change tracking
+- `grammar_rules` - EBNF rules
 
-## Key Features
+#### 9. **Orchestration** (4 tables)
+- `orchestration_sessions` - Multi-domain sessions
+- `orchestration_domain_sessions` - Domain execution
+- `orchestration_tasks` - Task queue
+- `orchestration_state_history` - State snapshots
 
-### DSL-as-State Architecture
-The database is designed to support a "DSL-as-State" pattern where accumulated DSL documents serve as both state representation and audit trail.
+#### 10. **Reference Data** (2 tables)
+- `master_jurisdictions` - Jurisdiction reference
+- `master_entity_xref` - External ID mappings
 
-### AttributeID-as-Type Pattern
-Variables in DSL are typed by AttributeID (UUID) referencing the universal dictionary, not primitive types. This provides:
-- Type safety through dictionary validation
-- Privacy classification (PII, PCI, PHI)
-- Source/sink metadata
-- Business domain context
+#### 11. **Audit & Misc** (3 tables)
+- `crud_operations` - CRUD audit log
+- `rag_embeddings` - Vector embeddings
+- `schema_changes` - Schema change log
 
-### UUID Support
-Full support for UUID-based attribute references with:
-- Hybrid UUID + semantic ID approach
-- Bidirectional resolution (O(1) HashMap)
-- Runtime value binding with execution context
-- Source tracking for audit trails
+## 🔄 Migration Strategy
 
-### Multi-Domain Support
-Supports 7 operational domains with 70+ approved verbs:
-- Core Operations (case management)
-- Entity Management (registration, classification, identity)
-- Product Operations (configuration, provisioning)
-- KYC Operations (collection, verification, compliance)
-- UBO Operations (ownership structures, calculations)
-- Document Library (cataloging, extraction, lifecycle)
-- ISDA Derivatives (master agreements, trades, margin)
+### Current Approach (Post-Consolidation)
+1. **No more incremental migrations** - Schema is stable
+2. **Use consolidated files** for new databases
+3. **Document changes** in git commits
+4. **Periodic regeneration** of CURRENT_SCHEMA_DUMP.sql from live DB
 
-## Maintenance
+### Historical Migrations (Archived)
+All historical migrations moved to `archive/migrations/`:
+- `001` through `008` - Original phased development
+- Attribute refactoring series
+- Various fixes and enhancements
 
-### Schema Updates
+**Note:** These are for reference only. Do not run on new databases.
 
-**IMPORTANT**: The master schema file (`00_master_schema.sql`) is generated from the production database. To update it:
+## 📝 Seed Data Contents
 
+### Entity Types
+- PERSON, LIMITED_COMPANY, PARTNERSHIP, TRUST, FOUNDATION, LLC
+
+### Roles
+- Beneficial Owner, Director, Shareholder, Trustee, Partner, etc.
+
+### Products
+- **CUSTODY_INST** - Institutional Custody
+- **PRIME_BROKER** - Prime Brokerage
+- **FUND_ADMIN** - Fund Administration
+
+### Services
+- **SETTLEMENT** - Trade Settlement (with multi-market options)
+- **SAFEKEEPING** - Asset Safekeeping
+- **CORP_ACTIONS** - Corporate Actions
+- **REPORTING** - Client Reporting
+
+### Production Resources
+- **DTCC_SETTLE** - US markets (T0/T1/T2)
+- **EUROCLEAR** - European markets (T1/T2)
+- **APAC_CLEAR** - APAC markets (T2)
+
+### DSL Domains
+- case, kyc, entity, products, services, ubo, document, compliance
+
+### Jurisdictions (Sample)
+- US, GB, DE, FR, SG, HK, CH, LU, KY, BM
+
+### Document Types (Sample)
+- Passport, Drivers License, National ID, Proof of Address
+- Certificate of Incorporation, Articles of Association
+- Trust Deed, Partnership Agreement, UBO Certificate
+
+## 🔧 Maintenance
+
+### Regenerate Schema Dump
 ```bash
-# Extract current schema from database
-pg_dump --schema-only --schema=ob-poc -d data_designer -U adamtc007 > 00_master_schema.sql
+pg_dump $DATABASE_URL --schema-only --schema="ob-poc" > CURRENT_SCHEMA_DUMP.sql
 ```
 
-Do not manually edit the master schema file. Make changes to the database first, then regenerate the file.
-
-### Adding Seed Data
-
-To add new seed data, edit `01_seed_data.sql` directly. Use `INSERT ... ON CONFLICT DO NOTHING` for idempotent inserts.
-
-## Database Connection
-
-The system expects a `DATABASE_URL` environment variable:
-
+### Verify Schema
 ```bash
-export DATABASE_URL="postgresql://user:password@localhost/database_name"
+psql $DATABASE_URL -c "
+SELECT tablename 
+FROM pg_tables 
+WHERE schemaname = 'ob-poc' 
+ORDER BY tablename;"
 ```
 
-For local development with default PostgreSQL settings:
-
+### Check Seed Data
 ```bash
-export DATABASE_URL="postgresql:///data_designer?user=adamtc007"
+psql $DATABASE_URL -f 01_SEED_DATA_CONSOLIDATED.sql
+# Look for verification output at end
 ```
 
-## Testing
+## 📚 Related Documentation
 
-Test database connectivity from the Rust codebase:
+- **CLAUDE.md** - Project overview and architecture
+- **TAXONOMY_IMPLEMENTATION_COMPLETE.md** - Taxonomy system details
+- **TAXONOMY_QUICK_START.md** - Quick reference guide
+- **rust/COMPLETE_TAXONOMY_IMPLEMENTATION.md** - Original Opus plan
 
-```bash
-cd ../rust
-cargo run --bin test_db_connection --features="database"
-```
+## ⚠️ Important Notes
 
-## Schema Statistics
+1. **Always use consolidated files** for new setups
+2. **Archive old migrations** - don't delete (git history)
+3. **Document schema changes** in commit messages
+4. **Test migrations** on dev database first
+5. **Backup before schema changes** in production
 
-- **Total Tables**: 57
-- **Schema Size**: ~4,400 lines of SQL
-- **Seed Data**: ~275 lines
-- **Attributes in Dictionary**: 76+ financial onboarding attributes
-- **Sample CBUs**: Hedge funds and investment vehicles
+## 🎯 Version History
 
-## Version History
-
-- **2025-11-15**: Consolidated to master schema file (generated from production DB)
-- **2025-11-14**: UUID migration complete, document extraction system implemented
-- **2025-11-13**: AI integration and attribute resolution
-- **Previous**: Iterative migrations (archived)
-
-## Architecture Documentation
-
-For complete architectural details, see `/CLAUDE.md` in the repository root.
+| Version | Date | Description |
+|---------|------|-------------|
+| **3.0** | 2025-11-16 | Consolidated schema (67 tables) + taxonomy system |
+| 2.x | 2025-11 | Phased development, attribute refactoring |
+| 1.x | 2025-10 | Initial schema development |
 
 ---
 
-**Status**: Production-ready schema with comprehensive domain support
-**Last Schema Export**: 2025-11-15
-**Database Version**: PostgreSQL 14.19+
+**Schema Status:** ✅ Production Ready  
+**Last Schema Dump:** 2025-11-16  
+**Total Tables:** 67

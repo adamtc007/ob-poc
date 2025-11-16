@@ -326,3 +326,10 @@ uuid-*.tar.gz
 *.tar.gz
 !sql/**/*.tar.gz  # Allow SQL backup archives if needed
 *.bak*
+
+# Build and test output files
+**/check_output.txt
+**/clippy_warnings.txt
+**/full_clippy_output.txt
+clippy_output.txt
+test_output.txt

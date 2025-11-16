@@ -51,6 +51,10 @@ pub mod database;
 #[cfg(feature = "database")]
 pub mod models;
 
+// Taxonomy system for Product-Service-Resource management
+#[cfg(feature = "database")]
+pub mod taxonomy;
+
 // Refactored call chain components
 pub mod db_state_manager;
 pub mod dsl;
