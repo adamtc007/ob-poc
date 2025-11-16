@@ -7,9 +7,7 @@
 //!
 //! Run with: cargo run --example agentic_dsl_crud_demo --features database
 
-use ob_poc::services::agentic_dsl_crud::{
-    AgenticDslService, CrudStatement, DslParser,
-};
+use ob_poc::services::agentic_dsl_crud::{AgenticCbuService, CrudStatement, DslParser};
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -25,10 +23,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // STEP 1: Database connection
     // =================================================================
     println!("\n📦 Step 1: Connecting to database...");
-    
+
     let database_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgresql://localhost:5432/ob-poc".to_string());
-    
+
     let pool = PgPool::connect(&database_url).await?;
     println!("✅ Connected to database");
 
@@ -36,8 +34,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // STEP 2: Create Agentic DSL Service
     // =================================================================
     println!("\n🤖 Step 2: Initializing agentic DSL service...");
-    
-    let agentic_service = AgenticDslService::new(pool.clone());
+
+    let agentic_service = AgenticCbuService::new(pool.clone());
     println!("✅ Service initialized");
 
     // =================================================================
@@ -48,7 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Test 1: Create CBU from natural language
     let instruction1 = "Create a CBU with Nature and Purpose 'Hedge Fund Management' and Source of Funds 'Investment Returns'";
     println!("\n  Input: {}", instruction1);
-    
+
     match DslParser::parse(instruction1) {
         Ok(CrudStatement::CreateCbu(create)) => {
             println!("  ✅ Parsed as CreateCbu:");
@@ -63,13 +61,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let entity_id = Uuid::new_v4();
     let cbu_id = Uuid::new_v4();
     let role_id = Uuid::new_v4();
-    
+
     let instruction2 = format!(
         "Connect entity {} to CBU {} as role {}",
         entity_id, cbu_id, role_id
     );
     println!("\n  Input: {}", instruction2);
-    
+
     match DslParser::parse(&instruction2) {
         Ok(CrudStatement::ConnectEntity(connect)) => {
             println!("  ✅ Parsed as ConnectEntity:");
@@ -85,7 +83,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let read_cbu_id = Uuid::new_v4();
     let instruction3 = format!("Read CBU {}", read_cbu_id);
     println!("\n  Input: {}", instruction3);
-    
+
     match DslParser::parse(&instruction3) {
         Ok(CrudStatement::ReadCbu(read)) => {
             println!("  ✅ Parsed as ReadCbu:");
@@ -99,36 +97,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // STEP 4: Execute CBU creation (if tables exist)
     // =================================================================
     println!("\n🔧 Step 4: Testing CBU creation...");
-    
+
     let nature_purpose = "Real Estate Investment Trust";
     let source_of_funds = "Property Sales";
-    
-    match agentic_service.create_cbu_from_natural_language(
-        "Create investment trust CBU",
-        nature_purpose,
-        source_of_funds,
-    ).await {
-        Ok(cbu_id) => {
-            println!("  ✅ CBU created successfully!");
-            println!("     CBU ID: {}", cbu_id);
+
+    let instruction = format!(
+        "Create a CBU with Nature and Purpose '{}' and Source of Funds '{}'",
+        nature_purpose, source_of_funds
+    );
+
+    match agentic_service.process_instruction(&instruction).await {
+        Ok(result) => {
+            println!("  ✅ Instruction processed successfully!");
+            println!("     Result: {:?}", result);
             println!("     Nature & Purpose: {}", nature_purpose);
             println!("     Source of Funds: {}", source_of_funds);
-            
-            // Clean up
-            sqlx::query(r#"DELETE FROM "ob-poc".cbu_creation_log WHERE cbu_id = $1"#)
-                .bind(cbu_id)
-                .execute(&pool)
-                .await
-                .ok();
-            sqlx::query(r#"DELETE FROM "ob-poc".cbus WHERE cbu_id = $1"#)
-                .bind(cbu_id)
-                .execute(&pool)
-                .await
-                .ok();
-            println!("  🧹 Cleanup complete");
+
+            // Clean up if CBU was created
+            if let Some(entity_id) = result.entity_id {
+                sqlx::query(r#"DELETE FROM "ob-poc".cbu_creation_log WHERE cbu_id = $1"#)
+                    .bind(entity_id)
+                    .execute(&pool)
+                    .await
+                    .ok();
+                sqlx::query(r#"DELETE FROM "ob-poc".cbus WHERE cbu_id = $1"#)
+                    .bind(entity_id)
+                    .execute(&pool)
+                    .await
+                    .ok();
+                println!("  🧹 Cleanup complete");
+            }
         }
         Err(e) => {
-            println!("  ⚠️  CBU creation skipped (tables may not exist)");
+            println!("  ⚠️  Instruction processing failed (tables may not exist)");
             println!("     Error: {}", e);
             println!("     Run migration: sql/migrations/007_agentic_dsl_crud.sql");
         }
