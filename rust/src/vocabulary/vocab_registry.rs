@@ -146,6 +146,7 @@ impl VocabularyRegistry {
     }
 
     /// Extract action from a fully-qualified verb
+    #[allow(dead_code)]
     pub(crate) fn extract_action(verb: &str) -> Option<String> {
         Self::validate_verb_format(verb)
             .map(|(_, action)| action)
@@ -153,6 +154,7 @@ impl VocabularyRegistry {
     }
 
     /// Register a new verb in the registry
+    #[allow(dead_code)]
     pub(crate) fn register_verb(
         &mut self,
         verb: String,
@@ -179,11 +181,13 @@ impl VocabularyRegistry {
     }
 
     /// Get all shared verbs (replaces the removed shared_verbs HashMap)
+    #[allow(dead_code)]
     pub(crate) fn get_shared_verbs(&self) -> Vec<&VerbRegistryEntry> {
         self.registry.values().filter(|e| e.shared).collect()
     }
 
     /// Get all verbs for a specific domain
+    #[allow(dead_code)]
     pub(crate) fn get_domain_verbs(&self, domain: &str) -> Vec<&String> {
         self.domain_ownership
             .get(domain)
@@ -192,11 +196,13 @@ impl VocabularyRegistry {
     }
 
     /// Get verb entry by fully-qualified name
+    #[allow(dead_code)]
     pub(crate) fn get_verb(&self, verb: &str) -> Option<&VerbRegistryEntry> {
         self.registry.get(verb)
     }
 
     /// Get registry statistics
+    #[allow(dead_code)]
     pub(crate) fn get_stats(&self) -> RegistryStats {
         let total_verbs = self.registry.len();
         let shared_verbs = self.get_shared_verbs().len();
