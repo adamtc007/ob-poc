@@ -4,7 +4,7 @@
 //! supporting new semantics including link identity, append-only notes, and evidence linking.
 
 use crate::ast::types::{ErrorSeverity, SourceLocation, ValidationError, ValidationWarning};
-use crate::parser_ast::{Form, Key, Literal, PropertyMap, Value, VerbForm};
+use crate::parser::ast::{Form, Key, Literal, PropertyMap, Value, VerbForm};
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 
@@ -636,4 +636,3 @@ impl Default for DslValidator {
         Self::new()
     }
 }
-

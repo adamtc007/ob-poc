@@ -126,7 +126,7 @@ pub struct DataDelete {
 // ============================================================================
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct ComplexQuery {
+pub struct ComplexQuery {
     pub primary_asset: String,
     pub joins: Option<Vec<JoinClause>>,
     pub conditions: HashMap<String, Value>,
@@ -138,14 +138,14 @@ pub(crate) struct ComplexQuery {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct JoinClause {
+pub struct JoinClause {
     pub join_type: JoinType,
     pub target_asset: String,
     pub on_condition: PropertyMap,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) enum JoinType {
+pub enum JoinType {
     Inner,
     Left,
     Right,
@@ -153,21 +153,21 @@ pub(crate) enum JoinType {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct AggregateClause {
+pub struct AggregateClause {
     pub operations: Vec<AggregateOperation>,
     pub group_by: Option<Vec<String>>,
     pub having: Option<PropertyMap>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct AggregateOperation {
+pub struct AggregateOperation {
     pub function: AggregateFunction,
     pub field: String,
     pub alias: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) enum AggregateFunction {
+pub enum AggregateFunction {
     Count,
     Sum,
     Avg,
@@ -177,19 +177,19 @@ pub(crate) enum AggregateFunction {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct OrderClause {
+pub struct OrderClause {
     pub field: String,
     pub direction: OrderDirection,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) enum OrderDirection {
+pub enum OrderDirection {
     Asc,
     Desc,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct ConditionalUpdate {
+pub struct ConditionalUpdate {
     pub asset: String,
     pub primary_condition: HashMap<String, Value>,
     pub if_exists: Option<HashMap<String, Value>>,
@@ -206,25 +206,6 @@ pub struct BatchOperation {
 }
 
 // TransactionMode and RollbackStrategy moved to dsl_types crate - import from there
-
-// --- Transaction Management ---
-
-#[derive(Debug, Clone)]
-pub(crate) struct CrudTransaction {
-    pub operations: Vec<CrudStatement>,
-    pub rollback_strategy: RollbackStrategy,
-    pub atomic: bool,
-    pub timeout_seconds: Option<u64>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct TransactionResult {
-    pub success: bool,
-    pub completed_operations: Vec<usize>,
-    pub failed_operations: Vec<(usize, String)>,
-    pub rollback_performed: bool,
-    pub total_duration_ms: u64,
-}
 
 // --- Validation Structures ---
 
@@ -244,13 +225,6 @@ pub struct ValidationWarning {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct IntegrityResult {
-    pub referential_integrity_ok: bool,
-    pub constraint_violations: Vec<ConstraintViolation>,
-    pub dependency_issues: Vec<DependencyIssue>,
-}
-
-#[derive(Debug, Clone)]
 pub struct ConstraintViolation {
     pub constraint_name: String,
     pub violation_type: ConstraintType,
@@ -259,43 +233,10 @@ pub struct ConstraintViolation {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum ConstraintType {
+pub enum ConstraintType {
     ForeignKey,
     Unique,
     NotNull,
     Check,
     Custom,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct DependencyIssue {
-    pub dependent_table: String,
-    pub dependency_type: DependencyType,
-    pub affected_count: u32,
-    pub resolution_hint: String,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) enum DependencyType {
-    Cascade,
-    Restrict,
-    SetNull,
-    SetDefault,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct SimulationResult {
-    pub would_succeed: bool,
-    pub affected_records: u32,
-    pub estimated_duration_ms: u64,
-    pub resource_usage: ResourceUsage,
-    pub potential_issues: Vec<String>,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct ResourceUsage {
-    pub memory_kb: u64,
-    pub disk_operations: u32,
-    pub network_calls: u32,
-    pub cpu_time_ms: u64,
 }

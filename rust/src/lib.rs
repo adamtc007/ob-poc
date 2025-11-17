@@ -22,9 +22,8 @@ pub mod error;
 
 // Essential AST types
 pub mod ast;
-pub mod parser_ast;
 
-// Core parser with full DSL capabilities
+// Core parser with full DSL capabilities (includes AST types in parser::ast)
 pub mod parser;
 
 // Grammar engine for EBNF parsing
@@ -89,8 +88,8 @@ pub use vocabulary::vocab_registry::VocabularyRegistry;
 // Essential error types
 pub use error::{DSLError, ParseError};
 
-// Core AST types
-pub use ast::{Statement, Workflow};
+// Core AST types (EntityLabel, EdgeType for graph operations)
+pub use ast::{EdgeType, EntityLabel};
 
 // System info
 pub use system_info as get_system_info;
@@ -102,7 +101,7 @@ pub use parser::{
 };
 
 /// Parse DSL with full normalization and validation
-pub fn parse_dsl(input: &str) -> Result<parser_ast::Program, ParseError> {
+pub fn parse_dsl(input: &str) -> Result<parser::Program, ParseError> {
     parse_program(input).map_err(|e| ParseError::Internal {
         message: format!("Parse error: {:?}", e),
     })
@@ -120,9 +119,7 @@ pub fn process_dsl_change_sync(request: services::DslChangeRequest) -> Result<St
 }
 
 /// Execute DSL program
-pub fn execute_dsl_program(
-    program: &parser_ast::Program,
-) -> Result<ParserExecutionResult, ParseError> {
+pub fn execute_dsl_program(program: &parser::Program) -> Result<ParserExecutionResult, ParseError> {
     execute_dsl(program).map_err(|e| ParseError::Internal {
         message: format!("Execution error: {:?}", e),
     })

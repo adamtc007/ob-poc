@@ -33,7 +33,8 @@ pub struct DbStateManager {
     database: Option<crate::database::DatabaseManager>,
     /// In-memory state store for testing and development
     state_store: HashMap<String, StoredDslState>,
-    /// Configuration for state management
+    /// Configuration for state management (currently unused, reserved for future features)
+    #[allow(dead_code)]
     config: StateManagerConfig,
 }
 
@@ -260,7 +261,7 @@ impl DbStateManager {
         let snapshot_id = self.generate_snapshot_id(&stored_state);
 
         // Sync to DSL and AST tables - critical sync points
-        let sync_result = self.sync_to_tables(&stored_state, dsl_result).await;
+        let _sync_result = self.sync_to_tables(&stored_state, dsl_result).await;
 
         if persist_result {
             println!(
@@ -484,7 +485,7 @@ impl DbStateManager {
     }
 
     /// Sync to DSL table - maintains accumulated DSL state
-    async fn sync_to_dsl_table(&self, state: &StoredDslState) -> bool {
+    async fn sync_to_dsl_table(&self, _state: &StoredDslState) -> bool {
         #[cfg(feature = "database")]
         {
             if let Some(ref _database) = self.database {
@@ -507,7 +508,7 @@ impl DbStateManager {
     }
 
     /// Sync to AST table - maintains parsed representations
-    async fn sync_to_ast_table(&self, state: &StoredDslState, dsl_result: &DslModResult) -> bool {
+    async fn sync_to_ast_table(&self, _state: &StoredDslState, _dsl_result: &DslModResult) -> bool {
         #[cfg(feature = "database")]
         {
             if let Some(ref _database) = self.database {

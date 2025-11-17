@@ -18,11 +18,6 @@ impl AttributeId {
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
-
-    /// Create an AttributeId from a UUID
-    pub(crate) fn from_uuid(uuid: Uuid) -> Self {
-        Self(uuid)
-    }
 }
 
 impl std::fmt::Display for AttributeId {
@@ -70,7 +65,7 @@ pub struct AttributeDefinition {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum DataType {
+pub enum DataType {
     String,
     Numeric,
     Integer,
@@ -96,7 +91,7 @@ pub struct Constraints {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SemanticMetadata {
+pub struct SemanticMetadata {
     /// Deep English description for RAG
     pub description: String,
 
@@ -114,7 +109,7 @@ pub(crate) struct SemanticMetadata {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct EmbeddingInfo {
+pub struct EmbeddingInfo {
     pub vector: Option<Vec<f32>>, // Actual vector (3072-dim for text-embedding-3-large)
     pub model: String,
     pub dimension: usize,
@@ -122,7 +117,7 @@ pub(crate) struct EmbeddingInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct UiMetadata {
+pub struct UiMetadata {
     pub category: String,
     pub subcategory: String,
     pub display_order: u32,
@@ -134,7 +129,7 @@ pub(crate) struct UiMetadata {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum Importance {
+pub enum Importance {
     Critical,
     High,
     Medium,
@@ -142,20 +137,20 @@ pub(crate) enum Importance {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct DataSources {
+pub struct DataSources {
     pub primary: Option<SourceDefinition>,
     pub secondary: Option<SourceDefinition>,
     pub tertiary: Option<SourceDefinition>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SourceDefinition {
+pub struct SourceDefinition {
     pub source_type: SourceType,
     pub details: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum SourceType {
+pub enum SourceType {
     DocumentExtraction,
     Solicitation,
     ThirdPartyService,
@@ -164,7 +159,7 @@ pub(crate) enum SourceType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct DataSinks {
+pub struct DataSinks {
     pub operational: Option<SinkDefinition>,
     pub master: Option<SinkDefinition>,
     pub archive: Option<SinkDefinition>,
@@ -173,14 +168,14 @@ pub(crate) struct DataSinks {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SinkDefinition {
+pub struct SinkDefinition {
     pub sink_type: SinkType,
     pub details: HashMap<String, serde_json::Value>,
     pub retention: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum SinkType {
+pub enum SinkType {
     PostgreSQL,
     S3,
     DataLake,
@@ -189,7 +184,7 @@ pub(crate) enum SinkType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct VerificationRules {
+pub struct VerificationRules {
     pub required_confidence: f64,
     pub requires_human_review: bool,
     pub review_trigger: Option<String>,

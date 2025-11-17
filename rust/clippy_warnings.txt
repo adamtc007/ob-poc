@@ -1,0 +1,1032 @@
+warning: unused imports: `error` and `warn`
+  --> rust/src/dsl/pipeline_processor.rs:26:22
+   |
+26 | use tracing::{debug, error, info, instrument, warn};
+   |                      ^^^^^                    ^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `AccumulatedState` and `StateResult`
+  --> rust/src/dsl_manager/clean_manager.rs:22:31
+   |
+22 | use crate::db_state_manager::{AccumulatedState, DbStateManager, StateResult};
+   |                               ^^^^^^^^^^^^^^^^                  ^^^^^^^^^^^
+
+warning: unused imports: `PipelineConfig` and `ProcessingOptions`
+  --> rust/src/dsl_manager/clean_manager.rs:25:57
+   |
+25 |     OrchestrationOperation, OrchestrationOperationType, PipelineConfig, ProcessingOptions,
+   |                                                         ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^
+
+warning: unused import: `VisualizationResult`
+  --> rust/src/dsl_manager/clean_manager.rs:27:44
+   |
+27 | use crate::dsl_visualizer::{DslVisualizer, VisualizationResult};
+   |                                            ^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `Deserialize` and `Serialize`
+  --> rust/src/dsl_manager/clean_manager.rs:28:13
+   |
+28 | use serde::{Deserialize, Serialize};
+   |             ^^^^^^^^^^^  ^^^^^^^^^
+
+warning: unused imports: `Deserialize` and `Serialize`
+  --> rust/src/dsl_visualizer/mod.rs:18:13
+   |
+18 | use serde::{Deserialize, Serialize};
+   |             ^^^^^^^^^^^  ^^^^^^^^^
+
+warning: unused variable: `sync_result`
+   --> rust/src/db_state_manager/mod.rs:263:13
+    |
+263 |         let sync_result = self.sync_to_tables(&stored_state, dsl_result).await;
+    |             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_sync_result`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `state`
+   --> rust/src/db_state_manager/mod.rs:487:39
+    |
+487 |     async fn sync_to_dsl_table(&self, state: &StoredDslState) -> bool {
+    |                                       ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> rust/src/db_state_manager/mod.rs:510:39
+    |
+510 | ...elf, state: &StoredDslState, dsl_result: &DslModResult) -> bool {
+    |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `dsl_result`
+   --> rust/src/db_state_manager/mod.rs:510:63
+    |
+510 | ...elf, state: &StoredDslState, dsl_result: &DslModResult) -> bool {
+    |                                 ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_dsl_result`
+
+warning: type `ast::SolicitAttribute` is more private than the item `ast::Statement::SolicitAttribute::0`
+   --> rust/src/ast/mod.rs:49:22
+    |
+ 49 |     SolicitAttribute(SolicitAttribute),
+    |                      ^^^^^^^^^^^^^^^^ field `ast::Statement::SolicitAttribute::0` is reachable at visibility `pub`
+    |
+note: but type `ast::SolicitAttribute` is only usable at visibility `pub(crate)`
+   --> rust/src/ast/mod.rs:117:1
+    |
+117 | pub(crate) struct SolicitAttribute {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: `#[warn(private_interfaces)]` on by default
+
+warning: type `ast::ResolveConflict` is more private than the item `ast::Statement::ResolveConflict::0`
+   --> rust/src/ast/mod.rs:50:21
+    |
+ 50 |     ResolveConflict(ResolveConflict),
+    |                     ^^^^^^^^^^^^^^^ field `ast::Statement::ResolveConflict::0` is reachable at visibility `pub`
+    |
+note: but type `ast::ResolveConflict` is only usable at visibility `pub(crate)`
+   --> rust/src/ast/mod.rs:135:1
+    |
+135 | pub(crate) struct ResolveConflict {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: type `ast::GenerateReport` is more private than the item `ast::Statement::GenerateReport::0`
+   --> rust/src/ast/mod.rs:51:20
+    |
+ 51 |     GenerateReport(GenerateReport),
+    |                    ^^^^^^^^^^^^^^ field `ast::Statement::GenerateReport::0` is reachable at visibility `pub`
+    |
+note: but type `ast::GenerateReport` is only usable at visibility `pub(crate)`
+   --> rust/src/ast/mod.rs:163:1
+    |
+163 | pub(crate) struct GenerateReport {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: type `ast::ScheduleMonitoring` is more private than the item `ast::Statement::ScheduleMonitoring::0`
+   --> rust/src/ast/mod.rs:52:24
+    |
+ 52 |     ScheduleMonitoring(ScheduleMonitoring),
+    |                        ^^^^^^^^^^^^^^^^^^ field `ast::Statement::ScheduleMonitoring::0` is reachable at visibility `pub`
+    |
+note: but type `ast::ScheduleMonitoring` is only usable at visibility `pub(crate)`
+   --> rust/src/ast/mod.rs:172:1
+    |
+172 | pub(crate) struct ScheduleMonitoring {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: type `ast::ParallelObtain` is more private than the item `ast::Statement::ParallelObtain::0`
+  --> rust/src/ast/mod.rs:53:20
+   |
+53 |     ParallelObtain(ParallelObtain),
+   |                    ^^^^^^^^^^^^^^ field `ast::Statement::ParallelObtain::0` is reachable at visibility `pub`
+   |
+note: but type `ast::ParallelObtain` is only usable at visibility `pub(crate)`
+  --> rust/src/ast/mod.rs:91:1
+   |
+91 | pub(crate) struct ParallelObtain {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: type `ast::ValueWithSource` is more private than the item `ast::Value::MultiValue::0`
+   --> rust/src/ast/mod.rs:189:16
+    |
+189 |     MultiValue(Vec<ValueWithSource>),
+    |                ^^^^^^^^^^^^^^^^^^^^ field `ast::Value::MultiValue::0` is reachable at visibility `pub`
+    |
+note: but type `ast::ValueWithSource` is only usable at visibility `pub(crate)`
+   --> rust/src/ast/mod.rs:194:1
+    |
+194 | pub(crate) struct ValueWithSource {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: type `ast::types::GrammarRuleType` is more private than the item `ast::types::GrammarRule::rule_type`
+   --> rust/src/ast/types.rs:195:5
+    |
+195 |     pub rule_type: GrammarRuleType,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ field `ast::types::GrammarRule::rule_type` is reachable at visibility `pub`
+    |
+note: but type `ast::types::GrammarRuleType` is only usable at visibility `pub(crate)`
+   --> rust/src/ast/types.rs:205:1
+    |
+205 | pub(crate) enum GrammarRuleType {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: type `parser_ast::ComplexQuery` is more private than the item `parser_ast::CrudStatement::ComplexQuery::0`
+   --> rust/src/parser_ast/mod.rs:90:18
+    |
+ 90 |     ComplexQuery(ComplexQuery),
+    |                  ^^^^^^^^^^^^ field `parser_ast::CrudStatement::ComplexQuery::0` is reachable at visibility `pub`
+    |
+note: but type `parser_ast::ComplexQuery` is only usable at visibility `pub(crate)`
+   --> rust/src/parser_ast/mod.rs:129:1
+    |
+129 | pub(crate) struct ComplexQuery {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: type `parser_ast::ConditionalUpdate` is more private than the item `parser_ast::CrudStatement::ConditionalUpdate::0`
+   --> rust/src/parser_ast/mod.rs:91:23
+    |
+ 91 |     ConditionalUpdate(ConditionalUpdate),
+    |                       ^^^^^^^^^^^^^^^^^ field `parser_ast::CrudStatement::ConditionalUpdate::0` is reachable at visibility `pub`
+    |
+note: but type `parser_ast::ConditionalUpdate` is only usable at visibility `pub(crate)`
+   --> rust/src/parser_ast/mod.rs:192:1
+    |
+192 | pub(crate) struct ConditionalUpdate {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: type `parser_ast::ConstraintType` is more private than the item `parser_ast::ConstraintViolation::violation_type`
+   --> rust/src/parser_ast/mod.rs:256:5
+    |
+256 |     pub violation_type: ConstraintType,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ field `parser_ast::ConstraintViolation::violation_type` is reachable at visibility `pub`
+    |
+note: but type `parser_ast::ConstraintType` is only usable at visibility `pub(crate)`
+   --> rust/src/parser_ast/mod.rs:262:1
+    |
+262 | pub(crate) enum ConstraintType {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: type `data_dictionary::attribute::DataType` is more private than the item `data_dictionary::attribute::AttributeDefinition::data_type`
+  --> rust/src/data_dictionary/attribute.rs:50:5
+   |
+50 |     pub data_type: DataType,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^ field `data_dictionary::attribute::AttributeDefinition::data_type` is reachable at visibility `pub`
+   |
+note: but type `data_dictionary::attribute::DataType` is only usable at visibility `pub(crate)`
+  --> rust/src/data_dictionary/attribute.rs:73:1
+   |
+73 | pub(crate) enum DataType {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: type `data_dictionary::attribute::SemanticMetadata` is more private than the item `data_dictionary::attribute::AttributeDefinition::semantic`
+  --> rust/src/data_dictionary/attribute.rs:54:5
+   |
+54 |     pub semantic: SemanticMetadata,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ field `data_dictionary::attribute::AttributeDefinition::semantic` is reachable at visibility `pub`
+   |
+note: but type `data_dictionary::attribute::SemanticMetadata` is only usable at visibility `pub(crate)`
+  --> rust/src/data_dictionary/attribute.rs:99:1
+   |
+99 | pub(crate) struct SemanticMetadata {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: type `data_dictionary::attribute::EmbeddingInfo` is more private than the item `data_dictionary::attribute::AttributeDefinition::embedding`
+   --> rust/src/data_dictionary/attribute.rs:57:5
+    |
+ 57 |     pub embedding: Option<EmbeddingInfo>,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ field `data_dictionary::attribute::AttributeDefinition::embedding` is reachable at visibility `pub`
+    |
+note: but type `data_dictionary::attribute::EmbeddingInfo` is only usable at visibility `pub(crate)`
+   --> rust/src/data_dictionary/attribute.rs:117:1
+    |
+117 | pub(crate) struct EmbeddingInfo {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: type `data_dictionary::attribute::UiMetadata` is more private than the item `data_dictionary::attribute::AttributeDefinition::ui_metadata`
+   --> rust/src/data_dictionary/attribute.rs:60:5
+    |
+ 60 |     pub ui_metadata: UiMetadata,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ field `data_dictionary::attribute::AttributeDefinition::ui_metadata` is reachable at visibility `pub`
+    |
+note: but type `data_dictionary::attribute::UiMetadata` is only usable at visibility `pub(crate)`
+   --> rust/src/data_dictionary/attribute.rs:125:1
+    |
+125 | pub(crate) struct UiMetadata {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: type `data_dictionary::attribute::DataSources` is more private than the item `data_dictionary::attribute::AttributeDefinition::sources`
+   --> rust/src/data_dictionary/attribute.rs:63:5
+    |
+ 63 |     pub sources: DataSources,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^ field `data_dictionary::attribute::AttributeDefinition::sources` is reachable at visibility `pub`
+    |
+note: but type `data_dictionary::attribute::DataSources` is only usable at visibility `pub(crate)`
+   --> rust/src/data_dictionary/attribute.rs:145:1
+    |
+145 | pub(crate) struct DataSources {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: type `data_dictionary::attribute::DataSinks` is more private than the item `data_dictionary::attribute::AttributeDefinition::sinks`
+   --> rust/src/data_dictionary/attribute.rs:66:5
+    |
+ 66 |     pub sinks: DataSinks,
+    |     ^^^^^^^^^^^^^^^^^^^^ field `data_dictionary::attribute::AttributeDefinition::sinks` is reachable at visibility `pub`
+    |
+note: but type `data_dictionary::attribute::DataSinks` is only usable at visibility `pub(crate)`
+   --> rust/src/data_dictionary/attribute.rs:167:1
+    |
+167 | pub(crate) struct DataSinks {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: type `data_dictionary::attribute::VerificationRules` is more private than the item `data_dictionary::attribute::AttributeDefinition::verification`
+   --> rust/src/data_dictionary/attribute.rs:69:5
+    |
+ 69 |     pub verification: VerificationRules,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ field `data_dictionary::attribute::AttributeDefinition::verification` is reachable at visibility `pub`
+    |
+note: but type `data_dictionary::attribute::VerificationRules` is only usable at visibility `pub(crate)`
+   --> rust/src/data_dictionary/attribute.rs:192:1
+    |
+192 | pub(crate) struct VerificationRules {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: type alias `GrammarResult` is never used
+   --> rust/src/error.rs:299:17
+    |
+299 | pub(crate) type GrammarResult<T> = Result<T, GrammarError>;
+    |                 ^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: type alias `VocabularyResult` is never used
+   --> rust/src/error.rs:300:17
+    |
+300 | pub(crate) type VocabularyResult<T> = Result<T, VocabularyError>;
+    |                 ^^^^^^^^^^^^^^^^
+
+warning: type alias `RuntimeResult` is never used
+   --> rust/src/error.rs:302:17
+    |
+302 | pub(crate) type RuntimeResult<T> = Result<T, RuntimeError>;
+    |                 ^^^^^^^^^^^^^
+
+warning: struct `ContextualError` is never constructed
+   --> rust/src/error.rs:311:19
+    |
+311 | pub(crate) struct ContextualError {
+    |                   ^^^^^^^^^^^^^^^
+
+warning: associated items `new` and `with_context` are never used
+   --> rust/src/error.rs:319:12
+    |
+318 | impl ContextualError {
+    | -------------------- associated items in this implementation
+319 |     pub fn new(error: DSLError, location: SourceLocation, severity: ErrorSeverity) -> S...
+    |            ^^^
+...
+328 |     pub fn with_context(mut self, context: impl Into<String>) -> Self {
+    |            ^^^^^^^^^^^^
+
+warning: struct `ErrorCollector` is never constructed
+   --> rust/src/error.rs:354:19
+    |
+354 | pub(crate) struct ErrorCollector {
+    |                   ^^^^^^^^^^^^^^
+
+warning: associated items `new`, `add_simple_error`, `has_errors`, `error_count`, and `clear` are never used
+   --> rust/src/error.rs:359:12
+    |
+358 | impl ErrorCollector {
+    | ------------------- associated items in this implementation
+359 |     pub fn new() -> Self {
+    |            ^^^
+...
+363 |     pub(crate) fn add_simple_error(
+    |                   ^^^^^^^^^^^^^^^^
+...
+373 |     pub(crate) fn has_errors(&self) -> bool {
+    |                   ^^^^^^^^^^
+...
+377 |     pub(crate) fn error_count(&self) -> usize {
+    |                   ^^^^^^^^^^^
+...
+381 |     pub fn clear(&mut self) {
+    |            ^^^^^
+
+warning: struct `CalculateUbo` is never constructed
+   --> rust/src/ast/mod.rs:125:19
+    |
+125 | pub(crate) struct CalculateUbo {
+    |                   ^^^^^^^^^^^^
+
+warning: struct `SemanticInfo` is never constructed
+  --> rust/src/ast/types.rs:11:19
+   |
+11 | pub(crate) struct SemanticInfo {
+   |                   ^^^^^^^^^^^^
+
+warning: struct `TypeInfo` is never constructed
+  --> rust/src/ast/types.rs:28:19
+   |
+28 | pub(crate) struct TypeInfo {
+   |                   ^^^^^^^^
+
+warning: enum `DSLType` is never used
+  --> rust/src/ast/types.rs:36:17
+   |
+36 | pub(crate) enum DSLType {
+   |                 ^^^^^^^
+
+warning: enum `TypeConstraint` is never used
+  --> rust/src/ast/types.rs:74:17
+   |
+74 | pub(crate) enum TypeConstraint {
+   |                 ^^^^^^^^^^^^^^
+
+warning: struct `DatabaseReference` is never constructed
+   --> rust/src/ast/types.rs:122:19
+    |
+122 | pub(crate) struct DatabaseReference {
+    |                   ^^^^^^^^^^^^^^^^^
+
+warning: enum `DbReferenceType` is never used
+   --> rust/src/ast/types.rs:131:17
+    |
+131 | pub(crate) enum DbReferenceType {
+    |                 ^^^^^^^^^^^^^^^
+
+warning: enum `EnhancedValue` is never used
+   --> rust/src/ast/types.rs:143:17
+    |
+143 | pub(crate) enum EnhancedValue {
+    |                 ^^^^^^^^^^^^^
+
+warning: struct `DSLState` is never constructed
+   --> rust/src/ast/types.rs:230:19
+    |
+230 | pub(crate) struct DSLState {
+    |                   ^^^^^^^^
+
+warning: enum `LifecycleState` is never used
+   --> rust/src/ast/types.rs:241:17
+    |
+241 | pub(crate) enum LifecycleState {
+    |                 ^^^^^^^^^^^^^^
+
+warning: methods `as_string`, `as_map`, `is_null`, and `to_enhanced` are never used
+   --> rust/src/ast/types.rs:256:19
+    |
+255 | impl Value {
+    | ---------- methods in this implementation
+256 |     pub(crate) fn as_string(&self) -> Option<&str> {
+    |                   ^^^^^^^^^
+...
+270 |     pub(crate) fn as_map(&self) -> Option<&PropertyMap> {
+    |                   ^^^^^^
+...
+277 |     pub(crate) fn is_null(&self) -> bool {
+    |                   ^^^^^^^
+...
+282 |     pub(crate) fn to_enhanced(&self, semantic: Option<SemanticInfo>) -> EnhancedValue {
+    |                   ^^^^^^^^^^^
+
+warning: methods `extract_value`, `get_semantic_info`, and `set_semantic_info` are never used
+   --> rust/src/ast/types.rs:329:12
+    |
+327 | impl EnhancedValue {
+    | ------------------ methods in this implementation
+328 |     /// Extract the underlying value without semantic information
+329 |     pub fn extract_value(&self) -> Value {
+    |            ^^^^^^^^^^^^^
+...
+353 |     pub(crate) fn get_semantic_info(&self) -> Option<&SemanticInfo> {
+    |                   ^^^^^^^^^^^^^^^^^
+...
+369 |     pub(crate) fn set_semantic_info(&mut self, new_semantic: SemanticInfo) {
+    |                   ^^^^^^^^^^^^^^^^^
+
+warning: trait `StatementVisitor` is never used
+ --> rust/src/ast/visitors.rs:5:18
+  |
+5 | pub(crate) trait StatementVisitor {
+  |                  ^^^^^^^^^^^^^^^^
+
+warning: trait `AstWalker` is never used
+  --> rust/src/ast/visitors.rs:12:18
+   |
+12 | pub(crate) trait AstWalker {
+   |                  ^^^^^^^^^
+
+warning: struct `CrudTransaction` is never constructed
+   --> rust/src/parser_ast/mod.rs:213:19
+    |
+213 | pub(crate) struct CrudTransaction {
+    |                   ^^^^^^^^^^^^^^^
+
+warning: struct `TransactionResult` is never constructed
+   --> rust/src/parser_ast/mod.rs:221:19
+    |
+221 | pub(crate) struct TransactionResult {
+    |                   ^^^^^^^^^^^^^^^^^
+
+warning: struct `IntegrityResult` is never constructed
+   --> rust/src/parser_ast/mod.rs:247:19
+    |
+247 | pub(crate) struct IntegrityResult {
+    |                   ^^^^^^^^^^^^^^^
+
+warning: variants `ForeignKey`, `Unique`, `NotNull`, `Check`, and `Custom` are never constructed
+   --> rust/src/parser_ast/mod.rs:263:5
+    |
+262 | pub(crate) enum ConstraintType {
+    |                 -------------- variants in this enum
+263 |     ForeignKey,
+    |     ^^^^^^^^^^
+264 |     Unique,
+    |     ^^^^^^
+265 |     NotNull,
+    |     ^^^^^^^
+266 |     Check,
+    |     ^^^^^
+267 |     Custom,
+    |     ^^^^^^
+    |
+    = note: `ConstraintType` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: struct `DependencyIssue` is never constructed
+   --> rust/src/parser_ast/mod.rs:271:19
+    |
+271 | pub(crate) struct DependencyIssue {
+    |                   ^^^^^^^^^^^^^^^
+
+warning: enum `DependencyType` is never used
+   --> rust/src/parser_ast/mod.rs:279:17
+    |
+279 | pub(crate) enum DependencyType {
+    |                 ^^^^^^^^^^^^^^
+
+warning: struct `SimulationResult` is never constructed
+   --> rust/src/parser_ast/mod.rs:287:19
+    |
+287 | pub(crate) struct SimulationResult {
+    |                   ^^^^^^^^^^^^^^^^
+
+warning: struct `ResourceUsage` is never constructed
+   --> rust/src/parser_ast/mod.rs:296:19
+    |
+296 | pub(crate) struct ResourceUsage {
+    |                   ^^^^^^^^^^^^^
+
+warning: enum `NormalizationError` is never used
+  --> rust/src/parser/normalizer.rs:12:17
+   |
+12 | pub(crate) enum NormalizationError {
+   |                 ^^^^^^^^^^^^^^^^^^
+
+warning: fields `verb_aliases` and `key_aliases` are never read
+  --> rust/src/parser/normalizer.rs:28:5
+   |
+27 | pub struct DslNormalizer {
+   |            ------------- fields in this struct
+28 |     verb_aliases: HashMap<String, String>,
+   |     ^^^^^^^^^^^^
+29 |     key_aliases: HashMap<String, String>,
+   |     ^^^^^^^^^^^
+
+warning: multiple methods are never used
+   --> rust/src/parser/normalizer.rs:88:19
+    |
+ 32 | impl DslNormalizer {
+    | ------------------ methods in this implementation
+...
+ 88 |     pub(crate) fn normalize_program(&self, program: &mut [Form]) -> Result<(), Normaliz...
+    |                   ^^^^^^^^^^^^^^^^^
+...
+ 98 |     fn normalize_verb_form(&self, form: &mut VerbForm) -> Result<(), NormalizationError> {
+    |        ^^^^^^^^^^^^^^^^^^^
+...
+122 |     fn normalize_keys(&self, pairs: &mut PropertyMap) -> Result<(), NormalizationError> {
+    |        ^^^^^^^^^^^^^^
+...
+144 |     fn normalize_value(&self, value: Value) -> Result<Value, NormalizationError> {
+    |        ^^^^^^^^^^^^^^^
+...
+161 |     fn transform_ownership_link(&self, form: &mut VerbForm) -> Result<(), Normalization...
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+216 |     fn transform_control_link(&self, form: &mut VerbForm) -> Result<(), NormalizationEr...
+    |        ^^^^^^^^^^^^^^^^^^^^^^
+...
+261 |     fn transform_evidence_link(&self, form: &mut VerbForm) -> Result<(), NormalizationE...
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+...
+295 |     fn transform_finding_to_notes(&self, form: &mut VerbForm) -> Result<(), Normalizati...
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+317 |     fn extract_string_value(
+    |        ^^^^^^^^^^^^^^^^^^^^
+...
+337 |     fn extract_numeric_value(
+    |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: variants `InvalidLinkIdentity`, `EvidenceLinkingError`, `InvalidRelationshipStructure`, and `NoteFormatError` are never constructed
+  --> rust/src/parser/validators.rs:24:5
+   |
+12 | pub(crate) enum ValidatorError {
+   |                 -------------- variants in this enum
+...
+24 |     InvalidLinkIdentity { message: String },
+   |     ^^^^^^^^^^^^^^^^^^^
+...
+27 |     EvidenceLinkingError { message: String },
+   |     ^^^^^^^^^^^^^^^^^^^^
+...
+30 |     InvalidRelationshipStructure { message: String },
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+33 |     NoteFormatError { message: String },
+   |     ^^^^^^^^^^^^^^^
+   |
+   = note: `ValidatorError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `first_seen_location` is never read
+  --> rust/src/parser/validators.rs:53:5
+   |
+49 | struct LinkInfo {
+   |        -------- field in this struct
+...
+53 |     first_seen_location: Option<usize>, // Form index where first defined
+   |     ^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `LinkInfo` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `case_type` is never read
+  --> rust/src/parser/validators.rs:58:5
+   |
+57 | struct CaseInfo {
+   |        -------- field in this struct
+58 |     case_type: Option<String>,
+   |     ^^^^^^^^^
+   |
+   = note: `CaseInfo` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: methods `load_grammar`, `get_grammar`, `rule_names`, `check_circular_dependencies`, and `detect_cycles` are never used
+   --> rust/src/grammar/mod.rs:30:19
+    |
+ 23 | impl GrammarEngine {
+    | ------------------ methods in this implementation
+...
+ 30 |     pub(crate) fn load_grammar(
+    |                   ^^^^^^^^^^^^
+...
+ 59 |     pub(crate) fn get_grammar(&self, name: &str) -> Option<&EBNFGrammar> {
+    |                   ^^^^^^^^^^^
+...
+ 88 |     pub(crate) fn rule_names(&self) -> Vec<String> {
+    |                   ^^^^^^^^^^
+...
+ 95 |     pub(crate) fn check_circular_dependencies(&self) -> Result<(), DSLError> {
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+105 |     fn detect_cycles(&self, grammar: &EBNFGrammar) -> Result<(), DSLError> {
+    |        ^^^^^^^^^^^^^
+
+warning: function `count_expression_features` is never used
+   --> rust/src/grammar/mod.rs:174:4
+    |
+174 | fn count_expression_features(
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `GrammarSummary` is never constructed
+   --> rust/src/grammar/mod.rs:206:19
+    |
+206 | pub(crate) struct GrammarSummary {
+    |                   ^^^^^^^^^^^^^^
+
+warning: function `load_default_grammar` is never used
+   --> rust/src/grammar/mod.rs:215:15
+    |
+215 | pub(crate) fn load_default_grammar() -> Result<GrammarEngine, DSLError> {
+    |               ^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `EBNFParser` is never constructed
+  --> rust/src/grammar/idiomatic_ebnf.rs:68:12
+   |
+68 | pub struct EBNFParser;
+   |            ^^^^^^^^^^
+
+warning: associated items `new` and `parse_grammar` are never used
+  --> rust/src/grammar/idiomatic_ebnf.rs:72:12
+   |
+70 | impl EBNFParser {
+   | --------------- associated items in this implementation
+71 |     /// Create a new EBNF parser
+72 |     pub fn new() -> Self {
+   |            ^^^
+...
+77 |     pub(crate) fn parse_grammar(&self, input: &str) -> Result<EBNFGrammar, String> {
+   |                   ^^^^^^^^^^^^^
+
+warning: function `grammar` is never used
+   --> rust/src/grammar/idiomatic_ebnf.rs:104:4
+    |
+104 | fn grammar(input: &str) -> EBNFResult<'_, Vec<EBNFRule>> {
+    |    ^^^^^^^
+
+warning: function `rule` is never used
+   --> rust/src/grammar/idiomatic_ebnf.rs:112:4
+    |
+112 | fn rule(input: &str) -> EBNFResult<'_, EBNFRule> {
+    |    ^^^^
+
+warning: function `expression` is never used
+   --> rust/src/grammar/idiomatic_ebnf.rs:131:4
+    |
+131 | fn expression(input: &str) -> EBNFResult<'_, EBNFExpression> {
+    |    ^^^^^^^^^^
+
+warning: function `choice` is never used
+   --> rust/src/grammar/idiomatic_ebnf.rs:136:4
+    |
+136 | fn choice(input: &str) -> EBNFResult<'_, EBNFExpression> {
+    |    ^^^^^^
+
+warning: function `sequence` is never used
+   --> rust/src/grammar/idiomatic_ebnf.rs:153:4
+    |
+153 | fn sequence(input: &str) -> EBNFResult<'_, EBNFExpression> {
+    |    ^^^^^^^^
+
+warning: function `postfix` is never used
+   --> rust/src/grammar/idiomatic_ebnf.rs:167:4
+    |
+167 | fn postfix(input: &str) -> EBNFResult<'_, EBNFExpression> {
+    |    ^^^^^^^
+
+warning: function `primary` is never used
+   --> rust/src/grammar/idiomatic_ebnf.rs:180:4
+    |
+180 | fn primary(input: &str) -> EBNFResult<'_, EBNFExpression> {
+    |    ^^^^^^^
+
+warning: function `group` is never used
+   --> rust/src/grammar/idiomatic_ebnf.rs:188:4
+    |
+188 | fn group(input: &str) -> EBNFResult<'_, EBNFExpression> {
+    |    ^^^^^
+
+warning: function `terminal` is never used
+   --> rust/src/grammar/idiomatic_ebnf.rs:199:4
+    |
+199 | fn terminal(input: &str) -> EBNFResult<'_, EBNFExpression> {
+    |    ^^^^^^^^
+
+warning: function `double_quoted_terminal` is never used
+   --> rust/src/grammar/idiomatic_ebnf.rs:207:4
+    |
+207 | fn double_quoted_terminal(input: &str) -> EBNFResult<'_, EBNFExpression> {
+    |    ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `single_quoted_terminal` is never used
+   --> rust/src/grammar/idiomatic_ebnf.rs:218:4
+    |
+218 | fn single_quoted_terminal(input: &str) -> EBNFResult<'_, EBNFExpression> {
+    |    ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `character_class` is never used
+   --> rust/src/grammar/idiomatic_ebnf.rs:229:4
+    |
+229 | fn character_class(input: &str) -> EBNFResult<'_, EBNFExpression> {
+    |    ^^^^^^^^^^^^^^^
+
+warning: function `non_terminal` is never used
+   --> rust/src/grammar/idiomatic_ebnf.rs:252:4
+    |
+252 | fn non_terminal(input: &str) -> EBNFResult<'_, EBNFExpression> {
+    |    ^^^^^^^^^^^^
+
+warning: function `identifier` is never used
+   --> rust/src/grammar/idiomatic_ebnf.rs:260:4
+    |
+260 | fn identifier(input: &str) -> EBNFResult<'_, String> {
+    |    ^^^^^^^^^^
+
+warning: function `comment` is never used
+   --> rust/src/grammar/idiomatic_ebnf.rs:274:4
+    |
+274 | fn comment(input: &str) -> EBNFResult<'_, String> {
+    |    ^^^^^^^
+
+warning: methods `validate`, `check_undefined_references`, `check_expr_references`, `find_reachable_rules`, and `find_reachable_in_expr` are never used
+   --> rust/src/grammar/idiomatic_ebnf.rs:285:12
+    |
+283 | impl EBNFGrammar {
+    | ---------------- methods in this implementation
+284 |     /// Validate the grammar for consistency
+285 |     pub fn validate(&self) -> Result<(), Vec<String>> {
+    |            ^^^^^^^^
+...
+310 |     fn check_undefined_references(&self) -> Result<(), Vec<String>> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+325 |     fn check_expr_references(
+    |        ^^^^^^^^^^^^^^^^^^^^^
+...
+352 |     fn find_reachable_rules(&self, start_rule: &str) -> std::collections::HashSet<Strin...
+    |        ^^^^^^^^^^^^^^^^^^^^
+...
+370 |     fn find_reachable_in_expr(&self, expr: &EBNFExpression, to_visit: &mut Vec<String>) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `DataDictionary` is never constructed
+  --> rust/src/data_dictionary/mod.rs:44:19
+   |
+44 | pub(crate) struct DataDictionary {
+   |                   ^^^^^^^^^^^^^^
+
+warning: struct `CategoryDefinition` is never constructed
+  --> rust/src/data_dictionary/mod.rs:51:19
+   |
+51 | pub(crate) struct CategoryDefinition {
+   |                   ^^^^^^^^^^^^^^^^^^
+
+warning: struct `AttributeRelationship` is never constructed
+  --> rust/src/data_dictionary/mod.rs:59:19
+   |
+59 | pub(crate) struct AttributeRelationship {
+   |                   ^^^^^^^^^^^^^^^^^^^^^
+
+warning: associated items `new` and `get_attribute` are never used
+  --> rust/src/data_dictionary/mod.rs:75:12
+   |
+74 | impl DataDictionary {
+   | ------------------- associated items in this implementation
+75 |     pub fn new() -> Self {
+   |            ^^^
+...
+83 |     pub(crate) fn get_attribute(&self, attr_id: &str) -> Option<&AttributeDefinition> {
+   |                   ^^^^^^^^^^^^^
+
+warning: associated function `from_uuid` is never used
+  --> rust/src/data_dictionary/attribute.rs:23:19
+   |
+16 | impl AttributeId {
+   | ---------------- associated function in this implementation
+...
+23 |     pub(crate) fn from_uuid(uuid: Uuid) -> Self {
+   |                   ^^^^^^^^^
+
+warning: struct `AttributeCatalogue` is never constructed
+ --> rust/src/data_dictionary/catalogue.rs:5:19
+  |
+5 | pub(crate) struct AttributeCatalogue {
+  |                   ^^^^^^^^^^^^^^^^^^
+
+warning: associated function `new` is never used
+  --> rust/src/data_dictionary/catalogue.rs:10:12
+   |
+ 9 | impl AttributeCatalogue {
+   | ----------------------- associated function in this implementation
+10 |     pub fn new(dictionary: DataDictionary) -> Self {
+   |            ^^^
+
+warning: function `cosine_similarity` is never used
+  --> rust/src/data_dictionary/catalogue.rs:15:4
+   |
+15 | fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
+   |    ^^^^^^^^^^^^^^^^^
+
+warning: associated items `new`, `deprecate`, `with_description`, and `with_version` are never used
+  --> rust/src/vocabulary/mod.rs:34:12
+   |
+32 | impl VerbRegistryEntry {
+   | ---------------------- associated items in this implementation
+33 |     /// Create a new registry entry
+34 |     pub fn new(verb_name: impl Into<String>, domain: impl Into<String>, shared: bool) ->...
+   |            ^^^
+...
+47 |     pub fn deprecate(mut self, replacement: Option<String>) -> Self {
+   |            ^^^^^^^^^
+...
+54 |     pub fn with_description(mut self, description: impl Into<String>) -> Self {
+   |            ^^^^^^^^^^^^^^^^
+...
+60 |     pub(crate) fn with_version(mut self, version: impl Into<String>) -> Self {
+   |                   ^^^^^^^^^^^^
+
+warning: fields `registry` and `domain_ownership` are never read
+  --> rust/src/vocabulary/vocab_registry.rs:29:5
+   |
+26 | pub struct VocabularyRegistry {
+   |            ------------------ fields in this struct
+...
+29 |     registry: HashMap<String, VerbRegistryEntry>,
+   |     ^^^^^^^^
+30 |     /// Domain ownership mapping: domain -> list of fully-qualified verbs
+31 |     domain_ownership: HashMap<String, Vec<String>>,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: struct `RegistryConfig` is never constructed
+  --> rust/src/vocabulary/vocab_registry.rs:35:19
+   |
+35 | pub(crate) struct RegistryConfig {
+   |                   ^^^^^^^^^^^^^^
+
+warning: enum `DeprecationPolicy` is never used
+  --> rust/src/vocabulary/vocab_registry.rs:44:17
+   |
+44 | pub(crate) enum DeprecationPolicy {
+   |                 ^^^^^^^^^^^^^^^^^
+
+warning: struct `RegistryStats` is never constructed
+  --> rust/src/vocabulary/vocab_registry.rs:55:19
+   |
+55 | pub(crate) struct RegistryStats {
+   |                   ^^^^^^^^^^^^^
+
+warning: multiple associated items are never used
+   --> rust/src/vocabulary/vocab_registry.rs:92:19
+    |
+ 73 | impl VocabularyRegistry {
+    | ----------------------- associated items in this implementation
+...
+ 92 |     pub(crate) fn validate_verb_format(verb: &str) -> Result<(String, String), Vocabula...
+    |                   ^^^^^^^^^^^^^^^^^^^^
+...
+136 |     pub(crate) fn extract_domain(verb: &str) -> Option<String> {
+    |                   ^^^^^^^^^^^^^^
+...
+143 |     pub(crate) fn extract_action(verb: &str) -> Option<String> {
+    |                   ^^^^^^^^^^^^^^
+...
+150 |     pub(crate) fn register_verb(
+    |                   ^^^^^^^^^^^^^
+...
+179 |     pub(crate) fn get_shared_verbs(&self) -> Vec<&VerbRegistryEntry> {
+    |                   ^^^^^^^^^^^^^^^^
+...
+184 |     pub(crate) fn get_domain_verbs(&self, domain: &str) -> Vec<&String> {
+    |                   ^^^^^^^^^^^^^^^^
+...
+192 |     pub(crate) fn get_verb(&self, verb: &str) -> Option<&VerbRegistryEntry> {
+    |                   ^^^^^^^^
+...
+197 |     pub(crate) fn get_stats(&self) -> RegistryStats {
+    |                   ^^^^^^^^^
+...
+212 |     pub(crate) fn get_domains(&self) -> Vec<&String> {
+    |                   ^^^^^^^^^^^
+...
+217 |     pub(crate) fn remove_verb(&mut self, verb: &str) -> Result<VerbRegistryEntry, Vocab...
+    |                   ^^^^^^^^^^^
+
+warning: field `config` is never read
+  --> rust/src/db_state_manager/mod.rs:37:5
+   |
+31 | pub struct DbStateManager {
+   |            -------------- field in this struct
+...
+37 |     config: StateManagerConfig,
+   |     ^^^^^^
+
+warning: name `UUID` contains a capitalized acronym
+  --> rust/src/ast/types.rs:51:5
+   |
+51 |     UUID,
+   |     ^^^^ help: consider making the acronym lowercase, except the initial letter: `Uuid`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.91.0/index.html#upper_case_acronyms
+   = note: `#[warn(clippy::upper_case_acronyms)]` on by default
+
+warning: name `UUID` contains a capitalized acronym
+   --> rust/src/ast/types.rs:168:5
+    |
+168 |     UUID {
+    |     ^^^^ help: consider making the acronym lowercase, except the initial letter: `Uuid`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.91.0/index.html#upper_case_acronyms
+
+warning: clamp-like pattern without using clamp function
+   --> rust/src/dsl/orchestration_interface.rs:581:25
+    |
+581 |         self.priority = priority.min(10).max(1);
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^ help: replace with clamp: `priority.clamp(1, 10)`
+    |
+    = note: clamp will panic if max < min
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.91.0/index.html#manual_clamp
+    = note: `#[warn(clippy::manual_clamp)]` on by default
+
+warning: unneeded `return` statement
+   --> rust/src/dsl_manager/clean_manager.rs:594:13
+    |
+594 | / ...   return format!(
+595 | | ...       r#"(case.create :case-id "{}" :case-type "ONBOARDING" :instruction "{}")"#,
+596 | | ...       self.generate_case_id(),
+597 | | ...       instruction
+598 | | ...   );
+    | |_______^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.91.0/index.html#needless_return
+    = note: `#[warn(clippy::needless_return)]` on by default
+help: remove `return`
+    |
+594 ~             format!(
+595 +                 r#"(case.create :case-id "{}" :case-type "ONBOARDING" :instruction "{}")"#,
+596 +                 self.generate_case_id(),
+597 +                 instruction
+598 ~             )
+    |
+
+warning: unneeded `return` statement
+   --> rust/src/dsl_manager/clean_manager.rs:600:13
+    |
+600 | / ...   return format!(
+601 | | ...       r#"(kyc.collect :case-id "{}" :collection-type "ENHANCED" :instruction "{}"...
+602 | | ...       self.generate_case_id(),
+603 | | ...       instruction
+604 | | ...   );
+    | |_______^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.91.0/index.html#needless_return
+help: remove `return`
+    |
+600 ~             format!(
+601 +                 r#"(kyc.collect :case-id "{}" :collection-type "ENHANCED" :instruction "{}")"#,
+602 +                 self.generate_case_id(),
+603 +                 instruction
+604 ~             )
+    |
+
+warning: unneeded `return` statement
+   --> rust/src/dsl_manager/clean_manager.rs:606:13
+    |
+606 | /             return format!(
+607 | |                 r#"(case.create :case-id "{}" :case-type "GENERAL" :instruction "{}")"#,
+608 | |                 self.generate_case_id(),
+609 | |                 instruction
+610 | |             );
+    | |_____________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.91.0/index.html#needless_return
+help: remove `return`
+    |
+606 ~             format!(
+607 +                 r#"(case.create :case-id "{}" :case-type "GENERAL" :instruction "{}")"#,
+608 +                 self.generate_case_id(),
+609 +                 instruction
+610 ~             )
+    |
+
+warning: found call to `str::trim` before `str::split_whitespace`
+   --> rust/src/dsl_manager/clean_manager.rs:624:29
+    |
+624 |             .and_then(|s| s.trim().split_whitespace().next())
+    |                             ^^^^^^^ help: remove `trim()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.91.0/index.html#trim_split_whitespace
+    = note: `#[warn(clippy::trim_split_whitespace)]` on by default
+
+warning: useless use of `vec!`
+   --> rust/src/dsl/pipeline_processor.rs:357:29
+    |
+357 |           let verb_patterns = vec![
+    |  _____________________________^
+358 | |             "case.",
+359 | |             "kyc.",
+360 | |             "entity.",
+...   |
+365 | |             "isda.",
+366 | |         ];
+    | |_________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.91.0/index.html#useless_vec
+    = note: `#[warn(clippy::useless_vec)]` on by default
+help: you can use an array directly
+    |
+357 ~         let verb_patterns = ["case.",
+358 +             "kyc.",
+359 +             "entity.",
+360 +             "ubo.",
+361 +             "products.",
+362 +             "services.",
+363 +             "document.",
+364 ~             "isda."];
+    |
+

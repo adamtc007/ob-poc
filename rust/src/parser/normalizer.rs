@@ -4,7 +4,7 @@
 //! This module performs pre-validation normalization to ensure backward compatibility
 //! while migrating the codebase to canonical verb and key naming conventions.
 
-use crate::parser_ast::{Form, Key, Literal, PropertyMap, Value, VerbForm};
+use crate::parser::ast::{Form, Key, Literal, PropertyMap, Value, VerbForm};
 use std::collections::HashMap;
 use thiserror::Error;
 
@@ -359,4 +359,3 @@ impl Default for DslNormalizer {
         Self::new()
     }
 }
-

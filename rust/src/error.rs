@@ -3,13 +3,8 @@
 //! This module provides idiomatic Rust error types using thiserror for
 //! better error messages and proper error chain handling.
 
-use std::fmt;
-
 use nom::error::VerboseError;
 use thiserror::Error;
-
-// Import types from dsl_types crate (Level 1 foundation)
-use dsl_types::{ErrorSeverity, SourceLocation};
 
 /// Main error type for the DSL system
 #[derive(Error, Debug)]
@@ -296,106 +291,12 @@ pub enum RuntimeError {
 /// Result type aliases for convenience
 pub(crate) type DSLResult<T> = Result<T, DSLError>;
 pub type ParseResult<T> = Result<T, ParseError>;
-pub(crate) type GrammarResult<T> = Result<T, GrammarError>;
-pub(crate) type VocabularyResult<T> = Result<T, VocabularyError>;
 pub type ValidationResult<T> = Result<T, ValidationError>;
-pub(crate) type RuntimeResult<T> = Result<T, RuntimeError>;
 
 // SourceLocation moved to dsl_types crate - import from there
 
 // Error severity levels
 // ErrorSeverity moved to dsl_types crate - import from there
-
-/// Structured error with additional context
-#[derive(Debug, serde::Serialize)]
-pub(crate) struct ContextualError {
-    pub error: DSLError,
-    pub location: SourceLocation,
-    pub severity: ErrorSeverity,
-    pub context: Vec<String>,
-}
-
-impl ContextualError {
-    pub fn new(error: DSLError, location: SourceLocation, severity: ErrorSeverity) -> Self {
-        Self {
-            error,
-            location,
-            severity,
-            context: Vec::new(),
-        }
-    }
-
-    pub fn with_context(mut self, context: impl Into<String>) -> Self {
-        self.context.push(context.into());
-        self
-    }
-}
-
-impl fmt::Display for ContextualError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "[{}] {} at {}", self.severity, self.error, self.location)?;
-
-        for (i, ctx) in self.context.iter().enumerate() {
-            writeln!(f, "  {}: {}", i + 1, ctx)?;
-        }
-
-        Ok(())
-    }
-}
-
-impl std::error::Error for ContextualError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(&self.error)
-    }
-}
-
-/// Error collector for batch validation
-#[derive(Debug, Default, serde::Serialize)]
-pub(crate) struct ErrorCollector {
-    pub errors: Vec<ContextualError>,
-}
-
-impl ErrorCollector {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub(crate) fn add_simple_error(
-        &mut self,
-        error: DSLError,
-        location: SourceLocation,
-        severity: ErrorSeverity,
-    ) {
-        self.errors
-            .push(ContextualError::new(error, location, severity));
-    }
-
-    pub(crate) fn has_errors(&self) -> bool {
-        !self.errors.is_empty()
-    }
-
-    pub(crate) fn error_count(&self) -> usize {
-        self.errors.len()
-    }
-
-    pub fn clear(&mut self) {
-        self.errors.clear();
-    }
-}
-
-impl fmt::Display for ErrorCollector {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.errors.is_empty() {
-            writeln!(f, "No errors")?;
-        } else {
-            writeln!(f, "Found {} error(s):", self.errors.len())?;
-            for (i, error) in self.errors.iter().enumerate() {
-                writeln!(f, "{}. {}", i + 1, error)?;
-            }
-        }
-        Ok(())
-    }
-}
 
 /// Helper macros for error construction
 #[macro_export]

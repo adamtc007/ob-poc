@@ -19,13 +19,12 @@
 //! - Provide unified interface for AI and direct DSL operations
 //! - Maintain separation between core DSL CRUD and optional AI layer
 
-use crate::db_state_manager::{AccumulatedState, DbStateManager, StateResult};
+use crate::db_state_manager::DbStateManager;
 use crate::dsl::{
     DslOrchestrationInterface, DslPipelineProcessor, DslPipelineResult, OrchestrationContext,
-    OrchestrationOperation, OrchestrationOperationType, PipelineConfig, ProcessingOptions,
+    OrchestrationOperation, OrchestrationOperationType,
 };
-use crate::dsl_visualizer::{DslVisualizer, VisualizationResult};
-use serde::{Deserialize, Serialize};
+use crate::dsl_visualizer::DslVisualizer;
 use std::time::Instant;
 use uuid::Uuid;
 
@@ -591,23 +590,23 @@ impl CleanDslManager {
     async fn mock_ai_generation(&self, instruction: &str) -> String {
         // Mock AI generation - replace with real AI service integration
         if instruction.to_lowercase().contains("onboarding") {
-            return format!(
+            format!(
                 r#"(case.create :case-id "{}" :case-type "ONBOARDING" :instruction "{}")"#,
                 self.generate_case_id(),
                 instruction
-            );
+            )
         } else if instruction.to_lowercase().contains("kyc") {
-            return format!(
+            format!(
                 r#"(kyc.collect :case-id "{}" :collection-type "ENHANCED" :instruction "{}")"#,
                 self.generate_case_id(),
                 instruction
-            );
+            )
         } else {
-            return format!(
+            format!(
                 r#"(case.create :case-id "{}" :case-type "GENERAL" :instruction "{}")"#,
                 self.generate_case_id(),
                 instruction
-            );
+            )
         }
     }
 

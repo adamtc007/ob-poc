@@ -23,7 +23,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Instant;
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, info, instrument};
 use uuid::Uuid;
 
 use crate::dsl::orchestration_interface::{
@@ -354,7 +354,7 @@ impl AstParser {
     }
 
     fn count_verbs(&self, dsl_content: &str) -> usize {
-        let verb_patterns = vec![
+        let verb_patterns = [
             "case.",
             "kyc.",
             "entity.",

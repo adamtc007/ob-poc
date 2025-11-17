@@ -14,7 +14,7 @@ use nom::{
     Finish, IResult,
 };
 
-use crate::parser_ast::{Form, Key, Literal, Program, Value, VerbForm};
+use crate::parser::ast::{Form, Key, Literal, Program, Value, VerbForm};
 
 /// Parser error type with context information
 pub(crate) type NomParseError<'a> = VerboseError<&'a str>;

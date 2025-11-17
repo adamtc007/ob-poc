@@ -45,7 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let context = OrchestrationContext::new("demo-user".to_string(), "kyc".to_string());
 
     // Test operations with different types and complexities
-    let test_operations = vec![
+    let test_operations = [
         (
             "Simple Parse",
             OrchestrationOperationType::Parse,

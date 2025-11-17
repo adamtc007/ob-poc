@@ -16,7 +16,7 @@
 // Domain modules will be implemented as needed
 // For now, providing stub implementations
 
-use crate::parser_ast::{PropertyMap, Value};
+use crate::parser::ast::{PropertyMap, Value};
 use async_trait::async_trait;
 use std::collections::HashMap;
 

@@ -33,10 +33,13 @@ use ob_poc::{
 
 #[cfg(feature = "database")]
 use sqlx::{PgPool, Row};
+#[cfg(feature = "database")]
 use std::collections::HashMap;
+#[cfg(feature = "database")]
 use std::time::{Duration, Instant};
-use tracing::{error, info, warn};
-use uuid::Uuid;
+#[cfg(feature = "database")]
+use tracing::warn;
+use tracing::{error, info};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
