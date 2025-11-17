@@ -10,10 +10,8 @@ pub mod ast;
 // pub mod advanced_parser; // Temporarily disabled due to compilation errors
 pub mod combinators;
 pub mod idiomatic_parser;
-pub mod normalizer;
 pub mod primitives;
 pub mod statements;
-pub mod validators;
 
 // Public re-exports for AST types
 pub use ast::{
@@ -24,8 +22,6 @@ pub use ast::{
 
 // Public re-exports for DSL compilation and execution
 pub use idiomatic_parser::{parse_form, parse_program};
-pub use normalizer::DslNormalizer;
-pub use validators::{DslValidator, ValidationResult};
 
 // Core parser functions
 use crate::error::{DSLResult, ParseError};

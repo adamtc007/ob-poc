@@ -26,9 +26,6 @@ pub mod ast;
 // Core parser with full DSL capabilities (includes AST types in parser::ast)
 pub mod parser;
 
-// Grammar engine for EBNF parsing
-pub mod grammar;
-
 // Data dictionary and vocabulary management
 pub mod data_dictionary;
 pub mod vocabulary;
@@ -81,8 +78,7 @@ pub use services::{
 pub use domains::{DomainHandler, DomainRegistry, DomainResult};
 pub use parser::{PropertyMap, Value};
 
-// Grammar and vocabulary
-pub use grammar::GrammarEngine;
+// Vocabulary
 pub use vocabulary::vocab_registry::VocabularyRegistry;
 
 // Essential error types
