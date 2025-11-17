@@ -26,12 +26,15 @@ use std::collections::HashMap;
 pub struct VocabularyRegistry {
     /// Registry of all verbs with their metadata
     /// Key format: "domain.action" (e.g., "kyc.declare-entity")
+    #[allow(dead_code)]
     registry: HashMap<String, VerbRegistryEntry>,
     /// Domain ownership mapping: domain -> list of fully-qualified verbs
+    #[allow(dead_code)]
     domain_ownership: HashMap<String, Vec<String>>,
 }
 
 /// Registry configuration options
+#[allow(dead_code)]
 pub(crate) struct RegistryConfig {
     pub allow_shared_verbs: bool,
     pub enforce_domain_ownership: bool,
@@ -41,6 +44,7 @@ pub(crate) struct RegistryConfig {
 
 /// Policy for handling deprecated verbs
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) enum DeprecationPolicy {
     /// Immediately remove deprecated verbs
     Immediate,
@@ -52,6 +56,7 @@ pub(crate) enum DeprecationPolicy {
 
 /// Registry statistics
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) struct RegistryStats {
     pub total_verbs: usize,
     pub shared_verbs: usize,
@@ -89,6 +94,7 @@ impl VocabularyRegistry {
     /// assert!(VocabularyRegistry::validate_verb_format("kyc.declare-entity").is_ok());
     /// assert!(VocabularyRegistry::validate_verb_format("invalid-verb").is_err());
     /// ```
+    #[allow(dead_code)]
     pub(crate) fn validate_verb_format(verb: &str) -> Result<(String, String), VocabularyError> {
         let parts: Vec<&str> = verb.split('.').collect();
 
@@ -167,10 +173,7 @@ impl VocabularyRegistry {
         self.registry.insert(verb.clone(), entry);
 
         // Update domain ownership
-        self.domain_ownership
-            .entry(domain)
-            .or_default()
-            .push(verb);
+        self.domain_ownership.entry(domain).or_default().push(verb);
 
         Ok(())
     }
@@ -209,11 +212,13 @@ impl VocabularyRegistry {
     }
 
     /// Get all domains
+    #[allow(dead_code)]
     pub(crate) fn get_domains(&self) -> Vec<&String> {
         self.domain_ownership.keys().collect()
     }
 
     /// Remove a verb from the registry
+    #[allow(dead_code)]
     pub(crate) fn remove_verb(&mut self, verb: &str) -> Result<VerbRegistryEntry, VocabularyError> {
         let entry = self
             .registry
@@ -242,4 +247,3 @@ impl Default for VocabularyRegistry {
         Self::new()
     }
 }
-
