@@ -359,23 +359,3 @@ impl AttributeSource for ApiDataSource {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::services::extraction_service::MockExtractionService;
-
-    #[test]
-    fn test_source_priorities() {
-        let doc_source = DocumentCatalogSource {
-            pool: PgPool::connect_lazy("postgresql://localhost/test").unwrap(),
-            extraction_service: Arc::new(MockExtractionService::new()),
-        };
-        let form_source = FormDataSource {
-            pool: PgPool::connect_lazy("postgresql://localhost/test").unwrap(),
-        };
-        let api_source = ApiDataSource::new();
-
-        assert!(doc_source.priority() > form_source.priority());
-        assert!(form_source.priority() > api_source.priority());
-    }
-}

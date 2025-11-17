@@ -278,21 +278,3 @@ impl AttributeExecutor {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::services::document_catalog_source::DocumentCatalogSource;
-    use crate::services::extraction_service::MockExtractionService;
-
-    #[tokio::test]
-    async fn test_attribute_executor_fallback() {
-        // This test would require a test database connection
-        // For now, it's a placeholder showing the structure
-    }
-
-    #[test]
-    fn test_executor_source_ordering() {
-        // Verify sources are sorted by priority
-        // Placeholder test
-    }
-}

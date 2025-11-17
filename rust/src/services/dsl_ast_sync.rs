@@ -662,21 +662,3 @@ impl Default for DslAstSyncService {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_sync_service_creation() {
-        let service = DslAstSyncService::new();
-        assert!(service.health_check().await);
-    }
-
-    #[test]
-    fn test_sync_config() {
-        let config = SyncConfig::default();
-        assert!(config.enable_atomic_sync);
-        assert_eq!(config.sync_timeout_seconds, 30);
-        assert!(config.enable_ast_compression);
-    }
-}

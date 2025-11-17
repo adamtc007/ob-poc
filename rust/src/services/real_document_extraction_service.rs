@@ -348,23 +348,3 @@ impl RealDocumentExtractionService {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use sqlx::PgPool;
-
-    #[tokio::test]
-    #[ignore] // Requires database
-    async fn test_extract_from_passport() {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgresql:///data_designer?user=adamtc007".to_string());
-        let pool = Arc::new(PgPool::connect(&database_url).await.unwrap());
-
-        let repository = DocumentTypeRepository::new(pool);
-        let service = RealDocumentExtractionService::new(repository);
-
-        // This would require an actual document in the database
-        // For now, just verify the service can be constructed
-        assert!(true);
-    }
-}

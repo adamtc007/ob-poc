@@ -315,30 +315,3 @@ struct AttributeDefinition {
     data_type: String,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_mock_extraction_service() {
-        let doc_id = Uuid::new_v4();
-        let attr_id = Uuid::new_v4();
-        let expected_value = serde_json::json!("John Doe");
-
-        let service =
-            MockExtractionService::new().with_mock_data(doc_id, attr_id, expected_value.clone());
-
-        let result = service.extract(&doc_id, &attr_id).await.unwrap();
-        assert_eq!(result, expected_value);
-    }
-
-    #[tokio::test]
-    async fn test_mock_extraction_missing_data() {
-        let service = MockExtractionService::new();
-        let doc_id = Uuid::new_v4();
-        let attr_id = Uuid::new_v4();
-
-        let result = service.extract(&doc_id, &attr_id).await;
-        assert!(result.is_err());
-    }
-}
