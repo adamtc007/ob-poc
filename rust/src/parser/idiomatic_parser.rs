@@ -218,9 +218,23 @@ pub(crate) fn parse_map_value(input: &str) -> ParseResult<'_, Value> {
     Ok((input, Value::Map(pairs.into_iter().collect())))
 }
 
-/// Parse an attribute reference: @attr{uuid}
+/// Parse an attribute reference: @attr{uuid} or @attr{"uuid"}
+/// Supports both quoted and unquoted UUID formats
 fn parse_attr_ref(input: &str) -> ParseResult<'_, Value> {
-    let (input, uuid_str) = delimited(tag("@attr{"), parse_string_literal, char('}'))(input)?;
+    let (input, _) = tag("@attr{")(input)?;
+
+    // Try unquoted UUID first (more common), then fall back to quoted
+    let (input, uuid_str) = alt((
+        // Unquoted UUID: alphanumeric with dashes
+        map(
+            recognize(pair(alphanumeric1, many0(alt((alphanumeric1, tag("-")))))),
+            |s: &str| s.to_string(),
+        ),
+        // Quoted string (backward compatibility)
+        parse_string_literal,
+    ))(input)?;
+
+    let (input, _) = char('}')(input)?;
     Ok((input, Value::AttrRef(uuid_str)))
 }
 

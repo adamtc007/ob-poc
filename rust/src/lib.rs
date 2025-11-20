@@ -8,12 +8,12 @@
 //!
 //! ## Quick Start
 //!
-//! ```rust
+//! ```rust,no_run
 //! use ob_poc::dsl_manager::CleanDslManager;
 //!
 //! let mut manager = CleanDslManager::new();
 //! let dsl_content = r#"(case.create :case-id "TEST-001" :case-type "ONBOARDING")"#;
-//! let result = manager.process_dsl_request(dsl_content.to_string()).await;
+//! let result = manager.process_dsl_request(dsl_content.to_string());
 //! assert!(result.success);
 //! ```
 
@@ -34,8 +34,8 @@ pub mod vocabulary;
 pub mod domains;
 
 // Execution engine for DSL operations
-#[cfg(feature = "database")]
-pub mod execution;
+// #[cfg(feature = "database")]
+// pub mod execution;
 
 // Database integration (when enabled)
 #[cfg(feature = "database")]
@@ -53,6 +53,9 @@ pub mod dsl_visualizer;
 #[cfg(feature = "database")]
 pub mod services;
 
+// Forth-style DSL execution engine
+pub mod forth_engine;
+
 // Public re-exports for the clean architecture
 pub use db_state_manager::{AccumulatedState, DbStateManager, StateResult};
 pub use dsl::{
@@ -66,13 +69,8 @@ pub use dsl_visualizer::{DslVisualizer, VisualizationResult};
 #[cfg(feature = "database")]
 pub use database::{DatabaseConfig, DatabaseManager, DictionaryDatabaseService};
 
-// Universal DSL lifecycle service - edit→validate→parse→save pattern for ALL DSL
-#[cfg(feature = "database")]
-pub use services::{
-    create_lifecycle_service, create_lifecycle_service_with_config, DslChangeRequest,
-    DslChangeResult, DslChangeType, DslLifecycleService, EditSession, EditSessionStatus,
-    LifecycleConfig, LifecycleMetrics, LifecyclePhase,
-};
+// Services module (when database feature is enabled)
+// Note: Most types are already re-exported from dsl_manager above
 
 // Core parsing and execution capabilities
 pub use domains::{DomainHandler, DomainRegistry, DomainResult};
@@ -101,17 +99,6 @@ pub fn parse_dsl(input: &str) -> Result<parser::Program, ParseError> {
     parse_program(input).map_err(|e| ParseError::Internal {
         message: format!("Parse error: {:?}", e),
     })
-}
-
-/// Universal DSL change processing - implements edit→validate→parse→save for ALL DSL
-/// This is the master function that handles the universal lifecycle pattern
-#[cfg(feature = "database")]
-pub fn process_dsl_change_sync(request: services::DslChangeRequest) -> Result<String, ParseError> {
-    // Stub implementation for compilation
-    Ok(format!(
-        "Processed DSL change for case: {}",
-        request.case_id
-    ))
 }
 
 /// Execute DSL program

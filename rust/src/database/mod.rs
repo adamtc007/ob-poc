@@ -2,30 +2,23 @@
 //!
 //! This module provides database connection management, connection pooling,
 //! and configuration for the DSL architecture.
+//!
+//! ## Architecture Update (November 2025)
+//! Legacy database modules (business_request_repository, cbu_crud_manager, etc.)
+//! have been removed. The Forth engine now handles database operations through
+//! RuntimeEnv with direct SQL queries matching the demo_setup.sql schema.
 
 use sqlx::Row;
 use sqlx::{postgres::PgPoolOptions, PgPool};
 use std::time::Duration;
 use tracing::{info, warn};
 
-pub(crate) mod business_request_repository;
-pub(crate) mod cbu_crud_manager;
-pub(crate) mod cbu_repository;
 pub mod dictionary_service;
-pub(crate) mod dsl_domain_repository;
-pub(crate) mod entity_service;
+pub mod dsl_repository;
 
-// Re-export repository and trait for convenience
-pub(crate) use business_request_repository::{
-    DslBusinessRequestRepository, DslBusinessRequestRepositoryTrait,
-};
-pub(crate) use cbu_crud_manager::{
-    CbuCompleteData, CbuCreateRequest, CbuCrudManager, CbuDeleteRequest, CbuUpdateRequest,
-};
-pub(crate) use cbu_repository::CbuRepository;
+// Re-export for convenience
 pub use dictionary_service::DictionaryDatabaseService;
-pub(crate) use dsl_domain_repository::{DslDomainRepository, DslDomainRepositoryTrait};
-pub(crate) use entity_service::EntityDatabaseService;
+pub use dsl_repository::{DslRepository, DslSaveResult};
 
 /// Database configuration
 #[derive(Debug, Clone)]
@@ -102,24 +95,9 @@ impl DatabaseManager {
         &self.pool
     }
 
-    /// Create a new DSL domain repository using this database connection
-    pub(crate) fn dsl_repository(&self) -> DslDomainRepository {
-        DslDomainRepository::new(self.pool.clone())
-    }
-
-    /// Create a new DSL business request repository using this database connection
-    pub(crate) fn business_request_repository(&self) -> DslBusinessRequestRepository {
-        DslBusinessRequestRepository::new(self.pool.clone())
-    }
-
     /// Create a new dictionary database service using this database connection
     pub fn dictionary_service(&self) -> DictionaryDatabaseService {
         DictionaryDatabaseService::new(self.pool.clone())
-    }
-
-    /// Create a new entity database service using this database connection
-    pub(crate) fn entity_service(&self) -> EntityDatabaseService {
-        EntityDatabaseService::new(self.pool.clone())
     }
 
     /// Test database connectivity
@@ -134,18 +112,14 @@ impl DatabaseManager {
     pub async fn run_migrations(&self) -> Result<(), sqlx::migrate::MigrateError> {
         info!("Running database migrations");
 
-        // Note: In a real implementation, you might want to use sqlx-migrate
-        // or implement a custom migration runner here
-        // For now, we'll just verify the schema exists
-
+        // Verify the schema exists
         let tables_exist = sqlx::query(
             r#"
             SELECT COUNT(*) as count
             FROM information_schema.tables
             WHERE table_schema = 'ob-poc'
-            AND table_name IN ('dsl_domains', 'dsl_versions', 'parsed_asts', 'dsl_execution_log',
-                               'dictionary', 'document_catalog', 'document_metadata', 'document_relationships', 'document_types',
-                               'entities', 'entity_types', 'entity_limited_companies', 'entity_partnerships', 'entity_proper_persons', 'entity_trusts')
+            AND table_name IN ('cbus', 'dictionary', 'attribute_values', 'entities',
+                               'dsl_instances', 'parsed_asts', 'ubo_registry', 'document_catalog')
             "#,
         )
         .fetch_one(&self.pool)
@@ -154,8 +128,8 @@ impl DatabaseManager {
 
         let count: i64 = tables_exist.get("count");
 
-        if count < 15 {
-            warn!("Expected database tables not found. Please run migration scripts including essential agentic CRUD tables");
+        if count < 6 {
+            warn!("Expected database tables not found. Please run sql/demo_setup.sql");
             return Err(sqlx::migrate::MigrateError::VersionMissing(1));
         }
 
@@ -163,31 +137,10 @@ impl DatabaseManager {
         Ok(())
     }
 
-    /// Get database connection statistics
-    pub(crate) fn connection_stats(&self) -> ConnectionStats {
-        ConnectionStats {
-            size: self.pool.size(),
-            num_idle: self.pool.num_idle() as u32,
-        }
-    }
-
     /// Close the database connection pool
     pub async fn close(self) {
         info!("Closing database connection pool");
         self.pool.close().await;
-    }
-}
-
-/// Database connection statistics
-#[derive(Debug, Clone)]
-pub(crate) struct ConnectionStats {
-    pub size: u32,
-    pub num_idle: u32,
-}
-
-impl std::fmt::Display for ConnectionStats {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Pool size: {}, Idle: {}", self.size, self.num_idle)
     }
 }
 
@@ -208,4 +161,3 @@ fn mask_database_url(url: &str) -> String {
         }
     }
 }
-

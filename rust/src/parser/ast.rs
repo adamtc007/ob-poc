@@ -50,14 +50,73 @@ pub enum Value {
     Identifier(String), // For unquoted symbols
     List(Vec<Value>),
     Map(HashMap<Key, Value>),
-    AttrRef(String), // UUID string, e.g., "@attr{uuid-001}"
-    // Additional variants needed for CRUD operations
-    String(String),
-    Integer(i32),
-    Double(f64),
-    Boolean(bool),
-    Array(Vec<Value>),
-    Json(serde_json::Value),
+    AttrRef(String),         // UUID string, e.g., "@attr{uuid-001}"
+    Json(serde_json::Value), // Raw JSON for complex data
+}
+
+// Helper methods for Value type conversion
+impl Value {
+    /// Get value as string reference
+    pub fn as_string(&self) -> Option<&str> {
+        match self {
+            Value::Literal(Literal::String(s)) => Some(s),
+            Value::Identifier(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    /// Get value as owned string
+    pub fn into_string(self) -> Option<String> {
+        match self {
+            Value::Literal(Literal::String(s)) => Some(s),
+            Value::Identifier(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    /// Get value as number (f64)
+    pub fn as_number(&self) -> Option<f64> {
+        match self {
+            Value::Literal(Literal::Number(n)) => Some(*n),
+            _ => None,
+        }
+    }
+
+    /// Get value as integer (i64)
+    pub fn as_integer(&self) -> Option<i64> {
+        match self {
+            Value::Literal(Literal::Number(n)) => Some(*n as i64),
+            _ => None,
+        }
+    }
+
+    /// Get value as boolean
+    pub fn as_bool(&self) -> Option<bool> {
+        match self {
+            Value::Literal(Literal::Boolean(b)) => Some(*b),
+            _ => None,
+        }
+    }
+
+    /// Create a string value
+    pub fn string<S: Into<String>>(s: S) -> Self {
+        Value::Literal(Literal::String(s.into()))
+    }
+
+    /// Create an integer value
+    pub fn integer(i: i64) -> Self {
+        Value::Literal(Literal::Number(i as f64))
+    }
+
+    /// Create a boolean value
+    pub fn boolean(b: bool) -> Self {
+        Value::Literal(Literal::Boolean(b))
+    }
+
+    /// Create a number value
+    pub fn number(n: f64) -> Self {
+        Value::Literal(Literal::Number(n))
+    }
 }
 
 // Helper for property maps, for consistency with old PropertyMap, but uses new Key/Value

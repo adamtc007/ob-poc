@@ -73,7 +73,7 @@ impl DomainResult {
         result.success = false;
         result
             .result_data
-            .insert("error".to_string(), Value::String(reason.to_string()));
+            .insert("error".to_string(), Value::string(reason));
         result
     }
 

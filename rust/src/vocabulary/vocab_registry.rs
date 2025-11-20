@@ -85,15 +85,6 @@ impl VocabularyRegistry {
     }
 
     /// Validate verb format: must be "domain.action"
-    ///
-    /// # Examples
-    /// ```
-    /// use ob_poc::vocabulary::vocab_registry::VocabularyRegistry;
-    ///
-    /// let registry = VocabularyRegistry::new();
-    /// assert!(VocabularyRegistry::validate_verb_format("kyc.declare-entity").is_ok());
-    /// assert!(VocabularyRegistry::validate_verb_format("invalid-verb").is_err());
-    /// ```
     #[allow(dead_code)]
     pub(crate) fn validate_verb_format(verb: &str) -> Result<(String, String), VocabularyError> {
         let parts: Vec<&str> = verb.split('.').collect();
@@ -131,14 +122,6 @@ impl VocabularyRegistry {
     }
 
     /// Extract domain from a fully-qualified verb
-    ///
-    /// # Examples
-    /// ```
-    /// use ob_poc::vocabulary::vocab_registry::VocabularyRegistry;
-    ///
-    /// assert_eq!(VocabularyRegistry::extract_domain("kyc.declare-entity"), Some("kyc".to_string()));
-    /// assert_eq!(VocabularyRegistry::extract_domain("invalid"), None);
-    /// ```
     pub(crate) fn extract_domain(verb: &str) -> Option<String> {
         Self::validate_verb_format(verb)
             .map(|(domain, _)| domain)

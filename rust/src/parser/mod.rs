@@ -12,6 +12,7 @@ pub mod combinators;
 pub mod idiomatic_parser;
 pub mod primitives;
 pub mod statements;
+pub mod validation;
 
 // Public re-exports for AST types
 pub use ast::{
@@ -23,10 +24,15 @@ pub use ast::{
 // Public re-exports for DSL compilation and execution
 pub use idiomatic_parser::{parse_form, parse_program};
 
+// Public re-exports for validation
+pub use validation::{
+    parse_and_validate, validate_program, ParserValidationError, ValidationResult,
+};
+
 // Core parser functions
 use crate::error::{DSLResult, ParseError};
 
-/// Parse DSL text into AST with normalization
+/// Parse DSL text into AST with normalization and validation
 pub fn parse_normalize_and_validate(input: &str) -> DSLResult<Program> {
     // Step 1: Normalize DSL (v3.3 -> v3.1)
     let normalized = input.to_string(); // Stub normalization for now
@@ -38,7 +44,20 @@ pub fn parse_normalize_and_validate(input: &str) -> DSLResult<Program> {
     })?;
 
     // Step 3: Validate parsed AST
-    // validate_dsl(&program)?; // Stub validation for now
+    let validation_result = validate_program(&program);
+    if !validation_result.valid {
+        let error_msg = validation_result
+            .errors
+            .iter()
+            .map(|e| e.to_string())
+            .collect::<Vec<_>>()
+            .join("; ");
+        return Err(ParseError::Syntax {
+            message: format!("Validation failed: {}", error_msg),
+            position: 0,
+        }
+        .into());
+    }
 
     Ok(program)
 }
