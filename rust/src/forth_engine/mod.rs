@@ -68,12 +68,20 @@ pub async fn execute_sheet_with_db(
     // Persist to database using the database facade
     if let Some(case_id) = &result.case_id {
         // Extract domain and operation from DSL content
-        let domain = if sheet.content.contains("case.") {
+        let domain = if sheet.content.contains("cbu.") {
+            "cbu"
+        } else if sheet.content.contains("case.") {
             "case"
         } else if sheet.content.contains("kyc.") {
             "kyc"
         } else if sheet.content.contains("entity.") {
             "entity"
+        } else if sheet.content.contains("crud.") {
+            "crud"
+        } else if sheet.content.contains("attr.") {
+            "attr"
+        } else if sheet.content.contains("document.") {
+            "document"
         } else {
             "general"
         };
