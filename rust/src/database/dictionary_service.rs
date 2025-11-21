@@ -26,7 +26,7 @@ impl DictionaryDatabaseService {
         Self { pool }
     }
 
-    /// Get a reference to the connection pool
+    /// Get reference to the connection pool
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

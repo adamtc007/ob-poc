@@ -3,13 +3,8 @@
 //! This module provides idiomatic Rust error types using thiserror for
 //! better error messages and proper error chain handling.
 
-use std::fmt;
-
 use nom::error::VerboseError;
 use thiserror::Error;
-
-// Import types from dsl_types crate (Level 1 foundation)
-use dsl_types::{ErrorSeverity, SourceLocation};
 
 /// Main error type for the DSL system
 #[derive(Error, Debug)]
@@ -293,6 +288,52 @@ pub enum RuntimeError {
     PermissionDenied { operation: String },
 }
 
+// Conversions from Forth engine errors to DSLError
+impl From<crate::forth_engine::errors::EngineError> for DSLError {
+    fn from(err: crate::forth_engine::errors::EngineError) -> Self {
+        use crate::forth_engine::errors::EngineError;
+        match err {
+            EngineError::Parse(msg) => DSLError::Parse(ParseError::Internal { message: msg }),
+            EngineError::Compile(e) => DSLError::Runtime(RuntimeError::ExecutionFailed {
+                statement: "compile".to_string(),
+                message: e.to_string(),
+            }),
+            EngineError::Vm(e) => DSLError::Runtime(RuntimeError::ExecutionFailed {
+                statement: "vm".to_string(),
+                message: e.to_string(),
+            }),
+            EngineError::Database(msg) => {
+                #[cfg(feature = "database")]
+                {
+                    DSLError::Database(msg)
+                }
+                #[cfg(not(feature = "database"))]
+                {
+                    DSLError::Runtime(RuntimeError::Database { message: msg })
+                }
+            }
+        }
+    }
+}
+
+impl From<crate::forth_engine::errors::VmError> for DSLError {
+    fn from(err: crate::forth_engine::errors::VmError) -> Self {
+        DSLError::Runtime(RuntimeError::ExecutionFailed {
+            statement: "vm".to_string(),
+            message: err.to_string(),
+        })
+    }
+}
+
+impl From<crate::forth_engine::errors::CompileError> for DSLError {
+    fn from(err: crate::forth_engine::errors::CompileError) -> Self {
+        DSLError::Runtime(RuntimeError::ExecutionFailed {
+            statement: "compile".to_string(),
+            message: err.to_string(),
+        })
+    }
+}
+
 /// Result type aliases for convenience
 pub(crate) type DSLResult<T> = Result<T, DSLError>;
 pub type ParseResult<T> = Result<T, ParseError>;
@@ -302,108 +343,6 @@ pub type ValidationResult<T> = Result<T, ValidationError>;
 
 // Error severity levels
 // ErrorSeverity moved to dsl_types crate - import from there
-
-/// Structured error with additional context
-#[derive(Debug, serde::Serialize)]
-#[allow(dead_code)]
-pub(crate) struct ContextualError {
-    pub error: DSLError,
-    pub location: SourceLocation,
-    pub severity: ErrorSeverity,
-    pub context: Vec<String>,
-}
-
-#[allow(dead_code)]
-impl ContextualError {
-    #[allow(dead_code)]
-    pub fn new(error: DSLError, location: SourceLocation, severity: ErrorSeverity) -> Self {
-        Self {
-            error,
-            location,
-            severity,
-            context: Vec::new(),
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn with_context(mut self, context: impl Into<String>) -> Self {
-        self.context.push(context.into());
-        self
-    }
-}
-
-impl fmt::Display for ContextualError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "[{}] {} at {}", self.severity, self.error, self.location)?;
-
-        for (i, ctx) in self.context.iter().enumerate() {
-            writeln!(f, "  {}: {}", i + 1, ctx)?;
-        }
-
-        Ok(())
-    }
-}
-
-impl std::error::Error for ContextualError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(&self.error)
-    }
-}
-
-/// Error collector for batch validation
-#[derive(Debug, Default, serde::Serialize)]
-#[allow(dead_code)]
-pub(crate) struct ErrorCollector {
-    pub errors: Vec<ContextualError>,
-}
-
-#[allow(dead_code)]
-impl ErrorCollector {
-    #[allow(dead_code)]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn add_simple_error(
-        &mut self,
-        error: DSLError,
-        location: SourceLocation,
-        severity: ErrorSeverity,
-    ) {
-        self.errors
-            .push(ContextualError::new(error, location, severity));
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn has_errors(&self) -> bool {
-        !self.errors.is_empty()
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn error_count(&self) -> usize {
-        self.errors.len()
-    }
-
-    #[allow(dead_code)]
-    pub fn clear(&mut self) {
-        self.errors.clear();
-    }
-}
-
-impl fmt::Display for ErrorCollector {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.errors.is_empty() {
-            writeln!(f, "No errors")?;
-        } else {
-            writeln!(f, "Found {} error(s):", self.errors.len())?;
-            for (i, error) in self.errors.iter().enumerate() {
-                writeln!(f, "{}. {}", i + 1, error)?;
-            }
-        }
-        Ok(())
-    }
-}
 
 /// Helper macros for error construction
 #[macro_export]
@@ -432,4 +371,103 @@ macro_rules! validation_error {
     ($variant:ident { $($field:ident: $value:expr),* $(,)? }) => {
         $crate::error::ValidationError::$variant { $($field: $value),* }
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::forth_engine::errors::{CompileError, EngineError, VmError};
+
+    #[test]
+    fn test_vm_error_to_dsl_error() {
+        let vm_err = VmError::StackUnderflow {
+            expected: 2,
+            found: 0,
+        };
+        let dsl_err: DSLError = vm_err.into();
+        match dsl_err {
+            DSLError::Runtime(RuntimeError::ExecutionFailed { statement, .. }) => {
+                assert_eq!(statement, "vm");
+            }
+            _ => panic!("Expected Runtime error"),
+        }
+    }
+
+    #[test]
+    fn test_compile_error_to_dsl_error() {
+        let compile_err = CompileError::UnknownWord("unknown.verb".to_string());
+        let dsl_err: DSLError = compile_err.into();
+        match dsl_err {
+            DSLError::Runtime(RuntimeError::ExecutionFailed { statement, .. }) => {
+                assert_eq!(statement, "compile");
+            }
+            _ => panic!("Expected Runtime error"),
+        }
+    }
+
+    #[test]
+    fn test_engine_error_parse_to_dsl_error() {
+        let engine_err = EngineError::Parse("syntax error".to_string());
+        let dsl_err: DSLError = engine_err.into();
+        match dsl_err {
+            DSLError::Parse(ParseError::Internal { message }) => {
+                assert_eq!(message, "syntax error");
+            }
+            _ => panic!("Expected Parse error"),
+        }
+    }
+
+    #[test]
+    fn test_engine_error_vm_to_dsl_error() {
+        let vm_err = VmError::TypeError {
+            expected: "String".to_string(),
+            found: "Int".to_string(),
+        };
+        let engine_err = EngineError::Vm(vm_err);
+        let dsl_err: DSLError = engine_err.into();
+        match dsl_err {
+            DSLError::Runtime(RuntimeError::ExecutionFailed { statement, message }) => {
+                assert_eq!(statement, "vm");
+                assert!(message.contains("String"));
+            }
+            _ => panic!("Expected Runtime error"),
+        }
+    }
+
+    #[test]
+    fn test_parse_error_creation() {
+        let err = ParseError::Syntax {
+            position: 10,
+            message: "unexpected token".to_string(),
+        };
+        assert!(err.to_string().contains("unexpected token"));
+    }
+
+    #[test]
+    fn test_validation_error_creation() {
+        let err = ValidationError::TypeMismatch {
+            expected: "String".to_string(),
+            found: "Integer".to_string(),
+            location: "line 5".to_string(),
+        };
+        assert!(err.to_string().contains("String"));
+        assert!(err.to_string().contains("Integer"));
+    }
+
+    #[test]
+    fn test_runtime_error_creation() {
+        let err = RuntimeError::Database {
+            message: "connection failed".to_string(),
+        };
+        assert!(err.to_string().contains("connection failed"));
+    }
+
+    #[test]
+    fn test_vocabulary_error_creation() {
+        let err = VocabularyError::UnknownVerb {
+            verb: "unknown.verb".to_string(),
+            domain: "unknown".to_string(),
+        };
+        assert!(err.to_string().contains("unknown.verb"));
+    }
 }

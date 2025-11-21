@@ -20,21 +20,6 @@ impl AttributeId {
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
-
-    /// Create an AttributeId from a UUID
-    pub fn from_uuid(uuid: Uuid) -> Self {
-        Self(uuid)
-    }
-
-    /// Get the inner UUID reference
-    pub fn as_uuid(&self) -> &Uuid {
-        &self.0
-    }
-
-    /// Parse AttributeId from string
-    pub fn from_str(s: &str) -> Result<Self, uuid::Error> {
-        Ok(Self(Uuid::parse_str(s)?))
-    }
 }
 
 impl std::fmt::Display for AttributeId {
@@ -221,7 +206,7 @@ pub struct UiMetadata {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum Importance {
+pub enum Importance {
     Critical,
     High,
     Medium,
@@ -236,13 +221,13 @@ pub struct DataSources {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SourceDefinition {
+pub struct SourceDefinition {
     pub source_type: SourceType,
     pub details: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum SourceType {
+pub enum SourceType {
     DocumentExtraction,
     Solicitation,
     ThirdPartyService,
@@ -260,14 +245,14 @@ pub struct DataSinks {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SinkDefinition {
+pub struct SinkDefinition {
     pub sink_type: SinkType,
     pub details: HashMap<String, serde_json::Value>,
     pub retention: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum SinkType {
+pub enum SinkType {
     PostgreSQL,
     S3,
     DataLake,

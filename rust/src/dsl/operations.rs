@@ -1,16 +1,6 @@
-//! DSL Operations Module
-//!
-//! This module defines the core DSL operations that can be executed through
-//! the DSL Manager → DSL Processor pipeline. It maintains the clean architecture
-//! where all DSL operations are processed through the proper facades.
-//!
-//! ## Architecture Compliance
-//! - All operations flow through DSL Manager as the entry point
-//! - Operations are processed by DSL Processor via orchestration interface
-//! - Database operations use proper SQLX integration patterns
-
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
 use uuid::Uuid;
 
 /// Executable DSL Operation that can be processed by the execution engine
@@ -65,6 +55,12 @@ pub enum DslOperationType {
 
     /// Generic operation for unknown types
     Unknown,
+}
+
+impl fmt::Display for DslOperationType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 /// Context for DSL operation execution

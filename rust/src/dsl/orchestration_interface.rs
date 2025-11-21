@@ -578,7 +578,7 @@ impl OrchestrationOperation {
 
     /// Set priority for operation
     pub fn with_priority(mut self, priority: u8) -> Self {
-        self.priority = priority.min(10).max(1);
+        self.priority = priority.clamp(1, 10);
         self
     }
 

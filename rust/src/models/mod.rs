@@ -1,22 +1,14 @@
 //! Models module for DSL domain architecture
 //!
-//! This module contains all the data structures and types used to represent
-//! DSL domains, versions, AST storage, and execution tracking in the database.
+//! This module contains data structures and types used by the dictionary service.
+//!
+//! ## Architecture Update (November 2025)
+//! Legacy models (business_request, document, domain, entity) have been removed.
+//! The Forth engine uses simplified direct database operations.
 
-// Allow dead code for models - many are database schema definitions not yet used
-#![allow(dead_code)]
-#![allow(unused_imports)]
-
-pub(crate) mod business_request_models;
 pub mod dictionary_models;
-pub(crate) mod document_models;
-pub mod document_type_models;
-pub(crate) mod domain_models;
-pub(crate) mod entity_models;
-pub mod taxonomy;
 
-// Re-export commonly used types for convenience
-
+// Re-export dictionary types
 pub use dictionary_models::{
     AgenticAttributeCreateRequest, AgenticAttributeCrudResponse, AgenticAttributeDeleteRequest,
     AgenticAttributeDiscoverRequest, AgenticAttributeReadRequest, AgenticAttributeSearchRequest,

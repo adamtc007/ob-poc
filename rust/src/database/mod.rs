@@ -2,6 +2,11 @@
 //!
 //! This module provides database connection management, connection pooling,
 //! and configuration for the DSL architecture.
+//!
+//! ## Architecture Update (November 2025)
+//! Legacy database modules (business_request_repository, cbu_crud_manager, etc.)
+//! have been removed. The Forth engine now handles database operations through
+//! RuntimeEnv with direct SQL queries matching the demo_setup.sql schema.
 
 // Allow unused code - many repository methods are not yet used by the agentic system
 #![allow(dead_code)]
@@ -12,24 +17,26 @@ use sqlx::{postgres::PgPoolOptions, PgPool};
 use std::time::Duration;
 use tracing::{info, warn};
 
-// Temporarily disabled - requires attribute_values_typed table from migration
-// pub mod attribute_repository;
-pub(crate) mod business_request_repository;
-pub(crate) mod cbu_crud_manager;
-pub(crate) mod cbu_repository;
+pub mod attribute_values_service;
+pub mod cbu_entity_roles_service;
+pub mod cbu_service;
+pub mod crud_executor;
+pub mod crud_service;
 pub mod dictionary_service;
-pub mod document_type_repository;
-pub(crate) mod dsl_domain_repository;
-pub(crate) mod entity_service;
-pub mod taxonomy_repository;
+pub mod document_service;
+pub mod dsl_repository;
+pub mod entity_service;
 
-// Re-export repository and trait for convenience
-// pub use attribute_repository::{AttributeRepository, RepositoryError as AttributeRepositoryError};
-pub(crate) use business_request_repository::DslBusinessRequestRepository;
+// Re-export for convenience
+pub use attribute_values_service::{AttributeValueRow, AttributeValuesService};
+pub use cbu_entity_roles_service::{CbuEntityRoleExpanded, CbuEntityRolesService, RoleRow};
+pub use cbu_service::{CbuRow, CbuService, NewCbuFields};
+pub use crud_executor::{CrudExecutionResult, CrudExecutor, ExecutionContext};
+pub use crud_service::{AssetType, CrudOperation, CrudService, OperationType};
 pub use dictionary_service::DictionaryDatabaseService;
-pub(crate) use dsl_domain_repository::{DslDomainRepository, DslDomainRepositoryTrait};
-pub(crate) use entity_service::EntityDatabaseService;
-pub use taxonomy_repository::TaxonomyRepository;
+pub use document_service::{DocumentCatalogEntry, DocumentService, DocumentType};
+pub use dsl_repository::{DslRepository, DslSaveResult};
+pub use entity_service::{EntityRow, EntityService, NewEntityFields, NewProperPersonFields};
 
 /// Database configuration
 #[derive(Debug, Clone)]
@@ -101,34 +108,19 @@ impl DatabaseManager {
         Self::new(config).await
     }
 
+    /// Create a new database manager from an existing pool
+    pub fn from_pool(pool: PgPool) -> Self {
+        Self { pool }
+    }
+
     /// Get a reference to the connection pool
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
 
-    /// Create a new DSL domain repository using this database connection
-    pub(crate) fn dsl_repository(&self) -> DslDomainRepository {
-        DslDomainRepository::new(self.pool.clone())
-    }
-
-    /// Create a new DSL business request repository using this database connection
-    pub(crate) fn business_request_repository(&self) -> DslBusinessRequestRepository {
-        DslBusinessRequestRepository::new(self.pool.clone())
-    }
-
     /// Create a new dictionary database service using this database connection
     pub fn dictionary_service(&self) -> DictionaryDatabaseService {
         DictionaryDatabaseService::new(self.pool.clone())
-    }
-
-    /// Create a new entity database service using this database connection
-    pub(crate) fn entity_service(&self) -> EntityDatabaseService {
-        EntityDatabaseService::new(self.pool.clone())
-    }
-
-    /// Create a new taxonomy repository using this database connection
-    pub fn taxonomy_repository(&self) -> TaxonomyRepository {
-        TaxonomyRepository::new(self.pool.clone())
     }
 
     /// Test database connectivity
@@ -143,18 +135,14 @@ impl DatabaseManager {
     pub async fn run_migrations(&self) -> Result<(), sqlx::migrate::MigrateError> {
         info!("Running database migrations");
 
-        // Note: In a real implementation, you might want to use sqlx-migrate
-        // or implement a custom migration runner here
-        // For now, we'll just verify the schema exists
-
+        // Verify the schema exists
         let tables_exist = sqlx::query(
             r#"
             SELECT COUNT(*) as count
             FROM information_schema.tables
             WHERE table_schema = 'ob-poc'
-            AND table_name IN ('dsl_domains', 'dsl_versions', 'parsed_asts', 'dsl_execution_log',
-                               'dictionary', 'document_catalog', 'document_metadata', 'document_relationships', 'document_types',
-                               'entities', 'entity_types', 'entity_limited_companies', 'entity_partnerships', 'entity_proper_persons', 'entity_trusts')
+            AND table_name IN ('cbus', 'dictionary', 'attribute_values', 'entities',
+                               'dsl_instances', 'parsed_asts', 'ubo_registry', 'document_catalog')
             "#,
         )
         .fetch_one(&self.pool)
@@ -163,8 +151,8 @@ impl DatabaseManager {
 
         let count: i64 = tables_exist.get("count");
 
-        if count < 15 {
-            warn!("Expected database tables not found. Please run migration scripts including essential agentic CRUD tables");
+        if count < 6 {
+            warn!("Expected database tables not found. Please run sql/demo_setup.sql");
             return Err(sqlx::migrate::MigrateError::VersionMissing(1));
         }
 
@@ -172,31 +160,10 @@ impl DatabaseManager {
         Ok(())
     }
 
-    /// Get database connection statistics
-    pub(crate) fn connection_stats(&self) -> ConnectionStats {
-        ConnectionStats {
-            size: self.pool.size(),
-            num_idle: self.pool.num_idle() as u32,
-        }
-    }
-
     /// Close the database connection pool
     pub async fn close(self) {
         info!("Closing database connection pool");
         self.pool.close().await;
-    }
-}
-
-/// Database connection statistics
-#[derive(Debug, Clone)]
-pub(crate) struct ConnectionStats {
-    pub size: u32,
-    pub num_idle: u32,
-}
-
-impl std::fmt::Display for ConnectionStats {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Pool size: {}, Idle: {}", self.size, self.num_idle)
     }
 }
 

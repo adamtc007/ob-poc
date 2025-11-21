@@ -1042,7 +1042,7 @@ impl DslPipelineProcessor {
         &self,
         dsl_content: &str,
         context: &OrchestrationContext,
-        db_service: &crate::database::DslDomainRepository,
+        _db_service: &crate::database::DictionaryDatabaseService,
     ) -> DSLResult<Vec<crate::dsl::orchestration_interface::DatabaseOperation>> {
         use crate::dsl::orchestration_interface::DatabaseOperation;
         let mut operations = Vec::new();

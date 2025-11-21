@@ -1,58 +1,211 @@
-//! Entity Database Service - Comprehensive entity management operations
+//! Entity Service - CRUD operations for Entities and Proper Persons
 //!
-//! This service provides database operations for all entity-related tables in the ob-poc schema,
-//! supporting the full entity lifecycle from creation to archival. It follows the established
-//! database service patterns and integrates with the agentic CRUD system.
+//! This module provides database operations for the canonical normalized
+//! entity model: entities, entity_types, proper_persons.
+//!
+//! Canonical DB schema (DB is master per Section 3.3):
+//! - entities: entity_id, entity_type_id (FK), external_id, name
+//! - entity_types: entity_type_id, code (e.g., "PROPER_PERSON", "COMPANY")
+//! - proper_persons: proper_person_id, first_name, last_name, etc.
+//!
+//! DSL uses string type names (e.g., "PROPER_PERSON") which are resolved
+//! to entity_type_id via entity_types table.
 
 use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{FromRow, PgPool, Row};
+use sqlx::{FromRow, PgPool};
 use tracing::info;
 use uuid::Uuid;
 
-/// Comprehensive entity database service for all entity operations
-pub(crate) struct EntityDatabaseService {
+/// Entity row - matches canonical DB schema
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct EntityRow {
+    pub entity_id: Uuid,
+    pub entity_type_id: Uuid,
+    pub external_id: Option<String>,
+    pub name: String,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
+}
+
+/// Proper person row - matches canonical DB schema
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ProperPersonRow {
+    pub proper_person_id: Uuid,
+    pub first_name: String,
+    pub last_name: String,
+    pub middle_names: Option<String>,
+    pub date_of_birth: Option<NaiveDate>,
+    pub nationality: Option<String>,
+    pub residence_address: Option<String>,
+    pub id_document_type: Option<String>,
+    pub id_document_number: Option<String>,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
+}
+
+/// Fields for creating a new entity
+#[derive(Debug, Clone)]
+pub struct NewEntityFields {
+    pub entity_type: String, // e.g., "PROPER_PERSON", "COMPANY"
+    pub name: String,
+    pub external_id: Option<String>,
+}
+
+/// Fields for creating a proper person
+#[derive(Debug, Clone)]
+pub struct NewProperPersonFields {
+    pub first_name: String,
+    pub last_name: String,
+    pub middle_names: Option<String>,
+    pub date_of_birth: Option<NaiveDate>,
+    pub nationality: Option<String>,
+    pub residence_address: Option<String>,
+    pub id_document_type: Option<String>,
+    pub id_document_number: Option<String>,
+}
+
+/// Service for entity operations
+#[derive(Clone, Debug)]
+pub struct EntityService {
     pool: PgPool,
 }
 
-impl EntityDatabaseService {
-    /// Create new entity database service
+impl EntityService {
+    /// Create a new entity service
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
-    // ==========================================
-    // CORE ENTITY OPERATIONS
-    // ==========================================
+    /// Get reference to the connection pool
+    pub fn pool(&self) -> &PgPool {
+        &self.pool
+    }
 
-    /// Create a new entity in the entities table
-    pub async fn create_entity(&self, request: CreateEntityRequest) -> Result<Entity> {
-        let entity_id = Uuid::new_v4();
-
-        let entity = sqlx::query_as::<_, Entity>(
+    /// Resolve entity type code to entity_type_id
+    pub async fn resolve_entity_type_id(&self, type_code: &str) -> Result<Uuid> {
+        let result = sqlx::query_scalar::<_, Uuid>(
             r#"
-            INSERT INTO "ob-poc".entities (
-                entity_id, entity_type_id, external_id, name, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, NOW(), NOW())
-            RETURNING entity_id, entity_type_id, external_id, name, created_at, updated_at
+            SELECT entity_type_id
+            FROM "ob-poc".entity_types
+            WHERE code = $1 OR name = $1
+            "#,
+        )
+        .bind(type_code)
+        .fetch_optional(&self.pool)
+        .await
+        .context("Failed to query entity_types")?;
+
+        result.ok_or_else(|| {
+            anyhow!(
+                "Entity type '{}' not found in entity_types table",
+                type_code
+            )
+        })
+    }
+
+    /// Create a new entity (generic)
+    pub async fn create_entity(&self, fields: &NewEntityFields) -> Result<Uuid> {
+        let entity_id = Uuid::new_v4();
+        let entity_type_id = self.resolve_entity_type_id(&fields.entity_type).await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".entities (entity_id, entity_type_id, external_id, name, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, NOW(), NOW())
             "#,
         )
         .bind(entity_id)
-        .bind(request.entity_type_id)
-        .bind(request.external_id)
-        .bind(request.name)
-        .fetch_one(&self.pool)
+        .bind(entity_type_id)
+        .bind(&fields.external_id)
+        .bind(&fields.name)
+        .execute(&self.pool)
         .await
         .context("Failed to create entity")?;
 
-        info!("Created entity: {} ({})", entity.name, entity.entity_id);
-        Ok(entity)
+        info!(
+            "Created entity {} of type '{}' with name '{}'",
+            entity_id, fields.entity_type, fields.name
+        );
+
+        Ok(entity_id)
+    }
+
+    /// Create a proper person (entity + proper_persons record)
+    /// Returns (entity_id, proper_person_id)
+    pub async fn create_proper_person(
+        &self,
+        person_fields: &NewProperPersonFields,
+    ) -> Result<(Uuid, Uuid)> {
+        let entity_id = Uuid::new_v4();
+        let proper_person_id = entity_id; // Use same UUID for simplicity
+        let entity_type_id = self.resolve_entity_type_id("PROPER_PERSON").await?;
+
+        // Full name for entities table
+        let full_name = if let Some(middle) = &person_fields.middle_names {
+            format!(
+                "{} {} {}",
+                person_fields.first_name, middle, person_fields.last_name
+            )
+        } else {
+            format!("{} {}", person_fields.first_name, person_fields.last_name)
+        };
+
+        // Start transaction
+        let mut tx = self.pool.begin().await?;
+
+        // Insert into entities
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".entities (entity_id, entity_type_id, name, created_at, updated_at)
+            VALUES ($1, $2, $3, NOW(), NOW())
+            "#,
+        )
+        .bind(entity_id)
+        .bind(entity_type_id)
+        .bind(&full_name)
+        .execute(&mut *tx)
+        .await
+        .context("Failed to create entity for proper person")?;
+
+        // Insert into proper_persons
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".entity_proper_persons (
+                proper_person_id, first_name, last_name, middle_names,
+                date_of_birth, nationality, residence_address,
+                id_document_type, id_document_number, created_at, updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+            "#,
+        )
+        .bind(proper_person_id)
+        .bind(&person_fields.first_name)
+        .bind(&person_fields.last_name)
+        .bind(&person_fields.middle_names)
+        .bind(person_fields.date_of_birth)
+        .bind(&person_fields.nationality)
+        .bind(&person_fields.residence_address)
+        .bind(&person_fields.id_document_type)
+        .bind(&person_fields.id_document_number)
+        .execute(&mut *tx)
+        .await
+        .context("Failed to create proper person record")?;
+
+        tx.commit().await?;
+
+        info!(
+            "Created proper person {} ({} {})",
+            proper_person_id, person_fields.first_name, person_fields.last_name
+        );
+
+        Ok((entity_id, proper_person_id))
     }
 
     /// Get entity by ID
-    pub async fn get_entity(&self, entity_id: Uuid) -> Result<Option<Entity>> {
-        let entity = sqlx::query_as::<_, Entity>(
+    pub async fn get_entity_by_id(&self, entity_id: Uuid) -> Result<Option<EntityRow>> {
+        let result = sqlx::query_as::<_, EntityRow>(
             r#"
             SELECT entity_id, entity_type_id, external_id, name, created_at, updated_at
             FROM "ob-poc".entities
@@ -62,40 +215,75 @@ impl EntityDatabaseService {
         .bind(entity_id)
         .fetch_optional(&self.pool)
         .await
-        .context("Failed to fetch entity")?;
+        .context("Failed to get entity by ID")?;
 
-        Ok(entity)
+        Ok(result)
+    }
+
+    /// Get entity by name
+    pub async fn get_entity_by_name(&self, name: &str) -> Result<Option<EntityRow>> {
+        let result = sqlx::query_as::<_, EntityRow>(
+            r#"
+            SELECT entity_id, entity_type_id, external_id, name, created_at, updated_at
+            FROM "ob-poc".entities
+            WHERE name = $1
+            "#,
+        )
+        .bind(name)
+        .fetch_optional(&self.pool)
+        .await
+        .context("Failed to get entity by name")?;
+
+        Ok(result)
+    }
+
+    /// Get proper person details by entity_id
+    pub async fn get_proper_person(&self, entity_id: Uuid) -> Result<Option<ProperPersonRow>> {
+        let result = sqlx::query_as::<_, ProperPersonRow>(
+            r#"
+            SELECT proper_person_id, first_name, last_name, middle_names,
+                   date_of_birth, nationality, residence_address,
+                   id_document_type, id_document_number, created_at, updated_at
+            FROM "ob-poc".entity_proper_persons
+            WHERE proper_person_id = $1
+            "#,
+        )
+        .bind(entity_id)
+        .fetch_optional(&self.pool)
+        .await
+        .context("Failed to get proper person")?;
+
+        Ok(result)
     }
 
     /// Update entity
     pub async fn update_entity(
         &self,
         entity_id: Uuid,
-        request: UpdateEntityRequest,
-    ) -> Result<Entity> {
-        let entity = sqlx::query_as::<_, Entity>(
+        name: Option<&str>,
+        external_id: Option<&str>,
+    ) -> Result<bool> {
+        let result = sqlx::query(
             r#"
             UPDATE "ob-poc".entities
-            SET external_id = COALESCE($2, external_id),
-                name = COALESCE($3, name),
+            SET name = COALESCE($1, name),
+                external_id = COALESCE($2, external_id),
                 updated_at = NOW()
-            WHERE entity_id = $1
-            RETURNING entity_id, entity_type_id, external_id, name, created_at, updated_at
+            WHERE entity_id = $3
             "#,
         )
+        .bind(name)
+        .bind(external_id)
         .bind(entity_id)
-        .bind(request.external_id)
-        .bind(request.name)
-        .fetch_one(&self.pool)
+        .execute(&self.pool)
         .await
         .context("Failed to update entity")?;
 
-        info!("Updated entity: {} ({})", entity.name, entity.entity_id);
-        Ok(entity)
+        Ok(result.rows_affected() > 0)
     }
 
-    /// Delete entity (soft delete by marking as deleted)
-    pub async fn delete_entity(&self, entity_id: Uuid) -> Result<()> {
+    /// Delete entity (cascades to proper_persons if applicable)
+    pub async fn delete_entity(&self, entity_id: Uuid) -> Result<bool> {
         let result = sqlx::query(
             r#"
             DELETE FROM "ob-poc".entities
@@ -107,596 +295,36 @@ impl EntityDatabaseService {
         .await
         .context("Failed to delete entity")?;
 
-        if result.rows_affected() == 0 {
-            return Err(anyhow!("Entity not found: {}", entity_id));
+        if result.rows_affected() > 0 {
+            info!("Deleted entity {}", entity_id);
         }
 
-        info!("Deleted entity: {}", entity_id);
-        Ok(())
+        Ok(result.rows_affected() > 0)
     }
 
-    // ==========================================
-    // ENTITY TYPE MANAGEMENT
-    // ==========================================
+    /// List entities by type
+    pub async fn list_entities_by_type(
+        &self,
+        entity_type: &str,
+        limit: Option<i32>,
+    ) -> Result<Vec<EntityRow>> {
+        let entity_type_id = self.resolve_entity_type_id(entity_type).await?;
 
-    /// Get all entity types
-    pub async fn get_entity_types(&self) -> Result<Vec<EntityType>> {
-        let entity_types = sqlx::query_as::<_, EntityType>(
+        let results = sqlx::query_as::<_, EntityRow>(
             r#"
-            SELECT entity_type_id, name, description, table_name, created_at, updated_at
-            FROM "ob-poc".entity_types
-            ORDER BY name
-            "#,
-        )
-        .fetch_all(&self.pool)
-        .await
-        .context("Failed to fetch entity types")?;
-
-        Ok(entity_types)
-    }
-
-    /// Create new entity type
-    pub async fn create_entity_type(&self, request: CreateEntityTypeRequest) -> Result<EntityType> {
-        let entity_type_id = Uuid::new_v4();
-
-        let entity_type = sqlx::query_as::<_, EntityType>(
-            r#"
-            INSERT INTO "ob-poc".entity_types (
-                entity_type_id, name, description, table_name, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, NOW(), NOW())
-            RETURNING entity_type_id, name, description, table_name, created_at, updated_at
+            SELECT entity_id, entity_type_id, external_id, name, created_at, updated_at
+            FROM "ob-poc".entities
+            WHERE entity_type_id = $1
+            ORDER BY created_at DESC
+            LIMIT $2
             "#,
         )
         .bind(entity_type_id)
-        .bind(request.name)
-        .bind(request.description)
-        .bind(request.table_name)
-        .fetch_one(&self.pool)
-        .await
-        .context("Failed to create entity type")?;
-
-        info!(
-            "Created entity type: {} ({})",
-            entity_type.name, entity_type.entity_type_id
-        );
-        Ok(entity_type)
-    }
-
-    // ==========================================
-    // SPECIALIZED ENTITY OPERATIONS
-    // ==========================================
-
-    /// Create limited company
-    pub async fn create_limited_company(
-        &self,
-        request: CreateLimitedCompanyRequest,
-    ) -> Result<LimitedCompany> {
-        let limited_company_id = Uuid::new_v4();
-
-        let company = sqlx::query_as::<_, LimitedCompany>(
-            r#"
-            INSERT INTO "ob-poc".entity_limited_companies (
-                limited_company_id, company_name, registration_number, jurisdiction,
-                incorporation_date, registered_address, business_nature, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-            RETURNING limited_company_id, company_name, registration_number, jurisdiction,
-                      incorporation_date, registered_address, business_nature, created_at, updated_at
-            "#,
-        )
-        .bind(limited_company_id)
-        .bind(request.company_name)
-        .bind(request.registration_number)
-        .bind(request.jurisdiction)
-        .bind(request.incorporation_date)
-        .bind(request.registered_address)
-        .bind(request.business_nature)
-        .fetch_one(&self.pool)
-        .await
-        .context("Failed to create limited company")?;
-
-        info!(
-            "Created limited company: {} ({})",
-            company.company_name, company.limited_company_id
-        );
-        Ok(company)
-    }
-
-    /// Create partnership
-    pub async fn create_partnership(
-        &self,
-        request: CreatePartnershipRequest,
-    ) -> Result<Partnership> {
-        let partnership_id = Uuid::new_v4();
-
-        let partnership = sqlx::query_as::<_, Partnership>(
-            r#"
-            INSERT INTO "ob-poc".entity_partnerships (
-                partnership_id, partnership_name, partnership_type, jurisdiction,
-                formation_date, principal_place_business, partnership_agreement_date,
-                created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-            RETURNING partnership_id, partnership_name, partnership_type, jurisdiction,
-                      formation_date, principal_place_business, partnership_agreement_date,
-                      created_at, updated_at
-            "#,
-        )
-        .bind(partnership_id)
-        .bind(request.partnership_name)
-        .bind(request.partnership_type)
-        .bind(request.jurisdiction)
-        .bind(request.formation_date)
-        .bind(request.principal_place_business)
-        .bind(request.partnership_agreement_date)
-        .fetch_one(&self.pool)
-        .await
-        .context("Failed to create partnership")?;
-
-        info!(
-            "Created partnership: {} ({})",
-            partnership.partnership_name, partnership.partnership_id
-        );
-        Ok(partnership)
-    }
-
-    /// Create proper person
-    pub async fn create_proper_person(
-        &self,
-        request: CreateProperPersonRequest,
-    ) -> Result<ProperPerson> {
-        let proper_person_id = Uuid::new_v4();
-
-        let person = sqlx::query_as::<_, ProperPerson>(
-            r#"
-            INSERT INTO "ob-poc".entity_proper_persons (
-                proper_person_id, first_name, last_name, date_of_birth,
-                nationality, passport_number, residential_address, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-            RETURNING proper_person_id, first_name, last_name, date_of_birth,
-                      nationality, passport_number, residential_address, created_at, updated_at
-            "#,
-        )
-        .bind(proper_person_id)
-        .bind(request.first_name)
-        .bind(request.last_name)
-        .bind(request.date_of_birth)
-        .bind(request.nationality)
-        .bind(request.passport_number)
-        .bind(request.residential_address)
-        .fetch_one(&self.pool)
-        .await
-        .context("Failed to create proper person")?;
-
-        info!(
-            "Created proper person: {} {} ({})",
-            person.first_name, person.last_name, person.proper_person_id
-        );
-        Ok(person)
-    }
-
-    /// Create trust
-    pub async fn create_trust(&self, request: CreateTrustRequest) -> Result<Trust> {
-        let trust_id = Uuid::new_v4();
-
-        let trust = sqlx::query_as::<_, Trust>(
-            r#"
-            INSERT INTO "ob-poc".entity_trusts (
-                trust_id, trust_name, trust_type, governing_law,
-                establishment_date, trust_deed_date, principal_office_address,
-                created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-            RETURNING trust_id, trust_name, trust_type, governing_law,
-                      establishment_date, trust_deed_date, principal_office_address,
-                      created_at, updated_at
-            "#,
-        )
-        .bind(trust_id)
-        .bind(request.trust_name)
-        .bind(request.trust_type)
-        .bind(request.governing_law)
-        .bind(request.establishment_date)
-        .bind(request.trust_deed_date)
-        .bind(request.principal_office_address)
-        .fetch_one(&self.pool)
-        .await
-        .context("Failed to create trust")?;
-
-        info!("Created trust: {} ({})", trust.trust_name, trust.trust_id);
-        Ok(trust)
-    }
-
-    // ==========================================
-    // ENTITY LIFECYCLE MANAGEMENT
-    // ==========================================
-
-    /// Update entity status
-    pub async fn update_entity_status(
-        &self,
-        request: EntityStatusUpdateRequest,
-    ) -> Result<EntityLifecycleStatus> {
-        let status_id = Uuid::new_v4();
-
-        let status = sqlx::query_as::<_, EntityLifecycleStatus>(
-            r#"
-            INSERT INTO "ob-poc".entity_lifecycle_status (
-                status_id, entity_type, entity_id, status_code, status_description,
-                effective_date, end_date, reason_code, notes, created_by, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
-            RETURNING status_id, entity_type, entity_id, status_code, status_description,
-                      effective_date, end_date, reason_code, notes, created_by, created_at, updated_at
-            "#,
-        )
-        .bind(status_id)
-        .bind(request.entity_type)
-        .bind(request.entity_id)
-        .bind(&request.status_code)
-        .bind(request.status_description)
-        .bind(request.effective_date)
-        .bind(request.end_date)
-        .bind(request.reason_code)
-        .bind(request.notes)
-        .bind(request.created_by)
-        .fetch_one(&self.pool)
-        .await
-        .context("Failed to update entity status")?;
-
-        info!(
-            "Updated entity status: {} -> {} ({})",
-            request.entity_id, request.status_code, status_id
-        );
-        Ok(status)
-    }
-
-    /// Get entity status history
-    pub async fn get_entity_status_history(
-        &self,
-        entity_id: Uuid,
-    ) -> Result<Vec<EntityLifecycleStatus>> {
-        let statuses = sqlx::query_as::<_, EntityLifecycleStatus>(
-            r#"
-            SELECT status_id, entity_type, entity_id, status_code, status_description,
-                   effective_date, end_date, reason_code, notes, created_by, created_at, updated_at
-            FROM "ob-poc".entity_lifecycle_status
-            WHERE entity_id = $1
-            ORDER BY effective_date DESC, created_at DESC
-            "#,
-        )
-        .bind(entity_id)
+        .bind(limit.unwrap_or(100))
         .fetch_all(&self.pool)
         .await
-        .context("Failed to fetch entity status history")?;
+        .context("Failed to list entities by type")?;
 
-        Ok(statuses)
-    }
-
-    // ==========================================
-    // ENTITY SEARCH AND DISCOVERY
-    // ==========================================
-
-    /// Search entities by criteria
-    pub async fn search_entities(&self, criteria: EntitySearchCriteria) -> Result<Vec<Entity>> {
-        let mut query_builder = sqlx::QueryBuilder::new(
-            "SELECT entity_id, entity_type_id, external_id, name, created_at, updated_at FROM \"ob-poc\".entities WHERE 1=1"
-        );
-
-        if let Some(name_pattern) = &criteria.name_pattern {
-            query_builder.push(" AND name ILIKE ");
-            query_builder.push_bind(format!("%{}%", name_pattern));
-        }
-
-        if let Some(entity_type_id) = criteria.entity_type_id {
-            query_builder.push(" AND entity_type_id = ");
-            query_builder.push_bind(entity_type_id);
-        }
-
-        if let Some(external_id) = &criteria.external_id {
-            query_builder.push(" AND external_id = ");
-            query_builder.push_bind(external_id);
-        }
-
-        query_builder.push(" ORDER BY name LIMIT ");
-        query_builder.push_bind(criteria.limit.unwrap_or(100));
-
-        let entities = query_builder
-            .build_query_as::<Entity>()
-            .fetch_all(&self.pool)
-            .await
-            .context("Failed to search entities")?;
-
-        Ok(entities)
-    }
-
-    // ==========================================
-    // VALIDATION AND BUSINESS RULES
-    // ==========================================
-
-    /// Validate entity against business rules
-    pub async fn validate_entity(
-        &self,
-        entity_id: Uuid,
-        rule_set: Vec<String>,
-    ) -> Result<ValidationResult> {
-        // Implementation would check various business rules
-        // For now, return a basic validation result
-        let entity = self.get_entity(entity_id).await?;
-
-        match entity {
-            Some(_) => Ok(ValidationResult {
-                entity_id,
-                is_valid: true,
-                validation_errors: vec![],
-                validation_warnings: vec![],
-                rules_checked: rule_set,
-                validated_at: Utc::now(),
-            }),
-            None => Err(anyhow!("Entity not found for validation: {}", entity_id)),
-        }
-    }
-
-    /// Get entity validation rules for a specific entity type
-    pub async fn get_entity_rules(&self, entity_type: &str) -> Result<Vec<EntityCrudRule>> {
-        let rules = sqlx::query_as::<_, EntityCrudRule>(
-            r#"
-            SELECT rule_id, entity_table_name, operation_type, field_name,
-                   constraint_type, constraint_description, validation_pattern,
-                   error_message, is_active, created_at, updated_at
-            FROM "ob-poc".entity_crud_rules
-            WHERE entity_table_name = $1 AND is_active = true
-            ORDER BY constraint_type, field_name
-            "#,
-        )
-        .bind(entity_type)
-        .fetch_all(&self.pool)
-        .await
-        .context("Failed to fetch entity rules")?;
-
-        Ok(rules)
-    }
-
-    // ==========================================
-    // PRODUCT COMPATIBILITY
-    // ==========================================
-
-    /// Get products compatible with entity type
-    pub async fn get_compatible_products(
-        &self,
-        entity_type_id: Uuid,
-    ) -> Result<Vec<ProductMapping>> {
-        let mappings = sqlx::query_as::<_, ProductMapping>(
-            r#"
-            SELECT mapping_id, entity_type_id, product_id, is_compatible,
-                   compatibility_notes, created_at, updated_at
-            FROM "ob-poc".entity_product_mappings
-            WHERE entity_type_id = $1 AND is_compatible = true
-            ORDER BY product_id
-            "#,
-        )
-        .bind(entity_type_id)
-        .fetch_all(&self.pool)
-        .await
-        .context("Failed to fetch compatible products")?;
-
-        Ok(mappings)
+        Ok(results)
     }
 }
-
-// ==========================================
-// DATA STRUCTURES
-// ==========================================
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct Entity {
-    pub entity_id: Uuid,
-    pub entity_type_id: Uuid,
-    pub external_id: Option<String>,
-    pub name: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct EntityType {
-    pub entity_type_id: Uuid,
-    pub name: String,
-    pub description: Option<String>,
-    pub table_name: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct LimitedCompany {
-    pub limited_company_id: Uuid,
-    pub company_name: String,
-    pub registration_number: Option<String>,
-    pub jurisdiction: Option<String>,
-    pub incorporation_date: Option<NaiveDate>,
-    pub registered_address: Option<String>,
-    pub business_nature: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct Partnership {
-    pub partnership_id: Uuid,
-    pub partnership_name: String,
-    pub partnership_type: Option<String>,
-    pub jurisdiction: Option<String>,
-    pub formation_date: Option<NaiveDate>,
-    pub principal_place_business: Option<String>,
-    pub partnership_agreement_date: Option<NaiveDate>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct ProperPerson {
-    pub proper_person_id: Uuid,
-    pub first_name: String,
-    pub last_name: String,
-    pub date_of_birth: Option<NaiveDate>,
-    pub nationality: Option<String>,
-    pub passport_number: Option<String>,
-    pub residential_address: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct Trust {
-    pub trust_id: Uuid,
-    pub trust_name: String,
-    pub trust_type: Option<String>,
-    pub governing_law: Option<String>,
-    pub establishment_date: Option<NaiveDate>,
-    pub trust_deed_date: Option<NaiveDate>,
-    pub principal_office_address: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub(crate) struct EntityLifecycleStatus {
-    pub status_id: Uuid,
-    pub entity_type: String,
-    pub entity_id: Uuid,
-    pub status_code: String,
-    pub status_description: Option<String>,
-    pub effective_date: NaiveDate,
-    pub end_date: Option<NaiveDate>,
-    pub reason_code: Option<String>,
-    pub notes: Option<String>,
-    pub created_by: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct EntityCrudRule {
-    pub rule_id: Uuid,
-    pub entity_table_name: String,
-    pub operation_type: String,
-    pub field_name: Option<String>,
-    pub constraint_type: String,
-    pub constraint_description: String,
-    pub validation_pattern: Option<String>,
-    pub error_message: Option<String>,
-    pub is_active: bool,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub(crate) struct ProductMapping {
-    pub mapping_id: Uuid,
-    pub entity_type_id: Uuid,
-    pub product_id: Uuid,
-    pub is_compatible: bool,
-    pub compatibility_notes: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-// ==========================================
-// REQUEST STRUCTURES
-// ==========================================
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct CreateEntityRequest {
-    pub entity_type_id: Uuid,
-    pub external_id: Option<String>,
-    pub name: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct UpdateEntityRequest {
-    pub external_id: Option<String>,
-    pub name: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct CreateEntityTypeRequest {
-    pub name: String,
-    pub description: Option<String>,
-    pub table_name: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct CreateLimitedCompanyRequest {
-    pub company_name: String,
-    pub registration_number: Option<String>,
-    pub jurisdiction: Option<String>,
-    pub incorporation_date: Option<NaiveDate>,
-    pub registered_address: Option<String>,
-    pub business_nature: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct CreatePartnershipRequest {
-    pub partnership_name: String,
-    pub partnership_type: Option<String>,
-    pub jurisdiction: Option<String>,
-    pub formation_date: Option<NaiveDate>,
-    pub principal_place_business: Option<String>,
-    pub partnership_agreement_date: Option<NaiveDate>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct CreateProperPersonRequest {
-    pub first_name: String,
-    pub last_name: String,
-    pub date_of_birth: Option<NaiveDate>,
-    pub nationality: Option<String>,
-    pub passport_number: Option<String>,
-    pub residential_address: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct CreateTrustRequest {
-    pub trust_name: String,
-    pub trust_type: Option<String>,
-    pub governing_law: Option<String>,
-    pub establishment_date: Option<NaiveDate>,
-    pub trust_deed_date: Option<NaiveDate>,
-    pub principal_office_address: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct EntityStatusUpdateRequest {
-    pub entity_type: String,
-    pub entity_id: Uuid,
-    pub status_code: String,
-    pub status_description: Option<String>,
-    pub effective_date: NaiveDate,
-    pub end_date: Option<NaiveDate>,
-    pub reason_code: Option<String>,
-    pub notes: Option<String>,
-    pub created_by: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct EntitySearchCriteria {
-    pub name_pattern: Option<String>,
-    pub entity_type_id: Option<Uuid>,
-    pub external_id: Option<String>,
-    pub limit: Option<i64>,
-}
-
-// ==========================================
-// RESPONSE STRUCTURES
-// ==========================================
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ValidationResult {
-    pub entity_id: Uuid,
-    pub is_valid: bool,
-    pub validation_errors: Vec<String>,
-    pub validation_warnings: Vec<String>,
-    pub rules_checked: Vec<String>,
-    pub validated_at: DateTime<Utc>,
-}
-
-// ==========================================
-// TESTS
-// ==========================================
-

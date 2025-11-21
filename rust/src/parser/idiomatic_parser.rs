@@ -14,7 +14,7 @@ use nom::{
     Finish, IResult,
 };
 
-use crate::parser_ast::{Form, Key, Literal, Program, Value, VerbForm};
+use crate::parser::ast::{Form, Key, Literal, Program, Value, VerbForm};
 
 /// Parser error type with context information
 pub(crate) type NomParseError<'a> = VerboseError<&'a str>;
@@ -218,88 +218,24 @@ pub(crate) fn parse_map_value(input: &str) -> ParseResult<'_, Value> {
     Ok((input, Value::Map(pairs.into_iter().collect())))
 }
 
-/// Parse an attribute reference: @attr{uuid} or @attr.category.name
-/// Implements Phase 1: UUID-based and semantic attribute references
-/// Also supports source hints: @attr{uuid}:doc or @attr.category.name:form
+/// Parse an attribute reference: @attr{uuid} or @attr{"uuid"}
+/// Supports both quoted and unquoted UUID formats
 fn parse_attr_ref(input: &str) -> ParseResult<'_, Value> {
-    alt((
-        parse_attr_uuid_with_source,     // Try UUID with source hint first
-        parse_attr_uuid,                 // Then UUID without source
-        parse_attr_semantic_with_source, // Then semantic with source hint
-        parse_attr_semantic,             // Finally semantic without source
-    ))(input)
-}
-
-/// Parse UUID-based attribute reference with source hint: @attr{uuid}:source
-/// Example: @attr{3020d46f-472c-5437-9647-1b0682c35935}:doc
-fn parse_attr_uuid_with_source(input: &str) -> ParseResult<'_, Value> {
     let (input, _) = tag("@attr{")(input)?;
-    let (input, uuid_str) = take_while1(|c: char| c.is_ascii_hexdigit() || c == '-')(input)?;
-    let (input, _) = char('}')(input)?;
-    let (input, _) = char(':')(input)?;
-    let (input, source) = take_while1(|c: char| c.is_alphabetic())(input)?;
 
-    // Parse the UUID string into a proper Uuid type
-    let uuid = uuid::Uuid::parse_str(uuid_str).map_err(|_| {
-        nom::Err::Error(VerboseError::from_error_kind(
-            input,
-            nom::error::ErrorKind::Verify,
-        ))
-    })?;
-
-    Ok((input, Value::AttrUuidWithSource(uuid, source.to_string())))
-}
-
-/// Parse UUID-based attribute reference: @attr{uuid}
-/// Example: @attr{3020d46f-472c-5437-9647-1b0682c35935}
-fn parse_attr_uuid(input: &str) -> ParseResult<'_, Value> {
-    let (input, _) = tag("@attr{")(input)?;
-    let (input, uuid_str) = take_while1(|c: char| c.is_ascii_hexdigit() || c == '-')(input)?;
-    let (input, _) = char('}')(input)?;
-
-    // Parse the UUID string into a proper Uuid type
-    let uuid = uuid::Uuid::parse_str(uuid_str).map_err(|_| {
-        nom::Err::Error(VerboseError::from_error_kind(
-            input,
-            nom::error::ErrorKind::Verify,
-        ))
-    })?;
-
-    Ok((input, Value::AttrUuid(uuid)))
-}
-
-/// Parse semantic attribute reference with source hint: @attr.category.name:source
-/// Example: @attr.identity.first_name:form
-fn parse_attr_semantic_with_source(input: &str) -> ParseResult<'_, Value> {
-    let (input, attr_id) = parse_string_attr_ref(input)?;
-    let (input, _) = char(':')(input)?;
-    let (input, source) = take_while1(|c: char| c.is_alphabetic())(input)?;
-    Ok((input, Value::AttrRefWithSource(attr_id, source.to_string())))
-}
-
-/// Parse semantic attribute reference: @attr.category.name
-/// Example: @attr.identity.first_name
-fn parse_attr_semantic(input: &str) -> ParseResult<'_, Value> {
-    let (input, attr_id) = parse_string_attr_ref(input)?;
-    Ok((input, Value::AttrRef(attr_id)))
-}
-
-/// Parse new string-based attribute reference: @attr.category.name
-fn parse_string_attr_ref(input: &str) -> ParseResult<'_, String> {
-    let (input, _) = tag("@attr.")(input)?;
-    let (input, attr_id) = recognize(pair(
-        // First part: category (e.g., "identity")
-        alpha1,
-        // Remaining parts: .subcategory.name
-        many1(pair(
-            char('.'),
-            take_while1(|c: char| c.is_alphanumeric() || c == '_'),
-        )),
+    // Try unquoted UUID first (more common), then fall back to quoted
+    let (input, uuid_str) = alt((
+        // Unquoted UUID: alphanumeric with dashes
+        map(
+            recognize(pair(alphanumeric1, many0(alt((alphanumeric1, tag("-")))))),
+            |s: &str| s.to_string(),
+        ),
+        // Quoted string (backward compatibility)
+        parse_string_literal,
     ))(input)?;
 
-    // Reconstruct the full attribute ID
-    let full_id = format!("attr.{}", attr_id);
-    Ok((input, full_id))
+    let (input, _) = char('}')(input)?;
+    Ok((input, Value::AttrRef(uuid_str)))
 }
 
 /// Parse identifiers: alphanumeric with underscore, dash, dot

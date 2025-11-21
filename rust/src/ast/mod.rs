@@ -1,183 +1,15 @@
 //! Abstract Syntax Tree (AST) structures for the UBO/KYC DSL
 //!
-//! This module defines the in-memory representation of parsed DSL programs.
-//! The AST preserves all semantic information from the source DSL for
-//! validation, transformation, and execution.
+//! This module defines core type definitions used across the DSL system.
+//! For the primary V3.1 AST implementation, see `parser::ast` module.
 
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub mod types;
-pub(crate) mod visitors;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Program {
-    pub workflows: Vec<Workflow>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Workflow {
-    pub id: String,
-    pub properties: PropertyMap,
-    pub statements: Vec<Statement>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum Statement {
-    DeclareEntity {
-        id: String,
-        entity_type: String,
-        properties: PropertyMap,
-    },
-    ObtainDocument {
-        document_type: String,
-        source: String,
-        properties: PropertyMap,
-    },
-    CreateEdge {
-        from: String,
-        to: String,
-        edge_type: String,
-        properties: PropertyMap,
-    },
-    CalculateUbo {
-        entity_id: String,
-        properties: PropertyMap,
-    },
-    // Legacy variants for compatibility
-    SolicitAttribute(SolicitAttribute),
-    ResolveConflict(ResolveConflict),
-    GenerateReport(GenerateReport),
-    ScheduleMonitoring(ScheduleMonitoring),
-    ParallelObtain(ParallelObtain),
-    Parallel(Vec<Statement>),
-    Sequential(Vec<Statement>),
-    // Placeholder for unknown statement types during parsing
-    Placeholder {
-        command: String,
-        args: Vec<Value>,
-    },
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct DeclareEntity {
-    pub node_id: String,
-    pub label: EntityLabel,
-    pub properties: PropertyMap,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum EntityLabel {
-    Company,
-    Person,
-    Trust,
-    Address,
-    Document,
-    Officer,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ObtainDocument {
-    pub doc_id: String,
-    pub doc_type: String,
-    pub issuer: String,
-    pub issue_date: NaiveDate,
-    pub confidence: f64,
-    pub additional_props: PropertyMap,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ParallelObtain {
-    pub documents: Vec<ObtainDocument>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CreateEdge {
-    pub from: String,
-    pub to: String,
-    pub edge_type: EdgeType,
-    pub properties: PropertyMap,
-    pub evidenced_by: Vec<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum EdgeType {
-    HasOwnership,
-    HasControl,
-    IsDirectorOf,
-    IsSecretaryOf,
-    HasShareholder,
-    ResidesAt,
-    HasRegisteredOffice,
-    EvidencedBy,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct SolicitAttribute {
-    pub attr_id: String,
-    pub from: String,
-    pub value_type: String,
-    pub additional_props: PropertyMap,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub(crate) struct CalculateUbo {
-    pub target: String,
-    pub algorithm: String,
-    pub max_depth: usize,
-    pub threshold: f64,
-    pub traversal_rules: PropertyMap,
-    pub output: PropertyMap,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ResolveConflict {
-    pub node: String,
-    pub property: String,
-    pub strategy: WaterfallStrategy,
-    pub resolution: PropertyMap,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct WaterfallStrategy {
-    pub priorities: Vec<SourcePriority>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct SourcePriority {
-    pub source_type: SourceType,
-    pub name: String,
-    pub confidence: f64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum SourceType {
-    PrimarySource,
-    GovernmentRegistry,
-    ThirdPartyService,
-    SelfDeclared,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct GenerateReport {
-    pub target: String,
-    pub status: String,
-    pub identified_ubos: Vec<PropertyMap>,
-    pub unresolved_prongs: Vec<PropertyMap>,
-    pub additional_props: PropertyMap,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ScheduleMonitoring {
-    pub target: String,
-    pub frequency: String,
-    pub triggers: Vec<PropertyMap>,
-    pub additional_props: PropertyMap,
-}
-
-/// Property value with support for multi-source fragmented data
+/// Property value - basic type definitions for AST types module
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Value {
     String(String),
@@ -191,6 +23,7 @@ pub enum Value {
     Null,
 }
 
+/// Value with source metadata for multi-source data
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ValueWithSource {
     pub value: Box<Value>,
@@ -198,7 +31,32 @@ pub struct ValueWithSource {
     pub confidence: Option<f64>,
 }
 
+/// Property map type alias
 pub type PropertyMap = HashMap<String, Value>;
+
+/// Entity labels for graph node classification
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum EntityLabel {
+    Company,
+    Person,
+    Trust,
+    Address,
+    Document,
+    Officer,
+}
+
+/// Edge types for graph relationships
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum EdgeType {
+    HasOwnership,
+    HasControl,
+    IsDirectorOf,
+    IsSecretaryOf,
+    HasShareholder,
+    ResidesAt,
+    HasRegisteredOffice,
+    EvidencedBy,
+}
 
 impl std::fmt::Display for EntityLabel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

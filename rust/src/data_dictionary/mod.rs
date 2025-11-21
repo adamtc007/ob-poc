@@ -16,7 +16,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub mod attribute;
-pub(crate) mod catalogue;
 pub mod validation;
 
 pub use attribute::*;
@@ -55,58 +54,4 @@ pub trait DictionaryService: Send + Sync {
         doc_id: uuid::Uuid,
         cbu_id: uuid::Uuid,
     ) -> Result<Vec<AttributeId>, String>;
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg(feature = "database")]
-pub(crate) struct DataDictionary {
-    pub attributes: HashMap<String, AttributeDefinition>,
-    pub categories: Vec<CategoryDefinition>,
-    pub relationships: Vec<AttributeRelationship>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct CategoryDefinition {
-    pub category_id: String,
-    pub display_name: String,
-    pub description: String,
-    pub display_order: u32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct AttributeRelationship {
-    pub from_attr: String,
-    pub to_attr: String,
-    pub relationship_type: RelationshipType,
-    pub strength: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum RelationshipType {
-    ProximityPreference,
-    CrossValidation,
-    DependsOn,
-    MutuallyExclusive,
-}
-
-#[cfg(feature = "database")]
-impl DataDictionary {
-    pub fn new() -> Self {
-        DataDictionary {
-            attributes: HashMap::new(),
-            categories: Vec::new(),
-            relationships: Vec::new(),
-        }
-    }
-
-    pub(crate) fn get_attribute(&self, attr_id: &str) -> Option<&AttributeDefinition> {
-        self.attributes.get(attr_id)
-    }
-}
-
-#[cfg(feature = "database")]
-impl Default for DataDictionary {
-    fn default() -> Self {
-        Self::new()
-    }
 }
