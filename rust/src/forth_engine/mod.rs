@@ -7,7 +7,7 @@ use crate::forth_engine::vm::VM;
 use std::sync::Arc;
 
 #[cfg(feature = "database")]
-use crate::database::DslRepository;
+use crate::database::{CrudExecutor, DslRepository};
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
@@ -61,9 +61,37 @@ pub async fn execute_sheet_with_db(
     let start_time = std::time::Instant::now();
 
     // Execute the DSL synchronously (parse + compile + run)
-    let (mut result, env) = execute_sheet_internal_with_env(sheet, Some(pool.clone()))?;
+    let (mut result, mut env) = execute_sheet_internal_with_env(sheet, Some(pool.clone()))?;
 
     let parse_time_ms = start_time.elapsed().as_millis() as u64;
+
+    // Execute pending CRUD statements against database
+    let pending_crud = env.take_pending_crud();
+    if !pending_crud.is_empty() {
+        let executor = CrudExecutor::new(pool.clone());
+        let crud_results = executor
+            .execute_all(&pending_crud)
+            .await
+            .map_err(|e| EngineError::Database(format!("CRUD execution failed: {}", e)))?;
+
+        // Log CRUD results
+        for crud_result in &crud_results {
+            result.logs.push(format!(
+                "CRUD {}: {} - {} rows affected",
+                crud_result.operation, crud_result.asset, crud_result.rows_affected
+            ));
+
+            // If a CBU was created, use its ID as the case_id
+            if crud_result.asset == "CBU" && crud_result.operation == "CREATE" {
+                if let Some(id) = &crud_result.generated_id {
+                    if result.case_id.is_none() {
+                        result.case_id = Some(id.to_string());
+                        env.set_case_id(id.to_string());
+                    }
+                }
+            }
+        }
+    }
 
     // Persist to database using the database facade
     if let Some(case_id) = &result.case_id {

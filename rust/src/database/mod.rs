@@ -15,6 +15,7 @@ use tracing::{info, warn};
 
 pub mod attribute_values_service;
 pub mod cbu_service;
+pub mod crud_executor;
 pub mod crud_service;
 pub mod dictionary_service;
 pub mod document_service;
@@ -23,6 +24,7 @@ pub mod dsl_repository;
 // Re-export for convenience
 pub use attribute_values_service::AttributeValuesService;
 pub use cbu_service::{Cbu, CbuService, Role};
+pub use crud_executor::{CrudExecutionResult, CrudExecutor};
 pub use crud_service::{AssetType, CrudOperation, CrudService, OperationType};
 pub use dictionary_service::DictionaryDatabaseService;
 pub use document_service::{DocumentCatalogEntry, DocumentService, DocumentType};
