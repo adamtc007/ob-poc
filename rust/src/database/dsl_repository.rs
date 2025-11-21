@@ -5,6 +5,7 @@
 
 use sqlx::PgPool;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 /// Result of saving a DSL/AST pair
 #[derive(Debug, Clone)]
@@ -12,6 +13,7 @@ pub struct DslSaveResult {
     pub case_id: String,
     pub version: i32,
     pub success: bool,
+    pub instance_id: Uuid,
 }
 
 /// DSL Repository for database operations
@@ -52,15 +54,17 @@ impl DslRepository {
                 .await?;
 
         let version = version_result.0 as i32;
+        let instance_id = Uuid::new_v4();
 
         // Insert DSL instance
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".dsl_instances
-            (case_id, dsl_content, domain, operation_type, status, processing_time_ms, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, 'PROCESSED', $5, NOW(), NOW())
+            (instance_id, case_id, dsl_content, domain, operation_type, status, processing_time_ms, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, 'PROCESSED', $6, NOW(), NOW())
             "#
         )
+        .bind(instance_id)
         .bind(case_id)
         .bind(dsl_content)
         .bind(domain)
@@ -90,7 +94,40 @@ impl DslRepository {
             case_id: case_id.to_string(),
             version,
             success: true,
+            instance_id,
         })
+    }
+
+    /// Save DSL execution with CBU context (simplified version for CBU Model DSL)
+    pub async fn save_execution(
+        &self,
+        dsl_content: &str,
+        domain: &str,
+        case_id: &str,
+        _cbu_id: Option<Uuid>,
+        ast_json: &serde_json::Value,
+    ) -> Result<DslSaveResult, sqlx::Error> {
+        let ast_str =
+            serde_json::to_string(ast_json).map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+
+        self.save_dsl_ast(case_id, dsl_content, &ast_str, domain, "save", 0)
+            .await
+    }
+
+    /// Get DSL content by instance ID
+    pub async fn get_dsl_content(&self, instance_id: Uuid) -> Result<Option<String>, sqlx::Error> {
+        let result = sqlx::query_as::<_, (String,)>(
+            r#"
+            SELECT dsl_content
+            FROM "ob-poc".dsl_instances
+            WHERE instance_id = $1
+            "#,
+        )
+        .bind(instance_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(result.map(|(content,)| content))
     }
 
     /// Load latest DSL for a case
@@ -215,15 +252,17 @@ impl DslRepository {
                 .await?;
 
         let version = version_result.0 as i32;
+        let instance_id = Uuid::new_v4();
 
         // Insert DSL instance
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".dsl_instances
-            (case_id, dsl_content, domain, operation_type, status, processing_time_ms, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, 'PROCESSED', $5, NOW(), NOW())
+            (instance_id, case_id, dsl_content, domain, operation_type, status, processing_time_ms, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, 'PROCESSED', $6, NOW(), NOW())
             "#
         )
+        .bind(instance_id)
         .bind(case_id)
         .bind(dsl_content)
         .bind(domain)
@@ -289,6 +328,7 @@ impl DslRepository {
             case_id: case_id.to_string(),
             version,
             success: true,
+            instance_id,
         })
     }
 }

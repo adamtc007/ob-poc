@@ -56,6 +56,9 @@ pub mod services;
 // Forth-style DSL execution engine
 pub mod forth_engine;
 
+// CBU Model DSL - specification DSL for CBU business models
+pub mod cbu_model_dsl;
+
 // Public re-exports for the clean architecture
 pub use db_state_manager::{AccumulatedState, DbStateManager, StateResult};
 pub use dsl::{
@@ -84,6 +87,11 @@ pub use error::{DSLError, ParseError};
 
 // Core AST types (EntityLabel, EdgeType for graph operations)
 pub use ast::{EdgeType, EntityLabel};
+
+// CBU Model DSL types
+#[cfg(feature = "database")]
+pub use cbu_model_dsl::CbuModelService;
+pub use cbu_model_dsl::{CbuModel, CbuModelError, CbuModelParser};
 
 // System info
 pub use system_info as get_system_info;

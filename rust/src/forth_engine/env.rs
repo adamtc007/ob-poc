@@ -2,7 +2,9 @@
 //!
 //! Provides database-backed storage for attributes and documents during DSL execution.
 
+use crate::cbu_model_dsl::ast::CbuModel;
 use crate::forth_engine::value::{AttributeId, DocumentId, Value};
+use crate::parser::ast::CrudStatement;
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
@@ -42,6 +44,15 @@ pub struct RuntimeEnv {
 
     /// Source attributes - attributes that produce data in this context
     pub source_attributes: HashSet<Uuid>,
+
+    /// CBU Model specification for validation (Phase 5)
+    pub cbu_model: Option<CbuModel>,
+
+    /// Pending CRUD statements to be executed (Phase 6)
+    pub pending_crud: Vec<CrudStatement>,
+
+    /// Current CBU state for state machine validation
+    pub cbu_state: Option<String>,
 }
 
 /// Document metadata
@@ -67,6 +78,9 @@ impl RuntimeEnv {
             case_id: None,
             sink_attributes: HashSet::new(),
             source_attributes: HashSet::new(),
+            cbu_model: None,
+            pending_crud: Vec::new(),
+            cbu_state: None,
         }
     }
 
@@ -83,6 +97,9 @@ impl RuntimeEnv {
             case_id: None,
             sink_attributes: HashSet::new(),
             source_attributes: HashSet::new(),
+            cbu_model: None,
+            pending_crud: Vec::new(),
+            cbu_state: None,
         }
     }
 
@@ -146,6 +163,84 @@ impl RuntimeEnv {
     #[cfg(not(feature = "database"))]
     pub fn has_database(&self) -> bool {
         false
+    }
+
+    /// Set the CBU Model for validation
+    pub fn set_cbu_model(&mut self, model: CbuModel) {
+        // Set initial state from model
+        self.cbu_state = Some(model.states.initial.clone());
+        self.cbu_model = Some(model);
+    }
+
+    /// Get the CBU Model
+    pub fn get_cbu_model(&self) -> Option<&CbuModel> {
+        self.cbu_model.as_ref()
+    }
+
+    /// Add a CRUD statement to pending operations
+    pub fn push_crud(&mut self, stmt: CrudStatement) {
+        self.pending_crud.push(stmt);
+    }
+
+    /// Get pending CRUD statements
+    pub fn get_pending_crud(&self) -> &[CrudStatement] {
+        &self.pending_crud
+    }
+
+    /// Take pending CRUD statements (drains the list)
+    pub fn take_pending_crud(&mut self) -> Vec<CrudStatement> {
+        std::mem::take(&mut self.pending_crud)
+    }
+
+    /// Set current CBU state
+    pub fn set_cbu_state(&mut self, state: String) {
+        self.cbu_state = Some(state);
+    }
+
+    /// Get current CBU state
+    pub fn get_cbu_state(&self) -> Option<&str> {
+        self.cbu_state.as_deref()
+    }
+
+    /// Check if a state transition is valid according to the CBU Model
+    pub fn is_valid_transition(&self, to_state: &str) -> bool {
+        match (&self.cbu_model, &self.cbu_state) {
+            (Some(model), Some(from_state)) => {
+                model.states.is_valid_transition(from_state, to_state)
+            }
+            _ => true, // No model or state = no validation
+        }
+    }
+
+    /// Get the verb required for a state transition
+    pub fn get_transition_verb(&self, to_state: &str) -> Option<String> {
+        match (&self.cbu_model, &self.cbu_state) {
+            (Some(model), Some(from_state)) => model
+                .states
+                .get_transition(from_state, to_state)
+                .map(|t| t.verb.clone()),
+            _ => None,
+        }
+    }
+
+    /// Check if all required attributes are present for a transition
+    pub fn check_transition_preconditions(&self, to_state: &str) -> Vec<String> {
+        match (&self.cbu_model, &self.cbu_state) {
+            (Some(model), Some(from_state)) => {
+                if let Some(transition) = model.states.get_transition(from_state, to_state) {
+                    let present: Vec<&str> =
+                        self.attribute_cache.keys().map(|k| k.0.as_str()).collect();
+                    transition
+                        .check_preconditions(&present)
+                        .into_iter()
+                        .map(|s| s.to_string())
+                        .collect()
+                } else {
+                    vec![]
+                }
+            }
+            _ => vec![],
+        }
     }
 
     /// Get attribute from cache (sync - for VM execution)

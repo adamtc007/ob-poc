@@ -575,4 +575,115 @@ mod tests {
         let result = execute_sheet(&sheet);
         assert!(result.is_ok());
     }
+
+    #[test]
+    fn test_cbu_create_emits_crud_statement() {
+        use crate::parser::ast::CrudStatement;
+
+        let sheet = DslSheet {
+            id: "test-crud".to_string(),
+            domain: "cbu".to_string(),
+            version: "1".to_string(),
+            content: r#"(cbu.create :cbu-name "Test Corp" :client-type "CORP" :jurisdiction "US")"#
+                .to_string(),
+        };
+
+        // Execute using internal function that returns env
+        #[cfg(feature = "database")]
+        let (_, env) = execute_sheet_internal_with_env(&sheet, None).unwrap();
+        #[cfg(not(feature = "database"))]
+        let (_, env) = execute_sheet_internal_with_env(&sheet, None).unwrap();
+
+        // Should have one pending CRUD statement
+        assert_eq!(env.pending_crud.len(), 1);
+        match &env.pending_crud[0] {
+            CrudStatement::DataCreate(create) => {
+                assert_eq!(create.asset, "CBU");
+                assert!(create.values.contains_key("cbu-name"));
+                assert!(create.values.contains_key("client-type"));
+                assert!(create.values.contains_key("jurisdiction"));
+            }
+            _ => panic!("Expected DataCreate statement"),
+        }
+    }
+
+    #[test]
+    fn test_cbu_model_state_transitions() {
+        use crate::cbu_model_dsl::CbuModelParser;
+        use crate::forth_engine::env::OnboardingRequestId;
+
+        let model_dsl = r#"
+        (cbu-model
+          :id "CBU.TEST"
+          :version "1.0"
+          (attributes
+            (group :name "core" :required [@attr("LEGAL_NAME")]))
+          (states
+            :initial "Proposed"
+            :final ["Closed"]
+            (state "Proposed" :description "Initial")
+            (state "Active" :description "Active")
+            (state "Closed" :description "Closed"))
+          (transitions
+            (-> "Proposed" "Active" :verb "cbu.approve" :preconditions [])
+            (-> "Active" "Closed" :verb "cbu.close" :preconditions []))
+          (roles
+            (role "Owner" :min 1)))
+        "#;
+
+        let model = CbuModelParser::parse_str(model_dsl).unwrap();
+
+        let mut env = RuntimeEnv::new(OnboardingRequestId("TEST".to_string()));
+        env.set_cbu_model(model);
+
+        // Initial state should be "Proposed"
+        assert_eq!(env.get_cbu_state(), Some("Proposed"));
+
+        // Valid transition: Proposed -> Active
+        assert!(env.is_valid_transition("Active"));
+
+        // Invalid transition: Proposed -> Closed (not defined)
+        assert!(!env.is_valid_transition("Closed"));
+
+        // After transitioning to Active
+        env.set_cbu_state("Active".to_string());
+        assert!(env.is_valid_transition("Closed"));
+    }
+
+    #[test]
+    fn test_multiple_cbu_operations_emit_crud() {
+        use crate::parser::ast::CrudStatement;
+
+        let sheet = DslSheet {
+            id: "test-multi-crud".to_string(),
+            domain: "cbu".to_string(),
+            version: "1".to_string(),
+            content: r#"
+                (cbu.create :cbu-name "Multi Corp" :client-type "FUND" :jurisdiction "GB")
+                (cbu.attach-entity :entity-id "ENT-001" :role "OWNER")
+                (cbu.finalize :cbu-id "CBU-001" :status "ACTIVE")
+            "#
+            .to_string(),
+        };
+
+        // Execute using internal function that returns env
+        #[cfg(feature = "database")]
+        let (_, env) = execute_sheet_internal_with_env(&sheet, None).unwrap();
+        #[cfg(not(feature = "database"))]
+        let (_, env) = execute_sheet_internal_with_env(&sheet, None).unwrap();
+
+        // Should have 3 pending CRUD statements
+        assert_eq!(env.pending_crud.len(), 3);
+
+        // First: DataCreate for CBU
+        assert!(matches!(&env.pending_crud[0], CrudStatement::DataCreate(c) if c.asset == "CBU"));
+
+        // Second: DataCreate for relationship
+        assert!(
+            matches!(&env.pending_crud[1], CrudStatement::DataCreate(c) if c.asset == "CBU_ENTITY_RELATIONSHIP")
+        );
+
+        // Third: DataUpdate for finalize
+        assert!(matches!(&env.pending_crud[2], CrudStatement::DataUpdate(u) if u.asset == "CBU"));
+    }
 }

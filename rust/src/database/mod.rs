@@ -98,6 +98,11 @@ impl DatabaseManager {
         Self::new(config).await
     }
 
+    /// Create a new database manager from an existing pool
+    pub fn from_pool(pool: PgPool) -> Self {
+        Self { pool }
+    }
+
     /// Get a reference to the connection pool
     pub fn pool(&self) -> &PgPool {
         &self.pool

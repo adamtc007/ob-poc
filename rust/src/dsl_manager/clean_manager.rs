@@ -220,7 +220,8 @@ impl CleanDslManager {
         database_service: crate::database::DictionaryDatabaseService,
     ) -> Self {
         // Create database manager from the service's pool
-        let db_manager = crate::database::DatabaseManager::new(database_service.pool().clone());
+        let db_manager =
+            crate::database::DatabaseManager::from_pool(database_service.pool().clone());
 
         Self {
             dsl_processor: DslPipelineProcessor::with_config_and_database(

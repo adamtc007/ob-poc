@@ -7,6 +7,7 @@ use crate::forth_engine::errors::VmError;
 use crate::forth_engine::value::{AttributeId, Value};
 use crate::forth_engine::vm::VM;
 use crate::forth_engine::vocab::{Vocab, WordId, WordSpec};
+use crate::parser::ast::{CrudStatement, DataCreate, DataDelete, DataRead, DataUpdate};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -206,37 +207,265 @@ fn word_set_attribute(vm: &mut VM) -> Result<(), VmError> {
     }
 }
 
-// CBU Operations (Phase 4)
+// CBU Operations (Phase 4) - Now emit CrudStatements
 fn word_cbu_create(vm: &mut VM) -> Result<(), VmError> {
-    typed_word(vm, "cbu.create", 3) // :cbu-name, :client-type, :jurisdiction
+    let pairs = collect_keyword_pairs(vm, 3)?; // :cbu-name, :client-type, :jurisdiction
+    process_pairs(vm, &pairs);
+
+    // Convert pairs to CRUD values
+    let values: HashMap<String, crate::parser::ast::Value> = pairs
+        .into_iter()
+        .map(|(k, v)| {
+            let key = k.trim_start_matches(':').to_string();
+            let val = match v {
+                Value::Str(s) => {
+                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                }
+                Value::Int(i) => crate::parser::ast::Value::Literal(
+                    crate::parser::ast::Literal::Number(i as f64),
+                ),
+                Value::Bool(b) => {
+                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::Boolean(b))
+                }
+                _ => crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(
+                    format!("{:?}", v),
+                )),
+            };
+            (key, val)
+        })
+        .collect();
+
+    // Emit CrudStatement
+    vm.env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "CBU".to_string(),
+        values,
+    }));
+
+    Ok(())
 }
 
 fn word_cbu_read(vm: &mut VM) -> Result<(), VmError> {
-    typed_word(vm, "cbu.read", 1) // :cbu-id
+    let pairs = collect_keyword_pairs(vm, 1)?; // :cbu-id
+    process_pairs(vm, &pairs);
+
+    // Convert to where clause
+    let where_clause: HashMap<String, crate::parser::ast::Value> = pairs
+        .into_iter()
+        .map(|(k, v)| {
+            let key = k.trim_start_matches(':').to_string();
+            let val = match v {
+                Value::Str(s) => {
+                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                }
+                _ => crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(
+                    format!("{:?}", v),
+                )),
+            };
+            (key, val)
+        })
+        .collect();
+
+    vm.env.push_crud(CrudStatement::DataRead(DataRead {
+        asset: "CBU".to_string(),
+        where_clause,
+        select: vec!["*".to_string()],
+        limit: Some(1),
+    }));
+
+    Ok(())
 }
 
 fn word_cbu_update(vm: &mut VM) -> Result<(), VmError> {
-    typed_word(vm, "cbu.update", 2) // :cbu-id, :status or other fields
+    let pairs = collect_keyword_pairs(vm, 2)?; // :cbu-id, :status or other fields
+    process_pairs(vm, &pairs);
+
+    // Separate cbu-id (where clause) from update values
+    let mut where_clause = HashMap::new();
+    let mut values = HashMap::new();
+
+    for (k, v) in pairs {
+        let key = k.trim_start_matches(':').to_string();
+        let val = match v {
+            Value::Str(s) => {
+                crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+            }
+            Value::Int(i) => {
+                crate::parser::ast::Value::Literal(crate::parser::ast::Literal::Number(i as f64))
+            }
+            Value::Bool(b) => {
+                crate::parser::ast::Value::Literal(crate::parser::ast::Literal::Boolean(b))
+            }
+            _ => crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(format!(
+                "{:?}",
+                v
+            ))),
+        };
+
+        if key == "cbu-id" {
+            where_clause.insert(key, val);
+        } else {
+            values.insert(key, val);
+        }
+    }
+
+    vm.env.push_crud(CrudStatement::DataUpdate(DataUpdate {
+        asset: "CBU".to_string(),
+        where_clause,
+        values,
+    }));
+
+    Ok(())
 }
 
 fn word_cbu_delete(vm: &mut VM) -> Result<(), VmError> {
-    typed_word(vm, "cbu.delete", 1) // :cbu-id
+    let pairs = collect_keyword_pairs(vm, 1)?; // :cbu-id
+    process_pairs(vm, &pairs);
+
+    let where_clause: HashMap<String, crate::parser::ast::Value> = pairs
+        .into_iter()
+        .map(|(k, v)| {
+            let key = k.trim_start_matches(':').to_string();
+            let val = match v {
+                Value::Str(s) => {
+                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                }
+                _ => crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(
+                    format!("{:?}", v),
+                )),
+            };
+            (key, val)
+        })
+        .collect();
+
+    vm.env.push_crud(CrudStatement::DataDelete(DataDelete {
+        asset: "CBU".to_string(),
+        where_clause,
+    }));
+
+    Ok(())
 }
 
 fn word_cbu_list(vm: &mut VM) -> Result<(), VmError> {
-    typed_word(vm, "cbu.list", 1) // :filter (optional)
+    let pairs = collect_keyword_pairs(vm, 1)?; // :filter (optional)
+    process_pairs(vm, &pairs);
+
+    let where_clause: HashMap<String, crate::parser::ast::Value> = pairs
+        .into_iter()
+        .map(|(k, v)| {
+            let key = k.trim_start_matches(':').to_string();
+            let val = match v {
+                Value::Str(s) => {
+                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                }
+                _ => crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(
+                    format!("{:?}", v),
+                )),
+            };
+            (key, val)
+        })
+        .collect();
+
+    vm.env.push_crud(CrudStatement::DataRead(DataRead {
+        asset: "CBU".to_string(),
+        where_clause,
+        select: vec!["*".to_string()],
+        limit: None,
+    }));
+
+    Ok(())
 }
 
 fn word_cbu_attach_entity(vm: &mut VM) -> Result<(), VmError> {
-    typed_word(vm, "cbu.attach-entity", 2) // :entity-id, :role
+    let pairs = collect_keyword_pairs(vm, 2)?; // :entity-id, :role
+    process_pairs(vm, &pairs);
+
+    // Create a relationship record
+    let values: HashMap<String, crate::parser::ast::Value> = pairs
+        .into_iter()
+        .map(|(k, v)| {
+            let key = k.trim_start_matches(':').to_string();
+            let val = match v {
+                Value::Str(s) => {
+                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                }
+                _ => crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(
+                    format!("{:?}", v),
+                )),
+            };
+            (key, val)
+        })
+        .collect();
+
+    vm.env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "CBU_ENTITY_RELATIONSHIP".to_string(),
+        values,
+    }));
+
+    Ok(())
 }
 
 fn word_cbu_attach_proper_person(vm: &mut VM) -> Result<(), VmError> {
-    typed_word(vm, "cbu.attach-proper-person", 2) // :person-name, :role
+    let pairs = collect_keyword_pairs(vm, 2)?; // :person-name, :role
+    process_pairs(vm, &pairs);
+
+    let values: HashMap<String, crate::parser::ast::Value> = pairs
+        .into_iter()
+        .map(|(k, v)| {
+            let key = k.trim_start_matches(':').to_string();
+            let val = match v {
+                Value::Str(s) => {
+                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                }
+                _ => crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(
+                    format!("{:?}", v),
+                )),
+            };
+            (key, val)
+        })
+        .collect();
+
+    vm.env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "CBU_PROPER_PERSON".to_string(),
+        values,
+    }));
+
+    Ok(())
 }
 
 fn word_cbu_finalize(vm: &mut VM) -> Result<(), VmError> {
-    typed_word(vm, "cbu.finalize", 2) // :cbu-id, :status
+    let pairs = collect_keyword_pairs(vm, 2)?; // :cbu-id, :status
+    process_pairs(vm, &pairs);
+
+    // Separate cbu-id from status
+    let mut where_clause = HashMap::new();
+    let mut values = HashMap::new();
+
+    for (k, v) in pairs {
+        let key = k.trim_start_matches(':').to_string();
+        let val = match v {
+            Value::Str(s) => {
+                crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+            }
+            _ => crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(format!(
+                "{:?}",
+                v
+            ))),
+        };
+
+        if key == "cbu-id" {
+            where_clause.insert(key, val);
+        } else {
+            values.insert(key, val);
+        }
+    }
+
+    vm.env.push_crud(CrudStatement::DataUpdate(DataUpdate {
+        asset: "CBU".to_string(),
+        where_clause,
+        values,
+    }));
+
+    Ok(())
 }
 
 // CRUD Operations (Phase 5)
