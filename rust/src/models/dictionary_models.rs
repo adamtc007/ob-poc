@@ -99,13 +99,9 @@ pub struct DiscoveredAttribute {
     pub match_reason: String,
 }
 
-/// Types of operations supported for attributes
 // AttributeOperationType moved to dsl_types crate - import from there
-
 // FromStr implementation for AttributeOperationType moved to dsl_types crate
-
-// AttributeAssetType moved to dsl_types crate - import from there
-// All implementations moved with the type
+// AttributeAssetType moved to dsl_types crate - import from there (all implementations moved with the type)
 
 /// Request for creating attributes via agentic CRUD
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -197,6 +193,7 @@ pub struct DictionaryAttributeWithMetadata {
 }
 
 /// Batch operation request for attributes
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AttributeBatchRequest {
     pub operation_type: AttributeOperationType,
@@ -205,6 +202,7 @@ pub(crate) struct AttributeBatchRequest {
 }
 
 /// Batch operation result for attributes
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AttributeBatchResult {
     pub transaction_id: Uuid,
@@ -216,6 +214,7 @@ pub(crate) struct AttributeBatchResult {
 }
 
 /// Individual batch item result
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AttributeBatchItemResult {
     pub index: i32,

@@ -59,6 +59,10 @@ pub mod forth_engine;
 // CBU Model DSL - specification DSL for CBU business models
 pub mod cbu_model_dsl;
 
+// CBU CRUD Template - template generation and instantiation
+#[cfg(feature = "database")]
+pub mod cbu_crud_template;
+
 // Public re-exports for the clean architecture
 pub use db_state_manager::{AccumulatedState, DbStateManager, StateResult};
 pub use dsl::{
@@ -92,6 +96,10 @@ pub use ast::{EdgeType, EntityLabel};
 #[cfg(feature = "database")]
 pub use cbu_model_dsl::CbuModelService;
 pub use cbu_model_dsl::{CbuModel, CbuModelError, CbuModelParser};
+
+// CBU CRUD Template types
+#[cfg(feature = "database")]
+pub use cbu_crud_template::{CbuCrudTemplate, CbuCrudTemplateService, DslDocSource};
 
 // System info
 pub use system_info as get_system_info;

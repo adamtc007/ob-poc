@@ -287,4 +287,93 @@ impl CrudService {
 
         Ok(result)
     }
+
+    /// Log a CBU CRUD operation with full document-directed traceability
+    ///
+    /// Per Phase 7 of the plan, this logs:
+    /// - Associated DSL CRUD document id
+    /// - Associated CBU id
+    /// - Attribute chunks touched
+    /// - State transitions
+    pub async fn log_cbu_crud_operation(
+        &self,
+        operation_type: OperationType,
+        cbu_id: Uuid,
+        dsl_crud_doc_id: Option<Uuid>,
+        model_id: Option<&str>,
+        chunks: &[String],
+        state_transition: Option<(&str, &str)>, // (from_state, to_state)
+        generated_dsl: Option<&str>,
+        affected_records: Option<JsonValue>,
+    ) -> Result<Uuid> {
+        let operation_id = Uuid::new_v4();
+
+        // Build metadata JSON with full traceability
+        let metadata = serde_json::json!({
+            "cbu_id": cbu_id.to_string(),
+            "dsl_crud_doc_id": dsl_crud_doc_id.map(|id| id.to_string()),
+            "model_id": model_id,
+            "chunks": chunks,
+            "state_transition": state_transition.map(|(from, to)| {
+                serde_json::json!({
+                    "from": from,
+                    "to": to
+                })
+            }),
+        });
+
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".crud_operations (
+                operation_id, operation_type, asset_type, entity_table_name,
+                generated_dsl, ai_instruction, affected_records,
+                execution_status, created_at
+            )
+            VALUES ($1, $2, 'CBU', 'cbus', $3, $4, $5, 'COMPLETED', NOW())
+            "#,
+        )
+        .bind(operation_id)
+        .bind(operation_type.to_string())
+        .bind(generated_dsl)
+        .bind(serde_json::to_string(&metadata).ok())
+        .bind(affected_records)
+        .execute(&self.pool)
+        .await
+        .context("Failed to log CBU CRUD operation")?;
+
+        info!(
+            "Logged CBU {} operation {} for CBU {} (chunks: {:?}, doc: {:?})",
+            operation_type, operation_id, cbu_id, chunks, dsl_crud_doc_id
+        );
+
+        Ok(operation_id)
+    }
+
+    /// Get CRUD operations for a specific CBU
+    pub async fn get_operations_for_cbu(
+        &self,
+        cbu_id: Uuid,
+        limit: Option<i32>,
+    ) -> Result<Vec<CrudOperation>> {
+        let results = sqlx::query_as::<_, CrudOperation>(
+            r#"
+            SELECT operation_id, operation_type, asset_type, entity_table_name,
+                   generated_dsl, ai_instruction, affected_records,
+                   affected_sinks, contributing_sources,
+                   execution_status, ai_confidence, ai_provider, ai_model, created_at
+            FROM "ob-poc".crud_operations
+            WHERE asset_type = 'CBU'
+            AND ai_instruction LIKE '%' || $1 || '%'
+            ORDER BY created_at DESC
+            LIMIT $2
+            "#,
+        )
+        .bind(cbu_id.to_string())
+        .bind(limit.unwrap_or(100))
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to get CRUD operations for CBU")?;
+
+        Ok(results)
+    }
 }

@@ -134,6 +134,46 @@ impl CbuStateMachine {
     pub fn transitions_for_verb(&self, verb: &str) -> Vec<&CbuTransition> {
         self.transitions.iter().filter(|t| t.verb == verb).collect()
     }
+
+    /// Find a single transition by verb (returns first match)
+    pub fn find_transition_by_verb(&self, verb: &str) -> Option<&CbuTransition> {
+        self.transitions.iter().find(|t| t.verb == verb)
+    }
+}
+
+impl CbuModel {
+    /// Get a chunk (attribute group) by name
+    pub fn get_chunk(&self, name: &str) -> Option<&CbuAttributeGroup> {
+        self.attributes.get_group(name)
+    }
+
+    /// Find transition by verb
+    pub fn find_transition_by_verb(&self, verb: &str) -> Option<&CbuTransition> {
+        self.states.find_transition_by_verb(verb)
+    }
+
+    /// Get all attributes required for a set of chunks
+    pub fn get_chunk_attributes(&self, chunk_names: &[String]) -> Vec<&str> {
+        let mut attrs = Vec::new();
+        for name in chunk_names {
+            if let Some(chunk) = self.get_chunk(name) {
+                attrs.extend(chunk.required.iter().map(|s| s.as_str()));
+                attrs.extend(chunk.optional.iter().map(|s| s.as_str()));
+            }
+        }
+        attrs
+    }
+
+    /// Get all required attributes for a set of chunks
+    pub fn get_chunk_required_attributes(&self, chunk_names: &[String]) -> Vec<&str> {
+        let mut attrs = Vec::new();
+        for name in chunk_names {
+            if let Some(chunk) = self.get_chunk(name) {
+                attrs.extend(chunk.required.iter().map(|s| s.as_str()));
+            }
+        }
+        attrs
+    }
 }
 
 /// A single state in the CBU lifecycle
@@ -154,6 +194,8 @@ pub struct CbuTransition {
     pub to: String,
     /// Verb that triggers this transition (e.g., "cbu.submit")
     pub verb: String,
+    /// Attribute chunks that must be complete for this transition (e.g., ["core", "contact"])
+    pub chunks: Vec<String>,
     /// Attribute IDs that must be present for this transition
     pub preconditions: Vec<String>,
 }
@@ -183,12 +225,12 @@ pub struct CbuRoleSpec {
 impl CbuRoleSpec {
     /// Check if a count satisfies this role's constraints
     pub fn is_satisfied(&self, count: u32) -> bool {
-        count >= self.min && self.max.map_or(true, |max| count <= max)
+        count >= self.min && self.max.is_none_or(|max| count <= max)
     }
 
     /// Check if more entities can be added with this role
     pub fn can_add(&self, current_count: u32) -> bool {
-        self.max.map_or(true, |max| current_count < max)
+        self.max.is_none_or(|max| current_count < max)
     }
 }
 
@@ -244,12 +286,14 @@ mod tests {
                     from: "Proposed".to_string(),
                     to: "Active".to_string(),
                     verb: "cbu.approve".to_string(),
+                    chunks: vec!["core".to_string()],
                     preconditions: vec!["ATTR1".to_string()],
                 },
                 CbuTransition {
                     from: "Active".to_string(),
                     to: "Closed".to_string(),
                     verb: "cbu.close".to_string(),
+                    chunks: vec![],
                     preconditions: vec![],
                 },
             ],
@@ -267,6 +311,7 @@ mod tests {
             from: "A".to_string(),
             to: "B".to_string(),
             verb: "test".to_string(),
+            chunks: vec!["core".to_string()],
             preconditions: vec![
                 "ATTR1".to_string(),
                 "ATTR2".to_string(),

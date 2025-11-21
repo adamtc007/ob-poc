@@ -47,8 +47,9 @@ state_description = ":description" , string ;
 transitions_section = "(" , "transitions" , { transition_def } , ")" ;
 
 transition_def = "(" , "->" , string , string ,
-                 ":verb" , string , [ preconditions ] , ")" ;
+                 ":verb" , string , [ chunks ] , [ preconditions ] , ")" ;
 
+chunks = ":chunks" , string_list ;
 preconditions = ":preconditions" , attr_ref_list ;
 
 (* Roles section - entity role requirements *)
@@ -107,10 +108,12 @@ pub const CBU_MODEL_EXAMPLE: &str = r#"
   (transitions
     (-> "Proposed" "PendingKYC"
         :verb "cbu.submit"
+        :chunks ["core", "contact"]
         :preconditions [@attr("CBU.LEGAL_NAME"), @attr("CBU.JURISDICTION")])
 
     (-> "PendingKYC" "PendingApproval"
         :verb "kyc.complete"
+        :chunks ["ubo"]
         :preconditions [@attr("KYC.VERIFICATION_STATUS")])
 
     (-> "PendingApproval" "Active"

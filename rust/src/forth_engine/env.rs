@@ -48,11 +48,20 @@ pub struct RuntimeEnv {
     /// CBU Model specification for validation (Phase 5)
     pub cbu_model: Option<CbuModel>,
 
+    /// CBU Model ID for tracking which model is in use
+    pub cbu_model_id: Option<String>,
+
     /// Pending CRUD statements to be executed (Phase 6)
     pub pending_crud: Vec<CrudStatement>,
 
     /// Current CBU state for state machine validation
     pub cbu_state: Option<String>,
+
+    /// Current transition verb being executed
+    pub current_transition_verb: Option<String>,
+
+    /// Current chunks being processed
+    pub current_chunks: Vec<String>,
 }
 
 /// Document metadata
@@ -79,8 +88,11 @@ impl RuntimeEnv {
             sink_attributes: HashSet::new(),
             source_attributes: HashSet::new(),
             cbu_model: None,
+            cbu_model_id: None,
             pending_crud: Vec::new(),
             cbu_state: None,
+            current_transition_verb: None,
+            current_chunks: Vec::new(),
         }
     }
 
@@ -98,8 +110,11 @@ impl RuntimeEnv {
             sink_attributes: HashSet::new(),
             source_attributes: HashSet::new(),
             cbu_model: None,
+            cbu_model_id: None,
             pending_crud: Vec::new(),
             cbu_state: None,
+            current_transition_verb: None,
+            current_chunks: Vec::new(),
         }
     }
 
@@ -169,7 +184,35 @@ impl RuntimeEnv {
     pub fn set_cbu_model(&mut self, model: CbuModel) {
         // Set initial state from model
         self.cbu_state = Some(model.states.initial.clone());
+        self.cbu_model_id = Some(model.id.clone());
         self.cbu_model = Some(model);
+    }
+
+    /// Get the CBU Model ID
+    pub fn get_cbu_model_id(&self) -> Option<&str> {
+        self.cbu_model_id.as_deref()
+    }
+
+    /// Set the current transition verb being executed
+    pub fn set_current_transition(&mut self, verb: &str) {
+        self.current_transition_verb = Some(verb.to_string());
+
+        // Look up chunks for this transition from the model
+        if let Some(model) = &self.cbu_model {
+            if let Some(transition) = model.find_transition_by_verb(verb) {
+                self.current_chunks = transition.chunks.clone();
+            }
+        }
+    }
+
+    /// Get the current transition verb
+    pub fn get_current_transition(&self) -> Option<&str> {
+        self.current_transition_verb.as_deref()
+    }
+
+    /// Get the current chunks being processed
+    pub fn get_current_chunks(&self) -> &[String] {
+        &self.current_chunks
     }
 
     /// Get the CBU Model

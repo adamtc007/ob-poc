@@ -7,7 +7,7 @@ use crate::cbu_model_dsl::ast::{
     CbuTransition,
 };
 use nom::{
-    bytes::complete::{tag, take_until, take_while1},
+    bytes::complete::{tag, take_until},
     character::complete::{char, digit1, multispace0},
     combinator::{map, map_res, opt, value},
     multi::{many0, separated_list0},
@@ -199,6 +199,7 @@ fn parse_transition_def(input: &str) -> IResult<&str, CbuTransition> {
     let (input, _) = ws(input)?;
     let (input, to) = quoted_string(input)?;
     let (input, verb) = kv_string(":verb")(input)?;
+    let (input, chunks) = opt(kv_string_list(":chunks"))(input)?;
     let (input, preconditions) = opt(kv_attr_list(":preconditions"))(input)?;
     let (input, _) = tuple((ws, char(')')))(input)?;
 
@@ -208,6 +209,7 @@ fn parse_transition_def(input: &str) -> IResult<&str, CbuTransition> {
             from,
             to,
             verb,
+            chunks: chunks.unwrap_or_default(),
             preconditions: preconditions.unwrap_or_default(),
         },
     ))
@@ -333,12 +335,25 @@ mod tests {
 
     #[test]
     fn test_parse_transition_def() {
+        let input = r#"(-> "Proposed" "Active" :verb "cbu.approve" :chunks ["core", "contact"] :preconditions [@attr("ATTR1")])"#;
+        let (remaining, trans) = parse_transition_def(input).unwrap();
+        assert_eq!(trans.from, "Proposed");
+        assert_eq!(trans.to, "Active");
+        assert_eq!(trans.verb, "cbu.approve");
+        assert_eq!(trans.chunks, vec!["core", "contact"]);
+        assert_eq!(trans.preconditions, vec!["ATTR1"]);
+        assert_eq!(remaining, "");
+    }
+
+    #[test]
+    fn test_parse_transition_def_no_chunks() {
         let input =
             r#"(-> "Proposed" "Active" :verb "cbu.approve" :preconditions [@attr("ATTR1")])"#;
         let (remaining, trans) = parse_transition_def(input).unwrap();
         assert_eq!(trans.from, "Proposed");
         assert_eq!(trans.to, "Active");
         assert_eq!(trans.verb, "cbu.approve");
+        assert_eq!(trans.chunks, Vec::<String>::new());
         assert_eq!(trans.preconditions, vec!["ATTR1"]);
         assert_eq!(remaining, "");
     }
@@ -371,7 +386,7 @@ mod tests {
             (state "Closed" :description "Final state"))
 
           (transitions
-            (-> "Proposed" "Closed" :verb "cbu.close" :preconditions []))
+            (-> "Proposed" "Closed" :verb "cbu.close" :chunks ["core"] :preconditions []))
 
           (roles
             (role "Owner" :min 1)))
@@ -383,6 +398,7 @@ mod tests {
         assert_eq!(model.attributes.groups.len(), 1);
         assert_eq!(model.states.states.len(), 2);
         assert_eq!(model.states.transitions.len(), 1);
+        assert_eq!(model.states.transitions[0].chunks, vec!["core"]);
         assert_eq!(model.roles.len(), 1);
     }
 

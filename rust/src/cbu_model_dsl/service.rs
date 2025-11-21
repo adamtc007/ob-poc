@@ -323,7 +323,7 @@ impl CbuModelService {
             "#,
         )
         .bind(doc_id)
-        .bind(&format!("{} v{}", model.id, model.version))
+        .bind(format!("{} v{}", model.id, model.version))
         .bind(serde_json::json!({
             "model_id": model.id,
             "version": model.version,

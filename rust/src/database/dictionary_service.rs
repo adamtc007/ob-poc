@@ -5,15 +5,13 @@
 
 use crate::models::dictionary_models::{
     AttributeSearchCriteria, AttributeValidationRequest, AttributeValidationResult,
-    DictionaryAttribute, DictionaryAttributeWithMetadata, DictionaryHealthCheck,
+    DictionaryAttribute, DictionaryHealthCheck,
     DictionaryStatistics, DiscoveredAttribute, NewDictionaryAttribute, UpdateDictionaryAttribute,
 };
-use anyhow::{anyhow, Context, Result};
-use async_trait::async_trait;
-use serde_json::Value as JsonValue;
+use anyhow::{Context, Result};
 use sqlx::{PgPool, Row};
 use std::collections::HashMap;
-use tracing::{debug, error, info, warn};
+use tracing::{info, warn};
 use uuid::Uuid;
 
 /// Database service for dictionary operations
@@ -37,11 +35,11 @@ impl DictionaryDatabaseService {
     pub fn new_mock() -> Self {
         // This creates a mock service that will fail on actual database operations
         // but is useful for type checking and basic initialization
-        use std::str::FromStr;
+        
         let mock_url = "postgresql://mock:mock@localhost/mock";
         let pool = sqlx::postgres::PgPoolOptions::new()
             .max_connections(1)
-            .connect_lazy(&mock_url)
+            .connect_lazy(mock_url)
             .expect("Mock pool creation failed");
 
         Self { pool }
@@ -451,7 +449,7 @@ impl DictionaryDatabaseService {
                 let relevance_score = 1.0 - (index as f64 * 0.1); // Simple scoring
                 let match_reason = if attr.name.to_lowercase().contains(&query.to_lowercase()) {
                     "Name match".to_string()
-                } else if attr.long_description.as_ref().map_or(false, |desc| {
+                } else if attr.long_description.as_ref().is_some_and(|desc| {
                     desc.to_lowercase().contains(&query.to_lowercase())
                 }) {
                     "Description match".to_string()

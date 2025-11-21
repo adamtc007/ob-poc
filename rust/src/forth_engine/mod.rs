@@ -7,6 +7,8 @@ use crate::forth_engine::vm::VM;
 use std::sync::Arc;
 
 #[cfg(feature = "database")]
+use crate::cbu_model_dsl::CbuModelService;
+#[cfg(feature = "database")]
 use crate::database::{CrudExecutor, DslRepository};
 #[cfg(feature = "database")]
 use sqlx::PgPool;
@@ -63,14 +65,38 @@ pub async fn execute_sheet_with_db(
     // Execute the DSL synchronously (parse + compile + run)
     let (mut result, mut env) = execute_sheet_internal_with_env(sheet, Some(pool.clone()))?;
 
-    let parse_time_ms = start_time.elapsed().as_millis() as u64;
+    // Load CBU Model for validation if this is a CBU-related operation
+    if sheet.domain == "cbu" || sheet.content.contains("cbu.") {
+        let model_service = CbuModelService::new(pool.clone());
 
-    // Execute pending CRUD statements against database
+        // Try to load the generic CBU model for validation
+        match model_service.load_model_by_id("CBU.GENERIC").await {
+            Ok(Some(model)) => {
+                tracing::debug!("Loaded CBU.GENERIC model for execution context");
+                env.set_cbu_model(model);
+            }
+            Ok(None) => {
+                tracing::debug!("No CBU.GENERIC model found, proceeding without model validation");
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to load CBU model: {}, proceeding without validation",
+                    e
+                );
+            }
+        }
+    }
+
+    let _parse_time_ms = start_time.elapsed().as_millis() as u64;
+
+    // Execute pending CRUD statements against database with model validation
     let pending_crud = env.take_pending_crud();
     if !pending_crud.is_empty() {
         let executor = CrudExecutor::new(pool.clone());
+
+        // Execute with environment for state validation
         let crud_results = executor
-            .execute_all(&pending_crud)
+            .execute_all_with_env(&pending_crud, &mut env)
             .await
             .map_err(|e| EngineError::Database(format!("CRUD execution failed: {}", e)))?;
 
@@ -134,7 +160,7 @@ pub async fn execute_sheet_with_db(
         .to_string();
 
         // Extract client name and type for CBU
-        let client_name = env
+        let _client_name = env
             .attribute_cache
             .iter()
             .find(|(k, _)| k.0.contains("client-name"))
@@ -144,7 +170,7 @@ pub async fn execute_sheet_with_db(
             })
             .unwrap_or_else(|| case_id.to_string());
 
-        let case_type = env
+        let _case_type = env
             .attribute_cache
             .iter()
             .find(|(k, _)| k.0.contains("case-type"))
@@ -154,36 +180,22 @@ pub async fn execute_sheet_with_db(
             })
             .unwrap_or_else(|| "ONBOARDING".to_string());
 
-        // Build attributes map for transactional save
-        let mut attributes = std::collections::HashMap::new();
-        for (attr_id, value) in &env.attribute_cache {
-            let (value_text, value_type) = match value {
-                Value::Str(s) => (s.clone(), "STRING".to_string()),
-                Value::Int(i) => (i.to_string(), "INTEGER".to_string()),
-                Value::Bool(b) => (b.to_string(), "BOOLEAN".to_string()),
-                Value::Keyword(k) => (k.clone(), "KEYWORD".to_string()),
-                _ => continue,
-            };
-            attributes.insert(attr_id.0.clone(), (value_text, value_type));
-        }
-
-        // Use DslRepository for fully transactional save
-        // All operations (DSL, AST, CBU, attributes) are atomic
+        // Save DSL instance and version via DslRepository
+        // Note: Attributes are now handled by CrudExecutor via AttributeValuesService
         let repo = DslRepository::new(pool.clone());
+        let ast_value: serde_json::Value = serde_json::from_str(&ast_json)
+            .unwrap_or_else(|_| serde_json::json!({"raw": ast_json}));
+
         let save_result = repo
-            .save_execution_transactionally(
-                case_id,
-                &sheet.content,
-                &ast_json,
-                domain,
-                operation_type,
-                parse_time_ms as i64,
-                &client_name,
-                &case_type,
-                &attributes,
+            .save_dsl_instance(
+                case_id,          // business_reference
+                domain,           // domain_name
+                &sheet.content,   // dsl_content
+                Some(&ast_value), // ast_json
+                operation_type,   // operation_type
             )
             .await
-            .map_err(|e| EngineError::Database(format!("Failed to save execution: {}", e)))?;
+            .map_err(|e| EngineError::Database(format!("Failed to save DSL instance: {}", e)))?;
 
         // Set version in result
         result.version = save_result.version;
