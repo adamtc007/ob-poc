@@ -226,10 +226,6 @@ impl DbStateManager {
         // Sync to DSL and AST tables - critical sync points
         let _sync_result = self.sync_to_tables(&stored_state, dsl_result).await;
 
-        if !sync_result {
-            eprintln!("⚠️  Warning: Failed to sync state to database tables");
-        }
-
         if persist_result {
             StateResult {
                 success: true,

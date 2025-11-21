@@ -10,7 +10,6 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use uuid::Uuid;
 
 // Import types from dsl_types crate (Level 1 foundation)
 pub use dsl_types::{RollbackStrategy, TransactionMode};

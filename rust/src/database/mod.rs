@@ -8,10 +8,6 @@
 //! have been removed. The Forth engine now handles database operations through
 //! RuntimeEnv with direct SQL queries matching the demo_setup.sql schema.
 
-// Allow unused code - many repository methods are not yet used by the agentic system
-#![allow(dead_code)]
-#![allow(unused_imports)]
-
 use sqlx::Row;
 use sqlx::{postgres::PgPoolOptions, PgPool};
 use std::time::Duration;

@@ -30,10 +30,6 @@ pub mod parser;
 pub mod data_dictionary;
 pub mod vocabulary;
 
-// Macro system for reducing boilerplate
-#[macro_use]
-pub mod macros;
-
 // Domain handlers for business logic
 pub mod domains;
 
@@ -46,10 +42,6 @@ pub mod domains;
 pub mod database;
 #[cfg(feature = "database")]
 pub mod models;
-
-// Taxonomy system for Product-Service-Resource management
-#[cfg(feature = "database")]
-pub mod taxonomy;
 
 // Refactored call chain components
 pub mod db_state_manager;

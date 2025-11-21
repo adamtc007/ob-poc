@@ -43,7 +43,7 @@ pub struct DslPipelineProcessor {
     metrics: ProcessingMetrics,
     /// Database service for actual database operations
     #[cfg(feature = "database")]
-    database_service: Option<crate::database::DslDomainRepository>,
+    database_service: Option<crate::database::DictionaryDatabaseService>,
     /// Phase 5: Orchestration metrics for performance monitoring
     orchestration_metrics:
         std::sync::Arc<std::sync::Mutex<crate::dsl::orchestration_interface::OrchestrationMetrics>>,
@@ -551,7 +551,7 @@ impl DslPipelineProcessor {
 
     /// Create a new DSL Pipeline Processor with database connectivity
     #[cfg(feature = "database")]
-    pub fn with_database(database_service: crate::database::DslDomainRepository) -> Self {
+    pub fn with_database(database_service: crate::database::DictionaryDatabaseService) -> Self {
         Self {
             config: PipelineConfig::default(),
             step_processors: StepProcessors {
@@ -591,7 +591,7 @@ impl DslPipelineProcessor {
     #[cfg(feature = "database")]
     pub fn with_config_and_database(
         config: PipelineConfig,
-        database_service: crate::database::DslDomainRepository,
+        database_service: crate::database::DictionaryDatabaseService,
     ) -> Self {
         Self {
             config,
@@ -982,7 +982,7 @@ impl DslPipelineProcessor {
 
     /// Get a reference to the database service if available
     #[cfg(feature = "database")]
-    pub fn database_service(&self) -> Option<&crate::database::DslDomainRepository> {
+    pub fn database_service(&self) -> Option<&crate::database::DictionaryDatabaseService> {
         self.database_service.as_ref()
     }
 
