@@ -170,14 +170,12 @@ fn word_document_link(vm: &mut VM) -> Result<(), VmError> {
 
 // Low-level attribute operations (from original kyc_vocab)
 fn word_require_attribute(vm: &mut VM) -> Result<(), VmError> {
-    println!("[word] Executing 'require-attribute'");
     let attr_val = vm.data_stack.pop_back().ok_or(VmError::StackUnderflow {
         expected: 1,
         found: 0,
     })?;
 
-    if let Value::Attr(attr_id) = attr_val {
-        println!("[word] Checking for attribute: {}", attr_id.0);
+    if let Value::Attr(_attr_id) = attr_val {
         Ok(())
     } else {
         Err(VmError::TypeError {
@@ -188,7 +186,6 @@ fn word_require_attribute(vm: &mut VM) -> Result<(), VmError> {
 }
 
 fn word_set_attribute(vm: &mut VM) -> Result<(), VmError> {
-    println!("[word] Executing 'set-attribute'");
     let value = vm.data_stack.pop_back().ok_or(VmError::StackUnderflow {
         expected: 2,
         found: 1,
@@ -199,7 +196,7 @@ fn word_set_attribute(vm: &mut VM) -> Result<(), VmError> {
     })?;
 
     if let Value::Attr(id) = attr_val {
-        println!("[word] Setting attribute '{}' to '{}'", id.0, value);
+        vm.env.set_attribute(id, value);
         Ok(())
     } else {
         Err(VmError::TypeError {
@@ -207,6 +204,74 @@ fn word_set_attribute(vm: &mut VM) -> Result<(), VmError> {
             found: format!("{:?}", attr_val),
         })
     }
+}
+
+// CBU Operations (Phase 4)
+fn word_cbu_create(vm: &mut VM) -> Result<(), VmError> {
+    typed_word(vm, "cbu.create", 3) // :cbu-name, :client-type, :jurisdiction
+}
+
+fn word_cbu_read(vm: &mut VM) -> Result<(), VmError> {
+    typed_word(vm, "cbu.read", 1) // :cbu-id
+}
+
+fn word_cbu_update(vm: &mut VM) -> Result<(), VmError> {
+    typed_word(vm, "cbu.update", 2) // :cbu-id, :status or other fields
+}
+
+fn word_cbu_delete(vm: &mut VM) -> Result<(), VmError> {
+    typed_word(vm, "cbu.delete", 1) // :cbu-id
+}
+
+fn word_cbu_list(vm: &mut VM) -> Result<(), VmError> {
+    typed_word(vm, "cbu.list", 1) // :filter (optional)
+}
+
+fn word_cbu_attach_entity(vm: &mut VM) -> Result<(), VmError> {
+    typed_word(vm, "cbu.attach-entity", 2) // :entity-id, :role
+}
+
+fn word_cbu_attach_proper_person(vm: &mut VM) -> Result<(), VmError> {
+    typed_word(vm, "cbu.attach-proper-person", 2) // :person-name, :role
+}
+
+fn word_cbu_finalize(vm: &mut VM) -> Result<(), VmError> {
+    typed_word(vm, "cbu.finalize", 2) // :cbu-id, :status
+}
+
+// CRUD Operations (Phase 5)
+fn word_crud_begin(vm: &mut VM) -> Result<(), VmError> {
+    typed_word(vm, "crud.begin", 2) // :operation-type, :asset-type
+}
+
+fn word_crud_commit(vm: &mut VM) -> Result<(), VmError> {
+    typed_word(vm, "crud.commit", 3) // :entity-table, :ai-instruction, :ai-provider
+}
+
+// Attribute Operations (Phase 2)
+fn word_attr_require(vm: &mut VM) -> Result<(), VmError> {
+    typed_word(vm, "attr.require", 1) // @attr reference
+}
+
+fn word_attr_set(vm: &mut VM) -> Result<(), VmError> {
+    typed_word(vm, "attr.set", 2) // @attr reference, value
+}
+
+fn word_attr_validate(vm: &mut VM) -> Result<(), VmError> {
+    typed_word(vm, "attr.validate", 2) // @attr reference, value
+}
+
+// Document Operations (Phase 3) - extended
+fn word_document_link_to_cbu(vm: &mut VM) -> Result<(), VmError> {
+    typed_word(vm, "document.link-to-cbu", 3) // :cbu-id, :document-id, :relationship-type
+}
+
+fn word_document_extract_attributes(vm: &mut VM) -> Result<(), VmError> {
+    typed_word(vm, "document.extract-attributes", 2) // :document-id, :document-type
+}
+
+fn word_document_require(vm: &mut VM) -> Result<(), VmError> {
+    typed_word(vm, "document.require", 1) // @doc reference
 }
 
 /// Constructs the complete DSL Vocabulary with all domain verbs.
@@ -435,6 +500,122 @@ pub fn kyc_orch_vocab() -> Vocab {
             domain: "core".to_string(),
             stack_effect: (2, 0),
             impl_fn: Arc::new(word_set_attribute),
+        },
+        // CBU Operations (Phase 4)
+        WordSpec {
+            id: WordId(31),
+            name: "cbu.create".to_string(),
+            domain: "cbu".to_string(),
+            stack_effect: (6, 0), // 3 pairs
+            impl_fn: Arc::new(word_cbu_create),
+        },
+        WordSpec {
+            id: WordId(32),
+            name: "cbu.read".to_string(),
+            domain: "cbu".to_string(),
+            stack_effect: (2, 0), // 1 pair
+            impl_fn: Arc::new(word_cbu_read),
+        },
+        WordSpec {
+            id: WordId(33),
+            name: "cbu.update".to_string(),
+            domain: "cbu".to_string(),
+            stack_effect: (4, 0), // 2 pairs
+            impl_fn: Arc::new(word_cbu_update),
+        },
+        WordSpec {
+            id: WordId(34),
+            name: "cbu.delete".to_string(),
+            domain: "cbu".to_string(),
+            stack_effect: (2, 0), // 1 pair
+            impl_fn: Arc::new(word_cbu_delete),
+        },
+        WordSpec {
+            id: WordId(35),
+            name: "cbu.list".to_string(),
+            domain: "cbu".to_string(),
+            stack_effect: (2, 0), // 1 pair
+            impl_fn: Arc::new(word_cbu_list),
+        },
+        WordSpec {
+            id: WordId(36),
+            name: "cbu.attach-entity".to_string(),
+            domain: "cbu".to_string(),
+            stack_effect: (4, 0), // 2 pairs
+            impl_fn: Arc::new(word_cbu_attach_entity),
+        },
+        WordSpec {
+            id: WordId(37),
+            name: "cbu.attach-proper-person".to_string(),
+            domain: "cbu".to_string(),
+            stack_effect: (4, 0), // 2 pairs
+            impl_fn: Arc::new(word_cbu_attach_proper_person),
+        },
+        WordSpec {
+            id: WordId(38),
+            name: "cbu.finalize".to_string(),
+            domain: "cbu".to_string(),
+            stack_effect: (4, 0), // 2 pairs
+            impl_fn: Arc::new(word_cbu_finalize),
+        },
+        // CRUD Operations (Phase 5)
+        WordSpec {
+            id: WordId(39),
+            name: "crud.begin".to_string(),
+            domain: "crud".to_string(),
+            stack_effect: (4, 0), // 2 pairs
+            impl_fn: Arc::new(word_crud_begin),
+        },
+        WordSpec {
+            id: WordId(40),
+            name: "crud.commit".to_string(),
+            domain: "crud".to_string(),
+            stack_effect: (6, 0), // 3 pairs
+            impl_fn: Arc::new(word_crud_commit),
+        },
+        // Attribute Operations (Phase 2)
+        WordSpec {
+            id: WordId(41),
+            name: "attr.require".to_string(),
+            domain: "attr".to_string(),
+            stack_effect: (2, 0), // 1 pair
+            impl_fn: Arc::new(word_attr_require),
+        },
+        WordSpec {
+            id: WordId(42),
+            name: "attr.set".to_string(),
+            domain: "attr".to_string(),
+            stack_effect: (4, 0), // 2 pairs
+            impl_fn: Arc::new(word_attr_set),
+        },
+        WordSpec {
+            id: WordId(43),
+            name: "attr.validate".to_string(),
+            domain: "attr".to_string(),
+            stack_effect: (4, 0), // 2 pairs
+            impl_fn: Arc::new(word_attr_validate),
+        },
+        // Document Operations (Phase 3) - extended
+        WordSpec {
+            id: WordId(44),
+            name: "document.link-to-cbu".to_string(),
+            domain: "document".to_string(),
+            stack_effect: (6, 0), // 3 pairs
+            impl_fn: Arc::new(word_document_link_to_cbu),
+        },
+        WordSpec {
+            id: WordId(45),
+            name: "document.extract-attributes".to_string(),
+            domain: "document".to_string(),
+            stack_effect: (4, 0), // 2 pairs
+            impl_fn: Arc::new(word_document_extract_attributes),
+        },
+        WordSpec {
+            id: WordId(46),
+            name: "document.require".to_string(),
+            domain: "document".to_string(),
+            stack_effect: (2, 0), // 1 pair
+            impl_fn: Arc::new(word_document_require),
         },
     ];
     Vocab::new(specs)
