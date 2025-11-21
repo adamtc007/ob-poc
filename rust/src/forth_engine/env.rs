@@ -307,7 +307,9 @@ impl RuntimeEnv {
     }
 
     /// Load attribute from database into cache
+    /// TODO: Move SQL to AttributeValuesService and call service from here
     #[cfg(feature = "database")]
+    #[allow(dead_code)]
     pub async fn load_attribute(&mut self, id: &AttributeId) -> Result<Option<Value>, sqlx::Error> {
         if let Some(pool) = &self.pool {
             let case_id = self.case_id.as_deref().unwrap_or("");

@@ -10,8 +10,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::PgPool;
 use std::collections::HashMap;
+use std::sync::Arc;
 use tracing::info;
 use uuid::Uuid;
+
+// Note: All SQL operations have been moved to DocumentService.
+// This module uses DocumentService for document_catalog operations
+// and DslRepository for dsl_instances operations.
 
 /// A CBU CRUD Template - parametrized recipe for CBU operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,12 +62,17 @@ pub struct DslDocSource {
 /// Service for generating and managing CBU CRUD templates
 pub struct CbuCrudTemplateService {
     pool: PgPool,
+    document_service: Arc<DocumentService>,
 }
 
 impl CbuCrudTemplateService {
     /// Create a new template service
     pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+        let document_service = Arc::new(DocumentService::new(pool.clone()));
+        Self {
+            pool,
+            document_service,
+        }
     }
 
     /// Generate all templates for a CBU Model
@@ -172,28 +182,21 @@ impl CbuCrudTemplateService {
 
             // Create document catalog entry
             let doc_id = Uuid::new_v4();
-            sqlx::query(
-                r#"
-                INSERT INTO "ob-poc".document_catalog (
-                    document_id, document_type_code, document_name,
-                    source_system, status, metadata
+            self.document_service
+                .create_document_with_metadata(
+                    doc_id,
+                    "DSL.CRUD.CBU.TEMPLATE",
+                    &format!("{} v{}", template.id, model.version),
+                    json!({
+                        "template_id": template.id,
+                        "model_id": model.id,
+                        "model_version": model.version,
+                        "transition_verb": template.transition_verb,
+                        "chunks": template.chunks,
+                        "dsl_instance_id": result.instance_id.to_string(),
+                    }),
                 )
-                VALUES ($1, 'DSL.CRUD.CBU.TEMPLATE', $2, 'ob-poc', 'active', $3)
-                "#,
-            )
-            .bind(doc_id)
-            .bind(format!("{} v{}", template.id, model.version))
-            .bind(json!({
-                "template_id": template.id,
-                "model_id": model.id,
-                "model_version": model.version,
-                "transition_verb": template.transition_verb,
-                "chunks": template.chunks,
-                "dsl_instance_id": result.instance_id.to_string(),
-            }))
-            .execute(&self.pool)
-            .await
-            .map_err(|e| anyhow!("Failed to create document entry: {}", e))?;
+                .await?;
 
             document_ids.push(doc_id);
 
@@ -212,18 +215,14 @@ impl CbuCrudTemplateService {
 
     /// Ensure the template document type exists
     async fn ensure_template_document_type(&self) -> Result<()> {
-        sqlx::query(
-            r#"
-            INSERT INTO "ob-poc".document_types (type_code, display_name, category, description)
-            VALUES ('DSL.CRUD.CBU.TEMPLATE', 'CBU CRUD Template', 'DSL', 'Parametrized CBU CRUD recipe')
-            ON CONFLICT (type_code) DO NOTHING
-            "#,
-        )
-        .execute(&self.pool)
-        .await
-        .map_err(|e| anyhow!("Failed to ensure document type: {}", e))?;
-
-        Ok(())
+        self.document_service
+            .ensure_document_type(
+                "DSL.CRUD.CBU.TEMPLATE",
+                "CBU CRUD Template",
+                "DSL",
+                "Parametrized CBU CRUD recipe",
+            )
+            .await
     }
 
     /// Instantiate a CRUD sheet from a template
@@ -235,17 +234,11 @@ impl CbuCrudTemplateService {
         initial_values: HashMap<String, String>,
     ) -> Result<(Uuid, Uuid)> {
         // Load template from document catalog
-        let template_row = sqlx::query_as::<_, (String, serde_json::Value)>(
-            r#"
-            SELECT document_name, metadata
-            FROM "ob-poc".document_catalog
-            WHERE document_id = $1
-            "#,
-        )
-        .bind(template_doc_id)
-        .fetch_optional(&self.pool)
-        .await?
-        .ok_or_else(|| anyhow!("Template document {} not found", template_doc_id))?;
+        let template_row = self
+            .document_service
+            .get_document_catalog_entry(template_doc_id)
+            .await?
+            .ok_or_else(|| anyhow!("Template document {} not found", template_doc_id))?;
 
         let metadata = template_row.1;
         let dsl_instance_id_str = metadata
@@ -291,28 +284,21 @@ impl CbuCrudTemplateService {
             .and_then(|v| v.as_str())
             .unwrap_or("unknown");
 
-        sqlx::query(
-            r#"
-            INSERT INTO "ob-poc".document_catalog (
-                document_id, document_type_code, document_name,
-                source_system, status, metadata
+        self.document_service
+            .create_document_with_metadata(
+                doc_id,
+                "DSL.CRUD.CBU",
+                &crud_id,
+                json!({
+                    "crud_id": crud_id,
+                    "model_id": model_id,
+                    "template_id": template_id,
+                    "template_doc_id": template_doc_id.to_string(),
+                    "dsl_instance_id": result.instance_id.to_string(),
+                    "values_provided": initial_values.keys().collect::<Vec<_>>(),
+                }),
             )
-            VALUES ($1, 'DSL.CRUD.CBU', $2, 'ob-poc', 'active', $3)
-            "#,
-        )
-        .bind(doc_id)
-        .bind(&crud_id)
-        .bind(json!({
-            "crud_id": crud_id,
-            "model_id": model_id,
-            "template_id": template_id,
-            "template_doc_id": template_doc_id.to_string(),
-            "dsl_instance_id": result.instance_id.to_string(),
-            "values_provided": initial_values.keys().collect::<Vec<_>>(),
-        }))
-        .execute(&self.pool)
-        .await
-        .map_err(|e| anyhow!("Failed to create CRUD document entry: {}", e))?;
+            .await?;
 
         info!(
             "Instantiated CRUD {} from template {} (instance: {}, doc: {})",
@@ -324,39 +310,25 @@ impl CbuCrudTemplateService {
 
     /// Ensure the CRUD document type exists
     async fn ensure_crud_document_type(&self) -> Result<()> {
-        sqlx::query(
-            r#"
-            INSERT INTO "ob-poc".document_types (type_code, display_name, category, description)
-            VALUES ('DSL.CRUD.CBU', 'CBU CRUD Sheet', 'DSL', 'Concrete CBU CRUD execution document')
-            ON CONFLICT (type_code) DO NOTHING
-            "#,
-        )
-        .execute(&self.pool)
-        .await
-        .map_err(|e| anyhow!("Failed to ensure CRUD document type: {}", e))?;
-
-        Ok(())
+        self.document_service
+            .ensure_document_type(
+                "DSL.CRUD.CBU",
+                "CBU CRUD Sheet",
+                "DSL",
+                "Concrete CBU CRUD execution document",
+            )
+            .await
     }
 
     /// Load a template by its ID
     pub async fn load_template(&self, template_id: &str) -> Result<Option<CbuCrudTemplate>> {
-        let row = sqlx::query_as::<_, (serde_json::Value,)>(
-            r#"
-            SELECT metadata
-            FROM "ob-poc".document_catalog
-            WHERE document_type_code = 'DSL.CRUD.CBU.TEMPLATE'
-            AND metadata->>'template_id' = $1
-            AND status = 'active'
-            ORDER BY created_at DESC
-            LIMIT 1
-            "#,
-        )
-        .bind(template_id)
-        .fetch_optional(&self.pool)
-        .await?;
+        let row = self
+            .document_service
+            .find_template_by_id(template_id)
+            .await?;
 
         match row {
-            Some((metadata,)) => {
+            Some((_doc_id, metadata)) => {
                 let dsl_instance_id_str = metadata
                     .get("dsl_instance_id")
                     .and_then(|v| v.as_str())

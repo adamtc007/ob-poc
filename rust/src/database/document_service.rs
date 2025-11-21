@@ -314,4 +314,102 @@ impl DocumentService {
 
         Ok(rows)
     }
+
+    /// Ensure a document type exists, creating it if necessary
+    pub async fn ensure_document_type(
+        &self,
+        type_code: &str,
+        display_name: &str,
+        category: &str,
+        description: &str,
+    ) -> Result<()> {
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".document_types (type_code, display_name, category, description)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (type_code) DO NOTHING
+            "#,
+        )
+        .bind(type_code)
+        .bind(display_name)
+        .bind(category)
+        .bind(description)
+        .execute(&self.pool)
+        .await
+        .context("Failed to ensure document type")?;
+
+        Ok(())
+    }
+
+    /// Get document metadata by document ID
+    pub async fn get_document_catalog_entry(
+        &self,
+        doc_id: Uuid,
+    ) -> Result<Option<(String, serde_json::Value)>> {
+        let row = sqlx::query_as::<_, (String, serde_json::Value)>(
+            r#"
+            SELECT document_name, metadata
+            FROM "ob-poc".document_catalog
+            WHERE document_id = $1
+            "#,
+        )
+        .bind(doc_id)
+        .fetch_optional(&self.pool)
+        .await
+        .context("Failed to get document catalog entry")?;
+
+        Ok(row)
+    }
+
+    /// Find template document by template_id in metadata
+    pub async fn find_template_by_id(
+        &self,
+        template_id: &str,
+    ) -> Result<Option<(Uuid, serde_json::Value)>> {
+        let row = sqlx::query_as::<_, (Uuid, serde_json::Value)>(
+            r#"
+            SELECT document_id, metadata
+            FROM "ob-poc".document_catalog
+            WHERE document_type_code = 'DSL.CRUD.CBU.TEMPLATE'
+            AND metadata->>'template_id' = $1
+            AND status = 'active'
+            ORDER BY created_at DESC
+            LIMIT 1
+            "#,
+        )
+        .bind(template_id)
+        .fetch_optional(&self.pool)
+        .await
+        .context("Failed to find template by ID")?;
+
+        Ok(row)
+    }
+
+    /// Create a document catalog entry with full metadata (simplified version)
+    pub async fn create_document_with_metadata(
+        &self,
+        doc_id: Uuid,
+        type_code: &str,
+        name: &str,
+        metadata: serde_json::Value,
+    ) -> Result<Uuid> {
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".document_catalog (
+                document_id, document_type_code, document_name,
+                source_system, status, metadata
+            )
+            VALUES ($1, $2, $3, 'ob-poc', 'active', $4)
+            "#,
+        )
+        .bind(doc_id)
+        .bind(type_code)
+        .bind(name)
+        .bind(metadata)
+        .execute(&self.pool)
+        .await
+        .context("Failed to create document with metadata")?;
+
+        Ok(doc_id)
+    }
 }

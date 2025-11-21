@@ -140,6 +140,8 @@ impl CrudService {
     }
 
     /// Log a CRUD operation with sink/source tracking
+    /// Reserved for future use - attribute source/sink tracking
+    #[allow(dead_code)]
     pub async fn log_crud_operation_with_sinks(
         &self,
         operation_type: OperationType,
@@ -194,6 +196,8 @@ impl CrudService {
     }
 
     /// Get CRUD operations for an entity
+    /// Reserved for audit/compliance queries
+    #[allow(dead_code)]
     pub async fn get_operations_for_entity(
         &self,
         entity_table_name: &str,
@@ -221,6 +225,8 @@ impl CrudService {
     }
 
     /// Get CRUD operations by asset type
+    /// Reserved for audit/compliance queries
+    #[allow(dead_code)]
     pub async fn get_operations_by_asset_type(
         &self,
         asset_type: AssetType,
@@ -248,6 +254,8 @@ impl CrudService {
     }
 
     /// Get recent CRUD operations
+    /// Reserved for audit/compliance queries
+    #[allow(dead_code)]
     pub async fn get_recent_operations(&self, limit: Option<i32>) -> Result<Vec<CrudOperation>> {
         let results = sqlx::query_as::<_, CrudOperation>(
             r#"
@@ -269,6 +277,8 @@ impl CrudService {
     }
 
     /// Get CRUD operation by ID
+    /// Reserved for audit/compliance queries
+    #[allow(dead_code)]
     pub async fn get_operation_by_id(&self, operation_id: Uuid) -> Result<Option<CrudOperation>> {
         let result = sqlx::query_as::<_, CrudOperation>(
             r#"
@@ -350,6 +360,8 @@ impl CrudService {
     }
 
     /// Get CRUD operations for a specific CBU
+    /// Reserved for audit/compliance queries
+    #[allow(dead_code)]
     pub async fn get_operations_for_cbu(
         &self,
         cbu_id: Uuid,

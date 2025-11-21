@@ -8,8 +8,8 @@
 
 use crate::cbu_model_dsl::ast::CbuModel;
 use crate::database::{
-    AttributeValuesService, CbuEntityRolesService, CbuService, EntityService, NewCbuFields,
-    NewEntityFields, NewProperPersonFields,
+    AttributeValuesService, CbuEntityRolesService, CbuService, DictionaryDatabaseService,
+    EntityService, NewCbuFields, NewEntityFields, NewProperPersonFields,
 };
 use crate::forth_engine::env::RuntimeEnv;
 use crate::parser::ast::{
@@ -56,12 +56,14 @@ pub struct CrudExecutionResult {
 
 /// Executor for CRUD statements - bridges IR to domain services
 pub struct CrudExecutor {
+    #[allow(dead_code)]
     pool: PgPool,
     cbu_service: CbuService,
     entity_service: EntityService,
     #[allow(dead_code)]
     cbu_entity_roles_service: CbuEntityRolesService,
     attribute_values_service: AttributeValuesService,
+    dictionary_service: DictionaryDatabaseService,
 }
 
 impl CrudExecutor {
@@ -72,6 +74,7 @@ impl CrudExecutor {
             entity_service: EntityService::new(pool.clone()),
             cbu_entity_roles_service: CbuEntityRolesService::new(pool.clone()),
             attribute_values_service: AttributeValuesService::new(pool.clone()),
+            dictionary_service: DictionaryDatabaseService::new(pool.clone()),
             pool,
         }
     }
@@ -304,19 +307,12 @@ impl CrudExecutor {
 
     /// Resolve attribute dictionary name to UUID
     async fn resolve_attribute_id(&self, attr_name: &str) -> Result<Uuid> {
-        // Query dictionary for attribute UUID
-        let result = sqlx::query_scalar::<_, Uuid>(
-            r#"
-            SELECT attribute_id
-            FROM "ob-poc".dictionary
-            WHERE name = $1
-            "#,
-        )
-        .bind(attr_name)
-        .fetch_optional(&self.pool)
-        .await?;
+        // Use DictionaryDatabaseService to look up attribute
+        let result = self.dictionary_service.get_by_name(attr_name).await?;
 
-        result.ok_or_else(|| anyhow!("Attribute '{}' not found in dictionary", attr_name))
+        result
+            .map(|attr| attr.attribute_id)
+            .ok_or_else(|| anyhow!("Attribute '{}' not found in dictionary", attr_name))
     }
 
     /// Execute a CREATE statement by delegating to appropriate service

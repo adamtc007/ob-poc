@@ -3,10 +3,12 @@
 //! This module provides database connection management, connection pooling,
 //! and configuration for the DSL architecture.
 //!
-//! ## Architecture Update (November 2025)
-//! Legacy database modules (business_request_repository, cbu_crud_manager, etc.)
-//! have been removed. The Forth engine now handles database operations through
-//! RuntimeEnv with direct SQL queries matching the demo_setup.sql schema.
+//! ## Architecture (November 2025)
+//! All database operations are centralized in domain services:
+//! - `CrudExecutor` orchestrates CRUD operations via domain services
+//! - Domain services (`CbuService`, `EntityService`, etc.) own all SQL
+//! - Forth engine and RuntimeEnv never call SQL directly - they emit CRUD IR
+//! - DSL layers are free of SQLx dependencies
 
 use sqlx::Row;
 use sqlx::{postgres::PgPoolOptions, PgPool};
@@ -22,6 +24,11 @@ pub mod dictionary_service;
 pub mod document_service;
 pub mod dsl_repository;
 pub mod entity_service;
+
+// Legacy modules not yet integrated - kept for reference but not compiled
+// pub mod attribute_repository;
+// pub mod document_type_repository;
+// pub mod taxonomy_repository;
 
 // Re-export for convenience
 pub use attribute_values_service::{AttributeValueRow, AttributeValuesService};
