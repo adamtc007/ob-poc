@@ -3,7 +3,8 @@
 //! Provides database-backed storage for attributes and documents during DSL execution.
 
 use crate::forth_engine::value::{AttributeId, DocumentId, Value};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use uuid::Uuid;
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
@@ -21,6 +22,12 @@ pub struct RuntimeEnv {
     #[cfg(feature = "database")]
     pub pool: Option<PgPool>,
 
+    /// Current CBU ID for this execution context
+    pub cbu_id: Option<Uuid>,
+
+    /// Current entity ID for this execution context
+    pub entity_id: Option<Uuid>,
+
     /// In-memory cache for attributes during execution
     pub attribute_cache: HashMap<AttributeId, Value>,
 
@@ -29,6 +36,12 @@ pub struct RuntimeEnv {
 
     /// Extracted case_id from DSL execution
     pub case_id: Option<String>,
+
+    /// Sink attributes - attributes that should be populated for this context
+    pub sink_attributes: HashSet<Uuid>,
+
+    /// Source attributes - attributes that produce data in this context
+    pub source_attributes: HashSet<Uuid>,
 }
 
 /// Document metadata
@@ -47,9 +60,13 @@ impl RuntimeEnv {
             request_id,
             #[cfg(feature = "database")]
             pool: None,
+            cbu_id: None,
+            entity_id: None,
             attribute_cache: HashMap::new(),
             document_cache: HashMap::new(),
             case_id: None,
+            sink_attributes: HashSet::new(),
+            source_attributes: HashSet::new(),
         }
     }
 
@@ -59,10 +76,65 @@ impl RuntimeEnv {
         Self {
             request_id,
             pool: Some(pool),
+            cbu_id: None,
+            entity_id: None,
             attribute_cache: HashMap::new(),
             document_cache: HashMap::new(),
             case_id: None,
+            sink_attributes: HashSet::new(),
+            source_attributes: HashSet::new(),
         }
+    }
+
+    /// Set the CBU ID for this execution context
+    pub fn set_cbu_id(&mut self, id: Uuid) {
+        self.cbu_id = Some(id);
+    }
+
+    /// Get the CBU ID, returning error if not set
+    pub fn ensure_cbu_id(&self) -> Result<Uuid, &'static str> {
+        self.cbu_id.ok_or("CBU ID not set in runtime environment")
+    }
+
+    /// Set the entity ID for this execution context
+    pub fn set_entity_id(&mut self, id: Uuid) {
+        self.entity_id = Some(id);
+    }
+
+    /// Get the entity ID, returning error if not set
+    pub fn ensure_entity_id(&self) -> Result<Uuid, &'static str> {
+        self.entity_id
+            .ok_or("Entity ID not set in runtime environment")
+    }
+
+    /// Check if an attribute is a sink for this context
+    pub fn is_sink(&self, attr_id: &Uuid) -> bool {
+        self.sink_attributes.contains(attr_id)
+    }
+
+    /// Check if an attribute is a source for this context
+    pub fn is_source(&self, attr_id: &Uuid) -> bool {
+        self.source_attributes.contains(attr_id)
+    }
+
+    /// Add a sink attribute
+    pub fn add_sink_attribute(&mut self, attr_id: Uuid) {
+        self.sink_attributes.insert(attr_id);
+    }
+
+    /// Add a source attribute
+    pub fn add_source_attribute(&mut self, attr_id: Uuid) {
+        self.source_attributes.insert(attr_id);
+    }
+
+    /// Set sink attributes from a list
+    pub fn set_sink_attributes(&mut self, attrs: Vec<Uuid>) {
+        self.sink_attributes = attrs.into_iter().collect();
+    }
+
+    /// Set source attributes from a list
+    pub fn set_source_attributes(&mut self, attrs: Vec<Uuid>) {
+        self.source_attributes = attrs.into_iter().collect();
     }
 
     /// Check if database is available
