@@ -435,4 +435,136 @@ mod tests {
         // Should fail due to stack underflow
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_execute_sheet_cbu_create() {
+        let sheet = DslSheet {
+            id: "test-cbu-create".to_string(),
+            domain: "cbu".to_string(),
+            version: "1".to_string(),
+            content: r#"(cbu.create :cbu-name "ACME Corp" :client-type "CORP" :jurisdiction "US")"#
+                .to_string(),
+        };
+
+        let result = execute_sheet(&sheet);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_execute_sheet_cbu_operations() {
+        let sheet = DslSheet {
+            id: "test-cbu-ops".to_string(),
+            domain: "cbu".to_string(),
+            version: "1".to_string(),
+            content: r#"
+                (cbu.create :cbu-name "Test Fund" :client-type "FUND" :jurisdiction "GB")
+                (cbu.attach-entity :entity-id "ENT-001" :role "BENEFICIAL_OWNER")
+            "#
+            .to_string(),
+        };
+
+        let result = execute_sheet(&sheet);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_execute_sheet_cbu_read() {
+        let sheet = DslSheet {
+            id: "test-cbu-read".to_string(),
+            domain: "cbu".to_string(),
+            version: "1".to_string(),
+            content: r#"(cbu.read :cbu-id "CBU-001")"#.to_string(),
+        };
+
+        let result = execute_sheet(&sheet);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_execute_sheet_cbu_update() {
+        let sheet = DslSheet {
+            id: "test-cbu-update".to_string(),
+            domain: "cbu".to_string(),
+            version: "1".to_string(),
+            content: r#"(cbu.update :cbu-id "CBU-001" :status "ACTIVE")"#.to_string(),
+        };
+
+        let result = execute_sheet(&sheet);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_execute_sheet_cbu_delete() {
+        let sheet = DslSheet {
+            id: "test-cbu-delete".to_string(),
+            domain: "cbu".to_string(),
+            version: "1".to_string(),
+            content: r#"(cbu.delete :cbu-id "CBU-001")"#.to_string(),
+        };
+
+        let result = execute_sheet(&sheet);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_execute_sheet_crud_operations() {
+        let sheet = DslSheet {
+            id: "test-crud".to_string(),
+            domain: "crud".to_string(),
+            version: "1".to_string(),
+            content: r#"
+                (crud.begin :operation-type "CREATE" :asset-type "CBU")
+                (crud.commit :entity-table "cbus" :ai-instruction "Create test CBU" :ai-provider "OPENAI")
+            "#.to_string(),
+        };
+
+        let result = execute_sheet(&sheet);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_execute_sheet_attr_operations() {
+        let sheet = DslSheet {
+            id: "test-attr".to_string(),
+            domain: "attr".to_string(),
+            version: "1".to_string(),
+            content: r#"(attr.set :attr-id "KYC.LEI" :value "5493001KJTIIGC8Y1R12")"#.to_string(),
+        };
+
+        let result = execute_sheet(&sheet);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_execute_sheet_document_extended() {
+        let sheet = DslSheet {
+            id: "test-doc-ext".to_string(),
+            domain: "document".to_string(),
+            version: "1".to_string(),
+            content: r#"(document.extract-attributes :document-id "DOC-001" :document-type "UK-PASSPORT")"#.to_string(),
+        };
+
+        let result = execute_sheet(&sheet);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_execute_sheet_full_onboarding_flow() {
+        let sheet = DslSheet {
+            id: "test-full-flow".to_string(),
+            domain: "onboarding".to_string(),
+            version: "1".to_string(),
+            content: r#"
+                (cbu.create :cbu-name "Full Flow Corp" :client-type "CORP" :jurisdiction "US")
+                (entity.register :entity-id "ENT-001" :entity-type "PROPER_PERSON")
+                (cbu.attach-entity :entity-id "ENT-001" :role "BENEFICIAL_OWNER")
+                (document.catalog :doc-id "PASS-001" :doc-type "UK-PASSPORT")
+                (document.extract-attributes :document-id "PASS-001" :document-type "UK-PASSPORT")
+            "#
+            .to_string(),
+        };
+
+        let result = execute_sheet(&sheet);
+        assert!(result.is_ok());
+    }
 }

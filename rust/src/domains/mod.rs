@@ -112,6 +112,10 @@ impl DomainRegistry {
         registry.register_handler(Box::new(StubDomainHandler::new("entity")));
         registry.register_handler(Box::new(StubDomainHandler::new("products")));
         registry.register_handler(Box::new(StubDomainHandler::new("documents")));
+        // New domains for CBU CRUD operations
+        registry.register_handler(Box::new(StubDomainHandler::new("cbu")));
+        registry.register_handler(Box::new(StubDomainHandler::new("crud")));
+        registry.register_handler(Box::new(StubDomainHandler::new("attr")));
 
         registry
     }
@@ -252,13 +256,40 @@ impl DomainHandler for StubDomainHandler {
 
     fn supported_verbs(&self) -> Vec<&str> {
         match self.domain.as_str() {
-            "kyc" => vec!["collect", "verify", "assess"],
-            "ubo" => vec!["collect-entity-data", "analyze", "calculate"],
+            "kyc" => vec!["collect", "verify", "assess", "start"],
+            "ubo" => vec![
+                "collect-entity-data",
+                "analyze",
+                "calculate",
+                "get-ownership-structure",
+                "resolve-ubos",
+                "calculate-indirect-ownership",
+            ],
             "isda" => vec!["establish_master", "execute_trade", "margin_call"],
             "onboarding" => vec!["create", "update", "approve"],
             "entity" => vec!["register", "classify", "link"],
             "products" => vec!["add", "configure", "provision"],
-            "documents" => vec!["catalog", "verify", "extract"],
+            "documents" => vec![
+                "catalog",
+                "verify",
+                "extract",
+                "link",
+                "link-to-cbu",
+                "extract-attributes",
+                "require",
+            ],
+            "cbu" => vec![
+                "create",
+                "read",
+                "update",
+                "delete",
+                "list",
+                "attach-entity",
+                "attach-proper-person",
+                "finalize",
+            ],
+            "crud" => vec!["begin", "commit"],
+            "attr" => vec!["require", "set", "validate"],
             _ => vec!["process"],
         }
     }
