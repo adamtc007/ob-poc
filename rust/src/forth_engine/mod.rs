@@ -233,6 +233,20 @@ pub async fn create_ob_request(
     Ok((ob_request_id, result))
 }
 
+/// Execute a DSL sheet and return both result and RuntimeEnv with pending_crud.
+/// This is the entry point for tests that want to:
+/// 1. Run Forth to populate pending_crud
+/// 2. Manually call CrudExecutor.execute_all
+///
+/// Does NOT automatically execute CRUD against DB - caller must do that.
+#[cfg(feature = "database")]
+pub fn execute_sheet_into_env(
+    sheet: &DslSheet,
+    pool: Option<PgPool>,
+) -> Result<(ExecutionResult, RuntimeEnv), EngineError> {
+    execute_sheet_internal_with_env(sheet, pool)
+}
+
 /// Internal execution function
 fn execute_sheet_internal(
     sheet: &DslSheet,

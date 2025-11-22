@@ -37,6 +37,8 @@ pub struct NewCbuFields {
     pub name: String,
     pub description: Option<String>,
     pub nature_purpose: Option<String>,
+    pub client_type: Option<String>,
+    pub jurisdiction: Option<String>,
 }
 
 /// Service for CBU operations
@@ -62,14 +64,16 @@ impl CbuService {
 
         sqlx::query(
             r#"
-            INSERT INTO "ob-poc".cbus (cbu_id, name, description, nature_purpose, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, NOW(), NOW())
+            INSERT INTO "ob-poc".cbus (cbu_id, name, description, nature_purpose, client_type, jurisdiction, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
             "#,
         )
         .bind(cbu_id)
         .bind(&fields.name)
         .bind(&fields.description)
         .bind(&fields.nature_purpose)
+        .bind(&fields.client_type)
+        .bind(&fields.jurisdiction)
         .execute(&self.pool)
         .await
         .context("Failed to create CBU")?;

@@ -245,25 +245,34 @@ impl CrudExecutor {
         ctx: &ExecutionContext,
     ) -> Result<(NewCbuFields, Vec<(String, JsonValue, String)>)> {
         // Core CBU fields that go into the cbus table
-        let core_fields = ["cbu-name", "name", "description", "nature-purpose"];
+        let core_fields = [
+            "cbu-name",
+            "name",
+            "description",
+            "nature-purpose",
+            "client-type",
+            "jurisdiction",
+        ];
 
         let name = self
             .get_string_value(&create.values, "cbu-name")
             .or_else(|| self.get_string_value(&create.values, "name"))
             .unwrap_or_else(|| "Unknown".to_string());
 
-        let description = self
-            .get_string_value(&create.values, "description")
-            .or_else(|| self.get_string_value(&create.values, "client-type"));
+        let client_type = self.get_string_value(&create.values, "client-type");
 
-        let nature_purpose = self
-            .get_string_value(&create.values, "nature-purpose")
-            .or_else(|| self.get_string_value(&create.values, "jurisdiction"));
+        let jurisdiction = self.get_string_value(&create.values, "jurisdiction");
+
+        let nature_purpose = self.get_string_value(&create.values, "nature-purpose");
+
+        let description = self.get_string_value(&create.values, "description");
 
         let cbu_fields = NewCbuFields {
             name,
             description,
             nature_purpose,
+            client_type,
+            jurisdiction,
         };
 
         // Remaining fields become attribute values
@@ -319,24 +328,27 @@ impl CrudExecutor {
     async fn execute_create(&self, create: &DataCreate) -> Result<CrudExecutionResult> {
         match create.asset.as_str() {
             "CBU" => {
-                // Map DSL fields to canonical DB columns per Section 3.1
+                // Map DSL fields to canonical DB columns
+                // DSL keywords: :cbu-name, :client-type, :jurisdiction, :nature-purpose, :description
                 let name = self
                     .get_string_value(&create.values, "cbu-name")
                     .or_else(|| self.get_string_value(&create.values, "name"))
                     .unwrap_or_else(|| "Unknown".to_string());
 
-                let description = self
-                    .get_string_value(&create.values, "description")
-                    .or_else(|| self.get_string_value(&create.values, "client-type"));
+                let client_type = self.get_string_value(&create.values, "client-type");
 
-                let nature_purpose = self
-                    .get_string_value(&create.values, "nature-purpose")
-                    .or_else(|| self.get_string_value(&create.values, "jurisdiction"));
+                let jurisdiction = self.get_string_value(&create.values, "jurisdiction");
+
+                let nature_purpose = self.get_string_value(&create.values, "nature-purpose");
+
+                let description = self.get_string_value(&create.values, "description");
 
                 let fields = NewCbuFields {
                     name: name.clone(),
                     description,
                     nature_purpose,
+                    client_type,
+                    jurisdiction,
                 };
 
                 let cbu_id = self.cbu_service.create_cbu(&fields).await?;

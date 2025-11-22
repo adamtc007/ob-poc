@@ -1,14 +1,12 @@
--- Entity types (just enough for CBU CRUD tests)
+-- Entity types for CBU CRUD tests
+-- Schema: "ob-poc".entity_types (requires name and table_name)
 
-INSERT INTO "ob-poc".entity_types (entity_type_id, type_name)
+INSERT INTO "ob-poc".entity_types (name, description, table_name)
 VALUES
-  (gen_random_uuid(), 'PROPER_PERSON'),
-  (gen_random_uuid(), 'COMPANY')
-ON CONFLICT (type_name) DO NOTHING;
+  ('PROPER_PERSON', 'Natural person entity', 'proper_persons'),
+  ('COMPANY',       'Corporate entity',      'companies')
+ON CONFLICT (name) DO UPDATE SET
+  description = EXCLUDED.description;
 
--- Roles (e.g. Beneficial Owner)
-
-INSERT INTO "ob-poc".roles (role_id, role_name)
-VALUES
-  (gen_random_uuid(), 'BeneficialOwner')
-ON CONFLICT (role_name) DO NOTHING;
+-- Note: roles table may not exist in current schema
+-- If needed, create it or use cbu_entity_roles table instead

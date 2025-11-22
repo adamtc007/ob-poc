@@ -139,11 +139,11 @@ impl CbuCrudTemplateService {
 
         lines.push(format!("({}", dsl_verb));
 
-        for (attr_id, is_required) in attrs {
+        for (attr_id, _is_required) in attrs {
             let keyword = map_attr_to_dsl_keyword(attr_id);
             let placeholder = format!("{{{{{}}}}}", attr_id);
-            let comment = if *is_required { "" } else { " ; optional" };
-            lines.push(format!("  {} \"{}\"{}", keyword, placeholder, comment));
+            // Note: Comments removed as DSL parser doesn't support them
+            lines.push(format!("  {} \"{}\"", keyword, placeholder));
         }
 
         lines.push(")".to_string());
@@ -513,11 +513,10 @@ fn generate_templates_for_model(model: &CbuModel) -> Vec<CbuCrudTemplate> {
             };
 
             lines.push(format!("({}", dsl_verb));
-            for (attr_id, is_required) in &all_attrs {
+            for (attr_id, _is_required) in &all_attrs {
                 let keyword = map_attr_to_dsl_keyword(attr_id);
                 let placeholder = format!("{{{{{}}}}}", attr_id);
-                let comment = if *is_required { "" } else { " ; optional" };
-                lines.push(format!("  {} \"{}\"{}", keyword, placeholder, comment));
+                lines.push(format!("  {} \"{}\"", keyword, placeholder));
             }
             lines.push(")".to_string());
 
