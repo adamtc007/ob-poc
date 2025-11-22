@@ -27,6 +27,8 @@ pub struct CbuRow {
     pub name: String,
     pub description: Option<String>,
     pub nature_purpose: Option<String>,
+    pub client_type: Option<String>,
+    pub jurisdiction: Option<String>,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
 }
@@ -87,7 +89,7 @@ impl CbuService {
     pub async fn get_cbu_by_id(&self, cbu_id: Uuid) -> Result<Option<CbuRow>> {
         let result = sqlx::query_as::<_, CbuRow>(
             r#"
-            SELECT cbu_id, name, description, nature_purpose, created_at, updated_at
+            SELECT cbu_id, name, description, nature_purpose, client_type, jurisdiction, created_at, updated_at
             FROM "ob-poc".cbus
             WHERE cbu_id = $1
             "#,
@@ -104,7 +106,7 @@ impl CbuService {
     pub async fn get_cbu_by_name(&self, name: &str) -> Result<Option<CbuRow>> {
         let result = sqlx::query_as::<_, CbuRow>(
             r#"
-            SELECT cbu_id, name, description, nature_purpose, created_at, updated_at
+            SELECT cbu_id, name, description, nature_purpose, client_type, jurisdiction, created_at, updated_at
             FROM "ob-poc".cbus
             WHERE name = $1
             "#,
@@ -121,7 +123,7 @@ impl CbuService {
     pub async fn list_cbus(&self, limit: Option<i32>, offset: Option<i32>) -> Result<Vec<CbuRow>> {
         let results = sqlx::query_as::<_, CbuRow>(
             r#"
-            SELECT cbu_id, name, description, nature_purpose, created_at, updated_at
+            SELECT cbu_id, name, description, nature_purpose, client_type, jurisdiction, created_at, updated_at
             FROM "ob-poc".cbus
             ORDER BY created_at DESC
             LIMIT $1 OFFSET $2
