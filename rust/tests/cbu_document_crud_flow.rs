@@ -303,3 +303,164 @@ async fn test_cbu_persistence_check() {
     
     // Don't cleanup - leave for inspection
 }
+
+#[tokio::test]
+#[ignore]
+async fn test_document_crud_operations() {
+    let pool = get_test_pool().await;
+
+    seed_test_data(&pool).await;
+
+    // Seed a document type for testing
+    sqlx::query(
+        r#"
+        INSERT INTO "ob-poc".document_types (type_id, type_code, display_name, category, description)
+        VALUES (gen_random_uuid(), 'UK-PASSPORT', 'UK Passport', 'Identity', 'United Kingdom Passport')
+        ON CONFLICT (type_code) DO NOTHING
+        "#,
+    )
+    .execute(&pool)
+    .await
+    .expect("Failed to seed UK-PASSPORT type");
+
+    // Test document.catalog - should emit DataCreate for DOCUMENT
+    let dsl_content = r#"
+        (document.catalog :doc-id "DOC-TEST-001" :doc-type "UK-PASSPORT")
+    "#;
+
+    let sheet = DslSheet {
+        id: Uuid::new_v4().to_string(),
+        domain: "document".to_string(),
+        version: "1".to_string(),
+        content: dsl_content.to_string(),
+    };
+
+    let (result, mut env) =
+        execute_sheet_into_env(&sheet, Some(pool.clone())).expect("Failed to execute DSL");
+
+    assert!(result.success, "DSL execution should succeed");
+
+    let pending_crud = env.take_pending_crud();
+    assert_eq!(pending_crud.len(), 1, "Should have one CRUD statement");
+
+    // Verify it's a DOCUMENT create
+    match &pending_crud[0] {
+        ob_poc::parser::ast::CrudStatement::DataCreate(create) => {
+            assert_eq!(create.asset, "DOCUMENT");
+            assert!(create.values.contains_key("doc-id"));
+            assert!(create.values.contains_key("doc-type"));
+            println!("Document CRUD statement: {:?}", create);
+        }
+        _ => panic!("Expected DataCreate for DOCUMENT"),
+    }
+
+    println!("document.catalog emits correct CRUD statement");
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_document_verify_update() {
+    let pool = get_test_pool().await;
+
+    // Test document.verify - should emit DataUpdate for DOCUMENT
+    let dsl_content = r#"
+        (document.verify :doc-id "DOC-VERIFY-001")
+    "#;
+
+    let sheet = DslSheet {
+        id: Uuid::new_v4().to_string(),
+        domain: "document".to_string(),
+        version: "1".to_string(),
+        content: dsl_content.to_string(),
+    };
+
+    let (result, mut env) =
+        execute_sheet_into_env(&sheet, Some(pool.clone())).expect("Failed to execute DSL");
+
+    assert!(result.success, "DSL execution should succeed");
+
+    let pending_crud = env.take_pending_crud();
+    assert_eq!(pending_crud.len(), 1, "Should have one CRUD statement");
+
+    // Verify it's a DOCUMENT update with verification status
+    match &pending_crud[0] {
+        ob_poc::parser::ast::CrudStatement::DataUpdate(update) => {
+            assert_eq!(update.asset, "DOCUMENT");
+            assert!(update.values.contains_key("verification-status"));
+            println!("Document verify CRUD statement: {:?}", update);
+        }
+        _ => panic!("Expected DataUpdate for DOCUMENT"),
+    }
+
+    println!("document.verify emits correct CRUD statement");
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_full_document_flow() {
+    let pool = get_test_pool().await;
+
+    seed_test_data(&pool).await;
+
+    // Seed document type
+    sqlx::query(
+        r#"
+        INSERT INTO "ob-poc".document_types (type_id, type_code, display_name, category, description)
+        VALUES (gen_random_uuid(), 'UK-PASSPORT', 'UK Passport', 'Identity', 'United Kingdom Passport')
+        ON CONFLICT (type_code) DO NOTHING
+        "#,
+    )
+    .execute(&pool)
+    .await
+    .expect("Failed to seed UK-PASSPORT type");
+
+    // Test a full onboarding flow with CBU and documents
+    let dsl_content = r#"
+        (cbu.create :cbu-name "Full Flow Corp" :client-type "CORP" :jurisdiction "US")
+        (document.catalog :doc-id "PASS-001" :doc-type "UK-PASSPORT")
+        (document.extract-attributes :document-id "PASS-001" :document-type "UK-PASSPORT")
+    "#;
+
+    let sheet = DslSheet {
+        id: Uuid::new_v4().to_string(),
+        domain: "onboarding".to_string(),
+        version: "1".to_string(),
+        content: dsl_content.to_string(),
+    };
+
+    let (result, mut env) =
+        execute_sheet_into_env(&sheet, Some(pool.clone())).expect("Failed to execute DSL");
+
+    assert!(result.success, "DSL execution should succeed");
+
+    let pending_crud = env.take_pending_crud();
+    
+    // Should have 3 CRUD statements: CBU create, document catalog, document extraction
+    assert_eq!(pending_crud.len(), 3, "Should have 3 CRUD statements");
+
+    println!("=== Full Document Flow CRUD Statements ===");
+    for (i, stmt) in pending_crud.iter().enumerate() {
+        match stmt {
+            ob_poc::parser::ast::CrudStatement::DataCreate(create) => {
+                println!("{}. CREATE {}: {:?}", i + 1, create.asset, create.values.keys().collect::<Vec<_>>());
+            }
+            ob_poc::parser::ast::CrudStatement::DataUpdate(update) => {
+                println!("{}. UPDATE {}: {:?}", i + 1, update.asset, update.values.keys().collect::<Vec<_>>());
+            }
+            _ => println!("{}. Other statement", i + 1),
+        }
+    }
+
+    // Verify statement types
+    assert!(matches!(&pending_crud[0], ob_poc::parser::ast::CrudStatement::DataCreate(c) if c.asset == "CBU"));
+    assert!(matches!(&pending_crud[1], ob_poc::parser::ast::CrudStatement::DataCreate(c) if c.asset == "DOCUMENT"));
+    assert!(matches!(&pending_crud[2], ob_poc::parser::ast::CrudStatement::DataCreate(c) if c.asset == "DOCUMENT_EXTRACTION"));
+
+    println!("Full document flow emits correct CRUD statements");
+
+    // Cleanup
+    sqlx::query(r#"DELETE FROM "ob-poc".cbus WHERE name = 'Full Flow Corp'"#)
+        .execute(&pool)
+        .await
+        .ok();
+}
