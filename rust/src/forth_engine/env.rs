@@ -306,39 +306,11 @@ impl RuntimeEnv {
         self.case_id.as_ref()
     }
 
-    /// Load attribute from database into cache
-    /// TODO: Move SQL to AttributeValuesService and call service from here
-    #[cfg(feature = "database")]
-    #[allow(dead_code)]
-    pub async fn load_attribute(&mut self, id: &AttributeId) -> Result<Option<Value>, sqlx::Error> {
-        if let Some(pool) = &self.pool {
-            let case_id = self.case_id.as_deref().unwrap_or("");
-
-            let row = sqlx::query_as::<_, (String,)>(
-                r#"
-                SELECT attribute_value
-                FROM "ob-poc".attribute_values
-                WHERE attribute_id = $1::uuid AND entity_id = $2
-                "#,
-            )
-            .bind(&id.0)
-            .bind(case_id)
-            .fetch_optional(pool)
-            .await?;
-
-            if let Some((value_text,)) = row {
-                let value = Value::Str(value_text);
-                self.attribute_cache.insert(id.clone(), value.clone());
-                return Ok(Some(value));
-            }
-        }
-        Ok(None)
-    }
-
     // Note: DB operations for DSL/AST persistence, CBU creation, and attribute saving
     // have been moved to the central database facade (DslRepository).
     // RuntimeEnv now only handles in-memory caching and attribute loading during execution.
     // See crate::database::DslRepository for transactional DSL/AST saves.
+    // Attribute loading from DB should use AttributeValuesService via CrudExecutor.
 }
 
 /// Generate a new OB Request ID
