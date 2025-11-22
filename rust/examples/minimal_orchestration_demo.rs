@@ -118,7 +118,7 @@ async fn test_dsl_manager_processing(
 
     for (i, dsl) in test_dsl_operations.iter().enumerate() {
         let start = Instant::now();
-        let result = manager.process_dsl_request(dsl.to_string()).await;
+        let result = manager.process_dsl_request(dsl.to_string());
         let duration = start.elapsed();
 
         if result.success {

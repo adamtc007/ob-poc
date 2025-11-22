@@ -152,21 +152,141 @@ fn word_ubo_calculate_indirect_ownership(vm: &mut VM) -> Result<(), VmError> {
     typed_word(vm, "ubo.calculate-indirect-ownership", 1) // :entity-id
 }
 
-// Document Operations
+// Document Operations - emit CrudStatements
 fn word_document_catalog(vm: &mut VM) -> Result<(), VmError> {
-    typed_word(vm, "document.catalog", 2) // :doc-id, :doc-type
+    let pairs = collect_keyword_pairs(vm, 2)?; // :doc-id, :doc-type
+    process_pairs(vm, &pairs);
+
+    // Convert pairs to CRUD values
+    let values: HashMap<String, crate::parser::ast::Value> = pairs
+        .into_iter()
+        .map(|(k, v)| {
+            let key = k.trim_start_matches(':').to_string();
+            let val = match v {
+                Value::Str(s) => {
+                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                }
+                Value::Int(i) => crate::parser::ast::Value::Literal(
+                    crate::parser::ast::Literal::Number(i as f64),
+                ),
+                Value::Bool(b) => {
+                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::Boolean(b))
+                }
+                _ => crate::parser::ast::Value::Identifier(format!("{:?}", v)),
+            };
+            (key, val)
+        })
+        .collect();
+
+    // Emit CrudStatement for document creation
+    vm.env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "DOCUMENT".to_string(),
+        values,
+    }));
+
+    Ok(())
 }
 
 fn word_document_verify(vm: &mut VM) -> Result<(), VmError> {
-    typed_word(vm, "document.verify", 1) // :doc-id
+    let pairs = collect_keyword_pairs(vm, 1)?; // :doc-id
+    process_pairs(vm, &pairs);
+
+    // Convert pairs to CRUD values
+    let mut values: HashMap<String, crate::parser::ast::Value> = pairs
+        .into_iter()
+        .map(|(k, v)| {
+            let key = k.trim_start_matches(':').to_string();
+            let val = match v {
+                Value::Str(s) => {
+                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                }
+                _ => crate::parser::ast::Value::Identifier(format!("{:?}", v)),
+            };
+            (key, val)
+        })
+        .collect();
+
+    // Add verification status update
+    values.insert(
+        "verification-status".to_string(),
+        crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(
+            "verified".to_string(),
+        )),
+    );
+
+    // Emit CrudStatement for document update
+    vm.env.push_crud(CrudStatement::DataUpdate(DataUpdate {
+        asset: "DOCUMENT".to_string(),
+        values: values.clone(),
+        where_clause: values.into_iter().filter(|(k, _)| k == "doc-id").collect(),
+    }));
+
+    Ok(())
 }
 
 fn word_document_extract(vm: &mut VM) -> Result<(), VmError> {
-    typed_word(vm, "document.extract", 1) // :doc-id
+    let pairs = collect_keyword_pairs(vm, 1)?; // :doc-id
+    process_pairs(vm, &pairs);
+
+    // Convert pairs to CRUD values
+    let mut values: HashMap<String, crate::parser::ast::Value> = pairs
+        .into_iter()
+        .map(|(k, v)| {
+            let key = k.trim_start_matches(':').to_string();
+            let val = match v {
+                Value::Str(s) => {
+                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                }
+                _ => crate::parser::ast::Value::Identifier(format!("{:?}", v)),
+            };
+            (key, val)
+        })
+        .collect();
+
+    // Add extraction status update
+    values.insert(
+        "extraction-status".to_string(),
+        crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(
+            "extracted".to_string(),
+        )),
+    );
+
+    // Emit CrudStatement for document update
+    vm.env.push_crud(CrudStatement::DataUpdate(DataUpdate {
+        asset: "DOCUMENT".to_string(),
+        values: values.clone(),
+        where_clause: values.into_iter().filter(|(k, _)| k == "doc-id").collect(),
+    }));
+
+    Ok(())
 }
 
 fn word_document_link(vm: &mut VM) -> Result<(), VmError> {
-    typed_word(vm, "document.link", 2) // :doc-id, :entity-id
+    let pairs = collect_keyword_pairs(vm, 2)?; // :doc-id, :entity-id
+    process_pairs(vm, &pairs);
+
+    // Convert pairs to CRUD values
+    let values: HashMap<String, crate::parser::ast::Value> = pairs
+        .into_iter()
+        .map(|(k, v)| {
+            let key = k.trim_start_matches(':').to_string();
+            let val = match v {
+                Value::Str(s) => {
+                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                }
+                _ => crate::parser::ast::Value::Identifier(format!("{:?}", v)),
+            };
+            (key, val)
+        })
+        .collect();
+
+    // Emit CrudStatement for document-entity relationship
+    vm.env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "DOCUMENT_ENTITY_LINK".to_string(),
+        values,
+    }));
+
+    Ok(())
 }
 
 // Low-level attribute operations (from original kyc_vocab)
@@ -490,17 +610,94 @@ fn word_attr_validate(vm: &mut VM) -> Result<(), VmError> {
     typed_word(vm, "attr.validate", 2) // @attr reference, value
 }
 
-// Document Operations (Phase 3) - extended
+// Document Operations (Phase 3) - extended - emit CrudStatements
 fn word_document_link_to_cbu(vm: &mut VM) -> Result<(), VmError> {
-    typed_word(vm, "document.link-to-cbu", 3) // :cbu-id, :document-id, :relationship-type
+    let pairs = collect_keyword_pairs(vm, 3)?; // :cbu-id, :document-id, :relationship-type
+    process_pairs(vm, &pairs);
+
+    // Convert pairs to CRUD values
+    let values: HashMap<String, crate::parser::ast::Value> = pairs
+        .into_iter()
+        .map(|(k, v)| {
+            let key = k.trim_start_matches(':').to_string();
+            let val = match v {
+                Value::Str(s) => {
+                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                }
+                _ => crate::parser::ast::Value::Identifier(format!("{:?}", v)),
+            };
+            (key, val)
+        })
+        .collect();
+
+    // Emit CrudStatement for document-CBU link
+    vm.env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "DOCUMENT_CBU_LINK".to_string(),
+        values,
+    }));
+
+    Ok(())
 }
 
 fn word_document_extract_attributes(vm: &mut VM) -> Result<(), VmError> {
-    typed_word(vm, "document.extract-attributes", 2) // :document-id, :document-type
+    let pairs = collect_keyword_pairs(vm, 2)?; // :document-id, :document-type
+    process_pairs(vm, &pairs);
+
+    // Convert pairs to CRUD values
+    let mut values: HashMap<String, crate::parser::ast::Value> = pairs
+        .into_iter()
+        .map(|(k, v)| {
+            let key = k.trim_start_matches(':').to_string();
+            let val = match v {
+                Value::Str(s) => {
+                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                }
+                _ => crate::parser::ast::Value::Identifier(format!("{:?}", v)),
+            };
+            (key, val)
+        })
+        .collect();
+
+    // Add extraction status
+    values.insert(
+        "extraction-status".to_string(),
+        crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(
+            "pending".to_string(),
+        )),
+    );
+
+    // Emit CrudStatement for attribute extraction task
+    vm.env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "DOCUMENT_EXTRACTION".to_string(),
+        values,
+    }));
+
+    Ok(())
 }
 
 fn word_document_require(vm: &mut VM) -> Result<(), VmError> {
-    typed_word(vm, "document.require", 1) // @doc reference
+    // This is a validation/check operation, not a CRUD operation
+    // Just validate the stack and track as required source attribute
+    let attr_val = vm.data_stack.pop_back().ok_or(VmError::StackUnderflow {
+        expected: 1,
+        found: 0,
+    })?;
+
+    if let Value::Attr(attr_id) = attr_val {
+        // Track this as a required source attribute
+        // AttributeId.0 is a String that may be a UUID
+        if let Ok(uuid) = uuid::Uuid::parse_str(&attr_id.0) {
+            vm.env.source_attributes.insert(uuid);
+        }
+        // If not a valid UUID, we still consider the operation successful
+        // The attribute reference was valid DSL syntax
+        Ok(())
+    } else {
+        Err(VmError::TypeError {
+            expected: "AttributeId (@doc reference)".to_string(),
+            found: format!("{:?}", attr_val),
+        })
+    }
 }
 
 /// Constructs the complete DSL Vocabulary with all domain verbs.

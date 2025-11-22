@@ -270,10 +270,10 @@ impl DocumentService {
     ) -> Result<()> {
         sqlx::query(
             r#"
-            INSERT INTO "ob-poc".document_metadata (document_id, attribute_id, value, created_at, updated_at)
-            VALUES ($1, $2, $3, NOW(), NOW())
+            INSERT INTO "ob-poc".document_metadata (document_id, attribute_id, extracted_value, created_at)
+            VALUES ($1, $2, $3, NOW())
             ON CONFLICT (document_id, attribute_id)
-            DO UPDATE SET value = $3, updated_at = NOW()
+            DO UPDATE SET extracted_value = $3
             "#,
         )
         .bind(document_id)
@@ -295,7 +295,7 @@ impl DocumentService {
     pub async fn get_document_metadata(&self, document_id: Uuid) -> Result<Vec<(Uuid, String)>> {
         let rows = sqlx::query_as::<_, (Uuid, String)>(
             r#"
-            SELECT attribute_id, value
+            SELECT attribute_id, COALESCE(extracted_value, '')
             FROM "ob-poc".document_metadata
             WHERE document_id = $1
             "#,
@@ -318,11 +318,10 @@ impl DocumentService {
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".document_relationships (
-                source_document_id, target_document_id, relationship_type, created_at
+                source_document_id, target_document_id, relationship_type
             )
-            VALUES ($1, $2, $3, NOW())
-            ON CONFLICT (source_document_id, target_document_id, relationship_type)
-            DO NOTHING
+            VALUES ($1, $2, $3)
+            ON CONFLICT DO NOTHING
             "#,
         )
         .bind(source_document_id)
