@@ -17,8 +17,17 @@ fn collect_keyword_pairs(vm: &mut VM, num_pairs: usize) -> Result<HashMap<String
     let mut pairs = HashMap::new();
 
     for _ in 0..num_pairs {
-        let (keyword, value) = vm.pop_keyword_value()?;
-        pairs.insert(keyword, value);
+        // Try to pop a keyword-value pair, but don't fail if stack is empty
+        match vm.pop_keyword_value() {
+            Ok((keyword, value)) => {
+                pairs.insert(keyword, value);
+            }
+            Err(VmError::StackUnderflow { .. }) => {
+                // No more pairs available, that's okay
+                break;
+            }
+            Err(e) => return Err(e),
+        }
     }
 
     Ok(pairs)
@@ -329,7 +338,8 @@ fn word_set_attribute(vm: &mut VM) -> Result<(), VmError> {
 
 // CBU Operations (Phase 4) - Now emit CrudStatements
 fn word_cbu_create(vm: &mut VM) -> Result<(), VmError> {
-    let pairs = collect_keyword_pairs(vm, 3)?; // :cbu-name, :client-type, :jurisdiction
+    // Collect all keyword pairs from the stack (up to 5: :cbu-name, :client-type, :jurisdiction, :nature-purpose, :description)
+    let pairs = collect_keyword_pairs(vm, 5)?;
     process_pairs(vm, &pairs);
 
     // Convert pairs to CRUD values

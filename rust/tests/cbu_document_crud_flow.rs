@@ -182,9 +182,9 @@ async fn test_document_catalog_full_db_execution() {
         .expect("DB query failed")
         .expect("Document not found in database");
 
-    assert_eq!(doc.document_code, doc_code);
+    assert_eq!(doc.document_code(), doc_code);
 
-    println!("✅ Document persisted to DB: {} ({})", doc.document_code, doc.document_id);
+    println!("✅ Document persisted to DB: {} ({})", doc.document_code(), doc.document_id());
 
     // Cleanup
     cleanup_document(&pool, &doc_code).await;
@@ -248,11 +248,11 @@ async fn test_full_onboarding_flow_db_execution() {
     
     let doc_service = DocumentService::new(pool.clone());
     let doc = doc_service.get_document_by_id(doc_id).await.expect("Query failed").expect("Document not found");
-    assert_eq!(doc.document_code, doc_code);
+    assert_eq!(doc.document_code(), doc_code);
 
     println!("✅ Full flow persisted to DB:");
     println!("   CBU: {} ({})", cbu.name, cbu.cbu_id);
-    println!("   Document: {} ({})", doc.document_code, doc.document_id);
+    println!("   Document: {} ({})", doc.document_code(), doc.document_id());
 
     // Cleanup
     cleanup_document(&pool, &doc_code).await;
@@ -268,15 +268,9 @@ async fn test_cbu_fields_persist_correctly() {
     seed_test_data(&pool).await;
     cleanup_cbu(&pool, &test_cbu_name).await;
 
-    // Test all CBU fields
+    // Test all CBU fields - single line
     let dsl_content = format!(
-        r#"(cbu.create 
-            :cbu-name "{}" 
-            :client-type "PENSION_FUND" 
-            :jurisdiction "DE" 
-            :nature-purpose "Investment management"
-            :description "Test fund for field validation"
-        )"#,
+        r#"(cbu.create :cbu-name "{}" :client-type "PENSION_FUND" :jurisdiction "DE" :nature-purpose "Investment management" :description "Test fund for field validation")"#,
         test_cbu_name
     );
 

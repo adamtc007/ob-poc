@@ -24,23 +24,33 @@ pub struct DocumentType {
     pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
-/// Document catalog entry - aligned with actual DB schema
+/// Document catalog entry - aligned with actual DB schema in data_designer
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct DocumentCatalogEntry {
-    pub document_id: Uuid,
-    pub document_code: String,
-    pub document_type_id: Uuid,
-    pub issuer_id: Option<Uuid>,
-    pub title: Option<String>,
-    pub description: Option<String>,
-    pub file_hash: Option<String>,
-    pub file_path: Option<String>,
-    pub mime_type: Option<String>,
-    pub confidentiality_level: Option<String>,
-    pub verification_status: Option<String>,
+    pub doc_id: Uuid,
+    pub document_name: Option<String>,
+    pub document_type_id: Option<Uuid>,
+    pub document_type_code: Option<String>,
     pub cbu_id: Option<Uuid>,
+    pub file_hash_sha256: Option<String>,
+    pub storage_key: Option<String>,
+    pub file_size_bytes: Option<i64>,
+    pub mime_type: Option<String>,
+    pub status: Option<String>,
+    pub metadata: Option<JsonValue>,
     pub created_at: Option<chrono::DateTime<chrono::Utc>>,
     pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+// Compatibility alias for code using document_id
+impl DocumentCatalogEntry {
+    pub fn document_id(&self) -> Uuid {
+        self.doc_id
+    }
+
+    pub fn document_code(&self) -> String {
+        self.document_name.clone().unwrap_or_default()
+    }
 }
 
 /// Fields for creating a new document catalog entry
@@ -127,39 +137,33 @@ impl DocumentService {
 
     /// Create a document catalog entry with NewDocumentFields
     pub async fn create_document(&self, fields: &NewDocumentFields) -> Result<Uuid> {
-        let document_id = Uuid::new_v4();
+        let doc_id = Uuid::new_v4();
 
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".document_catalog (
-                document_id, document_code, document_type_id, issuer_id, title,
-                description, file_hash, file_path, mime_type, confidentiality_level,
-                verification_status, cbu_id, created_at, updated_at
+                doc_id, document_name, document_type_id, cbu_id,
+                file_hash_sha256, mime_type, status, created_at, updated_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', $11, NOW(), NOW())
+            VALUES ($1, $2, $3, $4, $5, $6, 'active', NOW(), NOW())
             "#,
         )
-        .bind(document_id)
-        .bind(&fields.document_code)
+        .bind(doc_id)
+        .bind(&fields.document_code) // maps to document_name
         .bind(fields.document_type_id)
-        .bind(fields.issuer_id)
-        .bind(&fields.title)
-        .bind(&fields.description)
-        .bind(&fields.file_hash)
-        .bind(&fields.file_path)
-        .bind(&fields.mime_type)
-        .bind(&fields.confidentiality_level)
         .bind(fields.cbu_id)
+        .bind(&fields.file_hash)
+        .bind(&fields.mime_type)
         .execute(&self.pool)
         .await
         .context("Failed to create document catalog entry")?;
 
         info!(
-            "Created document catalog entry {} with code {} (type_id: {})",
-            document_id, fields.document_code, fields.document_type_id
+            "Created document catalog entry {} with name {} (type_id: {})",
+            doc_id, fields.document_code, fields.document_type_id
         );
 
-        Ok(document_id)
+        Ok(doc_id)
     }
 
     /// Create a document catalog entry (legacy interface for compatibility)
@@ -203,11 +207,11 @@ impl DocumentService {
     ) -> Result<Option<DocumentCatalogEntry>> {
         let result = sqlx::query_as::<_, DocumentCatalogEntry>(
             r#"
-            SELECT document_id, document_code, document_type_id, issuer_id, title,
-                   description, file_hash, file_path, mime_type, confidentiality_level,
-                   verification_status, cbu_id, created_at, updated_at
+            SELECT doc_id, document_name, document_type_id, document_type_code,
+                   cbu_id, file_hash_sha256, storage_key, file_size_bytes,
+                   mime_type, status, metadata, created_at, updated_at
             FROM "ob-poc".document_catalog
-            WHERE document_id = $1
+            WHERE doc_id = $1
             "#,
         )
         .bind(document_id)
@@ -222,9 +226,9 @@ impl DocumentService {
     pub async fn get_documents_for_cbu(&self, cbu_id: Uuid) -> Result<Vec<DocumentCatalogEntry>> {
         let results = sqlx::query_as::<_, DocumentCatalogEntry>(
             r#"
-            SELECT document_id, document_code, document_type_id, issuer_id, title,
-                   description, file_hash, file_path, mime_type, confidentiality_level,
-                   verification_status, cbu_id, created_at, updated_at
+            SELECT doc_id, document_name, document_type_id, document_type_code,
+                   cbu_id, file_hash_sha256, storage_key, file_size_bytes,
+                   mime_type, status, metadata, created_at, updated_at
             FROM "ob-poc".document_catalog
             WHERE cbu_id = $1
             ORDER BY created_at DESC
