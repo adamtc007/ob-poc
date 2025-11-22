@@ -531,7 +531,9 @@ impl Template {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dsl::generation::{GenerationContext, GenerationOperationType, GenerationRequest};
     use tempfile::tempdir;
+    use tokio::fs;
 
     // NOTE: The following template-based tests have been deleted as they tested
     // deprecated template system functionality that has been superseded by the

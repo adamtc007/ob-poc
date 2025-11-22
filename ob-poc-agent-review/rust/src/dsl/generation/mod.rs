@@ -216,6 +216,7 @@ pub fn create_auto_factory(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
     use tempfile::tempdir;
 
     #[test]

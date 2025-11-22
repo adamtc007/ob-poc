@@ -118,7 +118,7 @@ async fn test_cbu_model_saves_and_loads() {
     assert_eq!(model.states.initial, "Proposed");
     assert_eq!(model.states.transitions.len(), 6);
 
-    let _instance_id = model_service
+    let instance_id = model_service
         .save_model(TEST_CBU_MODEL, &model)
         .await
         .expect("Model save failed");
