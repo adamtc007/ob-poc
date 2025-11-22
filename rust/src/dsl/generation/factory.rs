@@ -253,8 +253,8 @@ impl GenerationFactory {
         &self,
         operation_type: &GenerationOperationType,
     ) -> GenerationResult<GeneratorSelection> {
-        let mut selection_confidence = 0.0;
-        let mut selection_reason = String::new();
+        let selection_confidence;
+        let selection_reason;
         let mut alternatives = vec![];
 
         // Check template availability

@@ -166,40 +166,6 @@ impl DocumentService {
         Ok(doc_id)
     }
 
-    /// Create a document catalog entry (legacy interface for compatibility)
-    pub async fn create_document_catalog_entry(
-        &self,
-        document_code: &str,
-        document_type_code: &str,
-        issuer_id: Option<Uuid>,
-        title: Option<&str>,
-        file_hash: Option<&str>,
-        file_path: Option<&str>,
-        mime_type: Option<&str>,
-        confidentiality_level: Option<&str>,
-    ) -> Result<Uuid> {
-        // Look up the document type ID from the code
-        let document_type_id = self
-            .get_document_type_id_by_code(document_type_code)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Document type '{}' not found", document_type_code))?;
-
-        let fields = NewDocumentFields {
-            document_code: document_code.to_string(),
-            document_type_id,
-            issuer_id,
-            title: title.map(|s| s.to_string()),
-            description: None,
-            file_hash: file_hash.map(|s| s.to_string()),
-            file_path: file_path.map(|s| s.to_string()),
-            mime_type: mime_type.map(|s| s.to_string()),
-            confidentiality_level: confidentiality_level.map(|s| s.to_string()),
-            cbu_id: None,
-        };
-
-        self.create_document(&fields).await
-    }
-
     /// Get document catalog entry by ID
     pub async fn get_document_by_id(
         &self,

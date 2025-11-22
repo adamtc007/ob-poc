@@ -17,7 +17,6 @@ use super::{
     AiDslGenerationService,
 };
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::sync::Arc;
 use tempfile::tempdir;
 use tokio::fs;
@@ -251,7 +250,9 @@ impl AiDslGenerationService for MockAiService {
 }
 
 /// Create test templates for equivalence testing
-async fn create_test_templates(templates_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+async fn create_test_templates(
+    templates_dir: &std::path::Path,
+) -> Result<(), Box<dyn std::error::Error>> {
     // Create onboarding directory
     let onboarding_dir = templates_dir.join("onboarding");
     fs::create_dir_all(&onboarding_dir).await?;
@@ -440,10 +441,10 @@ fn extract_dsl_keywords(content: &str) -> std::collections::HashSet<String> {
     // Extract S-expression patterns
     for line in content.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with('(') {
+        if let Some(stripped) = trimmed.strip_prefix('(') {
             // Extract the operation name (first word after opening paren)
-            if let Some(op_end) = trimmed[1..].find(|c: char| c.is_whitespace() || c == ')') {
-                let operation = &trimmed[1..=op_end];
+            if let Some(op_end) = stripped.find(|c: char| c.is_whitespace() || c == ')') {
+                let operation = &stripped[..op_end];
                 keywords.insert(operation.to_string());
             }
         }

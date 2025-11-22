@@ -588,7 +588,7 @@ Generate only the DSL content, without explanations or markdown formatting.
         confidence += complexity_score;
 
         // Clamp to valid range
-        confidence.max(0.0).min(1.0)
+        confidence.clamp(0.0, 1.0)
     }
 }
 

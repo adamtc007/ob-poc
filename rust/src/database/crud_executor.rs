@@ -242,6 +242,7 @@ impl CrudExecutor {
     }
 
     /// Split DSL values into CBU core fields and attribute values
+    #[allow(clippy::type_complexity)]
     fn split_cbu_values(
         &self,
         create: &DataCreate,
