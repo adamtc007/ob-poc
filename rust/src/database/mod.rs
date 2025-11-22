@@ -37,7 +37,9 @@ pub use cbu_service::{CbuRow, CbuService, NewCbuFields};
 pub use crud_executor::{CrudExecutionResult, CrudExecutor, ExecutionContext};
 pub use crud_service::{AssetType, CrudOperation, CrudService, OperationType};
 pub use dictionary_service::DictionaryDatabaseService;
-pub use document_service::{DocumentCatalogEntry, DocumentService, DocumentType};
+pub use document_service::{
+    DocumentCatalogEntry, DocumentService, DocumentType, NewDocumentFields,
+};
 pub use dsl_repository::{DslRepository, DslSaveResult};
 pub use entity_service::{EntityRow, EntityService, NewEntityFields, NewProperPersonFields};
 

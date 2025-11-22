@@ -2,6 +2,8 @@
 //!
 //! This module provides database operations for document types, catalog,
 //! metadata, and relationships following the document dictionary pattern.
+//!
+//! Schema aligned with "ob-poc".document_catalog table structure.
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -22,27 +24,44 @@ pub struct DocumentType {
     pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
-/// Document catalog entry
+/// Document catalog entry - aligned with actual DB schema
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct DocumentCatalogEntry {
-    pub doc_id: Uuid,
-    pub entity_id: String,
-    pub document_type: String,
-    pub issuer: Option<String>,
+    pub document_id: Uuid,
+    pub document_code: String,
+    pub document_type_id: Uuid,
+    pub issuer_id: Option<Uuid>,
     pub title: Option<String>,
+    pub description: Option<String>,
     pub file_hash: Option<String>,
-    pub storage_key: Option<String>,
+    pub file_path: Option<String>,
     pub mime_type: Option<String>,
     pub confidentiality_level: Option<String>,
-    pub status: String,
+    pub verification_status: Option<String>,
+    pub cbu_id: Option<Uuid>,
     pub created_at: Option<chrono::DateTime<chrono::Utc>>,
     pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+/// Fields for creating a new document catalog entry
+#[derive(Debug, Clone)]
+pub struct NewDocumentFields {
+    pub document_code: String,
+    pub document_type_id: Uuid,
+    pub issuer_id: Option<Uuid>,
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub file_hash: Option<String>,
+    pub file_path: Option<String>,
+    pub mime_type: Option<String>,
+    pub confidentiality_level: Option<String>,
+    pub cbu_id: Option<Uuid>,
 }
 
 /// Document metadata (attribute values extracted from documents)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DocumentMetadata {
-    pub doc_id: Uuid,
+    pub document_id: Uuid,
     pub attribute_id: Uuid,
     pub value: String,
 }
@@ -50,8 +69,8 @@ pub struct DocumentMetadata {
 /// Document relationship
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DocumentRelationship {
-    pub primary_doc_id: Uuid,
-    pub related_doc_id: Uuid,
+    pub source_document_id: Uuid,
+    pub target_document_id: Uuid,
     pub relationship_type: String,
 }
 
@@ -89,63 +108,109 @@ impl DocumentService {
         Ok(result)
     }
 
-    /// Create a document catalog entry
-    pub async fn create_document_catalog_entry(
-        &self,
-        entity_id: &str,
-        document_type: &str,
-        issuer: Option<&str>,
-        title: Option<&str>,
-        file_hash: Option<&str>,
-        storage_key: Option<&str>,
-        mime_type: Option<&str>,
-        confidentiality_level: Option<&str>,
-    ) -> Result<Uuid> {
-        let doc_id = Uuid::new_v4();
+    /// Get document type ID by code
+    pub async fn get_document_type_id_by_code(&self, type_code: &str) -> Result<Option<Uuid>> {
+        let result = sqlx::query_scalar::<_, Uuid>(
+            r#"
+            SELECT type_id
+            FROM "ob-poc".document_types
+            WHERE type_code = $1
+            "#,
+        )
+        .bind(type_code)
+        .fetch_optional(&self.pool)
+        .await
+        .context("Failed to get document type ID by code")?;
+
+        Ok(result)
+    }
+
+    /// Create a document catalog entry with NewDocumentFields
+    pub async fn create_document(&self, fields: &NewDocumentFields) -> Result<Uuid> {
+        let document_id = Uuid::new_v4();
 
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".document_catalog (
-                doc_id, entity_id, document_type, issuer, title,
-                file_hash, storage_key, mime_type, confidentiality_level,
-                status, created_at, updated_at
+                document_id, document_code, document_type_id, issuer_id, title,
+                description, file_hash, file_path, mime_type, confidentiality_level,
+                verification_status, cbu_id, created_at, updated_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'ACTIVE', NOW(), NOW())
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', $11, NOW(), NOW())
             "#,
         )
-        .bind(doc_id)
-        .bind(entity_id)
-        .bind(document_type)
-        .bind(issuer)
-        .bind(title)
-        .bind(file_hash)
-        .bind(storage_key)
-        .bind(mime_type)
-        .bind(confidentiality_level)
+        .bind(document_id)
+        .bind(&fields.document_code)
+        .bind(fields.document_type_id)
+        .bind(fields.issuer_id)
+        .bind(&fields.title)
+        .bind(&fields.description)
+        .bind(&fields.file_hash)
+        .bind(&fields.file_path)
+        .bind(&fields.mime_type)
+        .bind(&fields.confidentiality_level)
+        .bind(fields.cbu_id)
         .execute(&self.pool)
         .await
         .context("Failed to create document catalog entry")?;
 
         info!(
-            "Created document catalog entry {} for entity {} (type: {})",
-            doc_id, entity_id, document_type
+            "Created document catalog entry {} with code {} (type_id: {})",
+            document_id, fields.document_code, fields.document_type_id
         );
 
-        Ok(doc_id)
+        Ok(document_id)
+    }
+
+    /// Create a document catalog entry (legacy interface for compatibility)
+    pub async fn create_document_catalog_entry(
+        &self,
+        document_code: &str,
+        document_type_code: &str,
+        issuer_id: Option<Uuid>,
+        title: Option<&str>,
+        file_hash: Option<&str>,
+        file_path: Option<&str>,
+        mime_type: Option<&str>,
+        confidentiality_level: Option<&str>,
+    ) -> Result<Uuid> {
+        // Look up the document type ID from the code
+        let document_type_id = self
+            .get_document_type_id_by_code(document_type_code)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Document type '{}' not found", document_type_code))?;
+
+        let fields = NewDocumentFields {
+            document_code: document_code.to_string(),
+            document_type_id,
+            issuer_id,
+            title: title.map(|s| s.to_string()),
+            description: None,
+            file_hash: file_hash.map(|s| s.to_string()),
+            file_path: file_path.map(|s| s.to_string()),
+            mime_type: mime_type.map(|s| s.to_string()),
+            confidentiality_level: confidentiality_level.map(|s| s.to_string()),
+            cbu_id: None,
+        };
+
+        self.create_document(&fields).await
     }
 
     /// Get document catalog entry by ID
-    pub async fn get_document_by_id(&self, doc_id: Uuid) -> Result<Option<DocumentCatalogEntry>> {
+    pub async fn get_document_by_id(
+        &self,
+        document_id: Uuid,
+    ) -> Result<Option<DocumentCatalogEntry>> {
         let result = sqlx::query_as::<_, DocumentCatalogEntry>(
             r#"
-            SELECT doc_id, entity_id, document_type, issuer, title,
-                   file_hash, storage_key, mime_type, confidentiality_level,
-                   status, created_at, updated_at
+            SELECT document_id, document_code, document_type_id, issuer_id, title,
+                   description, file_hash, file_path, mime_type, confidentiality_level,
+                   verification_status, cbu_id, created_at, updated_at
             FROM "ob-poc".document_catalog
-            WHERE doc_id = $1
+            WHERE document_id = $1
             "#,
         )
-        .bind(doc_id)
+        .bind(document_id)
         .fetch_optional(&self.pool)
         .await
         .context("Failed to get document by ID")?;
@@ -153,25 +218,45 @@ impl DocumentService {
         Ok(result)
     }
 
-    /// Get documents for an entity
-    pub async fn get_documents_for_entity(
-        &self,
-        entity_id: &str,
-    ) -> Result<Vec<DocumentCatalogEntry>> {
+    /// Get documents for a CBU
+    pub async fn get_documents_for_cbu(&self, cbu_id: Uuid) -> Result<Vec<DocumentCatalogEntry>> {
         let results = sqlx::query_as::<_, DocumentCatalogEntry>(
             r#"
-            SELECT doc_id, entity_id, document_type, issuer, title,
-                   file_hash, storage_key, mime_type, confidentiality_level,
-                   status, created_at, updated_at
+            SELECT document_id, document_code, document_type_id, issuer_id, title,
+                   description, file_hash, file_path, mime_type, confidentiality_level,
+                   verification_status, cbu_id, created_at, updated_at
             FROM "ob-poc".document_catalog
-            WHERE entity_id = $1
+            WHERE cbu_id = $1
             ORDER BY created_at DESC
             "#,
         )
-        .bind(entity_id)
+        .bind(cbu_id)
         .fetch_all(&self.pool)
         .await
-        .context("Failed to get documents for entity")?;
+        .context("Failed to get documents for CBU")?;
+
+        Ok(results)
+    }
+
+    /// Get documents by document code pattern
+    pub async fn get_documents_by_code(
+        &self,
+        document_code: &str,
+    ) -> Result<Vec<DocumentCatalogEntry>> {
+        let results = sqlx::query_as::<_, DocumentCatalogEntry>(
+            r#"
+            SELECT document_id, document_code, document_type_id, issuer_id, title,
+                   description, file_hash, file_path, mime_type, confidentiality_level,
+                   verification_status, cbu_id, created_at, updated_at
+            FROM "ob-poc".document_catalog
+            WHERE document_code = $1
+            ORDER BY created_at DESC
+            "#,
+        )
+        .bind(document_code)
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to get documents by code")?;
 
         Ok(results)
     }
@@ -179,19 +264,19 @@ impl DocumentService {
     /// Set document metadata (attribute extracted from document)
     pub async fn set_document_metadata(
         &self,
-        doc_id: Uuid,
+        document_id: Uuid,
         attribute_id: Uuid,
         value: &str,
     ) -> Result<()> {
         sqlx::query(
             r#"
-            INSERT INTO "ob-poc".document_metadata (doc_id, attribute_id, value, created_at, updated_at)
+            INSERT INTO "ob-poc".document_metadata (document_id, attribute_id, value, created_at, updated_at)
             VALUES ($1, $2, $3, NOW(), NOW())
-            ON CONFLICT (doc_id, attribute_id)
+            ON CONFLICT (document_id, attribute_id)
             DO UPDATE SET value = $3, updated_at = NOW()
             "#,
         )
-        .bind(doc_id)
+        .bind(document_id)
         .bind(attribute_id)
         .bind(value)
         .execute(&self.pool)
@@ -200,22 +285,22 @@ impl DocumentService {
 
         info!(
             "Set metadata for doc {} attribute {} = '{}'",
-            doc_id, attribute_id, value
+            document_id, attribute_id, value
         );
 
         Ok(())
     }
 
     /// Get all metadata for a document
-    pub async fn get_document_metadata(&self, doc_id: Uuid) -> Result<Vec<(Uuid, String)>> {
+    pub async fn get_document_metadata(&self, document_id: Uuid) -> Result<Vec<(Uuid, String)>> {
         let rows = sqlx::query_as::<_, (Uuid, String)>(
             r#"
             SELECT attribute_id, value
             FROM "ob-poc".document_metadata
-            WHERE doc_id = $1
+            WHERE document_id = $1
             "#,
         )
-        .bind(doc_id)
+        .bind(document_id)
         .fetch_all(&self.pool)
         .await
         .context("Failed to get document metadata")?;
@@ -226,22 +311,22 @@ impl DocumentService {
     /// Link two documents with a relationship
     pub async fn link_documents(
         &self,
-        primary_doc_id: Uuid,
-        related_doc_id: Uuid,
+        source_document_id: Uuid,
+        target_document_id: Uuid,
         relationship_type: &str,
     ) -> Result<()> {
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".document_relationships (
-                primary_doc_id, related_doc_id, relationship_type, created_at
+                source_document_id, target_document_id, relationship_type, created_at
             )
             VALUES ($1, $2, $3, NOW())
-            ON CONFLICT (primary_doc_id, related_doc_id, relationship_type)
+            ON CONFLICT (source_document_id, target_document_id, relationship_type)
             DO NOTHING
             "#,
         )
-        .bind(primary_doc_id)
-        .bind(related_doc_id)
+        .bind(source_document_id)
+        .bind(target_document_id)
         .bind(relationship_type)
         .execute(&self.pool)
         .await
@@ -249,7 +334,7 @@ impl DocumentService {
 
         info!(
             "Linked documents {} -> {} ({})",
-            primary_doc_id, related_doc_id, relationship_type
+            source_document_id, target_document_id, relationship_type
         );
 
         Ok(())
@@ -279,17 +364,17 @@ impl DocumentService {
         }
     }
 
-    /// Update document status
-    pub async fn update_document_status(&self, doc_id: Uuid, status: &str) -> Result<bool> {
+    /// Update document verification status
+    pub async fn update_document_status(&self, document_id: Uuid, status: &str) -> Result<bool> {
         let result = sqlx::query(
             r#"
             UPDATE "ob-poc".document_catalog
-            SET status = $1, updated_at = NOW()
-            WHERE doc_id = $2
+            SET verification_status = $1, updated_at = NOW()
+            WHERE document_id = $2
             "#,
         )
         .bind(status)
-        .bind(doc_id)
+        .bind(document_id)
         .execute(&self.pool)
         .await
         .context("Failed to update document status")?;
@@ -322,14 +407,21 @@ impl DocumentService {
         display_name: &str,
         category: &str,
         description: &str,
-    ) -> Result<()> {
+    ) -> Result<Uuid> {
+        // Try to get existing type first
+        if let Some(existing) = self.get_document_type_by_code(type_code).await? {
+            return Ok(existing.type_id);
+        }
+
+        // Create new type
+        let type_id = Uuid::new_v4();
         sqlx::query(
             r#"
-            INSERT INTO "ob-poc".document_types (type_code, display_name, category, description)
-            VALUES ($1, $2, $3, $4)
-            ON CONFLICT (type_code) DO NOTHING
+            INSERT INTO "ob-poc".document_types (type_id, type_code, display_name, category, description)
+            VALUES ($1, $2, $3, $4, $5)
             "#,
         )
+        .bind(type_id)
         .bind(type_code)
         .bind(display_name)
         .bind(category)
@@ -338,22 +430,77 @@ impl DocumentService {
         .await
         .context("Failed to ensure document type")?;
 
-        Ok(())
+        Ok(type_id)
     }
 
-    /// Get document metadata by document ID
+    /// Link a document to a CBU
+    pub async fn link_document_to_cbu(&self, document_id: Uuid, cbu_id: Uuid) -> Result<bool> {
+        let result = sqlx::query(
+            r#"
+            UPDATE "ob-poc".document_catalog
+            SET cbu_id = $1, updated_at = NOW()
+            WHERE document_id = $2
+            "#,
+        )
+        .bind(cbu_id)
+        .bind(document_id)
+        .execute(&self.pool)
+        .await
+        .context("Failed to link document to CBU")?;
+
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// Create a document catalog entry with full metadata
+    /// Used by cbu_crud_template service for template/instance tracking
+    pub async fn create_document_with_metadata(
+        &self,
+        document_id: Uuid,
+        type_code: &str,
+        name: &str,
+        metadata: serde_json::Value,
+    ) -> Result<Uuid> {
+        // Look up document type ID
+        let document_type_id = self
+            .get_document_type_id_by_code(type_code)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Document type '{}' not found", type_code))?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".document_catalog (
+                document_id, document_code, document_type_id,
+                title, extracted_attributes, verification_status
+            )
+            VALUES ($1, $2, $3, $4, $5, 'pending')
+            "#,
+        )
+        .bind(document_id)
+        .bind(name)
+        .bind(document_type_id)
+        .bind(name)
+        .bind(metadata)
+        .execute(&self.pool)
+        .await
+        .context("Failed to create document with metadata")?;
+
+        Ok(document_id)
+    }
+
+    /// Get document catalog entry by ID (returns name and metadata)
+    /// Used by cbu_crud_template service
     pub async fn get_document_catalog_entry(
         &self,
-        doc_id: Uuid,
+        document_id: Uuid,
     ) -> Result<Option<(String, serde_json::Value)>> {
         let row = sqlx::query_as::<_, (String, serde_json::Value)>(
             r#"
-            SELECT document_name, metadata
+            SELECT COALESCE(title, document_code), COALESCE(extracted_attributes, '{}'::jsonb)
             FROM "ob-poc".document_catalog
             WHERE document_id = $1
             "#,
         )
-        .bind(doc_id)
+        .bind(document_id)
         .fetch_optional(&self.pool)
         .await
         .context("Failed to get document catalog entry")?;
@@ -362,54 +509,37 @@ impl DocumentService {
     }
 
     /// Find template document by template_id in metadata
+    /// Used by cbu_crud_template service
     pub async fn find_template_by_id(
         &self,
         template_id: &str,
     ) -> Result<Option<(Uuid, serde_json::Value)>> {
+        // Look up the document type ID for templates
+        let type_id = self
+            .get_document_type_id_by_code("DSL.CRUD.CBU.TEMPLATE")
+            .await?;
+
+        if type_id.is_none() {
+            return Ok(None);
+        }
+
         let row = sqlx::query_as::<_, (Uuid, serde_json::Value)>(
             r#"
-            SELECT document_id, metadata
+            SELECT document_id, COALESCE(extracted_attributes, '{}'::jsonb)
             FROM "ob-poc".document_catalog
-            WHERE document_type_code = 'DSL.CRUD.CBU.TEMPLATE'
-            AND metadata->>'template_id' = $1
-            AND status = 'active'
+            WHERE document_type_id = $1
+            AND extracted_attributes->>'template_id' = $2
+            AND verification_status != 'deleted'
             ORDER BY created_at DESC
             LIMIT 1
             "#,
         )
+        .bind(type_id.unwrap())
         .bind(template_id)
         .fetch_optional(&self.pool)
         .await
         .context("Failed to find template by ID")?;
 
         Ok(row)
-    }
-
-    /// Create a document catalog entry with full metadata (simplified version)
-    pub async fn create_document_with_metadata(
-        &self,
-        doc_id: Uuid,
-        type_code: &str,
-        name: &str,
-        metadata: serde_json::Value,
-    ) -> Result<Uuid> {
-        sqlx::query(
-            r#"
-            INSERT INTO "ob-poc".document_catalog (
-                document_id, document_type_code, document_name,
-                source_system, status, metadata
-            )
-            VALUES ($1, $2, $3, 'ob-poc', 'active', $4)
-            "#,
-        )
-        .bind(doc_id)
-        .bind(type_code)
-        .bind(name)
-        .bind(metadata)
-        .execute(&self.pool)
-        .await
-        .context("Failed to create document with metadata")?;
-
-        Ok(doc_id)
     }
 }

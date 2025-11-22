@@ -222,7 +222,8 @@ impl CbuCrudTemplateService {
                 "DSL",
                 "Parametrized CBU CRUD recipe",
             )
-            .await
+            .await?;
+        Ok(())
     }
 
     /// Instantiate a CRUD sheet from a template
@@ -317,7 +318,8 @@ impl CbuCrudTemplateService {
                 "DSL",
                 "Concrete CBU CRUD execution document",
             )
-            .await
+            .await?;
+        Ok(())
     }
 
     /// Load a template by its ID

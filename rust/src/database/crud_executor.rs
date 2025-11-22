@@ -9,7 +9,8 @@
 use crate::cbu_model_dsl::ast::CbuModel;
 use crate::database::{
     AttributeValuesService, CbuEntityRolesService, CbuService, DictionaryDatabaseService,
-    EntityService, NewCbuFields, NewEntityFields, NewProperPersonFields,
+    DocumentService, EntityService, NewCbuFields, NewDocumentFields, NewEntityFields,
+    NewProperPersonFields,
 };
 use crate::forth_engine::env::RuntimeEnv;
 use crate::parser::ast::{
@@ -60,6 +61,7 @@ pub struct CrudExecutor {
     pool: PgPool,
     cbu_service: CbuService,
     entity_service: EntityService,
+    document_service: DocumentService,
     #[allow(dead_code)]
     cbu_entity_roles_service: CbuEntityRolesService,
     attribute_values_service: AttributeValuesService,
@@ -72,6 +74,7 @@ impl CrudExecutor {
         Self {
             cbu_service: CbuService::new(pool.clone()),
             entity_service: EntityService::new(pool.clone()),
+            document_service: DocumentService::new(pool.clone()),
             cbu_entity_roles_service: CbuEntityRolesService::new(pool.clone()),
             attribute_values_service: AttributeValuesService::new(pool.clone()),
             dictionary_service: DictionaryDatabaseService::new(pool.clone()),
@@ -475,6 +478,69 @@ impl CrudExecutor {
                     asset: "ATTRIBUTE".to_string(),
                     rows_affected: 1,
                     generated_id: None,
+                    data: None,
+                })
+            }
+
+            "DOCUMENT" => {
+                // Map DSL fields to document catalog
+                // DSL keywords: :doc-id, :doc-type, :document-code, :title, :cbu-id
+                let document_code = self
+                    .get_string_value(&create.values, "doc-id")
+                    .or_else(|| self.get_string_value(&create.values, "document-code"))
+                    .unwrap_or_else(|| format!("DOC-{}", Uuid::new_v4()));
+
+                let doc_type_code = self
+                    .get_string_value(&create.values, "doc-type")
+                    .or_else(|| self.get_string_value(&create.values, "document-type"))
+                    .unwrap_or_else(|| "GENERAL".to_string());
+
+                // Look up document type ID
+                let document_type_id = self
+                    .document_service
+                    .get_document_type_id_by_code(&doc_type_code)
+                    .await?
+                    .ok_or_else(|| anyhow!("Document type '{}' not found", doc_type_code))?;
+
+                // Parse CBU ID if provided
+                let cbu_id =
+                    if let Some(cbu_id_str) = self.get_string_value(&create.values, "cbu-id") {
+                        Some(Uuid::parse_str(&cbu_id_str)?)
+                    } else {
+                        None
+                    };
+
+                // Parse issuer ID if provided
+                let issuer_id =
+                    if let Some(issuer_str) = self.get_string_value(&create.values, "issuer-id") {
+                        Some(Uuid::parse_str(&issuer_str)?)
+                    } else {
+                        None
+                    };
+
+                let fields = NewDocumentFields {
+                    document_code: document_code.clone(),
+                    document_type_id,
+                    issuer_id,
+                    title: self.get_string_value(&create.values, "title"),
+                    description: self.get_string_value(&create.values, "description"),
+                    file_hash: self.get_string_value(&create.values, "file-hash"),
+                    file_path: self.get_string_value(&create.values, "file-path"),
+                    mime_type: self.get_string_value(&create.values, "mime-type"),
+                    confidentiality_level: self
+                        .get_string_value(&create.values, "confidentiality-level"),
+                    cbu_id,
+                };
+
+                let document_id = self.document_service.create_document(&fields).await?;
+
+                info!("Created document: {} ({})", document_code, document_id);
+
+                Ok(CrudExecutionResult {
+                    operation: "CREATE".to_string(),
+                    asset: "DOCUMENT".to_string(),
+                    rows_affected: 1,
+                    generated_id: Some(document_id),
                     data: None,
                 })
             }
