@@ -229,7 +229,7 @@ impl AiDslGenerator {
 
         if lower.contains("create") && lower.contains("cbu") {
             // Template for CBU creation
-            format!("CREATE CBU WITH {}", instruction)
+            Self::generate_cbu_create_dsl(instruction)
         } else if lower.contains("connect") {
             // Template for entity connection
             format!("CONNECT ENTITY {}", instruction)
