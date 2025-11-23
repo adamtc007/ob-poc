@@ -4,7 +4,8 @@
 //! and persistence as documents.
 
 use crate::cbu_model_dsl::ast::CbuModel;
-use crate::cbu_model_dsl::parser::{CbuModelError, CbuModelParser};
+use crate::cbu_model_dsl::ast::CbuModelError;
+use crate::forth_engine::cbu_model_parser::CbuModelParser;
 use crate::database::{DictionaryDatabaseService, DslRepository};
 use serde_json::Value as JsonValue;
 use sqlx::PgPool;

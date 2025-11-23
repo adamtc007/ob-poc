@@ -51,8 +51,12 @@ fn validate_stack_effects(program: &Program, vocab: &Vocab) -> Result<(), Compil
             }
             // All literal instructions push one value onto the stack
             Instruction::LitInt(_)
+            | Instruction::LitFloat(_)
             | Instruction::LitStr(_)
             | Instruction::LitKeyword(_)
+            | Instruction::LitDottedKeyword(_)
+            | Instruction::LitList(_)
+            | Instruction::LitMap(_)
             | Instruction::AttrRef(_)
             | Instruction::DocRef(_) => {
                 stack_depth += 1;
@@ -83,8 +87,10 @@ fn compile_expr_inner(
         }
         Expr::StringLiteral(s) => instructions.push(Instruction::LitStr(s.clone())),
         Expr::IntegerLiteral(i) => instructions.push(Instruction::LitInt(*i)),
+        Expr::FloatLiteral(f) => instructions.push(Instruction::LitFloat(*f)),
         Expr::BoolLiteral(b) => instructions.push(Instruction::LitInt(if *b { 1 } else { 0 })),
         Expr::Keyword(k) => instructions.push(Instruction::LitKeyword(k.clone())),
+        Expr::DottedKeyword(parts) => instructions.push(Instruction::LitDottedKeyword(parts.clone())),
         Expr::AttributeRef(name) => {
             let attr_id = resolve_attribute_id(name)?;
             instructions.push(Instruction::AttrRef(attr_id));
@@ -92,6 +98,29 @@ fn compile_expr_inner(
         Expr::DocumentRef(name) => {
             let doc_id = resolve_document_id(name)?;
             instructions.push(Instruction::DocRef(doc_id));
+        }
+        Expr::ListLiteral(items) => {
+            // Compile each item and collect into a list instruction
+            let mut compiled_items = Vec::new();
+            for item in items {
+                let mut item_instructions = Vec::new();
+                compile_expr_inner(item, vocab, &mut item_instructions)?;
+                compiled_items.extend(item_instructions);
+            }
+            instructions.push(Instruction::LitList(compiled_items));
+        }
+        Expr::MapLiteral(pairs) => {
+            // Compile each key-value pair
+            let mut compiled_pairs = Vec::new();
+            for (key, value) in pairs {
+                let mut value_instructions = Vec::new();
+                compile_expr_inner(value, vocab, &mut value_instructions)?;
+                compiled_pairs.push((key.clone(), value_instructions));
+            }
+            instructions.push(Instruction::LitMap(compiled_pairs));
+        }
+        Expr::Comment(_) => {
+            // Comments are ignored during compilation
         }
     }
     Ok(())

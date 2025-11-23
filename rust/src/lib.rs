@@ -4,7 +4,8 @@
 //! following the proven call chain architecture.
 //!
 //! ## Clean Architecture
-//! DSL Manager → DSL Mod → DB State Manager → DSL Visualizer
+//! All DSL operations flow through the Forth engine:
+//! DSL Source -> Forth Parser -> Expr AST -> Compile -> VM Execute
 //!
 //! ## Quick Start
 //!
@@ -23,19 +24,12 @@ pub mod error;
 // Essential AST types
 pub mod ast;
 
-// Core parser with full DSL capabilities (includes AST types in parser::ast)
-pub mod parser;
-
 // Data dictionary and vocabulary management
 pub mod data_dictionary;
 pub mod vocabulary;
 
 // Domain handlers for business logic
 pub mod domains;
-
-// Execution engine for DSL operations
-// #[cfg(feature = "database")]
-// pub mod execution;
 
 // Database integration (when enabled)
 #[cfg(feature = "database")]
@@ -53,7 +47,7 @@ pub mod dsl_visualizer;
 #[cfg(feature = "database")]
 pub mod services;
 
-// Forth-style DSL execution engine
+// Forth-style DSL execution engine - THE single DSL processing path
 pub mod forth_engine;
 
 // CBU Model DSL - specification DSL for CBU business models
@@ -76,12 +70,8 @@ pub use dsl_visualizer::{DslVisualizer, VisualizationResult};
 #[cfg(feature = "database")]
 pub use database::{DatabaseConfig, DatabaseManager, DictionaryDatabaseService};
 
-// Services module (when database feature is enabled)
-// Note: Most types are already re-exported from dsl_manager above
-
-// Core parsing and execution capabilities
+// Core domain capabilities
 pub use domains::{DomainHandler, DomainRegistry, DomainResult};
-pub use parser::{PropertyMap, Value};
 
 // Vocabulary
 pub use vocabulary::vocab_registry::VocabularyRegistry;
@@ -92,10 +82,15 @@ pub use error::{DSLError, ParseError};
 // Core AST types (EntityLabel, EdgeType for graph operations)
 pub use ast::{EdgeType, EntityLabel};
 
+// Forth engine types - the canonical DSL interface
+pub use forth_engine::ast::{DslParser, DslSheet, Expr};
+pub use forth_engine::parser_nom::NomDslParser;
+
 // CBU Model DSL types
 #[cfg(feature = "database")]
 pub use cbu_model_dsl::CbuModelService;
-pub use cbu_model_dsl::{CbuModel, CbuModelError, CbuModelParser};
+pub use cbu_model_dsl::{CbuModel, CbuModelError};
+pub use forth_engine::cbu_model_parser::CbuModelParser;
 
 // CBU CRUD Template types
 #[cfg(feature = "database")]
@@ -103,26 +98,6 @@ pub use cbu_crud_template::{CbuCrudTemplate, CbuCrudTemplateService, DslDocSourc
 
 // System info
 pub use system_info as get_system_info;
-
-/// Parse DSL program using full parser capabilities
-pub use parser::{
-    execute_dsl, parse_normalize_and_validate, parse_program,
-    ExecutionResult as ParserExecutionResult,
-};
-
-/// Parse DSL with full normalization and validation
-pub fn parse_dsl(input: &str) -> Result<parser::Program, ParseError> {
-    parse_program(input).map_err(|e| ParseError::Internal {
-        message: format!("Parse error: {:?}", e),
-    })
-}
-
-/// Execute DSL program
-pub fn execute_dsl_program(program: &parser::Program) -> Result<ParserExecutionResult, ParseError> {
-    execute_dsl(program).map_err(|e| ParseError::Internal {
-        message: format!("Execution error: {:?}", e),
-    })
-}
 
 /// System information module
 pub mod system_info {

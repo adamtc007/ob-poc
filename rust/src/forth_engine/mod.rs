@@ -2,7 +2,7 @@
 
 use crate::forth_engine::env::RuntimeEnv;
 use crate::forth_engine::kyc_vocab::kyc_orch_vocab;
-use crate::forth_engine::parser_nom::NomKycParser;
+use crate::forth_engine::parser_nom::NomDslParser;
 use crate::forth_engine::vm::VM;
 use std::sync::Arc;
 
@@ -24,6 +24,7 @@ pub mod parser_nom;
 pub mod value;
 pub mod vm;
 pub mod vocab;
+pub mod cbu_model_parser;
 
 // Re-export key types
 pub use ast::{DslParser, DslSheet, Expr};
@@ -273,7 +274,7 @@ fn execute_sheet_internal_with_env(
     #[cfg(not(feature = "database"))] _pool: Option<()>,
 ) -> Result<(ExecutionResult, RuntimeEnv), EngineError> {
     // 1. Parsing (sheet.content -> AST)
-    let parser = NomKycParser::new();
+    let parser = NomDslParser::new();
     let ast = parser.parse(&sheet.content)?;
 
     // 2. Compiling (AST -> Bytecode)
@@ -632,7 +633,7 @@ mod tests {
 
     #[test]
     fn test_cbu_create_emits_crud_statement() {
-        use crate::parser::ast::CrudStatement;
+        use crate::forth_engine::value::CrudStatement;
 
         let sheet = DslSheet {
             id: "test-crud".to_string(),
@@ -663,7 +664,7 @@ mod tests {
 
     #[test]
     fn test_cbu_model_state_transitions() {
-        use crate::cbu_model_dsl::CbuModelParser;
+        use crate::forth_engine::cbu_model_parser::CbuModelParser;
         use crate::forth_engine::env::OnboardingRequestId;
 
         let model_dsl = r#"
@@ -706,7 +707,7 @@ mod tests {
 
     #[test]
     fn test_multiple_cbu_operations_emit_crud() {
-        use crate::parser::ast::CrudStatement;
+        use crate::forth_engine::value::CrudStatement;
 
         let sheet = DslSheet {
             id: "test-multi-crud".to_string(),

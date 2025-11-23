@@ -4,7 +4,7 @@
 
 use crate::cbu_model_dsl::ast::CbuModel;
 use crate::forth_engine::value::{AttributeId, DocumentId, Value};
-use crate::parser::ast::CrudStatement;
+use crate::forth_engine::value::CrudStatement;
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 

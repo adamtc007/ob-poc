@@ -1,6 +1,8 @@
 //! Natural language to DSL parser for taxonomy operations
 
 use super::crud_ast::*;
+use crate::forth_engine::ast::{DslParser, Expr};
+use crate::forth_engine::parser_nom::NomDslParser;
 use anyhow::{anyhow, Result};
 use regex::Regex;
 use std::collections::HashMap;
@@ -32,26 +34,177 @@ impl TaxonomyDslParser {
     }
 
     fn parse_structured_dsl(input: &str) -> Result<TaxonomyCrudStatement> {
-        // Parse S-expression style DSL
-        let cleaned = input.trim_start_matches('(').trim_end_matches(')');
-        let parts: Vec<&str> = cleaned.split_whitespace().collect();
-
-        if parts.is_empty() {
+        let parser = NomDslParser::new();
+        let exprs = parser.parse(input)
+            .map_err(|e| anyhow!("Parse error: {}", e))?;
+        
+        if exprs.is_empty() {
             return Err(anyhow!("Empty DSL statement"));
         }
+        
+        Self::ast_to_crud_statement(&exprs[0])
+    }
 
-        match parts[0] {
-            "product.create" => Self::parse_product_create_dsl(&parts[1..]),
-            "service.create" => Self::parse_service_create_dsl(&parts[1..]),
-            "onboarding.create" => Self::parse_onboarding_create_dsl(&parts[1..]),
-            "products.add" => Self::parse_products_add_dsl(&parts[1..]),
-            "service.configure" => Self::parse_service_configure_dsl(&parts[1..]),
-            "services.discover" => Self::parse_services_discover_dsl(&parts[1..]),
-            "workflow.query" => Self::parse_workflow_query_dsl(&parts[1..]),
-            _ => Err(anyhow!("Unknown DSL operation: {}", parts[0])),
+    fn ast_to_crud_statement(expr: &Expr) -> Result<TaxonomyCrudStatement> {
+        match expr {
+            Expr::WordCall { name, args } => {
+                let params = Self::extract_keyword_pairs(args)?;
+                
+                match name.as_str() {
+                    "product.create" => Self::build_create_product(params),
+                    "service.create" => Self::build_create_service(params),
+                    "onboarding.create" => Self::build_create_onboarding(params),
+                    "products.add" => Self::build_add_products(params),
+                    "service.configure" => Self::build_configure_service(params),
+                    "services.discover" => Self::build_discover_services(params),
+                    "workflow.query" => Self::build_query_workflow(params),
+                    _ => Err(anyhow!("Unknown DSL operation: {}", name)),
+                }
+            }
+            _ => Err(anyhow!("Expected WordCall expression")),
         }
     }
 
+    fn extract_keyword_pairs(args: &[Expr]) -> Result<HashMap<String, serde_json::Value>> {
+        let mut params = HashMap::new();
+        let mut i = 0;
+        
+        while i < args.len() {
+            if let Expr::Keyword(key) = &args[i] {
+                let key_name = key.trim_start_matches(':').to_string();
+                if i + 1 < args.len() {
+                    let value = Self::expr_to_json_value(&args[i + 1])?;
+                    params.insert(key_name, value);
+                    i += 2;
+                } else {
+                    return Err(anyhow!("Keyword {} missing value", key));
+                }
+            } else {
+                i += 1;
+            }
+        }
+        
+        Ok(params)
+    }
+
+    fn expr_to_json_value(expr: &Expr) -> Result<serde_json::Value> {
+        match expr {
+            Expr::StringLiteral(s) => Ok(serde_json::json!(s)),
+            Expr::IntegerLiteral(n) => Ok(serde_json::json!(n)),
+            Expr::BoolLiteral(b) => Ok(serde_json::json!(b)),
+            Expr::Keyword(k) => Ok(serde_json::json!(k)),
+            _ => Err(anyhow!("Cannot convert {:?} to JSON value", expr)),
+        }
+    }
+
+    fn build_create_product(mut params: HashMap<String, serde_json::Value>) -> Result<TaxonomyCrudStatement> {
+        Ok(TaxonomyCrudStatement::CreateProduct(CreateProduct {
+            product_code: params.remove("code")
+                .ok_or_else(|| anyhow!("Missing :code parameter"))?
+                .as_str().unwrap().to_string(),
+            name: params.remove("name")
+                .ok_or_else(|| anyhow!("Missing :name parameter"))?
+                .as_str().unwrap().to_string(),
+            category: params.remove("category").and_then(|v| v.as_str().map(String::from)),
+            regulatory_framework: params.remove("regulatory").and_then(|v| v.as_str().map(String::from)),
+            min_asset_requirement: params.remove("min-assets").and_then(|v| v.as_f64()),
+            metadata: if params.is_empty() { None } else { Some(params) },
+        }))
+    }
+
+    fn build_create_service(mut params: HashMap<String, serde_json::Value>) -> Result<TaxonomyCrudStatement> {
+        Ok(TaxonomyCrudStatement::CreateService(CreateService {
+            service_code: params.remove("code")
+                .ok_or_else(|| anyhow!("Missing :code parameter"))?
+                .as_str().unwrap().to_string(),
+            name: params.remove("name")
+                .ok_or_else(|| anyhow!("Missing :name parameter"))?
+                .as_str().unwrap().to_string(),
+            category: params.remove("category").and_then(|v| v.as_str().map(String::from)),
+            sla_definition: params.remove("sla"),
+            options: Vec::new(),
+        }))
+    }
+
+    fn build_create_onboarding(mut params: HashMap<String, serde_json::Value>) -> Result<TaxonomyCrudStatement> {
+        let cbu_id_str = params.remove("cbu-id")
+            .ok_or_else(|| anyhow!("Missing :cbu-id parameter"))?;
+        let cbu_id = Uuid::parse_str(cbu_id_str.as_str().unwrap())
+            .map_err(|e| anyhow!("Invalid UUID: {}", e))?;
+        
+        Ok(TaxonomyCrudStatement::CreateOnboarding(CreateOnboarding {
+            cbu_id,
+            initiated_by: params.remove("initiated-by")
+                .and_then(|v| v.as_str().map(String::from))
+                .unwrap_or_else(|| "system".to_string()),
+            metadata: if params.is_empty() { None } else { Some(params) },
+        }))
+    }
+
+    fn build_add_products(mut params: HashMap<String, serde_json::Value>) -> Result<TaxonomyCrudStatement> {
+        let onboarding_id_str = params.remove("onboarding-id")
+            .ok_or_else(|| anyhow!("Missing :onboarding-id parameter"))?;
+        let onboarding_id = Uuid::parse_str(onboarding_id_str.as_str().unwrap())
+            .map_err(|e| anyhow!("Invalid UUID: {}", e))?;
+        
+        let products = params.remove("products")
+            .ok_or_else(|| anyhow!("Missing :products parameter"))?;
+        let product_codes: Vec<String> = serde_json::from_value(products)
+            .map_err(|e| anyhow!("Invalid products list: {}", e))?;
+        
+        Ok(TaxonomyCrudStatement::AddProductsToOnboarding(AddProductsToOnboarding {
+            onboarding_id,
+            product_codes,
+            auto_discover_services: params.remove("auto-discover")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
+        }))
+    }
+
+    fn build_configure_service(mut params: HashMap<String, serde_json::Value>) -> Result<TaxonomyCrudStatement> {
+        let onboarding_id_str = params.remove("onboarding-id")
+            .ok_or_else(|| anyhow!("Missing :onboarding-id parameter"))?;
+        let onboarding_id = Uuid::parse_str(onboarding_id_str.as_str().unwrap())
+            .map_err(|e| anyhow!("Invalid UUID: {}", e))?;
+        
+        let service_code = params.remove("service-code")
+            .ok_or_else(|| anyhow!("Missing :service-code parameter"))?
+            .as_str().unwrap().to_string();
+        
+        Ok(TaxonomyCrudStatement::ConfigureService(ConfigureService {
+            onboarding_id,
+            service_code,
+            options: params,
+        }))
+    }
+
+    fn build_discover_services(mut params: HashMap<String, serde_json::Value>) -> Result<TaxonomyCrudStatement> {
+        let product_id_str = params.remove("product-id")
+            .ok_or_else(|| anyhow!("Missing :product-id parameter"))?;
+        let product_id = Uuid::parse_str(product_id_str.as_str().unwrap())
+            .map_err(|e| anyhow!("Invalid UUID: {}", e))?;
+        
+        Ok(TaxonomyCrudStatement::DiscoverServices(DiscoverServices {
+            product_id,
+            include_optional: params.remove("include-optional")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
+        }))
+    }
+
+    fn build_query_workflow(mut params: HashMap<String, serde_json::Value>) -> Result<TaxonomyCrudStatement> {
+        let onboarding_id_str = params.remove("onboarding-id")
+            .ok_or_else(|| anyhow!("Missing :onboarding-id parameter"))?;
+        let onboarding_id = Uuid::parse_str(onboarding_id_str.as_str().unwrap())
+            .map_err(|e| anyhow!("Invalid UUID: {}", e))?;
+        
+        Ok(TaxonomyCrudStatement::QueryWorkflow(QueryWorkflow {
+            onboarding_id,
+            include_history: params.remove("include-history")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
+        }))
+    }
     fn parse_create_product(input: &str) -> Result<TaxonomyCrudStatement> {
         let product_code = Self::extract_code(input)
             .or_else(|| Self::extract_after_keyword(input, "code"))

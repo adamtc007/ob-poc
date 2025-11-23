@@ -421,7 +421,7 @@ pub fn map_dsl_keyword_to_attr(keyword: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cbu_model_dsl::CbuModelParser;
+    use crate::forth_engine::cbu_model_parser::CbuModelParser;
 
     #[test]
     fn test_map_attr_to_dsl_keyword() {

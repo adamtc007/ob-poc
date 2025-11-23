@@ -13,8 +13,8 @@ use crate::database::{
     NewProperPersonFields,
 };
 use crate::forth_engine::env::RuntimeEnv;
-use crate::parser::ast::{
-    CrudStatement, DataCreate, DataDelete, DataRead, DataUpdate, Literal, Value,
+use crate::forth_engine::value::{
+    CrudStatement, DataCreate, DataDelete, DataRead, DataUpdate, Value,
 };
 use anyhow::{anyhow, Result};
 use serde_json::Value as JsonValue;
@@ -89,7 +89,6 @@ impl CrudExecutor {
             CrudStatement::DataRead(read) => self.execute_read(read).await,
             CrudStatement::DataUpdate(update) => self.execute_update(update).await,
             CrudStatement::DataDelete(delete) => self.execute_delete(delete).await,
-            _ => Err(anyhow!("Unsupported CRUD statement type")),
         }
     }
 
@@ -705,8 +704,7 @@ impl CrudExecutor {
         key: &str,
     ) -> Option<String> {
         values.get(key).and_then(|v| match v {
-            Value::Literal(Literal::String(s)) => Some(s.clone()),
-            Value::Identifier(s) => Some(s.clone()),
+            Value::Str(s) => Some(s.clone()),
             _ => None,
         })
     }
@@ -718,7 +716,7 @@ impl CrudExecutor {
         key: &str,
     ) -> Option<i64> {
         values.get(key).and_then(|v| match v {
-            Value::Literal(Literal::Number(n)) => Some(*n as i64),
+            Value::Float(n) => Some(*n as i64),
             _ => None,
         })
     }
@@ -726,13 +724,11 @@ impl CrudExecutor {
     /// Convert AST Value to JSON Value
     fn value_to_json(&self, value: &Value) -> JsonValue {
         match value {
-            Value::Literal(Literal::String(s)) => JsonValue::String(s.clone()),
-            Value::Literal(Literal::Number(n)) => serde_json::Number::from_f64(*n)
+            Value::Str(s) => JsonValue::String(s.clone()),
+            Value::Float(n) => serde_json::Number::from_f64(*n)
                 .map(JsonValue::Number)
                 .unwrap_or(JsonValue::Null),
-            Value::Literal(Literal::Boolean(b)) => JsonValue::Bool(*b),
-            Value::Identifier(s) => JsonValue::String(s.clone()),
-            Value::Json(j) => j.clone(),
+            Value::Bool(b) => JsonValue::Bool(*b),
             _ => JsonValue::Null,
         }
     }

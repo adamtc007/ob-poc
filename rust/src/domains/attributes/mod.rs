@@ -10,16 +10,12 @@ pub mod resolver;
 pub mod sources;
 pub mod types;
 pub mod uuid_constants;
-pub mod validator;
 
 // Re-export key types for convenience
 pub use types::{
     AttributeCategory, AttributeMetadata, AttributeType, DataType, TypedAttributeRef,
     ValidationError as TypeValidationError, ValidationErrorType, ValidationRules,
 };
-
-// Re-export validator
-pub use validator::{AttributeValidator, ValidationError as DslValidationError};
 
 // Re-export resolver (Phase 2)
 pub use resolver::{AttributeResolver, ResolutionError, ResolutionResult};

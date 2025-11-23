@@ -5,9 +5,9 @@
 
 use crate::forth_engine::errors::VmError;
 use crate::forth_engine::value::{AttributeId, Value};
+use crate::forth_engine::value::{CrudStatement, DataCreate, DataDelete, DataRead, DataUpdate};
 use crate::forth_engine::vm::VM;
 use crate::forth_engine::vocab::{Vocab, WordId, WordSpec};
-use crate::parser::ast::{CrudStatement, DataCreate, DataDelete, DataRead, DataUpdate};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -167,21 +167,19 @@ fn word_document_catalog(vm: &mut VM) -> Result<(), VmError> {
     process_pairs(vm, &pairs);
 
     // Convert pairs to CRUD values
-    let values: HashMap<String, crate::parser::ast::Value> = pairs
+    let values: HashMap<String, Value> = pairs
         .into_iter()
         .map(|(k, v)| {
             let key = k.trim_start_matches(':').to_string();
             let val = match v {
                 Value::Str(s) => {
-                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                    Value::Str(s)
                 }
-                Value::Int(i) => crate::parser::ast::Value::Literal(
-                    crate::parser::ast::Literal::Number(i as f64),
-                ),
+                Value::Int(i) => Value::Float(i as f64),
                 Value::Bool(b) => {
-                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::Boolean(b))
+                    Value::Bool(b)
                 }
-                _ => crate::parser::ast::Value::Identifier(format!("{:?}", v)),
+                _ => Value::Str(format!("{:?}", v)),
             };
             (key, val)
         })
@@ -201,15 +199,15 @@ fn word_document_verify(vm: &mut VM) -> Result<(), VmError> {
     process_pairs(vm, &pairs);
 
     // Convert pairs to CRUD values
-    let mut values: HashMap<String, crate::parser::ast::Value> = pairs
+    let mut values: HashMap<String, Value> = pairs
         .into_iter()
         .map(|(k, v)| {
             let key = k.trim_start_matches(':').to_string();
             let val = match v {
                 Value::Str(s) => {
-                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                    Value::Str(s)
                 }
-                _ => crate::parser::ast::Value::Identifier(format!("{:?}", v)),
+                _ => Value::Str(format!("{:?}", v)),
             };
             (key, val)
         })
@@ -218,9 +216,9 @@ fn word_document_verify(vm: &mut VM) -> Result<(), VmError> {
     // Add verification status update
     values.insert(
         "verification-status".to_string(),
-        crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(
+        Value::Str(
             "verified".to_string(),
-        )),
+        ),
     );
 
     // Emit CrudStatement for document update
@@ -238,15 +236,15 @@ fn word_document_extract(vm: &mut VM) -> Result<(), VmError> {
     process_pairs(vm, &pairs);
 
     // Convert pairs to CRUD values
-    let mut values: HashMap<String, crate::parser::ast::Value> = pairs
+    let mut values: HashMap<String, Value> = pairs
         .into_iter()
         .map(|(k, v)| {
             let key = k.trim_start_matches(':').to_string();
             let val = match v {
                 Value::Str(s) => {
-                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                    Value::Str(s)
                 }
-                _ => crate::parser::ast::Value::Identifier(format!("{:?}", v)),
+                _ => Value::Str(format!("{:?}", v)),
             };
             (key, val)
         })
@@ -255,9 +253,9 @@ fn word_document_extract(vm: &mut VM) -> Result<(), VmError> {
     // Add extraction status update
     values.insert(
         "extraction-status".to_string(),
-        crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(
+        Value::Str(
             "extracted".to_string(),
-        )),
+        ),
     );
 
     // Emit CrudStatement for document update
@@ -275,15 +273,15 @@ fn word_document_link(vm: &mut VM) -> Result<(), VmError> {
     process_pairs(vm, &pairs);
 
     // Convert pairs to CRUD values
-    let values: HashMap<String, crate::parser::ast::Value> = pairs
+    let values: HashMap<String, Value> = pairs
         .into_iter()
         .map(|(k, v)| {
             let key = k.trim_start_matches(':').to_string();
             let val = match v {
                 Value::Str(s) => {
-                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                    Value::Str(s)
                 }
-                _ => crate::parser::ast::Value::Identifier(format!("{:?}", v)),
+                _ => Value::Str(format!("{:?}", v)),
             };
             (key, val)
         })
@@ -343,23 +341,21 @@ fn word_cbu_create(vm: &mut VM) -> Result<(), VmError> {
     process_pairs(vm, &pairs);
 
     // Convert pairs to CRUD values
-    let values: HashMap<String, crate::parser::ast::Value> = pairs
+    let values: HashMap<String, Value> = pairs
         .into_iter()
         .map(|(k, v)| {
             let key = k.trim_start_matches(':').to_string();
             let val = match v {
                 Value::Str(s) => {
-                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                    Value::Str(s)
                 }
-                Value::Int(i) => crate::parser::ast::Value::Literal(
-                    crate::parser::ast::Literal::Number(i as f64),
-                ),
+                Value::Int(i) => Value::Float(i as f64),
                 Value::Bool(b) => {
-                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::Boolean(b))
+                    Value::Bool(b)
                 }
-                _ => crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(
+                _ => Value::Str(
                     format!("{:?}", v),
-                )),
+),
             };
             (key, val)
         })
@@ -379,17 +375,17 @@ fn word_cbu_read(vm: &mut VM) -> Result<(), VmError> {
     process_pairs(vm, &pairs);
 
     // Convert to where clause
-    let where_clause: HashMap<String, crate::parser::ast::Value> = pairs
+    let where_clause: HashMap<String, Value> = pairs
         .into_iter()
         .map(|(k, v)| {
             let key = k.trim_start_matches(':').to_string();
             let val = match v {
                 Value::Str(s) => {
-                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                    Value::Str(s)
                 }
-                _ => crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(
+                _ => Value::Str(
                     format!("{:?}", v),
-                )),
+),
             };
             (key, val)
         })
@@ -417,18 +413,15 @@ fn word_cbu_update(vm: &mut VM) -> Result<(), VmError> {
         let key = k.trim_start_matches(':').to_string();
         let val = match v {
             Value::Str(s) => {
-                crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                Value::Str(s)
             }
             Value::Int(i) => {
-                crate::parser::ast::Value::Literal(crate::parser::ast::Literal::Number(i as f64))
+                Value::Float(i as f64)
             }
             Value::Bool(b) => {
-                crate::parser::ast::Value::Literal(crate::parser::ast::Literal::Boolean(b))
+                Value::Bool(b)
             }
-            _ => crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(format!(
-                "{:?}",
-                v
-            ))),
+            _ => Value::Str(format!("{:?}", v)),
         };
 
         if key == "cbu-id" {
@@ -451,17 +444,17 @@ fn word_cbu_delete(vm: &mut VM) -> Result<(), VmError> {
     let pairs = collect_keyword_pairs(vm, 1)?; // :cbu-id
     process_pairs(vm, &pairs);
 
-    let where_clause: HashMap<String, crate::parser::ast::Value> = pairs
+    let where_clause: HashMap<String, Value> = pairs
         .into_iter()
         .map(|(k, v)| {
             let key = k.trim_start_matches(':').to_string();
             let val = match v {
                 Value::Str(s) => {
-                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                    Value::Str(s)
                 }
-                _ => crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(
+                _ => Value::Str(
                     format!("{:?}", v),
-                )),
+),
             };
             (key, val)
         })
@@ -479,17 +472,17 @@ fn word_cbu_list(vm: &mut VM) -> Result<(), VmError> {
     let pairs = collect_keyword_pairs(vm, 1)?; // :filter (optional)
     process_pairs(vm, &pairs);
 
-    let where_clause: HashMap<String, crate::parser::ast::Value> = pairs
+    let where_clause: HashMap<String, Value> = pairs
         .into_iter()
         .map(|(k, v)| {
             let key = k.trim_start_matches(':').to_string();
             let val = match v {
                 Value::Str(s) => {
-                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                    Value::Str(s)
                 }
-                _ => crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(
+                _ => Value::Str(
                     format!("{:?}", v),
-                )),
+),
             };
             (key, val)
         })
@@ -510,17 +503,17 @@ fn word_cbu_attach_entity(vm: &mut VM) -> Result<(), VmError> {
     process_pairs(vm, &pairs);
 
     // Create a relationship record
-    let values: HashMap<String, crate::parser::ast::Value> = pairs
+    let values: HashMap<String, Value> = pairs
         .into_iter()
         .map(|(k, v)| {
             let key = k.trim_start_matches(':').to_string();
             let val = match v {
                 Value::Str(s) => {
-                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                    Value::Str(s)
                 }
-                _ => crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(
+                _ => Value::Str(
                     format!("{:?}", v),
-                )),
+),
             };
             (key, val)
         })
@@ -538,17 +531,17 @@ fn word_cbu_attach_proper_person(vm: &mut VM) -> Result<(), VmError> {
     let pairs = collect_keyword_pairs(vm, 2)?; // :person-name, :role
     process_pairs(vm, &pairs);
 
-    let values: HashMap<String, crate::parser::ast::Value> = pairs
+    let values: HashMap<String, Value> = pairs
         .into_iter()
         .map(|(k, v)| {
             let key = k.trim_start_matches(':').to_string();
             let val = match v {
                 Value::Str(s) => {
-                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                    Value::Str(s)
                 }
-                _ => crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(
+                _ => Value::Str(
                     format!("{:?}", v),
-                )),
+),
             };
             (key, val)
         })
@@ -574,12 +567,9 @@ fn word_cbu_finalize(vm: &mut VM) -> Result<(), VmError> {
         let key = k.trim_start_matches(':').to_string();
         let val = match v {
             Value::Str(s) => {
-                crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                Value::Str(s)
             }
-            _ => crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(format!(
-                "{:?}",
-                v
-            ))),
+            _ => Value::Str(format!("{:?}", v)),
         };
 
         if key == "cbu-id" {
@@ -626,15 +616,15 @@ fn word_document_link_to_cbu(vm: &mut VM) -> Result<(), VmError> {
     process_pairs(vm, &pairs);
 
     // Convert pairs to CRUD values
-    let values: HashMap<String, crate::parser::ast::Value> = pairs
+    let values: HashMap<String, Value> = pairs
         .into_iter()
         .map(|(k, v)| {
             let key = k.trim_start_matches(':').to_string();
             let val = match v {
                 Value::Str(s) => {
-                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                    Value::Str(s)
                 }
-                _ => crate::parser::ast::Value::Identifier(format!("{:?}", v)),
+                _ => Value::Str(format!("{:?}", v)),
             };
             (key, val)
         })
@@ -654,15 +644,15 @@ fn word_document_extract_attributes(vm: &mut VM) -> Result<(), VmError> {
     process_pairs(vm, &pairs);
 
     // Convert pairs to CRUD values
-    let mut values: HashMap<String, crate::parser::ast::Value> = pairs
+    let mut values: HashMap<String, Value> = pairs
         .into_iter()
         .map(|(k, v)| {
             let key = k.trim_start_matches(':').to_string();
             let val = match v {
                 Value::Str(s) => {
-                    crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(s))
+                    Value::Str(s)
                 }
-                _ => crate::parser::ast::Value::Identifier(format!("{:?}", v)),
+                _ => Value::Str(format!("{:?}", v)),
             };
             (key, val)
         })
@@ -671,9 +661,9 @@ fn word_document_extract_attributes(vm: &mut VM) -> Result<(), VmError> {
     // Add extraction status
     values.insert(
         "extraction-status".to_string(),
-        crate::parser::ast::Value::Literal(crate::parser::ast::Literal::String(
+        Value::Str(
             "pending".to_string(),
-        )),
+        ),
     );
 
     // Emit CrudStatement for attribute extraction task

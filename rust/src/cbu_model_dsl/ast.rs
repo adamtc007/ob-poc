@@ -4,6 +4,27 @@
 //! They are purely conceptual and do not contain any SQL or database logic.
 
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
+/// Errors that can occur during CBU Model DSL parsing or validation
+#[derive(Debug, Error)]
+pub enum CbuModelError {
+    #[error("Parse error: {0}")]
+    ParseError(String),
+
+    #[error("Missing required field: {0}")]
+    MissingField(String),
+
+    #[error("Invalid value for {field}: {message}")]
+    InvalidValue { field: String, message: String },
+
+    #[error("Validation error: {0}")]
+    ValidationError(String),
+
+    #[error("Database error: {0}")]
+    DatabaseError(String),
+}
+
 
 /// Complete CBU Model specification
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

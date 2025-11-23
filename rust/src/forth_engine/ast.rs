@@ -16,10 +16,15 @@ pub enum Expr {
     WordCall { name: String, args: Vec<Expr> },
     StringLiteral(String),
     IntegerLiteral(i64),
+    FloatLiteral(f64),
     BoolLiteral(bool),
-    Keyword(String), // :case-id, :case-type, etc.
-    AttributeRef(String),
-    DocumentRef(String),
+    Keyword(String),            // :case-id, :case-type, etc.
+    DottedKeyword(Vec<String>), // :customer.id -> ["customer", "id"]
+    AttributeRef(String),       // @attr{uuid}
+    DocumentRef(String),        // @doc{uuid}
+    ListLiteral(Vec<Expr>),
+    MapLiteral(Vec<(String, Expr)>), // {:key value :key2 value2}
+    Comment(String),            // ;; comment text
 }
 
 pub trait DslParser {
