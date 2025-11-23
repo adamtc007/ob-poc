@@ -14,6 +14,21 @@ impl Default for AttributeId {
 }
 
 impl AttributeId {
+    /// Create from an existing UUID
+    pub fn from_uuid(uuid: Uuid) -> Self {
+        Self(uuid)
+    }
+
+    /// Get the inner UUID
+    pub fn as_uuid(&self) -> Uuid {
+        self.0
+    }
+
+    /// Parse from string representation
+    pub fn from_str(s: &str) -> Result<Self, uuid::Error> {
+        Ok(Self(Uuid::parse_str(s)?))
+    }
+
     /// Create a new attribute ID with a fresh UUID
     pub fn new() -> Self {
         Self(Uuid::new_v4())
@@ -189,4 +204,52 @@ pub struct VerificationRules {
     pub requires_human_review: bool,
     pub review_trigger: Option<String>,
     pub cross_validation: Vec<String>,
+}
+
+/// Simplified attribute definition matching database schema
+/// Used for DB queries in DictionaryService
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DbAttributeDefinition {
+    pub attribute_id: AttributeId,
+    pub name: String,
+    pub long_description: Option<String>,
+    pub data_type: String,
+    pub source_config: Option<sqlx::types::Json<SourceConfig>>,
+    pub sink_config: Option<sqlx::types::Json<SinkConfig>>,
+    pub group_id: Option<String>,
+    pub domain: Option<String>,
+}
+
+/// Source configuration for attribute data retrieval
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SourceConfig {
+    pub source_type: String,
+    pub extraction_rules: Vec<String>,
+    pub priority: i32,
+}
+
+/// Sink configuration for attribute data persistence
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SinkConfig {
+    pub sink_type: String,
+    pub destinations: Vec<String>,
+}
+
+impl DataType {
+    pub fn as_str(&self) -> &str {
+        match self {
+            DataType::String => "string",
+            DataType::Numeric => "numeric",
+            DataType::Integer => "integer",
+            DataType::Boolean => "boolean",
+            DataType::Date => "date",
+            DataType::Address => "address",
+            DataType::Currency => "currency",
+            DataType::Percentage => "percentage",
+            DataType::Email => "email",
+            DataType::Phone => "phone",
+            DataType::TaxId => "tax_id",
+            DataType::Custom(s) => s,
+        }
+    }
 }

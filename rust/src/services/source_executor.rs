@@ -1,6 +1,6 @@
 //! Source execution service for fetching attribute values from various sources
 
-use crate::data_dictionary::{AttributeDefinition, AttributeId};
+use crate::data_dictionary::{DbAttributeDefinition, AttributeId};
 use async_trait::async_trait;
 use serde_json::Value;
 use sqlx::PgPool;
@@ -11,7 +11,7 @@ pub trait SourceExecutor: Send + Sync {
     async fn fetch_value(
         &self,
         attribute_id: &AttributeId,
-        definition: &AttributeDefinition,
+        definition: &DbAttributeDefinition,
         entity_id: Uuid,
     ) -> Result<Option<Value>, String>;
 }
@@ -34,7 +34,7 @@ impl CompositeSourceExecutor {
     pub async fn fetch_from_best_source(
         &self,
         attribute_id: &AttributeId,
-        definition: &AttributeDefinition,
+        definition: &DbAttributeDefinition,
         entity_id: Uuid,
     ) -> Result<Option<Value>, String> {
         if let Some(source_config) = &definition.source_config {
@@ -72,7 +72,7 @@ impl SourceExecutor for DocumentSource {
     async fn fetch_value(
         &self,
         attribute_id: &AttributeId,
-        _definition: &AttributeDefinition,
+        _definition: &DbAttributeDefinition,
         entity_id: Uuid,
     ) -> Result<Option<Value>, String> {
         // Fetch from document_metadata for most recent extraction
@@ -113,7 +113,7 @@ impl SourceExecutor for DatabaseSource {
     async fn fetch_value(
         &self,
         attribute_id: &AttributeId,
-        _definition: &AttributeDefinition,
+        _definition: &DbAttributeDefinition,
         entity_id: Uuid,
     ) -> Result<Option<Value>, String> {
         // Fetch from attribute_values_typed

@@ -8,7 +8,12 @@ use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::domains::attributes::execution_context::ExecutionContext;
+/// Stub ExecutionContext for attribute operations
+#[derive(Debug, Clone)]
+pub struct ExecutionContext {
+    pub cbu_id: Option<uuid::Uuid>,
+    pub document_id: Option<uuid::Uuid>,
+}
 // Note: ObPocError removed - not available in current error module
 use super::document_catalog_source::{AttributeSource, SourceError};
 

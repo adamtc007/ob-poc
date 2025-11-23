@@ -224,6 +224,11 @@ impl AiDslGenerator {
         })
     }
 
+    /// Generate CBU creation DSL from instruction
+    fn generate_cbu_create_dsl(instruction: &str) -> String {
+        format!("(cbu.create :cbu-name \"{}\" :client-type \"CORPORATE\" :jurisdiction \"GB\")", instruction)
+    }
+
     fn generate_dsl_template(&self, instruction: &str) -> String {
         let lower = instruction.to_lowercase();
 

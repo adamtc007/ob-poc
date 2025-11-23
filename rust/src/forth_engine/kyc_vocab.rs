@@ -232,38 +232,43 @@ fn word_document_verify(vm: &mut VM) -> Result<(), VmError> {
 }
 
 fn word_document_extract(vm: &mut VM) -> Result<(), VmError> {
-    let pairs = collect_keyword_pairs(vm, 1)?; // :doc-id
+    let pairs = collect_keyword_pairs(vm, 1)?; // :doc-id required, :attr-id, :cbu-id, :method, :value optional
     process_pairs(vm, &pairs);
 
     // Convert pairs to CRUD values
-    let mut values: HashMap<String, Value> = pairs
+    let values: HashMap<String, Value> = pairs
         .into_iter()
         .map(|(k, v)| {
             let key = k.trim_start_matches(':').to_string();
             let val = match v {
-                Value::Str(s) => {
-                    Value::Str(s)
-                }
+                Value::Str(s) => Value::Str(s),
                 _ => Value::Str(format!("{:?}", v)),
             };
             (key, val)
         })
         .collect();
 
-    // Add extraction status update
-    values.insert(
-        "extraction-status".to_string(),
-        Value::Str(
-            "extracted".to_string(),
-        ),
-    );
-
-    // Emit CrudStatement for document update
-    vm.env.push_crud(CrudStatement::DataUpdate(DataUpdate {
-        asset: "DOCUMENT".to_string(),
-        values: values.clone(),
-        where_clause: values.into_iter().filter(|(k, _)| k == "doc-id").collect(),
-    }));
+    // Check if this is a metadata extraction (has attr-id) or just status update
+    if values.contains_key("attr-id") {
+        // Emit CREATE for document_metadata
+        vm.env.push_crud(CrudStatement::DataCreate(DataCreate {
+            asset: "DOCUMENT_METADATA".to_string(),
+            values: values.clone(),
+        }));
+    } else {
+        // Original behavior: update document extraction status
+        let mut update_values = values.clone();
+        update_values.insert(
+            "extraction-status".to_string(),
+            Value::Str("extracted".to_string()),
+        );
+        
+        vm.env.push_crud(CrudStatement::DataUpdate(DataUpdate {
+            asset: "DOCUMENT".to_string(),
+            values: update_values.clone(),
+            where_clause: update_values.into_iter().filter(|(k, _)| k == "doc-id").collect(),
+        }));
+    }
 
     Ok(())
 }
@@ -1043,6 +1048,390 @@ pub fn kyc_orch_vocab() -> Vocab {
             stack_effect: (2, 0), // 1 pair
             impl_fn: Arc::new(word_document_require),
         },
+        WordSpec {
+            id: WordId(50),
+            name: "product.create".to_string(),
+            domain: "product".to_string(),
+            stack_effect: (10, 0),
+            impl_fn: Arc::new(word_product_create),
+        },
+        WordSpec {
+            id: WordId(51),
+            name: "product.read".to_string(),
+            domain: "product".to_string(),
+            stack_effect: (2, 0),
+            impl_fn: Arc::new(word_product_read),
+        },
+        WordSpec {
+            id: WordId(52),
+            name: "product.update".to_string(),
+            domain: "product".to_string(),
+            stack_effect: (4, 0),
+            impl_fn: Arc::new(word_product_update),
+        },
+        WordSpec {
+            id: WordId(53),
+            name: "product.delete".to_string(),
+            domain: "product".to_string(),
+            stack_effect: (2, 0),
+            impl_fn: Arc::new(word_product_delete),
+        },
+        WordSpec {
+            id: WordId(54),
+            name: "service.create".to_string(),
+            domain: "service".to_string(),
+            stack_effect: (6, 0),
+            impl_fn: Arc::new(word_service_create),
+        },
+        WordSpec {
+            id: WordId(55),
+            name: "service.read".to_string(),
+            domain: "service".to_string(),
+            stack_effect: (2, 0),
+            impl_fn: Arc::new(word_service_read),
+        },
+        WordSpec {
+            id: WordId(56),
+            name: "service.update".to_string(),
+            domain: "service".to_string(),
+            stack_effect: (4, 0),
+            impl_fn: Arc::new(word_service_update),
+        },
+        WordSpec {
+            id: WordId(57),
+            name: "service.delete".to_string(),
+            domain: "service".to_string(),
+            stack_effect: (2, 0),
+            impl_fn: Arc::new(word_service_delete),
+        },
+        WordSpec {
+            id: WordId(58),
+            name: "service.link-product".to_string(),
+            domain: "service".to_string(),
+            stack_effect: (6, 0),
+            impl_fn: Arc::new(word_service_link_product),
+        },
+        WordSpec {
+            id: WordId(59),
+            name: "lifecycle-resource.create".to_string(),
+            domain: "lifecycle-resource".to_string(),
+            stack_effect: (8, 0),
+            impl_fn: Arc::new(word_lifecycle_resource_create),
+        },
+        WordSpec {
+            id: WordId(60),
+            name: "lifecycle-resource.read".to_string(),
+            domain: "lifecycle-resource".to_string(),
+            stack_effect: (2, 0),
+            impl_fn: Arc::new(word_lifecycle_resource_read),
+        },
+        WordSpec {
+            id: WordId(61),
+            name: "lifecycle-resource.update".to_string(),
+            domain: "lifecycle-resource".to_string(),
+            stack_effect: (4, 0),
+            impl_fn: Arc::new(word_lifecycle_resource_update),
+        },
+        WordSpec {
+            id: WordId(62),
+            name: "lifecycle-resource.delete".to_string(),
+            domain: "lifecycle-resource".to_string(),
+            stack_effect: (2, 0),
+            impl_fn: Arc::new(word_lifecycle_resource_delete),
+        },
+        WordSpec {
+            id: WordId(63),
+            name: "lifecycle-resource.link-service".to_string(),
+            domain: "lifecycle-resource".to_string(),
+            stack_effect: (4, 0),
+            impl_fn: Arc::new(word_lifecycle_resource_link_service),
+        },
     ];
     Vocab::new(specs)
+}
+
+// ============================================================================
+// TAXONOMY DOMAIN VERBS: Product, Service, Lifecycle Resource
+// ============================================================================
+
+/// product.create - Create a new product
+fn word_product_create(vm: &mut VM) -> Result<(), VmError> {
+    let pairs = collect_keyword_pairs(vm, 5)?;
+    process_pairs(vm, &pairs);
+    
+    let mut values = std::collections::HashMap::new();
+    for (key, val) in pairs {
+        let clean_key = key.trim_start_matches(':').replace('-', "_");
+        values.insert(clean_key, val);
+    }
+    
+    vm.env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "Product".to_string(),
+        values,
+    }));
+    
+    Ok(())
+}
+
+/// product.read - Read a product by ID or code
+fn word_product_read(vm: &mut VM) -> Result<(), VmError> {
+    let pairs = collect_keyword_pairs(vm, 1)?;
+    
+    let mut where_clause = std::collections::HashMap::new();
+    for (key, val) in pairs {
+        let clean_key = key.trim_start_matches(':').replace('-', "_");
+        where_clause.insert(clean_key, val);
+    }
+    
+    vm.env.push_crud(CrudStatement::DataRead(DataRead {
+        asset: "Product".to_string(),
+        where_clause,
+        select: vec!["*".to_string()],
+        limit: Some(1),
+    }));
+    
+    Ok(())
+}
+
+/// product.update - Update a product
+fn word_product_update(vm: &mut VM) -> Result<(), VmError> {
+    let pairs = collect_keyword_pairs(vm, 2)?;
+    
+    let mut where_clause = std::collections::HashMap::new();
+    let mut values = std::collections::HashMap::new();
+    
+    for (key, val) in pairs {
+        let clean_key = key.trim_start_matches(':').replace('-', "_");
+        if clean_key == "product_id" || clean_key == "product_code" {
+            where_clause.insert(clean_key, val);
+        } else {
+            values.insert(clean_key, val);
+        }
+    }
+    
+    vm.env.push_crud(CrudStatement::DataUpdate(DataUpdate {
+        asset: "Product".to_string(),
+        where_clause,
+        values,
+    }));
+    
+    Ok(())
+}
+
+/// product.delete - Delete a product
+fn word_product_delete(vm: &mut VM) -> Result<(), VmError> {
+    let pairs = collect_keyword_pairs(vm, 1)?;
+    
+    let mut where_clause = std::collections::HashMap::new();
+    for (key, val) in pairs {
+        let clean_key = key.trim_start_matches(':').replace('-', "_");
+        where_clause.insert(clean_key, val);
+    }
+    
+    vm.env.push_crud(CrudStatement::DataDelete(DataDelete {
+        asset: "Product".to_string(),
+        where_clause,
+    }));
+    
+    Ok(())
+}
+
+/// service.create - Create a new service
+fn word_service_create(vm: &mut VM) -> Result<(), VmError> {
+    let pairs = collect_keyword_pairs(vm, 3)?;
+    process_pairs(vm, &pairs);
+    
+    let mut values = std::collections::HashMap::new();
+    for (key, val) in pairs {
+        let clean_key = key.trim_start_matches(':').replace('-', "_");
+        values.insert(clean_key, val);
+    }
+    
+    vm.env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "Service".to_string(),
+        values,
+    }));
+    
+    Ok(())
+}
+
+/// service.read - Read a service
+fn word_service_read(vm: &mut VM) -> Result<(), VmError> {
+    let pairs = collect_keyword_pairs(vm, 1)?;
+    
+    let mut where_clause = std::collections::HashMap::new();
+    for (key, val) in pairs {
+        let clean_key = key.trim_start_matches(':').replace('-', "_");
+        where_clause.insert(clean_key, val);
+    }
+    
+    vm.env.push_crud(CrudStatement::DataRead(DataRead {
+        asset: "Service".to_string(),
+        where_clause,
+        select: vec!["*".to_string()],
+        limit: Some(1),
+    }));
+    
+    Ok(())
+}
+
+/// service.update - Update a service
+fn word_service_update(vm: &mut VM) -> Result<(), VmError> {
+    let pairs = collect_keyword_pairs(vm, 2)?;
+    
+    let mut where_clause = std::collections::HashMap::new();
+    let mut values = std::collections::HashMap::new();
+    
+    for (key, val) in pairs {
+        let clean_key = key.trim_start_matches(':').replace('-', "_");
+        if clean_key == "service_id" || clean_key == "service_code" {
+            where_clause.insert(clean_key, val);
+        } else {
+            values.insert(clean_key, val);
+        }
+    }
+    
+    vm.env.push_crud(CrudStatement::DataUpdate(DataUpdate {
+        asset: "Service".to_string(),
+        where_clause,
+        values,
+    }));
+    
+    Ok(())
+}
+
+/// service.delete - Delete a service
+fn word_service_delete(vm: &mut VM) -> Result<(), VmError> {
+    let pairs = collect_keyword_pairs(vm, 1)?;
+    
+    let mut where_clause = std::collections::HashMap::new();
+    for (key, val) in pairs {
+        let clean_key = key.trim_start_matches(':').replace('-', "_");
+        where_clause.insert(clean_key, val);
+    }
+    
+    vm.env.push_crud(CrudStatement::DataDelete(DataDelete {
+        asset: "Service".to_string(),
+        where_clause,
+    }));
+    
+    Ok(())
+}
+
+/// service.link-product - Link a service to a product
+fn word_service_link_product(vm: &mut VM) -> Result<(), VmError> {
+    let pairs = collect_keyword_pairs(vm, 3)?;
+    
+    let mut values = std::collections::HashMap::new();
+    for (key, val) in pairs {
+        let clean_key = key.trim_start_matches(':').replace('-', "_");
+        values.insert(clean_key, val);
+    }
+    
+    vm.env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "ProductService".to_string(),
+        values,
+    }));
+    
+    Ok(())
+}
+
+/// lifecycle-resource.create - Create a lifecycle resource
+fn word_lifecycle_resource_create(vm: &mut VM) -> Result<(), VmError> {
+    let pairs = collect_keyword_pairs(vm, 4)?;
+    process_pairs(vm, &pairs);
+    
+    let mut values = std::collections::HashMap::new();
+    for (key, val) in pairs {
+        let clean_key = key.trim_start_matches(':').replace('-', "_");
+        values.insert(clean_key, val);
+    }
+    
+    vm.env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "LifecycleResource".to_string(),
+        values,
+    }));
+    
+    Ok(())
+}
+
+/// lifecycle-resource.read - Read a lifecycle resource
+fn word_lifecycle_resource_read(vm: &mut VM) -> Result<(), VmError> {
+    let pairs = collect_keyword_pairs(vm, 1)?;
+    
+    let mut where_clause = std::collections::HashMap::new();
+    for (key, val) in pairs {
+        let clean_key = key.trim_start_matches(':').replace('-', "_");
+        where_clause.insert(clean_key, val);
+    }
+    
+    vm.env.push_crud(CrudStatement::DataRead(DataRead {
+        asset: "LifecycleResource".to_string(),
+        where_clause,
+        select: vec!["*".to_string()],
+        limit: Some(1),
+    }));
+    
+    Ok(())
+}
+
+/// lifecycle-resource.update - Update a lifecycle resource
+fn word_lifecycle_resource_update(vm: &mut VM) -> Result<(), VmError> {
+    let pairs = collect_keyword_pairs(vm, 2)?;
+    
+    let mut where_clause = std::collections::HashMap::new();
+    let mut values = std::collections::HashMap::new();
+    
+    for (key, val) in pairs {
+        let clean_key = key.trim_start_matches(':').replace('-', "_");
+        if clean_key == "resource_id" || clean_key == "resource_code" {
+            where_clause.insert(clean_key, val);
+        } else {
+            values.insert(clean_key, val);
+        }
+    }
+    
+    vm.env.push_crud(CrudStatement::DataUpdate(DataUpdate {
+        asset: "LifecycleResource".to_string(),
+        where_clause,
+        values,
+    }));
+    
+    Ok(())
+}
+
+/// lifecycle-resource.delete - Delete a lifecycle resource
+fn word_lifecycle_resource_delete(vm: &mut VM) -> Result<(), VmError> {
+    let pairs = collect_keyword_pairs(vm, 1)?;
+    
+    let mut where_clause = std::collections::HashMap::new();
+    for (key, val) in pairs {
+        let clean_key = key.trim_start_matches(':').replace('-', "_");
+        where_clause.insert(clean_key, val);
+    }
+    
+    vm.env.push_crud(CrudStatement::DataDelete(DataDelete {
+        asset: "LifecycleResource".to_string(),
+        where_clause,
+    }));
+    
+    Ok(())
+}
+
+/// lifecycle-resource.link-service - Link a resource to a service
+fn word_lifecycle_resource_link_service(vm: &mut VM) -> Result<(), VmError> {
+    let pairs = collect_keyword_pairs(vm, 2)?;
+    
+    let mut values = std::collections::HashMap::new();
+    for (key, val) in pairs {
+        let clean_key = key.trim_start_matches(':').replace('-', "_");
+        values.insert(clean_key, val);
+    }
+    
+    vm.env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "ServiceResource".to_string(),
+        values,
+    }));
+    
+    Ok(())
 }

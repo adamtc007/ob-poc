@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 pub struct AttributeLifecycleService {
+    #[allow(dead_code)]
     pool: PgPool,
     source_executor: CompositeSourceExecutor,
     sink_executor: CompositeSinkExecutor,

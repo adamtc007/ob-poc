@@ -178,7 +178,7 @@ impl TaxonomyRepository {
         let resources = sqlx::query_as!(
             ProductionResource,
             r#"
-            SELECT pr.* FROM "ob-poc".prod_resources pr
+            SELECT pr.* FROM "ob-poc".lifecycle_resources pr
             JOIN "ob-poc".service_resource_capabilities src ON pr.resource_id = src.resource_id
             WHERE src.service_id = $1 
               AND src.is_active = true

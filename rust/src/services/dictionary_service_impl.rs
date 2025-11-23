@@ -1,9 +1,8 @@
 //! DictionaryService implementation for attribute validation and management
 
-use crate::data_dictionary::{AttributeDefinition, AttributeId, DictionaryService};
+use crate::data_dictionary::{AttributeId, DbAttributeDefinition, DictionaryService, SinkConfig, SourceConfig};
 use async_trait::async_trait;
 use sqlx::PgPool;
-use uuid::Uuid;
 
 pub struct DictionaryServiceImpl {
     pool: PgPool,
@@ -50,7 +49,7 @@ impl DictionaryService for DictionaryServiceImpl {
     async fn get_attribute(
         &self,
         attribute_id: &AttributeId,
-    ) -> Result<Option<AttributeDefinition>, String> {
+    ) -> Result<Option<DbAttributeDefinition>, String> {
         let record = sqlx::query!(
             r#"
             SELECT
@@ -72,16 +71,13 @@ impl DictionaryService for DictionaryServiceImpl {
         .map_err(|e| format!("Database error: {}", e))?;
 
         if let Some(rec) = record {
-            use crate::data_dictionary::{SinkConfig, SourceConfig};
-            use sqlx::types::Json;
-
             // Parse source configuration from JSONB
             let source_config = if let Some(source_json) = rec.source {
                 match serde_json::from_value::<SourceConfig>(source_json) {
-                    Ok(config) => Some(Json(config)),
+                    Ok(config) => Some(sqlx::types::Json(config)),
                     Err(_) => {
                         // Provide default if parsing fails
-                        Some(Json(SourceConfig {
+                        Some(sqlx::types::Json(SourceConfig {
                             source_type: "document".to_string(),
                             extraction_rules: vec![],
                             priority: 0,
@@ -95,10 +91,10 @@ impl DictionaryService for DictionaryServiceImpl {
             // Parse sink configuration from JSONB
             let sink_config = if let Some(sink_json) = rec.sink {
                 match serde_json::from_value::<SinkConfig>(sink_json) {
-                    Ok(config) => Some(Json(config)),
+                    Ok(config) => Some(sqlx::types::Json(config)),
                     Err(_) => {
                         // Provide default if parsing fails
-                        Some(Json(SinkConfig {
+                        Some(sqlx::types::Json(SinkConfig {
                             sink_type: "database".to_string(),
                             destinations: vec![],
                         }))
@@ -108,7 +104,7 @@ impl DictionaryService for DictionaryServiceImpl {
                 None
             };
 
-            Ok(Some(AttributeDefinition {
+            Ok(Some(DbAttributeDefinition {
                 attribute_id: AttributeId::from_uuid(rec.attribute_id),
                 name: rec.name,
                 long_description: rec.long_description,
@@ -167,32 +163,5 @@ impl DictionaryService for DictionaryServiceImpl {
         }
 
         Ok(())
-    }
-
-    async fn extract_attributes_from_document(
-        &self,
-        doc_id: Uuid,
-        cbu_id: Uuid,
-    ) -> Result<Vec<AttributeId>, String> {
-        // Get all extracted attributes from document_metadata
-        // Note: document_metadata references doc_id, not document_id
-        let attributes = sqlx::query!(
-            r#"
-            SELECT DISTINCT dm.attribute_id
-            FROM "ob-poc".document_metadata dm
-            JOIN "ob-poc".document_catalog dc ON dc.doc_id = dm.doc_id
-            WHERE dm.doc_id = $1 AND dc.cbu_id = $2
-            "#,
-            doc_id,
-            cbu_id
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| format!("Database error: {}", e))?;
-
-        Ok(attributes
-            .into_iter()
-            .map(|r| AttributeId::from_uuid(r.attribute_id))
-            .collect())
     }
 }

@@ -41,6 +41,7 @@ pub mod models;
 pub mod db_state_manager;
 pub mod dsl;
 pub mod dsl_manager;
+pub mod dsl_source;
 pub mod dsl_visualizer;
 
 // Services for database integration and universal DSL lifecycle

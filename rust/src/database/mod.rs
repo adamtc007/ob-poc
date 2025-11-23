@@ -24,6 +24,9 @@ pub mod dictionary_service;
 pub mod document_service;
 pub mod dsl_repository;
 pub mod entity_service;
+pub mod lifecycle_resource_service;
+pub mod product_service;
+pub mod service_service;
 
 // Legacy modules not yet integrated - kept for reference but not compiled
 // pub mod attribute_repository;
@@ -42,6 +45,9 @@ pub use document_service::{
 };
 pub use dsl_repository::{DslRepository, DslSaveResult};
 pub use entity_service::{EntityRow, EntityService, NewEntityFields, NewProperPersonFields};
+pub use lifecycle_resource_service::{LifecycleResourceRow, LifecycleResourceService, NewLifecycleResourceFields};
+pub use product_service::{NewProductFields, ProductRow, ProductService};
+pub use service_service::{NewServiceFields, ServiceRow, ServiceService};
 
 /// Database configuration
 #[derive(Debug, Clone)]

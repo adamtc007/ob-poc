@@ -136,7 +136,8 @@ impl MockExtractionService {
         }
     }
 
-    pub fn with_mock_data(mut self, doc_id: Uuid, attr_id: Uuid, value: serde_json::Value) -> Self {
+    pub fn with_mock_data(mut self, #[allow(dead_code)]
+    doc_id: Uuid, attr_id: Uuid, value: serde_json::Value) -> Self {
         self.mock_data.insert((doc_id, attr_id), value);
         self
     }
@@ -302,6 +303,7 @@ impl ExtractionService for OcrExtractionService {
 /// Document content from database
 #[derive(Debug, sqlx::FromRow)]
 struct DocumentContent {
+    #[allow(dead_code)]
     doc_id: Uuid,
     mime_type: Option<String>,
     extracted_data: Option<serde_json::Value>,
@@ -310,6 +312,7 @@ struct DocumentContent {
 /// Attribute definition from dictionary
 #[derive(Debug, sqlx::FromRow)]
 struct AttributeDefinition {
+    #[allow(dead_code)]
     attribute_id: Uuid,
     name: String,
     data_type: String,

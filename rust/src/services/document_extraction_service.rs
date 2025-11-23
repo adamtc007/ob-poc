@@ -1,7 +1,7 @@
 //! Document extraction service for extracting attributes from uploaded documents
 //! Aligned with actual database schema
 
-use crate::data_dictionary::{AttributeDefinition, AttributeId, DictionaryService};
+use crate::data_dictionary::{DbAttributeDefinition, AttributeId, DictionaryService};
 use serde_json::Value;
 use sqlx::PgPool;
 use std::collections::HashMap;
@@ -26,7 +26,7 @@ impl DocumentExtractionService {
         dictionary_service: &dyn DictionaryService,
     ) -> Result<HashMap<AttributeId, Value>, String> {
         // Step 1: Get document details from actual schema
-        let document = sqlx::query!(
+        let _document = sqlx::query!(
             r#"
             SELECT
                 doc_id,
@@ -112,7 +112,7 @@ impl DocumentExtractionService {
     // Mock extraction - in production would analyze actual document content
     async fn mock_extract_single_attribute(
         &self,
-        definition: &AttributeDefinition,
+        definition: &DbAttributeDefinition,
     ) -> Result<Option<Value>, String> {
         // For now, return a mock value based on data type
         let mock_value = match definition.data_type.as_str() {

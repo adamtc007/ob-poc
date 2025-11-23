@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::Instant;
 use uuid::Uuid;
 
-use crate::domains::attributes::execution_context::ExecutionContext;
+use crate::services::attribute_executor::ExecutionContext;
 // Note: ObPocError removed - not available in current error module
 use super::extraction_service::ExtractionService;
 
@@ -39,7 +39,7 @@ pub trait AttributeSource: Send + Sync {
     async fn get_value(
         &self,
         attribute_id: &Uuid,
-        context: &ExecutionContext,
+        _context: &ExecutionContext,
     ) -> SourceResult<Option<serde_json::Value>>;
 
     /// Priority of this source (higher = try first)
@@ -220,7 +220,7 @@ impl AttributeSource for DocumentCatalogSource {
     async fn get_value(
         &self,
         attribute_id: &Uuid,
-        context: &ExecutionContext,
+        _context: &ExecutionContext,
     ) -> SourceResult<Option<serde_json::Value>> {
         // Note: We need to extract CBU ID from context
         // For now, we'll create a placeholder CBU ID
@@ -309,7 +309,7 @@ impl AttributeSource for FormDataSource {
     async fn get_value(
         &self,
         _attribute_id: &Uuid,
-        _context: &ExecutionContext,
+        __context: &ExecutionContext,
     ) -> SourceResult<Option<serde_json::Value>> {
         // TODO: Implement form data lookup
         Ok(None)
@@ -344,7 +344,7 @@ impl AttributeSource for ApiDataSource {
     async fn get_value(
         &self,
         _attribute_id: &Uuid,
-        _context: &ExecutionContext,
+        __context: &ExecutionContext,
     ) -> SourceResult<Option<serde_json::Value>> {
         // TODO: Implement third-party API calls
         Ok(None)

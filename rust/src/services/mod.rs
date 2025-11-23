@@ -11,7 +11,46 @@
 //! removed in favor of the new Forth-engine architecture. All DSL operations
 //! now flow through the Forth stack-based execution engine.
 
+// Agentic services
+pub mod agentic_complete;
+pub mod agentic_dsl_crud;
+
+// Attribute services
+pub mod attribute_executor;
+pub mod attribute_lifecycle;
+
+// Dictionary and document services
+pub mod dictionary_service_impl;
+pub mod document_catalog_source;
+pub mod document_extraction_service;
+pub mod document_type_detector;
+pub mod extraction_service;
+// pub mod real_document_extraction_service; // TODO: fix imports
+
+// AI services
+// pub mod real_ai_entity_service; // TODO: fix imports
+
+// Executor services
+pub mod sink_executor;
+pub mod source_executor;
+
+// Taxonomy
+pub mod product_services_resources;
+
+// RAG and LLM services for agentic DSL generation
+
 // Re-export DSL Manager types for direct access when needed
 pub use crate::dsl_manager::{
     CallChainResult, CleanDslManager, DslManagerError, IncrementalResult,
 };
+
+// Re-export RAG and LLM types
+// Re-export from dsl_source
+pub use crate::dsl_source::agentic::{RagContext, RagContextProvider};
+pub use crate::dsl_source::agentic::rag_context::{VocabEntry, DslExample, AttributeDefinition as RagAttributeDefinition};
+pub use crate::dsl_source::agentic::{GeneratedDsl};
+pub use crate::dsl_source::agentic::llm_generator::{LlmDslGenerator, GeneratorConfig};
+pub use crate::dsl_source::agentic::providers::{MultiProviderLlm, LlmProvider, ProviderConfig, LlmResponse};
+pub use crate::dsl_source::validation::{ValidationPipeline, ValidationResult, ValidationStage, ValidationError};
+pub use sink_executor::CompositeSinkExecutor;
+pub use source_executor::CompositeSourceExecutor;

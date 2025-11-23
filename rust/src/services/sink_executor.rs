@@ -1,6 +1,6 @@
 //! Sink execution service for persisting attribute values to various destinations
 
-use crate::data_dictionary::{AttributeDefinition, AttributeId};
+use crate::data_dictionary::{DbAttributeDefinition, AttributeId};
 use async_trait::async_trait;
 use serde_json::Value;
 use sqlx::PgPool;
@@ -13,7 +13,7 @@ pub trait SinkExecutor: Send + Sync {
         &self,
         attribute_id: &AttributeId,
         value: &Value,
-        definition: &AttributeDefinition,
+        definition: &DbAttributeDefinition,
         entity_id: Uuid,
     ) -> Result<(), String>;
 }
@@ -35,7 +35,7 @@ impl CompositeSinkExecutor {
         &self,
         attribute_id: &AttributeId,
         value: &Value,
-        definition: &AttributeDefinition,
+        definition: &DbAttributeDefinition,
         entity_id: Uuid,
     ) -> Result<(), String> {
         // Always persist to database
@@ -72,7 +72,7 @@ impl SinkExecutor for DatabaseSink {
         &self,
         attribute_id: &AttributeId,
         value: &Value,
-        _definition: &AttributeDefinition,
+        _definition: &DbAttributeDefinition,
         entity_id: Uuid,
     ) -> Result<(), String> {
         let attribute_id_str = attribute_id.to_string();
