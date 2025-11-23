@@ -168,9 +168,9 @@ impl CrudExecutor {
     /// Extract target state from a CRUD statement if it's a state-changing operation
     fn extract_target_state(&self, stmt: &CrudStatement) -> Option<String> {
         match stmt {
-            CrudStatement::DataCreate(create) if create.asset == "CBU" => {
-                // New CBU starts in initial state (handled by model)
-                Some("Proposed".to_string())
+            CrudStatement::DataCreate(_create) if _create.asset == "CBU" => {
+                // CREATE sets initial state, not a transition
+                None
             }
             CrudStatement::DataUpdate(update) if update.asset == "CBU" => {
                 // Check for status/state field in update values
