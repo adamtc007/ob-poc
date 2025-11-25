@@ -25,6 +25,7 @@ pub mod runtime;
 pub mod value;
 pub mod vocab_registry;
 pub mod words;
+pub mod schema;
 
 // Re-export key types
 pub use ast::{DslParser, DslSheet, Expr};
