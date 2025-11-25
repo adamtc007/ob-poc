@@ -58,6 +58,10 @@ pub mod cbu_model_dsl;
 #[cfg(feature = "database")]
 pub mod cbu_crud_template;
 
+// DSL Test Harness - integration testing for onboarding DSL pipeline
+#[cfg(feature = "database")]
+pub mod dsl_test_harness;
+
 // Public re-exports for the clean architecture
 pub use db_state_manager::{AccumulatedState, DbStateManager, StateResult};
 pub use dsl::{

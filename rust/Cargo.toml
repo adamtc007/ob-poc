@@ -58,6 +58,7 @@ rand = "0.8"
 # For attribute API endpoints
 base64 = "0.22"
 sha2 = "0.10"
+clap = { version = "4.5.53", features = ["derive"] }
 
 # Serialization/Deserialization
 # serde is already included above
