@@ -150,7 +150,7 @@ impl OnboardingTestHarness {
                     )
                     .await?;
 
-                self.update_onboarding_state(request_id, "validated").await?;
+                self.update_onboarding_state(request_id, "products_selected").await?;
 
                 let persist_time_ms = persist_start.elapsed().as_millis() as u64;
 
@@ -335,7 +335,7 @@ impl OnboardingTestHarness {
             r#"
             INSERT INTO "ob-poc".onboarding_requests
             (request_id, cbu_id, request_state, created_at, updated_at)
-            VALUES ($1, $2, 'initiated', NOW(), NOW())
+            VALUES ($1, $2, 'draft', NOW(), NOW())
             "#,
         )
         .bind(request_id)
