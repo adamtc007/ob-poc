@@ -1,10 +1,11 @@
 //! Public facade for the DSL Forth Engine.
+//!
+//! This module provides the main entry points for DSL execution using
+//! direct AST interpretation (no stack machine).
 
 use crate::forth_engine::env::RuntimeEnv;
-use crate::forth_engine::kyc_vocab::kyc_orch_vocab;
 use crate::forth_engine::parser_nom::NomDslParser;
-use crate::forth_engine::vm::VM;
-use std::sync::Arc;
+use crate::forth_engine::vocab_registry::create_standard_runtime;
 
 #[cfg(feature = "database")]
 use crate::cbu_model_dsl::CbuModelService;
@@ -15,16 +16,15 @@ use sqlx::PgPool;
 
 // Module declarations
 pub mod ast;
-pub mod compiler;
+pub mod cbu_model_parser;
 pub mod ebnf;
 pub mod env;
 pub mod errors;
-pub mod kyc_vocab;
 pub mod parser_nom;
+pub mod runtime;
 pub mod value;
-pub mod vm;
-pub mod vocab;
-pub mod cbu_model_parser;
+pub mod vocab_registry;
+pub mod words;
 
 // Re-export key types
 pub use ast::{DslParser, DslSheet, Expr};
@@ -277,12 +277,7 @@ fn execute_sheet_internal_with_env(
     let parser = NomDslParser::new();
     let ast = parser.parse(&sheet.content)?;
 
-    // 2. Compiling (AST -> Bytecode)
-    let vocab = kyc_orch_vocab();
-    let program = compiler::compile_sheet(&ast, &vocab)?;
-    let program_arc = Arc::new(program);
-
-    // 3. Create runtime environment
+    // 2. Create runtime environment
     #[cfg(feature = "database")]
     let mut env = if let Some(p) = pool {
         RuntimeEnv::with_pool(env::OnboardingRequestId(sheet.id.clone()), p)
@@ -293,33 +288,28 @@ fn execute_sheet_internal_with_env(
     #[cfg(not(feature = "database"))]
     let mut env = RuntimeEnv::new(env::OnboardingRequestId(sheet.id.clone()));
 
-    // 4. VM Execution (Bytecode)
-    let mut vm = VM::new(program_arc, Arc::new(vocab), &mut env);
+    // 3. Direct AST execution (no bytecode compilation, no stack machine)
+    let runtime = create_standard_runtime();
+    runtime.execute_sheet(&ast, &mut env)?;
 
-    let mut logs = Vec::new();
-    loop {
-        match vm.step_with_logging() {
-            Ok(Some(log_msg)) => {
-                logs.push(log_msg);
+    // Generate execution logs
+    let logs: Vec<String> = ast
+        .iter()
+        .filter_map(|expr| {
+            if let ast::Expr::WordCall { name, args } = expr {
+                Some(format!(
+                    "[Runtime] Executed: {} with {} args",
+                    name,
+                    args.len()
+                ))
+            } else {
+                None
             }
-            Ok(None) => {
-                // End of program
-                break;
-            }
-            Err(e) => {
-                return Err(EngineError::Vm(e));
-            }
-        }
-    }
+        })
+        .collect();
 
     // Extract case_id from the execution
-    let case_id = vm.env.get_case_id().cloned();
-
-    // Clone the environment for return (need to transfer ownership)
-    let final_env = std::mem::replace(
-        &mut env,
-        RuntimeEnv::new(env::OnboardingRequestId(String::new())),
-    );
+    let case_id = env.get_case_id().cloned();
 
     Ok((
         ExecutionResult {
@@ -328,7 +318,7 @@ fn execute_sheet_internal_with_env(
             success: true,
             version: 0, // Will be set by execute_sheet_with_db after DB query
         },
-        final_env,
+        env,
     ))
 }
 
@@ -484,19 +474,34 @@ mod tests {
     }
 
     #[test]
-    fn test_stack_effect_validation() {
-        // Test that stack underflow is caught at compile time
+    fn test_unknown_word_error() {
+        // Test that unknown words are caught at runtime
         let sheet = DslSheet {
-            id: "test-stack".to_string(),
+            id: "test-unknown".to_string(),
             domain: "case".to_string(),
             version: "1".to_string(),
-            // case.create expects 4 items (2 pairs), but we only provide 2
-            content: r#"(case.create :case-id "UNDER-001")"#.to_string(),
+            content: r#"(nonexistent.verb :key "value")"#.to_string(),
         };
 
         let result = execute_sheet(&sheet);
-        // Should fail due to stack underflow
+        // Should fail due to unknown word
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_partial_args_succeeds() {
+        // With direct AST runtime, partial arguments are allowed
+        // (words handle missing optional args gracefully)
+        let sheet = DslSheet {
+            id: "test-partial".to_string(),
+            domain: "case".to_string(),
+            version: "1".to_string(),
+            content: r#"(case.create :case-id "PARTIAL-001")"#.to_string(),
+        };
+
+        let result = execute_sheet(&sheet);
+        // Should succeed - partial args are valid
+        assert!(result.is_ok());
     }
 
     #[test]
@@ -733,9 +738,9 @@ mod tests {
         // First: DataCreate for CBU
         assert!(matches!(&env.pending_crud[0], CrudStatement::DataCreate(c) if c.asset == "CBU"));
 
-        // Second: DataCreate for relationship
+        // Second: DataCreate for CBU-entity role attachment
         assert!(
-            matches!(&env.pending_crud[1], CrudStatement::DataCreate(c) if c.asset == "CBU_ENTITY_RELATIONSHIP")
+            matches!(&env.pending_crud[1], CrudStatement::DataCreate(c) if c.asset == "CBU_ENTITY_ROLE")
         );
 
         // Third: DataUpdate for finalize

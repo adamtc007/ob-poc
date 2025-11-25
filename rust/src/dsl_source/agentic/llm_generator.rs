@@ -1,18 +1,21 @@
 //! LLM DSL Generator
 //!
 //! Uses multi-provider LLM support with RAG context to generate valid DSL.
+//! Vocabulary context comes from the in-memory Runtime (vocab_registry.rs).
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use super::rag_context::{RagContext, RagContextProvider};
 use super::providers::MultiProviderLlm;
+use super::rag_context::{RagContext, RagContextProvider};
+use crate::forth_engine::runtime::Runtime;
 
 #[derive(Clone)]
 pub struct LlmDslGenerator {
     llm_client: Arc<MultiProviderLlm>,
     rag_provider: Arc<RagContextProvider>,
+    runtime: Arc<Runtime>,
     max_retries: usize,
 }
 
@@ -43,35 +46,52 @@ impl Default for GeneratorConfig {
 }
 
 impl LlmDslGenerator {
-    /// Create from environment variables (uses MultiProviderLlm)
-    pub fn from_env(rag_provider: Arc<RagContextProvider>) -> Result<Self> {
+    /// Create from environment variables with Runtime (preferred)
+    pub fn from_env_with_runtime(
+        rag_provider: Arc<RagContextProvider>,
+        runtime: Arc<Runtime>,
+    ) -> Result<Self> {
         let llm_client = MultiProviderLlm::from_env()?;
         Ok(Self {
             llm_client: Arc::new(llm_client),
             rag_provider,
+            runtime,
             max_retries: 3,
         })
     }
 
-    /// Create with explicit LLM client
+    /// Create from environment variables (uses MultiProviderLlm)
+    /// Creates its own Runtime internally
+    pub fn from_env(rag_provider: Arc<RagContextProvider>) -> Result<Self> {
+        use crate::forth_engine::vocab_registry::create_standard_runtime;
+        let llm_client = MultiProviderLlm::from_env()?;
+        Ok(Self {
+            llm_client: Arc::new(llm_client),
+            rag_provider,
+            runtime: Arc::new(create_standard_runtime()),
+            max_retries: 3,
+        })
+    }
+
+    /// Create with explicit LLM client and Runtime
     pub fn with_client(
         llm_client: Arc<MultiProviderLlm>,
         rag_provider: Arc<RagContextProvider>,
+        runtime: Arc<Runtime>,
     ) -> Self {
         Self {
             llm_client,
             rag_provider,
+            runtime,
             max_retries: 3,
         }
     }
 
     /// Create with Anthropic API key (legacy compatibility)
-    pub fn new(
-        anthropic_api_key: String,
-        rag_provider: Arc<RagContextProvider>,
-    ) -> Self {
-        use super::providers::{ProviderConfig, LlmProvider};
-        
+    pub fn new(anthropic_api_key: String, rag_provider: Arc<RagContextProvider>) -> Self {
+        use super::providers::{LlmProvider, ProviderConfig};
+        use crate::forth_engine::vocab_registry::create_standard_runtime;
+
         let config = ProviderConfig {
             provider: LlmProvider::Anthropic,
             api_key: anthropic_api_key,
@@ -81,13 +101,14 @@ impl LlmDslGenerator {
             temperature: 0.1,
             timeout_seconds: 30,
         };
-        
-        let llm_client = MultiProviderLlm::new(vec![config], 5)
-            .expect("Failed to create LLM client");
-        
+
+        let llm_client =
+            MultiProviderLlm::new(vec![config], 5).expect("Failed to create LLM client");
+
         Self {
             llm_client: Arc::new(llm_client),
             rag_provider,
+            runtime: Arc::new(create_standard_runtime()),
             max_retries: 3,
         }
     }
@@ -98,8 +119,9 @@ impl LlmDslGenerator {
         rag_provider: Arc<RagContextProvider>,
         config: GeneratorConfig,
     ) -> Self {
-        use super::providers::{ProviderConfig, LlmProvider};
-        
+        use super::providers::{LlmProvider, ProviderConfig};
+        use crate::forth_engine::vocab_registry::create_standard_runtime;
+
         let provider_config = ProviderConfig {
             provider: LlmProvider::Anthropic,
             api_key: anthropic_api_key,
@@ -109,15 +131,21 @@ impl LlmDslGenerator {
             temperature: config.temperature,
             timeout_seconds: 30,
         };
-        
-        let llm_client = MultiProviderLlm::new(vec![provider_config], 5)
-            .expect("Failed to create LLM client");
-        
+
+        let llm_client =
+            MultiProviderLlm::new(vec![provider_config], 5).expect("Failed to create LLM client");
+
         Self {
             llm_client: Arc::new(llm_client),
             rag_provider,
+            runtime: Arc::new(create_standard_runtime()),
             max_retries: config.max_retries,
         }
+    }
+
+    /// Get a reference to the Runtime
+    pub fn runtime(&self) -> &Runtime {
+        &self.runtime
     }
 
     /// Generate DSL from natural language instruction
@@ -127,11 +155,10 @@ impl LlmDslGenerator {
         operation_type: &str,
         domain: Option<&str>,
     ) -> Result<GeneratedDsl> {
-        // Step 1: Get RAG context
+        // Step 1: Get RAG context using Runtime vocabulary (preferred method)
         let context = self
             .rag_provider
-            .get_context(operation_type, instruction, domain)
-            .await
+            .get_context_with_runtime(&self.runtime, operation_type, instruction, domain)
             .context("Failed to retrieve RAG context")?;
 
         // Step 2: Build prompts
@@ -171,7 +198,10 @@ impl LlmDslGenerator {
             }
         }
 
-        anyhow::bail!("Failed to generate valid DSL after {} attempts", self.max_retries)
+        anyhow::bail!(
+            "Failed to generate valid DSL after {} attempts",
+            self.max_retries
+        )
     }
 
     fn build_system_prompt(&self, context: &RagContext) -> String {
@@ -194,7 +224,12 @@ impl LlmDslGenerator {
             .attributes
             .iter()
             .take(10)
-            .map(|a| format!("  @attr(\"{}\") - {} ({})", a.semantic_id, a.name, a.data_type))
+            .map(|a| {
+                format!(
+                    "  @attr(\"{}\") - {} ({})",
+                    a.semantic_id, a.name, a.data_type
+                )
+            })
             .collect::<Vec<_>>()
             .join("\n");
 
@@ -239,14 +274,35 @@ Respond with JSON:
 
 IMPORTANT: The DSL must be EXECUTABLE. Invalid syntax will cause system failure."#,
             grammar_list,
-            if vocab_list.is_empty() { "  (no specific vocabulary loaded)" } else { &vocab_list },
-            if attributes_list.is_empty() { "  (no specific attributes loaded)" } else { &attributes_list },
-            if examples_list.is_empty() { "  (no examples available)" } else { &examples_list },
-            if constraints_list.is_empty() { "None" } else { &constraints_list }
+            if vocab_list.is_empty() {
+                "  (no specific vocabulary loaded)"
+            } else {
+                &vocab_list
+            },
+            if attributes_list.is_empty() {
+                "  (no specific attributes loaded)"
+            } else {
+                &attributes_list
+            },
+            if examples_list.is_empty() {
+                "  (no examples available)"
+            } else {
+                &examples_list
+            },
+            if constraints_list.is_empty() {
+                "None"
+            } else {
+                &constraints_list
+            }
         )
     }
 
     fn parse_response(&self, response: &str) -> Result<GeneratedDsl> {
+        Self::parse_response_text(response)
+    }
+
+    /// Static helper to parse response without requiring an LlmDslGenerator instance
+    pub fn parse_response_text(response: &str) -> Result<GeneratedDsl> {
         // Try to parse as JSON first
         if let Ok(generated) = serde_json::from_str::<GeneratedDsl>(response) {
             return Ok(generated);
@@ -309,12 +365,8 @@ mod tests {
 
     #[test]
     fn test_parse_json_response() {
-        let pool = sqlx::PgPool::connect_lazy("postgresql://localhost/test").unwrap();
-        let rag_provider = Arc::new(RagContextProvider::new(pool));
-        let generator = LlmDslGenerator::new("test".to_string(), rag_provider);
-
         let response = r#"{"dsl_text": "(cbu.create :name \"Test\")", "confidence": 0.9, "reasoning": "test"}"#;
-        let result = generator.parse_response(response).unwrap();
+        let result = LlmDslGenerator::parse_response_text(response).unwrap();
 
         assert_eq!(result.dsl_text, "(cbu.create :name \"Test\")");
         assert_eq!(result.confidence, 0.9);
@@ -322,24 +374,16 @@ mod tests {
 
     #[test]
     fn test_parse_embedded_json() {
-        let pool = sqlx::PgPool::connect_lazy("postgresql://localhost/test").unwrap();
-        let rag_provider = Arc::new(RagContextProvider::new(pool));
-        let generator = LlmDslGenerator::new("test".to_string(), rag_provider);
-
         let response = r#"Here is the DSL: {"dsl_text": "(cbu.create :name \"Test\")", "confidence": 0.9, "reasoning": "test"} Done."#;
-        let result = generator.parse_response(response).unwrap();
+        let result = LlmDslGenerator::parse_response_text(response).unwrap();
 
         assert_eq!(result.dsl_text, "(cbu.create :name \"Test\")");
     }
 
     #[test]
     fn test_parse_fallback_extraction() {
-        let pool = sqlx::PgPool::connect_lazy("postgresql://localhost/test").unwrap();
-        let rag_provider = Arc::new(RagContextProvider::new(pool));
-        let generator = LlmDslGenerator::new("test".to_string(), rag_provider);
-
         let response = "Here is your DSL: (cbu.create :name \"Test\") I hope this works.";
-        let result = generator.parse_response(response).unwrap();
+        let result = LlmDslGenerator::parse_response_text(response).unwrap();
 
         assert_eq!(result.dsl_text, "(cbu.create :name \"Test\")");
         assert_eq!(result.confidence, 0.7);

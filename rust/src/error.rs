@@ -312,6 +312,14 @@ impl From<crate::forth_engine::errors::EngineError> for DSLError {
                     DSLError::Runtime(RuntimeError::Database { message: msg })
                 }
             }
+            EngineError::UnknownWord(word) => DSLError::Runtime(RuntimeError::ExecutionFailed {
+                statement: "word_lookup".to_string(),
+                message: format!("Unknown word: {}", word),
+            }),
+            EngineError::MissingArgument(arg) => DSLError::Runtime(RuntimeError::ExecutionFailed {
+                statement: "argument".to_string(),
+                message: format!("Missing required argument: {}", arg),
+            }),
         }
     }
 }

@@ -9,8 +9,10 @@
 use crate::cbu_model_dsl::ast::CbuModel;
 use crate::database::{
     AttributeValuesService, CbuEntityRolesService, CbuService, DictionaryDatabaseService,
-    DocumentService, EntityService, NewCbuFields, NewDocumentFields, NewEntityFields,
-    NewProperPersonFields, LifecycleResourceService, NewLifecycleResourceFields, ProductService, NewProductFields, ServiceService, NewServiceFields,
+    DocumentService, EntityService, LifecycleResourceService, NewCbuFields, NewDocumentFields,
+    NewEntityFields, NewLifecycleResourceFields, NewLimitedCompanyFields, NewPartnershipFields,
+    NewProductFields, NewProperPersonFields, NewServiceFields, NewTrustFields, ProductService,
+    ServiceService,
 };
 use crate::forth_engine::env::RuntimeEnv;
 use crate::forth_engine::value::{
@@ -406,34 +408,54 @@ impl CrudExecutor {
 
             "PROPER_PERSON" | "CBU_PROPER_PERSON" => {
                 // Map DSL fields to proper person model
-                let person_name = self
-                    .get_string_value(&create.values, "person-name")
-                    .or_else(|| self.get_string_value(&create.values, "name"))
-                    .unwrap_or_else(|| "Unknown Person".to_string());
+                let first_name = self
+                    .get_string_value(&create.values, "first-name")
+                    .unwrap_or_else(|| {
+                        // Fallback: try to split person-name or name
+                        let person_name = self
+                            .get_string_value(&create.values, "person-name")
+                            .or_else(|| self.get_string_value(&create.values, "name"))
+                            .unwrap_or_else(|| "Unknown".to_string());
+                        let parts: Vec<&str> = person_name.split_whitespace().collect();
+                        parts
+                            .first()
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| "Unknown".to_string())
+                    });
 
-                // Split name into first/last
-                let parts: Vec<&str> = person_name.split_whitespace().collect();
-                let (first_name, last_name) = if parts.len() >= 2 {
-                    (parts[0].to_string(), parts[1..].join(" "))
-                } else {
-                    (person_name.clone(), String::new())
-                };
+                let last_name = self
+                    .get_string_value(&create.values, "last-name")
+                    .unwrap_or_else(|| {
+                        let person_name = self
+                            .get_string_value(&create.values, "person-name")
+                            .or_else(|| self.get_string_value(&create.values, "name"))
+                            .unwrap_or_default();
+                        let parts: Vec<&str> = person_name.split_whitespace().collect();
+                        if parts.len() > 1 {
+                            parts[1..].join(" ")
+                        } else {
+                            String::new()
+                        }
+                    });
 
                 let fields = NewProperPersonFields {
-                    first_name,
-                    last_name,
-                    middle_names: None,
-                    date_of_birth: None,
+                    first_name: first_name.clone(),
+                    last_name: last_name.clone(),
+                    middle_names: self.get_string_value(&create.values, "middle-name"),
+                    date_of_birth: self.get_date_value(&create.values, "date-of-birth"),
                     nationality: self.get_string_value(&create.values, "nationality"),
-                    residence_address: None,
-                    id_document_type: None,
-                    id_document_number: None,
+                    residence_address: self.get_string_value(&create.values, "residence-address"),
+                    id_document_type: self.get_string_value(&create.values, "id-document-type"),
+                    id_document_number: self.get_string_value(&create.values, "id-document-number"),
                 };
 
                 let (entity_id, _proper_person_id) =
                     self.entity_service.create_proper_person(&fields).await?;
 
-                info!("Created proper person: {} ({})", person_name, entity_id);
+                info!(
+                    "Created proper person: {} {} ({})",
+                    first_name, last_name, entity_id
+                );
 
                 Ok(CrudExecutionResult {
                     operation: "CREATE".to_string(),
@@ -441,6 +463,144 @@ impl CrudExecutor {
                     rows_affected: 1,
                     generated_id: Some(entity_id),
                     data: None,
+                })
+            }
+
+            "LIMITED_COMPANY" => {
+                let name = self
+                    .get_string_value(&create.values, "name")
+                    .or_else(|| self.get_string_value(&create.values, "company-name"))
+                    .unwrap_or_else(|| "Unknown Company".to_string());
+
+                let fields = NewLimitedCompanyFields {
+                    name: name.clone(),
+                    jurisdiction: self.get_string_value(&create.values, "jurisdiction"),
+                    registration_number: self
+                        .get_string_value(&create.values, "registration-number")
+                        .or_else(|| self.get_string_value(&create.values, "company-number")),
+                    incorporation_date: self.get_date_value(&create.values, "incorporation-date"),
+                    registered_address: self
+                        .get_string_value(&create.values, "registered-office")
+                        .or_else(|| self.get_string_value(&create.values, "registered-address")),
+                    business_nature: self.get_string_value(&create.values, "business-nature"),
+                };
+
+                let limited_company_id =
+                    self.entity_service.create_limited_company(&fields).await?;
+
+                info!("Created limited company: {} ({})", name, limited_company_id);
+
+                Ok(CrudExecutionResult {
+                    operation: "CREATE".to_string(),
+                    asset: "LIMITED_COMPANY".to_string(),
+                    rows_affected: 1,
+                    generated_id: Some(limited_company_id),
+                    data: None,
+                })
+            }
+
+            "PARTNERSHIP" => {
+                let name = self
+                    .get_string_value(&create.values, "name")
+                    .or_else(|| self.get_string_value(&create.values, "partnership-name"))
+                    .unwrap_or_else(|| "Unknown Partnership".to_string());
+
+                let fields = NewPartnershipFields {
+                    name: name.clone(),
+                    jurisdiction: self.get_string_value(&create.values, "jurisdiction"),
+                    partnership_type: self.get_string_value(&create.values, "partnership-type"),
+                    formation_date: self.get_date_value(&create.values, "formation-date"),
+                    principal_place_business: self
+                        .get_string_value(&create.values, "principal-place-business"),
+                    partnership_agreement_date: self
+                        .get_date_value(&create.values, "agreement-date")
+                        .or_else(|| {
+                            self.get_date_value(&create.values, "partnership-agreement-date")
+                        }),
+                };
+
+                let partnership_id = self.entity_service.create_partnership(&fields).await?;
+
+                info!("Created partnership: {} ({})", name, partnership_id);
+
+                Ok(CrudExecutionResult {
+                    operation: "CREATE".to_string(),
+                    asset: "PARTNERSHIP".to_string(),
+                    rows_affected: 1,
+                    generated_id: Some(partnership_id),
+                    data: None,
+                })
+            }
+
+            "TRUST" => {
+                let name = self
+                    .get_string_value(&create.values, "name")
+                    .or_else(|| self.get_string_value(&create.values, "trust-name"))
+                    .unwrap_or_else(|| "Unknown Trust".to_string());
+
+                let jurisdiction = self
+                    .get_string_value(&create.values, "jurisdiction")
+                    .unwrap_or_else(|| "Unknown".to_string());
+
+                let fields = NewTrustFields {
+                    name: name.clone(),
+                    jurisdiction,
+                    trust_type: self.get_string_value(&create.values, "trust-type"),
+                    establishment_date: self
+                        .get_date_value(&create.values, "formation-date")
+                        .or_else(|| self.get_date_value(&create.values, "establishment-date")),
+                    trust_deed_date: self.get_date_value(&create.values, "trust-deed-date"),
+                    trust_purpose: self.get_string_value(&create.values, "trust-purpose"),
+                    governing_law: self.get_string_value(&create.values, "governing-law"),
+                };
+
+                let trust_id = self.entity_service.create_trust(&fields).await?;
+
+                info!("Created trust: {} ({})", name, trust_id);
+
+                Ok(CrudExecutionResult {
+                    operation: "CREATE".to_string(),
+                    asset: "TRUST".to_string(),
+                    rows_affected: 1,
+                    generated_id: Some(trust_id),
+                    data: None,
+                })
+            }
+
+            "CBU_ENTITY_ROLE" => {
+                // THE CRITICAL FIX: Actually link entity to CBU via cbu_entity_roles
+                let cbu_id = self
+                    .get_uuid_value(&create.values, "cbu-id")
+                    .ok_or_else(|| anyhow!("cbu-id required for CBU_ENTITY_ROLE"))?;
+
+                let entity_id = self
+                    .get_uuid_value(&create.values, "entity-id")
+                    .ok_or_else(|| anyhow!("entity-id required for CBU_ENTITY_ROLE"))?;
+
+                let role = self
+                    .get_string_value(&create.values, "role")
+                    .ok_or_else(|| anyhow!("role required for CBU_ENTITY_ROLE"))?;
+
+                let cbu_entity_role_id = self
+                    .entity_service
+                    .attach_entity_to_cbu(cbu_id, entity_id, &role)
+                    .await?;
+
+                info!(
+                    "Attached entity {} to CBU {} with role '{}'",
+                    entity_id, cbu_id, role
+                );
+
+                Ok(CrudExecutionResult {
+                    operation: "CREATE".to_string(),
+                    asset: "CBU_ENTITY_ROLE".to_string(),
+                    rows_affected: 1,
+                    generated_id: Some(cbu_entity_role_id),
+                    data: Some(serde_json::json!({
+                        "cbu_id": cbu_id.to_string(),
+                        "entity_id": entity_id.to_string(),
+                        "role": role
+                    })),
                 })
             }
 
@@ -578,10 +738,10 @@ impl CrudExecutor {
                 // Insert into document_metadata
                 sqlx::query!(
                     r#"
-                    INSERT INTO "ob-poc".document_metadata 
+                    INSERT INTO "ob-poc".document_metadata
                     (doc_id, attribute_id, value, extraction_method, extracted_at)
                     VALUES ($1, $2, $3, $4, NOW())
-                    ON CONFLICT (doc_id, attribute_id) 
+                    ON CONFLICT (doc_id, attribute_id)
                     DO UPDATE SET value = $3, extraction_method = $4, extracted_at = NOW()
                     "#,
                     doc_id,
@@ -593,7 +753,10 @@ impl CrudExecutor {
                 .await
                 .context("Failed to insert document metadata")?;
 
-                info!("Extracted attribute {} from document {}", attribute_id, doc_id);
+                info!(
+                    "Extracted attribute {} from document {}",
+                    attribute_id, doc_id
+                );
 
                 Ok(CrudExecutionResult {
                     operation: "CREATE".to_string(),
@@ -604,9 +767,9 @@ impl CrudExecutor {
                 })
             }
 
-
             "Product" | "PRODUCT" => {
-                let name = self.get_string_value(&create.values, "name")
+                let name = self
+                    .get_string_value(&create.values, "name")
                     .or_else(|| self.get_string_value(&create.values, "product-name"))
                     .unwrap_or_else(|| "Unknown Product".to_string());
                 let fields = NewProductFields {
@@ -614,7 +777,8 @@ impl CrudExecutor {
                     description: self.get_string_value(&create.values, "description"),
                     product_code: self.get_string_value(&create.values, "product-code"),
                     product_category: self.get_string_value(&create.values, "product-category"),
-                    regulatory_framework: self.get_string_value(&create.values, "regulatory-framework"),
+                    regulatory_framework: self
+                        .get_string_value(&create.values, "regulatory-framework"),
                     min_asset_requirement: None,
                     is_active: Some(true),
                     metadata: None,
@@ -631,7 +795,8 @@ impl CrudExecutor {
             }
 
             "Service" | "SERVICE" => {
-                let name = self.get_string_value(&create.values, "name")
+                let name = self
+                    .get_string_value(&create.values, "name")
                     .or_else(|| self.get_string_value(&create.values, "service-name"))
                     .unwrap_or_else(|| "Unknown Service".to_string());
                 let fields = NewServiceFields {
@@ -654,10 +819,12 @@ impl CrudExecutor {
             }
 
             "LifecycleResource" | "LIFECYCLE_RESOURCE" => {
-                let name = self.get_string_value(&create.values, "name")
+                let name = self
+                    .get_string_value(&create.values, "name")
                     .or_else(|| self.get_string_value(&create.values, "resource-name"))
                     .unwrap_or_else(|| "Unknown Resource".to_string());
-                let owner = self.get_string_value(&create.values, "owner")
+                let owner = self
+                    .get_string_value(&create.values, "owner")
                     .unwrap_or_else(|| "system".to_string());
                 let fields = NewLifecycleResourceFields {
                     name: name.clone(),
@@ -670,10 +837,14 @@ impl CrudExecutor {
                     version: self.get_string_value(&create.values, "version"),
                     api_endpoint: self.get_string_value(&create.values, "api-endpoint"),
                     api_version: self.get_string_value(&create.values, "api-version"),
-                    authentication_method: self.get_string_value(&create.values, "authentication-method"),
+                    authentication_method: self
+                        .get_string_value(&create.values, "authentication-method"),
                     is_active: Some(true),
                 };
-                let resource_id = self.lifecycle_resource_service.create_lifecycle_resource(&fields).await?;
+                let resource_id = self
+                    .lifecycle_resource_service
+                    .create_lifecycle_resource(&fields)
+                    .await?;
                 info!("Created lifecycle resource: {} ({})", name, resource_id);
                 Ok(CrudExecutionResult {
                     operation: "CREATE".to_string(),
@@ -744,13 +915,26 @@ impl CrudExecutor {
                 let data = if let Some(id) = product_id {
                     let uuid = Uuid::parse_str(&id)?;
                     if let Some(product) = self.product_service.get_product_by_id(uuid).await? {
-                        vec![serde_json::json!({"product_id": product.product_id.to_string(), "name": product.name, "description": product.description})]
-                    } else { vec![] }
+                        vec![
+                            serde_json::json!({"product_id": product.product_id.to_string(), "name": product.name, "description": product.description}),
+                        ]
+                    } else {
+                        vec![]
+                    }
                 } else {
-                    let products = self.product_service.list_products(read.limit.map(|l| l as i32), None).await?;
+                    let products = self
+                        .product_service
+                        .list_products(read.limit.map(|l| l as i32), None)
+                        .await?;
                     products.into_iter().map(|p| serde_json::json!({"product_id": p.product_id.to_string(), "name": p.name, "description": p.description})).collect()
                 };
-                Ok(CrudExecutionResult { operation: "READ".to_string(), asset: "Product".to_string(), rows_affected: data.len() as u64, generated_id: None, data: Some(JsonValue::Array(data)) })
+                Ok(CrudExecutionResult {
+                    operation: "READ".to_string(),
+                    asset: "Product".to_string(),
+                    rows_affected: data.len() as u64,
+                    generated_id: None,
+                    data: Some(JsonValue::Array(data)),
+                })
             }
 
             "Service" | "SERVICE" => {
@@ -758,27 +942,91 @@ impl CrudExecutor {
                 let data = if let Some(id) = service_id {
                     let uuid = Uuid::parse_str(&id)?;
                     if let Some(service) = self.service_service.get_service_by_id(uuid).await? {
-                        vec![serde_json::json!({"service_id": service.service_id.to_string(), "name": service.name, "description": service.description})]
-                    } else { vec![] }
+                        vec![
+                            serde_json::json!({"service_id": service.service_id.to_string(), "name": service.name, "description": service.description}),
+                        ]
+                    } else {
+                        vec![]
+                    }
                 } else {
-                    let services = self.service_service.list_services(read.limit.map(|l| l as i32), None).await?;
+                    let services = self
+                        .service_service
+                        .list_services(read.limit.map(|l| l as i32), None)
+                        .await?;
                     services.into_iter().map(|s| serde_json::json!({"service_id": s.service_id.to_string(), "name": s.name, "description": s.description})).collect()
                 };
-                Ok(CrudExecutionResult { operation: "READ".to_string(), asset: "Service".to_string(), rows_affected: data.len() as u64, generated_id: None, data: Some(JsonValue::Array(data)) })
+                Ok(CrudExecutionResult {
+                    operation: "READ".to_string(),
+                    asset: "Service".to_string(),
+                    rows_affected: data.len() as u64,
+                    generated_id: None,
+                    data: Some(JsonValue::Array(data)),
+                })
             }
 
             "LifecycleResource" | "LIFECYCLE_RESOURCE" => {
                 let resource_id = self.get_string_value(&read.where_clause, "resource-id");
                 let data = if let Some(id) = resource_id {
                     let uuid = Uuid::parse_str(&id)?;
-                    if let Some(resource) = self.lifecycle_resource_service.get_lifecycle_resource_by_id(uuid).await? {
-                        vec![serde_json::json!({"resource_id": resource.resource_id.to_string(), "name": resource.name, "description": resource.description, "owner": resource.owner})]
-                    } else { vec![] }
+                    if let Some(resource) = self
+                        .lifecycle_resource_service
+                        .get_lifecycle_resource_by_id(uuid)
+                        .await?
+                    {
+                        vec![
+                            serde_json::json!({"resource_id": resource.resource_id.to_string(), "name": resource.name, "description": resource.description, "owner": resource.owner}),
+                        ]
+                    } else {
+                        vec![]
+                    }
                 } else {
-                    let resources = self.lifecycle_resource_service.list_lifecycle_resources(read.limit.map(|l| l as i32), None).await?;
+                    let resources = self
+                        .lifecycle_resource_service
+                        .list_lifecycle_resources(read.limit.map(|l| l as i32), None)
+                        .await?;
                     resources.into_iter().map(|r| serde_json::json!({"resource_id": r.resource_id.to_string(), "name": r.name, "description": r.description, "owner": r.owner})).collect()
                 };
-                Ok(CrudExecutionResult { operation: "READ".to_string(), asset: "LifecycleResource".to_string(), rows_affected: data.len() as u64, generated_id: None, data: Some(JsonValue::Array(data)) })
+                Ok(CrudExecutionResult {
+                    operation: "READ".to_string(),
+                    asset: "LifecycleResource".to_string(),
+                    rows_affected: data.len() as u64,
+                    generated_id: None,
+                    data: Some(JsonValue::Array(data)),
+                })
+            }
+
+            "CBU_ENTITY_ROLE" => {
+                // List entities attached to a CBU
+                let cbu_id = self
+                    .get_uuid_value(&read.where_clause, "cbu-id")
+                    .ok_or_else(|| anyhow!("cbu-id required for CBU_ENTITY_ROLE read"))?;
+
+                let role = self.get_string_value(&read.where_clause, "role");
+
+                let entities = self
+                    .entity_service
+                    .list_cbu_entities(cbu_id, role.as_deref())
+                    .await?;
+
+                let data: Vec<JsonValue> = entities
+                    .into_iter()
+                    .map(|e| {
+                        serde_json::json!({
+                            "cbu_entity_role_id": e.cbu_entity_role_id.to_string(),
+                            "cbu_id": e.cbu_id.to_string(),
+                            "entity_id": e.entity_id.to_string(),
+                            "role_id": e.role_id.to_string(),
+                        })
+                    })
+                    .collect();
+
+                Ok(CrudExecutionResult {
+                    operation: "READ".to_string(),
+                    asset: "CBU_ENTITY_ROLE".to_string(),
+                    rows_affected: data.len() as u64,
+                    generated_id: None,
+                    data: Some(JsonValue::Array(data)),
+                })
             }
 
             _ => {
@@ -831,34 +1079,72 @@ impl CrudExecutor {
             }
 
             "Product" | "PRODUCT" => {
-                let product_id_str = self.get_string_value(&update.where_clause, "product-id").ok_or_else(|| anyhow!("product-id required for UPDATE"))?;
+                let product_id_str = self
+                    .get_string_value(&update.where_clause, "product-id")
+                    .ok_or_else(|| anyhow!("product-id required for UPDATE"))?;
                 let product_id = Uuid::parse_str(&product_id_str)?;
                 let name = self.get_string_value(&update.values, "name");
                 let description = self.get_string_value(&update.values, "description");
-                let updated = self.product_service.update_product(product_id, name.as_deref(), description.as_deref()).await?;
+                let updated = self
+                    .product_service
+                    .update_product(product_id, name.as_deref(), description.as_deref())
+                    .await?;
                 info!("Updated Product: {}", product_id);
-                Ok(CrudExecutionResult { operation: "UPDATE".to_string(), asset: "Product".to_string(), rows_affected: if updated { 1 } else { 0 }, generated_id: None, data: None })
+                Ok(CrudExecutionResult {
+                    operation: "UPDATE".to_string(),
+                    asset: "Product".to_string(),
+                    rows_affected: if updated { 1 } else { 0 },
+                    generated_id: None,
+                    data: None,
+                })
             }
 
             "Service" | "SERVICE" => {
-                let service_id_str = self.get_string_value(&update.where_clause, "service-id").ok_or_else(|| anyhow!("service-id required for UPDATE"))?;
+                let service_id_str = self
+                    .get_string_value(&update.where_clause, "service-id")
+                    .ok_or_else(|| anyhow!("service-id required for UPDATE"))?;
                 let service_id = Uuid::parse_str(&service_id_str)?;
                 let name = self.get_string_value(&update.values, "name");
                 let description = self.get_string_value(&update.values, "description");
-                let updated = self.service_service.update_service(service_id, name.as_deref(), description.as_deref()).await?;
+                let updated = self
+                    .service_service
+                    .update_service(service_id, name.as_deref(), description.as_deref())
+                    .await?;
                 info!("Updated Service: {}", service_id);
-                Ok(CrudExecutionResult { operation: "UPDATE".to_string(), asset: "Service".to_string(), rows_affected: if updated { 1 } else { 0 }, generated_id: None, data: None })
+                Ok(CrudExecutionResult {
+                    operation: "UPDATE".to_string(),
+                    asset: "Service".to_string(),
+                    rows_affected: if updated { 1 } else { 0 },
+                    generated_id: None,
+                    data: None,
+                })
             }
 
             "LifecycleResource" | "LIFECYCLE_RESOURCE" => {
-                let resource_id_str = self.get_string_value(&update.where_clause, "resource-id").ok_or_else(|| anyhow!("resource-id required for UPDATE"))?;
+                let resource_id_str = self
+                    .get_string_value(&update.where_clause, "resource-id")
+                    .ok_or_else(|| anyhow!("resource-id required for UPDATE"))?;
                 let resource_id = Uuid::parse_str(&resource_id_str)?;
                 let name = self.get_string_value(&update.values, "name");
                 let description = self.get_string_value(&update.values, "description");
                 let owner = self.get_string_value(&update.values, "owner");
-                let updated = self.lifecycle_resource_service.update_lifecycle_resource(resource_id, name.as_deref(), description.as_deref(), owner.as_deref()).await?;
+                let updated = self
+                    .lifecycle_resource_service
+                    .update_lifecycle_resource(
+                        resource_id,
+                        name.as_deref(),
+                        description.as_deref(),
+                        owner.as_deref(),
+                    )
+                    .await?;
                 info!("Updated Lifecycle Resource: {}", resource_id);
-                Ok(CrudExecutionResult { operation: "UPDATE".to_string(), asset: "LifecycleResource".to_string(), rows_affected: if updated { 1 } else { 0 }, generated_id: None, data: None })
+                Ok(CrudExecutionResult {
+                    operation: "UPDATE".to_string(),
+                    asset: "LifecycleResource".to_string(),
+                    rows_affected: if updated { 1 } else { 0 },
+                    generated_id: None,
+                    data: None,
+                })
             }
 
             _ => {
@@ -897,27 +1183,85 @@ impl CrudExecutor {
             }
 
             "Product" | "PRODUCT" => {
-                let product_id_str = self.get_string_value(&delete.where_clause, "product-id").ok_or_else(|| anyhow!("product-id required for DELETE"))?;
+                let product_id_str = self
+                    .get_string_value(&delete.where_clause, "product-id")
+                    .ok_or_else(|| anyhow!("product-id required for DELETE"))?;
                 let product_id = Uuid::parse_str(&product_id_str)?;
                 let deleted = self.product_service.delete_product(product_id).await?;
                 info!("Deleted Product: {}", product_id);
-                Ok(CrudExecutionResult { operation: "DELETE".to_string(), asset: "Product".to_string(), rows_affected: if deleted { 1 } else { 0 }, generated_id: None, data: None })
+                Ok(CrudExecutionResult {
+                    operation: "DELETE".to_string(),
+                    asset: "Product".to_string(),
+                    rows_affected: if deleted { 1 } else { 0 },
+                    generated_id: None,
+                    data: None,
+                })
             }
 
             "Service" | "SERVICE" => {
-                let service_id_str = self.get_string_value(&delete.where_clause, "service-id").ok_or_else(|| anyhow!("service-id required for DELETE"))?;
+                let service_id_str = self
+                    .get_string_value(&delete.where_clause, "service-id")
+                    .ok_or_else(|| anyhow!("service-id required for DELETE"))?;
                 let service_id = Uuid::parse_str(&service_id_str)?;
                 let deleted = self.service_service.delete_service(service_id).await?;
                 info!("Deleted Service: {}", service_id);
-                Ok(CrudExecutionResult { operation: "DELETE".to_string(), asset: "Service".to_string(), rows_affected: if deleted { 1 } else { 0 }, generated_id: None, data: None })
+                Ok(CrudExecutionResult {
+                    operation: "DELETE".to_string(),
+                    asset: "Service".to_string(),
+                    rows_affected: if deleted { 1 } else { 0 },
+                    generated_id: None,
+                    data: None,
+                })
             }
 
             "LifecycleResource" | "LIFECYCLE_RESOURCE" => {
-                let resource_id_str = self.get_string_value(&delete.where_clause, "resource-id").ok_or_else(|| anyhow!("resource-id required for DELETE"))?;
+                let resource_id_str = self
+                    .get_string_value(&delete.where_clause, "resource-id")
+                    .ok_or_else(|| anyhow!("resource-id required for DELETE"))?;
                 let resource_id = Uuid::parse_str(&resource_id_str)?;
-                let deleted = self.lifecycle_resource_service.delete_lifecycle_resource(resource_id).await?;
+                let deleted = self
+                    .lifecycle_resource_service
+                    .delete_lifecycle_resource(resource_id)
+                    .await?;
                 info!("Deleted Lifecycle Resource: {}", resource_id);
-                Ok(CrudExecutionResult { operation: "DELETE".to_string(), asset: "LifecycleResource".to_string(), rows_affected: if deleted { 1 } else { 0 }, generated_id: None, data: None })
+                Ok(CrudExecutionResult {
+                    operation: "DELETE".to_string(),
+                    asset: "LifecycleResource".to_string(),
+                    rows_affected: if deleted { 1 } else { 0 },
+                    generated_id: None,
+                    data: None,
+                })
+            }
+
+            "CBU_ENTITY_ROLE" => {
+                // Detach entity from CBU
+                let cbu_id = self
+                    .get_uuid_value(&delete.where_clause, "cbu-id")
+                    .ok_or_else(|| anyhow!("cbu-id required for CBU_ENTITY_ROLE delete"))?;
+
+                let entity_id = self
+                    .get_uuid_value(&delete.where_clause, "entity-id")
+                    .ok_or_else(|| anyhow!("entity-id required for CBU_ENTITY_ROLE delete"))?;
+
+                let role = self.get_string_value(&delete.where_clause, "role");
+
+                let rows_affected = self
+                    .entity_service
+                    .detach_entity_from_cbu(cbu_id, entity_id, role.as_deref())
+                    .await?;
+
+                info!(
+                    "Detached entity {} from CBU {} (rows: {})",
+                    entity_id, cbu_id, rows_affected
+                );
+
+                Ok(CrudExecutionResult {
+                    operation: "DELETE".to_string(),
+                    asset: "CBU_ENTITY_ROLE".to_string(),
+                    rows_affected,
+                    generated_id: None,
+                    data: None,
+                })
             }
 
             _ => {
@@ -955,6 +1299,26 @@ impl CrudExecutor {
             Value::Float(n) => Some(*n as i64),
             _ => None,
         })
+    }
+
+    /// Helper to extract date value from HashMap (expects YYYY-MM-DD format)
+    fn get_date_value(
+        &self,
+        values: &std::collections::HashMap<String, Value>,
+        key: &str,
+    ) -> Option<chrono::NaiveDate> {
+        self.get_string_value(values, key)
+            .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok())
+    }
+
+    /// Helper to extract UUID value from HashMap
+    fn get_uuid_value(
+        &self,
+        values: &std::collections::HashMap<String, Value>,
+        key: &str,
+    ) -> Option<Uuid> {
+        self.get_string_value(values, key)
+            .and_then(|s| Uuid::parse_str(&s).ok())
     }
 
     /// Convert AST Value to JSON Value

@@ -24,9 +24,9 @@ pub mod error;
 // Essential AST types
 pub mod ast;
 
-// Data dictionary and vocabulary management
+// Data dictionary
 pub mod data_dictionary;
-pub mod vocabulary;
+// vocabulary module removed - vocabulary now lives in forth_engine::vocab_registry
 
 // Domain handlers for business logic
 pub mod domains;
@@ -74,8 +74,8 @@ pub use database::{DatabaseConfig, DatabaseManager, DictionaryDatabaseService};
 // Core domain capabilities
 pub use domains::{DomainHandler, DomainRegistry, DomainResult};
 
-// Vocabulary
-pub use vocabulary::vocab_registry::VocabularyRegistry;
+// Vocabulary - now in forth_engine::vocab_registry
+pub use forth_engine::vocab_registry::create_standard_runtime;
 
 // Essential error types
 pub use error::{DSLError, ParseError};

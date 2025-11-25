@@ -12,8 +12,8 @@
 //! now flow through the Forth stack-based execution engine.
 
 // Agentic services
-pub mod agentic_complete;
-pub mod agentic_dsl_crud;
+
+// agentic_dsl_crud removed - use dsl_source::orchestrator::AgenticOrchestrator instead
 
 // Attribute services
 pub mod attribute_executor;
@@ -46,11 +46,17 @@ pub use crate::dsl_manager::{
 
 // Re-export RAG and LLM types
 // Re-export from dsl_source
+pub use crate::dsl_source::agentic::llm_generator::{GeneratorConfig, LlmDslGenerator};
+pub use crate::dsl_source::agentic::providers::{
+    LlmProvider, LlmResponse, MultiProviderLlm, ProviderConfig,
+};
+pub use crate::dsl_source::agentic::rag_context::{
+    AttributeDefinition as RagAttributeDefinition, DslExample, VocabEntry,
+};
+pub use crate::dsl_source::agentic::GeneratedDsl;
 pub use crate::dsl_source::agentic::{RagContext, RagContextProvider};
-pub use crate::dsl_source::agentic::rag_context::{VocabEntry, DslExample, AttributeDefinition as RagAttributeDefinition};
-pub use crate::dsl_source::agentic::{GeneratedDsl};
-pub use crate::dsl_source::agentic::llm_generator::{LlmDslGenerator, GeneratorConfig};
-pub use crate::dsl_source::agentic::providers::{MultiProviderLlm, LlmProvider, ProviderConfig, LlmResponse};
-pub use crate::dsl_source::validation::{ValidationPipeline, ValidationResult, ValidationStage, ValidationError};
+pub use crate::dsl_source::validation::{
+    ValidationError, ValidationPipeline, ValidationResult, ValidationStage,
+};
 pub use sink_executor::CompositeSinkExecutor;
 pub use source_executor::CompositeSourceExecutor;

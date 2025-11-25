@@ -44,8 +44,14 @@ pub use document_service::{
     DocumentCatalogEntry, DocumentService, DocumentType, NewDocumentFields,
 };
 pub use dsl_repository::{DslRepository, DslSaveResult};
-pub use entity_service::{EntityRow, EntityService, NewEntityFields, NewProperPersonFields};
-pub use lifecycle_resource_service::{LifecycleResourceRow, LifecycleResourceService, NewLifecycleResourceFields};
+pub use entity_service::{
+    CbuEntityRoleRow, EntityRow, EntityService, LimitedCompanyRow, NewEntityFields,
+    NewLimitedCompanyFields, NewPartnershipFields, NewProperPersonFields, NewTrustFields,
+    PartnershipRow, TrustRow,
+};
+pub use lifecycle_resource_service::{
+    LifecycleResourceRow, LifecycleResourceService, NewLifecycleResourceFields,
+};
 pub use product_service::{NewProductFields, ProductRow, ProductService};
 pub use service_service::{NewServiceFields, ServiceRow, ServiceService};
 

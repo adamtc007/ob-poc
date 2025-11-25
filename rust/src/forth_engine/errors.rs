@@ -54,4 +54,10 @@ pub enum EngineError {
 
     #[error("Database error: {0}")]
     Database(String),
+
+    #[error("Unknown word: '{0}'")]
+    UnknownWord(String),
+
+    #[error("Missing required argument: '{0}'")]
+    MissingArgument(String),
 }

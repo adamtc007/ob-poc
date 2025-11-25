@@ -1,11 +1,16 @@
 //! RAG Context Provider for DSL Generation
 //!
-//! Retrieves relevant context from vocabulary registry, dictionary,
+//! Retrieves relevant context from Runtime vocabulary, dictionary,
 //! and example DSL corpus to guide LLM generation.
+//!
+//! The vocabulary now comes from the in-memory Runtime (vocab_registry.rs)
+//! rather than the deprecated vocabulary_registry DB table.
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
+
+use crate::forth_engine::runtime::Runtime;
 
 #[derive(Clone)]
 pub struct RagContextProvider {
@@ -16,16 +21,16 @@ pub struct RagContextProvider {
 pub struct RagContext {
     /// Valid vocabulary verbs for the operation
     pub vocabulary: Vec<VocabEntry>,
-    
+
     /// Similar DSL examples from corpus
     pub examples: Vec<DslExample>,
-    
+
     /// Relevant attributes from dictionary
     pub attributes: Vec<AttributeDefinition>,
-    
+
     /// Grammar hints (EBNF snippets)
     pub grammar_hints: Vec<String>,
-    
+
     /// Business constraints
     pub constraints: Vec<String>,
 }
@@ -59,8 +64,73 @@ impl RagContextProvider {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
-    
-    /// Get comprehensive context for DSL generation
+
+    /// Get comprehensive context for DSL generation using Runtime vocabulary
+    ///
+    /// This is the preferred method - vocabulary comes from in-memory Runtime
+    /// rather than the deprecated DB table.
+    pub fn get_context_with_runtime(
+        &self,
+        runtime: &Runtime,
+        operation_type: &str,
+        query: &str,
+        domain: Option<&str>,
+    ) -> Result<RagContext> {
+        // Get vocabulary from Runtime (in-memory, not DB)
+        let vocabulary = self.get_vocab_from_runtime(runtime, domain);
+
+        // These still come from DB (they have user data)
+        // Use block_on since we're in a sync context
+        let handle = tokio::runtime::Handle::try_current();
+        let (examples, attributes) = if let Ok(h) = handle {
+            h.block_on(async {
+                tokio::join!(
+                    self.search_examples(query, operation_type),
+                    self.query_attributes(query, domain)
+                )
+            })
+        } else {
+            // Fallback if no runtime - return empty results
+            (Ok(Vec::new()), Ok(Vec::new()))
+        };
+
+        Ok(RagContext {
+            vocabulary,
+            examples: examples?,
+            attributes: attributes?,
+            grammar_hints: self.get_grammar_hints(operation_type),
+            constraints: self.get_constraints(operation_type, domain),
+        })
+    }
+
+    /// Extract vocabulary from Runtime
+    fn get_vocab_from_runtime(&self, runtime: &Runtime, domain: Option<&str>) -> Vec<VocabEntry> {
+        let words = if let Some(d) = domain {
+            runtime.get_domain_words(d)
+        } else {
+            // Get all words
+            runtime
+                .get_all_word_names()
+                .iter()
+                .filter_map(|name| runtime.get_word(name))
+                .collect()
+        };
+
+        words
+            .iter()
+            .map(|w| VocabEntry {
+                verb_name: w.name.to_string(),
+                signature: w.signature.to_string(),
+                description: Some(w.description.to_string()),
+                examples: Some(serde_json::json!(w.examples)),
+            })
+            .collect()
+    }
+
+    /// Get comprehensive context for DSL generation (DEPRECATED)
+    ///
+    /// Use get_context_with_runtime instead - vocabulary now comes from Runtime.
+    #[allow(deprecated)]
     pub async fn get_context(
         &self,
         operation_type: &str,
@@ -73,7 +143,7 @@ impl RagContextProvider {
             self.search_examples(query, operation_type),
             self.query_attributes(query, domain)
         );
-        
+
         Ok(RagContext {
             vocabulary: vocabulary?,
             examples: examples?,
@@ -82,7 +152,7 @@ impl RagContextProvider {
             constraints: self.get_constraints(operation_type, domain),
         })
     }
-    
+
     /// Query vocabulary registry for valid verbs
     async fn query_vocabulary(
         &self,
@@ -94,7 +164,7 @@ impl RagContextProvider {
                 r#"
                 SELECT verb_name, signature, description, examples
                 FROM "ob-poc".vocabulary_registry
-                WHERE 
+                WHERE
                     is_active = true
                     AND $1 = ANY(operation_types)
                     AND domain = $2
@@ -112,7 +182,7 @@ impl RagContextProvider {
                 r#"
                 SELECT verb_name, signature, description, examples
                 FROM "ob-poc".vocabulary_registry
-                WHERE 
+                WHERE
                     is_active = true
                     AND $1 = ANY(operation_types)
                 ORDER BY usage_count DESC
@@ -124,32 +194,28 @@ impl RagContextProvider {
             .await
             .context("Failed to query vocabulary")?
         };
-        
+
         Ok(results)
     }
-    
+
     /// Search for similar DSL examples (keyword-based)
-    async fn search_examples(
-        &self,
-        query: &str,
-        operation_type: &str,
-    ) -> Result<Vec<DslExample>> {
+    async fn search_examples(&self, query: &str, operation_type: &str) -> Result<Vec<DslExample>> {
         let pattern = format!("%{}%", query);
-        
+
         let results = sqlx::query_as::<_, DslExample>(
             r#"
-            SELECT 
-                dsl_text, natural_language_input, 
+            SELECT
+                dsl_text, natural_language_input,
                 confidence_score::float8 as confidence_score, operation_type
             FROM "ob-poc".dsl_instances
-            WHERE 
+            WHERE
                 execution_success = true
                 AND operation_type = $1
                 AND (
                     natural_language_input ILIKE $2
                     OR dsl_text ILIKE $2
                 )
-            ORDER BY 
+            ORDER BY
                 confidence_score DESC NULLS LAST,
                 created_at DESC
             LIMIT 5
@@ -160,10 +226,10 @@ impl RagContextProvider {
         .fetch_all(&self.pool)
         .await
         .context("Failed to search DSL examples")?;
-        
+
         Ok(results)
     }
-    
+
     /// Query relevant attributes from dictionary
     async fn query_attributes(
         &self,
@@ -171,13 +237,13 @@ impl RagContextProvider {
         domain: Option<&str>,
     ) -> Result<Vec<AttributeDefinition>> {
         let keywords = self.extract_keywords(query);
-        
+
         if keywords.is_empty() {
             return Ok(Vec::new());
         }
-        
+
         let pattern = format!("%{}%", keywords.join("%"));
-        
+
         let results = if let Some(d) = domain {
             sqlx::query_as::<_, AttributeDefinition>(
                 r#"
@@ -217,13 +283,21 @@ impl RagContextProvider {
             .await
             .context("Failed to query attributes")?
         };
-        
+
         Ok(results)
     }
-    
+
     /// Extract keywords from query for attribute matching
     fn extract_keywords(&self, query: &str) -> Vec<String> {
-        let stop_words = ["with", "from", "create", "update", "delete", "read", "the", "a", "an", "for", "and", "or"];
+        Self::extract_keywords_from_text(query)
+    }
+
+    /// Static helper to extract keywords without requiring a RagContextProvider instance
+    pub fn extract_keywords_from_text(query: &str) -> Vec<String> {
+        let stop_words = [
+            "with", "from", "create", "update", "delete", "read", "the", "a", "an", "for", "and",
+            "or",
+        ];
         query
             .split_whitespace()
             .filter(|w| w.len() > 3)
@@ -231,7 +305,7 @@ impl RagContextProvider {
             .map(|w| w.to_lowercase())
             .collect()
     }
-    
+
     /// Get EBNF grammar hints for operation type
     fn get_grammar_hints(&self, operation_type: &str) -> Vec<String> {
         match operation_type {
@@ -256,21 +330,21 @@ impl RagContextProvider {
             ],
         }
     }
-    
+
     /// Get business constraints for operation
     fn get_constraints(&self, operation_type: &str, domain: Option<&str>) -> Vec<String> {
         let mut constraints = Vec::new();
-        
+
         if let Some("kyc") = domain {
             constraints.push("All KYC entities must have verification status".to_string());
             constraints.push("Documents must be verified before CBU approval".to_string());
         }
-        
+
         if let Some("cbu") = domain {
             constraints.push("CBU must have legal name and jurisdiction".to_string());
             constraints.push("CBU state transitions must follow lifecycle rules".to_string());
         }
-        
+
         match operation_type {
             "CREATE" | "CREATE_CBU" => {
                 constraints.push("All required fields must be provided".to_string());
@@ -283,7 +357,7 @@ impl RagContextProvider {
             }
             _ => {}
         }
-        
+
         constraints
     }
 }
@@ -291,32 +365,32 @@ impl RagContextProvider {
 #[cfg(all(test, feature = "database"))]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     #[ignore] // Requires database
     async fn test_rag_context_retrieval() {
         let database_url = std::env::var("DATABASE_URL")
             .unwrap_or_else(|_| "postgresql://localhost/data_designer".to_string());
         let pool = PgPool::connect(&database_url).await.unwrap();
-        
+
         let provider = RagContextProvider::new(pool);
-        
+
         let context = provider
             .get_context("CREATE", "Create CBU for TechCorp", Some("cbu"))
             .await
             .unwrap();
-        
-        assert!(!context.grammar_hints.is_empty(), "Should have grammar hints");
+
+        assert!(
+            !context.grammar_hints.is_empty(),
+            "Should have grammar hints"
+        );
     }
-    
+
     #[test]
     fn test_extract_keywords() {
-        let provider = RagContextProvider::new(
-            // We don't actually need a pool for this test
-            sqlx::PgPool::connect_lazy("postgresql://localhost/test").unwrap()
+        let keywords = RagContextProvider::extract_keywords_from_text(
+            "Create a CBU for TechCorp with banking services",
         );
-        
-        let keywords = provider.extract_keywords("Create a CBU for TechCorp with banking services");
         assert!(keywords.contains(&"techcorp".to_string()));
         assert!(keywords.contains(&"banking".to_string()));
         assert!(keywords.contains(&"services".to_string()));
