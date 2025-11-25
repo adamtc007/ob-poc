@@ -20,12 +20,17 @@ pub mod cbu_entity_roles_service;
 pub mod cbu_service;
 pub mod crud_executor;
 pub mod crud_service;
+pub mod decision_service;
 pub mod dictionary_service;
 pub mod document_service;
 pub mod dsl_repository;
 pub mod entity_service;
+pub mod investigation_service;
 pub mod lifecycle_resource_service;
+pub mod monitoring_service;
 pub mod product_service;
+pub mod risk_service;
+pub mod screening_service;
 pub mod service_service;
 
 // Legacy modules not yet integrated - kept for reference but not compiled
@@ -54,6 +59,28 @@ pub use lifecycle_resource_service::{
 };
 pub use product_service::{NewProductFields, ProductRow, ProductService};
 pub use service_service::{NewServiceFields, ServiceRow, ServiceService};
+
+// KYC Investigation services
+pub use decision_service::{
+    DecisionConditionRow, DecisionRow, DecisionService, NewConditionFields, NewDecisionFields,
+    SatisfyConditionFields,
+};
+pub use investigation_service::{
+    InvestigationAssignmentRow, InvestigationRow, InvestigationService, NewAssignmentFields,
+    NewInvestigationFields,
+};
+pub use monitoring_service::{
+    MonitoringEventRow, MonitoringService, MonitoringSetupFields, MonitoringSetupRow,
+    NewMonitoringEventFields, NewScheduledReviewFields, ScheduledReviewRow,
+};
+pub use risk_service::{
+    NewRiskAssessmentFields, NewRiskFlagFields, RiskAssessmentRow, RiskFlagRow, RiskRatingFields,
+    RiskService,
+};
+pub use screening_service::{
+    NewAdverseMediaScreeningFields, NewPepScreeningFields, NewSanctionsScreeningFields,
+    ScreeningResolutionFields, ScreeningResultFields, ScreeningRow, ScreeningService,
+};
 
 /// Database configuration
 #[derive(Debug, Clone)]

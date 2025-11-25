@@ -68,12 +68,41 @@ pub enum CrudStatement {
     DataRead(DataRead),
     DataUpdate(DataUpdate),
     DataDelete(DataDelete),
+    DataUpsert(DataUpsert),
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct DataCreate {
     pub asset: String,
     pub values: HashMap<String, Value>,
+    /// If set, capture the returned ID into RuntimeEnv under this key.
+    /// Supported keys: "cbu_id", "entity_id", "investigation_id", "decision_id"
+    #[serde(default)]
+    pub capture_result: Option<String>,
+}
+
+impl DataCreate {
+    /// Create a new DataCreate with no result capture
+    pub fn new(asset: impl Into<String>, values: HashMap<String, Value>) -> Self {
+        Self {
+            asset: asset.into(),
+            values,
+            capture_result: None,
+        }
+    }
+
+    /// Create a new DataCreate that captures the result into the given key
+    pub fn with_capture(
+        asset: impl Into<String>,
+        values: HashMap<String, Value>,
+        capture_key: impl Into<String>,
+    ) -> Self {
+        Self {
+            asset: asset.into(),
+            values,
+            capture_result: Some(capture_key.into()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -95,4 +124,49 @@ pub struct DataUpdate {
 pub struct DataDelete {
     pub asset: String,
     pub where_clause: HashMap<String, Value>,
+}
+
+/// UPSERT operation - create if not exists, update if changed.
+/// Uses natural keys (conflict_keys) to determine identity.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct DataUpsert {
+    pub asset: String,
+    pub values: HashMap<String, Value>,
+    /// Natural key fields used to detect conflicts (e.g., ["cbu-name", "jurisdiction"] for CBU)
+    pub conflict_keys: Vec<String>,
+    /// If set, capture the returned ID into RuntimeEnv under this key.
+    /// Supported keys: "cbu_id", "entity_id", "investigation_id", "decision_id"
+    #[serde(default)]
+    pub capture_result: Option<String>,
+}
+
+impl DataUpsert {
+    /// Create a new DataUpsert with no result capture
+    pub fn new(
+        asset: impl Into<String>,
+        values: HashMap<String, Value>,
+        conflict_keys: Vec<String>,
+    ) -> Self {
+        Self {
+            asset: asset.into(),
+            values,
+            conflict_keys,
+            capture_result: None,
+        }
+    }
+
+    /// Create a new DataUpsert that captures the result into the given key
+    pub fn with_capture(
+        asset: impl Into<String>,
+        values: HashMap<String, Value>,
+        conflict_keys: Vec<String>,
+        capture_key: impl Into<String>,
+    ) -> Self {
+        Self {
+            asset: asset.into(),
+            values,
+            conflict_keys,
+            capture_result: Some(capture_key.into()),
+        }
+    }
 }

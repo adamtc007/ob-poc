@@ -630,5 +630,375 @@ pub fn create_standard_runtime() -> Runtime {
                 r#"(cbu.update-entity-role :cbu-id @cbu :entity-id @person :old-role "Director" :new-role "BeneficialOwner")"#,
             ],
         },
+        // ============ IDEMPOTENT ENSURE VERBS (UPSERT) ============
+        WordEntry {
+            name: "cbu.ensure",
+            domain: "cbu",
+            func: words::cbu_ensure,
+            signature: ":cbu-name STRING :jurisdiction STRING? :client-type STRING? :nature-purpose STRING?",
+            description: "Idempotent CBU create-or-update using natural key (name, jurisdiction)",
+            examples: &[
+                r#"(cbu.ensure :cbu-name "Meridian Global Fund" :jurisdiction "LU" :client-type "SICAV")"#,
+            ],
+        },
+        WordEntry {
+            name: "entity.ensure-limited-company",
+            domain: "entity",
+            func: words::entity_ensure_limited_company,
+            signature: ":name STRING :jurisdiction STRING? :company-number STRING? :incorporation-date DATE?",
+            description: "Idempotent limited company create-or-update using natural key (company_number)",
+            examples: &[
+                r#"(entity.ensure-limited-company :name "Meridian GP S.à r.l." :jurisdiction "LU" :company-number "LU-B234568")"#,
+            ],
+        },
+        WordEntry {
+            name: "entity.ensure-proper-person",
+            domain: "entity",
+            func: words::entity_ensure_proper_person,
+            signature: ":first-name STRING :last-name STRING :nationality STRING? :tax-id STRING?",
+            description: "Idempotent proper person create-or-update using natural key (tax_id)",
+            examples: &[
+                r#"(entity.ensure-proper-person :first-name "Chen" :last-name "Wei" :nationality "SG" :tax-id "SG-123456789")"#,
+            ],
+        },
+        WordEntry {
+            name: "entity.ensure-ownership",
+            domain: "entity",
+            func: words::entity_ensure_ownership,
+            signature: ":from-entity-id UUID :to-entity-id UUID :ownership-percent DECIMAL :ownership-type STRING? :control-type STRING?",
+            description: "Idempotent ownership relationship create-or-update",
+            examples: &[
+                r#"(entity.ensure-ownership :from-entity-id @gp :to-entity-id @fund :ownership-percent 0.1 :control-type "GENERAL_PARTNER_CONTROL")"#,
+            ],
+        },
+        WordEntry {
+            name: "entity.update-ownership",
+            domain: "entity",
+            func: words::entity_update_ownership,
+            signature: ":from-entity-id UUID :to-entity-id UUID :ownership-percent DECIMAL? :effective-date DATE?",
+            description: "Update existing ownership relationship",
+            examples: &[
+                r#"(entity.update-ownership :from-entity-id @holding :to-entity-id @target :ownership-percent 45.0)"#,
+            ],
+        },
+        WordEntry {
+            name: "entity.remove-ownership",
+            domain: "entity",
+            func: words::entity_remove_ownership,
+            signature: ":from-entity-id UUID :to-entity-id UUID :effective-date DATE?",
+            description: "Remove ownership relationship",
+            examples: &[
+                r#"(entity.remove-ownership :from-entity-id @holding :to-entity-id @target :effective-date "2024-12-01")"#,
+            ],
+        },
+        WordEntry {
+            name: "entity.get-ownership-chain",
+            domain: "entity",
+            func: words::entity_get_ownership_chain,
+            signature: ":target-entity-id UUID :max-depth INTEGER? :threshold DECIMAL?",
+            description: "Get full ownership chain to a target entity",
+            examples: &[
+                r#"(entity.get-ownership-chain :target-entity-id @fund :max-depth 7 :threshold 10.0)"#,
+            ],
+        },
+        // ============ INVESTIGATION DOMAIN ============
+        WordEntry {
+            name: "investigation.create",
+            domain: "investigation",
+            func: words::investigation_create,
+            signature: ":cbu-id UUID? :investigation-type STRING :risk-rating STRING? :ubo-threshold DECIMAL? :deadline DATE?",
+            description: "Create a KYC investigation for a CBU",
+            examples: &[
+                r#"(investigation.create :cbu-id @cbu :investigation-type "ENHANCED_DUE_DILIGENCE" :risk-rating "HIGH" :ubo-threshold 10.0)"#,
+            ],
+        },
+        WordEntry {
+            name: "investigation.update-status",
+            domain: "investigation",
+            func: words::investigation_update_status,
+            signature: ":investigation-id UUID :status STRING",
+            description: "Update investigation status",
+            examples: &[
+                r#"(investigation.update-status :investigation-id @inv :status "COLLECTING_DOCUMENTS")"#,
+            ],
+        },
+        WordEntry {
+            name: "investigation.assign",
+            domain: "investigation",
+            func: words::investigation_assign,
+            signature: ":investigation-id UUID :assignee STRING :role STRING?",
+            description: "Assign analyst to investigation",
+            examples: &[
+                r#"(investigation.assign :investigation-id @inv :assignee "analyst@firm.com" :role "PRIMARY_ANALYST")"#,
+            ],
+        },
+        WordEntry {
+            name: "investigation.complete",
+            domain: "investigation",
+            func: words::investigation_complete,
+            signature: ":investigation-id UUID :outcome STRING :notes STRING?",
+            description: "Complete investigation with outcome",
+            examples: &[
+                r#"(investigation.complete :investigation-id @inv :outcome "APPROVED" :notes "All UBOs identified")"#,
+            ],
+        },
+        // ============ DOCUMENT COLLECTION DOMAIN ============
+        WordEntry {
+            name: "document.request",
+            domain: "document",
+            func: words::document_request,
+            signature: ":investigation-id UUID :entity-id UUID? :cbu-id UUID? :document-type STRING :source STRING? :priority STRING?",
+            description: "Request a document for an investigation",
+            examples: &[
+                r#"(document.request :investigation-id @inv :entity-id @company :document-type "CERTIFICATE_OF_INCORPORATION" :source "REGISTRY")"#,
+            ],
+        },
+        WordEntry {
+            name: "document.receive",
+            domain: "document",
+            func: words::document_receive,
+            signature: ":request-id UUID :document-id UUID :received-from STRING? :received-date DATE?",
+            description: "Record document received",
+            examples: &[
+                r#"(document.receive :request-id @req :document-id @doc :received-from "Luxembourg Company Registry")"#,
+            ],
+        },
+        // ============ TRUST DOMAIN ============
+        WordEntry {
+            name: "trust.add-party",
+            domain: "trust",
+            func: words::trust_add_party,
+            signature: ":trust-entity-id UUID :party-entity-id UUID :party-role STRING :interest-percent DECIMAL? :is-discretionary BOOL?",
+            description: "Add party to a trust (settlor, trustee, beneficiary, protector)",
+            examples: &[
+                r#"(trust.add-party :trust-entity-id @trust :party-entity-id @person :party-role "BENEFICIARY" :interest-percent 50.0)"#,
+            ],
+        },
+        // ============ PARTNERSHIP DOMAIN ============
+        WordEntry {
+            name: "partnership.add-partner",
+            domain: "partnership",
+            func: words::partnership_add_partner,
+            signature: ":partnership-entity-id UUID :partner-entity-id UUID :partner-type STRING :interest-percent DECIMAL? :capital-contribution DECIMAL?",
+            description: "Add partner to a partnership",
+            examples: &[
+                r#"(partnership.add-partner :partnership-entity-id @partnership :partner-entity-id @company :partner-type "LIMITED" :interest-percent 30.0)"#,
+            ],
+        },
+        // ============ UBO DOMAIN (new words) ============
+        WordEntry {
+            name: "ubo.calculate",
+            domain: "ubo",
+            func: words::ubo_calculate,
+            signature: ":cbu-id UUID :threshold DECIMAL? :max-depth INTEGER? :algorithm STRING?",
+            description: "Calculate UBOs for a CBU by traversing ownership graph",
+            examples: &[
+                r#"(ubo.calculate :cbu-id @cbu :threshold 10.0 :max-depth 7 :algorithm "RECURSIVE_MULTIPLY")"#,
+            ],
+        },
+        WordEntry {
+            name: "ubo.flag",
+            domain: "ubo",
+            func: words::ubo_flag,
+            signature: ":cbu-id UUID :entity-id UUID :ownership-percent DECIMAL? :flag-reason STRING :flagged-by STRING?",
+            description: "Manually flag a UBO (override calculation)",
+            examples: &[
+                r#"(ubo.flag :cbu-id @cbu :entity-id @person :ownership-percent 8.0 :flag-reason "MATERIAL_INFLUENCE")"#,
+            ],
+        },
+        WordEntry {
+            name: "ubo.verify",
+            domain: "ubo",
+            func: words::ubo_verify,
+            signature: ":ubo-id UUID :verification-method STRING :verified-by STRING? :notes STRING?",
+            description: "Verify a calculated UBO",
+            examples: &[
+                r#"(ubo.verify :ubo-id @ubo :verification-method "DOCUMENT_REVIEW" :verified-by "analyst@firm.com")"#,
+            ],
+        },
+        WordEntry {
+            name: "ubo.clear",
+            domain: "ubo",
+            func: words::ubo_clear,
+            signature: ":ubo-id UUID :reason STRING :effective-date DATE?",
+            description: "Clear a UBO flag (entity sold stake, etc.)",
+            examples: &[
+                r#"(ubo.clear :ubo-id @ubo :reason "OWNERSHIP_BELOW_THRESHOLD" :effective-date "2024-12-01")"#,
+            ],
+        },
+        // ============ SCREENING DOMAIN ============
+        WordEntry {
+            name: "screening.pep",
+            domain: "screening",
+            func: words::screening_pep,
+            signature: ":entity-id UUID :databases LIST? :include-rca BOOL?",
+            description: "PEP screening for an entity",
+            examples: &[
+                r#"(screening.pep :entity-id @person :databases ["WORLD_CHECK" "REFINITIV"] :include-rca true)"#,
+            ],
+        },
+        WordEntry {
+            name: "screening.sanctions",
+            domain: "screening",
+            func: words::screening_sanctions,
+            signature: ":entity-id UUID :lists LIST?",
+            description: "Sanctions screening for an entity",
+            examples: &[
+                r#"(screening.sanctions :entity-id @company :lists ["OFAC_SDN" "EU_SANCTIONS" "UK_HMT"])"#,
+            ],
+        },
+        WordEntry {
+            name: "screening.adverse-media",
+            domain: "screening",
+            func: words::screening_adverse_media,
+            signature: ":entity-id UUID :depth STRING? :languages LIST?",
+            description: "Adverse media screening for an entity",
+            examples: &[
+                r#"(screening.adverse-media :entity-id @person :depth "DEEP" :languages ["EN" "DE" "FR"])"#,
+            ],
+        },
+        WordEntry {
+            name: "screening.record-result",
+            domain: "screening",
+            func: words::screening_record_result,
+            signature: ":screening-id UUID :result STRING :match-details MAP? :reviewed-by STRING?",
+            description: "Record screening result",
+            examples: &[
+                r#"(screening.record-result :screening-id @screening :result "MATCH" :match-details {:list "OFAC_SDN" :match-score 95})"#,
+            ],
+        },
+        WordEntry {
+            name: "screening.resolve",
+            domain: "screening",
+            func: words::screening_resolve,
+            signature: ":screening-id UUID :resolution STRING :rationale STRING? :resolved-by STRING?",
+            description: "Resolve screening match (false positive, true hit, etc.)",
+            examples: &[
+                r#"(screening.resolve :screening-id @screening :resolution "FALSE_POSITIVE" :rationale "Different person - DOB mismatch")"#,
+            ],
+        },
+        // ============ RISK DOMAIN ============
+        WordEntry {
+            name: "risk.assess-entity",
+            domain: "risk",
+            func: words::risk_assess_entity,
+            signature: ":entity-id UUID :factors LIST?",
+            description: "Assess entity risk",
+            examples: &[
+                r#"(risk.assess-entity :entity-id @person :factors ["PEP_STATUS" "JURISDICTION" "SOURCE_OF_WEALTH"])"#,
+            ],
+        },
+        WordEntry {
+            name: "risk.assess-cbu",
+            domain: "risk",
+            func: words::risk_assess_cbu,
+            signature: ":cbu-id UUID :methodology STRING?",
+            description: "Assess CBU overall risk",
+            examples: &[
+                r#"(risk.assess-cbu :cbu-id @cbu :methodology "FACTOR_WEIGHTED")"#,
+            ],
+        },
+        WordEntry {
+            name: "risk.set-rating",
+            domain: "risk",
+            func: words::risk_set_rating,
+            signature: ":cbu-id UUID? :entity-id UUID? :rating STRING :factors LIST? :rationale STRING? :assessed-by STRING?",
+            description: "Set risk rating (manual or calculated)",
+            examples: &[
+                r#"(risk.set-rating :cbu-id @cbu :rating "HIGH" :factors [{:factor "PEP_EXPOSURE" :rating "HIGH"}] :rationale "PEP UBO")"#,
+            ],
+        },
+        WordEntry {
+            name: "risk.add-flag",
+            domain: "risk",
+            func: words::risk_add_flag,
+            signature: ":cbu-id UUID? :entity-id UUID? :flag-type STRING :description STRING? :flagged-by STRING?",
+            description: "Add risk flag (red flag, amber flag, note)",
+            examples: &[
+                r#"(risk.add-flag :cbu-id @cbu :flag-type "RED_FLAG" :description "Trust beneficiaries not disclosed")"#,
+            ],
+        },
+        // ============ DECISION DOMAIN ============
+        WordEntry {
+            name: "decision.record",
+            domain: "decision",
+            func: words::decision_record,
+            signature: ":cbu-id UUID :investigation-id UUID? :decision STRING :decision-authority STRING? :rationale STRING? :decided-by STRING?",
+            description: "Record onboarding decision",
+            examples: &[
+                r#"(decision.record :cbu-id @cbu :investigation-id @inv :decision "CONDITIONAL_ACCEPTANCE" :decision-authority "SENIOR_MANAGEMENT")"#,
+            ],
+        },
+        WordEntry {
+            name: "decision.add-condition",
+            domain: "decision",
+            func: words::decision_add_condition,
+            signature: ":decision-id UUID :condition-type STRING :description STRING? :frequency STRING? :due-date DATE? :threshold DECIMAL? :currency STRING?",
+            description: "Add condition to conditional acceptance",
+            examples: &[
+                r#"(decision.add-condition :decision-id @decision :condition-type "ENHANCED_MONITORING" :frequency "QUARTERLY")"#,
+            ],
+        },
+        WordEntry {
+            name: "decision.satisfy-condition",
+            domain: "decision",
+            func: words::decision_satisfy_condition,
+            signature: ":condition-id UUID :satisfied-by STRING? :evidence STRING?",
+            description: "Mark condition as satisfied",
+            examples: &[
+                r#"(decision.satisfy-condition :condition-id @condition :satisfied-by "analyst@firm.com" :evidence "Trust beneficiaries disclosed")"#,
+            ],
+        },
+        WordEntry {
+            name: "decision.review",
+            domain: "decision",
+            func: words::decision_review,
+            signature: ":decision-id UUID :review-date DATE? :reviewed-by STRING?",
+            description: "Review/update a decision",
+            examples: &[
+                r#"(decision.review :decision-id @decision :review-date "2025-01-15")"#,
+            ],
+        },
+        // ============ MONITORING DOMAIN ============
+        WordEntry {
+            name: "monitoring.setup",
+            domain: "monitoring",
+            func: words::monitoring_setup,
+            signature: ":cbu-id UUID :monitoring-level STRING :components LIST?",
+            description: "Setup ongoing monitoring for a CBU",
+            examples: &[
+                r#"(monitoring.setup :cbu-id @cbu :monitoring-level "ENHANCED" :components [{:type "TRANSACTION_MONITORING" :frequency "REAL_TIME"}])"#,
+            ],
+        },
+        WordEntry {
+            name: "monitoring.record-event",
+            domain: "monitoring",
+            func: words::monitoring_record_event,
+            signature: ":cbu-id UUID :event-type STRING :description STRING? :severity STRING? :requires-review BOOL?",
+            description: "Record a monitoring event",
+            examples: &[
+                r#"(monitoring.record-event :cbu-id @cbu :event-type "TRANSACTION_ALERT" :severity "HIGH" :requires-review true)"#,
+            ],
+        },
+        WordEntry {
+            name: "monitoring.schedule-review",
+            domain: "monitoring",
+            func: words::monitoring_schedule_review,
+            signature: ":cbu-id UUID :review-type STRING :due-date DATE :assigned-to STRING?",
+            description: "Schedule a periodic review",
+            examples: &[
+                r#"(monitoring.schedule-review :cbu-id @cbu :review-type "ANNUAL_KYC_REFRESH" :due-date "2025-01-15" :assigned-to "analyst@firm.com")"#,
+            ],
+        },
+        WordEntry {
+            name: "monitoring.complete-review",
+            domain: "monitoring",
+            func: words::monitoring_complete_review,
+            signature: ":review-id UUID :completed-by STRING :notes STRING?",
+            description: "Complete a scheduled review",
+            examples: &[
+                r#"(monitoring.complete-review :review-id @review :completed-by "analyst@firm.com" :notes "All checks passed")"#,
+            ],
+        },
     ])
 }

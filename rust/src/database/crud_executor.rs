@@ -8,15 +8,20 @@
 
 use crate::cbu_model_dsl::ast::CbuModel;
 use crate::database::{
-    AttributeValuesService, CbuEntityRolesService, CbuService, DictionaryDatabaseService,
-    DocumentService, EntityService, LifecycleResourceService, NewCbuFields, NewDocumentFields,
-    NewEntityFields, NewLifecycleResourceFields, NewLimitedCompanyFields, NewPartnershipFields,
-    NewProductFields, NewProperPersonFields, NewServiceFields, NewTrustFields, ProductService,
+    AttributeValuesService, CbuEntityRolesService, CbuService, DecisionService,
+    DictionaryDatabaseService, DocumentService, EntityService, InvestigationService,
+    LifecycleResourceService, MonitoringService, MonitoringSetupFields, NewCbuFields,
+    NewConditionFields, NewDecisionFields, NewDocumentFields, NewEntityFields,
+    NewInvestigationFields, NewLifecycleResourceFields, NewLimitedCompanyFields,
+    NewMonitoringEventFields, NewPartnershipFields, NewPepScreeningFields, NewProductFields,
+    NewProperPersonFields, NewRiskAssessmentFields, NewRiskFlagFields, NewSanctionsScreeningFields,
+    NewScheduledReviewFields, NewServiceFields, NewTrustFields, ProductService, RiskRatingFields,
+    RiskService, ScreeningResolutionFields, ScreeningResultFields, ScreeningService,
     ServiceService,
 };
 use crate::forth_engine::env::RuntimeEnv;
 use crate::forth_engine::value::{
-    CrudStatement, DataCreate, DataDelete, DataRead, DataUpdate, Value,
+    CrudStatement, DataCreate, DataDelete, DataRead, DataUpdate, DataUpsert, Value,
 };
 use anyhow::{anyhow, Context, Result};
 use serde_json::Value as JsonValue;
@@ -71,6 +76,12 @@ pub struct CrudExecutor {
     product_service: ProductService,
     service_service: ServiceService,
     lifecycle_resource_service: LifecycleResourceService,
+    // KYC Investigation services
+    investigation_service: InvestigationService,
+    screening_service: ScreeningService,
+    risk_service: RiskService,
+    decision_service: DecisionService,
+    monitoring_service: MonitoringService,
 }
 
 impl CrudExecutor {
@@ -86,6 +97,12 @@ impl CrudExecutor {
             product_service: ProductService::new(pool.clone()),
             service_service: ServiceService::new(pool.clone()),
             lifecycle_resource_service: LifecycleResourceService::new(pool.clone()),
+            // KYC Investigation services
+            investigation_service: InvestigationService::new(pool.clone()),
+            screening_service: ScreeningService::new(pool.clone()),
+            risk_service: RiskService::new(pool.clone()),
+            decision_service: DecisionService::new(pool.clone()),
+            monitoring_service: MonitoringService::new(pool.clone()),
             pool,
         }
     }
@@ -97,6 +114,7 @@ impl CrudExecutor {
             CrudStatement::DataRead(read) => self.execute_read(read).await,
             CrudStatement::DataUpdate(update) => self.execute_update(update).await,
             CrudStatement::DataDelete(delete) => self.execute_delete(delete).await,
+            CrudStatement::DataUpsert(upsert) => self.execute_upsert(upsert).await,
         }
     }
 
@@ -150,16 +168,17 @@ impl CrudExecutor {
                 }
             }
 
+            // Inject context IDs from env into statement values before execution
+            let stmt_with_context = self.inject_context_ids(stmt, env);
+
             // Execute the CRUD statement
-            let result = self.execute(stmt).await?;
+            let result = self.execute(&stmt_with_context).await?;
+
+            // Capture result into RuntimeEnv if requested by the statement
+            self.capture_result_if_needed(&stmt_with_context, &result, env);
 
             // Update environment state after successful CBU operations
             if result.asset == "CBU" {
-                // Set CBU ID in environment if created
-                if let Some(id) = result.generated_id {
-                    env.set_cbu_id(id);
-                }
-
                 // Update state based on operation
                 if let Some(new_state) = self.extract_target_state(stmt) {
                     env.set_cbu_state(new_state);
@@ -186,6 +205,126 @@ impl CrudExecutor {
                     .or_else(|| self.get_string_value(&update.values, "state"))
             }
             _ => None,
+        }
+    }
+
+    /// Inject context IDs from RuntimeEnv into statement values before execution
+    ///
+    /// This enables late binding: when `cbu.ensure` runs first and captures its ID,
+    /// subsequent statements like `risk.assess-cbu` will have the cbu_id injected
+    /// even though the word was parsed before the CBU existed.
+    fn inject_context_ids(&self, stmt: &CrudStatement, env: &RuntimeEnv) -> CrudStatement {
+        match stmt {
+            CrudStatement::DataCreate(create) => {
+                let mut values = create.values.clone();
+                self.inject_context_values(&mut values, env);
+                CrudStatement::DataCreate(DataCreate {
+                    asset: create.asset.clone(),
+                    values,
+                    capture_result: create.capture_result.clone(),
+                })
+            }
+            CrudStatement::DataUpsert(upsert) => {
+                let mut values = upsert.values.clone();
+                self.inject_context_values(&mut values, env);
+                CrudStatement::DataUpsert(DataUpsert {
+                    asset: upsert.asset.clone(),
+                    values,
+                    conflict_keys: upsert.conflict_keys.clone(),
+                    capture_result: upsert.capture_result.clone(),
+                })
+            }
+            CrudStatement::DataUpdate(update) => {
+                let mut values = update.values.clone();
+                let mut where_clause = update.where_clause.clone();
+                self.inject_context_values(&mut values, env);
+                self.inject_context_values(&mut where_clause, env);
+                CrudStatement::DataUpdate(DataUpdate {
+                    asset: update.asset.clone(),
+                    values,
+                    where_clause,
+                })
+            }
+            // Read and Delete don't need context injection for now
+            _ => stmt.clone(),
+        }
+    }
+
+    /// Helper to inject context values into a HashMap
+    fn inject_context_values(
+        &self,
+        values: &mut std::collections::HashMap<String, Value>,
+        env: &RuntimeEnv,
+    ) {
+        // Inject cbu_id if not present
+        if !values.contains_key("cbu-id") {
+            if let Some(cbu_id) = &env.cbu_id {
+                values.insert("cbu-id".to_string(), Value::Str(cbu_id.to_string()));
+            }
+        }
+        // Inject entity_id if not present
+        if !values.contains_key("entity-id") {
+            if let Some(entity_id) = &env.entity_id {
+                values.insert("entity-id".to_string(), Value::Str(entity_id.to_string()));
+            }
+        }
+        // Inject investigation_id if not present
+        if !values.contains_key("investigation-id") {
+            if let Some(inv_id) = &env.investigation_id {
+                values.insert(
+                    "investigation-id".to_string(),
+                    Value::Str(inv_id.to_string()),
+                );
+            }
+        }
+        // Inject decision_id if not present
+        if !values.contains_key("decision-id") {
+            if let Some(dec_id) = &env.decision_id {
+                values.insert("decision-id".to_string(), Value::Str(dec_id.to_string()));
+            }
+        }
+    }
+
+    /// Capture execution result into RuntimeEnv if requested by the statement
+    ///
+    /// This enables context propagation: when a word like `cbu.ensure` creates a CBU,
+    /// the returned UUID is captured into `env.cbu_id` so subsequent words can use it.
+    fn capture_result_if_needed(
+        &self,
+        stmt: &CrudStatement,
+        result: &CrudExecutionResult,
+        env: &mut RuntimeEnv,
+    ) {
+        let capture_key = match stmt {
+            CrudStatement::DataCreate(c) => c.capture_result.as_ref(),
+            CrudStatement::DataUpsert(u) => u.capture_result.as_ref(),
+            _ => None,
+        };
+
+        if let Some(key) = capture_key {
+            if let Some(id) = result.generated_id {
+                match key.as_str() {
+                    "cbu_id" => {
+                        env.set_cbu_id(id);
+                        info!("Captured cbu_id into context: {}", id);
+                    }
+                    "entity_id" => {
+                        env.set_entity_id(id);
+                        info!("Captured entity_id into context: {}", id);
+                    }
+                    "investigation_id" => {
+                        env.set_investigation_id(id);
+                        info!("Captured investigation_id into context: {}", id);
+                    }
+                    "decision_id" => {
+                        env.set_decision_id(id);
+                        info!("Captured decision_id into context: {}", id);
+                    }
+                    _ => {
+                        warn!("Unknown capture key: {}", key);
+                    }
+                }
+            }
         }
     }
 
@@ -855,6 +994,247 @@ impl CrudExecutor {
                 })
             }
 
+            // KYC Investigation assets
+            "INVESTIGATION" | "KYC_INVESTIGATION" => {
+                self.execute_create_investigation(&create.values).await
+            }
+
+            "SCREENING_PEP" => self.execute_create_screening("PEP", &create.values).await,
+
+            "SCREENING_SANCTIONS" => {
+                self.execute_create_screening("SANCTIONS", &create.values)
+                    .await
+            }
+
+            "SCREENING_ADVERSE_MEDIA" => {
+                self.execute_create_screening("ADVERSE_MEDIA", &create.values)
+                    .await
+            }
+
+            "SCREENING_RESULT" => {
+                let screening_id = self
+                    .get_uuid_value(&create.values, "screening-id")
+                    .ok_or_else(|| anyhow!("screening-id required for SCREENING_RESULT"))?;
+
+                let result = self
+                    .get_string_value(&create.values, "result")
+                    .ok_or_else(|| anyhow!("result required for SCREENING_RESULT"))?;
+
+                let fields = ScreeningResultFields {
+                    screening_id,
+                    result: result.clone(),
+                    match_details: self.get_json_value(&create.values, "match-details"),
+                    reviewed_by: self.get_string_value(&create.values, "reviewed-by"),
+                };
+
+                self.screening_service.record_result(&fields).await?;
+
+                info!(
+                    "Recorded screening result '{}' for {}",
+                    result, screening_id
+                );
+
+                Ok(CrudExecutionResult {
+                    operation: "CREATE".to_string(),
+                    asset: "SCREENING_RESULT".to_string(),
+                    rows_affected: 1,
+                    generated_id: Some(screening_id),
+                    data: None,
+                })
+            }
+
+            "SCREENING_RESOLUTION" => {
+                let screening_id = self
+                    .get_uuid_value(&create.values, "screening-id")
+                    .ok_or_else(|| anyhow!("screening-id required for SCREENING_RESOLUTION"))?;
+
+                let resolution = self
+                    .get_string_value(&create.values, "resolution")
+                    .ok_or_else(|| anyhow!("resolution required for SCREENING_RESOLUTION"))?;
+
+                let fields = ScreeningResolutionFields {
+                    screening_id,
+                    resolution: resolution.clone(),
+                    rationale: self.get_string_value(&create.values, "rationale"),
+                    resolved_by: self.get_string_value(&create.values, "resolved-by"),
+                };
+
+                self.screening_service.resolve(&fields).await?;
+
+                info!("Resolved screening {} as '{}'", screening_id, resolution);
+
+                Ok(CrudExecutionResult {
+                    operation: "CREATE".to_string(),
+                    asset: "SCREENING_RESOLUTION".to_string(),
+                    rows_affected: 1,
+                    generated_id: Some(screening_id),
+                    data: None,
+                })
+            }
+
+            "RISK_ASSESSMENT_ENTITY" => {
+                self.execute_create_risk_assessment("ENTITY", &create.values)
+                    .await
+            }
+
+            "RISK_ASSESSMENT_CBU" => {
+                self.execute_create_risk_assessment("CBU", &create.values)
+                    .await
+            }
+
+            "RISK_RATING" => {
+                let fields = RiskRatingFields {
+                    cbu_id: self.get_uuid_value(&create.values, "cbu-id"),
+                    entity_id: self.get_uuid_value(&create.values, "entity-id"),
+                    investigation_id: self.get_uuid_value(&create.values, "investigation-id"),
+                    rating: self
+                        .get_string_value(&create.values, "rating")
+                        .ok_or_else(|| anyhow!("rating required for RISK_RATING"))?,
+                    factors: self.get_json_value(&create.values, "factors"),
+                    rationale: self.get_string_value(&create.values, "rationale"),
+                    assessed_by: self.get_string_value(&create.values, "assessed-by"),
+                };
+
+                let assessment_id = self.risk_service.set_rating(&fields).await?;
+
+                info!(
+                    "Set risk rating '{}' for assessment {}",
+                    fields.rating, assessment_id
+                );
+
+                Ok(CrudExecutionResult {
+                    operation: "CREATE".to_string(),
+                    asset: "RISK_RATING".to_string(),
+                    rows_affected: 1,
+                    generated_id: Some(assessment_id),
+                    data: None,
+                })
+            }
+
+            "RISK_FLAG" => {
+                let fields = NewRiskFlagFields {
+                    cbu_id: self.get_uuid_value(&create.values, "cbu-id"),
+                    entity_id: self.get_uuid_value(&create.values, "entity-id"),
+                    investigation_id: self.get_uuid_value(&create.values, "investigation-id"),
+                    flag_type: self
+                        .get_string_value(&create.values, "flag-type")
+                        .ok_or_else(|| anyhow!("flag-type required for RISK_FLAG"))?,
+                    description: self.get_string_value(&create.values, "description"),
+                    flagged_by: self.get_string_value(&create.values, "flagged-by"),
+                };
+
+                let flag_id = self.risk_service.add_flag(&fields).await?;
+
+                info!("Added {} flag {}", fields.flag_type, flag_id);
+
+                Ok(CrudExecutionResult {
+                    operation: "CREATE".to_string(),
+                    asset: "RISK_FLAG".to_string(),
+                    rows_affected: 1,
+                    generated_id: Some(flag_id),
+                    data: None,
+                })
+            }
+
+            "DECISION" | "KYC_DECISION" => self.execute_create_decision(&create.values).await,
+
+            "DECISION_CONDITION" => {
+                let decision_id = self
+                    .get_uuid_value(&create.values, "decision-id")
+                    .ok_or_else(|| anyhow!("decision-id required for DECISION_CONDITION"))?;
+
+                let fields = NewConditionFields {
+                    decision_id,
+                    condition_type: self
+                        .get_string_value(&create.values, "condition-type")
+                        .ok_or_else(|| anyhow!("condition-type required"))?,
+                    description: self.get_string_value(&create.values, "description"),
+                    frequency: self.get_string_value(&create.values, "frequency"),
+                    due_date: self.get_date_value(&create.values, "due-date"),
+                    threshold: self
+                        .get_string_value(&create.values, "threshold")
+                        .and_then(|s| s.parse().ok()),
+                    currency: self.get_string_value(&create.values, "currency"),
+                    assigned_to: self.get_string_value(&create.values, "assigned-to"),
+                };
+
+                let condition_id = self.decision_service.add_condition(&fields).await?;
+
+                info!(
+                    "Added condition {} to decision {}",
+                    condition_id, decision_id
+                );
+
+                Ok(CrudExecutionResult {
+                    operation: "CREATE".to_string(),
+                    asset: "DECISION_CONDITION".to_string(),
+                    rows_affected: 1,
+                    generated_id: Some(condition_id),
+                    data: None,
+                })
+            }
+
+            "MONITORING_SETUP" => self.execute_create_monitoring_setup(&create.values).await,
+
+            "MONITORING_EVENT" => {
+                let cbu_id = self
+                    .get_uuid_value(&create.values, "cbu-id")
+                    .ok_or_else(|| anyhow!("cbu-id required for MONITORING_EVENT"))?;
+
+                let fields = NewMonitoringEventFields {
+                    cbu_id,
+                    event_type: self
+                        .get_string_value(&create.values, "event-type")
+                        .ok_or_else(|| anyhow!("event-type required"))?,
+                    description: self.get_string_value(&create.values, "description"),
+                    severity: self.get_string_value(&create.values, "severity"),
+                    requires_review: self
+                        .get_string_value(&create.values, "requires-review")
+                        .map(|s| s.to_lowercase() == "true"),
+                };
+
+                let event_id = self.monitoring_service.record_event(&fields).await?;
+
+                info!("Recorded monitoring event {} for CBU {}", event_id, cbu_id);
+
+                Ok(CrudExecutionResult {
+                    operation: "CREATE".to_string(),
+                    asset: "MONITORING_EVENT".to_string(),
+                    rows_affected: 1,
+                    generated_id: Some(event_id),
+                    data: None,
+                })
+            }
+
+            "SCHEDULED_REVIEW" => {
+                let cbu_id = self
+                    .get_uuid_value(&create.values, "cbu-id")
+                    .ok_or_else(|| anyhow!("cbu-id required for SCHEDULED_REVIEW"))?;
+
+                let fields = NewScheduledReviewFields {
+                    cbu_id,
+                    review_type: self
+                        .get_string_value(&create.values, "review-type")
+                        .ok_or_else(|| anyhow!("review-type required"))?,
+                    due_date: self
+                        .get_date_value(&create.values, "due-date")
+                        .ok_or_else(|| anyhow!("due-date required"))?,
+                    assigned_to: self.get_string_value(&create.values, "assigned-to"),
+                };
+
+                let review_id = self.monitoring_service.schedule_review(&fields).await?;
+
+                info!("Scheduled review {} for CBU {}", review_id, cbu_id);
+
+                Ok(CrudExecutionResult {
+                    operation: "CREATE".to_string(),
+                    asset: "SCHEDULED_REVIEW".to_string(),
+                    rows_affected: 1,
+                    generated_id: Some(review_id),
+                    data: None,
+                })
+            }
+
             _ => {
                 warn!("Unknown asset type for CREATE: {}", create.asset);
                 Ok(CrudExecutionResult {
@@ -1329,8 +1709,577 @@ impl CrudExecutor {
                 .map(JsonValue::Number)
                 .unwrap_or(JsonValue::Null),
             Value::Bool(b) => JsonValue::Bool(*b),
+            Value::List(items) => {
+                JsonValue::Array(items.iter().map(|v| self.value_to_json(v)).collect())
+            }
+            Value::Map(pairs) => {
+                let map: serde_json::Map<String, JsonValue> = pairs
+                    .iter()
+                    .map(|(k, v)| (k.clone(), self.value_to_json(v)))
+                    .collect();
+                JsonValue::Object(map)
+            }
             _ => JsonValue::Null,
         }
+    }
+
+    /// Helper to extract JSON value from HashMap
+    fn get_json_value(
+        &self,
+        values: &std::collections::HashMap<String, Value>,
+        key: &str,
+    ) -> Option<JsonValue> {
+        values.get(key).map(|v| self.value_to_json(v))
+    }
+
+    // =========================================================================
+    // UPSERT Operations (Idempotent create-or-update)
+    // =========================================================================
+
+    /// Execute an UPSERT statement (idempotent create-or-update using natural keys)
+    async fn execute_upsert(&self, upsert: &DataUpsert) -> Result<CrudExecutionResult> {
+        match upsert.asset.as_str() {
+            "CBU" => {
+                // UPSERT CBU using natural key: (name) - names are globally unique per cbus_name_key constraint
+                let name = self
+                    .get_string_value(&upsert.values, "cbu-name")
+                    .or_else(|| self.get_string_value(&upsert.values, "name"))
+                    .ok_or_else(|| anyhow!("cbu-name required for CBU UPSERT"))?;
+
+                let jurisdiction = self.get_string_value(&upsert.values, "jurisdiction");
+                let nature_purpose = self.get_string_value(&upsert.values, "nature-purpose");
+                let description = self.get_string_value(&upsert.values, "description");
+                let client_type = self.get_string_value(&upsert.values, "client-type");
+
+                let cbu_id = sqlx::query_scalar::<_, Uuid>(
+                    r#"
+                    INSERT INTO "ob-poc".cbus (cbu_id, name, jurisdiction, nature_purpose, description, client_type, created_at, updated_at)
+                    VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, NOW(), NOW())
+                    ON CONFLICT (name)
+                    DO UPDATE SET
+                        jurisdiction = COALESCE(EXCLUDED.jurisdiction, cbus.jurisdiction),
+                        nature_purpose = COALESCE(EXCLUDED.nature_purpose, cbus.nature_purpose),
+                        description = COALESCE(EXCLUDED.description, cbus.description),
+                        client_type = COALESCE(EXCLUDED.client_type, cbus.client_type),
+                        updated_at = NOW()
+                    RETURNING cbu_id
+                    "#,
+                )
+                .bind(&name)
+                .bind(&jurisdiction)
+                .bind(&nature_purpose)
+                .bind(&description)
+                .bind(&client_type)
+                .fetch_one(&self.pool)
+                .await
+                .context("Failed to upsert CBU")?;
+
+                info!("Upserted CBU: {} ({})", name, cbu_id);
+
+                Ok(CrudExecutionResult {
+                    operation: "UPSERT".to_string(),
+                    asset: "CBU".to_string(),
+                    rows_affected: 1,
+                    generated_id: Some(cbu_id),
+                    data: None,
+                })
+            }
+
+            "LIMITED_COMPANY" => {
+                // UPSERT Limited Company using natural key: company_number
+                let name = self
+                    .get_string_value(&upsert.values, "name")
+                    .or_else(|| self.get_string_value(&upsert.values, "company-name"))
+                    .ok_or_else(|| anyhow!("name required for LIMITED_COMPANY UPSERT"))?;
+
+                let company_number = self
+                    .get_string_value(&upsert.values, "company-number")
+                    .or_else(|| self.get_string_value(&upsert.values, "registration-number"));
+
+                let jurisdiction = self.get_string_value(&upsert.values, "jurisdiction");
+
+                // First upsert the base entity
+                let entity_id = sqlx::query_scalar::<_, Uuid>(
+                    r#"
+                    INSERT INTO "ob-poc".entities (entity_id, entity_type_id, name, jurisdiction, created_at)
+                    SELECT gen_random_uuid(), et.entity_type_id, $1, $2, NOW()
+                    FROM "ob-poc".entity_types et WHERE et.type_code = 'LIMITED_COMPANY'
+                    ON CONFLICT (name, jurisdiction) WHERE entity_type_id = (
+                        SELECT entity_type_id FROM "ob-poc".entity_types WHERE type_code = 'LIMITED_COMPANY'
+                    )
+                    DO UPDATE SET updated_at = NOW()
+                    RETURNING entity_id
+                    "#,
+                )
+                .bind(&name)
+                .bind(&jurisdiction)
+                .fetch_one(&self.pool)
+                .await
+                .context("Failed to upsert LIMITED_COMPANY entity")?;
+
+                // Then upsert the extension table
+                let incorporation_date = self.get_date_value(&upsert.values, "incorporation-date");
+                let registered_address = self
+                    .get_string_value(&upsert.values, "registered-office")
+                    .or_else(|| self.get_string_value(&upsert.values, "registered-address"));
+
+                sqlx::query(
+                    r#"
+                    INSERT INTO "ob-poc".entity_limited_companies
+                        (company_id, entity_id, company_number, incorporation_date, registered_address)
+                    VALUES (gen_random_uuid(), $1, $2, $3, $4)
+                    ON CONFLICT (entity_id)
+                    DO UPDATE SET
+                        company_number = COALESCE(EXCLUDED.company_number, entity_limited_companies.company_number),
+                        incorporation_date = COALESCE(EXCLUDED.incorporation_date, entity_limited_companies.incorporation_date),
+                        registered_address = COALESCE(EXCLUDED.registered_address, entity_limited_companies.registered_address)
+                    "#,
+                )
+                .bind(entity_id)
+                .bind(&company_number)
+                .bind(incorporation_date)
+                .bind(&registered_address)
+                .execute(&self.pool)
+                .await
+                .context("Failed to upsert LIMITED_COMPANY extension")?;
+
+                info!("Upserted LIMITED_COMPANY: {} ({})", name, entity_id);
+
+                Ok(CrudExecutionResult {
+                    operation: "UPSERT".to_string(),
+                    asset: "LIMITED_COMPANY".to_string(),
+                    rows_affected: 1,
+                    generated_id: Some(entity_id),
+                    data: None,
+                })
+            }
+
+            "PROPER_PERSON" => {
+                // UPSERT Proper Person using natural key: tax_id OR (first_name, last_name, date_of_birth)
+                let first_name = self
+                    .get_string_value(&upsert.values, "first-name")
+                    .unwrap_or_else(|| {
+                        let person_name = self
+                            .get_string_value(&upsert.values, "name")
+                            .unwrap_or_default();
+                        person_name
+                            .split_whitespace()
+                            .next()
+                            .unwrap_or("Unknown")
+                            .to_string()
+                    });
+
+                let last_name = self
+                    .get_string_value(&upsert.values, "last-name")
+                    .unwrap_or_else(|| {
+                        let person_name = self
+                            .get_string_value(&upsert.values, "name")
+                            .unwrap_or_default();
+                        let parts: Vec<&str> = person_name.split_whitespace().collect();
+                        if parts.len() > 1 {
+                            parts[1..].join(" ")
+                        } else {
+                            String::new()
+                        }
+                    });
+
+                let full_name = format!("{} {}", first_name, last_name);
+                let nationality = self.get_string_value(&upsert.values, "nationality");
+                let tax_id = self.get_string_value(&upsert.values, "tax-id");
+
+                // Upsert base entity
+                let entity_id = sqlx::query_scalar::<_, Uuid>(
+                    r#"
+                    INSERT INTO "ob-poc".entities (entity_id, entity_type_id, name, created_at)
+                    SELECT gen_random_uuid(), et.entity_type_id, $1, NOW()
+                    FROM "ob-poc".entity_types et WHERE et.type_code = 'PROPER_PERSON'
+                    ON CONFLICT (name, jurisdiction) WHERE entity_type_id = (
+                        SELECT entity_type_id FROM "ob-poc".entity_types WHERE type_code = 'PROPER_PERSON'
+                    )
+                    DO UPDATE SET updated_at = NOW()
+                    RETURNING entity_id
+                    "#,
+                )
+                .bind(&full_name)
+                .fetch_one(&self.pool)
+                .await
+                .context("Failed to upsert PROPER_PERSON entity")?;
+
+                // Upsert extension
+                let date_of_birth = self.get_date_value(&upsert.values, "date-of-birth");
+
+                sqlx::query(
+                    r#"
+                    INSERT INTO "ob-poc".entity_proper_persons
+                        (person_id, entity_id, first_name, last_name, date_of_birth, nationality, tax_id)
+                    VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6)
+                    ON CONFLICT (entity_id)
+                    DO UPDATE SET
+                        first_name = EXCLUDED.first_name,
+                        last_name = EXCLUDED.last_name,
+                        date_of_birth = COALESCE(EXCLUDED.date_of_birth, entity_proper_persons.date_of_birth),
+                        nationality = COALESCE(EXCLUDED.nationality, entity_proper_persons.nationality),
+                        tax_id = COALESCE(EXCLUDED.tax_id, entity_proper_persons.tax_id)
+                    "#,
+                )
+                .bind(entity_id)
+                .bind(&first_name)
+                .bind(&last_name)
+                .bind(date_of_birth)
+                .bind(&nationality)
+                .bind(&tax_id)
+                .execute(&self.pool)
+                .await
+                .context("Failed to upsert PROPER_PERSON extension")?;
+
+                info!("Upserted PROPER_PERSON: {} ({})", full_name, entity_id);
+
+                Ok(CrudExecutionResult {
+                    operation: "UPSERT".to_string(),
+                    asset: "PROPER_PERSON".to_string(),
+                    rows_affected: 1,
+                    generated_id: Some(entity_id),
+                    data: None,
+                })
+            }
+
+            "CBU_ENTITY_ROLE" => {
+                // UPSERT CBU-Entity-Role using natural key: (cbu_id, entity_id, role_id)
+                let cbu_id = self
+                    .get_uuid_value(&upsert.values, "cbu-id")
+                    .ok_or_else(|| anyhow!("cbu-id required for CBU_ENTITY_ROLE UPSERT"))?;
+
+                let entity_id = self
+                    .get_uuid_value(&upsert.values, "entity-id")
+                    .ok_or_else(|| anyhow!("entity-id required for CBU_ENTITY_ROLE UPSERT"))?;
+
+                let role = self
+                    .get_string_value(&upsert.values, "role")
+                    .ok_or_else(|| anyhow!("role required for CBU_ENTITY_ROLE UPSERT"))?;
+
+                let ownership_percent = self
+                    .get_string_value(&upsert.values, "ownership-percent")
+                    .and_then(|s| s.parse::<f64>().ok());
+
+                // This uses the existing UNIQUE constraint on (cbu_id, entity_id, role_id)
+                let cbu_entity_role_id = self
+                    .entity_service
+                    .attach_entity_to_cbu(cbu_id, entity_id, &role)
+                    .await?;
+
+                info!(
+                    "Upserted CBU_ENTITY_ROLE: CBU {} + Entity {} as {} ({})",
+                    cbu_id, entity_id, role, cbu_entity_role_id
+                );
+
+                Ok(CrudExecutionResult {
+                    operation: "UPSERT".to_string(),
+                    asset: "CBU_ENTITY_ROLE".to_string(),
+                    rows_affected: 1,
+                    generated_id: Some(cbu_entity_role_id),
+                    data: Some(serde_json::json!({
+                        "cbu_id": cbu_id.to_string(),
+                        "entity_id": entity_id.to_string(),
+                        "role": role,
+                        "ownership_percent": ownership_percent
+                    })),
+                })
+            }
+
+            "OWNERSHIP_EDGE" => {
+                // UPSERT ownership edge using natural key: (from_entity_id, to_entity_id, relationship_type)
+                let from_entity_id = self
+                    .get_uuid_value(&upsert.values, "from-entity-id")
+                    .ok_or_else(|| anyhow!("from-entity-id required for OWNERSHIP_EDGE UPSERT"))?;
+
+                let to_entity_id = self
+                    .get_uuid_value(&upsert.values, "to-entity-id")
+                    .ok_or_else(|| anyhow!("to-entity-id required for OWNERSHIP_EDGE UPSERT"))?;
+
+                let ownership_percent = self
+                    .get_string_value(&upsert.values, "ownership-percent")
+                    .and_then(|s| s.parse::<f64>().ok());
+
+                let ownership_type = self
+                    .get_string_value(&upsert.values, "ownership-type")
+                    .unwrap_or_else(|| "DIRECT".to_string());
+
+                let control_type = self
+                    .get_string_value(&upsert.values, "control-type")
+                    .unwrap_or_else(|| "SHAREHOLDING".to_string());
+
+                let effective_date = self.get_date_value(&upsert.values, "effective-date");
+
+                let connection_id = sqlx::query_scalar::<_, Uuid>(
+                    r#"
+                    INSERT INTO "ob-poc".entity_role_connections
+                        (connection_id, source_entity_id, target_entity_id, relationship_type,
+                         ownership_percentage, control_type, effective_date, created_at)
+                    VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, NOW())
+                    ON CONFLICT (source_entity_id, target_entity_id, relationship_type)
+                    DO UPDATE SET
+                        ownership_percentage = COALESCE(EXCLUDED.ownership_percentage, entity_role_connections.ownership_percentage),
+                        control_type = COALESCE(EXCLUDED.control_type, entity_role_connections.control_type),
+                        effective_date = COALESCE(EXCLUDED.effective_date, entity_role_connections.effective_date),
+                        updated_at = NOW()
+                    RETURNING connection_id
+                    "#,
+                )
+                .bind(from_entity_id)
+                .bind(to_entity_id)
+                .bind(&ownership_type)
+                .bind(ownership_percent)
+                .bind(&control_type)
+                .bind(effective_date)
+                .fetch_one(&self.pool)
+                .await
+                .context("Failed to upsert OWNERSHIP_EDGE")?;
+
+                info!(
+                    "Upserted OWNERSHIP_EDGE: {} -> {} ({})",
+                    from_entity_id, to_entity_id, connection_id
+                );
+
+                Ok(CrudExecutionResult {
+                    operation: "UPSERT".to_string(),
+                    asset: "OWNERSHIP_EDGE".to_string(),
+                    rows_affected: 1,
+                    generated_id: Some(connection_id),
+                    data: None,
+                })
+            }
+
+            _ => {
+                warn!(
+                    "Unknown asset type for UPSERT: {}, falling back to CREATE",
+                    upsert.asset
+                );
+                // Fall back to create behavior
+                let create = DataCreate {
+                    asset: upsert.asset.clone(),
+                    values: upsert.values.clone(),
+                    capture_result: upsert.capture_result.clone(),
+                };
+                self.execute_create(&create).await
+            }
+        }
+    }
+
+    // =========================================================================
+    // KYC Investigation Operations
+    // =========================================================================
+
+    /// Execute investigation CREATE
+    async fn execute_create_investigation(
+        &self,
+        values: &std::collections::HashMap<String, Value>,
+    ) -> Result<CrudExecutionResult> {
+        let investigation_type = self
+            .get_string_value(values, "investigation-type")
+            .unwrap_or_else(|| "STANDARD".to_string());
+
+        let cbu_id = self.get_uuid_value(values, "cbu-id");
+
+        let fields = NewInvestigationFields {
+            cbu_id,
+            investigation_type: investigation_type.clone(),
+            risk_rating: self.get_string_value(values, "risk-rating"),
+            regulatory_framework: self.get_json_value(values, "regulatory-framework"),
+            ubo_threshold: self
+                .get_string_value(values, "ubo-threshold")
+                .and_then(|s| s.parse().ok()),
+            investigation_depth: self
+                .get_string_value(values, "investigation-depth")
+                .and_then(|s| s.parse().ok()),
+            deadline: self.get_date_value(values, "deadline"),
+        };
+
+        let investigation_id = self
+            .investigation_service
+            .create_investigation(&fields)
+            .await?;
+
+        info!(
+            "Created investigation {} type '{}'",
+            investigation_id, investigation_type
+        );
+
+        Ok(CrudExecutionResult {
+            operation: "CREATE".to_string(),
+            asset: "INVESTIGATION".to_string(),
+            rows_affected: 1,
+            generated_id: Some(investigation_id),
+            data: None,
+        })
+    }
+
+    /// Execute screening CREATE (PEP, Sanctions, Adverse Media)
+    async fn execute_create_screening(
+        &self,
+        screening_type: &str,
+        values: &std::collections::HashMap<String, Value>,
+    ) -> Result<CrudExecutionResult> {
+        let entity_id = self
+            .get_uuid_value(values, "entity-id")
+            .ok_or_else(|| anyhow!("entity-id required for screening"))?;
+
+        let investigation_id = self.get_uuid_value(values, "investigation-id");
+
+        let screening_id = match screening_type {
+            "PEP" => {
+                let fields = NewPepScreeningFields {
+                    investigation_id,
+                    entity_id,
+                    databases: self.get_json_value(values, "databases"),
+                    include_rca: self
+                        .get_string_value(values, "include-rca")
+                        .map(|s| s.to_lowercase() == "true"),
+                };
+                self.screening_service.create_pep_screening(&fields).await?
+            }
+            "SANCTIONS" => {
+                let fields = NewSanctionsScreeningFields {
+                    investigation_id,
+                    entity_id,
+                    lists: self.get_json_value(values, "lists"),
+                };
+                self.screening_service
+                    .create_sanctions_screening(&fields)
+                    .await?
+            }
+            "ADVERSE_MEDIA" => {
+                let fields = crate::database::NewAdverseMediaScreeningFields {
+                    investigation_id,
+                    entity_id,
+                    search_depth: self.get_string_value(values, "depth"),
+                    languages: self.get_json_value(values, "languages"),
+                };
+                self.screening_service
+                    .create_adverse_media_screening(&fields)
+                    .await?
+            }
+            _ => return Err(anyhow!("Unknown screening type: {}", screening_type)),
+        };
+
+        info!(
+            "Created {} screening {} for entity {}",
+            screening_type, screening_id, entity_id
+        );
+
+        Ok(CrudExecutionResult {
+            operation: "CREATE".to_string(),
+            asset: format!("SCREENING_{}", screening_type),
+            rows_affected: 1,
+            generated_id: Some(screening_id),
+            data: None,
+        })
+    }
+
+    /// Execute risk assessment CREATE
+    async fn execute_create_risk_assessment(
+        &self,
+        assessment_type: &str,
+        values: &std::collections::HashMap<String, Value>,
+    ) -> Result<CrudExecutionResult> {
+        let fields = NewRiskAssessmentFields {
+            cbu_id: self.get_uuid_value(values, "cbu-id"),
+            entity_id: self.get_uuid_value(values, "entity-id"),
+            investigation_id: self.get_uuid_value(values, "investigation-id"),
+            assessment_type: assessment_type.to_string(),
+            methodology: self.get_string_value(values, "methodology"),
+        };
+
+        let assessment_id = match assessment_type {
+            "ENTITY" => self.risk_service.assess_entity(&fields).await?,
+            "CBU" => self.risk_service.assess_cbu(&fields).await?,
+            _ => return Err(anyhow!("Unknown assessment type: {}", assessment_type)),
+        };
+
+        info!(
+            "Created {} risk assessment {}",
+            assessment_type, assessment_id
+        );
+
+        Ok(CrudExecutionResult {
+            operation: "CREATE".to_string(),
+            asset: format!("RISK_ASSESSMENT_{}", assessment_type),
+            rows_affected: 1,
+            generated_id: Some(assessment_id),
+            data: None,
+        })
+    }
+
+    /// Execute decision CREATE
+    async fn execute_create_decision(
+        &self,
+        values: &std::collections::HashMap<String, Value>,
+    ) -> Result<CrudExecutionResult> {
+        let cbu_id = self
+            .get_uuid_value(values, "cbu-id")
+            .ok_or_else(|| anyhow!("cbu-id required for decision"))?;
+
+        let decision = self
+            .get_string_value(values, "decision")
+            .ok_or_else(|| anyhow!("decision required"))?;
+
+        let fields = NewDecisionFields {
+            cbu_id,
+            investigation_id: self.get_uuid_value(values, "investigation-id"),
+            decision: decision.clone(),
+            decision_authority: self.get_string_value(values, "decision-authority"),
+            rationale: self.get_string_value(values, "rationale"),
+            decided_by: self.get_string_value(values, "decided-by"),
+        };
+
+        let decision_id = self.decision_service.record_decision(&fields).await?;
+
+        info!(
+            "Recorded decision {} '{}' for CBU {}",
+            decision_id, decision, cbu_id
+        );
+
+        Ok(CrudExecutionResult {
+            operation: "CREATE".to_string(),
+            asset: "DECISION".to_string(),
+            rows_affected: 1,
+            generated_id: Some(decision_id),
+            data: None,
+        })
+    }
+
+    /// Execute monitoring setup CREATE
+    async fn execute_create_monitoring_setup(
+        &self,
+        values: &std::collections::HashMap<String, Value>,
+    ) -> Result<CrudExecutionResult> {
+        let cbu_id = self
+            .get_uuid_value(values, "cbu-id")
+            .ok_or_else(|| anyhow!("cbu-id required for monitoring setup"))?;
+
+        let monitoring_level = self
+            .get_string_value(values, "monitoring-level")
+            .unwrap_or_else(|| "STANDARD".to_string());
+
+        let fields = MonitoringSetupFields {
+            cbu_id,
+            monitoring_level: monitoring_level.clone(),
+            components: self.get_json_value(values, "components"),
+        };
+
+        let setup_id = self.monitoring_service.setup_monitoring(&fields).await?;
+
+        info!(
+            "Setup {} monitoring for CBU {} ({})",
+            monitoring_level, cbu_id, setup_id
+        );
+
+        Ok(CrudExecutionResult {
+            operation: "CREATE".to_string(),
+            asset: "MONITORING_SETUP".to_string(),
+            rows_affected: 1,
+            generated_id: Some(setup_id),
+            data: None,
+        })
     }
 }
 

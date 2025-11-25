@@ -8,7 +8,7 @@ use crate::forth_engine::env::RuntimeEnv;
 use crate::forth_engine::errors::EngineError;
 use crate::forth_engine::runtime::Arg;
 use crate::forth_engine::value::{
-    AttributeId, CrudStatement, DataCreate, DataDelete, DataRead, DataUpdate, Value,
+    AttributeId, CrudStatement, DataCreate, DataDelete, DataRead, DataUpdate, DataUpsert, Value,
 };
 use std::collections::HashMap;
 
@@ -39,6 +39,49 @@ fn process_args(args: &[Arg], env: &mut RuntimeEnv) {
         // Store all keyword-value pairs as attributes
         let attr_id = AttributeId(arg.key.clone());
         env.set_attribute(attr_id, arg.value.clone());
+    }
+}
+
+// ============================================================================
+// CONTEXT INJECTION HELPERS
+// ============================================================================
+
+/// Inject cbu_id from RuntimeEnv into values if not already present
+fn inject_cbu_id_if_missing(values: &mut HashMap<String, Value>, env: &RuntimeEnv) {
+    if !values.contains_key("cbu-id") {
+        if let Some(cbu_id) = &env.cbu_id {
+            values.insert("cbu-id".to_string(), Value::Str(cbu_id.to_string()));
+        }
+    }
+}
+
+/// Inject entity_id from RuntimeEnv into values if not already present
+fn inject_entity_id_if_missing(values: &mut HashMap<String, Value>, env: &RuntimeEnv) {
+    if !values.contains_key("entity-id") {
+        if let Some(entity_id) = &env.entity_id {
+            values.insert("entity-id".to_string(), Value::Str(entity_id.to_string()));
+        }
+    }
+}
+
+/// Inject investigation_id from RuntimeEnv into values if not already present
+fn inject_investigation_id_if_missing(values: &mut HashMap<String, Value>, env: &RuntimeEnv) {
+    if !values.contains_key("investigation-id") {
+        if let Some(inv_id) = &env.investigation_id {
+            values.insert(
+                "investigation-id".to_string(),
+                Value::Str(inv_id.to_string()),
+            );
+        }
+    }
+}
+
+/// Inject decision_id from RuntimeEnv into values if not already present
+fn inject_decision_id_if_missing(values: &mut HashMap<String, Value>, env: &RuntimeEnv) {
+    if !values.contains_key("decision-id") {
+        if let Some(dec_id) = &env.decision_id {
+            values.insert("decision-id".to_string(), Value::Str(dec_id.to_string()));
+        }
     }
 }
 
@@ -202,7 +245,8 @@ pub fn document_catalog(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), Engine
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "DOCUMENT".to_string(),
         values,
-    }));
+    
+        capture_result: None,}));
 
     Ok(())
 }
@@ -241,7 +285,8 @@ pub fn document_extract(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), Engine
         env.push_crud(CrudStatement::DataCreate(DataCreate {
             asset: "DOCUMENT_METADATA".to_string(),
             values,
-        }));
+        
+        capture_result: None,}));
     } else {
         let mut update_values = values.clone();
         update_values.insert(
@@ -273,7 +318,8 @@ pub fn document_link(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineErr
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "DOCUMENT_ENTITY_LINK".to_string(),
         values,
-    }));
+    
+        capture_result: None,}));
 
     Ok(())
 }
@@ -286,7 +332,8 @@ pub fn document_link_to_cbu(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), En
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "DOCUMENT_CBU_LINK".to_string(),
         values,
-    }));
+    
+        capture_result: None,}));
 
     Ok(())
 }
@@ -303,7 +350,8 @@ pub fn document_extract_attributes(args: &[Arg], env: &mut RuntimeEnv) -> Result
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "DOCUMENT_EXTRACTION".to_string(),
         values,
-    }));
+    
+        capture_result: None,}));
 
     Ok(())
 }
@@ -385,6 +433,7 @@ pub fn cbu_create(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError>
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "CBU".to_string(),
         values,
+        capture_result: Some("cbu_id".to_string()),
     }));
 
     Ok(())
@@ -467,7 +516,8 @@ pub fn cbu_attach_entity(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), Engin
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "CBU_ENTITY_ROLE".to_string(),
         values,
-    }));
+    
+        capture_result: None,}));
 
     Ok(())
 }
@@ -480,7 +530,8 @@ pub fn cbu_attach_proper_person(args: &[Arg], env: &mut RuntimeEnv) -> Result<()
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "CBU_PROPER_PERSON".to_string(),
         values,
-    }));
+    
+        capture_result: None,}));
 
     Ok(())
 }
@@ -541,7 +592,8 @@ pub fn product_create(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineEr
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "Product".to_string(),
         values,
-    }));
+    
+        capture_result: None,}));
 
     Ok(())
 }
@@ -612,7 +664,8 @@ pub fn service_create(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineEr
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "Service".to_string(),
         values,
-    }));
+    
+        capture_result: None,}));
 
     Ok(())
 }
@@ -681,7 +734,8 @@ pub fn service_link_product(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), En
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "ProductService".to_string(),
         values,
-    }));
+    
+        capture_result: None,}));
 
     Ok(())
 }
@@ -698,7 +752,8 @@ pub fn lifecycle_resource_create(args: &[Arg], env: &mut RuntimeEnv) -> Result<(
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "LifecycleResource".to_string(),
         values,
-    }));
+    
+        capture_result: None,}));
 
     Ok(())
 }
@@ -770,7 +825,8 @@ pub fn lifecycle_resource_link_service(
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "ServiceResource".to_string(),
         values,
-    }));
+    
+        capture_result: None,}));
 
     Ok(())
 }
@@ -788,7 +844,8 @@ pub fn entity_create_proper_person(args: &[Arg], env: &mut RuntimeEnv) -> Result
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "PROPER_PERSON".to_string(),
         values,
-    }));
+    
+        capture_result: None,}));
 
     Ok(())
 }
@@ -805,7 +862,8 @@ pub fn entity_create_limited_company(
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "LIMITED_COMPANY".to_string(),
         values,
-    }));
+    
+        capture_result: None,}));
 
     Ok(())
 }
@@ -819,7 +877,8 @@ pub fn entity_create_partnership(args: &[Arg], env: &mut RuntimeEnv) -> Result<(
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "PARTNERSHIP".to_string(),
         values,
-    }));
+    
+        capture_result: None,}));
 
     Ok(())
 }
@@ -833,7 +892,8 @@ pub fn entity_create_trust(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), Eng
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "TRUST".to_string(),
         values,
-    }));
+    
+        capture_result: None,}));
 
     Ok(())
 }
@@ -965,6 +1025,744 @@ pub fn cbu_update_entity_role(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), 
 
     env.push_crud(CrudStatement::DataUpdate(DataUpdate {
         asset: "CBU_ENTITY_ROLE".to_string(),
+        where_clause,
+        values,
+    }));
+
+    Ok(())
+}
+
+// ============================================================================
+// IDEMPOTENT ENSURE VERBS (UPSERT semantics)
+// ============================================================================
+
+/// Idempotent CBU create-or-update using natural key (name, jurisdiction)
+pub fn cbu_ensure(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let values = args_to_crud_values(args);
+
+    env.push_crud(CrudStatement::DataUpsert(DataUpsert {
+        asset: "CBU".to_string(),
+        values,
+        conflict_keys: vec!["cbu-name".to_string()],
+        capture_result: Some("cbu_id".to_string()),
+    }));
+
+    Ok(())
+}
+
+/// Idempotent limited company create-or-update using natural key (company_number)
+pub fn entity_ensure_limited_company(
+    args: &[Arg],
+    env: &mut RuntimeEnv,
+) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let values = args_to_crud_values(args);
+
+    env.push_crud(CrudStatement::DataUpsert(DataUpsert {
+        asset: "LIMITED_COMPANY".to_string(),
+        values,
+        conflict_keys: vec!["company-number".to_string()],
+    
+        capture_result: None,}));
+
+    Ok(())
+}
+
+/// Idempotent proper person create-or-update using natural key (tax_id or name+dob)
+pub fn entity_ensure_proper_person(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let values = args_to_crud_values(args);
+
+    env.push_crud(CrudStatement::DataUpsert(DataUpsert {
+        asset: "PROPER_PERSON".to_string(),
+        values,
+        conflict_keys: vec!["tax-id".to_string()],
+    
+        capture_result: None,}));
+
+    Ok(())
+}
+
+/// Idempotent ownership edge create-or-update
+pub fn entity_ensure_ownership(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let values = args_to_crud_values(args);
+
+    env.push_crud(CrudStatement::DataUpsert(DataUpsert {
+        asset: "OWNERSHIP_EDGE".to_string(),
+        values,
+        conflict_keys: vec![
+            "from-entity-id".to_string(),
+            "to-entity-id".to_string(),
+            "ownership-type".to_string(),
+        ],
+    
+        capture_result: None,}));
+
+    Ok(())
+}
+
+/// Update ownership percentage/details
+pub fn entity_update_ownership(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let all_values = args_to_crud_values(args);
+
+    let mut where_clause = HashMap::new();
+    let mut values = HashMap::new();
+
+    for (key, val) in all_values {
+        if key == "from-entity-id" || key == "to-entity-id" {
+            where_clause.insert(key, val);
+        } else {
+            values.insert(key, val);
+        }
+    }
+
+    env.push_crud(CrudStatement::DataUpdate(DataUpdate {
+        asset: "OWNERSHIP_EDGE".to_string(),
+        where_clause,
+        values,
+    }));
+
+    Ok(())
+}
+
+/// Remove ownership edge
+pub fn entity_remove_ownership(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let where_clause = args_to_crud_values(args);
+
+    env.push_crud(CrudStatement::DataDelete(DataDelete {
+        asset: "OWNERSHIP_EDGE".to_string(),
+        where_clause,
+    }));
+
+    Ok(())
+}
+
+/// Get full ownership chain to a target
+pub fn entity_get_ownership_chain(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let where_clause = args_to_crud_values(args);
+
+    env.push_crud(CrudStatement::DataRead(DataRead {
+        asset: "OWNERSHIP_CHAIN".to_string(),
+        where_clause,
+        select: vec!["*".to_string()],
+        limit: None,
+    }));
+
+    Ok(())
+}
+
+// ============================================================================
+// INVESTIGATION DOMAIN
+// ============================================================================
+
+/// Create a KYC investigation
+pub fn investigation_create(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let mut values = args_to_crud_values(args);
+
+    // Inject cbu_id from context if not provided
+    inject_cbu_id_if_missing(&mut values, env);
+
+    env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "INVESTIGATION".to_string(),
+        values,
+        capture_result: Some("investigation_id".to_string()),
+    }));
+
+    Ok(())
+}
+
+/// Update investigation status
+pub fn investigation_update_status(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let mut all_values = args_to_crud_values(args);
+
+    // Inject investigation_id from context if not provided
+    inject_investigation_id_if_missing(&mut all_values, env);
+
+    let mut where_clause = HashMap::new();
+    let mut values = HashMap::new();
+
+    for (key, val) in all_values {
+        if key == "investigation-id" {
+            where_clause.insert(key, val);
+        } else {
+            values.insert(key, val);
+        }
+    }
+
+    env.push_crud(CrudStatement::DataUpdate(DataUpdate {
+        asset: "INVESTIGATION".to_string(),
+        where_clause,
+        values,
+    }));
+
+    Ok(())
+}
+
+/// Assign analyst to investigation
+pub fn investigation_assign(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let values = args_to_crud_values(args);
+
+    env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "INVESTIGATION_ASSIGNMENT".to_string(),
+        values,
+    
+        capture_result: None,}));
+
+    Ok(())
+}
+
+/// Complete investigation
+pub fn investigation_complete(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let all_values = args_to_crud_values(args);
+
+    let mut where_clause = HashMap::new();
+    let mut values = HashMap::new();
+
+    for (key, val) in all_values {
+        if key == "investigation-id" {
+            where_clause.insert(key, val);
+        } else {
+            values.insert(key, val);
+        }
+    }
+
+    // Add completion status
+    values.insert("status".to_string(), Value::Str("COMPLETE".to_string()));
+
+    env.push_crud(CrudStatement::DataUpdate(DataUpdate {
+        asset: "INVESTIGATION".to_string(),
+        where_clause,
+        values,
+    }));
+
+    Ok(())
+}
+
+// ============================================================================
+// DOCUMENT COLLECTION DOMAIN (new words)
+// ============================================================================
+
+/// Request a document for an investigation
+pub fn document_request(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let values = args_to_crud_values(args);
+
+    env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "DOCUMENT_REQUEST".to_string(),
+        values,
+    
+        capture_result: None,}));
+
+    Ok(())
+}
+
+/// Record document received
+pub fn document_receive(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let all_values = args_to_crud_values(args);
+
+    let mut where_clause = HashMap::new();
+    let mut values = HashMap::new();
+
+    for (key, val) in all_values {
+        if key == "request-id" {
+            where_clause.insert(key, val);
+        } else {
+            values.insert(key, val);
+        }
+    }
+
+    values.insert("status".to_string(), Value::Str("RECEIVED".to_string()));
+
+    env.push_crud(CrudStatement::DataUpdate(DataUpdate {
+        asset: "DOCUMENT_REQUEST".to_string(),
+        where_clause,
+        values,
+    }));
+
+    Ok(())
+}
+
+// ============================================================================
+// TRUST DOMAIN
+// ============================================================================
+
+/// Add party to a trust (settlor, trustee, beneficiary, protector)
+pub fn trust_add_party(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let values = args_to_crud_values(args);
+
+    env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "TRUST_PARTY".to_string(),
+        values,
+    
+        capture_result: None,}));
+
+    Ok(())
+}
+
+// ============================================================================
+// PARTNERSHIP DOMAIN
+// ============================================================================
+
+/// Add partner to a partnership
+pub fn partnership_add_partner(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let values = args_to_crud_values(args);
+
+    env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "PARTNERSHIP_PARTNER".to_string(),
+        values,
+    
+        capture_result: None,}));
+
+    Ok(())
+}
+
+// ============================================================================
+// UBO DOMAIN (new words)
+// ============================================================================
+
+/// Calculate UBOs for a CBU (traverses ownership graph)
+pub fn ubo_calculate(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let values = args_to_crud_values(args);
+
+    env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "UBO_CALCULATION".to_string(),
+        values,
+    
+        capture_result: None,}));
+
+    Ok(())
+}
+
+/// Manually flag a UBO (override calculation)
+pub fn ubo_flag(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let values = args_to_crud_values(args);
+
+    env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "UBO_FLAG".to_string(),
+        values,
+    
+        capture_result: None,}));
+
+    Ok(())
+}
+
+/// Verify a calculated UBO
+pub fn ubo_verify(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let all_values = args_to_crud_values(args);
+
+    let mut where_clause = HashMap::new();
+    let mut values = HashMap::new();
+
+    for (key, val) in all_values {
+        if key == "ubo-id" {
+            where_clause.insert(key, val);
+        } else {
+            values.insert(key, val);
+        }
+    }
+
+    values.insert("verified".to_string(), Value::Bool(true));
+
+    env.push_crud(CrudStatement::DataUpdate(DataUpdate {
+        asset: "UBO_REGISTRY".to_string(),
+        where_clause,
+        values,
+    }));
+
+    Ok(())
+}
+
+/// Clear a UBO flag
+pub fn ubo_clear(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let all_values = args_to_crud_values(args);
+
+    let mut where_clause = HashMap::new();
+    let mut values = HashMap::new();
+
+    for (key, val) in all_values {
+        if key == "ubo-id" {
+            where_clause.insert(key, val);
+        } else {
+            values.insert(key, val);
+        }
+    }
+
+    values.insert("status".to_string(), Value::Str("CLEARED".to_string()));
+
+    env.push_crud(CrudStatement::DataUpdate(DataUpdate {
+        asset: "UBO_REGISTRY".to_string(),
+        where_clause,
+        values,
+    }));
+
+    Ok(())
+}
+
+// ============================================================================
+// SCREENING DOMAIN
+// ============================================================================
+
+/// PEP screening
+pub fn screening_pep(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let values = args_to_crud_values(args);
+
+    env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "SCREENING_PEP".to_string(),
+        values,
+    
+        capture_result: None,}));
+
+    Ok(())
+}
+
+/// Sanctions screening
+pub fn screening_sanctions(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let values = args_to_crud_values(args);
+
+    env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "SCREENING_SANCTIONS".to_string(),
+        values,
+    
+        capture_result: None,}));
+
+    Ok(())
+}
+
+/// Adverse media screening
+pub fn screening_adverse_media(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let values = args_to_crud_values(args);
+
+    env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "SCREENING_ADVERSE_MEDIA".to_string(),
+        values,
+    
+        capture_result: None,}));
+
+    Ok(())
+}
+
+/// Record screening result
+pub fn screening_record_result(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let values = args_to_crud_values(args);
+
+    env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "SCREENING_RESULT".to_string(),
+        values,
+    
+        capture_result: None,}));
+
+    Ok(())
+}
+
+/// Resolve screening match
+pub fn screening_resolve(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let values = args_to_crud_values(args);
+
+    env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "SCREENING_RESOLUTION".to_string(),
+        values,
+    
+        capture_result: None,}));
+
+    Ok(())
+}
+
+// ============================================================================
+// RISK DOMAIN
+// ============================================================================
+
+/// Assess entity risk
+pub fn risk_assess_entity(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let values = args_to_crud_values(args);
+
+    env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "RISK_ASSESSMENT_ENTITY".to_string(),
+        values,
+    
+        capture_result: None,}));
+
+    Ok(())
+}
+
+/// Assess CBU overall risk
+pub fn risk_assess_cbu(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let mut values = args_to_crud_values(args);
+
+    // Inject context IDs
+    inject_cbu_id_if_missing(&mut values, env);
+    inject_investigation_id_if_missing(&mut values, env);
+
+    env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "RISK_ASSESSMENT_CBU".to_string(),
+        values,
+        capture_result: None,
+    }));
+
+    Ok(())
+}
+
+/// Set risk rating
+pub fn risk_set_rating(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let mut values = args_to_crud_values(args);
+
+    // Inject context IDs
+    inject_cbu_id_if_missing(&mut values, env);
+    inject_investigation_id_if_missing(&mut values, env);
+
+    env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "RISK_RATING".to_string(),
+        values,
+        capture_result: None,
+    }));
+
+    Ok(())
+}
+
+/// Add risk flag
+pub fn risk_add_flag(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let mut values = args_to_crud_values(args);
+
+    // Inject context ID
+    inject_cbu_id_if_missing(&mut values, env);
+
+    env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "RISK_FLAG".to_string(),
+        values,
+        capture_result: None,
+    }));
+
+    Ok(())
+}
+
+// ============================================================================
+// DECISION DOMAIN
+// ============================================================================
+
+/// Record onboarding decision
+pub fn decision_record(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let mut values = args_to_crud_values(args);
+
+    // Inject context IDs
+    inject_cbu_id_if_missing(&mut values, env);
+    inject_investigation_id_if_missing(&mut values, env);
+
+    env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "DECISION".to_string(),
+        values,
+        capture_result: Some("decision_id".to_string()),
+    }));
+
+    Ok(())
+}
+
+/// Add condition to conditional acceptance
+pub fn decision_add_condition(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let mut values = args_to_crud_values(args);
+
+    // Inject decision_id from context
+    inject_decision_id_if_missing(&mut values, env);
+
+    env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "DECISION_CONDITION".to_string(),
+        values,
+        capture_result: None,
+    }));
+
+    Ok(())
+}
+
+/// Satisfy a condition
+pub fn decision_satisfy_condition(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let all_values = args_to_crud_values(args);
+
+    let mut where_clause = HashMap::new();
+    let mut values = HashMap::new();
+
+    for (key, val) in all_values {
+        if key == "condition-id" {
+            where_clause.insert(key, val);
+        } else {
+            values.insert(key, val);
+        }
+    }
+
+    values.insert("status".to_string(), Value::Str("SATISFIED".to_string()));
+
+    env.push_crud(CrudStatement::DataUpdate(DataUpdate {
+        asset: "DECISION_CONDITION".to_string(),
+        where_clause,
+        values,
+    }));
+
+    Ok(())
+}
+
+/// Review decision
+pub fn decision_review(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let all_values = args_to_crud_values(args);
+
+    let mut where_clause = HashMap::new();
+    let mut values = HashMap::new();
+
+    for (key, val) in all_values {
+        if key == "decision-id" {
+            where_clause.insert(key, val);
+        } else {
+            values.insert(key, val);
+        }
+    }
+
+    env.push_crud(CrudStatement::DataUpdate(DataUpdate {
+        asset: "DECISION".to_string(),
+        where_clause,
+        values,
+    }));
+
+    Ok(())
+}
+
+// ============================================================================
+// MONITORING DOMAIN
+// ============================================================================
+
+/// Setup ongoing monitoring
+pub fn monitoring_setup(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let mut values = args_to_crud_values(args);
+
+    // Inject cbu_id from context
+    inject_cbu_id_if_missing(&mut values, env);
+
+    // Use UPSERT since monitoring_setup has unique constraint on cbu_id
+    env.push_crud(CrudStatement::DataUpsert(DataUpsert {
+        asset: "MONITORING_SETUP".to_string(),
+        values,
+        conflict_keys: vec!["cbu-id".to_string()],
+        capture_result: None,
+    }));
+
+    Ok(())
+}
+
+/// Record monitoring event
+pub fn monitoring_record_event(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let mut values = args_to_crud_values(args);
+
+    // Inject cbu_id from context
+    inject_cbu_id_if_missing(&mut values, env);
+
+    env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "MONITORING_EVENT".to_string(),
+        values,
+        capture_result: None,
+    }));
+
+    Ok(())
+}
+
+/// Schedule a review
+pub fn monitoring_schedule_review(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let mut values = args_to_crud_values(args);
+
+    // Inject cbu_id from context
+    inject_cbu_id_if_missing(&mut values, env);
+
+    env.push_crud(CrudStatement::DataCreate(DataCreate {
+        asset: "SCHEDULED_REVIEW".to_string(),
+        values,
+        capture_result: None,
+    }));
+
+    Ok(())
+}
+
+/// Complete a scheduled review
+pub fn monitoring_complete_review(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
+    process_args(args, env);
+
+    let all_values = args_to_crud_values(args);
+
+    let mut where_clause = HashMap::new();
+    let mut values = HashMap::new();
+
+    for (key, val) in all_values {
+        if key == "review-id" {
+            where_clause.insert(key, val);
+        } else {
+            values.insert(key, val);
+        }
+    }
+
+    values.insert("status".to_string(), Value::Str("COMPLETED".to_string()));
+
+    env.push_crud(CrudStatement::DataUpdate(DataUpdate {
+        asset: "SCHEDULED_REVIEW".to_string(),
         where_clause,
         values,
     }));

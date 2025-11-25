@@ -3,8 +3,8 @@
 //! Provides database-backed storage for attributes and documents during DSL execution.
 
 use crate::cbu_model_dsl::ast::CbuModel;
-use crate::forth_engine::value::{AttributeId, DocumentId, Value};
 use crate::forth_engine::value::CrudStatement;
+use crate::forth_engine::value::{AttributeId, DocumentId, Value};
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
@@ -29,6 +29,12 @@ pub struct RuntimeEnv {
 
     /// Current entity ID for this execution context
     pub entity_id: Option<Uuid>,
+
+    /// Current investigation ID for this execution context
+    pub investigation_id: Option<Uuid>,
+
+    /// Current decision ID for this execution context
+    pub decision_id: Option<Uuid>,
 
     /// In-memory cache for attributes during execution
     pub attribute_cache: HashMap<AttributeId, Value>,
@@ -82,6 +88,8 @@ impl RuntimeEnv {
             pool: None,
             cbu_id: None,
             entity_id: None,
+            investigation_id: None,
+            decision_id: None,
             attribute_cache: HashMap::new(),
             document_cache: HashMap::new(),
             case_id: None,
@@ -104,6 +112,8 @@ impl RuntimeEnv {
             pool: Some(pool),
             cbu_id: None,
             entity_id: None,
+            investigation_id: None,
+            decision_id: None,
             attribute_cache: HashMap::new(),
             document_cache: HashMap::new(),
             case_id: None,
@@ -137,6 +147,28 @@ impl RuntimeEnv {
     pub fn ensure_entity_id(&self) -> Result<Uuid, &'static str> {
         self.entity_id
             .ok_or("Entity ID not set in runtime environment")
+    }
+
+    /// Set the investigation ID for this execution context
+    pub fn set_investigation_id(&mut self, id: Uuid) {
+        self.investigation_id = Some(id);
+    }
+
+    /// Get the investigation ID, returning error if not set
+    pub fn ensure_investigation_id(&self) -> Result<Uuid, &'static str> {
+        self.investigation_id
+            .ok_or("Investigation ID not set in runtime environment")
+    }
+
+    /// Set the decision ID for this execution context
+    pub fn set_decision_id(&mut self, id: Uuid) {
+        self.decision_id = Some(id);
+    }
+
+    /// Get the decision ID, returning error if not set
+    pub fn ensure_decision_id(&self) -> Result<Uuid, &'static str> {
+        self.decision_id
+            .ok_or("Decision ID not set in runtime environment")
     }
 
     /// Check if an attribute is a sink for this context
