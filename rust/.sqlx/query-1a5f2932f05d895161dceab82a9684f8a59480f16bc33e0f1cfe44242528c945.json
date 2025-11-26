@@ -1,0 +1,59 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                value_text,\n                value_number,\n                value_integer,\n                value_boolean,\n                value_date,\n                value_datetime,\n                value_json\n            FROM \"ob-poc\".attribute_values_typed\n            WHERE attribute_id = $1 AND entity_id = $2\n            ORDER BY created_at DESC\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "value_text",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "value_number",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 2,
+        "name": "value_integer",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "value_boolean",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
+        "name": "value_date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 5,
+        "name": "value_datetime",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "value_json",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "1a5f2932f05d895161dceab82a9684f8a59480f16bc33e0f1cfe44242528c945"
+}

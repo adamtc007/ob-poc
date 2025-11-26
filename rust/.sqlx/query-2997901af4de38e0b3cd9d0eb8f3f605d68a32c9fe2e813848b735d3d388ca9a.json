@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT dm.value\n            FROM \"ob-poc\".document_metadata dm\n            JOIN \"ob-poc\".document_catalog dc ON dc.doc_id = dm.doc_id\n            WHERE dm.attribute_id = $1 AND dc.cbu_id = $2\n            ORDER BY dc.created_at DESC\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "value",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2997901af4de38e0b3cd9d0eb8f3f605d68a32c9fe2e813848b735d3d388ca9a"
+}

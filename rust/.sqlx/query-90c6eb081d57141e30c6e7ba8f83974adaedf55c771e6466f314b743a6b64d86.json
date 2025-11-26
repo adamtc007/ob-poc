@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                attribute_id,\n                name,\n                long_description,\n                mask,\n                source,\n                sink,\n                group_id,\n                domain\n            FROM \"ob-poc\".dictionary\n            WHERE attribute_id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "attribute_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "long_description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "mask",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "source",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 5,
+        "name": "sink",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 6,
+        "name": "group_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "domain",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "90c6eb081d57141e30c6e7ba8f83974adaedf55c771e6466f314b743a6b64d86"
+}

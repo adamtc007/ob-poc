@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    INSERT INTO \"ob-poc\".attribute_values_typed (\n                        entity_id, attribute_id, value_number\n                    ) VALUES ($1, $2, $3)\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Numeric"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c03733e25bceb1222ba1775960cf90863a62bdcb6080d307e05a83a079f45ddc"
+}
