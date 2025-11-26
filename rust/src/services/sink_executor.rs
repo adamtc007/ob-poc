@@ -71,74 +71,53 @@ impl SinkExecutor for DatabaseSink {
         attribute_id: &AttributeId,
         value: &Value,
         _definition: &DbAttributeDefinition,
-        entity_id: Uuid,
+        cbu_id: Uuid,
     ) -> Result<(), String> {
-        let attribute_id_str = attribute_id.to_string();
-
         // Persist to attribute_values_typed based on value type
+        // Live DB schema uses: cbu_id, string_value, numeric_value, boolean_value, json_value, value_type
         match value {
             Value::String(s) => {
                 sqlx::query!(
                     r#"
                     INSERT INTO "ob-poc".attribute_values_typed (
-                        entity_id, attribute_id, value_text, attribute_uuid
-                    ) VALUES ($1, $2, $3, $4)
+                        cbu_id, attribute_id, value_type, string_value
+                    ) VALUES ($1, $2, 'string', $3)
                     "#,
-                    entity_id,
-                    attribute_id_str,
-                    s,
-                    attribute_id.as_uuid()
+                    cbu_id,
+                    attribute_id.as_uuid(),
+                    s
                 )
                 .execute(&self.pool)
                 .await
                 .map_err(|e| format!("Failed to persist string value: {}", e))?;
             }
             Value::Number(n) => {
-                if let Some(int_val) = n.as_i64() {
-                    sqlx::query!(
-                        r#"
-                        INSERT INTO "ob-poc".attribute_values_typed (
-                            entity_id, attribute_id, value_integer, attribute_uuid
-                        ) VALUES ($1, $2, $3, $4)
-                        "#,
-                        entity_id,
-                        attribute_id_str,
-                        int_val,
-                        attribute_id.as_uuid()
-                    )
-                    .execute(&self.pool)
-                    .await
-                    .map_err(|e| format!("Failed to persist integer value: {}", e))?;
-                } else {
-                    let decimal = bigdecimal::BigDecimal::from_str(&n.to_string())
-                        .map_err(|e| format!("Failed to parse number: {}", e))?;
-                    sqlx::query!(
-                        r#"
-                        INSERT INTO "ob-poc".attribute_values_typed (
-                            entity_id, attribute_id, value_number, attribute_uuid
-                        ) VALUES ($1, $2, $3, $4)
-                        "#,
-                        entity_id,
-                        attribute_id_str,
-                        decimal,
-                        attribute_id.as_uuid()
-                    )
-                    .execute(&self.pool)
-                    .await
-                    .map_err(|e| format!("Failed to persist number value: {}", e))?;
-                }
+                let decimal = bigdecimal::BigDecimal::from_str(&n.to_string())
+                    .map_err(|e| format!("Failed to parse number: {}", e))?;
+                sqlx::query!(
+                    r#"
+                    INSERT INTO "ob-poc".attribute_values_typed (
+                        cbu_id, attribute_id, value_type, numeric_value
+                    ) VALUES ($1, $2, 'numeric', $3)
+                    "#,
+                    cbu_id,
+                    attribute_id.as_uuid(),
+                    decimal
+                )
+                .execute(&self.pool)
+                .await
+                .map_err(|e| format!("Failed to persist number value: {}", e))?;
             }
             Value::Bool(b) => {
                 sqlx::query!(
                     r#"
                     INSERT INTO "ob-poc".attribute_values_typed (
-                        entity_id, attribute_id, value_boolean, attribute_uuid
-                    ) VALUES ($1, $2, $3, $4)
+                        cbu_id, attribute_id, value_type, boolean_value
+                    ) VALUES ($1, $2, 'boolean', $3)
                     "#,
-                    entity_id,
-                    attribute_id_str,
-                    b,
-                    attribute_id.as_uuid()
+                    cbu_id,
+                    attribute_id.as_uuid(),
+                    b
                 )
                 .execute(&self.pool)
                 .await
@@ -148,13 +127,12 @@ impl SinkExecutor for DatabaseSink {
                 sqlx::query!(
                     r#"
                     INSERT INTO "ob-poc".attribute_values_typed (
-                        entity_id, attribute_id, value_json, attribute_uuid
-                    ) VALUES ($1, $2, $3, $4)
+                        cbu_id, attribute_id, value_type, json_value
+                    ) VALUES ($1, $2, 'json', $3)
                     "#,
-                    entity_id,
-                    attribute_id_str,
-                    value,
-                    attribute_id.as_uuid()
+                    cbu_id,
+                    attribute_id.as_uuid(),
+                    value
                 )
                 .execute(&self.pool)
                 .await

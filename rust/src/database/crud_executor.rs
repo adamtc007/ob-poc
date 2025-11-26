@@ -873,19 +873,24 @@ impl CrudExecutor {
                     .get("value")
                     .map(|v| self.value_to_json(v))
                     .unwrap_or(serde_json::json!(null));
+                
+                // Convert JSON value to string for extracted_value (TEXT column)
+                let extracted_value = match &value {
+                    serde_json::Value::String(s) => s.clone(),
+                    other => other.to_string(),
+                };
 
                 // Insert into document_metadata
+                // Live DB: document_id (not doc_id), extracted_value (TEXT not JSONB)
                 sqlx::query!(
                     r#"
                     INSERT INTO "ob-poc".document_metadata
-                    (doc_id, attribute_id, value, extraction_method, extracted_at)
-                    VALUES ($1, $2, $3, $4, NOW())
-                    ON CONFLICT (doc_id, attribute_id)
-                    DO UPDATE SET value = $3, extraction_method = $4, extracted_at = NOW()
+                    (document_id, attribute_id, extracted_value, extraction_method)
+                    VALUES ($1, $2, $3, $4)
                     "#,
                     doc_id,
                     attribute_id,
-                    value,
+                    extracted_value,
                     extraction_method
                 )
                 .execute(&self.pool)

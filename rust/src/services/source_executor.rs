@@ -71,27 +71,27 @@ impl SourceExecutor for DocumentSource {
         &self,
         attribute_id: &AttributeId,
         _definition: &DbAttributeDefinition,
-        entity_id: Uuid,
+        cbu_id: Uuid,
     ) -> Result<Option<Value>, String> {
         // Fetch from document_metadata for most recent extraction
-        // Note: entity_id maps to cbu_id in this context
+        // Live DB schema: document_id (not doc_id), extracted_value (not value)
         let result = sqlx::query!(
             r#"
-            SELECT dm.value
+            SELECT dm.extracted_value
             FROM "ob-poc".document_metadata dm
-            JOIN "ob-poc".document_catalog dc ON dc.doc_id = dm.doc_id
+            JOIN "ob-poc".document_catalog dc ON dc.document_id = dm.document_id
             WHERE dm.attribute_id = $1 AND dc.cbu_id = $2
             ORDER BY dc.created_at DESC
             LIMIT 1
             "#,
             attribute_id.as_uuid(),
-            entity_id
+            cbu_id
         )
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| format!("Database error: {}", e))?;
 
-        Ok(result.map(|row| row.value))
+        Ok(result.and_then(|row| row.extracted_value.map(|v| Value::String(v))))
     }
 }
 
@@ -112,52 +112,46 @@ impl SourceExecutor for DatabaseSource {
         &self,
         attribute_id: &AttributeId,
         _definition: &DbAttributeDefinition,
-        entity_id: Uuid,
+        cbu_id: Uuid,
     ) -> Result<Option<Value>, String> {
         // Fetch from attribute_values_typed
-        let attribute_id_str = attribute_id.to_string();
-
+        // Live DB schema: cbu_id, string_value, numeric_value, boolean_value, date_value, json_value
         let result = sqlx::query!(
             r#"
             SELECT
-                value_text,
-                value_number,
-                value_integer,
-                value_boolean,
-                value_date,
-                value_datetime,
-                value_json
+                value_type,
+                string_value,
+                numeric_value,
+                boolean_value,
+                date_value,
+                json_value
             FROM "ob-poc".attribute_values_typed
-            WHERE attribute_id = $1 AND entity_id = $2
+            WHERE attribute_id = $1 AND cbu_id = $2
             ORDER BY created_at DESC
             LIMIT 1
             "#,
-            attribute_id_str,
-            entity_id
+            attribute_id.as_uuid(),
+            cbu_id
         )
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| format!("Database error: {}", e))?;
 
         if let Some(row) = result {
-            // Return the first non-null value
-            let value = if let Some(text) = row.value_text {
+            // Return value based on value_type
+            let value = if let Some(text) = row.string_value {
                 Some(Value::String(text))
-            } else if let Some(num) = row.value_number {
+            } else if let Some(num) = row.numeric_value {
                 Value::Number(
                     serde_json::Number::from_f64(num.to_string().parse().unwrap_or(0.0)).unwrap(),
                 )
                 .into()
-            } else if let Some(int) = row.value_integer {
-                Value::Number(serde_json::Number::from(int)).into()
-            } else if let Some(b) = row.value_boolean {
+            } else if let Some(b) = row.boolean_value {
                 Some(Value::Bool(b))
-            } else if let Some(date) = row.value_date {
+            } else if let Some(date) = row.date_value {
                 Some(Value::String(date.to_string()))
-            } else if let Some(datetime) = row.value_datetime {
-                Some(Value::String(datetime.to_rfc3339()))
             } else {
-                row.value_json
+                row.json_value
             };
             Ok(value)
         } else {

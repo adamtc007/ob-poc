@@ -3,72 +3,41 @@
 -- Purpose: Complete persistence layer for DSL verb domains
 -- Generated: 2024-11-26
 -- 
--- This migration adds 14 missing tables required by the verb schema:
---   - Document domain: document_requests, document_entity_links
---   - Entity domain: ownership_relationships
---   - KYC domain: investigations, risk_assessments, risk_ratings
---   - Screening domain: screening_results, screening_hit_resolutions, screening_batches
---   - Decision domain: decisions, decision_conditions
---   - Monitoring domain: monitoring_reviews, monitoring_cases, monitoring_alert_rules, monitoring_activities
+-- NOTE: This migration is ADDITIVE to 017_kyc_investigation_tables.sql
+-- It adds missing tables and creates views to bridge naming conventions
+-- between the existing schema and the DSL verb crud_asset values.
+--
+-- Existing tables from 017 that we'll use:
+--   - kyc_investigations → bridges to INVESTIGATION crud_asset
+--   - screenings → bridges to SCREENING_RESULT crud_asset  
+--   - risk_assessments → already matches RISK_ASSESSMENT_CBU
+--   - kyc_decisions → bridges to DECISION crud_asset
+--   - decision_conditions → already matches DECISION_CONDITION
+--   - document_requests → already matches DOCUMENT_REQUEST
+--
+-- New tables this migration adds:
+--   - ownership_relationships (OWNERSHIP)
+--   - document_entity_links (DOCUMENT_LINK)
+--   - risk_ratings (RISK_RATING)
+--   - screening_hit_resolutions (SCREENING_HIT_RESOLUTION)
+--   - screening_batches (SCREENING_BATCH)
+--   - monitoring_cases (MONITORING_CASE)
+--   - monitoring_reviews (MONITORING_REVIEW)
+--   - monitoring_alert_rules (MONITORING_ALERT_RULE)
+--   - monitoring_activities (MONITORING_ACTIVITY)
 -- ============================================================================
 
 BEGIN;
 
 -- ============================================================================
--- DOCUMENT DOMAIN - Missing Tables
+-- ENTITY DOMAIN - ownership_relationships (OWNERSHIP crud_asset)
 -- ============================================================================
-
-CREATE TABLE IF NOT EXISTS "ob-poc".document_requests (
-    request_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    cbu_id UUID REFERENCES "ob-poc".cbus(cbu_id),
-    entity_id UUID REFERENCES "ob-poc".entities(entity_id),
-    document_type_id UUID REFERENCES "ob-poc".document_types(type_id),
-    priority VARCHAR(20) DEFAULT 'NORMAL' 
-        CHECK (priority IN ('LOW', 'NORMAL', 'HIGH', 'URGENT')),
-    source VARCHAR(30) 
-        CHECK (source IN ('REGISTRY', 'CLIENT', 'THIRD_PARTY')),
-    due_date DATE,
-    status VARCHAR(30) DEFAULT 'PENDING' 
-        CHECK (status IN ('PENDING', 'RECEIVED', 'EXPIRED', 'CANCELLED')),
-    fulfilled_by_doc_id UUID REFERENCES "ob-poc".document_catalog(doc_id),
-    notes TEXT,
-    requested_by VARCHAR(255) DEFAULT 'system',
-    created_at TIMESTAMPTZ DEFAULT (NOW() AT TIME ZONE 'utc'),
-    updated_at TIMESTAMPTZ DEFAULT (NOW() AT TIME ZONE 'utc'),
-    
-    CONSTRAINT document_requests_target_check 
-        CHECK (cbu_id IS NOT NULL OR entity_id IS NOT NULL)
-);
-
-COMMENT ON TABLE "ob-poc".document_requests IS 
-    'Tracks document requests for CBUs or entities during onboarding/KYC';
-
-CREATE INDEX idx_document_requests_cbu ON "ob-poc".document_requests(cbu_id);
-CREATE INDEX idx_document_requests_entity ON "ob-poc".document_requests(entity_id);
-CREATE INDEX idx_document_requests_status ON "ob-poc".document_requests(status);
-
-
-CREATE TABLE IF NOT EXISTS "ob-poc".document_entity_links (
-    link_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    doc_id UUID NOT NULL REFERENCES "ob-poc".document_catalog(doc_id),
-    entity_id UUID NOT NULL REFERENCES "ob-poc".entities(entity_id),
-    link_type VARCHAR(50) DEFAULT 'EVIDENCE'
-        CHECK (link_type IN ('EVIDENCE', 'IDENTITY', 'ADDRESS', 'FINANCIAL', 'REGULATORY', 'OTHER')),
-    linked_by VARCHAR(255) DEFAULT 'system',
-    created_at TIMESTAMPTZ DEFAULT (NOW() AT TIME ZONE 'utc'),
-    
-    UNIQUE(doc_id, entity_id, link_type)
-);
-
-COMMENT ON TABLE "ob-poc".document_entity_links IS 
-    'Links documents to entities with typed relationship';
-
-CREATE INDEX idx_document_entity_links_doc ON "ob-poc".document_entity_links(doc_id);
-CREATE INDEX idx_document_entity_links_entity ON "ob-poc".document_entity_links(entity_id);
-
-
--- ============================================================================
--- ENTITY DOMAIN - Missing Tables  
+-- NOTE: This table stores the OWNERSHIP CHAIN (edges in the ownership graph).
+-- It is DIFFERENT from ubo_registry which stores the IDENTIFIED UBOs (the result).
+-- 
+-- Example: A owns 60% of B, B owns 40% of C, Person X owns 80% of A
+-- ownership_relationships: 3 rows (A→B, B→C, X→A)
+-- ubo_registry: 1 row (X is UBO of C with calculated 19.2%)
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS "ob-poc".ownership_relationships (
@@ -81,7 +50,7 @@ CREATE TABLE IF NOT EXISTS "ob-poc".ownership_relationships (
         CHECK (ownership_percent >= 0 AND ownership_percent <= 100),
     effective_from DATE DEFAULT CURRENT_DATE,
     effective_to DATE,
-    evidence_doc_id UUID REFERENCES "ob-poc".document_catalog(doc_id),
+    evidence_doc_id UUID REFERENCES "ob-poc".document_catalog(document_id),
     notes TEXT,
     created_by VARCHAR(255) DEFAULT 'system',
     created_at TIMESTAMPTZ DEFAULT (NOW() AT TIME ZONE 'utc'),
@@ -91,70 +60,44 @@ CREATE TABLE IF NOT EXISTS "ob-poc".ownership_relationships (
     CONSTRAINT ownership_temporal CHECK (effective_to IS NULL OR effective_to > effective_from)
 );
 
+CREATE INDEX IF NOT EXISTS idx_ownership_owner ON "ob-poc".ownership_relationships(owner_entity_id);
+CREATE INDEX IF NOT EXISTS idx_ownership_owned ON "ob-poc".ownership_relationships(owned_entity_id);
+CREATE INDEX IF NOT EXISTS idx_ownership_type ON "ob-poc".ownership_relationships(ownership_type);
+
 COMMENT ON TABLE "ob-poc".ownership_relationships IS 
-    'Tracks ownership relationships between entities for UBO analysis';
-
-CREATE INDEX idx_ownership_owner ON "ob-poc".ownership_relationships(owner_entity_id);
-CREATE INDEX idx_ownership_owned ON "ob-poc".ownership_relationships(owned_entity_id);
-CREATE INDEX idx_ownership_type ON "ob-poc".ownership_relationships(ownership_type);
+    'Tracks ownership relationships between entities for UBO analysis (OWNERSHIP crud_asset)';
 
 
 -- ============================================================================
--- KYC DOMAIN - Missing Tables
+-- DOCUMENT DOMAIN - document_entity_links (DOCUMENT_LINK crud_asset)
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS "ob-poc".investigations (
-    investigation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    cbu_id UUID NOT NULL REFERENCES "ob-poc".cbus(cbu_id),
-    investigation_type VARCHAR(30) NOT NULL
-        CHECK (investigation_type IN ('STANDARD', 'ENHANCED_DUE_DILIGENCE', 'SIMPLIFIED', 'PERIODIC_REVIEW')),
-    status VARCHAR(30) DEFAULT 'PENDING'
-        CHECK (status IN ('PENDING', 'IN_PROGRESS', 'COLLECTING_DOCUMENTS', 'UNDER_REVIEW', 
-                          'ESCALATED', 'APPROVED', 'REJECTED', 'CLOSED')),
-    risk_rating VARCHAR(20)
-        CHECK (risk_rating IN ('LOW', 'MEDIUM', 'MEDIUM_HIGH', 'HIGH', 'VERY_HIGH')),
-    ubo_threshold NUMERIC(5,2) DEFAULT 25.0
-        CHECK (ubo_threshold >= 0 AND ubo_threshold <= 100),
-    deadline DATE,
-    outcome VARCHAR(30)
-        CHECK (outcome IN ('APPROVED', 'REJECTED', 'CONDITIONALLY_APPROVED')),
-    outcome_rationale TEXT,
-    assigned_to VARCHAR(255),
-    completed_at TIMESTAMPTZ,
-    created_by VARCHAR(255) DEFAULT 'system',
+CREATE TABLE IF NOT EXISTS "ob-poc".document_entity_links (
+    link_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    document_id UUID NOT NULL REFERENCES "ob-poc".document_catalog(document_id),
+    entity_id UUID NOT NULL REFERENCES "ob-poc".entities(entity_id),
+    link_type VARCHAR(50) DEFAULT 'EVIDENCE'
+        CHECK (link_type IN ('EVIDENCE', 'IDENTITY', 'ADDRESS', 'FINANCIAL', 'REGULATORY', 'OTHER')),
+    linked_by VARCHAR(255) DEFAULT 'system',
     created_at TIMESTAMPTZ DEFAULT (NOW() AT TIME ZONE 'utc'),
-    updated_at TIMESTAMPTZ DEFAULT (NOW() AT TIME ZONE 'utc')
+    
+    UNIQUE(document_id, entity_id, link_type)
 );
 
-COMMENT ON TABLE "ob-poc".investigations IS 
-    'KYC investigations for client business units';
+CREATE INDEX IF NOT EXISTS idx_document_entity_links_doc ON "ob-poc".document_entity_links(document_id);
+CREATE INDEX IF NOT EXISTS idx_document_entity_links_entity ON "ob-poc".document_entity_links(entity_id);
 
-CREATE INDEX idx_investigations_cbu ON "ob-poc".investigations(cbu_id);
-CREATE INDEX idx_investigations_status ON "ob-poc".investigations(status);
-CREATE INDEX idx_investigations_type ON "ob-poc".investigations(investigation_type);
+COMMENT ON TABLE "ob-poc".document_entity_links IS 
+    'Links documents to entities with typed relationship (DOCUMENT_LINK crud_asset)';
 
 
-CREATE TABLE IF NOT EXISTS "ob-poc".risk_assessments (
-    assessment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    cbu_id UUID NOT NULL REFERENCES "ob-poc".cbus(cbu_id),
-    investigation_id UUID REFERENCES "ob-poc".investigations(investigation_id),
-    methodology VARCHAR(30) NOT NULL
-        CHECK (methodology IN ('FACTOR_WEIGHTED', 'HIGHEST_RISK', 'CUMULATIVE')),
-    overall_score NUMERIC(5,2),
-    factor_scores JSONB DEFAULT '{}'::jsonb,
-    risk_factors JSONB DEFAULT '[]'::jsonb,
-    mitigating_factors JSONB DEFAULT '[]'::jsonb,
-    assessed_by VARCHAR(255) DEFAULT 'system',
-    assessed_at TIMESTAMPTZ DEFAULT (NOW() AT TIME ZONE 'utc'),
-    created_at TIMESTAMPTZ DEFAULT (NOW() AT TIME ZONE 'utc')
-);
-
-COMMENT ON TABLE "ob-poc".risk_assessments IS 
-    'Risk assessment results for CBUs using configured methodology';
-
-CREATE INDEX idx_risk_assessments_cbu ON "ob-poc".risk_assessments(cbu_id);
-CREATE INDEX idx_risk_assessments_investigation ON "ob-poc".risk_assessments(investigation_id);
-
+-- ============================================================================
+-- KYC DOMAIN - risk_ratings (RISK_RATING crud_asset)
+-- ============================================================================
+-- NOTE: This tracks CBU-LEVEL risk ratings with full history.
+-- ubo_registry.risk_rating tracks UBO-LEVEL risk (individual beneficial owners).
+-- Both are needed: CBU risk aggregates all factors, UBO risk is per-person.
+-- ============================================================================
 
 CREATE TABLE IF NOT EXISTS "ob-poc".risk_ratings (
     rating_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -171,50 +114,28 @@ CREATE TABLE IF NOT EXISTS "ob-poc".risk_ratings (
     created_at TIMESTAMPTZ DEFAULT (NOW() AT TIME ZONE 'utc')
 );
 
-COMMENT ON TABLE "ob-poc".risk_ratings IS 
-    'Historical record of risk ratings assigned to CBUs';
-
-CREATE INDEX idx_risk_ratings_cbu ON "ob-poc".risk_ratings(cbu_id);
-CREATE INDEX idx_risk_ratings_rating ON "ob-poc".risk_ratings(rating);
-CREATE INDEX idx_risk_ratings_current ON "ob-poc".risk_ratings(cbu_id, effective_to) 
+CREATE INDEX IF NOT EXISTS idx_risk_ratings_cbu ON "ob-poc".risk_ratings(cbu_id);
+CREATE INDEX IF NOT EXISTS idx_risk_ratings_rating ON "ob-poc".risk_ratings(rating);
+CREATE INDEX IF NOT EXISTS idx_risk_ratings_current ON "ob-poc".risk_ratings(cbu_id, effective_to) 
     WHERE effective_to IS NULL;
 
+COMMENT ON TABLE "ob-poc".risk_ratings IS 
+    'Historical record of risk ratings assigned to CBUs (RISK_RATING crud_asset)';
+
 
 -- ============================================================================
--- SCREENING DOMAIN - Missing Tables
+-- SCREENING DOMAIN - screening_hit_resolutions (SCREENING_HIT_RESOLUTION crud_asset)
 -- ============================================================================
-
-CREATE TABLE IF NOT EXISTS "ob-poc".screening_results (
-    result_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    entity_id UUID NOT NULL REFERENCES "ob-poc".entities(entity_id),
-    screen_type VARCHAR(30) NOT NULL
-        CHECK (screen_type IN ('PEP', 'SANCTIONS', 'ADVERSE_MEDIA')),
-    provider VARCHAR(30)
-        CHECK (provider IN ('REFINITIV', 'DOW_JONES', 'LEXISNEXIS', 'INTERNAL')),
-    match_threshold NUMERIC(5,2) DEFAULT 85.0,
-    hit_count INTEGER DEFAULT 0,
-    highest_match_score NUMERIC(5,2),
-    raw_response JSONB,
-    categories JSONB DEFAULT '[]'::jsonb,  -- For adverse media categories
-    lookback_months INTEGER,                -- For adverse media
-    screened_at TIMESTAMPTZ DEFAULT (NOW() AT TIME ZONE 'utc'),
-    expires_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT (NOW() AT TIME ZONE 'utc')
-);
-
-COMMENT ON TABLE "ob-poc".screening_results IS 
-    'Results from PEP, sanctions, and adverse media screening';
-
-CREATE INDEX idx_screening_results_entity ON "ob-poc".screening_results(entity_id);
-CREATE INDEX idx_screening_results_type ON "ob-poc".screening_results(screen_type);
-CREATE INDEX idx_screening_results_hits ON "ob-poc".screening_results(entity_id, hit_count) 
-    WHERE hit_count > 0;
-
+-- NOTE: This provides DETAILED resolution workflow for screening hits.
+-- ubo_registry.screening_result only stores final status ('PENDING'/'CLEAR'/'HIT').
+-- This table stores the full resolution history with rationale and evidence.
+-- ============================================================================
 
 CREATE TABLE IF NOT EXISTS "ob-poc".screening_hit_resolutions (
     resolution_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    result_id UUID NOT NULL REFERENCES "ob-poc".screening_results(result_id),
-    hit_reference VARCHAR(255),  -- External hit ID from provider
+    screening_id UUID NOT NULL REFERENCES "ob-poc".screenings(screening_id),
+    hit_reference VARCHAR(255),
+    ubo_id UUID REFERENCES "ob-poc".ubo_registry(ubo_id),  -- Link to UBO if screening was for UBO identification
     resolution VARCHAR(30) NOT NULL
         CHECK (resolution IN ('TRUE_MATCH', 'FALSE_POSITIVE', 'INCONCLUSIVE', 'ESCALATE')),
     dismiss_reason VARCHAR(30)
@@ -230,16 +151,21 @@ CREATE TABLE IF NOT EXISTS "ob-poc".screening_hit_resolutions (
     created_at TIMESTAMPTZ DEFAULT (NOW() AT TIME ZONE 'utc')
 );
 
+CREATE INDEX IF NOT EXISTS idx_screening_hit_resolutions_screening ON "ob-poc".screening_hit_resolutions(screening_id);
+CREATE INDEX IF NOT EXISTS idx_screening_hit_resolutions_resolution ON "ob-poc".screening_hit_resolutions(resolution);
+
 COMMENT ON TABLE "ob-poc".screening_hit_resolutions IS 
-    'Resolution decisions for screening hits';
+    'Resolution decisions for screening hits (SCREENING_HIT_RESOLUTION crud_asset)';
 
-CREATE INDEX idx_screening_hit_resolutions_result ON "ob-poc".screening_hit_resolutions(result_id);
-CREATE INDEX idx_screening_hit_resolutions_resolution ON "ob-poc".screening_hit_resolutions(resolution);
 
+-- ============================================================================
+-- SCREENING DOMAIN - screening_batches (SCREENING_BATCH crud_asset)
+-- ============================================================================
 
 CREATE TABLE IF NOT EXISTS "ob-poc".screening_batches (
     batch_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     cbu_id UUID REFERENCES "ob-poc".cbus(cbu_id),
+    investigation_id UUID REFERENCES "ob-poc".kyc_investigations(investigation_id),
     screen_types JSONB NOT NULL DEFAULT '["PEP", "SANCTIONS"]'::jsonb,
     entity_count INTEGER DEFAULT 0,
     completed_count INTEGER DEFAULT 0,
@@ -254,106 +180,22 @@ CREATE TABLE IF NOT EXISTS "ob-poc".screening_batches (
     created_at TIMESTAMPTZ DEFAULT (NOW() AT TIME ZONE 'utc')
 );
 
+CREATE INDEX IF NOT EXISTS idx_screening_batches_cbu ON "ob-poc".screening_batches(cbu_id);
+CREATE INDEX IF NOT EXISTS idx_screening_batches_status ON "ob-poc".screening_batches(status);
+
 COMMENT ON TABLE "ob-poc".screening_batches IS 
-    'Batch screening jobs for multiple entities';
+    'Batch screening jobs for multiple entities (SCREENING_BATCH crud_asset)';
 
-CREATE INDEX idx_screening_batches_cbu ON "ob-poc".screening_batches(cbu_id);
-CREATE INDEX idx_screening_batches_status ON "ob-poc".screening_batches(status);
-
-
--- Link table for batch -> individual results
+-- Link table for batch -> individual screening results
 CREATE TABLE IF NOT EXISTS "ob-poc".screening_batch_results (
     batch_id UUID NOT NULL REFERENCES "ob-poc".screening_batches(batch_id),
-    result_id UUID NOT NULL REFERENCES "ob-poc".screening_results(result_id),
-    PRIMARY KEY (batch_id, result_id)
+    screening_id UUID NOT NULL REFERENCES "ob-poc".screenings(screening_id),
+    PRIMARY KEY (batch_id, screening_id)
 );
 
 
 -- ============================================================================
--- DECISION DOMAIN - Missing Tables
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS "ob-poc".decisions (
-    decision_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    investigation_id UUID REFERENCES "ob-poc".investigations(investigation_id),
-    cbu_id UUID REFERENCES "ob-poc".cbus(cbu_id),
-    decision_type VARCHAR(30) NOT NULL
-        CHECK (decision_type IN ('APPROVE', 'REJECT', 'ESCALATE', 'DEFER', 'CONDITIONAL_APPROVE')),
-    rationale TEXT NOT NULL,
-    decision_date DATE DEFAULT CURRENT_DATE,
-    
-    -- Approval specific
-    approval_level VARCHAR(20)
-        CHECK (approval_level IN ('ANALYST', 'SENIOR_ANALYST', 'MANAGER', 'DIRECTOR', 'COMMITTEE')),
-    next_review_date DATE,
-    
-    -- Rejection specific
-    reason_code VARCHAR(40)
-        CHECK (reason_code IN ('SANCTIONS_HIT', 'PEP_UNRESOLVED', 'SOURCE_OF_FUNDS', 'ADVERSE_MEDIA',
-                               'DOCUMENTATION_INCOMPLETE', 'HIGH_RISK_JURISDICTION', 
-                               'BENEFICIAL_OWNER_UNVERIFIED', 'REGULATORY_PROHIBITION', 'OTHER')),
-    is_permanent BOOLEAN DEFAULT FALSE,
-    reapply_after DATE,
-    
-    -- Escalation specific
-    escalate_to VARCHAR(20)
-        CHECK (escalate_to IN ('SENIOR_ANALYST', 'MANAGER', 'DIRECTOR', 'COMMITTEE', 'MLRO', 'LEGAL')),
-    escalation_reason VARCHAR(40)
-        CHECK (escalation_reason IN ('HIGH_RISK', 'PEP_INVOLVEMENT', 'SANCTIONS_HIT', 'COMPLEX_STRUCTURE',
-                                      'UNUSUAL_ACTIVITY', 'POLICY_EXCEPTION', 'SENIOR_APPROVAL_REQUIRED', 'OTHER')),
-    escalation_priority VARCHAR(20)
-        CHECK (escalation_priority IN ('LOW', 'NORMAL', 'HIGH', 'URGENT')),
-    escalation_due_date DATE,
-    case_summary TEXT,
-    
-    -- Defer specific
-    defer_until DATE,
-    pending_items JSONB DEFAULT '[]'::jsonb,
-    
-    decided_by VARCHAR(255) NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT (NOW() AT TIME ZONE 'utc'),
-    updated_at TIMESTAMPTZ DEFAULT (NOW() AT TIME ZONE 'utc')
-);
-
-COMMENT ON TABLE "ob-poc".decisions IS 
-    'KYC/onboarding decisions including approvals, rejections, escalations, and deferrals';
-
-CREATE INDEX idx_decisions_investigation ON "ob-poc".decisions(investigation_id);
-CREATE INDEX idx_decisions_cbu ON "ob-poc".decisions(cbu_id);
-CREATE INDEX idx_decisions_type ON "ob-poc".decisions(decision_type);
-CREATE INDEX idx_decisions_escalation ON "ob-poc".decisions(escalate_to) 
-    WHERE decision_type = 'ESCALATE';
-
-
-CREATE TABLE IF NOT EXISTS "ob-poc".decision_conditions (
-    condition_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    decision_id UUID NOT NULL REFERENCES "ob-poc".decisions(decision_id),
-    condition_type VARCHAR(30) NOT NULL
-        CHECK (condition_type IN ('DOCUMENT_REQUIRED', 'ENHANCED_MONITORING', 'TRANSACTION_LIMIT',
-                                   'PERIODIC_REVIEW', 'SENIOR_SIGN_OFF', 'REGULATORY_APPROVAL', 'OTHER')),
-    description TEXT NOT NULL,
-    due_date DATE,
-    is_blocking BOOLEAN DEFAULT TRUE,
-    status VARCHAR(20) DEFAULT 'PENDING'
-        CHECK (status IN ('PENDING', 'SATISFIED', 'WAIVED', 'EXPIRED')),
-    satisfied_at TIMESTAMPTZ,
-    satisfied_by VARCHAR(255),
-    evidence_ref TEXT,
-    created_at TIMESTAMPTZ DEFAULT (NOW() AT TIME ZONE 'utc'),
-    updated_at TIMESTAMPTZ DEFAULT (NOW() AT TIME ZONE 'utc')
-);
-
-COMMENT ON TABLE "ob-poc".decision_conditions IS 
-    'Conditions attached to conditional approvals';
-
-CREATE INDEX idx_decision_conditions_decision ON "ob-poc".decision_conditions(decision_id);
-CREATE INDEX idx_decision_conditions_status ON "ob-poc".decision_conditions(status);
-CREATE INDEX idx_decision_conditions_blocking ON "ob-poc".decision_conditions(decision_id, is_blocking) 
-    WHERE status = 'PENDING';
-
-
--- ============================================================================
--- MONITORING DOMAIN - Missing Tables
+-- MONITORING DOMAIN - monitoring_cases (MONITORING_CASE crud_asset)
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS "ob-poc".monitoring_cases (
@@ -375,12 +217,16 @@ CREATE TABLE IF NOT EXISTS "ob-poc".monitoring_cases (
     updated_at TIMESTAMPTZ DEFAULT (NOW() AT TIME ZONE 'utc')
 );
 
+CREATE INDEX IF NOT EXISTS idx_monitoring_cases_cbu ON "ob-poc".monitoring_cases(cbu_id);
+CREATE INDEX IF NOT EXISTS idx_monitoring_cases_status ON "ob-poc".monitoring_cases(status);
+
 COMMENT ON TABLE "ob-poc".monitoring_cases IS 
-    'Ongoing monitoring cases for CBUs';
+    'Ongoing monitoring cases for CBUs (MONITORING_CASE crud_asset)';
 
-CREATE INDEX idx_monitoring_cases_cbu ON "ob-poc".monitoring_cases(cbu_id);
-CREATE INDEX idx_monitoring_cases_status ON "ob-poc".monitoring_cases(status);
 
+-- ============================================================================
+-- MONITORING DOMAIN - monitoring_reviews (MONITORING_REVIEW crud_asset)
+-- ============================================================================
 
 CREATE TABLE IF NOT EXISTS "ob-poc".monitoring_reviews (
     review_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -412,15 +258,18 @@ CREATE TABLE IF NOT EXISTS "ob-poc".monitoring_reviews (
     updated_at TIMESTAMPTZ DEFAULT (NOW() AT TIME ZONE 'utc')
 );
 
-COMMENT ON TABLE "ob-poc".monitoring_reviews IS 
-    'Periodic and triggered reviews for ongoing monitoring';
-
-CREATE INDEX idx_monitoring_reviews_case ON "ob-poc".monitoring_reviews(case_id);
-CREATE INDEX idx_monitoring_reviews_cbu ON "ob-poc".monitoring_reviews(cbu_id);
-CREATE INDEX idx_monitoring_reviews_due ON "ob-poc".monitoring_reviews(due_date) 
+CREATE INDEX IF NOT EXISTS idx_monitoring_reviews_case ON "ob-poc".monitoring_reviews(case_id);
+CREATE INDEX IF NOT EXISTS idx_monitoring_reviews_cbu ON "ob-poc".monitoring_reviews(cbu_id);
+CREATE INDEX IF NOT EXISTS idx_monitoring_reviews_due ON "ob-poc".monitoring_reviews(due_date) 
     WHERE status IN ('SCHEDULED', 'OVERDUE');
-CREATE INDEX idx_monitoring_reviews_status ON "ob-poc".monitoring_reviews(status);
 
+COMMENT ON TABLE "ob-poc".monitoring_reviews IS 
+    'Periodic and triggered reviews for ongoing monitoring (MONITORING_REVIEW crud_asset)';
+
+
+-- ============================================================================
+-- MONITORING DOMAIN - monitoring_alert_rules (MONITORING_ALERT_RULE crud_asset)
+-- ============================================================================
 
 CREATE TABLE IF NOT EXISTS "ob-poc".monitoring_alert_rules (
     rule_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -431,7 +280,7 @@ CREATE TABLE IF NOT EXISTS "ob-poc".monitoring_alert_rules (
                               'COUNTERPARTY_TYPE', 'PATTERN_DEVIATION', 'CUSTOM')),
     rule_name VARCHAR(255) NOT NULL,
     description TEXT,
-    threshold JSONB NOT NULL,  -- Flexible threshold definition
+    threshold JSONB NOT NULL,
     is_active BOOLEAN DEFAULT TRUE,
     last_triggered_at TIMESTAMPTZ,
     trigger_count INTEGER DEFAULT 0,
@@ -440,13 +289,17 @@ CREATE TABLE IF NOT EXISTS "ob-poc".monitoring_alert_rules (
     updated_at TIMESTAMPTZ DEFAULT (NOW() AT TIME ZONE 'utc')
 );
 
-COMMENT ON TABLE "ob-poc".monitoring_alert_rules IS 
-    'Custom alert rules for ongoing monitoring';
-
-CREATE INDEX idx_monitoring_alert_rules_cbu ON "ob-poc".monitoring_alert_rules(cbu_id);
-CREATE INDEX idx_monitoring_alert_rules_active ON "ob-poc".monitoring_alert_rules(cbu_id, is_active) 
+CREATE INDEX IF NOT EXISTS idx_monitoring_alert_rules_cbu ON "ob-poc".monitoring_alert_rules(cbu_id);
+CREATE INDEX IF NOT EXISTS idx_monitoring_alert_rules_active ON "ob-poc".monitoring_alert_rules(cbu_id, is_active) 
     WHERE is_active = TRUE;
 
+COMMENT ON TABLE "ob-poc".monitoring_alert_rules IS 
+    'Custom alert rules for ongoing monitoring (MONITORING_ALERT_RULE crud_asset)';
+
+
+-- ============================================================================
+-- MONITORING DOMAIN - monitoring_activities (MONITORING_ACTIVITY crud_asset)
+-- ============================================================================
 
 CREATE TABLE IF NOT EXISTS "ob-poc".monitoring_activities (
     activity_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -456,24 +309,23 @@ CREATE TABLE IF NOT EXISTS "ob-poc".monitoring_activities (
         CHECK (activity_type IN ('CLIENT_CONTACT', 'DOCUMENT_UPDATE', 'SCREENING_RUN',
                                   'TRANSACTION_REVIEW', 'RISK_ASSESSMENT', 'INTERNAL_NOTE', 'OTHER')),
     description TEXT NOT NULL,
-    reference_id VARCHAR(255),  -- Link to related record
-    reference_type VARCHAR(50), -- Type of related record
+    reference_id VARCHAR(255),
+    reference_type VARCHAR(50),
     recorded_by VARCHAR(255) NOT NULL,
     recorded_at TIMESTAMPTZ DEFAULT (NOW() AT TIME ZONE 'utc'),
     created_at TIMESTAMPTZ DEFAULT (NOW() AT TIME ZONE 'utc')
 );
 
-COMMENT ON TABLE "ob-poc".monitoring_activities IS 
-    'Activity log for monitoring cases';
+CREATE INDEX IF NOT EXISTS idx_monitoring_activities_case ON "ob-poc".monitoring_activities(case_id);
+CREATE INDEX IF NOT EXISTS idx_monitoring_activities_cbu ON "ob-poc".monitoring_activities(cbu_id);
+CREATE INDEX IF NOT EXISTS idx_monitoring_activities_type ON "ob-poc".monitoring_activities(activity_type);
 
-CREATE INDEX idx_monitoring_activities_case ON "ob-poc".monitoring_activities(case_id);
-CREATE INDEX idx_monitoring_activities_cbu ON "ob-poc".monitoring_activities(cbu_id);
-CREATE INDEX idx_monitoring_activities_type ON "ob-poc".monitoring_activities(activity_type);
-CREATE INDEX idx_monitoring_activities_recorded ON "ob-poc".monitoring_activities(recorded_at DESC);
+COMMENT ON TABLE "ob-poc".monitoring_activities IS 
+    'Activity log for monitoring cases (MONITORING_ACTIVITY crud_asset)';
 
 
 -- ============================================================================
--- RISK UPDATE TRACKING (for monitoring.update-risk verb)
+-- RISK RATING CHANGE TRACKING (for monitoring.update-risk verb)
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS "ob-poc".risk_rating_changes (
@@ -495,56 +347,157 @@ CREATE TABLE IF NOT EXISTS "ob-poc".risk_rating_changes (
     created_at TIMESTAMPTZ DEFAULT (NOW() AT TIME ZONE 'utc')
 );
 
+CREATE INDEX IF NOT EXISTS idx_risk_rating_changes_cbu ON "ob-poc".risk_rating_changes(cbu_id);
+
 COMMENT ON TABLE "ob-poc".risk_rating_changes IS 
     'Audit trail of risk rating changes during monitoring';
 
-CREATE INDEX idx_risk_rating_changes_cbu ON "ob-poc".risk_rating_changes(cbu_id);
-CREATE INDEX idx_risk_rating_changes_case ON "ob-poc".risk_rating_changes(case_id);
+
+-- ============================================================================
+-- BRIDGE VIEWS - Map existing 017 tables to DSL crud_asset naming
+-- ============================================================================
+
+-- INVESTIGATION crud_asset -> kyc_investigations
+CREATE OR REPLACE VIEW "ob-poc".investigations AS
+SELECT 
+    investigation_id,
+    cbu_id,
+    investigation_type,
+    status,
+    risk_rating,
+    ubo_threshold,
+    deadline,
+    outcome,
+    outcome AS outcome_rationale,  -- Bridge column
+    notes AS assigned_to,          -- Bridge column
+    created_at,
+    updated_at,
+    completed_at
+FROM "ob-poc".kyc_investigations;
+
+COMMENT ON VIEW "ob-poc".investigations IS 
+    'Bridge view: maps kyc_investigations to INVESTIGATION crud_asset';
+
+
+-- SCREENING_RESULT crud_asset -> screenings
+CREATE OR REPLACE VIEW "ob-poc".screening_results AS
+SELECT 
+    screening_id AS result_id,
+    entity_id,
+    screening_type AS screen_type,
+    CASE 
+        WHEN databases IS NOT NULL THEN databases->>0 
+        ELSE 'INTERNAL' 
+    END AS provider,
+    85.0 AS match_threshold,
+    CASE WHEN result = 'MATCH' THEN 1 
+         WHEN result = 'POTENTIAL_MATCH' THEN 1 
+         ELSE 0 END AS hit_count,
+    NULL::NUMERIC AS highest_match_score,
+    match_details AS raw_response,
+    '[]'::jsonb AS categories,
+    NULL::INTEGER AS lookback_months,
+    screened_at,
+    NULL::TIMESTAMPTZ AS expires_at,
+    screened_at AS created_at
+FROM "ob-poc".screenings;
+
+COMMENT ON VIEW "ob-poc".screening_results IS 
+    'Bridge view: maps screenings to SCREENING_RESULT crud_asset';
+
+
+-- DECISION crud_asset -> kyc_decisions
+CREATE OR REPLACE VIEW "ob-poc".decisions AS
+SELECT 
+    decision_id,
+    investigation_id,
+    cbu_id,
+    CASE 
+        WHEN decision = 'ACCEPT' THEN 'APPROVE'
+        WHEN decision = 'CONDITIONAL_ACCEPTANCE' THEN 'CONDITIONAL_APPROVE'
+        WHEN decision = 'REJECT' THEN 'REJECT'
+        WHEN decision = 'ESCALATE' THEN 'ESCALATE'
+        ELSE decision
+    END AS decision_type,
+    rationale,
+    decided_at::DATE AS decision_date,
+    decision_authority AS approval_level,
+    review_date AS next_review_date,
+    NULL::VARCHAR AS reason_code,
+    FALSE AS is_permanent,
+    NULL::DATE AS reapply_after,
+    NULL::VARCHAR AS escalate_to,
+    NULL::VARCHAR AS escalation_reason,
+    NULL::VARCHAR AS escalation_priority,
+    NULL::DATE AS escalation_due_date,
+    rationale AS case_summary,
+    NULL::DATE AS defer_until,
+    '[]'::jsonb AS pending_items,
+    decided_by,
+    decided_at AS created_at,
+    decided_at AS updated_at
+FROM "ob-poc".kyc_decisions;
+
+COMMENT ON VIEW "ob-poc".decisions IS 
+    'Bridge view: maps kyc_decisions to DECISION crud_asset';
 
 
 -- ============================================================================
--- UPDATE CRUD_OPERATIONS CONSTRAINTS FOR NEW ASSET TYPES
+-- UPDATE CRUD_OPERATIONS CONSTRAINTS FOR NEW ASSET TYPES (if table exists)
 -- ============================================================================
 
--- Drop and recreate the constraint with expanded asset types
-ALTER TABLE "ob-poc".crud_operations 
-    DROP CONSTRAINT IF EXISTS crud_operations_asset_type_check;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'ob-poc' AND tablename = 'crud_operations') THEN
+        ALTER TABLE "ob-poc".crud_operations 
+            DROP CONSTRAINT IF EXISTS crud_operations_asset_type_check;
 
-ALTER TABLE "ob-poc".crud_operations 
-    ADD CONSTRAINT crud_operations_asset_type_check 
-    CHECK ((asset_type)::text = ANY (ARRAY[
-        -- Original types
-        'CBU', 'ENTITY', 'PARTNERSHIP', 'LIMITED_COMPANY', 'PROPER_PERSON', 
-        'TRUST', 'ATTRIBUTE', 'DOCUMENT',
-        -- New types from verb schema
-        'CBU_ENTITY_ROLE', 'OWNERSHIP', 'DOCUMENT_REQUEST', 'DOCUMENT_LINK',
-        'INVESTIGATION', 'RISK_ASSESSMENT_CBU', 'RISK_RATING',
-        'SCREENING_RESULT', 'SCREENING_HIT_RESOLUTION', 'SCREENING_BATCH',
-        'DECISION', 'DECISION_CONDITION',
-        'MONITORING_CASE', 'MONITORING_REVIEW', 'MONITORING_ALERT_RULE', 
-        'MONITORING_ACTIVITY', 'ATTRIBUTE_VALUE', 'ATTRIBUTE_VALIDATION'
-    ]::text[]));
+        ALTER TABLE "ob-poc".crud_operations 
+            ADD CONSTRAINT crud_operations_asset_type_check 
+            CHECK ((asset_type)::text = ANY (ARRAY[
+                'CBU', 'ENTITY', 'PARTNERSHIP', 'LIMITED_COMPANY', 'PROPER_PERSON', 
+                'TRUST', 'ATTRIBUTE', 'DOCUMENT',
+                'CBU_ENTITY_ROLE', 'OWNERSHIP', 'DOCUMENT_REQUEST', 'DOCUMENT_LINK',
+                'INVESTIGATION', 'RISK_ASSESSMENT_CBU', 'RISK_RATING',
+                'SCREENING_RESULT', 'SCREENING_HIT_RESOLUTION', 'SCREENING_BATCH',
+                'DECISION', 'DECISION_CONDITION',
+                'MONITORING_CASE', 'MONITORING_REVIEW', 'MONITORING_ALERT_RULE', 
+                'MONITORING_ACTIVITY', 'ATTRIBUTE_VALUE', 'ATTRIBUTE_VALIDATION'
+            ]::text[]));
+        RAISE NOTICE 'Updated crud_operations constraint';
+    ELSE
+        RAISE NOTICE 'crud_operations table does not exist, skipping constraint update';
+    END IF;
+END $$;
 
 
 -- ============================================================================
--- UPDATE DSL_EXAMPLES CONSTRAINTS FOR NEW ASSET TYPES
+-- UPDATE DSL_EXAMPLES CONSTRAINTS FOR NEW ASSET TYPES (if table exists)
 -- ============================================================================
 
-ALTER TABLE "ob-poc".dsl_examples 
-    DROP CONSTRAINT IF EXISTS dsl_examples_asset_type_check;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'ob-poc' AND tablename = 'dsl_examples') THEN
+        ALTER TABLE "ob-poc".dsl_examples 
+            DROP CONSTRAINT IF EXISTS dsl_examples_asset_type_check;
 
-ALTER TABLE "ob-poc".dsl_examples 
-    ADD CONSTRAINT dsl_examples_asset_type_check 
-    CHECK ((asset_type)::text = ANY (ARRAY[
-        'CBU', 'ENTITY', 'PARTNERSHIP', 'LIMITED_COMPANY', 'PROPER_PERSON', 
-        'TRUST', 'ATTRIBUTE', 'DOCUMENT',
-        'CBU_ENTITY_ROLE', 'OWNERSHIP', 'DOCUMENT_REQUEST', 'DOCUMENT_LINK',
-        'INVESTIGATION', 'RISK_ASSESSMENT_CBU', 'RISK_RATING',
-        'SCREENING_RESULT', 'SCREENING_HIT_RESOLUTION', 'SCREENING_BATCH',
-        'DECISION', 'DECISION_CONDITION',
-        'MONITORING_CASE', 'MONITORING_REVIEW', 'MONITORING_ALERT_RULE', 
-        'MONITORING_ACTIVITY', 'ATTRIBUTE_VALUE', 'ATTRIBUTE_VALIDATION'
-    ]::text[]));
+        ALTER TABLE "ob-poc".dsl_examples 
+            ADD CONSTRAINT dsl_examples_asset_type_check 
+            CHECK ((asset_type)::text = ANY (ARRAY[
+                'CBU', 'ENTITY', 'PARTNERSHIP', 'LIMITED_COMPANY', 'PROPER_PERSON', 
+                'TRUST', 'ATTRIBUTE', 'DOCUMENT',
+                'CBU_ENTITY_ROLE', 'OWNERSHIP', 'DOCUMENT_REQUEST', 'DOCUMENT_LINK',
+                'INVESTIGATION', 'RISK_ASSESSMENT_CBU', 'RISK_RATING',
+                'SCREENING_RESULT', 'SCREENING_HIT_RESOLUTION', 'SCREENING_BATCH',
+                'DECISION', 'DECISION_CONDITION',
+                'MONITORING_CASE', 'MONITORING_REVIEW', 'MONITORING_ALERT_RULE', 
+                'MONITORING_ACTIVITY', 'ATTRIBUTE_VALUE', 'ATTRIBUTE_VALIDATION'
+            ]::text[]));
+        RAISE NOTICE 'Updated dsl_examples constraint';
+    ELSE
+        RAISE NOTICE 'dsl_examples table does not exist, skipping constraint update';
+    END IF;
+END $$;
 
 
 -- ============================================================================
@@ -560,39 +513,11 @@ SELECT
     i.status,
     i.risk_rating,
     i.deadline,
-    i.assigned_to,
     i.created_at,
     EXTRACT(DAY FROM NOW() - i.created_at) as days_open
-FROM "ob-poc".investigations i
+FROM "ob-poc".kyc_investigations i
 JOIN "ob-poc".cbus c ON i.cbu_id = c.cbu_id
-WHERE i.status NOT IN ('APPROVED', 'REJECTED', 'CLOSED');
-
-COMMENT ON VIEW "ob-poc".active_investigations IS 
-    'Currently active KYC investigations with CBU details';
-
-
-CREATE OR REPLACE VIEW "ob-poc".pending_screening_hits AS
-SELECT 
-    sr.result_id,
-    sr.entity_id,
-    e.name as entity_name,
-    sr.screen_type,
-    sr.hit_count,
-    sr.highest_match_score,
-    sr.screened_at,
-    COUNT(shr.resolution_id) as resolved_count,
-    sr.hit_count - COUNT(shr.resolution_id) as unresolved_count
-FROM "ob-poc".screening_results sr
-JOIN "ob-poc".entities e ON sr.entity_id = e.entity_id
-LEFT JOIN "ob-poc".screening_hit_resolutions shr ON sr.result_id = shr.result_id
-WHERE sr.hit_count > 0
-GROUP BY sr.result_id, sr.entity_id, e.name, sr.screen_type, 
-         sr.hit_count, sr.highest_match_score, sr.screened_at
-HAVING sr.hit_count > COUNT(shr.resolution_id);
-
-COMMENT ON VIEW "ob-poc".pending_screening_hits IS 
-    'Screening results with unresolved hits requiring attention';
-
+WHERE i.status NOT IN ('COMPLETE');
 
 CREATE OR REPLACE VIEW "ob-poc".overdue_reviews AS
 SELECT 
@@ -608,15 +533,11 @@ JOIN "ob-poc".cbus c ON mr.cbu_id = c.cbu_id
 WHERE mr.due_date < CURRENT_DATE
   AND mr.status IN ('SCHEDULED', 'IN_PROGRESS');
 
-COMMENT ON VIEW "ob-poc".overdue_reviews IS 
-    'Monitoring reviews past their due date';
-
-
 CREATE OR REPLACE VIEW "ob-poc".blocking_conditions AS
 SELECT 
     dc.condition_id,
     dc.decision_id,
-    d.cbu_id,
+    kd.cbu_id,
     c.name as cbu_name,
     dc.condition_type,
     dc.description,
@@ -628,13 +549,9 @@ SELECT
         ELSE 'PENDING'
     END as urgency
 FROM "ob-poc".decision_conditions dc
-JOIN "ob-poc".decisions d ON dc.decision_id = d.decision_id
-JOIN "ob-poc".cbus c ON d.cbu_id = c.cbu_id
-WHERE dc.is_blocking = TRUE
-  AND dc.status = 'PENDING';
-
-COMMENT ON VIEW "ob-poc".blocking_conditions IS 
-    'Blocking conditions that must be satisfied for conditional approvals';
+JOIN "ob-poc".kyc_decisions kd ON dc.decision_id = kd.decision_id
+JOIN "ob-poc".cbus c ON kd.cbu_id = c.cbu_id
+WHERE dc.status = 'PENDING';
 
 
 COMMIT;
@@ -642,22 +559,14 @@ COMMIT;
 -- ============================================================================
 -- POST-MIGRATION VERIFICATION
 -- ============================================================================
--- Run these queries to verify the migration:
+-- 
+-- SELECT tablename FROM pg_tables WHERE schemaname = 'ob-poc' 
+-- AND tablename IN ('ownership_relationships', 'document_entity_links', 
+--                   'risk_ratings', 'screening_hit_resolutions', 
+--                   'screening_batches', 'monitoring_cases', 
+--                   'monitoring_reviews', 'monitoring_alert_rules', 
+--                   'monitoring_activities')
+-- ORDER BY tablename;
 --
--- SELECT tablename FROM pg_tables WHERE schemaname = 'ob-poc' ORDER BY tablename;
---
--- SELECT 
---     t.table_name,
---     (SELECT count(*) FROM information_schema.columns c 
---      WHERE c.table_schema = t.table_schema AND c.table_name = t.table_name) as column_count
--- FROM information_schema.tables t
--- WHERE t.table_schema = 'ob-poc'
--- AND t.table_name IN (
---     'document_requests', 'document_entity_links', 'ownership_relationships',
---     'investigations', 'risk_assessments', 'risk_ratings',
---     'screening_results', 'screening_hit_resolutions', 'screening_batches',
---     'decisions', 'decision_conditions',
---     'monitoring_cases', 'monitoring_reviews', 'monitoring_alert_rules', 'monitoring_activities'
--- )
--- ORDER BY t.table_name;
+-- Expected: 9 new tables
 -- ============================================================================

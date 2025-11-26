@@ -73,22 +73,20 @@ impl DocumentSource {
         &self,
         document_type_code: &str,
     ) -> Result<Vec<DocumentAttributeMapping>, SourceError> {
-        // Query document_types to get attribute index
+        // Query document_attribute_mappings - live DB uses document_type_code (varchar) not FK
+        // Live DB: dam.document_type_code, dam.attribute_id, dam.extraction_priority, dam.is_required
         let mappings = sqlx::query!(
             r#"
             SELECT 
-                dt.type_code,
-                d.attribute_id,
+                dam.document_type_code,
+                dam.attribute_id,
                 d.name as attribute_name,
-                dam.extraction_method,
-                dam.is_required,
-                dam.confidence_threshold,
-                dam.field_name
-            FROM "ob-poc".document_types dt
-            JOIN "ob-poc".document_attribute_mappings dam ON dt.type_id = dam.document_type_id
-            JOIN "ob-poc".dictionary d ON dam.attribute_uuid = d.attribute_id
-            WHERE dt.type_code = $1
-            ORDER BY dam.created_at
+                dam.extraction_priority,
+                dam.is_required
+            FROM "ob-poc".document_attribute_mappings dam
+            JOIN "ob-poc".dictionary d ON dam.attribute_id = d.attribute_id
+            WHERE dam.document_type_code = $1
+            ORDER BY dam.extraction_priority, dam.created_at
             "#,
             document_type_code
         )
@@ -100,12 +98,10 @@ impl DocumentSource {
             .map(|row| DocumentAttributeMapping {
                 attribute_uuid: row.attribute_id,
                 attribute_name: row.attribute_name,
-                extraction_method: parse_extraction_method(&row.extraction_method),
+                extraction_method: ExtractionMethod::AI, // Default - no method column in live DB
                 is_required: row.is_required.unwrap_or(false),
-                confidence_threshold: row.confidence_threshold
-                    .map(|d| d.to_string().parse::<f64>().unwrap_or(0.8))
-                    .unwrap_or(0.8),
-                field_name: row.field_name,
+                confidence_threshold: 0.8, // Default - no threshold column in live DB
+                field_name: None, // No field_name in live DB
             })
             .collect())
     }
@@ -116,13 +112,13 @@ impl DocumentSource {
         document_id: Uuid,
         cbu_id: Uuid,
     ) -> Result<ExtractionDsl, SourceError> {
-        // Get document type from catalog
+        // Get document type from catalog - live DB uses document_id not doc_id
         let doc = sqlx::query!(
             r#"
-            SELECT dc.doc_id, dt.type_code
+            SELECT dc.document_id, dt.type_code
             FROM "ob-poc".document_catalog dc
             JOIN "ob-poc".document_types dt ON dc.document_type_id = dt.type_id
-            WHERE dc.doc_id = $1
+            WHERE dc.document_id = $1
             "#,
             document_id
         )
@@ -224,15 +220,16 @@ impl AttributeSource for DocumentSource {
             .ok_or_else(|| SourceError::ExtractionFailed("No document_id in context".to_string()))?;
 
         // Check if this attribute was already extracted from this document
+        // Live DB: document_id (not doc_id), extracted_value (not value), no extraction_confidence
         let existing = sqlx::query!(
             r#"
             SELECT 
                 dm.attribute_id,
-                dm.value,
-                dm.extraction_confidence,
+                dm.extracted_value,
+                dm.confidence,
                 dm.extraction_method
             FROM "ob-poc".document_metadata dm
-            WHERE dm.doc_id = $1 AND dm.attribute_id = $2
+            WHERE dm.document_id = $1 AND dm.attribute_id = $2
             "#,
             document_id,
             attribute_id
@@ -243,10 +240,8 @@ impl AttributeSource for DocumentSource {
         if let Some(row) = existing {
             Ok(Some(ExtractedValue {
                 attribute_id: row.attribute_id,
-                value: row.value,
-                confidence: row.extraction_confidence
-                    .map(|d| d.to_string().parse::<f64>().unwrap_or(0.0))
-                    .unwrap_or(0.0),
+                value: row.extracted_value.map(|v| serde_json::json!(v)).unwrap_or(serde_json::Value::Null),
+                confidence: row.confidence.unwrap_or(0.0),
                 extraction_method: parse_extraction_method(&row.extraction_method.unwrap_or_default()),
                 metadata: None,
             }))
@@ -257,11 +252,12 @@ impl AttributeSource for DocumentSource {
 
     async fn can_provide(&self, attribute_id: Uuid) -> bool {
         // Check if any document type can provide this attribute
+        // Live DB: uses attribute_id (not attribute_uuid)
         let result = sqlx::query!(
             r#"
             SELECT COUNT(*) as count
             FROM "ob-poc".document_attribute_mappings
-            WHERE attribute_uuid = $1
+            WHERE attribute_id = $1
             "#,
             attribute_id
         )
