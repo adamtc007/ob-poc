@@ -94,3 +94,9 @@ server = ["database", "dep:axum", "dep:tower", "dep:tower-http"]  # REST API ser
 # members = [
 #     "proto", # Assuming your proto files are in a 'proto' directory
 # ]
+
+[workspace]
+members = [
+    ".",
+    "crates/dsl-lsp",
+]

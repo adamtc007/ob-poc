@@ -285,3 +285,220 @@ mod tests {
         assert!(filtered.iter().any(|e| e.code == "USD"));
     }
 }
+
+// ============================================
+// Database loading methods (requires "database" feature)
+// ============================================
+
+#[cfg(feature = "database")]
+mod db_loading {
+    use super::*;
+    use sqlx::FromRow;
+
+    #[derive(FromRow)]
+    struct DocTypeRow {
+        type_code: String,
+        type_name: String,
+        description: Option<String>,
+        category: Option<String>,
+    }
+
+    #[derive(FromRow)]
+    struct RoleRow {
+        name: String,
+        description: Option<String>,
+    }
+
+    #[derive(FromRow)]
+    struct EntityTypeRow {
+        type_code: String,
+        type_name: String,
+        description: Option<String>,
+    }
+
+    #[derive(FromRow)]
+    struct JurisdictionRow {
+        iso_code: String,
+        name: String,
+        description: Option<String>,
+    }
+
+    #[derive(FromRow)]
+    struct AttributeRow {
+        attr_id: String,
+        attr_name: String,
+        domain: String,
+        description: Option<String>,
+    }
+
+    #[derive(FromRow)]
+    struct ScreeningListRow {
+        list_code: String,
+        list_name: String,
+        list_type: String,
+        description: Option<String>,
+    }
+
+    #[derive(FromRow)]
+    struct CurrencyRow {
+        iso_code: String,
+        name: String,
+        symbol: Option<String>,
+    }
+
+    impl SchemaCache {
+        /// Load schema cache from database.
+        /// Falls back gracefully if tables don't exist.
+        pub async fn load_from_db(pool: &sqlx::PgPool) -> Result<Self, sqlx::Error> {
+            let mut cache = Self::with_defaults(); // Start with defaults as fallback
+
+            // Load document types
+            if let Ok(doc_types) = sqlx::query_as::<_, DocTypeRow>(
+                r#"SELECT type_code, type_name, description, category
+                   FROM "ob-poc".document_types WHERE is_active = true
+                   ORDER BY category, type_name"#
+            )
+            .fetch_all(pool)
+            .await {
+                cache.document_types.clear();
+                for row in doc_types {
+                    cache.document_types.insert(row.type_code.clone(), LookupEntry {
+                        code: row.type_code,
+                        display_name: row.type_name,
+                        category: row.category,
+                        description: row.description,
+                        extractable_attributes: None,
+                    });
+                }
+            }
+
+            // Load roles
+            if let Ok(roles) = sqlx::query_as::<_, RoleRow>(
+                r#"SELECT name, description FROM "ob-poc".roles ORDER BY name"#
+            )
+            .fetch_all(pool)
+            .await {
+                cache.roles.clear();
+                for row in roles {
+                    cache.roles.insert(row.name.clone(), LookupEntry {
+                        code: row.name.clone(),
+                        display_name: row.name,
+                        category: Some("Role".to_string()),
+                        description: row.description,
+                        extractable_attributes: None,
+                    });
+                }
+            }
+
+            // Load entity types
+            if let Ok(entity_types) = sqlx::query_as::<_, EntityTypeRow>(
+                r#"SELECT type_code, type_name, description
+                   FROM "ob-poc".entity_types WHERE is_active = true
+                   ORDER BY type_name"#
+            )
+            .fetch_all(pool)
+            .await {
+                cache.entity_types.clear();
+                for row in entity_types {
+                    cache.entity_types.insert(row.type_code.clone(), LookupEntry {
+                        code: row.type_code,
+                        display_name: row.type_name,
+                        category: None,
+                        description: row.description,
+                        extractable_attributes: None,
+                    });
+                }
+            }
+
+            // Load jurisdictions (from master_jurisdictions)
+            if let Ok(jurisdictions) = sqlx::query_as::<_, JurisdictionRow>(
+                r#"SELECT jurisdiction_code as iso_code, jurisdiction_name as name, 
+                          regulatory_framework as description
+                   FROM "ob-poc".master_jurisdictions ORDER BY jurisdiction_name"#
+            )
+            .fetch_all(pool)
+            .await {
+                cache.jurisdictions.clear();
+                for row in jurisdictions {
+                    cache.jurisdictions.insert(row.iso_code.clone(), LookupEntry {
+                        code: row.iso_code,
+                        display_name: row.name,
+                        category: None,
+                        description: row.description,
+                        extractable_attributes: None,
+                    });
+                }
+            }
+
+            // Load attributes (if table exists)
+            if let Ok(attributes) = sqlx::query_as::<_, AttributeRow>(
+                r#"SELECT attr_id, attr_name, domain, description
+                   FROM "ob-poc".attribute_dictionary WHERE is_active = true
+                   ORDER BY domain, attr_name"#
+            )
+            .fetch_all(pool)
+            .await {
+                cache.attributes.clear();
+                for row in attributes {
+                    cache.attributes.insert(row.attr_id.clone(), LookupEntry {
+                        code: row.attr_id,
+                        display_name: row.attr_name,
+                        category: Some(row.domain),
+                        description: row.description,
+                        extractable_attributes: None,
+                    });
+                }
+            }
+
+            // Load screening lists (if table exists)
+            if let Ok(screening_lists) = sqlx::query_as::<_, ScreeningListRow>(
+                r#"SELECT list_code, list_name, list_type, description
+                   FROM "ob-poc".screening_lists WHERE is_active = true
+                   ORDER BY list_type, list_name"#
+            )
+            .fetch_all(pool)
+            .await {
+                cache.screening_lists.clear();
+                for row in screening_lists {
+                    cache.screening_lists.insert(row.list_code.clone(), LookupEntry {
+                        code: row.list_code,
+                        display_name: row.list_name,
+                        category: Some(row.list_type),
+                        description: row.description,
+                        extractable_attributes: None,
+                    });
+                }
+            }
+
+            // Load currencies (if table exists)
+            if let Ok(currencies) = sqlx::query_as::<_, CurrencyRow>(
+                r#"SELECT iso_code, name, symbol
+                   FROM "ob-poc".currencies WHERE is_active = true
+                   ORDER BY name"#
+            )
+            .fetch_all(pool)
+            .await {
+                cache.currencies.clear();
+                for row in currencies {
+                    let display = if let Some(symbol) = row.symbol {
+                        format!("{} ({})", row.name, symbol)
+                    } else {
+                        row.name.clone()
+                    };
+                    cache.currencies.insert(row.iso_code.clone(), LookupEntry {
+                        code: row.iso_code,
+                        display_name: display,
+                        category: None,
+                        description: Some(row.name),
+                        extractable_attributes: None,
+                    });
+                }
+            }
+
+            Ok(cache)
+        }
+    }
+}
+
+#[cfg(feature = "database")]
+pub use db_loading::*;

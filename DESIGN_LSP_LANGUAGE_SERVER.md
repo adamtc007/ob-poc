@@ -1,19 +1,39 @@
 # Design: DSL Language Server Protocol (LSP) Implementation
 
 **Created:** 2025-11-25  
-**Status:** DESIGN SPECIFICATION  
+**Updated:** 2025-11-26  
+**Status:** IMPLEMENTED  
 **Priority:** P2 — Developer Experience  
 **Scope:** LSP server for IDE integration (Zed, VS Code)  
 
 ---
 
+## Implementation Status
+
+| Component | Status | Location |
+|-----------|--------|----------|
+| **LSP Server Core** | IMPLEMENTED | `rust/crates/dsl-lsp/src/server.rs` |
+| **Completion Handler** | IMPLEMENTED | `rust/crates/dsl-lsp/src/handlers/completion.rs` |
+| **Hover Handler** | IMPLEMENTED | `rust/crates/dsl-lsp/src/handlers/hover.rs` |
+| **Diagnostics Handler** | IMPLEMENTED | `rust/crates/dsl-lsp/src/handlers/diagnostics.rs` |
+| **Go-to-Definition** | IMPLEMENTED | `rust/crates/dsl-lsp/src/handlers/goto_definition.rs` |
+| **Signature Help** | IMPLEMENTED | `rust/crates/dsl-lsp/src/handlers/signature.rs` |
+| **Document Symbols** | IMPLEMENTED | `rust/crates/dsl-lsp/src/handlers/symbols.rs` |
+| **Schema Cache** | IMPLEMENTED | `rust/src/forth_engine/schema/cache.rs` |
+| **DB Loading** | IMPLEMENTED | `SchemaCache::load_from_db()` |
+| **Zed Extension** | IMPLEMENTED | `rust/crates/dsl-lsp/zed-extension/` |
+| **Tree-sitter Grammar** | IMPLEMENTED | `rust/crates/dsl-lsp/tree-sitter-dsl/` |
+| **Lookup Tables Migration** | IMPLEMENTED | `sql/migrations/018_lsp_lookup_tables.sql` |
+
+---
+
 ## Executive Summary
 
-Build an LSP server for the s-expression DSL that provides:
+The LSP server provides IDE integration for the Onboarding DSL:
 - Syntax highlighting and error detection
 - **Smart completions with human-readable picklists** (Option A)
 - Go-to-definition for `@symbol` references
-- Hover documentation for words
+- Hover documentation for verbs
 - Signature help while typing
 
 **Option A Decision:** Display human-readable names, insert codes, runtime resolves to UUIDs.
@@ -36,18 +56,15 @@ Runtime:    Looks up UUID from document_types table
                                      │ LSP Protocol (JSON-RPC over stdio)
                                      ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                          dsl-language-server                                │
-│                          (Rust binary)                                      │
-├─────────────────────────────────────────────────────────────────────────────┤
+│                          dsl-lsp (Rust binary)                              │
 │                                                                             │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
-│  │   Parser     │  │   Analyzer   │  │  Vocabulary  │  │ Schema Cache │    │
-│  │  (Layer 1)   │  │  (Layer 2-3) │  │  (Layer 2)   │  │  (Layer 4)   │    │
+│  │   Parser     │  │   Analyzer   │  │ VerbRegistry │  │ SchemaCache  │    │
 │  │              │  │              │  │              │  │              │    │
-│  │ • Tokenize   │  │ • Symbol     │  │ • Word       │  │ • Doc types  │    │
-│  │ • Parse      │  │   table      │  │   registry   │  │ • Attributes │    │
-│  │ • AST        │  │ • Type check │  │ • Signatures │  │ • Roles      │    │
-│  │ • Errors     │  │ • References │  │ • Param hints│  │ • Entities   │    │
+│  │ • Tokenize   │  │ • Symbol     │  │ • 28 verbs   │  │ • Doc types  │    │
+│  │ • Parse      │  │   table      │  │ • ArgSpecs   │  │ • Attributes │    │
+│  │ • AST        │  │ • Type check │  │ • Examples   │  │ • Roles      │    │
+│  │ • Errors     │  │ • References │  │              │  │ • Currencies │    │
 │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘    │
 │         │                 │                 │                 │             │
 │         └─────────────────┴─────────────────┴─────────────────┘             │
@@ -62,652 +79,208 @@ Runtime:    Looks up UUID from document_types table
 │                    └─────────────────────────────┘                          │
 └─────────────────────────────────────────────────────────────────────────────┘
                                      │
-                                     │ (Optional, for Layer 4)
+                                     │ (via SchemaCache::load_from_db)
                                      ▼
                               ┌─────────────┐
                               │  PostgreSQL │
-                              │  (metadata) │
+                              │  (lookups)  │
                               └─────────────┘
 ```
 
 ---
 
-## Part 2: Binding Layers
+## Part 2: Type Consistency Chain
 
-| Layer | Name | When | Data Source | LSP Features |
-|-------|------|------|-------------|--------------|
-| 1 | Lexical | On keystroke | Parser | Syntax errors, bracket matching |
-| 2 | Vocabulary | On keystroke | In-memory registry | Word completions, signature help, hover |
-| 3 | Session Symbols | On save/request | AST analysis | Go-to-definition, find references, `@symbol` completions |
-| 4 | Reference Resolution | On request | Schema cache (from DB) | **Picklist completions for document types, attributes, roles** |
-| 5 | Runtime | Execution only | Live DB | (Not in LSP — actual execution) |
+The LSP relies on a consistent type chain from database to DSL:
 
----
+### Database → Rust Mapping
 
-## Part 3: Semantic Parameter Types
+| RefType | DB Table | Code Column | Display Column | Status |
+|---------|----------|-------------|----------------|--------|
+| `DocumentType` | `document_types` | `type_code` | `type_name` | EXISTS |
+| `Role` | `roles` | `name` | `description` | EXISTS |
+| `EntityType` | `entity_types` | `type_code` | `type_name` | EXISTS |
+| `Jurisdiction` | `jurisdictions` (view) | `iso_code` | `name` | CREATED |
+| `Attribute` | `attribute_dictionary` | `attr_id` | `attr_name` | CREATED |
+| `ScreeningList` | `screening_lists` | `list_code` | `list_name` | CREATED |
+| `Currency` | `currencies` | `iso_code` | `name` | CREATED |
 
-### 3.1 The Problem
+### Migration: 018_lsp_lookup_tables.sql
 
-Current signature:
-```rust
-signature: ":document-type STRING"  // Too weak — what STRING values are valid?
-```
-
-LSP can't provide meaningful completions without knowing the **semantic type**.
-
-### 3.2 Solution: Semantic Type Annotations
-
-**File:** `rust/src/dsl_runtime/vocabulary.rs`
-
-```rust
-/// Semantic types for parameter values
-#[derive(Debug, Clone, PartialEq)]
-pub enum SemanticType {
-    // Primitives
-    String,
-    Uuid,
-    Integer,
-    Decimal,
-    Date,
-    Boolean,
-    
-    // Reference types — trigger picklist from schema cache
-    DocumentTypeRef,      // → document_types table
-    AttributeRef,         // → attribute_dictionary table
-    RoleRef,              // → roles table
-    EntityTypeRef,        // → entity_types table
-    JurisdictionRef,      // → jurisdictions table
-    ScreeningListRef,     // → screening_lists table
-    
-    // Enum types — fixed set of values
-    Enum(Vec<&'static str>),
-    
-    // Symbol reference — from session symbol table
-    SymbolRef,
-}
-
-/// Parameter definition with semantic type
-#[derive(Debug, Clone)]
-pub struct ParamDef {
-    pub name: &'static str,           // ":document-type"
-    pub semantic_type: SemanticType,  // DocumentTypeRef
-    pub required: bool,
-    pub description: &'static str,
-}
-
-/// Word entry with typed parameters
-pub struct WordEntry {
-    pub name: &'static str,
-    pub domain: &'static str,
-    pub func: WordFn,
-    pub params: &'static [ParamDef],
-    pub description: &'static str,
-    pub examples: &'static [&'static str],
-}
-```
-
-### 3.3 Example Word Definition
-
-```rust
-WordEntry {
-    name: "document.request",
-    domain: "document",
-    func: words::document_request,
-    params: &[
-        ParamDef {
-            name: ":investigation-id",
-            semantic_type: SemanticType::SymbolRef,
-            required: true,
-            description: "Investigation this request belongs to",
-        },
-        ParamDef {
-            name: ":entity-id",
-            semantic_type: SemanticType::SymbolRef,
-            required: true,
-            description: "Entity to request document from",
-        },
-        ParamDef {
-            name: ":document-type",
-            semantic_type: SemanticType::DocumentTypeRef,  // ← TRIGGERS PICKLIST
-            required: true,
-            description: "Type of document to request",
-        },
-        ParamDef {
-            name: ":source",
-            semantic_type: SemanticType::Enum(&["REGISTRY", "CLIENT", "THIRD_PARTY"]),
-            required: false,
-            description: "Source to request from",
-        },
-        ParamDef {
-            name: ":priority",
-            semantic_type: SemanticType::Enum(&["LOW", "NORMAL", "HIGH", "URGENT"]),
-            required: false,
-            description: "Request priority",
-        },
-    ],
-    description: "Request a document for KYC investigation",
-    examples: &[
-        r#"(document.request :investigation-id @inv :entity-id @company :document-type "CERT_OF_INCORP")"#,
-    ],
-}
-```
+Creates missing tables:
+- `attribute_dictionary` - CBU, PERSON, COMPANY, DOCUMENT attributes
+- `screening_lists` - OFAC, EU, UN, UK sanctions + PEP lists
+- `currencies` - Major ISO currencies
+- `jurisdictions` view - Aliases `master_jurisdictions`
 
 ---
 
-## Part 4: Schema Cache
+## Part 3: Implemented Components
 
-### 4.1 Structure
-
-**File:** `rust/src/lsp/schema_cache.rs`
+### 3.1 Server Core (`server.rs`)
 
 ```rust
-use std::collections::HashMap;
-
-/// Entry in a lookup table for LSP completions
-#[derive(Debug, Clone)]
-pub struct LookupEntry {
-    /// Human-readable name shown in picklist
-    pub display_name: String,
-    
-    /// Code inserted into DSL (NOT UUID)
-    pub insert_value: String,
-    
-    /// Optional description for hover/detail
-    pub description: Option<String>,
-    
-    /// Category for grouping in completion list
-    pub category: Option<String>,
-    
-    /// Filter tags for smart filtering
-    pub tags: Vec<String>,
+pub struct DslLanguageServer {
+    client: Client,
+    documents: Arc<RwLock<HashMap<Url, DocumentState>>>,
+    symbols: Arc<RwLock<SymbolTable>>,
 }
 
-/// Cached schema metadata for LSP completions
-pub struct SchemaCache {
-    /// Document types: display_name → LookupEntry
-    pub document_types: Vec<LookupEntry>,
-    
-    /// Attributes: grouped by domain
-    pub attributes: Vec<LookupEntry>,
-    
-    /// Roles: all valid role names
-    pub roles: Vec<LookupEntry>,
-    
-    /// Entity types
-    pub entity_types: Vec<LookupEntry>,
-    
-    /// Jurisdictions (ISO codes)
-    pub jurisdictions: Vec<LookupEntry>,
-    
-    /// Screening lists
-    pub screening_lists: Vec<LookupEntry>,
-    
-    /// Last refresh timestamp
-    pub last_refresh: std::time::Instant,
+impl LanguageServer for DslLanguageServer {
+    async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>>;
+    async fn hover(&self, params: HoverParams) -> Result<Option<Hover>>;
+    async fn goto_definition(&self, params: GotoDefinitionParams) -> Result<Option<GotoDefinitionResponse>>;
+    async fn did_open(&self, params: DidOpenTextDocumentParams);
+    async fn did_change(&self, params: DidChangeTextDocumentParams);
+    // ... etc
 }
+```
 
+### 3.2 Completion Handler (`completion.rs`)
+
+Provides context-aware completions:
+
+1. **Verb names** - After `(`, suggests from `VERB_REGISTRY`
+2. **Keywords** - After `:`, suggests from `VerbDef.args`
+3. **Keyword values** - Based on `SemType`:
+   - `Ref(RefType)` → Picklist from `SchemaCache`
+   - `Enum(values)` → Fixed value list
+   - `Symbol` → Session `@` symbols
+4. **Symbol refs** - After `@`, suggests defined symbols
+
+```rust
+pub fn get_completions(doc: &DocumentState, position: Position, symbols: &SymbolTable) -> Vec<CompletionItem>;
+```
+
+### 3.3 Hover Handler (`hover.rs`)
+
+Shows documentation on hover:
+- **Verbs**: Description, arguments, examples
+- **Keywords**: Type, required status, description
+- **Symbols**: Definition location, verb that created it
+
+### 3.4 Diagnostics Handler (`diagnostics.rs`)
+
+Reports errors:
+- `E001` - Unknown verb (with suggestions)
+- `E002` - Unknown argument (with suggestions)
+- `E003` - Missing required argument
+- `E007` - Undefined symbol reference
+
+### 3.5 Schema Cache (`cache.rs`)
+
+Two modes:
+1. `SchemaCache::with_defaults()` - Hardcoded test data
+2. `SchemaCache::load_from_db(pool)` - Loads from PostgreSQL
+
+```rust
 impl SchemaCache {
-    /// Load from database
-    pub async fn load(pool: &PgPool) -> Result<Self> {
-        let document_types = Self::load_document_types(pool).await?;
-        let attributes = Self::load_attributes(pool).await?;
-        let roles = Self::load_roles(pool).await?;
-        let entity_types = Self::load_entity_types(pool).await?;
-        let jurisdictions = Self::load_jurisdictions(pool).await?;
-        let screening_lists = Self::load_screening_lists(pool).await?;
-        
-        Ok(Self {
-            document_types,
-            attributes,
-            roles,
-            entity_types,
-            jurisdictions,
-            screening_lists,
-            last_refresh: std::time::Instant::now(),
-        })
-    }
+    pub fn get_completions(&self, ref_type: &RefType) -> Vec<&LookupEntry>;
+    pub fn exists(&self, ref_type: &RefType, code: &str) -> bool;
+    pub fn suggest(&self, ref_type: &RefType, typo: &str) -> Vec<String>;
     
-    async fn load_document_types(pool: &PgPool) -> Result<Vec<LookupEntry>> {
-        let rows = sqlx::query_as::<_, (String, String, Option<String>, Option<String>)>(
-            r#"
-            SELECT type_code, type_name, description, category
-            FROM "ob-poc".document_types
-            WHERE is_active = true
-            ORDER BY category, type_name
-            "#
-        )
-        .fetch_all(pool)
-        .await?;
-        
-        Ok(rows.into_iter().map(|(code, name, desc, cat)| {
-            LookupEntry {
-                display_name: name,
-                insert_value: code,
-                description: desc,
-                category: cat,
-                tags: vec![],
-            }
-        }).collect())
-    }
-    
-    async fn load_attributes(pool: &PgPool) -> Result<Vec<LookupEntry>> {
-        let rows = sqlx::query_as::<_, (String, String, Option<String>, Option<String>)>(
-            r#"
-            SELECT attr_id, attr_name, description, domain
-            FROM "ob-poc".attribute_dictionary
-            WHERE is_active = true
-            ORDER BY domain, attr_name
-            "#
-        )
-        .fetch_all(pool)
-        .await?;
-        
-        Ok(rows.into_iter().map(|(id, name, desc, domain)| {
-            LookupEntry {
-                display_name: format!("{} ({})", name, id),
-                insert_value: id,
-                description: desc,
-                category: domain,
-                tags: vec![],
-            }
-        }).collect())
-    }
-    
-    async fn load_roles(pool: &PgPool) -> Result<Vec<LookupEntry>> {
-        let rows = sqlx::query_as::<_, (String, Option<String>)>(
-            r#"
-            SELECT name, description
-            FROM "ob-poc".roles
-            ORDER BY name
-            "#
-        )
-        .fetch_all(pool)
-        .await?;
-        
-        Ok(rows.into_iter().map(|(name, desc)| {
-            LookupEntry {
-                display_name: name.clone(),
-                insert_value: name,
-                description: desc,
-                category: None,
-                tags: vec![],
-            }
-        }).collect())
-    }
-    
-    // Similar for entity_types, jurisdictions, screening_lists...
-    
-    /// Get completions for a semantic type
-    pub fn get_completions(&self, semantic_type: &SemanticType) -> Vec<&LookupEntry> {
-        match semantic_type {
-            SemanticType::DocumentTypeRef => self.document_types.iter().collect(),
-            SemanticType::AttributeRef => self.attributes.iter().collect(),
-            SemanticType::RoleRef => self.roles.iter().collect(),
-            SemanticType::EntityTypeRef => self.entity_types.iter().collect(),
-            SemanticType::JurisdictionRef => self.jurisdictions.iter().collect(),
-            SemanticType::ScreeningListRef => self.screening_lists.iter().collect(),
-            _ => vec![],
-        }
-    }
-    
-    /// Filter completions by prefix
-    pub fn filter_completions<'a>(
-        entries: &'a [LookupEntry],
-        prefix: &str,
-    ) -> Vec<&'a LookupEntry> {
-        let prefix_lower = prefix.to_lowercase();
-        entries
-            .iter()
-            .filter(|e| {
-                e.display_name.to_lowercase().contains(&prefix_lower)
-                    || e.insert_value.to_lowercase().contains(&prefix_lower)
-            })
-            .collect()
-    }
+    #[cfg(feature = "database")]
+    pub async fn load_from_db(pool: &PgPool) -> Result<Self, sqlx::Error>;
 }
-```
-
-### 4.2 Database Tables Required
-
-```sql
--- Document types lookup
-CREATE TABLE IF NOT EXISTS "ob-poc".document_types (
-    document_type_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    type_code VARCHAR(100) UNIQUE NOT NULL,     -- "CERT_OF_INCORP" ← inserted into DSL
-    type_name VARCHAR(255) NOT NULL,            -- "Certificate of Incorporation" ← shown in picker
-    category VARCHAR(100),                      -- "Corporate", "Identity", "Financial"
-    description TEXT,
-    required_for JSONB,                         -- ["LIMITED_COMPANY", "PARTNERSHIP"]
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Seed data
-INSERT INTO "ob-poc".document_types (type_code, type_name, category, description) VALUES
-('CERT_OF_INCORP', 'Certificate of Incorporation', 'Corporate', 'Official incorporation document'),
-('ARTICLES_OF_ASSOC', 'Articles of Association', 'Corporate', 'Company constitution document'),
-('SHARE_REGISTER', 'Share Register', 'Corporate', 'Record of shareholders'),
-('ANNUAL_RETURN', 'Annual Return', 'Corporate', 'Yearly company filing'),
-('PASSPORT', 'Passport', 'Identity', 'Government-issued travel document'),
-('NATIONAL_ID', 'National ID Card', 'Identity', 'Government-issued ID'),
-('DRIVING_LICENSE', 'Driving License', 'Identity', 'Driver identification'),
-('PROOF_OF_ADDRESS', 'Proof of Address', 'Identity', 'Utility bill or bank statement'),
-('BANK_STATEMENT', 'Bank Statement', 'Financial', 'Account statement'),
-('TAX_RETURN', 'Tax Return', 'Financial', 'Annual tax filing'),
-('AUDITED_ACCOUNTS', 'Audited Financial Statements', 'Financial', 'Audited annual accounts'),
-('TRUST_DEED', 'Trust Deed', 'Trust', 'Trust formation document'),
-('PARTNERSHIP_AGREEMENT', 'Partnership Agreement', 'Partnership', 'Partnership formation document')
-ON CONFLICT (type_code) DO NOTHING;
-
--- Attribute dictionary lookup
-CREATE TABLE IF NOT EXISTS "ob-poc".attribute_dictionary (
-    attr_id VARCHAR(100) PRIMARY KEY,           -- "CBU.LEGAL_NAME" ← inserted into DSL
-    attr_name VARCHAR(255) NOT NULL,            -- "Legal Name" ← shown in picker
-    domain VARCHAR(50),                         -- "CBU", "PERSON", "COMPANY"
-    data_type VARCHAR(50),                      -- "STRING", "DATE", "DECIMAL", "BOOLEAN"
-    description TEXT,
-    validation_pattern VARCHAR(255),
-    is_required BOOLEAN DEFAULT false,
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Seed data
-INSERT INTO "ob-poc".attribute_dictionary (attr_id, attr_name, domain, data_type, description) VALUES
-('CBU.LEGAL_NAME', 'Legal Name', 'CBU', 'STRING', 'Official registered name'),
-('CBU.REGISTRATION_NUMBER', 'Registration Number', 'CBU', 'STRING', 'Company/fund registration'),
-('CBU.INCORPORATION_DATE', 'Incorporation Date', 'CBU', 'DATE', 'Date of formation'),
-('CBU.JURISDICTION', 'Jurisdiction', 'CBU', 'STRING', 'Country of registration'),
-('CBU.NATURE_PURPOSE', 'Nature and Purpose', 'CBU', 'STRING', 'Business description'),
-('PERSON.FULL_NAME', 'Full Name', 'PERSON', 'STRING', 'Complete legal name'),
-('PERSON.DATE_OF_BIRTH', 'Date of Birth', 'PERSON', 'DATE', 'Birth date'),
-('PERSON.NATIONALITY', 'Nationality', 'PERSON', 'STRING', 'Country of citizenship'),
-('PERSON.TAX_ID', 'Tax ID', 'PERSON', 'STRING', 'Tax identification number'),
-('PERSON.RESIDENTIAL_ADDRESS', 'Residential Address', 'PERSON', 'STRING', 'Home address'),
-('COMPANY.COMPANY_NUMBER', 'Company Number', 'COMPANY', 'STRING', 'Official registration number'),
-('COMPANY.REGISTERED_OFFICE', 'Registered Office', 'COMPANY', 'STRING', 'Official address'),
-('COMPANY.SHARE_CAPITAL', 'Share Capital', 'COMPANY', 'DECIMAL', 'Authorized share capital')
-ON CONFLICT (attr_id) DO NOTHING;
 ```
 
 ---
 
-## Part 5: LSP Completion Flow
+## Part 4: Crate Structure
 
-### 5.1 Trigger Detection
-
-```rust
-/// Detect what kind of completion to provide based on cursor position
-pub fn detect_completion_context(
-    document: &str,
-    position: Position,
-) -> CompletionContext {
-    let line = get_line(document, position.line);
-    let col = position.character as usize;
-    let prefix = &line[..col];
-    
-    // Find enclosing s-expression
-    let (word_name, current_param) = parse_context(prefix);
-    
-    match (word_name.as_deref(), current_param.as_deref()) {
-        // At start of expression — complete word names
-        (None, None) if prefix.trim_end().ends_with('(') => {
-            CompletionContext::WordName { prefix: String::new() }
-        }
-        
-        // After word, before any param — complete word names
-        (None, None) => {
-            let word_prefix = extract_word_prefix(prefix);
-            CompletionContext::WordName { prefix: word_prefix }
-        }
-        
-        // After a keyword — complete its value
-        (Some(word), Some(param)) => {
-            let param_def = lookup_param_def(word, param);
-            let value_prefix = extract_value_prefix(prefix);
-            CompletionContext::ParamValue {
-                word: word.to_string(),
-                param: param.to_string(),
-                param_def,
-                prefix: value_prefix,
-            }
-        }
-        
-        // After word, typing keyword — complete keywords
-        (Some(word), None) if prefix.ends_with(':') || prefix.ends_with(" :") => {
-            CompletionContext::ParamKeyword {
-                word: word.to_string(),
-                prefix: String::new(),
-            }
-        }
-        
-        // Symbol reference
-        _ if prefix.ends_with('@') => {
-            CompletionContext::SymbolRef { prefix: String::new() }
-        }
-        
-        _ => CompletionContext::None,
-    }
-}
+```
+rust/crates/dsl-lsp/
+├── Cargo.toml
+├── src/
+│   ├── main.rs              # Entry point
+│   ├── server.rs            # LSP server implementation
+│   ├── analysis/
+│   │   ├── mod.rs
+│   │   ├── document.rs      # Document state, parsed expressions
+│   │   ├── symbols.rs       # Cross-document symbol table
+│   │   └── context.rs       # Completion context detection
+│   └── handlers/
+│       ├── mod.rs
+│       ├── completion.rs    # textDocument/completion
+│       ├── hover.rs         # textDocument/hover
+│       ├── diagnostics.rs   # Document analysis + errors
+│       ├── goto_definition.rs
+│       ├── signature.rs     # textDocument/signatureHelp
+│       └── symbols.rs       # textDocument/documentSymbol
+├── zed-extension/
+│   ├── extension.json
+│   └── languages/dsl/
+│       ├── config.toml
+│       ├── highlights.scm
+│       └── indents.scm
+└── tree-sitter-dsl/
+    ├── grammar.js
+    └── package.json
 ```
 
-### 5.2 Completion Generation
+---
 
-```rust
-pub fn generate_completions(
-    context: &CompletionContext,
-    vocabulary: &Vocabulary,
-    schema_cache: &SchemaCache,
-    symbol_table: &SymbolTable,
-) -> Vec<CompletionItem> {
-    match context {
-        CompletionContext::WordName { prefix } => {
-            vocabulary
-                .words
-                .iter()
-                .filter(|w| w.name.starts_with(prefix))
-                .map(|w| CompletionItem {
-                    label: w.name.to_string(),
-                    kind: Some(CompletionItemKind::FUNCTION),
-                    detail: Some(format_signature(w)),
-                    documentation: Some(Documentation::String(w.description.to_string())),
-                    insert_text: Some(w.name.to_string()),
-                    ..Default::default()
-                })
-                .collect()
-        }
-        
-        CompletionContext::ParamKeyword { word, prefix } => {
-            let word_def = vocabulary.get_word(word).unwrap();
-            word_def
-                .params
-                .iter()
-                .filter(|p| p.name.starts_with(&format!(":{}", prefix)))
-                .map(|p| CompletionItem {
-                    label: p.name.to_string(),
-                    kind: Some(CompletionItemKind::PROPERTY),
-                    detail: Some(format!("{:?}", p.semantic_type)),
-                    documentation: Some(Documentation::String(p.description.to_string())),
-                    insert_text: Some(format!("{} ", p.name)),
-                    ..Default::default()
-                })
-                .collect()
-        }
-        
-        CompletionContext::ParamValue { word, param, param_def, prefix } => {
-            match &param_def.semantic_type {
-                // Reference types — picklist from schema cache
-                SemanticType::DocumentTypeRef => {
-                    generate_lookup_completions(
-                        &schema_cache.document_types,
-                        prefix,
-                        "📄",
-                    )
-                }
-                
-                SemanticType::AttributeRef => {
-                    generate_lookup_completions(
-                        &schema_cache.attributes,
-                        prefix,
-                        "📋",
-                    )
-                }
-                
-                SemanticType::RoleRef => {
-                    generate_lookup_completions(
-                        &schema_cache.roles,
-                        prefix,
-                        "👤",
-                    )
-                }
-                
-                SemanticType::EntityTypeRef => {
-                    generate_lookup_completions(
-                        &schema_cache.entity_types,
-                        prefix,
-                        "🏢",
-                    )
-                }
-                
-                // Enum — fixed values
-                SemanticType::Enum(values) => {
-                    values
-                        .iter()
-                        .filter(|v| v.to_lowercase().contains(&prefix.to_lowercase()))
-                        .map(|v| CompletionItem {
-                            label: v.to_string(),
-                            kind: Some(CompletionItemKind::ENUM_MEMBER),
-                            insert_text: Some(format!("\"{}\"", v)),
-                            ..Default::default()
-                        })
-                        .collect()
-                }
-                
-                // Symbol reference — from session
-                SemanticType::SymbolRef => {
-                    symbol_table
-                        .symbols
-                        .iter()
-                        .filter(|(name, _)| name.contains(prefix))
-                        .map(|(name, sym)| CompletionItem {
-                            label: format!("@{}", name),
-                            kind: Some(CompletionItemKind::VARIABLE),
-                            detail: Some(format!("{:?} from line {}", sym.sym_type, sym.line)),
-                            insert_text: Some(format!("@{}", name)),
-                            ..Default::default()
-                        })
-                        .collect()
-                }
-                
-                _ => vec![],
-            }
-        }
-        
-        CompletionContext::SymbolRef { prefix } => {
-            symbol_table
-                .symbols
-                .iter()
-                .filter(|(name, _)| name.starts_with(prefix))
-                .map(|(name, sym)| CompletionItem {
-                    label: format!("@{}", name),
-                    kind: Some(CompletionItemKind::VARIABLE),
-                    detail: Some(format!("{:?}", sym.sym_type)),
-                    insert_text: Some(name.to_string()),
-                    ..Default::default()
-                })
-                .collect()
-        }
-        
-        CompletionContext::None => vec![],
-    }
-}
+## Part 5: Dependencies
 
-/// Generate completions from lookup entries (Option A)
-fn generate_lookup_completions(
-    entries: &[LookupEntry],
-    prefix: &str,
-    icon: &str,
-) -> Vec<CompletionItem> {
-    let prefix_lower = prefix.to_lowercase();
-    
-    entries
-        .iter()
-        .filter(|e| {
-            e.display_name.to_lowercase().contains(&prefix_lower)
-                || e.insert_value.to_lowercase().contains(&prefix_lower)
-        })
-        .map(|e| {
-            let mut item = CompletionItem {
-                // Show human-readable name
-                label: format!("{} {}", icon, e.display_name),
-                kind: Some(CompletionItemKind::VALUE),
-                
-                // Show code in detail
-                detail: Some(e.insert_value.clone()),
-                
-                // Show description in documentation
-                documentation: e.description.as_ref().map(|d| {
-                    Documentation::String(d.clone())
-                }),
-                
-                // INSERT THE CODE (Option A)
-                insert_text: Some(format!("\"{}\"", e.insert_value)),
-                
-                // Sort by category then name
-                sort_text: Some(format!(
-                    "{}-{}",
-                    e.category.as_deref().unwrap_or("zzz"),
-                    e.display_name
-                )),
-                
-                // Filter matches both display and code
-                filter_text: Some(format!("{} {}", e.display_name, e.insert_value)),
-                
-                ..Default::default()
-            };
-            
-            // Group by category
-            if let Some(cat) = &e.category {
-                item.label_details = Some(CompletionItemLabelDetails {
-                    description: Some(cat.clone()),
-                    ..Default::default()
-                });
-            }
-            
-            item
-        })
-        .collect()
-}
+```toml
+[dependencies]
+tower-lsp = "0.20"
+lsp-types = "0.95"
+tokio = { version = "1", features = ["full", "sync"] }
+ob-poc = { path = "../..", features = ["database"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+regex = "1"
 ```
 
 ---
 
 ## Part 6: IDE Experience
 
-### 6.1 Document Type Completion
+### 6.1 Verb Completion
 
-User types:
-```clojure
-(document.request :document-type |
+User types: `(cbu`
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ cbu.ensure      [cbu] requires: :cbu-name                       │
+│ cbu.create      [cbu] requires: :cbu-name                       │
+│ cbu.attach-entity [cbu] requires: :entity-id, :role             │
+│ cbu.detach-entity [cbu]                                         │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-IDE shows:
+### 6.2 Keyword Completion
+
+User types: `(cbu.ensure :`
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ :cbu-name      STRING (required)                                │
+│ :jurisdiction  JURISDICTION_REF                                 │
+│ :client-type   one of ["UCITS", "AIFM", ...]                    │
+│ :as            SYMBOL (@name)                                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 6.3 Reference Completion (Option A)
+
+User types: `(document.request :document-type "`
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │ 📄 Certificate of Incorporation          CERT_OF_INCORP        │
-│    Corporate · Official incorporation document                  │
+│    Corporate                                                    │
 ├─────────────────────────────────────────────────────────────────┤
 │ 📄 Articles of Association               ARTICLES_OF_ASSOC     │
-│    Corporate · Company constitution document                    │
-├─────────────────────────────────────────────────────────────────┤
-│ 📄 Share Register                        SHARE_REGISTER        │
-│    Corporate · Record of shareholders                           │
+│    Corporate                                                    │
 ├─────────────────────────────────────────────────────────────────┤
 │ 📄 Passport                              PASSPORT              │
-│    Identity · Government-issued travel document                 │
-├─────────────────────────────────────────────────────────────────┤
-│ 📄 Bank Statement                        BANK_STATEMENT        │
-│    Financial · Account statement                                │
+│    Identity                                                     │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -716,378 +289,101 @@ User selects "Certificate of Incorporation", DSL becomes:
 (document.request :document-type "CERT_OF_INCORP"
 ```
 
-### 6.2 Attribute Completion
-
-User types:
-```clojure
-(document.extract-attributes :attributes [{:attr-id |
-```
-
-IDE shows:
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ 📋 Legal Name (CBU.LEGAL_NAME)                                  │
-│    CBU · Official registered name                               │
-├─────────────────────────────────────────────────────────────────┤
-│ 📋 Registration Number (CBU.REGISTRATION_NUMBER)                │
-│    CBU · Company/fund registration                              │
-├─────────────────────────────────────────────────────────────────┤
-│ 📋 Full Name (PERSON.FULL_NAME)                                 │
-│    PERSON · Complete legal name                                 │
-├─────────────────────────────────────────────────────────────────┤
-│ 📋 Date of Birth (PERSON.DATE_OF_BIRTH)                         │
-│    PERSON · Birth date                                          │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-User selects "Legal Name", DSL becomes:
-```clojure
-(document.extract-attributes :attributes [{:attr-id "CBU.LEGAL_NAME"
-```
-
-### 6.3 Role Completion
-
-User types:
-```clojure
-(cbu.attach-entity :entity-id @company :role |
-```
-
-IDE shows:
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ 👤 AssetOwner                                                   │
-│    Legal owner of assets                                        │
-├─────────────────────────────────────────────────────────────────┤
-│ 👤 InvestmentManager                                            │
-│    Manages investment decisions                                 │
-├─────────────────────────────────────────────────────────────────┤
-│ 👤 ManagementCompany                                            │
-│    UCITS/AIFM management company                                │
-├─────────────────────────────────────────────────────────────────┤
-│ 👤 BeneficialOwner                                              │
-│    Ultimate beneficial owner (>10% or >25%)                     │
-├─────────────────────────────────────────────────────────────────┤
-│ 👤 Custodian                                                    │
-│    Holds assets in custody                                      │
-└─────────────────────────────────────────────────────────────────┘
-```
-
 ### 6.4 Symbol Completion
 
-User types:
-```clojure
-(cbu.ensure :cbu-name "Test Fund" :as @fund)
-(entity.create-limited-company :name "TestCo" :as @testco)
+User types: `(cbu.attach-entity :entity-id @`
 
-(cbu.attach-entity :cbu-id @|
-```
-
-IDE shows:
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ @fund                        UUID from cbu.ensure (line 1)      │
-├─────────────────────────────────────────────────────────────────┤
-│ @testco                      UUID from entity.create (line 2)   │
+│ @company         EntityId from entity.create-limited-company    │
+│ @person          EntityId from entity.create-proper-person      │
+│ @fund            CbuId from cbu.ensure                          │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Part 7: Runtime Resolution
+## Part 7: Building and Running
 
-### 7.1 Code → UUID Lookup at Runtime
+### Build the LSP Server
 
-**File:** `rust/src/database/lookup_service.rs`
-
-```rust
-pub struct LookupService {
-    pool: PgPool,
-    // Cache for performance
-    document_type_cache: HashMap<String, Uuid>,
-    role_cache: HashMap<String, Uuid>,
-}
-
-impl LookupService {
-    /// Resolve document type code to UUID
-    pub async fn resolve_document_type(&self, type_code: &str) -> Result<Uuid> {
-        // Check cache first
-        if let Some(id) = self.document_type_cache.get(type_code) {
-            return Ok(*id);
-        }
-        
-        // Query DB
-        let id: Uuid = sqlx::query_scalar(
-            r#"
-            SELECT document_type_id 
-            FROM "ob-poc".document_types 
-            WHERE type_code = $1 AND is_active = true
-            "#
-        )
-        .bind(type_code)
-        .fetch_optional(&self.pool)
-        .await?
-        .ok_or_else(|| anyhow!("Unknown document type: {}", type_code))?;
-        
-        Ok(id)
-    }
-    
-    /// Resolve role name to UUID
-    pub async fn resolve_role(&self, role_name: &str) -> Result<Uuid> {
-        if let Some(id) = self.role_cache.get(role_name) {
-            return Ok(*id);
-        }
-        
-        let id: Uuid = sqlx::query_scalar(
-            r#"SELECT role_id FROM "ob-poc".roles WHERE name = $1"#
-        )
-        .bind(role_name)
-        .fetch_optional(&self.pool)
-        .await?
-        .ok_or_else(|| anyhow!("Unknown role: {}", role_name))?;
-        
-        Ok(id)
-    }
-    
-    /// Resolve entity type code to UUID
-    pub async fn resolve_entity_type(&self, type_code: &str) -> Result<Uuid> {
-        let id: Uuid = sqlx::query_scalar(
-            r#"SELECT entity_type_id FROM "ob-poc".entity_types WHERE type_code = $1"#
-        )
-        .bind(type_code)
-        .fetch_optional(&self.pool)
-        .await?
-        .ok_or_else(|| anyhow!("Unknown entity type: {}", type_code))?;
-        
-        Ok(id)
-    }
-}
+```bash
+cd rust
+cargo build --release -p dsl-lsp
 ```
 
-### 7.2 CrudExecutor Uses LookupService
+### Run Standalone
 
-```rust
-// In CrudExecutor
-"DOCUMENT_REQUEST" => {
-    let doc_type_code = self.get_string_value(&values, "document-type")?;
-    
-    // Resolve code to UUID at runtime
-    let doc_type_id = self.lookup_service
-        .resolve_document_type(&doc_type_code)
-        .await?;
-    
-    // Use UUID in INSERT
-    sqlx::query(
-        r#"
-        INSERT INTO "ob-poc".document_requests (document_type_id, ...)
-        VALUES ($1, ...)
-        "#
-    )
-    .bind(doc_type_id)
-    // ...
-}
+```bash
+./target/release/dsl-lsp
 ```
 
----
+### Zed Integration
 
-## Part 8: LSP Server Structure
+1. Copy `zed-extension/` to `~/.config/zed/extensions/onboarding-dsl/`
+2. Build tree-sitter grammar:
+   ```bash
+   cd tree-sitter-dsl
+   npm install
+   npm run build
+   ```
+3. Restart Zed
 
-### 8.1 Crate Structure
+### VS Code Integration
 
-```
-rust/
-├── Cargo.toml
-├── src/
-│   └── ...                    # Main library
-└── crates/
-    └── dsl-lsp/
-        ├── Cargo.toml
-        ├── src/
-        │   ├── main.rs        # LSP binary entry point
-        │   ├── server.rs      # LSP server implementation
-        │   ├── handlers/
-        │   │   ├── mod.rs
-        │   │   ├── completion.rs
-        │   │   ├── hover.rs
-        │   │   ├── goto_definition.rs
-        │   │   ├── diagnostics.rs
-        │   │   └── signature_help.rs
-        │   ├── analysis/
-        │   │   ├── mod.rs
-        │   │   ├── parser.rs
-        │   │   ├── symbol_table.rs
-        │   │   └── type_check.rs
-        │   └── schema_cache.rs
-        └── tests/
-```
-
-### 8.2 Dependencies
-
-```toml
-# crates/dsl-lsp/Cargo.toml
-[package]
-name = "dsl-lsp"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-# LSP protocol
-tower-lsp = "0.20"
-lsp-types = "0.94"
-
-# Async runtime
-tokio = { version = "1", features = ["full"] }
-
-# Database (optional, for schema cache)
-sqlx = { version = "0.7", features = ["runtime-tokio", "postgres"], optional = true }
-
-# Main library (for parser, vocabulary)
-ob-poc = { path = "../.." }
-
-# Utilities
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-anyhow = "1"
-tracing = "0.1"
-
-[features]
-default = []
-database = ["sqlx"]
-```
-
-### 8.3 Main Entry Point
-
-```rust
-// crates/dsl-lsp/src/main.rs
-use tower_lsp::{LspService, Server};
-use crate::server::DslLanguageServer;
-
-#[tokio::main]
-async fn main() {
-    // Setup logging
-    tracing_subscriber::fmt::init();
-    
-    // Create LSP service
-    let stdin = tokio::io::stdin();
-    let stdout = tokio::io::stdout();
-    
-    let (service, socket) = LspService::new(|client| {
-        DslLanguageServer::new(client)
-    });
-    
-    // Run server
-    Server::new(stdin, stdout, socket).serve(service).await;
-}
-```
-
----
-
-## Part 9: Zed Integration
-
-### 9.1 Extension Configuration
-
+Create `.vscode/settings.json`:
 ```json
-// zed-extension/extension.json
 {
-  "id": "dsl-onboard",
-  "name": "Onboarding DSL",
-  "version": "0.1.0",
-  "description": "Language support for the onboarding DSL",
-  "languages": ["dsl"],
-  "language_servers": {
-    "dsl-lsp": {
-      "command": {
-        "path": "dsl-lsp",
-        "arguments": []
-      },
-      "languages": ["dsl"]
-    }
-  }
+  "dsl.serverPath": "./rust/target/release/dsl-lsp"
 }
-```
-
-### 9.2 Language Definition
-
-```json
-// zed-extension/languages/dsl/config.toml
-name = "DSL"
-path_suffixes = ["dsl", "obl"]
-line_comments = [";"]
-```
-
-### 9.3 Tree-sitter Grammar
-
-```javascript
-// tree-sitter-dsl/grammar.js
-module.exports = grammar({
-  name: 'dsl',
-  
-  rules: {
-    source_file: $ => repeat($._expression),
-    
-    _expression: $ => choice(
-      $.list,
-      $.symbol,
-      $.keyword,
-      $.string,
-      $.number,
-      $.symbol_ref,
-      $.comment,
-    ),
-    
-    list: $ => seq(
-      '(',
-      optional($.symbol),  // word name
-      repeat($._expression),
-      ')'
-    ),
-    
-    symbol: $ => /[a-zA-Z_][a-zA-Z0-9_\-\.]*/,
-    
-    keyword: $ => seq(':', /[a-zA-Z_][a-zA-Z0-9_\-]*/),
-    
-    string: $ => /"[^"]*"/,
-    
-    number: $ => /\-?[0-9]+(\.[0-9]+)?/,
-    
-    symbol_ref: $ => seq('@', /[a-zA-Z_][a-zA-Z0-9_\-]*/),
-    
-    comment: $ => /;.*/,
-  }
-});
 ```
 
 ---
 
-## Part 10: Implementation Phases
+## Part 8: Testing
 
-### Phase 1: Core LSP (No DB)
-- [ ] Parser integration
-- [ ] Vocabulary completions (words, keywords)
-- [ ] Symbol table for `@` references
-- [ ] Hover documentation
-- [ ] Signature help
-- [ ] Basic diagnostics (syntax errors)
+### Unit Tests
 
-### Phase 2: Schema Cache (With DB)
-- [ ] Schema cache loading
-- [ ] Document type completions
-- [ ] Attribute completions
-- [ ] Role completions
-- [ ] Entity type completions
-- [ ] Cache refresh mechanism
+```bash
+cargo test -p dsl-lsp
+```
 
-### Phase 3: IDE Integration
-- [ ] Zed extension packaging
-- [ ] VS Code extension packaging
-- [ ] Tree-sitter grammar
-- [ ] Syntax highlighting
+### Manual Testing
 
-### Phase 4: Advanced Features
-- [ ] Find all references
-- [ ] Rename symbol
+Create `test.dsl`:
+```clojure
+; Test file for LSP
+(cbu.ensure :cbu-name "Test Fund" :jurisdiction "LU" :as @fund)
+
+(entity.create-limited-company 
+  :name "TestCo Ltd"
+  :jurisdiction "GB"
+  :as @company)
+
+(cbu.attach-entity :cbu-id @fund :entity-id @company :role "InvestmentManager")
+```
+
+Open in IDE with LSP configured:
+- Hover over `cbu.ensure` → See documentation
+- Type `:role "` → Get role completions
+- Type `@` → Get symbol completions
+- Reference undefined symbol → See error
+
+---
+
+## Part 9: Future Enhancements
+
+### Phase 2: Advanced Features
 - [ ] Code actions (quick fixes)
+- [ ] Rename symbol
+- [ ] Find all references
 - [ ] Workspace-wide analysis
-- [ ] Incremental parsing
+- [ ] Incremental parsing for large files
+
+### Phase 3: Database Integration
+- [ ] Real-time schema cache refresh
+- [ ] Connection to live database
+- [ ] Attribute extraction suggestions based on document type
 
 ---
 
@@ -1095,11 +391,11 @@ module.exports = grammar({
 
 | Component | Description |
 |-----------|-------------|
-| **Semantic Types** | `DocumentTypeRef`, `AttributeRef`, `RoleRef` in param definitions |
-| **Schema Cache** | Loads lookup tables from DB, caches in memory |
-| **Completion Flow** | Detect context → Get semantic type → Query cache → Build picklist |
-| **Option A Pattern** | Display human name, insert code, runtime resolves to UUID |
-| **LSP Protocol** | Standard tower-lsp implementation |
-| **IDE Support** | Zed extension with tree-sitter grammar |
+| **Type System** | `SemType` with `Ref(RefType)` for lookup references |
+| **Schema Cache** | `SchemaCache::load_from_db()` or `with_defaults()` |
+| **Completion Flow** | Context detection → Semantic type → Query cache → Build picklist |
+| **Option A Pattern** | Display human name, insert code, runtime resolves UUID |
+| **LSP Protocol** | tower-lsp 0.20 with full capability support |
+| **IDE Support** | Zed extension + tree-sitter grammar |
 
 This delivers a full IDE experience where users see friendly names but the DSL remains portable with code identifiers.

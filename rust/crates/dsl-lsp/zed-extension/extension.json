@@ -1,0 +1,18 @@
+{
+  "id": "onboarding-dsl",
+  "name": "Onboarding DSL",
+  "version": "0.1.0",
+  "description": "Language support for the Onboarding DSL (S-expression based)",
+  "authors": ["OB-POC Team"],
+  "repository": "https://github.com/ob-poc/ob-poc",
+  "languages": ["dsl"],
+  "language_servers": {
+    "dsl-lsp": {
+      "command": {
+        "path": "dsl-lsp",
+        "arguments": []
+      },
+      "languages": ["dsl"]
+    }
+  }
+}

@@ -1,0 +1,265 @@
+//! LSP Server implementation for the Onboarding DSL.
+
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use tower_lsp::jsonrpc::Result;
+use tower_lsp::lsp_types::*;
+use tower_lsp::{Client, LanguageServer};
+
+use crate::analysis::{DocumentState, SymbolTable};
+use crate::handlers;
+
+/// DSL Language Server state.
+pub struct DslLanguageServer {
+    /// LSP client for sending notifications
+    client: Client,
+    /// Open documents and their state
+    documents: Arc<RwLock<HashMap<Url, DocumentState>>>,
+    /// Session symbol table (shared across documents)
+    symbols: Arc<RwLock<SymbolTable>>,
+}
+
+impl DslLanguageServer {
+    /// Create a new language server instance.
+    pub fn new(client: Client) -> Self {
+        Self {
+            client,
+            documents: Arc::new(RwLock::new(HashMap::new())),
+            symbols: Arc::new(RwLock::new(SymbolTable::new())),
+        }
+    }
+
+    /// Get a document by URL.
+    pub async fn get_document(&self, uri: &Url) -> Option<DocumentState> {
+        self.documents.read().await.get(uri).cloned()
+    }
+
+    /// Update diagnostics for a document.
+    async fn publish_diagnostics(&self, uri: Url, diagnostics: Vec<Diagnostic>) {
+        self.client
+            .publish_diagnostics(uri, diagnostics, None)
+            .await;
+    }
+
+    /// Analyze a document and publish diagnostics.
+    async fn analyze_document(&self, uri: &Url, text: &str) {
+        let (state, diagnostics) = handlers::diagnostics::analyze_document(text);
+        
+        // Store document state
+        {
+            let mut docs = self.documents.write().await;
+            docs.insert(uri.clone(), state.clone());
+        }
+        
+        // Update symbol table from this document
+        {
+            let mut symbols = self.symbols.write().await;
+            symbols.merge_from_document(uri, &state);
+        }
+        
+        // Publish diagnostics
+        self.publish_diagnostics(uri.clone(), diagnostics).await;
+    }
+}
+
+#[tower_lsp::async_trait]
+impl LanguageServer for DslLanguageServer {
+    async fn initialize(&self, _: InitializeParams) -> Result<InitializeResult> {
+        tracing::info!("Initializing DSL Language Server");
+        
+        Ok(InitializeResult {
+            capabilities: ServerCapabilities {
+                // Incremental sync for efficiency
+                text_document_sync: Some(TextDocumentSyncCapability::Kind(
+                    TextDocumentSyncKind::INCREMENTAL,
+                )),
+                
+                // Completion support
+                completion_provider: Some(CompletionOptions {
+                    resolve_provider: Some(false),
+                    trigger_characters: Some(vec![
+                        ":".to_string(),  // Keywords
+                        "@".to_string(),  // Symbols
+                        "(".to_string(),  // S-expressions
+                        "\"".to_string(), // Strings (for refs)
+                        " ".to_string(),  // After keyword
+                    ]),
+                    ..Default::default()
+                }),
+                
+                // Hover support
+                hover_provider: Some(HoverProviderCapability::Simple(true)),
+                
+                // Go to definition
+                definition_provider: Some(OneOf::Left(true)),
+                
+                // Find references
+                references_provider: Some(OneOf::Left(true)),
+                
+                // Signature help
+                signature_help_provider: Some(SignatureHelpOptions {
+                    trigger_characters: Some(vec!["(".to_string(), " ".to_string()]),
+                    retrigger_characters: Some(vec![" ".to_string()]),
+                    ..Default::default()
+                }),
+                
+                // Document symbols (outline)
+                document_symbol_provider: Some(OneOf::Left(true)),
+                
+                ..Default::default()
+            },
+            server_info: Some(ServerInfo {
+                name: "dsl-lsp".to_string(),
+                version: Some(env!("CARGO_PKG_VERSION").to_string()),
+            }),
+        })
+    }
+
+    async fn initialized(&self, _: InitializedParams) {
+        tracing::info!("DSL Language Server initialized");
+        self.client
+            .log_message(MessageType::INFO, "DSL Language Server ready")
+            .await;
+    }
+
+    async fn shutdown(&self) -> Result<()> {
+        tracing::info!("Shutting down DSL Language Server");
+        Ok(())
+    }
+
+    async fn did_open(&self, params: DidOpenTextDocumentParams) {
+        tracing::debug!("Document opened: {}", params.text_document.uri);
+        self.analyze_document(&params.text_document.uri, &params.text_document.text)
+            .await;
+    }
+
+    async fn did_change(&self, params: DidChangeTextDocumentParams) {
+        tracing::debug!("Document changed: {}", params.text_document.uri);
+        
+        // Get full text from incremental changes
+        if let Some(doc) = self.get_document(&params.text_document.uri).await {
+            let mut text = doc.text.clone();
+            for change in params.content_changes {
+                if let Some(range) = change.range {
+                    // Apply incremental change
+                    let start_offset = offset_from_position(&text, range.start);
+                    let end_offset = offset_from_position(&text, range.end);
+                    text.replace_range(start_offset..end_offset, &change.text);
+                } else {
+                    // Full document replacement
+                    text = change.text;
+                }
+            }
+            self.analyze_document(&params.text_document.uri, &text).await;
+        }
+    }
+
+    async fn did_close(&self, params: DidCloseTextDocumentParams) {
+        tracing::debug!("Document closed: {}", params.text_document.uri);
+        
+        // Remove document state
+        {
+            let mut docs = self.documents.write().await;
+            docs.remove(&params.text_document.uri);
+        }
+        
+        // Clear diagnostics
+        self.publish_diagnostics(params.text_document.uri, vec![]).await;
+    }
+
+    async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
+        let uri = &params.text_document_position.text_document.uri;
+        let position = params.text_document_position.position;
+        
+        if let Some(doc) = self.get_document(uri).await {
+            let symbols = self.symbols.read().await;
+            let completions = handlers::completion::get_completions(&doc, position, &symbols);
+            return Ok(Some(CompletionResponse::Array(completions)));
+        }
+        
+        Ok(None)
+    }
+
+    async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
+        let uri = &params.text_document_position_params.text_document.uri;
+        let position = params.text_document_position_params.position;
+        
+        if let Some(doc) = self.get_document(uri).await {
+            return Ok(handlers::hover::get_hover(&doc, position));
+        }
+        
+        Ok(None)
+    }
+
+    async fn goto_definition(
+        &self,
+        params: GotoDefinitionParams,
+    ) -> Result<Option<GotoDefinitionResponse>> {
+        let uri = &params.text_document_position_params.text_document.uri;
+        let position = params.text_document_position_params.position;
+        
+        if let Some(doc) = self.get_document(uri).await {
+            let symbols = self.symbols.read().await;
+            return Ok(handlers::goto_definition::get_definition(&doc, position, &symbols));
+        }
+        
+        Ok(None)
+    }
+
+    async fn references(&self, params: ReferenceParams) -> Result<Option<Vec<Location>>> {
+        let uri = &params.text_document_position.text_document.uri;
+        let position = params.text_document_position.position;
+        
+        if let Some(doc) = self.get_document(uri).await {
+            let symbols = self.symbols.read().await;
+            return Ok(handlers::goto_definition::get_references(&doc, position, &symbols));
+        }
+        
+        Ok(None)
+    }
+
+    async fn signature_help(&self, params: SignatureHelpParams) -> Result<Option<SignatureHelp>> {
+        let uri = &params.text_document_position_params.text_document.uri;
+        let position = params.text_document_position_params.position;
+        
+        if let Some(doc) = self.get_document(uri).await {
+            return Ok(handlers::signature::get_signature_help(&doc, position));
+        }
+        
+        Ok(None)
+    }
+
+    async fn document_symbol(
+        &self,
+        params: DocumentSymbolParams,
+    ) -> Result<Option<DocumentSymbolResponse>> {
+        let uri = &params.text_document.uri;
+        
+        if let Some(doc) = self.get_document(uri).await {
+            let symbols = handlers::symbols::get_document_symbols(&doc);
+            return Ok(Some(DocumentSymbolResponse::Flat(symbols)));
+        }
+        
+        Ok(None)
+    }
+}
+
+/// Convert LSP position to byte offset in text.
+fn offset_from_position(text: &str, position: Position) -> usize {
+    let mut offset = 0;
+    for (line_num, line) in text.lines().enumerate() {
+        if line_num == position.line as usize {
+            // Add character offset within line
+            offset += line
+                .chars()
+                .take(position.character as usize)
+                .map(|c| c.len_utf8())
+                .sum::<usize>();
+            break;
+        }
+        // Add line length plus newline
+        offset += line.len() + 1;
+    }
+    offset
+}

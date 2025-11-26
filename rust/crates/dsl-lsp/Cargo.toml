@@ -1,0 +1,35 @@
+[package]
+name = "dsl-lsp"
+version = "0.1.0"
+edition = "2021"
+description = "Language Server Protocol implementation for the Onboarding DSL"
+authors = ["OB-POC Team"]
+
+[[bin]]
+name = "dsl-lsp"
+path = "src/main.rs"
+
+[dependencies]
+# LSP protocol
+tower-lsp = "0.20"
+lsp-types = "0.95"
+
+# Async runtime
+tokio = { version = "1", features = ["full", "sync"] }
+
+# Main library (for parser, schema, vocabulary) - with database feature for full schema support
+ob-poc = { path = "../..", features = ["database"] }
+
+# Utilities
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Regex for pattern matching
+regex = "1"
+
+[dev-dependencies]
+tokio-test = "0.4"
