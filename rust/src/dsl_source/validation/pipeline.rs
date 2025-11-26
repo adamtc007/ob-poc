@@ -13,7 +13,6 @@ use crate::forth_engine::runtime::Runtime;
 use crate::forth_engine::vocab_registry::create_standard_runtime;
 
 pub struct ValidationPipeline {
-    pool: PgPool,
     runtime: Runtime,
 }
 
@@ -54,16 +53,17 @@ pub enum ValidationError {
 }
 
 impl ValidationPipeline {
-    pub fn new(pool: PgPool) -> Self {
+    /// Create a new ValidationPipeline with default runtime
+    /// Note: pool parameter kept for API compatibility but unused (validation is in-memory)
+    pub fn new(_pool: PgPool) -> Self {
         Self {
-            pool,
             runtime: create_standard_runtime(),
         }
     }
 
     /// Create with explicit Runtime
-    pub fn with_runtime(pool: PgPool, runtime: Runtime) -> Self {
-        Self { pool, runtime }
+    pub fn with_runtime(_pool: PgPool, runtime: Runtime) -> Self {
+        Self { runtime }
     }
 
     pub async fn validate(&self, dsl_text: &str) -> Result<ValidationResult> {

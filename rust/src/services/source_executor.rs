@@ -1,6 +1,6 @@
 //! Source execution service for fetching attribute values from various sources
 
-use crate::data_dictionary::{DbAttributeDefinition, AttributeId};
+use crate::data_dictionary::{AttributeId, DbAttributeDefinition};
 use async_trait::async_trait;
 use serde_json::Value;
 use sqlx::PgPool;
@@ -17,7 +17,6 @@ pub trait SourceExecutor: Send + Sync {
 }
 
 pub struct CompositeSourceExecutor {
-    pool: PgPool,
     document_source: Box<dyn SourceExecutor>,
     database_source: Box<dyn SourceExecutor>,
 }
@@ -25,7 +24,6 @@ pub struct CompositeSourceExecutor {
 impl CompositeSourceExecutor {
     pub fn new(pool: PgPool) -> Self {
         Self {
-            pool: pool.clone(),
             document_source: Box::new(DocumentSource::new(pool.clone())),
             database_source: Box::new(DatabaseSource::new(pool)),
         }
@@ -158,10 +156,8 @@ impl SourceExecutor for DatabaseSource {
                 Some(Value::String(date.to_string()))
             } else if let Some(datetime) = row.value_datetime {
                 Some(Value::String(datetime.to_rfc3339()))
-            } else if let Some(json) = row.value_json {
-                Some(json)
             } else {
-                None
+                row.value_json
             };
             Ok(value)
         } else {

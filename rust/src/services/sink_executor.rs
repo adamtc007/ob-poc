@@ -1,6 +1,6 @@
 //! Sink execution service for persisting attribute values to various destinations
 
-use crate::data_dictionary::{DbAttributeDefinition, AttributeId};
+use crate::data_dictionary::{AttributeId, DbAttributeDefinition};
 use async_trait::async_trait;
 use serde_json::Value;
 use sqlx::PgPool;
@@ -19,14 +19,12 @@ pub trait SinkExecutor: Send + Sync {
 }
 
 pub struct CompositeSinkExecutor {
-    pool: PgPool,
     database_sink: Box<dyn SinkExecutor>,
 }
 
 impl CompositeSinkExecutor {
     pub fn new(pool: PgPool) -> Self {
         Self {
-            pool: pool.clone(),
             database_sink: Box::new(DatabaseSink::new(pool)),
         }
     }

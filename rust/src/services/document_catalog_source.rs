@@ -182,6 +182,7 @@ impl DocumentCatalogSource {
     }
 
     /// Log extraction attempt
+    #[allow(clippy::too_many_arguments)]
     async fn log_extraction(
         &self,
         cbu_id: &Uuid,
@@ -358,4 +359,3 @@ impl AttributeSource for ApiDataSource {
         "third_party_api"
     }
 }
-

@@ -81,22 +81,18 @@ impl DocumentTypeDetector {
 
         // Calculate confidence based on multiple factors
         let name_lower = file_name.to_lowercase();
-        let mut confidence = 0.5; // Base confidence
-
-        // Increase confidence for strong indicators
-        if detected == "PASSPORT" && name_lower.contains("passport") {
-            confidence = 0.95;
+        let confidence = if detected == "PASSPORT" && name_lower.contains("passport") {
+            0.95
         } else if detected == "BANK_STATEMENT"
             && (name_lower.contains("bank") || name_lower.contains("statement"))
         {
-            confidence = 0.90;
+            0.90
         } else if detected.starts_with("GENERIC_") {
-            confidence = 0.60; // Lower confidence for generic types
+            0.60 // Lower confidence for generic types
         } else {
-            confidence = 0.75; // Medium confidence for pattern matches
-        }
+            0.75 // Medium confidence for pattern matches
+        };
 
         Some((detected, confidence))
     }
 }
-

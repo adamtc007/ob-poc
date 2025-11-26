@@ -55,15 +55,6 @@ fn inject_cbu_id_if_missing(values: &mut HashMap<String, Value>, env: &RuntimeEn
     }
 }
 
-/// Inject entity_id from RuntimeEnv into values if not already present
-fn inject_entity_id_if_missing(values: &mut HashMap<String, Value>, env: &RuntimeEnv) {
-    if !values.contains_key("entity-id") {
-        if let Some(entity_id) = &env.entity_id {
-            values.insert("entity-id".to_string(), Value::Str(entity_id.to_string()));
-        }
-    }
-}
-
 /// Inject investigation_id from RuntimeEnv into values if not already present
 fn inject_investigation_id_if_missing(values: &mut HashMap<String, Value>, env: &RuntimeEnv) {
     if !values.contains_key("investigation-id") {
@@ -245,8 +236,9 @@ pub fn document_catalog(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), Engine
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "DOCUMENT".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -285,8 +277,9 @@ pub fn document_extract(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), Engine
         env.push_crud(CrudStatement::DataCreate(DataCreate {
             asset: "DOCUMENT_METADATA".to_string(),
             values,
-        
-        capture_result: None,}));
+
+            capture_result: None,
+        }));
     } else {
         let mut update_values = values.clone();
         update_values.insert(
@@ -318,8 +311,9 @@ pub fn document_link(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineErr
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "DOCUMENT_ENTITY_LINK".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -332,8 +326,9 @@ pub fn document_link_to_cbu(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), En
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "DOCUMENT_CBU_LINK".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -350,8 +345,9 @@ pub fn document_extract_attributes(args: &[Arg], env: &mut RuntimeEnv) -> Result
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "DOCUMENT_EXTRACTION".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -516,8 +512,9 @@ pub fn cbu_attach_entity(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), Engin
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "CBU_ENTITY_ROLE".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -530,8 +527,9 @@ pub fn cbu_attach_proper_person(args: &[Arg], env: &mut RuntimeEnv) -> Result<()
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "CBU_PROPER_PERSON".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -592,8 +590,9 @@ pub fn product_create(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineEr
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "Product".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -664,8 +663,9 @@ pub fn service_create(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineEr
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "Service".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -734,8 +734,9 @@ pub fn service_link_product(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), En
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "ProductService".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -752,8 +753,9 @@ pub fn lifecycle_resource_create(args: &[Arg], env: &mut RuntimeEnv) -> Result<(
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "LifecycleResource".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -825,8 +827,9 @@ pub fn lifecycle_resource_link_service(
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "ServiceResource".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -844,8 +847,9 @@ pub fn entity_create_proper_person(args: &[Arg], env: &mut RuntimeEnv) -> Result
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "PROPER_PERSON".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -862,8 +866,9 @@ pub fn entity_create_limited_company(
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "LIMITED_COMPANY".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -877,8 +882,9 @@ pub fn entity_create_partnership(args: &[Arg], env: &mut RuntimeEnv) -> Result<(
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "PARTNERSHIP".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -892,8 +898,9 @@ pub fn entity_create_trust(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), Eng
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "TRUST".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -1065,8 +1072,9 @@ pub fn entity_ensure_limited_company(
         asset: "LIMITED_COMPANY".to_string(),
         values,
         conflict_keys: vec!["company-number".to_string()],
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -1081,8 +1089,9 @@ pub fn entity_ensure_proper_person(args: &[Arg], env: &mut RuntimeEnv) -> Result
         asset: "PROPER_PERSON".to_string(),
         values,
         conflict_keys: vec!["tax-id".to_string()],
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -1101,8 +1110,9 @@ pub fn entity_ensure_ownership(args: &[Arg], env: &mut RuntimeEnv) -> Result<(),
             "to-entity-id".to_string(),
             "ownership-type".to_string(),
         ],
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -1223,8 +1233,9 @@ pub fn investigation_assign(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), En
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "INVESTIGATION_ASSIGNMENT".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -1271,8 +1282,9 @@ pub fn document_request(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), Engine
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "DOCUMENT_REQUEST".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -1318,8 +1330,9 @@ pub fn trust_add_party(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineE
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "TRUST_PARTY".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -1337,8 +1350,9 @@ pub fn partnership_add_partner(args: &[Arg], env: &mut RuntimeEnv) -> Result<(),
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "PARTNERSHIP_PARTNER".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -1356,8 +1370,9 @@ pub fn ubo_calculate(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineErr
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "UBO_CALCULATION".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -1371,8 +1386,9 @@ pub fn ubo_flag(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineError> {
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "UBO_FLAG".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -1446,8 +1462,9 @@ pub fn screening_pep(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), EngineErr
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "SCREENING_PEP".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -1461,8 +1478,9 @@ pub fn screening_sanctions(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), Eng
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "SCREENING_SANCTIONS".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -1476,8 +1494,9 @@ pub fn screening_adverse_media(args: &[Arg], env: &mut RuntimeEnv) -> Result<(),
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "SCREENING_ADVERSE_MEDIA".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -1491,8 +1510,9 @@ pub fn screening_record_result(args: &[Arg], env: &mut RuntimeEnv) -> Result<(),
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "SCREENING_RESULT".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -1506,8 +1526,9 @@ pub fn screening_resolve(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), Engin
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "SCREENING_RESOLUTION".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }
@@ -1525,8 +1546,9 @@ pub fn risk_assess_entity(args: &[Arg], env: &mut RuntimeEnv) -> Result<(), Engi
     env.push_crud(CrudStatement::DataCreate(DataCreate {
         asset: "RISK_ASSESSMENT_ENTITY".to_string(),
         values,
-    
-        capture_result: None,}));
+
+        capture_result: None,
+    }));
 
     Ok(())
 }

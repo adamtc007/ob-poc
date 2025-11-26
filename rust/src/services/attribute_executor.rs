@@ -183,7 +183,7 @@ impl AttributeExecutor {
     ) -> Self {
         // Sort sources by priority (highest first)
         let mut sources = sources;
-        sources.sort_by(|a, b| b.priority().cmp(&a.priority()));
+        sources.sort_by_key(|s| std::cmp::Reverse(s.priority()));
 
         Self {
             sources,
@@ -282,4 +282,3 @@ impl AttributeExecutor {
         results
     }
 }
-

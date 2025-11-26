@@ -1,6 +1,7 @@
 //! Attribute definition with complete metadata
 
 use super::*;
+use std::str::FromStr;
 use uuid::Uuid;
 
 /// Unique identifier for attributes in the data dictionary
@@ -24,14 +25,17 @@ impl AttributeId {
         self.0
     }
 
-    /// Parse from string representation
-    pub fn from_str(s: &str) -> Result<Self, uuid::Error> {
-        Ok(Self(Uuid::parse_str(s)?))
-    }
-
     /// Create a new attribute ID with a fresh UUID
     pub fn new() -> Self {
         Self(Uuid::new_v4())
+    }
+}
+
+impl FromStr for AttributeId {
+    type Err = uuid::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(Uuid::parse_str(s)?))
     }
 }
 

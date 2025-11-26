@@ -103,8 +103,7 @@ impl MultiProviderLlm {
             providers.push(ProviderConfig {
                 provider: LlmProvider::Gemini,
                 api_key,
-                model: std::env::var("GEMINI_MODEL")
-                    .unwrap_or_else(|_| "gemini-pro".to_string()),
+                model: std::env::var("GEMINI_MODEL").unwrap_or_else(|_| "gemini-pro".to_string()),
                 base_url: "https://generativelanguage.googleapis.com/v1".to_string(),
                 max_tokens: 1024,
                 temperature: 0.1,
@@ -117,7 +116,10 @@ impl MultiProviderLlm {
 
     /// Generate completion with automatic failover
     pub async fn generate(&self, system_prompt: &str, user_prompt: &str) -> Result<LlmResponse> {
-        let _permit = self.rate_limiter.acquire().await
+        let _permit = self
+            .rate_limiter
+            .acquire()
+            .await
             .map_err(|_| anyhow!("Failed to acquire rate limit permit"))?;
 
         let mut last_error = None;
@@ -146,7 +148,10 @@ impl MultiProviderLlm {
         user_prompt: &str,
     ) -> Result<LlmResponse> {
         match config.provider {
-            LlmProvider::Anthropic => self.call_anthropic(config, system_prompt, user_prompt).await,
+            LlmProvider::Anthropic => {
+                self.call_anthropic(config, system_prompt, user_prompt)
+                    .await
+            }
             LlmProvider::OpenAI => self.call_openai(config, system_prompt, user_prompt).await,
             LlmProvider::Gemini => self.call_gemini(config, system_prompt, user_prompt).await,
         }
@@ -202,8 +207,9 @@ impl MultiProviderLlm {
 
         debug!("Calling Anthropic API with model: {}", config.model);
 
-        let response = self.client
-            .post(&format!("{}/messages", config.base_url))
+        let response = self
+            .client
+            .post(format!("{}/messages", config.base_url))
             .header("x-api-key", &config.api_key)
             .header("anthropic-version", "2023-06-01")
             .header("Content-Type", "application/json")
@@ -217,15 +223,23 @@ impl MultiProviderLlm {
             return Err(anyhow!("Anthropic API error: {}", error_text));
         }
 
-        let result: AnthropicResponse = response.json().await
+        let result: AnthropicResponse = response
+            .json()
+            .await
             .context("Failed to parse Anthropic response")?;
 
-        let content = result.content.first()
+        let content = result
+            .content
+            .first()
             .map(|c| c.text.clone())
             .unwrap_or_default();
 
         let tokens = result.usage.input_tokens + result.usage.output_tokens;
-        let cost = estimate_anthropic_cost(&config.model, result.usage.input_tokens, result.usage.output_tokens);
+        let cost = estimate_anthropic_cost(
+            &config.model,
+            result.usage.input_tokens,
+            result.usage.output_tokens,
+        );
 
         Ok(LlmResponse {
             content,
@@ -290,8 +304,9 @@ impl MultiProviderLlm {
 
         debug!("Calling OpenAI API with model: {}", config.model);
 
-        let response = self.client
-            .post(&format!("{}/chat/completions", config.base_url))
+        let response = self
+            .client
+            .post(format!("{}/chat/completions", config.base_url))
             .header("Authorization", format!("Bearer {}", config.api_key))
             .header("Content-Type", "application/json")
             .json(&request)
@@ -304,10 +319,14 @@ impl MultiProviderLlm {
             return Err(anyhow!("OpenAI API error: {}", error_text));
         }
 
-        let result: OpenAiResponse = response.json().await
+        let result: OpenAiResponse = response
+            .json()
+            .await
             .context("Failed to parse OpenAI response")?;
 
-        let content = result.choices.first()
+        let content = result
+            .choices
+            .first()
             .map(|c| c.message.content.clone())
             .unwrap_or_default();
 
@@ -392,7 +411,8 @@ impl MultiProviderLlm {
 
         debug!("Calling Gemini API with model: {}", config.model);
 
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .header("Content-Type", "application/json")
             .json(&request)
@@ -405,15 +425,22 @@ impl MultiProviderLlm {
             return Err(anyhow!("Gemini API error: {}", error_text));
         }
 
-        let result: GeminiResponse = response.json().await
+        let result: GeminiResponse = response
+            .json()
+            .await
             .context("Failed to parse Gemini response")?;
 
-        let content = result.candidates.first()
+        let content = result
+            .candidates
+            .first()
             .and_then(|c| c.content.parts.first())
             .map(|p| p.text.clone())
             .unwrap_or_default();
 
-        let tokens = result.usage_metadata.map(|u| u.total_token_count).unwrap_or(0);
+        let tokens = result
+            .usage_metadata
+            .map(|u| u.total_token_count)
+            .unwrap_or(0);
         let cost = estimate_gemini_cost(tokens);
 
         Ok(LlmResponse {

@@ -1703,24 +1703,23 @@ impl CrudExecutor {
 
     /// Convert AST Value to JSON Value
     fn value_to_json(&self, value: &Value) -> JsonValue {
-        match value {
-            Value::Str(s) => JsonValue::String(s.clone()),
-            Value::Float(n) => serde_json::Number::from_f64(*n)
-                .map(JsonValue::Number)
-                .unwrap_or(JsonValue::Null),
-            Value::Bool(b) => JsonValue::Bool(*b),
-            Value::List(items) => {
-                JsonValue::Array(items.iter().map(|v| self.value_to_json(v)).collect())
+        fn convert(value: &Value) -> JsonValue {
+            match value {
+                Value::Str(s) => JsonValue::String(s.clone()),
+                Value::Float(n) => serde_json::Number::from_f64(*n)
+                    .map(JsonValue::Number)
+                    .unwrap_or(JsonValue::Null),
+                Value::Bool(b) => JsonValue::Bool(*b),
+                Value::List(items) => JsonValue::Array(items.iter().map(convert).collect()),
+                Value::Map(pairs) => {
+                    let map: serde_json::Map<String, JsonValue> =
+                        pairs.iter().map(|(k, v)| (k.clone(), convert(v))).collect();
+                    JsonValue::Object(map)
+                }
+                _ => JsonValue::Null,
             }
-            Value::Map(pairs) => {
-                let map: serde_json::Map<String, JsonValue> = pairs
-                    .iter()
-                    .map(|(k, v)| (k.clone(), self.value_to_json(v)))
-                    .collect();
-                JsonValue::Object(map)
-            }
-            _ => JsonValue::Null,
         }
+        convert(value)
     }
 
     /// Helper to extract JSON value from HashMap

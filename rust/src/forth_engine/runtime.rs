@@ -102,36 +102,40 @@ impl Runtime {
 
     /// Convert AST Expr to runtime Value
     fn expr_to_value(&self, expr: &Expr) -> Result<Value, EngineError> {
-        match expr {
-            Expr::StringLiteral(s) => Ok(Value::Str(s.clone())),
-            Expr::IntegerLiteral(i) => Ok(Value::Int(*i)),
-            Expr::FloatLiteral(f) => Ok(Value::Float(*f)),
-            Expr::BoolLiteral(b) => Ok(Value::Bool(*b)),
-            Expr::Keyword(k) => Ok(Value::Keyword(k.clone())),
-            Expr::DottedKeyword(parts) => Ok(Value::DottedKeyword(parts.clone())),
-            Expr::AttributeRef(id) => Ok(Value::Attr(AttributeId(id.clone()))),
-            Expr::DocumentRef(id) => Ok(Value::Doc(DocumentId(id.clone()))),
-            Expr::ListLiteral(items) => {
-                let values: Result<Vec<_>, _> =
-                    items.iter().map(|e| self.expr_to_value(e)).collect();
-                Ok(Value::List(values?))
-            }
-            Expr::MapLiteral(pairs) => {
-                let mut converted = Vec::new();
-                for (k, v) in pairs {
-                    converted.push((k.clone(), self.expr_to_value(v)?));
+        fn convert(expr: &Expr) -> Result<Value, EngineError> {
+            match expr {
+                Expr::StringLiteral(s) => Ok(Value::Str(s.clone())),
+                Expr::IntegerLiteral(i) => Ok(Value::Int(*i)),
+                Expr::FloatLiteral(f) => Ok(Value::Float(*f)),
+                Expr::BoolLiteral(b) => Ok(Value::Bool(*b)),
+                Expr::Keyword(k) => Ok(Value::Keyword(k.clone())),
+                Expr::DottedKeyword(parts) => Ok(Value::DottedKeyword(parts.clone())),
+                Expr::AttributeRef(id) => Ok(Value::Attr(AttributeId(id.clone()))),
+                Expr::DocumentRef(id) => Ok(Value::Doc(DocumentId(id.clone()))),
+                Expr::ListLiteral(items) => {
+                    let values: Result<Vec<_>, _> = items.iter().map(convert).collect();
+                    Ok(Value::List(values?))
                 }
-                Ok(Value::Map(converted))
+                Expr::MapLiteral(pairs) => {
+                    let mut converted = Vec::new();
+                    for (k, v) in pairs {
+                        converted.push((k.clone(), convert(v)?));
+                    }
+                    Ok(Value::Map(converted))
+                }
+                Expr::WordCall { .. } => {
+                    // Nested word calls - for now, error
+                    // Could support if words return values
+                    Err(EngineError::Parse(
+                        "Nested word calls not yet supported as values".into(),
+                    ))
+                }
+                Expr::Comment(_) => {
+                    Err(EngineError::Parse("Comment cannot be used as value".into()))
+                }
             }
-            Expr::WordCall { .. } => {
-                // Nested word calls - for now, error
-                // Could support if words return values
-                Err(EngineError::Parse(
-                    "Nested word calls not yet supported as values".into(),
-                ))
-            }
-            Expr::Comment(_) => Err(EngineError::Parse("Comment cannot be used as value".into())),
         }
+        convert(expr)
     }
 
     /// Get word entry for RAG context building

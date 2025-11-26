@@ -1,8 +1,11 @@
 //! DictionaryService implementation for attribute validation and management
 
-use crate::data_dictionary::{AttributeId, DbAttributeDefinition, DictionaryService, SinkConfig, SourceConfig};
+use crate::data_dictionary::{
+    AttributeId, DbAttributeDefinition, DictionaryService, SinkConfig, SourceConfig,
+};
 use async_trait::async_trait;
 use sqlx::PgPool;
+use std::str::FromStr;
 
 pub struct DictionaryServiceImpl {
     pool: PgPool,
