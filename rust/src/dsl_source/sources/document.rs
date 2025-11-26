@@ -80,11 +80,11 @@ impl DocumentSource {
             SELECT 
                 dam.document_type_code,
                 dam.attribute_id,
-                d.name as attribute_name,
+                ca.attribute_name,
                 dam.extraction_priority,
                 dam.is_required
             FROM "ob-poc".document_attribute_mappings dam
-            JOIN "ob-poc".dictionary d ON dam.attribute_id = d.attribute_id
+            JOIN "ob-poc".consolidated_attributes ca ON dam.attribute_id = ca.attribute_id
             WHERE dam.document_type_code = $1
             ORDER BY dam.extraction_priority, dam.created_at
             "#,
