@@ -60,3 +60,4 @@ pub use crate::dsl_source::validation::{
 };
 pub use sink_executor::CompositeSinkExecutor;
 pub use source_executor::CompositeSourceExecutor;
+pub use dictionary_service_impl::DictionaryServiceImpl;

@@ -62,6 +62,10 @@ pub mod cbu_crud_template;
 #[cfg(feature = "database")]
 pub mod dsl_test_harness;
 
+// REST API module (when server feature is enabled)
+#[cfg(feature = "server")]
+pub mod api;
+
 // Public re-exports for the clean architecture
 pub use db_state_manager::{AccumulatedState, DbStateManager, StateResult};
 pub use dsl::{

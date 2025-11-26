@@ -1,54 +1,62 @@
 //! Agentic DSL REST API Server
 //!
 //! This binary provides a REST API server for the agentic DSL system,
-//! enabling HTTP access to entity creation, role management, CBU operations,
-//! and complete workflow orchestration.
+//! enabling HTTP access to intelligent DSL generation, entity creation,
+//! role management, CBU operations, and complete workflow orchestration.
 //!
 //! ## Usage
 //!
 //! ```bash
 //! # Start the server
-//! DATABASE_URL=postgresql://localhost/ob-poc cargo run --bin agentic_server --features server
+//! DATABASE_URL=postgresql://localhost/ob-poc \
+//! ANTHROPIC_API_KEY=your-key \
+//! cargo run --bin agentic_server --features server
+//!
+//! # Open web UI
+//! open http://localhost:3000
 //!
 //! # Test endpoints
-//! curl -X POST http://localhost:3000/api/agentic/execute \
+//! curl -X POST http://localhost:3000/api/agent/generate \
 //!   -H "Content-Type: application/json" \
-//!   -d '{"prompt": "Create entity John Smith as person"}'
+//!   -d '{"instruction": "Create a CBU for TechCorp Ltd", "domain": "cbu"}'
 //!
-//! curl -X POST http://localhost:3000/api/agentic/setup \
-//!   -H "Content-Type: application/json" \
-//!   -d '{
-//!     "entity_name": "Alice Johnson",
-//!     "entity_type": "PERSON",
-//!     "role_name": "Director",
-//!     "cbu_nature": "Private wealth management",
-//!     "cbu_source": "Investment portfolio"
-//!   }'
-//!
-//! curl http://localhost:3000/api/agentic/tree/{cbu_id}
-//! curl http://localhost:3000/api/health
+//! curl http://localhost:3000/api/agent/domains
+//! curl http://localhost:3000/api/agent/vocabulary?domain=cbu
+//! curl http://localhost:3000/api/agent/health
 //! ```
 
 use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
 
-use ob_poc::api::{create_agentic_router, create_attribute_router};
+use ob_poc::api::{create_agent_router, create_attribute_router};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize tracing
     tracing_subscriber::fmt::init();
 
-    println!("🚀 Starting Agentic DSL REST API Server");
+    println!("Starting Agentic DSL REST API Server");
+
+    // Check for LLM API key
+    let has_anthropic = std::env::var("ANTHROPIC_API_KEY").is_ok();
+    let has_openai = std::env::var("OPENAI_API_KEY").is_ok();
+
+    if !has_anthropic && !has_openai {
+        println!("Warning: No LLM API key found (ANTHROPIC_API_KEY or OPENAI_API_KEY)");
+        println!("   DSL generation will not work without an API key");
+    } else {
+        println!("LLM API key configured");
+    }
 
     // Get database URL from environment
     let database_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgresql://localhost:5432/ob-poc".to_string());
 
-    println!("📊 Connecting to database: {}", database_url);
+    println!("Connecting to database: {}", database_url);
 
     // Create database connection pool
     let pool = PgPoolOptions::new()
@@ -56,11 +64,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .connect(&database_url)
         .await?;
 
-    println!("✅ Database connection established");
+    println!("Database connection established");
 
     // Create routers and merge them
-    let app = create_agentic_router(pool.clone())
+    let app = create_agent_router(pool.clone())
         .merge(create_attribute_router(pool))
+        // Serve static files from the static directory
+        .nest_service("/", ServeDir::new("static").append_index_html_on_directories(true))
         .layer(
             CorsLayer::new()
                 .allow_origin(Any)
@@ -71,13 +81,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Bind to address
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    println!("\n🌐 Server running on http://{}", addr);
-    println!("\n📖 Available endpoints:");
-    println!("  Agentic Operations:");
-    println!("    POST   http://localhost:3000/api/agentic/execute");
-    println!("    POST   http://localhost:3000/api/agentic/setup");
-    println!("    GET    http://localhost:3000/api/agentic/tree/:cbu_id");
-    println!("    GET    http://localhost:3000/api/health");
+    println!("\nServer running on http://{}", addr);
+    println!("\nAvailable endpoints:");
+    println!("  Web UI:");
+    println!("    GET    http://localhost:3000/                       - Agent Session UI");
+    println!("\n  Session Management:");
+    println!("    POST   http://localhost:3000/api/session            - Create new session");
+    println!("    GET    http://localhost:3000/api/session/:id        - Get session state");
+    println!("    DELETE http://localhost:3000/api/session/:id        - Delete session");
+    println!("    POST   http://localhost:3000/api/session/:id/chat   - Send chat message");
+    println!("    POST   http://localhost:3000/api/session/:id/execute - Execute accumulated DSL");
+    println!("\n  Agent DSL Generation:");
+    println!("    POST   http://localhost:3000/api/agent/generate     - Generate DSL from natural language");
+    println!("    POST   http://localhost:3000/api/agent/validate     - Validate DSL syntax/semantics");
+    println!("    GET    http://localhost:3000/api/agent/domains      - List available DSL domains");
+    println!("    GET    http://localhost:3000/api/agent/vocabulary   - Get vocabulary (optionally by domain)");
+    println!("    GET    http://localhost:3000/api/agent/health       - Health check");
     println!("\n  Attribute Dictionary:");
     println!("    POST   http://localhost:3000/api/documents/upload");
     println!("    POST   http://localhost:3000/api/attributes/validate-dsl");
@@ -85,7 +104,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("    GET    http://localhost:3000/api/attributes/:cbu_id");
     println!("    GET    http://localhost:3000/api/attributes/document/:doc_id");
     println!("    GET    http://localhost:3000/api/attributes/health");
-    println!("\n✨ Press Ctrl+C to stop\n");
+    println!("\nPress Ctrl+C to stop\n");
 
     // Start server (Axum 0.7+ style)
     let listener = TcpListener::bind(&addr).await?;
