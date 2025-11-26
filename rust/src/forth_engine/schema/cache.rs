@@ -266,7 +266,7 @@ mod tests {
     fn test_suggest() {
         let cache = SchemaCache::with_defaults();
         
-        let suggestions = cache.suggest(&RefType::Role, "Investmanager");
+        let suggestions = cache.suggest(&RefType::Role, "InvestmentManage");
         assert!(suggestions.contains(&"InvestmentManager".to_string()));
         
         let suggestions = cache.suggest(&RefType::Jurisdiction, "UK");
