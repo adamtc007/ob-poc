@@ -4,7 +4,9 @@ import type {
   VerbIntent,
   IntentValidation,
   ChatMessage,
-} from './types';
+  TemplateSummary,
+  FormTemplate,
+} from "./types";
 
 type Listener = (state: AppState) => void;
 
@@ -18,6 +20,14 @@ const initialState: AppState = {
   canExecute: false,
   loading: false,
   error: null,
+
+  // Template state
+  templates: [],
+  selectedTemplateId: null,
+  selectedTemplate: null,
+  formValues: {},
+  renderedDsl: null,
+  executionLog: [],
 };
 
 let state: AppState = { ...initialState };
@@ -51,7 +61,10 @@ export function setError(error: string): void {
   setState({ error, loading: false });
 }
 
-export function setSession(sessionId: string, sessionState: SessionState): void {
+export function setSession(
+  sessionId: string,
+  sessionState: SessionState,
+): void {
   setState({
     sessionId,
     sessionState,
@@ -64,7 +77,7 @@ export function setSession(sessionId: string, sessionState: SessionState): void 
   });
 }
 
-export function addMessage(role: 'user' | 'agent', content: string): void {
+export function addMessage(role: "user" | "agent", content: string): void {
   const message: ChatMessage = {
     id: crypto.randomUUID(),
     role,
@@ -79,7 +92,7 @@ export function updateFromChatResponse(
   validations: IntentValidation[],
   assembledDsl: string[],
   sessionState: SessionState,
-  canExecute: boolean
+  canExecute: boolean,
 ): void {
   setState({
     intents,
@@ -98,4 +111,47 @@ export function clearDsl(): void {
     assembledDsl: [],
     canExecute: false,
   });
+}
+
+// Template state management
+export function setTemplates(templates: TemplateSummary[]): void {
+  setState({ templates });
+}
+
+export function selectTemplate(template: FormTemplate | null): void {
+  setState({
+    selectedTemplateId: template?.id ?? null,
+    selectedTemplate: template,
+    formValues: template ? getDefaultValues(template) : {},
+    renderedDsl: null,
+  });
+}
+
+export function setFormValue(name: string, value: unknown): void {
+  setState({
+    formValues: { ...state.formValues, [name]: value },
+  });
+}
+
+export function setRenderedDsl(dsl: string | null): void {
+  setState({ renderedDsl: dsl });
+}
+
+export function addLogEntry(entry: string): void {
+  setState({
+    executionLog: [
+      ...state.executionLog,
+      `[${new Date().toLocaleTimeString()}] ${entry}`,
+    ],
+  });
+}
+
+function getDefaultValues(template: FormTemplate): Record<string, unknown> {
+  const values: Record<string, unknown> = {};
+  for (const slot of template.slots) {
+    if (slot.default_value !== undefined) {
+      values[slot.name] = slot.default_value;
+    }
+  }
+  return values;
 }

@@ -1,143 +1,289 @@
-import { api } from './api';
+import { api } from "./api";
+import { FormRenderer } from "./formRenderer";
 import {
   getState,
+  setState,
   subscribe,
-  setSession,
   setLoading,
   setError,
-  addMessage,
-  updateFromChatResponse,
-  clearDsl,
-  setState,
-} from './state';
-import { render, showLoading, hideLoading, showError } from './ui';
-import './style.css';
+  setTemplates,
+  selectTemplate,
+  setFormValue,
+  setRenderedDsl,
+  addLogEntry,
+  setSession,
+} from "./state";
+import type { TemplateSummary } from "./types";
+import "./style.css";
+
+// ============================================================================
+// DOM References
+// ============================================================================
+
+let formRenderer: FormRenderer | null = null;
+let lastRenderedTemplateId: string | null = null;
+
+function $(id: string): HTMLElement {
+  const el = document.getElementById(id);
+  if (!el) throw new Error(`Element not found: ${id}`);
+  return el;
+}
+
+// ============================================================================
+// Render Functions
+// ============================================================================
+
+function renderTemplateSelect(templates: TemplateSummary[]): void {
+  const select = $("template-select") as HTMLSelectElement;
+  select.innerHTML = '<option value="">Select Template...</option>';
+
+  // Group by domain
+  const byDomain = new Map<string, TemplateSummary[]>();
+  for (const t of templates) {
+    if (!byDomain.has(t.domain)) {
+      byDomain.set(t.domain, []);
+    }
+    byDomain.get(t.domain)!.push(t);
+  }
+
+  for (const [domain, domainTemplates] of byDomain) {
+    const optgroup = document.createElement("optgroup");
+    optgroup.label = domain.toUpperCase();
+
+    for (const t of domainTemplates) {
+      const option = document.createElement("option");
+      option.value = t.id;
+      option.textContent = t.name;
+      optgroup.appendChild(option);
+    }
+
+    select.appendChild(optgroup);
+  }
+}
+
+function renderSessionInfo(): void {
+  const state = getState();
+  const infoEl = $("session-info");
+  const stateEl = $("session-state");
+
+  if (state.sessionId) {
+    infoEl.textContent = `Session: ${state.sessionId.substring(0, 8)}...`;
+    infoEl.className = "session-info active";
+  } else {
+    infoEl.textContent = "No session";
+    infoEl.className = "session-info";
+  }
+
+  if (state.sessionState) {
+    stateEl.textContent = state.sessionState.replace(/_/g, " ");
+    stateEl.className = `session-state ${state.sessionState}`;
+    stateEl.style.display = "inline-block";
+  } else {
+    stateEl.style.display = "none";
+  }
+}
+
+function renderForm(): void {
+  const state = getState();
+  const container = $("form-container");
+  const renderBtn = $("render-btn") as HTMLButtonElement;
+
+  // Only re-render if template changed (not on every formValue change)
+  if (state.selectedTemplateId === lastRenderedTemplateId && formRenderer) {
+    // Just update the button state, don't recreate form
+    updateRenderButton();
+    return;
+  }
+
+  // Template changed - cleanup and recreate
+  lastRenderedTemplateId = state.selectedTemplateId;
+
+  if (formRenderer) {
+    formRenderer.destroy();
+    formRenderer = null;
+  }
+
+  if (!state.selectedTemplate) {
+    container.innerHTML =
+      '<p class="placeholder-text">Select a template to begin</p>';
+    renderBtn.disabled = true;
+    return;
+  }
+
+  // Create new form
+  formRenderer = new FormRenderer({
+    container,
+    template: state.selectedTemplate,
+    values: state.formValues,
+    onChange: (name, value) => {
+      setFormValue(name, value);
+      updateRenderButton();
+    },
+  });
+
+  updateRenderButton();
+}
+
+function updateRenderButton(): void {
+  const renderBtn = $("render-btn") as HTMLButtonElement;
+  renderBtn.disabled = !formRenderer || !formRenderer.isValid();
+}
+
+function renderDslPreview(): void {
+  const state = getState();
+  const preview = $("dsl-preview");
+  const executeBtn = $("execute-btn") as HTMLButtonElement;
+
+  if (state.renderedDsl) {
+    preview.textContent = state.renderedDsl;
+    preview.classList.remove("placeholder-text");
+    executeBtn.disabled = !state.sessionId;
+  } else {
+    preview.innerHTML =
+      '<span class="placeholder-text">DSL will appear here</span>';
+    executeBtn.disabled = true;
+  }
+}
+
+function renderExecutionLog(): void {
+  const state = getState();
+  const logEl = $("execution-log");
+
+  logEl.innerHTML = state.executionLog
+    .map((entry) => {
+      const isError = entry.includes("Error") || entry.includes("Failed");
+      const isSuccess = entry.includes("Success") || entry.includes("Created");
+      const cls = isError ? "error" : isSuccess ? "success" : "";
+      return `<div class="log-entry ${cls}">${entry}</div>`;
+    })
+    .join("");
+
+  // Auto-scroll to bottom
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function render(): void {
+  renderSessionInfo();
+  renderForm();
+  renderDslPreview();
+  renderExecutionLog();
+}
 
 // ============================================================================
 // Event Handlers
 // ============================================================================
 
-async function handleCreateSession(): Promise<void> {
+async function handleNewSession(): Promise<void> {
   try {
     setLoading(true);
     const response = await api.createSession({});
     setSession(response.session_id, response.state);
-    addMessage('agent', 'Session started. Describe what you want to create!');
+    addLogEntry(`Session created: ${response.session_id.substring(0, 8)}...`);
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    setError(`Failed to create session: ${message}`);
-    showError(`Failed to create session: ${message}`);
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    setError(msg);
+    addLogEntry(`Error creating session: ${msg}`);
   } finally {
     setLoading(false);
   }
 }
 
-async function handleSendMessage(): Promise<void> {
-  const state = getState();
-  if (!state.sessionId) {
-    alert('Create a session first');
+async function handleTemplateSelect(templateId: string): Promise<void> {
+  if (!templateId) {
+    selectTemplate(null);
     return;
   }
 
-  const input = document.getElementById('message') as HTMLInputElement;
-  const message = input.value.trim();
-  if (!message) return;
+  try {
+    setLoading(true);
+    const template = await api.getTemplate(templateId);
+    selectTemplate(template);
+    addLogEntry(`Template loaded: ${template.name}`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    setError(msg);
+    addLogEntry(`Error loading template: ${msg}`);
+  } finally {
+    setLoading(false);
+  }
+}
 
-  input.value = '';
-  addMessage('user', message);
-  showLoading();
-  setLoading(true);
+async function handleRenderDsl(): Promise<void> {
+  const state = getState();
+  if (!state.selectedTemplateId || !formRenderer) return;
 
   try {
-    const response = await api.chat(state.sessionId, { message });
-    hideLoading();
-
-    // Build agent response content
-    let content = response.message;
-    if (response.intents.length > 0) {
-      const validCount = response.validation_results.filter((v) => v.valid).length;
-      const totalCount = response.intents.length;
-      const badgeClass = validCount === totalCount ? 'valid' : 'invalid';
-      content += ` <span class="badge ${badgeClass}">${validCount}/${totalCount} valid</span>`;
-    }
-    addMessage('agent', content);
-
-    updateFromChatResponse(
-      response.intents,
-      response.validation_results,
-      response.assembled_dsl?.statements ?? [],
-      response.session_state,
-      response.can_execute
-    );
+    setLoading(true);
+    const values = formRenderer.getValues();
+    const response = await api.renderTemplate(state.selectedTemplateId, values);
+    setRenderedDsl(response.dsl);
+    addLogEntry(`DSL rendered: ${response.verb}`);
   } catch (err) {
-    hideLoading();
-    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-    setError(errorMsg);
-    showError(errorMsg);
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    setError(msg);
+    addLogEntry(`Error rendering DSL: ${msg}`);
+  } finally {
+    setLoading(false);
   }
 }
 
 async function handleExecuteDsl(): Promise<void> {
   const state = getState();
-  if (!state.sessionId || !state.canExecute) return;
-
-  setLoading(true);
+  if (!state.sessionId || !state.renderedDsl) return;
 
   try {
-    const response = await api.execute(state.sessionId, { dry_run: false });
+    setLoading(true);
+    addLogEntry(`Executing DSL...`);
 
-    if (response.success) {
-      addMessage(
-        'agent',
-        `<span class="success-message">Successfully executed ${response.results.length} DSL statement(s)</span>`
-      );
-      clearDsl();
+    // First, we need to send the DSL to the session
+    // Use chat endpoint with the rendered DSL
+    const chatResponse = await api.chat(state.sessionId, {
+      message: `Execute: ${state.renderedDsl}`,
+    });
+
+    if (chatResponse.can_execute) {
+      const execResponse = await api.execute(state.sessionId, {
+        dry_run: false,
+      });
+
+      if (execResponse.success) {
+        for (const result of execResponse.results) {
+          if (result.success) {
+            addLogEntry(`Success: ${result.message}`);
+          } else {
+            addLogEntry(`Failed: ${result.message}`);
+          }
+        }
+        addLogEntry(
+          `Execution complete: ${execResponse.results.length} statement(s)`,
+        );
+
+        // Clear for next operation
+        setRenderedDsl(null);
+        setState({ sessionState: execResponse.new_state });
+      } else {
+        for (const error of execResponse.errors) {
+          addLogEntry(`Error: ${error}`);
+        }
+      }
     } else {
-      const errors = response.errors.join('<br>');
-      addMessage(
-        'agent',
-        `<span class="error-message">Execution failed:<br>${errors}</span>`
-      );
+      addLogEntry(`Cannot execute: validation failed`);
+      if (chatResponse.validation_results) {
+        for (const v of chatResponse.validation_results) {
+          if (!v.valid) {
+            for (const e of v.errors) {
+              addLogEntry(`Validation error: ${e.message}`);
+            }
+          }
+        }
+      }
     }
-
-    setState({ sessionState: response.new_state });
-    await refreshSessionState();
   } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-    showError(`Execution error: ${errorMsg}`);
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    setError(msg);
+    addLogEntry(`Execution error: ${msg}`);
   } finally {
     setLoading(false);
-  }
-}
-
-async function handleClearDsl(): Promise<void> {
-  const state = getState();
-  if (!state.sessionId) return;
-
-  try {
-    const response = await api.clear(state.sessionId);
-    clearDsl();
-    setState({ sessionState: response.state });
-    addMessage('agent', 'DSL cleared.');
-  } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-    showError(`Error: ${errorMsg}`);
-  }
-}
-
-async function refreshSessionState(): Promise<void> {
-  const state = getState();
-  if (!state.sessionId) return;
-
-  try {
-    const response = await api.getSession(state.sessionId);
-    setState({
-      assembledDsl: response.assembled_dsl,
-      sessionState: response.state,
-      canExecute: response.can_execute,
-    });
-  } catch (err) {
-    console.error('Failed to refresh session state:', err);
   }
 }
 
@@ -146,53 +292,40 @@ async function refreshSessionState(): Promise<void> {
 // ============================================================================
 
 function bindEvents(): void {
-  // New Session button
-  const newSessionBtn = document.querySelector('.new-session-btn');
-  if (newSessionBtn) {
-    newSessionBtn.addEventListener('click', handleCreateSession);
-  }
+  $("new-session-btn").addEventListener("click", handleNewSession);
 
-  // Send button
-  const sendBtn = document.getElementById('send-btn');
-  if (sendBtn) {
-    sendBtn.addEventListener('click', handleSendMessage);
-  }
+  ($("template-select") as HTMLSelectElement).addEventListener(
+    "change",
+    (e) => {
+      const select = e.target as HTMLSelectElement;
+      handleTemplateSelect(select.value);
+    },
+  );
 
-  // Message input (Enter key)
-  const messageInput = document.getElementById('message');
-  if (messageInput) {
-    messageInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') handleSendMessage();
-    });
-  }
-
-  // Execute button
-  const executeBtn = document.getElementById('execute-btn');
-  if (executeBtn) {
-    executeBtn.addEventListener('click', handleExecuteDsl);
-  }
-
-  // Clear button
-  const clearBtn = document.getElementById('clear-btn');
-  if (clearBtn) {
-    clearBtn.addEventListener('click', handleClearDsl);
-  }
+  $("render-btn").addEventListener("click", handleRenderDsl);
+  $("execute-btn").addEventListener("click", handleExecuteDsl);
 }
 
-function init(): void {
+async function init(): Promise<void> {
   // Subscribe to state changes
   subscribe(render);
 
-  // Bind event handlers
+  // Bind events
   bindEvents();
 
-  // Initial render
-  render(getState());
+  // Load templates
+  try {
+    const response = await api.listTemplates();
+    setTemplates(response.templates);
+    renderTemplateSelect(response.templates);
+  } catch (err) {
+    console.error("Failed to load templates:", err);
+    addLogEntry("Error: Failed to load templates");
+  }
 
-  // Focus message input
-  const messageInput = document.getElementById('message');
-  if (messageInput) messageInput.focus();
+  // Initial render
+  render();
 }
 
-// Start the app
-document.addEventListener('DOMContentLoaded', init);
+// Start
+document.addEventListener("DOMContentLoaded", init);

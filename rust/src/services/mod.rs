@@ -15,6 +15,12 @@
 
 // agentic_dsl_crud removed - use dsl_source::orchestrator::AgenticOrchestrator instead
 
+// Entity search service for typeahead/autocomplete
+pub mod entity_search;
+pub use entity_search::{
+    EntityMatch, EntitySearchRequest, EntitySearchResponse, EntitySearchService, EntityType,
+};
+
 // Attribute services
 pub mod attribute_executor;
 pub mod attribute_lifecycle;
@@ -58,6 +64,6 @@ pub use crate::dsl_source::agentic::{RagContext, RagContextProvider};
 pub use crate::dsl_source::validation::{
     ValidationError, ValidationPipeline, ValidationResult, ValidationStage,
 };
+pub use dictionary_service_impl::DictionaryServiceImpl;
 pub use sink_executor::CompositeSinkExecutor;
 pub use source_executor::CompositeSourceExecutor;
-pub use dictionary_service_impl::DictionaryServiceImpl;

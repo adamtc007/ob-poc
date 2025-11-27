@@ -6,28 +6,33 @@ import type {
   SessionStateResponse,
   ExecuteRequest,
   ExecuteResponse,
-} from './types';
+  EntityType,
+  EntitySearchResponse,
+  TemplateSummary,
+  FormTemplate,
+  RenderResponse,
+} from "./types";
 
 const API_BASE = window.location.origin;
 
 class ApiError extends Error {
   constructor(
     public status: number,
-    message: string
+    message: string,
   ) {
     super(message);
-    this.name = 'ApiError';
+    this.name = "ApiError";
   }
 }
 
 async function request<T>(
   method: string,
   path: string,
-  body?: unknown
+  body?: unknown,
 ): Promise<T> {
   const options: RequestInit = {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { "Content-Type": "application/json" },
   };
 
   if (body !== undefined) {
@@ -51,32 +56,82 @@ async function request<T>(
 
 export const api = {
   /** Create a new agent session */
-  createSession(req: CreateSessionRequest = {}): Promise<CreateSessionResponse> {
-    return request('POST', '/api/session', req);
+  createSession(
+    req: CreateSessionRequest = {},
+  ): Promise<CreateSessionResponse> {
+    return request("POST", "/api/session", req);
   },
 
   /** Get current session state */
   getSession(sessionId: string): Promise<SessionStateResponse> {
-    return request('GET', `/api/session/${sessionId}`);
+    return request("GET", `/api/session/${sessionId}`);
   },
 
   /** Delete a session */
   deleteSession(sessionId: string): Promise<void> {
-    return request('DELETE', `/api/session/${sessionId}`);
+    return request("DELETE", `/api/session/${sessionId}`);
   },
 
   /** Send a chat message and extract intents */
   chat(sessionId: string, req: ChatRequest): Promise<ChatResponse> {
-    return request('POST', `/api/session/${sessionId}/chat`, req);
+    return request("POST", `/api/session/${sessionId}/chat`, req);
   },
 
   /** Execute accumulated DSL */
-  execute(sessionId: string, req: ExecuteRequest = {}): Promise<ExecuteResponse> {
-    return request('POST', `/api/session/${sessionId}/execute`, req);
+  execute(
+    sessionId: string,
+    req: ExecuteRequest = {},
+  ): Promise<ExecuteResponse> {
+    return request("POST", `/api/session/${sessionId}/execute`, req);
   },
 
   /** Clear accumulated DSL */
   clear(sessionId: string): Promise<SessionStateResponse> {
-    return request('POST', `/api/session/${sessionId}/clear`);
+    return request("POST", `/api/session/${sessionId}/clear`);
+  },
+
+  // ==========================================================================
+  // Entity Search
+  // ==========================================================================
+
+  /** Search entities by name */
+  searchEntities(params: {
+    q: string;
+    types?: EntityType[];
+    limit?: number;
+  }): Promise<EntitySearchResponse> {
+    const searchParams = new URLSearchParams();
+    searchParams.set("q", params.q);
+    if (params.types?.length) {
+      searchParams.set("types", params.types.join(","));
+    }
+    if (params.limit) {
+      searchParams.set("limit", String(params.limit));
+    }
+    return request("GET", `/api/entities/search?${searchParams}`);
+  },
+
+  // ==========================================================================
+  // Templates
+  // ==========================================================================
+
+  /** List all templates */
+  listTemplates(): Promise<{ templates: TemplateSummary[] }> {
+    return request("GET", "/api/templates");
+  },
+
+  /** Get a specific template */
+  getTemplate(id: string): Promise<FormTemplate> {
+    return request("GET", `/api/templates/${encodeURIComponent(id)}`);
+  },
+
+  /** Render template to DSL */
+  renderTemplate(
+    id: string,
+    values: Record<string, unknown>,
+  ): Promise<RenderResponse> {
+    return request("POST", `/api/templates/${encodeURIComponent(id)}/render`, {
+      values,
+    });
   },
 };

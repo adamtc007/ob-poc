@@ -166,4 +166,118 @@ export interface AppState {
   canExecute: boolean;
   loading: boolean;
   error: string | null;
+
+  // Template state
+  templates: TemplateSummary[];
+  selectedTemplateId: string | null;
+  selectedTemplate: FormTemplate | null;
+  formValues: Record<string, unknown>;
+  renderedDsl: string | null;
+  executionLog: string[];
+}
+
+// ============================================================================
+// Entity Search Types
+// ============================================================================
+
+export type EntityType =
+  | "CBU"
+  | "PERSON"
+  | "COMPANY"
+  | "TRUST"
+  | "DOCUMENT"
+  | "PRODUCT"
+  | "SERVICE";
+
+export interface EntitySearchRequest {
+  query: string;
+  types?: EntityType[];
+  limit?: number;
+  threshold?: number;
+  cbu_id?: string;
+}
+
+export interface EntityMatch {
+  id: string;
+  entity_type: EntityType;
+  display_name: string;
+  subtitle?: string;
+  detail?: string;
+  score: number;
+}
+
+export interface EntitySearchResponse {
+  results: EntityMatch[];
+  total: number;
+  truncated: boolean;
+  search_time_ms: number;
+}
+
+// ============================================================================
+// Template Types
+// ============================================================================
+
+export type SlotType =
+  | { type: "text"; max_length?: number; multiline?: boolean }
+  | { type: "date" }
+  | { type: "country" }
+  | { type: "currency" }
+  | { type: "money"; currency_slot: string }
+  | { type: "percentage" }
+  | { type: "integer"; min?: number; max?: number }
+  | { type: "decimal"; precision?: number }
+  | { type: "boolean" }
+  | { type: "enum"; options: EnumOption[] }
+  | {
+      type: "entity_ref";
+      allowed_types: EntityType[];
+      scope: RefScope;
+      allow_create: boolean;
+    }
+  | { type: "uuid"; auto_generate?: boolean };
+
+export interface EnumOption {
+  value: string;
+  label: string;
+  description?: string;
+}
+
+export type RefScope = "global" | "within_cbu" | "within_session";
+
+export interface SlotDefinition {
+  name: string;
+  label: string;
+  slot_type: SlotType;
+  required: boolean;
+  default_value?: unknown;
+  help_text?: string;
+  placeholder?: string;
+  dsl_param?: string;
+}
+
+export interface FormTemplate {
+  id: string;
+  name: string;
+  description: string;
+  verb: string;
+  domain: string;
+  slots: SlotDefinition[];
+  tags: string[];
+}
+
+export interface TemplateSummary {
+  id: string;
+  name: string;
+  description: string;
+  domain: string;
+  tags: string[];
+}
+
+export interface RenderRequest {
+  values: Record<string, unknown>;
+}
+
+export interface RenderResponse {
+  dsl: string;
+  verb: string;
 }

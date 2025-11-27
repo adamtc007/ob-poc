@@ -1,75 +1,79 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>OB-POC Agent Session</title>
-    <script type="module" crossorigin src="/assets/index--ceCpB_O.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-R1VPMHMP.css">
-  </head>
-  <body>
-    <div class="header">
-      <div>
-        <h1>OB-POC Agent Session</h1>
-        <div>
-          <span id="session-info" class="session-info">No active session</span>
-          <span
-            id="session-state"
-            class="session-state"
-            style="display: none"
-          ></span>
-        </div>
-      </div>
-      <button class="new-session-btn">New Session</button>
-    </div>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>DSL Template Editor</title>
+      <script type="module" crossorigin src="/assets/index-C9hDOvxK.js"></script>
+      <link rel="stylesheet" crossorigin href="/assets/index-BH_PRT0Z.css">
+    </head>
+    <body>
+        <div class="app">
+            <!-- Header -->
+            <header class="header">
+                <div class="header-left">
+                    <h1>DSL Template Editor</h1>
+                    <span id="session-info" class="session-info"
+                        >No session</span
+                    >
+                    <span id="session-state" class="session-state"></span>
+                </div>
+                <div class="header-right">
+                    <select id="template-select" class="template-select">
+                        <option value="">Select Template...</option>
+                    </select>
+                    <button id="new-session-btn" class="btn btn-primary">
+                        New Session
+                    </button>
+                </div>
+            </header>
 
-    <div class="container">
-      <div class="panel">
-        <div class="panel-header">Chat</div>
-        <div class="chat" id="chat">
-          <div class="empty-state">Create a session to start chatting</div>
-        </div>
-        <div class="input-area">
-          <input
-            type="text"
-            id="message"
-            placeholder="Describe what you want to create..."
-            disabled
-          />
-          <button id="send-btn" disabled>Send</button>
-        </div>
-      </div>
+            <!-- Main Content -->
+            <main class="main-content">
+                <!-- Left: Template Form -->
+                <section class="panel form-panel">
+                    <h2>Template Form</h2>
+                    <div id="form-container" class="form-container">
+                        <p class="placeholder-text">
+                            Select a template to begin
+                        </p>
+                    </div>
+                    <div class="form-actions">
+                        <button
+                            id="render-btn"
+                            class="btn btn-secondary"
+                            disabled
+                        >
+                            Render DSL
+                        </button>
+                    </div>
+                </section>
 
-      <div class="panel">
-        <div class="panel-header">
-          Extracted Intents
-          <span class="badge count" id="intent-count" style="display: none"
-            >0</span
-          >
-        </div>
-        <div class="intents-panel" id="intents-panel">
-          <div class="empty-state">Intents will appear here</div>
-        </div>
-      </div>
+                <!-- Right: DSL Preview -->
+                <section class="panel dsl-panel">
+                    <h2>DSL Preview</h2>
+                    <pre
+                        id="dsl-preview"
+                        class="dsl-preview"
+                    ><span class="placeholder-text">DSL will appear here</span></pre>
+                    <div class="dsl-actions">
+                        <button
+                            id="execute-btn"
+                            class="btn btn-success"
+                            disabled
+                        >
+                            Execute DSL
+                        </button>
+                    </div>
+                </section>
+            </main>
 
-      <div class="panel">
-        <div class="panel-header">
-          Assembled DSL
-          <span class="badge count" id="dsl-count" style="display: none"
-            >0</span
-          >
+            <!-- Footer: Execution Log -->
+            <footer class="log-panel">
+                <h3>Execution Log</h3>
+                <div id="execution-log" class="execution-log"></div>
+            </footer>
         </div>
-        <div class="dsl-preview" id="dsl-preview">
-          <div class="empty-state" style="color: #666">DSL will appear here</div>
-        </div>
-        <div class="execute-area">
-          <button class="execute-btn" id="execute-btn" disabled>
-            Execute All DSL
-          </button>
-          <button class="clear-btn" id="clear-btn" disabled>Clear</button>
-        </div>
-      </div>
-    </div>
 
-  </body>
+    </body>
 </html>

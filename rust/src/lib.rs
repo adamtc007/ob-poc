@@ -66,6 +66,10 @@ pub mod dsl_test_harness;
 #[cfg(feature = "server")]
 pub mod api;
 
+// Template system for structured DSL generation
+#[cfg(feature = "server")]
+pub mod templates;
+
 // Public re-exports for the clean architecture
 pub use db_state_manager::{AccumulatedState, DbStateManager, StateResult};
 pub use dsl::{

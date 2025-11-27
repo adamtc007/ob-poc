@@ -29,7 +29,19 @@ pub mod intent_extractor;
 pub mod dsl_assembler;
 
 #[cfg(feature = "server")]
+pub mod entity_routes;
+
+#[cfg(feature = "server")]
+pub mod template_routes;
+
+#[cfg(feature = "server")]
 pub use attribute_routes::create_attribute_router;
+
+#[cfg(feature = "server")]
+pub use entity_routes::create_entity_router;
+
+#[cfg(feature = "server")]
+pub use template_routes::create_template_router;
 
 #[cfg(feature = "server")]
 pub use agent_routes::create_agent_router;

@@ -32,7 +32,9 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
 
-use ob_poc::api::{create_agent_router, create_attribute_router};
+use ob_poc::api::{
+    create_agent_router, create_attribute_router, create_entity_router, create_template_router,
+};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -69,7 +71,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create routers and merge them
     // IMPORTANT: Use fallback_service for static files so API routes take precedence
     let app = create_agent_router(pool.clone())
-        .merge(create_attribute_router(pool))
+        .merge(create_attribute_router(pool.clone()))
+        .merge(create_entity_router(pool))
+        .merge(create_template_router())
         .layer(
             CorsLayer::new()
                 .allow_origin(Any)
@@ -94,8 +98,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("    POST   http://localhost:3000/api/session/:id/execute - Execute accumulated DSL");
     println!("\n  Agent DSL Generation:");
     println!("    POST   http://localhost:3000/api/agent/generate     - Generate DSL from natural language");
-    println!("    POST   http://localhost:3000/api/agent/validate     - Validate DSL syntax/semantics");
-    println!("    GET    http://localhost:3000/api/agent/domains      - List available DSL domains");
+    println!(
+        "    POST   http://localhost:3000/api/agent/validate     - Validate DSL syntax/semantics"
+    );
+    println!(
+        "    GET    http://localhost:3000/api/agent/domains      - List available DSL domains"
+    );
     println!("    GET    http://localhost:3000/api/agent/vocabulary   - Get vocabulary (optionally by domain)");
     println!("    GET    http://localhost:3000/api/agent/health       - Health check");
     println!("\n  Attribute Dictionary:");
@@ -105,6 +113,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("    GET    http://localhost:3000/api/attributes/:cbu_id");
     println!("    GET    http://localhost:3000/api/attributes/document/:doc_id");
     println!("    GET    http://localhost:3000/api/attributes/health");
+    println!("\n  Entity Search:");
+    println!("    GET    http://localhost:3000/api/entities/search?q=<query>&types=PERSON,COMPANY");
+    println!("\n  Templates:");
+    println!("    GET    http://localhost:3000/api/templates                - List all templates");
+    println!(
+        "    GET    http://localhost:3000/api/templates/:id            - Get template details"
+    );
+    println!(
+        "    POST   http://localhost:3000/api/templates/:id/render     - Render template to DSL"
+    );
     println!("\nPress Ctrl+C to stop\n");
 
     // Start server (Axum 0.7+ style)
