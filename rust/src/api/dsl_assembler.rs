@@ -101,9 +101,25 @@ impl DslAssembler {
                 continue;
             }
 
-            // Assemble s-expression
-            let stmt = self.render_sexpr(intent, context);
-            statements.push(stmt);
+            // Check for unresolved refs
+            for (key, ref_name) in &intent.refs {
+                if context.resolve_ref(ref_name).is_none() {
+                    all_errors.push(IntentError {
+                        code: "E003".to_string(),
+                        message: format!(
+                            "Cannot resolve reference '{}' for parameter '{}' - no prior entity exists",
+                            ref_name, key
+                        ),
+                        param: Some(key.clone()),
+                    });
+                }
+            }
+
+            if all_errors.is_empty() {
+                // Assemble s-expression
+                let stmt = self.render_sexpr(intent, context);
+                statements.push(stmt);
+            }
         }
 
         if !all_errors.is_empty() {
@@ -120,6 +136,8 @@ impl DslAssembler {
     }
 
     /// Render a single intent as an s-expression
+    ///
+    /// Returns None if there are unresolved references that cannot be rendered.
     pub fn render_sexpr(&self, intent: &VerbIntent, context: &SessionContext) -> String {
         let mut parts = Vec::new();
 
@@ -137,15 +155,16 @@ impl DslAssembler {
         }
 
         // Add references (resolve from context, sorted for determinism)
+        // Skip refs that can't be resolved - they would cause parse errors
         let mut ref_keys: Vec<_> = intent.refs.keys().collect();
         ref_keys.sort();
 
         for key in ref_keys {
             if let Some(ref_name) = intent.refs.get(key) {
-                let resolved = context
-                    .resolve_ref(ref_name)
-                    .unwrap_or_else(|| ref_name.clone()); // Keep as-is if unresolved
-                parts.push(format!(":{} {}", key, resolved));
+                if let Some(resolved) = context.resolve_ref(ref_name) {
+                    parts.push(format!(":{} {}", key, resolved));
+                }
+                // If ref can't be resolved, skip it - better than outputting @last_cbu
             }
         }
 
@@ -153,6 +172,14 @@ impl DslAssembler {
         parts.push(")".to_string());
 
         parts.join(" ")
+    }
+
+    /// Check if all references in an intent can be resolved
+    pub fn can_resolve_refs(&self, intent: &VerbIntent, context: &SessionContext) -> bool {
+        intent
+            .refs
+            .values()
+            .all(|ref_name| context.resolve_ref(ref_name).is_some())
     }
 }
 

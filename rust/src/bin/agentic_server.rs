@@ -67,17 +67,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Database connection established");
 
     // Create routers and merge them
+    // IMPORTANT: Use fallback_service for static files so API routes take precedence
     let app = create_agent_router(pool.clone())
         .merge(create_attribute_router(pool))
-        // Serve static files from the static directory
-        .nest_service("/", ServeDir::new("static").append_index_html_on_directories(true))
         .layer(
             CorsLayer::new()
                 .allow_origin(Any)
                 .allow_methods(Any)
                 .allow_headers(Any),
         )
-        .layer(TraceLayer::new_for_http());
+        .layer(TraceLayer::new_for_http())
+        // Static files as fallback - only serves if no API route matches
+        .fallback_service(ServeDir::new("static").append_index_html_on_directories(true));
 
     // Bind to address
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));

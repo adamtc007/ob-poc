@@ -133,10 +133,10 @@ impl AgentSession {
         self.updated_at = Utc::now();
     }
 
-    /// Set assembled DSL after validation (clears pending intents)
+    /// Set assembled DSL after validation (keep intents for execution-time resolution)
     pub fn set_assembled_dsl(&mut self, dsl: Vec<String>) {
         self.assembled_dsl = dsl;
-        self.pending_intents.clear();
+        // NOTE: Don't clear pending_intents - we need them for execution-time ref resolution
         self.state = SessionState::ReadyToExecute;
         self.updated_at = Utc::now();
     }

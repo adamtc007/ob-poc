@@ -539,6 +539,8 @@ async fn chat_in_session(
         let assembled = if all_valid && !intents.is_empty() {
             match state.assembler.assemble(&intents, &session.context) {
                 Ok(dsl) => {
+                    // Store intents for execution-time ref resolution
+                    session.add_intents(intents.clone());
                     session.set_assembled_dsl(dsl.statements.clone());
                     Some(dsl)
                 }
@@ -603,26 +605,27 @@ async fn chat_in_session(
 
 /// POST /api/session/:id/execute
 /// Execute all accumulated DSL in the session using the real Runtime
+/// Re-assembles each intent at execution time to resolve @refs with updated context
 async fn execute_session_dsl(
     State(state): State<AgentState>,
     Path(session_id): Path<Uuid>,
 ) -> Result<Json<ExecuteResponse>, StatusCode> {
-    // Get accumulated DSL and session context
-    let (accumulated_dsl, cbu_id, current_state) = {
+    // Get intents and initial context from session
+    let (intents, mut context, current_state) = {
         let sessions = state.sessions.read().await;
         let session = sessions.get(&session_id).ok_or(StatusCode::NOT_FOUND)?;
         (
-            session.assembled_dsl.clone(),
-            session.context.last_cbu_id,
+            session.pending_intents.clone(),
+            session.context.clone(),
             session.state.clone(),
         )
     };
 
-    if accumulated_dsl.is_empty() {
+    if intents.is_empty() {
         return Ok(Json(ExecuteResponse {
             success: false,
             results: Vec::new(),
-            errors: vec!["No DSL to execute".to_string()],
+            errors: vec!["No intents to execute".to_string()],
             new_state: current_state,
         }));
     }
@@ -637,14 +640,17 @@ async fn execute_session_dsl(
     let mut env = RuntimeEnv::with_pool(request_id, state.pool.clone());
 
     // Set CBU ID if we have one from previous executions
-    if let Some(id) = cbu_id {
+    if let Some(id) = context.last_cbu_id {
         env.set_cbu_id(id);
     }
 
-    // Execute each DSL statement
-    for (idx, dsl) in accumulated_dsl.iter().enumerate() {
-        // First validate
-        let validation = validate_dsl_internal(dsl, &state.runtime);
+    // Execute each intent - assemble DSL at execution time with current context
+    for (idx, intent) in intents.iter().enumerate() {
+        // Assemble DSL with current context (resolves @last_cbu, @last_entity)
+        let dsl = state.assembler.render_sexpr(intent, &context);
+
+        // Validate
+        let validation = validate_dsl_internal(&dsl, &state.runtime);
 
         if !validation.valid {
             all_success = false;
@@ -667,20 +673,35 @@ async fn execute_session_dsl(
         }
 
         // Parse DSL
-        match parser.parse(dsl) {
+        match parser.parse(&dsl) {
             Ok(exprs) => {
                 // Execute using the real Runtime
                 match state.runtime.execute_sheet(&exprs, &mut env) {
                     Ok(()) => {
-                        // Check if a new entity was created
-                        let entity_id = env.entity_id;
-                        // Determine entity type from verb
-                        let entity_type = if dsl.contains("cbu.") {
+                        // Get entity ID from env based on verb type
+                        let entity_type = if intent.verb.starts_with("cbu.") {
+                            // CBU verbs store in env.cbu_id
+                            if let Some(id) = env.cbu_id {
+                                context.last_cbu_id = Some(id);
+                                context.cbu_ids.push(id);
+                            }
                             Some("CBU".to_string())
-                        } else if dsl.contains("entity.") {
+                        } else if intent.verb.starts_with("entity.") {
+                            // Entity verbs store in env.entity_id
+                            if let Some(id) = env.entity_id {
+                                context.last_entity_id = Some(id);
+                                context.entity_ids.push(id);
+                            }
                             Some("ENTITY".to_string())
                         } else {
                             None
+                        };
+                        
+                        // Use the appropriate ID for results
+                        let result_entity_id = if intent.verb.starts_with("cbu.") {
+                            env.cbu_id
+                        } else {
+                            env.entity_id
                         };
 
                         results.push(ExecutionResult {
@@ -688,7 +709,7 @@ async fn execute_session_dsl(
                             dsl: dsl.clone(),
                             success: true,
                             message: "Executed successfully".to_string(),
-                            entity_id,
+                            entity_id: result_entity_id,
                             entity_type,
                         });
                     }
@@ -723,10 +744,13 @@ async fn execute_session_dsl(
         }
     }
 
-    // Update session state and get new state
+    // Update session state
     let new_state = {
         let mut sessions = state.sessions.write().await;
         if let Some(session) = sessions.get_mut(&session_id) {
+            // Update session context with final state
+            session.context = context;
+            
             // Convert results to session format
             let session_results: Vec<crate::api::session::ExecutionResult> = results
                 .iter()
@@ -891,11 +915,11 @@ pub fn create_agent_router(pool: PgPool) -> Router {
         .route("/api/agent/health", get(agent_health))
         // Session Management (Intent-based pipeline)
         .route("/api/session", post(create_session))
-        .route("/api/session/{id}", get(get_session_state))
-        .route("/api/session/{id}", delete(delete_session))
-        .route("/api/session/{id}/chat", post(chat_in_session))
-        .route("/api/session/{id}/execute", post(execute_session_dsl))
-        .route("/api/session/{id}/clear", post(clear_session_dsl))
+        .route("/api/session/:id", get(get_session_state))
+        .route("/api/session/:id", delete(delete_session))
+        .route("/api/session/:id/chat", post(chat_in_session))
+        .route("/api/session/:id/execute", post(execute_session_dsl))
+        .route("/api/session/:id/clear", post(clear_session_dsl))
         .with_state(state)
 }
 
