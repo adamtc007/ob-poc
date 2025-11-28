@@ -102,28 +102,44 @@ fn comment<'a, E: NomParseError<&'a str>>(input: &'a str) -> IResult<&'a str, St
 fn verb_call<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
     input: &'a str,
 ) -> IResult<&'a str, VerbCall, E> {
-    let start_pos = input.len();
+    let original_input = input;
+    let start_offset = 0usize; // We'll compute offsets relative to original_input
 
     let (input, _) = char('(')(input)?;
     let (input, _) = multispace0(input)?;
+
+    // Capture verb span
+    let verb_start = original_input.len() - input.len();
     let (input, (domain, verb)) = word(input)?;
-    let (input, arguments) = many0(argument)(input)?;
+    let verb_end = original_input.len() - input.len();
+    let verb_span = Span::new(verb_start, verb_end);
+
+    let (input, arguments) = many0(|i| argument_with_span(i, original_input))(input)?;
     let (input, _) = multispace0(input)?;
-    // Parse optional :as @symbol binding
+
+    // Parse optional :as @symbol binding with span
+    let as_binding_start = original_input.len() - input.len();
     let (input, as_binding) = opt(as_binding_parser)(input)?;
+    let as_binding_end = original_input.len() - input.len();
+    let as_binding_span = as_binding
+        .as_ref()
+        .map(|_| Span::new(as_binding_start, as_binding_end));
+
     let (input, _) = multispace0(input)?;
     let (input, _) = cut(context("closing parenthesis", char(')')))(input)?;
 
-    let end_pos = input.len();
+    let end_offset = original_input.len() - input.len();
 
     Ok((
         input,
         VerbCall {
             domain,
             verb,
+            verb_span,
             arguments,
             as_binding,
-            span: Span::new(start_pos, end_pos),
+            as_binding_span,
+            span: Span::new(start_offset, end_offset),
         },
     ))
 }
@@ -137,6 +153,50 @@ fn as_binding_parser<'a, E: NomParseError<&'a str>>(input: &'a str) -> IResult<&
     Ok((input, name.to_string()))
 }
 
+/// Verb call parser with span tracking relative to original input
+fn verb_call_with_span<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
+    input: &'a str,
+    original_input: &'a str,
+) -> IResult<&'a str, VerbCall, E> {
+    let start_offset = original_input.len() - input.len();
+
+    let (input, _) = char('(')(input)?;
+    let (input, _) = multispace0(input)?;
+
+    let verb_start = original_input.len() - input.len();
+    let (input, (domain, verb)) = word(input)?;
+    let verb_end = original_input.len() - input.len();
+    let verb_span = Span::new(verb_start, verb_end);
+
+    let (input, arguments) = many0(|i| argument_with_span(i, original_input))(input)?;
+    let (input, _) = multispace0(input)?;
+
+    let as_binding_start = original_input.len() - input.len();
+    let (input, as_binding) = opt(as_binding_parser)(input)?;
+    let as_binding_end = original_input.len() - input.len();
+    let as_binding_span = as_binding
+        .as_ref()
+        .map(|_| Span::new(as_binding_start, as_binding_end));
+
+    let (input, _) = multispace0(input)?;
+    let (input, _) = cut(context("closing parenthesis", char(')')))(input)?;
+
+    let end_offset = original_input.len() - input.len();
+
+    Ok((
+        input,
+        VerbCall {
+            domain,
+            verb,
+            verb_span,
+            arguments,
+            as_binding,
+            as_binding_span,
+            span: Span::new(start_offset, end_offset),
+        },
+    ))
+}
+
 fn word<'a, E: NomParseError<&'a str>>(input: &'a str) -> IResult<&'a str, (String, String), E> {
     let (input, domain) = identifier(input)?;
     let (input, _) = char('.')(input)?;
@@ -148,8 +208,10 @@ fn word<'a, E: NomParseError<&'a str>>(input: &'a str) -> IResult<&'a str, (Stri
 // Arguments
 // ============================================================================
 
-fn argument<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
+/// Parse argument with span tracking relative to original input
+fn argument_with_span<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
     input: &'a str,
+    original_input: &'a str,
 ) -> IResult<&'a str, Argument, E> {
     let (input, _) = multispace0(input)?;
 
@@ -161,10 +223,27 @@ fn argument<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
         )));
     }
 
+    let key_start = original_input.len() - input.len();
     let (input, key) = keyword(input)?;
+    let key_end = original_input.len() - input.len();
+    let key_span = Span::new(key_start, key_end);
+
     let (input, _) = multispace1(input)?;
-    let (input, val) = context("value", value_parser)(input)?;
-    Ok((input, Argument { key, value: val }))
+
+    let value_start = original_input.len() - input.len();
+    let (input, val) = context("value", |i| value_parser_with_span(i, original_input))(input)?;
+    let value_end = original_input.len() - input.len();
+    let value_span = Span::new(value_start, value_end);
+
+    Ok((
+        input,
+        Argument {
+            key,
+            key_span,
+            value: val,
+            value_span,
+        },
+    ))
 }
 
 fn keyword<'a, E: NomParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Key, E> {
@@ -234,6 +313,30 @@ fn value_parser<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
         // Nested verb call - allows (verb.call ...) as a value
         map(verb_call, |vc| Value::NestedCall(Box::new(vc))),
         map(list_literal, Value::List),
+        map(map_literal, Value::Map),
+    ))(input)
+}
+
+/// Value parser with span tracking for nested verb calls
+fn value_parser_with_span<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
+    input: &'a str,
+    original_input: &'a str,
+) -> IResult<&'a str, Value, E> {
+    alt((
+        // Order matters: try specific patterns before generic ones
+        map(boolean_literal, Value::Boolean),
+        map(null_literal, |_| Value::Null),
+        map(attribute_ref, Value::AttributeRef),
+        map(document_ref, Value::DocumentRef),
+        map(reference, Value::Reference),
+        map(string_literal, Value::String),
+        number_literal,
+        // Nested verb call with span tracking
+        map(
+            |i| verb_call_with_span(i, original_input),
+            |vc| Value::NestedCall(Box::new(vc)),
+        ),
+        map(|i| list_literal_with_span(i, original_input), Value::List),
         map(map_literal, Value::Map),
     ))(input)
 }
@@ -361,6 +464,36 @@ fn list_literal<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
         remaining = rest;
 
         // Check for comma separator (optional)
+        if let Ok((rest, _)) = char::<_, E>(',')(remaining) {
+            let (rest, _) = multispace0::<_, E>(rest)?;
+            remaining = rest;
+        }
+    }
+
+    let (input, _) = multispace0(remaining)?;
+    let (input, _) = char(']')(input)?;
+
+    Ok((input, values))
+}
+
+/// List literal with span tracking for nested verb calls
+fn list_literal_with_span<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
+    input: &'a str,
+    original_input: &'a str,
+) -> IResult<&'a str, Vec<Value>, E> {
+    let (input, _) = char('[')(input)?;
+    let (input, _) = multispace0(input)?;
+
+    let mut values = Vec::new();
+    let mut remaining = input;
+
+    while let Ok((rest, val)) = value_parser_with_span::<E>(remaining, original_input) {
+        values.push(val);
+        remaining = rest;
+
+        let (rest, _) = multispace0::<_, E>(remaining)?;
+        remaining = rest;
+
         if let Ok((rest, _)) = char::<_, E>(',')(remaining) {
             let (rest, _) = multispace0::<_, E>(rest)?;
             remaining = rest;

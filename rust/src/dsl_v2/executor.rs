@@ -1265,7 +1265,9 @@ impl DslExecutor {
                     // Add the injected argument
                     vc.arguments.push(super::ast::Argument {
                         key: super::ast::Key::Simple(inj.into_arg.clone()),
+                        key_span: super::ast::Span::default(),
                         value: super::ast::Value::String(id.to_string()),
+                        value_span: super::ast::Span::default(),
                     });
                 }
             }

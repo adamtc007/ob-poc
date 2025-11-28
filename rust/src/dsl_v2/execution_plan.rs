@@ -261,7 +261,9 @@ fn extract_nested_children(vc: &VerbCall) -> (VerbCall, Vec<VerbCall>) {
                 if !flat_items.is_empty() {
                     flat_args.push(Argument {
                         key: arg.key.clone(),
+                        key_span: arg.key_span,
                         value: Value::List(flat_items),
+                        value_span: arg.value_span,
                     });
                 }
                 // If list was purely nested calls, we might want to track the key
@@ -281,8 +283,10 @@ fn extract_nested_children(vc: &VerbCall) -> (VerbCall, Vec<VerbCall>) {
     let flat_vc = VerbCall {
         domain: vc.domain.clone(),
         verb: vc.verb.clone(),
+        verb_span: vc.verb_span,
         arguments: flat_args,
         as_binding: vc.as_binding.clone(),
+        as_binding_span: vc.as_binding_span,
         span: vc.span,
     };
 
@@ -359,14 +363,18 @@ mod tests {
         VerbCall {
             domain: domain.to_string(),
             verb: verb.to_string(),
+            verb_span: Span::default(),
             arguments: args
                 .into_iter()
                 .map(|(k, v)| Argument {
                     key: Key::Simple(k.to_string()),
+                    key_span: Span::default(),
                     value: v,
+                    value_span: Span::default(),
                 })
                 .collect(),
             as_binding: None,
+            as_binding_span: None,
             span: Span::default(),
         }
     }
@@ -422,20 +430,26 @@ mod tests {
         let parent = VerbCall {
             domain: "cbu".to_string(),
             verb: "create".to_string(),
+            verb_span: Span::default(),
             arguments: vec![
                 Argument {
                     key: Key::Simple("name".into()),
+                    key_span: Span::default(),
                     value: Value::String("Test Fund".into()),
+                    value_span: Span::default(),
                 },
                 Argument {
                     key: Key::Simple("roles".into()),
+                    key_span: Span::default(),
                     value: Value::List(vec![
                         Value::NestedCall(Box::new(child1)),
                         Value::NestedCall(Box::new(child2)),
                     ]),
+                    value_span: Span::default(),
                 },
             ],
             as_binding: None,
+            as_binding_span: None,
             span: Span::default(),
         };
 
