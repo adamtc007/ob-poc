@@ -1,0 +1,40 @@
+{
+  "configurations": [
+    {
+      "label": "Debug Tests (lib)",
+      "adapter": "CodeLLDB",
+      "request": "launch",
+      "program": "${workspaceFolder}/rust/target/debug/deps/ob_poc-9bd5c1ded3c3938f",
+      "cwd": "${workspaceFolder}/rust",
+      "args": [],
+      "env": {
+        "DATABASE_URL": "postgresql:///data_designer",
+        "RUST_BACKTRACE": "1"
+      }
+    },
+    {
+      "label": "Debug Specific Test",
+      "adapter": "CodeLLDB",
+      "request": "launch",
+      "program": "${workspaceFolder}/rust/target/debug/deps/ob_poc-9bd5c1ded3c3938f",
+      "cwd": "${workspaceFolder}/rust",
+      "args": ["--test-threads=1", "test_name_here"],
+      "env": {
+        "DATABASE_URL": "postgresql:///data_designer",
+        "RUST_BACKTRACE": "1"
+      }
+    },
+    {
+      "label": "Debug DSL LSP",
+      "adapter": "CodeLLDB",
+      "request": "launch",
+      "program": "${workspaceFolder}/rust/target/debug/dsl-lsp",
+      "cwd": "${workspaceFolder}/rust",
+      "args": [],
+      "env": {
+        "DATABASE_URL": "postgresql:///data_designer",
+        "RUST_BACKTRACE": "1"
+      }
+    }
+  ]
+}

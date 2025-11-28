@@ -2,11 +2,63 @@
 //!
 //! This module takes validated intents and assembles them into DSL s-expressions.
 //! The assembly is purely deterministic - no LLM involved.
+//!
+//! Uses a "virtual context" to track entities that will be created during
+//! a multi-intent sequence, allowing refs like @last_cbu to resolve before execution.
 
 use super::intent::{AssembledDsl, IntentError, IntentValidation, ParamValue, VerbIntent};
 use super::session::SessionContext;
 use crate::forth_engine::runtime::Runtime;
+use std::collections::HashMap;
 use std::sync::Arc;
+use uuid::Uuid;
+
+/// Virtual context for tracking entities during assembly
+#[derive(Debug, Clone, Default)]
+struct VirtualContext {
+    last_cbu_id: Option<Uuid>,
+    last_entity_id: Option<Uuid>,
+    named_refs: HashMap<String, Uuid>,
+}
+
+impl VirtualContext {
+    /// Resolve a reference, checking virtual context first
+    fn resolve_ref(&self, ref_name: &str, real_context: &SessionContext) -> Option<String> {
+        match ref_name {
+            "@last_cbu" => self
+                .last_cbu_id
+                .or(real_context.last_cbu_id)
+                .map(|u| format!("\"{}\"", u)),
+            "@last_entity" => self
+                .last_entity_id
+                .or(real_context.last_entity_id)
+                .map(|u| format!("\"{}\"", u)),
+            _ if ref_name.starts_with('@') => {
+                let name = &ref_name[1..];
+                self.named_refs
+                    .get(name)
+                    .or_else(|| real_context.named_refs.get(name))
+                    .map(|u| format!("\"{}\"", u))
+            }
+            _ => None,
+        }
+    }
+
+    /// Track a new entity that will be created
+    fn track_intent(&mut self, intent: &VerbIntent) {
+        let verb = &intent.verb;
+        
+        // CBU creation verbs
+        if verb.starts_with("cbu.") && (verb.contains("ensure") || verb.contains("create")) {
+            self.last_cbu_id = Some(Uuid::new_v4());
+        }
+        
+        // Entity creation verbs
+        if verb.starts_with("entity.") && verb.contains("create") {
+            self.last_entity_id = Some(Uuid::new_v4());
+        }
+    }
+}
 
 /// Deterministic DSL assembler
 pub struct DslAssembler {
@@ -85,6 +137,9 @@ impl DslAssembler {
     }
 
     /// Assemble DSL from validated intents
+    ///
+    /// Uses a virtual context to track entities that will be created,
+    /// allowing refs like @last_cbu to resolve within a multi-intent sequence.
     pub fn assemble(
         &self,
         intents: &[VerbIntent],
@@ -92,22 +147,23 @@ impl DslAssembler {
     ) -> Result<AssembledDsl, Vec<IntentError>> {
         let mut statements = Vec::new();
         let mut all_errors = Vec::new();
+        let mut virtual_ctx = VirtualContext::default();
 
         for intent in intents {
-            // Validate first
+            // Validate verb exists
             let validation = self.validate_intent(intent);
             if !validation.valid {
                 all_errors.extend(validation.errors);
                 continue;
             }
 
-            // Check for unresolved refs
+            // Check for unresolved refs using BOTH virtual and real context
             for (key, ref_name) in &intent.refs {
-                if context.resolve_ref(ref_name).is_none() {
+                if virtual_ctx.resolve_ref(ref_name, context).is_none() {
                     all_errors.push(IntentError {
                         code: "E003".to_string(),
                         message: format!(
-                            "Cannot resolve reference '{}' for parameter '{}' - no prior entity exists",
+                            "Cannot resolve reference '{}' for parameter '{}' - no prior entity exists in this sequence",
                             ref_name, key
                         ),
                         param: Some(key.clone()),
@@ -116,9 +172,12 @@ impl DslAssembler {
             }
 
             if all_errors.is_empty() {
-                // Assemble s-expression
-                let stmt = self.render_sexpr(intent, context);
+                // Assemble s-expression using virtual context
+                let stmt = self.render_sexpr_with_virtual(intent, context, &virtual_ctx);
                 statements.push(stmt);
+                
+                // Track what this intent will create for subsequent refs
+                virtual_ctx.track_intent(intent);
             }
         }
 
@@ -133,6 +192,47 @@ impl DslAssembler {
             statements,
             combined,
         })
+    }
+
+    /// Render a single intent as an s-expression using virtual context
+    fn render_sexpr_with_virtual(
+        &self,
+        intent: &VerbIntent,
+        context: &SessionContext,
+        virtual_ctx: &VirtualContext,
+    ) -> String {
+        let mut parts = Vec::new();
+
+        // Start with verb
+        parts.push(format!("({}", intent.verb));
+
+        // Add literal params (sorted for determinism)
+        let mut param_keys: Vec<_> = intent.params.keys().collect();
+        param_keys.sort();
+
+        for key in param_keys {
+            if let Some(value) = intent.params.get(key) {
+                parts.push(format!(":{} {}", key, value.to_dsl_string()));
+            }
+        }
+
+        // Add references (resolve from virtual context first, then real context)
+        let mut ref_keys: Vec<_> = intent.refs.keys().collect();
+        ref_keys.sort();
+
+        for key in ref_keys {
+            if let Some(ref_name) = intent.refs.get(key) {
+                if let Some(resolved) = virtual_ctx.resolve_ref(ref_name, context) {
+                    parts.push(format!(":{} {}", key, resolved));
+                }
+                // If ref can't be resolved, skip it (validation should have caught this)
+            }
+        }
+
+        // Close the s-expression
+        parts.push(")".to_string());
+
+        parts.join(" ")
     }
 
     /// Render a single intent as an s-expression

@@ -1,21 +1,14 @@
-{
-  "version": "1",
-  "tasks": [
-    {
-      "label": "Housekeeping: Sweep",
-      "command": "bash",
-      "args": [
-        "housekeeping/scripts/sweep.sh"
-      ],
-      "problemMatcher": []
-    },
-    {
-      "label": "Housekeeping: Generate Report",
-      "command": "python3",
-      "args": [
-        "housekeeping/scripts/report.py"
-      ],
-      "problemMatcher": []
-    }
-  ]
-}
+[
+  {
+    "label": "Housekeeping: Sweep",
+    "command": "bash housekeeping/scripts/sweep.sh",
+    "cwd": "${ZED_WORKTREE_ROOT}/rust",
+    "tags": ["housekeeping"]
+  },
+  {
+    "label": "Housekeeping: Generate Report",
+    "command": "python3 housekeeping/scripts/report.py",
+    "cwd": "${ZED_WORKTREE_ROOT}/rust",
+    "tags": ["housekeeping", "report"]
+  }
+]
