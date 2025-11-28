@@ -1,4 +1,8 @@
 //! Source execution service for fetching attribute values from various sources
+//!
+//! Actual schemas:
+//! - document_metadata: doc_id, attribute_id (uuid), value (jsonb)
+//! - attribute_values_typed: entity_id, attribute_id (text), value_text/value_number/value_boolean/value_json
 
 use crate::data_dictionary::{AttributeId, DbAttributeDefinition};
 use async_trait::async_trait;
@@ -71,21 +75,22 @@ impl SourceExecutor for DocumentSource {
         &self,
         attribute_id: &AttributeId,
         _definition: &DbAttributeDefinition,
-        cbu_id: Uuid,
+        _entity_id: Uuid,
     ) -> Result<Option<Value>, String> {
         // Fetch from document_metadata for most recent extraction
-        // DB schema: doc_id, attribute_id (uuid), value (jsonb)
+        // Schema: doc_id, attribute_id (uuid), value (jsonb)
+        // Note: document_metadata links to documents, not directly to entities
+        // This would need a join through document_entity_links for entity-specific queries
+
         let result = sqlx::query!(
             r#"
             SELECT dm.value
             FROM "ob-poc".document_metadata dm
-            JOIN "ob-poc".document_catalog dc ON dc.doc_id = dm.doc_id
-            WHERE dm.attribute_id = $1 AND dc.cbu_id = $2
-            ORDER BY dc.created_at DESC
+            WHERE dm.attribute_id = $1
+            ORDER BY dm.created_at DESC
             LIMIT 1
             "#,
-            attribute_id.as_uuid(),
-            cbu_id
+            attribute_id.as_uuid()
         )
         .fetch_optional(&self.pool)
         .await
@@ -115,14 +120,15 @@ impl SourceExecutor for DatabaseSource {
         entity_id: Uuid,
     ) -> Result<Option<Value>, String> {
         // Fetch from attribute_values_typed
-        // DB schema: entity_id, attribute_id (text), value_text, value_number, value_boolean, value_date, value_json
-        let attr_id_str = attribute_id.as_uuid().to_string();
+        // Schema: entity_id, attribute_id (text), value_text/value_number/value_boolean/value_json
+        let attr_id_str = attribute_id.to_string();
 
         let result = sqlx::query!(
             r#"
             SELECT
                 value_text,
                 value_number,
+                value_integer,
                 value_boolean,
                 value_date,
                 value_json
@@ -139,24 +145,30 @@ impl SourceExecutor for DatabaseSource {
         .map_err(|e| format!("Database error: {}", e))?;
 
         if let Some(row) = result {
-            // Return value based on which column has data
-            let value = if let Some(text) = row.value_text {
-                Some(Value::String(text))
-            } else if let Some(num) = row.value_number {
-                Value::Number(
-                    serde_json::Number::from_f64(num.to_string().parse().unwrap_or(0.0)).unwrap(),
-                )
-                .into()
-            } else if let Some(b) = row.value_boolean {
-                Some(Value::Bool(b))
-            } else if let Some(date) = row.value_date {
-                Some(Value::String(date.to_string()))
-            } else {
-                row.value_json
-            };
-            Ok(value)
-        } else {
-            Ok(None)
+            // Return the first non-null value
+            if let Some(s) = row.value_text {
+                return Ok(Some(Value::String(s)));
+            }
+            if let Some(n) = row.value_number {
+                let f: f64 = n.to_string().parse().unwrap_or(0.0);
+                if let Some(num) = serde_json::Number::from_f64(f) {
+                    return Ok(Some(Value::Number(num)));
+                }
+            }
+            if let Some(i) = row.value_integer {
+                return Ok(Some(Value::Number(serde_json::Number::from(i))));
+            }
+            if let Some(b) = row.value_boolean {
+                return Ok(Some(Value::Bool(b)));
+            }
+            if let Some(d) = row.value_date {
+                return Ok(Some(Value::String(d.to_string())));
+            }
+            if let Some(j) = row.value_json {
+                return Ok(Some(j));
+            }
         }
+
+        Ok(None)
     }
 }

@@ -47,6 +47,8 @@ pub mod verbs;
 pub mod mappings;
 pub mod executor;
 pub mod custom_ops;
+pub mod assembly;
+pub mod semantic_intent;
 
 // Re-export key types for convenience
 pub use ast::{Program, Statement, VerbCall, Argument, Key, Value, Span};

@@ -1,4 +1,9 @@
 //! Sink execution service for persisting attribute values to various destinations
+//!
+//! Actual schema for attribute_values_typed:
+//! - entity_id (UUID, NOT NULL)
+//! - attribute_id (text, NOT NULL) - references attribute_registry.id
+//! - value_text, value_number, value_integer, value_boolean, value_date, value_datetime, value_json
 
 use crate::data_dictionary::{AttributeId, DbAttributeDefinition};
 use async_trait::async_trait;
@@ -45,7 +50,6 @@ impl CompositeSinkExecutor {
         if let Some(sink_config) = &definition.sink_config {
             for _destination in &sink_config.destinations {
                 // Future: implement webhook, cache, API sinks
-                // For now, just database persistence
             }
         }
 
@@ -74,8 +78,9 @@ impl SinkExecutor for DatabaseSink {
         entity_id: Uuid,
     ) -> Result<(), String> {
         // Persist to attribute_values_typed based on value type
-        // DB schema: entity_id, attribute_id (text), value_text, value_number, value_boolean, value_json
-        let attr_id_str = attribute_id.as_uuid().to_string();
+        // Schema: entity_id, attribute_id (text), value_text/value_number/value_boolean/value_json
+
+        let attr_id_str = attribute_id.to_string();
 
         match value {
             Value::String(s) => {

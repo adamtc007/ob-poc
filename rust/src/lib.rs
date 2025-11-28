@@ -41,6 +41,12 @@ pub mod services;
 // DSL v2 - Unified S-expression DSL with data-driven execution
 pub mod dsl_v2;
 
+// Intent schema for agent-produced intents
+pub mod intent;
+
+// Planner - converts intents to DSL
+pub mod planner;
+
 // REST API module (when server feature is enabled)
 #[cfg(feature = "server")]
 pub mod api;

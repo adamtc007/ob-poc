@@ -71,6 +71,7 @@ impl CustomOperationRegistry {
         };
 
         // Register built-in custom operations
+        registry.register(Arc::new(EntityCreateOp));
         registry.register(Arc::new(DocumentCatalogOp));
         registry.register(Arc::new(DocumentExtractOp));
         registry.register(Arc::new(UboCalculateOp));
@@ -116,6 +117,156 @@ impl Default for CustomOperationRegistry {
 // ============================================================================
 // Built-in Custom Operations
 // ============================================================================
+
+/// Generic entity creation with type dispatch
+///
+/// Rationale: Maps :type argument (natural-person, limited-company, etc.) to
+/// the correct entity_type and extension table. This is a convenience op
+/// for agent-generated DSL that uses a single verb with type parameter.
+pub struct EntityCreateOp;
+
+#[async_trait]
+impl CustomOperation for EntityCreateOp {
+    fn domain(&self) -> &'static str {
+        "entity"
+    }
+    fn verb(&self) -> &'static str {
+        "create"
+    }
+    fn rationale(&self) -> &'static str {
+        "Requires mapping :type to entity_type and selecting correct extension table"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use uuid::Uuid;
+
+        // Extract entity type
+        let entity_type = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("type"))
+            .and_then(|a| a.value.as_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing :type argument"))?;
+
+        // Extract name
+        let name = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("name"))
+            .and_then(|a| a.value.as_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing :name argument"))?;
+
+        // Map type string to entity_type_name and extension table
+        let (entity_type_name, extension_table) = match entity_type {
+            "natural-person" => ("PROPER_PERSON_NATURAL", "entity_proper_persons"),
+            "limited-company" => ("LIMITED_COMPANY_PRIVATE", "entity_limited_companies"),
+            "partnership" => ("PARTNERSHIP_LIMITED", "entity_partnerships"),
+            "trust" => ("TRUST_DISCRETIONARY", "entity_trusts"),
+            _ => return Err(anyhow::anyhow!("Unknown entity type: {}", entity_type)),
+        };
+
+        // Look up entity type ID
+        let type_row = sqlx::query!(
+            r#"SELECT entity_type_id FROM "ob-poc".entity_types WHERE name = $1"#,
+            entity_type_name
+        )
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Entity type not found: {}", entity_type_name))?;
+
+        let entity_type_id = type_row.entity_type_id;
+        let entity_id = Uuid::new_v4();
+
+        // Insert into base entities table
+        sqlx::query!(
+            r#"INSERT INTO "ob-poc".entities (entity_id, entity_type_id, created_at, updated_at)
+               VALUES ($1, $2, NOW(), NOW())"#,
+            entity_id,
+            entity_type_id
+        )
+        .execute(pool)
+        .await?;
+
+        // Insert into extension table based on type
+        match extension_table {
+            "entity_proper_persons" => {
+                // Split name into first/last for proper_persons
+                let name_parts: Vec<&str> = name.split_whitespace().collect();
+                let (first_name, last_name) = if name_parts.len() >= 2 {
+                    (name_parts[0].to_string(), name_parts[1..].join(" "))
+                } else {
+                    (name.to_string(), "".to_string())
+                };
+
+                sqlx::query!(
+                    r#"INSERT INTO "ob-poc".entity_proper_persons (entity_id, first_name, last_name)
+                       VALUES ($1, $2, $3)"#,
+                    entity_id,
+                    first_name,
+                    last_name
+                )
+                .execute(pool)
+                .await?;
+            }
+            "entity_limited_companies" => {
+                sqlx::query!(
+                    r#"INSERT INTO "ob-poc".entity_limited_companies (entity_id, company_name)
+                       VALUES ($1, $2)"#,
+                    entity_id,
+                    name
+                )
+                .execute(pool)
+                .await?;
+            }
+            "entity_partnerships" => {
+                sqlx::query!(
+                    r#"INSERT INTO "ob-poc".entity_partnerships (entity_id, partnership_name)
+                       VALUES ($1, $2)"#,
+                    entity_id,
+                    name
+                )
+                .execute(pool)
+                .await?;
+            }
+            "entity_trusts" => {
+                sqlx::query!(
+                    r#"INSERT INTO "ob-poc".entity_trusts (entity_id, trust_name)
+                       VALUES ($1, $2)"#,
+                    entity_id,
+                    name
+                )
+                .execute(pool)
+                .await?;
+            }
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Unknown extension table: {}",
+                    extension_table
+                ))
+            }
+        }
+
+        // Bind to context
+        ctx.bind("entity", entity_id);
+
+        Ok(ExecutionResult::Uuid(entity_id))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
+    }
+}
 
 /// Document cataloging with document type lookup
 ///
@@ -165,10 +316,10 @@ impl CustomOperation for DocumentCatalogOp {
         let doc_type_id = type_row.type_id;
 
         // Get optional arguments
-        let title = verb_call
+        let document_name = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("title"))
+            .find(|a| a.key.matches("title") || a.key.matches("document-name"))
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string());
 
@@ -185,7 +336,7 @@ impl CustomOperation for DocumentCatalogOp {
                 }
             });
 
-        // Create document - doc_id is the PK
+        // Create document - doc_id is the PK in actual schema
         let doc_id = Uuid::new_v4();
 
         sqlx::query!(
@@ -195,7 +346,7 @@ impl CustomOperation for DocumentCatalogOp {
             doc_id,
             doc_type_id,
             cbu_id,
-            title
+            document_name
         )
         .execute(pool)
         .await?;
@@ -243,7 +394,7 @@ impl CustomOperation for DocumentExtractOp {
     ) -> Result<ExecutionResult> {
         use uuid::Uuid;
 
-        // Get document ID (doc_id is the PK)
+        // Get document ID (doc_id is the PK in actual schema)
         let doc_id: Uuid = verb_call
             .arguments
             .iter()
@@ -595,6 +746,6 @@ mod tests {
     fn test_registry_list() {
         let registry = CustomOperationRegistry::new();
         let ops = registry.list();
-        assert_eq!(ops.len(), 5);
+        assert_eq!(ops.len(), 6); // entity.create, document.catalog, document.extract, ubo.calculate, screening.pep, screening.sanctions
     }
 }

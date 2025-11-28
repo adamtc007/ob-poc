@@ -1,13 +1,37 @@
-//! Aligned with actual database schema
-//! DB schema: document_catalog uses doc_id as PK, document_metadata uses doc_id + attribute_id,
-//!            attribute_values_typed uses entity_id + attribute_id (text)
+//! Document Extraction Service - Extracts attributes from documents using the document-attribute mapping
+//!
+//! Actual DB Schema:
+//! - document_catalog: doc_id (PK), document_type_id, cbu_id, document_name, extraction_status
+//! - document_types: type_id (PK), type_code, display_name, category, domain
+//! - document_attribute_mappings: mapping_id, document_type_id (FK), attribute_uuid (FK), extraction_method
+//! - document_metadata: doc_id + attribute_id (composite PK), value (jsonb)
+//! - attribute_values_typed: entity_id, attribute_id, value_text/value_number/etc.
 
 use crate::data_dictionary::{AttributeId, DbAttributeDefinition, DictionaryService};
 use serde_json::Value;
 use sqlx::PgPool;
 use std::collections::HashMap;
-use std::str::FromStr;
 use uuid::Uuid;
+
+/// Mapping from document_attribute_mappings table
+#[derive(Debug, Clone)]
+pub struct DocumentAttributeMapping {
+    pub mapping_id: Uuid,
+    pub attribute_uuid: Uuid,
+    pub extraction_method: String,
+    pub is_required: bool,
+    pub field_name: Option<String>,
+}
+
+/// Document info from document_catalog
+#[derive(Debug, Clone)]
+pub struct DocumentInfo {
+    pub doc_id: Uuid,
+    pub document_type_id: Uuid,
+    pub document_type_code: String,
+    pub cbu_id: Option<Uuid>,
+    pub document_name: Option<String>,
+}
 
 #[derive(Debug, Clone)]
 pub struct DocumentExtractionService {
@@ -19,63 +43,144 @@ impl DocumentExtractionService {
         Self { pool }
     }
 
+    // =========================================================================
+    // DOCUMENT LOOKUP
+    // =========================================================================
+
+    /// Get document info including type code
+    pub async fn get_document_info(&self, doc_id: Uuid) -> Result<Option<DocumentInfo>, String> {
+        let row = sqlx::query!(
+            r#"
+            SELECT
+                dc.doc_id,
+                dc.document_type_id,
+                dt.type_code,
+                dc.cbu_id,
+                dc.document_name
+            FROM "ob-poc".document_catalog dc
+            JOIN "ob-poc".document_types dt ON dt.type_id = dc.document_type_id
+            WHERE dc.doc_id = $1
+            "#,
+            doc_id
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| format!("Failed to fetch document: {}", e))?;
+
+        Ok(row.map(|r| DocumentInfo {
+            doc_id: r.doc_id,
+            document_type_id: r.document_type_id.unwrap_or_default(),
+            document_type_code: r.type_code,
+            cbu_id: r.cbu_id,
+            document_name: r.document_name,
+        }))
+    }
+
+    // =========================================================================
+    // ATTRIBUTE MAPPING
+    // =========================================================================
+
+    /// Get attribute mappings for a document type
+    pub async fn get_attribute_mappings_for_doc_type(
+        &self,
+        document_type_id: Uuid,
+    ) -> Result<Vec<DocumentAttributeMapping>, String> {
+        let mappings = sqlx::query!(
+            r#"
+            SELECT
+                mapping_id,
+                attribute_uuid,
+                extraction_method,
+                is_required,
+                field_name
+            FROM "ob-poc".document_attribute_mappings
+            WHERE document_type_id = $1
+            "#,
+            document_type_id
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| format!("Failed to get attribute mappings: {}", e))?;
+
+        Ok(mappings
+            .into_iter()
+            .map(|r| DocumentAttributeMapping {
+                mapping_id: r.mapping_id,
+                attribute_uuid: r.attribute_uuid,
+                extraction_method: r.extraction_method,
+                is_required: r.is_required.unwrap_or(false),
+                field_name: r.field_name,
+            })
+            .collect())
+    }
+
+    // =========================================================================
+    // EXTRACTION
+    // =========================================================================
+
     /// Extract attributes from an uploaded document
     pub async fn extract_attributes_from_document(
         &self,
         doc_id: Uuid,
-        cbu_id: Uuid,
         dictionary_service: &dyn DictionaryService,
     ) -> Result<HashMap<AttributeId, Value>, String> {
-        // Step 1: Get document details - DB uses doc_id as PK
-        let _document = sqlx::query!(
-            r#"
-            SELECT
-                doc_id,
-                document_name,
-                mime_type,
-                extracted_data
-            FROM "ob-poc".document_catalog
-            WHERE doc_id = $1 AND cbu_id = $2
-            "#,
-            doc_id,
-            cbu_id
-        )
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| format!("Failed to fetch document: {}", e))?
-        .ok_or_else(|| format!("Document {} not found", doc_id))?;
+        // Step 1: Get document details
+        let document = self
+            .get_document_info(doc_id)
+            .await?
+            .ok_or_else(|| format!("Document {} not found", doc_id))?;
 
-        // Step 2: Get applicable attributes (all document-extractable attributes)
-        let applicable_attributes = self.get_applicable_attributes().await?;
+        // Step 2: Get attribute mappings for this document type
+        let attribute_mappings = self
+            .get_attribute_mappings_for_doc_type(document.document_type_id)
+            .await?;
+
+        if attribute_mappings.is_empty() {
+            return Err(format!(
+                "No attribute mappings found for document type '{}'",
+                document.document_type_code
+            ));
+        }
 
         let mut extracted_values = HashMap::new();
 
-        // Step 3: Extract each attribute
-        for attribute_id in applicable_attributes {
-            if let Some(definition) = dictionary_service.get_attribute(&attribute_id).await? {
-                // For now, use mock extraction - in production would read file from storage_key
-                if let Some(value) = self.mock_extract_single_attribute(&definition).await? {
-                    // Step 4: Store in document_metadata (uses doc_id, attribute_id (uuid), value (jsonb))
-                    self.store_document_metadata(doc_id, &attribute_id, &value)
-                        .await?;
+        // Step 3: Extract each mapped attribute
+        for mapping in &attribute_mappings {
+            let attribute_id = AttributeId::from_uuid(mapping.attribute_uuid);
 
-                    // Step 5: Store in attribute_values_typed (uses entity_id)
-                    // Note: we use cbu_id as the entity_id here for CBU-level attributes
-                    self.store_attribute_value(&attribute_id, &value, cbu_id)
+            if let Some(definition) = dictionary_service.get_attribute(&attribute_id).await? {
+                // Extract value using hints from the mapping
+                if let Some(value) = self.extract_single_attribute(&definition, mapping).await? {
+                    // Step 4: Store in document_metadata
+                    self.store_document_metadata(doc_id, mapping.attribute_uuid, &value)
                         .await?;
 
                     extracted_values.insert(attribute_id, value);
+                } else if mapping.is_required {
+                    tracing::warn!(
+                        "Required attribute {} could not be extracted from document {}",
+                        mapping.attribute_uuid,
+                        doc_id
+                    );
                 }
             }
         }
 
-        // Step 6: Update document extraction status
-        let confidence = sqlx::types::BigDecimal::from_str("0.85").unwrap();
+        // Step 5: Update document extraction status
+        let confidence = if extracted_values.is_empty() {
+            bigdecimal::BigDecimal::from(0)
+        } else {
+            bigdecimal::BigDecimal::try_from(0.85).unwrap_or_else(|_| {
+                bigdecimal::BigDecimal::from(85) / bigdecimal::BigDecimal::from(100)
+            })
+        };
+
         sqlx::query!(
             r#"
             UPDATE "ob-poc".document_catalog
             SET extraction_status = 'COMPLETED',
                 extraction_confidence = $2,
+                last_extracted_at = CURRENT_TIMESTAMP,
                 updated_at = CURRENT_TIMESTAMP
             WHERE doc_id = $1
             "#,
@@ -89,59 +194,58 @@ impl DocumentExtractionService {
         Ok(extracted_values)
     }
 
-    async fn get_applicable_attributes(&self) -> Result<Vec<AttributeId>, String> {
-        // Get attributes that can be extracted from documents
-        let attributes = sqlx::query!(
-            r#"
-            SELECT DISTINCT d.attribute_id
-            FROM "ob-poc".dictionary d
-            WHERE d.source IS NOT NULL
-                AND d.source::jsonb @> jsonb_build_object('source_type', 'document')
-            LIMIT 10
-            "#
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| format!("Failed to get applicable attributes: {}", e))?;
-
-        Ok(attributes
-            .into_iter()
-            .map(|r| AttributeId::from_uuid(r.attribute_id))
-            .collect())
-    }
-
-    // Mock extraction - in production would analyze actual document content
-    async fn mock_extract_single_attribute(
+    /// Extract a single attribute value from the document
+    async fn extract_single_attribute(
         &self,
         definition: &DbAttributeDefinition,
+        mapping: &DocumentAttributeMapping,
     ) -> Result<Option<Value>, String> {
-        // For now, return a mock value based on data type
+        // TODO: Implement actual extraction using:
+        // - mapping.extraction_method (OCR, MRZ, BARCODE, etc.)
+        // - mapping.field_name
+        // - definition.data_type
+
         let mock_value = match definition.data_type.as_str() {
-            "string" => Value::String(format!("Extracted {}", definition.name)),
-            "number" | "numeric" => Value::Number(serde_json::Number::from_f64(42.0).unwrap()),
-            "boolean" => Value::Bool(true),
-            _ => Value::String("mock".to_string()),
+            "string" | "text" => Value::String(format!("Extracted {}", definition.name)),
+            "number" | "numeric" | "integer" | "decimal" => {
+                Value::Number(serde_json::Number::from_f64(42.0).unwrap())
+            }
+            "boolean" | "bool" => Value::Bool(true),
+            "date" => Value::String("2024-01-15".to_string()),
+            _ => Value::String("mock_value".to_string()),
         };
+
+        tracing::debug!(
+            "Extracting attribute '{}' using method '{}'",
+            mapping.attribute_uuid,
+            mapping.extraction_method
+        );
 
         Ok(Some(mock_value))
     }
 
+    // =========================================================================
+    // STORAGE
+    // =========================================================================
+
     async fn store_document_metadata(
         &self,
         doc_id: Uuid,
-        attribute_id: &AttributeId,
+        attribute_id: Uuid,
         value: &Value,
     ) -> Result<(), String> {
-        // DB schema: doc_id, attribute_id (UUID), value (JSONB)
+        // Use UPSERT since (doc_id, attribute_id) is the composite PK
         sqlx::query!(
             r#"
-            INSERT INTO "ob-poc".document_metadata (
-                doc_id, attribute_id, value
-            ) VALUES ($1, $2, $3)
-            ON CONFLICT (doc_id, attribute_id) DO UPDATE SET value = $3
+            INSERT INTO "ob-poc".document_metadata (doc_id, attribute_id, value, extraction_confidence, extracted_at)
+            VALUES ($1, $2, $3, 0.85, CURRENT_TIMESTAMP)
+            ON CONFLICT (doc_id, attribute_id)
+            DO UPDATE SET value = EXCLUDED.value,
+                          extraction_confidence = EXCLUDED.extraction_confidence,
+                          extracted_at = EXCLUDED.extracted_at
             "#,
             doc_id,
-            attribute_id.as_uuid(),
+            attribute_id,
             value
         )
         .execute(&self.pool)
@@ -151,82 +255,36 @@ impl DocumentExtractionService {
         Ok(())
     }
 
-    async fn store_attribute_value(
+    // =========================================================================
+    // QUERIES
+    // =========================================================================
+
+    /// Get all attributes that can be extracted from a document type
+    pub async fn get_extractable_attributes_for_doc_type(
         &self,
-        attribute_id: &AttributeId,
-        value: &Value,
-        entity_id: Uuid,
-    ) -> Result<(), String> {
-        // DB schema: entity_id, attribute_id (text), value_text/value_number/value_boolean/value_json
-        let attr_id_str = attribute_id.as_uuid().to_string();
+        document_type_id: Uuid,
+    ) -> Result<Vec<DocumentAttributeMapping>, String> {
+        self.get_attribute_mappings_for_doc_type(document_type_id)
+            .await
+    }
 
-        match value {
-            Value::String(s) => {
-                sqlx::query!(
-                    r#"
-                    INSERT INTO "ob-poc".attribute_values_typed (
-                        entity_id, attribute_id, value_text
-                    ) VALUES ($1, $2, $3)
-                    "#,
-                    entity_id,
-                    attr_id_str,
-                    s
-                )
-                .execute(&self.pool)
-                .await
-                .map_err(|e| format!("Failed to store string value: {}", e))?;
-            }
-            Value::Number(n) => {
-                let num_val = bigdecimal::BigDecimal::from_str(&n.to_string()).unwrap();
-                sqlx::query!(
-                    r#"
-                    INSERT INTO "ob-poc".attribute_values_typed (
-                        entity_id, attribute_id, value_number
-                    ) VALUES ($1, $2, $3)
-                    "#,
-                    entity_id,
-                    attr_id_str,
-                    num_val
-                )
-                .execute(&self.pool)
-                .await
-                .map_err(|e| format!("Failed to store number value: {}", e))?;
-            }
-            Value::Bool(b) => {
-                sqlx::query!(
-                    r#"
-                    INSERT INTO "ob-poc".attribute_values_typed (
-                        entity_id, attribute_id, value_boolean
-                    ) VALUES ($1, $2, $3)
-                    "#,
-                    entity_id,
-                    attr_id_str,
-                    b
-                )
-                .execute(&self.pool)
-                .await
-                .map_err(|e| format!("Failed to store boolean value: {}", e))?;
-            }
-            Value::Object(_) | Value::Array(_) => {
-                sqlx::query!(
-                    r#"
-                    INSERT INTO "ob-poc".attribute_values_typed (
-                        entity_id, attribute_id, value_json
-                    ) VALUES ($1, $2, $3)
-                    "#,
-                    entity_id,
-                    attr_id_str,
-                    value
-                )
-                .execute(&self.pool)
-                .await
-                .map_err(|e| format!("Failed to store JSON value: {}", e))?;
-            }
-            Value::Null => {
-                // Skip null values
-            }
-        }
+    /// Find document types that can provide a specific attribute
+    pub async fn get_doc_types_for_attribute(
+        &self,
+        attribute_uuid: Uuid,
+    ) -> Result<Vec<Uuid>, String> {
+        let doc_types = sqlx::query!(
+            r#"
+            SELECT DISTINCT document_type_id
+            FROM "ob-poc".document_attribute_mappings
+            WHERE attribute_uuid = $1
+            "#,
+            attribute_uuid
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| format!("Failed to get document types for attribute: {}", e))?;
 
-        Ok(())
+        Ok(doc_types.into_iter().map(|r| r.document_type_id).collect())
     }
 }
