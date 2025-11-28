@@ -3,15 +3,15 @@
 //! This module provides database operations for CBUs following the canonical
 //! DB schema. DSL field names are mapped to DB columns in CrudExecutor.
 //!
-//! Canonical DB schema (DB is master per Section 3.1):
+//! Canonical DB schema:
 //! - cbu_id uuid PK
 //! - name text (DSL :cbu-name maps here)
-//! - description text (DSL :description maps here)
-//! - nature_purpose text (DSL :nature-purpose maps here)
+//! - description text
+//! - nature_purpose text
+//! - source_of_funds text
+//! - client_type varchar(100)
+//! - jurisdiction varchar(50)
 //! - created_at, updated_at timestamps
-//!
-//! Note: Fields like :jurisdiction, :client-type, :status are stored as
-//! attributes in attribute_values table, not in cbus.
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
@@ -27,6 +27,7 @@ pub struct CbuRow {
     pub name: String,
     pub description: Option<String>,
     pub nature_purpose: Option<String>,
+    pub source_of_funds: Option<String>,
     pub client_type: Option<String>,
     pub jurisdiction: Option<String>,
     pub created_at: Option<DateTime<Utc>>,
@@ -39,6 +40,7 @@ pub struct NewCbuFields {
     pub name: String,
     pub description: Option<String>,
     pub nature_purpose: Option<String>,
+    pub source_of_funds: Option<String>,
     pub client_type: Option<String>,
     pub jurisdiction: Option<String>,
 }
@@ -66,14 +68,15 @@ impl CbuService {
 
         sqlx::query(
             r#"
-            INSERT INTO "ob-poc".cbus (cbu_id, name, description, nature_purpose, client_type, jurisdiction, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+            INSERT INTO "ob-poc".cbus (cbu_id, name, description, nature_purpose, source_of_funds, client_type, jurisdiction, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
             "#,
         )
         .bind(cbu_id)
         .bind(&fields.name)
         .bind(&fields.description)
         .bind(&fields.nature_purpose)
+        .bind(&fields.source_of_funds)
         .bind(&fields.client_type)
         .bind(&fields.jurisdiction)
         .execute(&self.pool)
@@ -89,7 +92,7 @@ impl CbuService {
     pub async fn get_cbu_by_id(&self, cbu_id: Uuid) -> Result<Option<CbuRow>> {
         let result = sqlx::query_as::<_, CbuRow>(
             r#"
-            SELECT cbu_id, name, description, nature_purpose, client_type, jurisdiction, created_at, updated_at
+            SELECT cbu_id, name, description, nature_purpose, source_of_funds, client_type, jurisdiction, created_at, updated_at
             FROM "ob-poc".cbus
             WHERE cbu_id = $1
             "#,
@@ -106,7 +109,7 @@ impl CbuService {
     pub async fn get_cbu_by_name(&self, name: &str) -> Result<Option<CbuRow>> {
         let result = sqlx::query_as::<_, CbuRow>(
             r#"
-            SELECT cbu_id, name, description, nature_purpose, client_type, jurisdiction, created_at, updated_at
+            SELECT cbu_id, name, description, nature_purpose, source_of_funds, client_type, jurisdiction, created_at, updated_at
             FROM "ob-poc".cbus
             WHERE name = $1
             "#,
@@ -123,7 +126,7 @@ impl CbuService {
     pub async fn list_cbus(&self, limit: Option<i32>, offset: Option<i32>) -> Result<Vec<CbuRow>> {
         let results = sqlx::query_as::<_, CbuRow>(
             r#"
-            SELECT cbu_id, name, description, nature_purpose, client_type, jurisdiction, created_at, updated_at
+            SELECT cbu_id, name, description, nature_purpose, source_of_funds, client_type, jurisdiction, created_at, updated_at
             FROM "ob-poc".cbus
             ORDER BY created_at DESC
             LIMIT $1 OFFSET $2
@@ -197,13 +200,16 @@ impl CbuService {
 
         sqlx::query(
             r#"
-            INSERT INTO "ob-poc".cbus (cbu_id, name, description, nature_purpose, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, NOW(), NOW())
+            INSERT INTO "ob-poc".cbus (cbu_id, name, description, nature_purpose, source_of_funds, client_type, jurisdiction, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
             ON CONFLICT (cbu_id)
             DO UPDATE SET
                 name = EXCLUDED.name,
                 description = EXCLUDED.description,
                 nature_purpose = EXCLUDED.nature_purpose,
+                source_of_funds = EXCLUDED.source_of_funds,
+                client_type = EXCLUDED.client_type,
+                jurisdiction = EXCLUDED.jurisdiction,
                 updated_at = NOW()
             "#,
         )
@@ -211,6 +217,9 @@ impl CbuService {
         .bind(&fields.name)
         .bind(&fields.description)
         .bind(&fields.nature_purpose)
+        .bind(&fields.source_of_funds)
+        .bind(&fields.client_type)
+        .bind(&fields.jurisdiction)
         .execute(&self.pool)
         .await
         .context("Failed to upsert CBU")?;
