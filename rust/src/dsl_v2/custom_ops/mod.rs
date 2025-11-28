@@ -185,7 +185,7 @@ impl CustomOperation for DocumentCatalogOp {
                 }
             });
 
-        // Create document
+        // Create document - doc_id is the PK
         let doc_id = Uuid::new_v4();
 
         sqlx::query!(
@@ -243,11 +243,11 @@ impl CustomOperation for DocumentExtractOp {
     ) -> Result<ExecutionResult> {
         use uuid::Uuid;
 
-        // Get document ID
+        // Get document ID (doc_id is the PK)
         let doc_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("document-id"))
+            .find(|a| a.key.matches("document-id") || a.key.matches("doc-id"))
             .and_then(|a| {
                 if let Some(name) = a.value.as_reference() {
                     ctx.resolve(name)
