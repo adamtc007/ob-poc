@@ -1,8 +1,8 @@
 //! Aligned with actual database schema
-//! Live DB: document_catalog.document_id, document_metadata.extracted_value,
-//!          attribute_values_typed uses cbu_id + string_value/numeric_value/etc.
+//! DB schema: document_catalog uses doc_id as PK, document_metadata uses doc_id + attribute_id,
+//!            attribute_values_typed uses entity_id + attribute_id (text)
 
-use crate::data_dictionary::{DbAttributeDefinition, AttributeId, DictionaryService};
+use crate::data_dictionary::{AttributeId, DbAttributeDefinition, DictionaryService};
 use serde_json::Value;
 use sqlx::PgPool;
 use std::collections::HashMap;
@@ -22,28 +22,28 @@ impl DocumentExtractionService {
     /// Extract attributes from an uploaded document
     pub async fn extract_attributes_from_document(
         &self,
-        document_id: Uuid,
+        doc_id: Uuid,
         cbu_id: Uuid,
         dictionary_service: &dyn DictionaryService,
     ) -> Result<HashMap<AttributeId, Value>, String> {
-        // Step 1: Get document details - live DB uses document_id, not doc_id
+        // Step 1: Get document details - DB uses doc_id as PK
         let _document = sqlx::query!(
             r#"
             SELECT
-                document_id,
-                file_path,
+                doc_id,
+                document_name,
                 mime_type,
-                extracted_attributes
+                extracted_data
             FROM "ob-poc".document_catalog
-            WHERE document_id = $1 AND cbu_id = $2
+            WHERE doc_id = $1 AND cbu_id = $2
             "#,
-            document_id,
+            doc_id,
             cbu_id
         )
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| format!("Failed to fetch document: {}", e))?
-        .ok_or_else(|| format!("Document {} not found", document_id))?;
+        .ok_or_else(|| format!("Document {} not found", doc_id))?;
 
         // Step 2: Get applicable attributes (all document-extractable attributes)
         let applicable_attributes = self.get_applicable_attributes().await?;
@@ -53,13 +53,14 @@ impl DocumentExtractionService {
         // Step 3: Extract each attribute
         for attribute_id in applicable_attributes {
             if let Some(definition) = dictionary_service.get_attribute(&attribute_id).await? {
-                // For now, use mock extraction - in production would read file from file_path
+                // For now, use mock extraction - in production would read file from storage_key
                 if let Some(value) = self.mock_extract_single_attribute(&definition).await? {
-                    // Step 4: Store in document_metadata (uses extracted_value TEXT column)
-                    self.store_document_metadata(document_id, &attribute_id, &value)
+                    // Step 4: Store in document_metadata (uses doc_id, attribute_id (uuid), value (jsonb))
+                    self.store_document_metadata(doc_id, &attribute_id, &value)
                         .await?;
 
-                    // Step 5: Store in attribute_values_typed (uses cbu_id)
+                    // Step 5: Store in attribute_values_typed (uses entity_id)
+                    // Note: we use cbu_id as the entity_id here for CBU-level attributes
                     self.store_attribute_value(&attribute_id, &value, cbu_id)
                         .await?;
 
@@ -69,16 +70,16 @@ impl DocumentExtractionService {
         }
 
         // Step 6: Update document extraction status
-        let confidence: f64 = 0.85;
+        let confidence = sqlx::types::BigDecimal::from_str("0.85").unwrap();
         sqlx::query!(
             r#"
             UPDATE "ob-poc".document_catalog
-            SET extraction_status = 'completed',
+            SET extraction_status = 'COMPLETED',
                 extraction_confidence = $2,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE document_id = $1
+            WHERE doc_id = $1
             "#,
-            document_id,
+            doc_id,
             confidence
         )
         .execute(&self.pool)
@@ -127,26 +128,21 @@ impl DocumentExtractionService {
 
     async fn store_document_metadata(
         &self,
-        document_id: Uuid,
+        doc_id: Uuid,
         attribute_id: &AttributeId,
         value: &Value,
     ) -> Result<(), String> {
-        // Live DB schema: document_id, attribute_id (UUID), extracted_value (TEXT)
-        // No ON CONFLICT - live table doesn't have unique constraint on (document_id, attribute_id)
-        let extracted_value = match value {
-            Value::String(s) => s.clone(),
-            other => other.to_string(),
-        };
-
+        // DB schema: doc_id, attribute_id (UUID), value (JSONB)
         sqlx::query!(
             r#"
             INSERT INTO "ob-poc".document_metadata (
-                document_id, attribute_id, extracted_value
+                doc_id, attribute_id, value
             ) VALUES ($1, $2, $3)
+            ON CONFLICT (doc_id, attribute_id) DO UPDATE SET value = $3
             "#,
-            document_id,
+            doc_id,
             attribute_id.as_uuid(),
-            extracted_value
+            value
         )
         .execute(&self.pool)
         .await
@@ -159,19 +155,21 @@ impl DocumentExtractionService {
         &self,
         attribute_id: &AttributeId,
         value: &Value,
-        cbu_id: Uuid,
+        entity_id: Uuid,
     ) -> Result<(), String> {
-        // Live DB schema: cbu_id, attribute_id (UUID), value_type, string_value/numeric_value/etc.
+        // DB schema: entity_id, attribute_id (text), value_text/value_number/value_boolean/value_json
+        let attr_id_str = attribute_id.as_uuid().to_string();
+
         match value {
             Value::String(s) => {
                 sqlx::query!(
                     r#"
                     INSERT INTO "ob-poc".attribute_values_typed (
-                        cbu_id, attribute_id, value_type, string_value
-                    ) VALUES ($1, $2, 'string', $3)
+                        entity_id, attribute_id, value_text
+                    ) VALUES ($1, $2, $3)
                     "#,
-                    cbu_id,
-                    attribute_id.as_uuid(),
+                    entity_id,
+                    attr_id_str,
                     s
                 )
                 .execute(&self.pool)
@@ -183,11 +181,11 @@ impl DocumentExtractionService {
                 sqlx::query!(
                     r#"
                     INSERT INTO "ob-poc".attribute_values_typed (
-                        cbu_id, attribute_id, value_type, numeric_value
-                    ) VALUES ($1, $2, 'numeric', $3)
+                        entity_id, attribute_id, value_number
+                    ) VALUES ($1, $2, $3)
                     "#,
-                    cbu_id,
-                    attribute_id.as_uuid(),
+                    entity_id,
+                    attr_id_str,
                     num_val
                 )
                 .execute(&self.pool)
@@ -198,11 +196,11 @@ impl DocumentExtractionService {
                 sqlx::query!(
                     r#"
                     INSERT INTO "ob-poc".attribute_values_typed (
-                        cbu_id, attribute_id, value_type, boolean_value
-                    ) VALUES ($1, $2, 'boolean', $3)
+                        entity_id, attribute_id, value_boolean
+                    ) VALUES ($1, $2, $3)
                     "#,
-                    cbu_id,
-                    attribute_id.as_uuid(),
+                    entity_id,
+                    attr_id_str,
                     b
                 )
                 .execute(&self.pool)
@@ -213,11 +211,11 @@ impl DocumentExtractionService {
                 sqlx::query!(
                     r#"
                     INSERT INTO "ob-poc".attribute_values_typed (
-                        cbu_id, attribute_id, value_type, json_value
-                    ) VALUES ($1, $2, 'json', $3)
+                        entity_id, attribute_id, value_json
+                    ) VALUES ($1, $2, $3)
                     "#,
-                    cbu_id,
-                    attribute_id.as_uuid(),
+                    entity_id,
+                    attr_id_str,
                     value
                 )
                 .execute(&self.pool)

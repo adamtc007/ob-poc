@@ -71,20 +71,22 @@ impl SinkExecutor for DatabaseSink {
         attribute_id: &AttributeId,
         value: &Value,
         _definition: &DbAttributeDefinition,
-        cbu_id: Uuid,
+        entity_id: Uuid,
     ) -> Result<(), String> {
         // Persist to attribute_values_typed based on value type
-        // Live DB schema uses: cbu_id, string_value, numeric_value, boolean_value, json_value, value_type
+        // DB schema: entity_id, attribute_id (text), value_text, value_number, value_boolean, value_json
+        let attr_id_str = attribute_id.as_uuid().to_string();
+
         match value {
             Value::String(s) => {
                 sqlx::query!(
                     r#"
                     INSERT INTO "ob-poc".attribute_values_typed (
-                        cbu_id, attribute_id, value_type, string_value
-                    ) VALUES ($1, $2, 'string', $3)
+                        entity_id, attribute_id, value_text
+                    ) VALUES ($1, $2, $3)
                     "#,
-                    cbu_id,
-                    attribute_id.as_uuid(),
+                    entity_id,
+                    attr_id_str,
                     s
                 )
                 .execute(&self.pool)
@@ -97,11 +99,11 @@ impl SinkExecutor for DatabaseSink {
                 sqlx::query!(
                     r#"
                     INSERT INTO "ob-poc".attribute_values_typed (
-                        cbu_id, attribute_id, value_type, numeric_value
-                    ) VALUES ($1, $2, 'numeric', $3)
+                        entity_id, attribute_id, value_number
+                    ) VALUES ($1, $2, $3)
                     "#,
-                    cbu_id,
-                    attribute_id.as_uuid(),
+                    entity_id,
+                    attr_id_str,
                     decimal
                 )
                 .execute(&self.pool)
@@ -112,11 +114,11 @@ impl SinkExecutor for DatabaseSink {
                 sqlx::query!(
                     r#"
                     INSERT INTO "ob-poc".attribute_values_typed (
-                        cbu_id, attribute_id, value_type, boolean_value
-                    ) VALUES ($1, $2, 'boolean', $3)
+                        entity_id, attribute_id, value_boolean
+                    ) VALUES ($1, $2, $3)
                     "#,
-                    cbu_id,
-                    attribute_id.as_uuid(),
+                    entity_id,
+                    attr_id_str,
                     b
                 )
                 .execute(&self.pool)
@@ -127,11 +129,11 @@ impl SinkExecutor for DatabaseSink {
                 sqlx::query!(
                     r#"
                     INSERT INTO "ob-poc".attribute_values_typed (
-                        cbu_id, attribute_id, value_type, json_value
-                    ) VALUES ($1, $2, 'json', $3)
+                        entity_id, attribute_id, value_json
+                    ) VALUES ($1, $2, $3)
                     "#,
-                    cbu_id,
-                    attribute_id.as_uuid(),
+                    entity_id,
+                    attr_id_str,
                     value
                 )
                 .execute(&self.pool)

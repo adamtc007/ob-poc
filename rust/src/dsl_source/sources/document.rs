@@ -71,24 +71,25 @@ impl DocumentSource {
     /// Get extractable attributes for a document type
     pub async fn get_document_type_attributes(
         &self,
-        document_type_code: &str,
+        document_type_id: Uuid,
     ) -> Result<Vec<DocumentAttributeMapping>, SourceError> {
-        // Query document_attribute_mappings - live DB uses document_type_code (varchar) not FK
-        // Live DB: dam.document_type_code, dam.attribute_id, dam.extraction_priority, dam.is_required
+        // Query document_attribute_mappings joined with dictionary
+        // DB schema: dam.document_type_id (uuid), dam.attribute_uuid (uuid)
         let mappings = sqlx::query!(
             r#"
-            SELECT 
-                dam.document_type_code,
-                dam.attribute_id,
-                ca.attribute_name,
-                dam.extraction_priority,
-                dam.is_required
+            SELECT
+                dam.attribute_uuid,
+                d.name as attribute_name,
+                dam.extraction_method,
+                dam.is_required,
+                dam.confidence_threshold,
+                dam.field_name
             FROM "ob-poc".document_attribute_mappings dam
-            JOIN "ob-poc".consolidated_attributes ca ON dam.attribute_id = ca.attribute_id
-            WHERE dam.document_type_code = $1
-            ORDER BY dam.extraction_priority, dam.created_at
+            JOIN "ob-poc".dictionary d ON dam.attribute_uuid = d.attribute_id
+            WHERE dam.document_type_id = $1
+            ORDER BY dam.created_at
             "#,
-            document_type_code
+            document_type_id
         )
         .fetch_all(&self.pool)
         .await?;
@@ -96,12 +97,15 @@ impl DocumentSource {
         Ok(mappings
             .into_iter()
             .map(|row| DocumentAttributeMapping {
-                attribute_uuid: row.attribute_id,
+                attribute_uuid: row.attribute_uuid,
                 attribute_name: row.attribute_name,
-                extraction_method: ExtractionMethod::AI, // Default - no method column in live DB
+                extraction_method: parse_extraction_method(&row.extraction_method),
                 is_required: row.is_required.unwrap_or(false),
-                confidence_threshold: 0.8, // Default - no threshold column in live DB
-                field_name: None, // No field_name in live DB
+                confidence_threshold: row
+                    .confidence_threshold
+                    .map(|d| d.to_string().parse().unwrap_or(0.8))
+                    .unwrap_or(0.8),
+                field_name: row.field_name,
             })
             .collect())
     }
@@ -109,25 +113,29 @@ impl DocumentSource {
     /// Generate DSL for extracting all attributes from a document
     pub async fn generate_extraction_dsl(
         &self,
-        document_id: Uuid,
+        doc_id: Uuid,
         cbu_id: Uuid,
     ) -> Result<ExtractionDsl, SourceError> {
-        // Get document type from catalog - live DB uses document_id not doc_id
+        // Get document type from catalog - DB uses doc_id as PK
         let doc = sqlx::query!(
             r#"
-            SELECT dc.document_id, dt.type_code
+            SELECT dc.doc_id, dc.document_type_id, dt.type_code
             FROM "ob-poc".document_catalog dc
             JOIN "ob-poc".document_types dt ON dc.document_type_id = dt.type_id
-            WHERE dc.document_id = $1
+            WHERE dc.doc_id = $1
             "#,
-            document_id
+            doc_id
         )
         .fetch_optional(&self.pool)
         .await?
-        .ok_or(SourceError::DocumentNotFound(document_id))?;
+        .ok_or(SourceError::DocumentNotFound(doc_id))?;
+
+        let document_type_id = doc.document_type_id.ok_or_else(|| {
+            SourceError::ExtractionFailed("Document has no document_type_id".to_string())
+        })?;
 
         // Get attribute mappings for this document type
-        let mappings = self.get_document_type_attributes(&doc.type_code).await?;
+        let mappings = self.get_document_type_attributes(document_type_id).await?;
 
         if mappings.is_empty() {
             return Err(SourceError::ExtractionFailed(format!(
@@ -142,7 +150,7 @@ impl DocumentSource {
         for mapping in &mappings {
             let dsl = format!(
                 r#"(document.extract :doc-id "{}" :attr-id "{}" :cbu-id "{}" :method "{}" :required {})"#,
-                document_id,
+                doc_id,
                 mapping.attribute_uuid,
                 cbu_id,
                 extraction_method_to_str(&mapping.extraction_method),
@@ -152,7 +160,7 @@ impl DocumentSource {
         }
 
         Ok(ExtractionDsl {
-            document_id,
+            document_id: doc_id,
             document_type_code: doc.type_code,
             dsl_statements,
             attribute_mappings: mappings,
@@ -162,14 +170,14 @@ impl DocumentSource {
     /// Generate DSL for a single attribute extraction
     pub fn generate_single_extraction_dsl(
         &self,
-        document_id: Uuid,
+        doc_id: Uuid,
         attribute_id: Uuid,
         cbu_id: Uuid,
         method: &ExtractionMethod,
     ) -> String {
         format!(
             r#"(document.extract :doc-id "{}" :attr-id "{}" :cbu-id "{}" :method "{}")"#,
-            document_id,
+            doc_id,
             attribute_id,
             cbu_id,
             extraction_method_to_str(method)
@@ -179,10 +187,10 @@ impl DocumentSource {
     /// Generate a complete DSL sheet for document extraction
     pub async fn generate_extraction_sheet(
         &self,
-        document_id: Uuid,
+        doc_id: Uuid,
         cbu_id: Uuid,
     ) -> Result<String, SourceError> {
-        let extraction = self.generate_extraction_dsl(document_id, cbu_id).await?;
+        let extraction = self.generate_extraction_dsl(doc_id, cbu_id).await?;
 
         let mut sheet = format!(
             r#"; Document Extraction Sheet
@@ -190,7 +198,7 @@ impl DocumentSource {
 ; Generated: {}
 
 "#,
-            document_id,
+            doc_id,
             extraction.document_type_code,
             chrono::Utc::now().to_rfc3339()
         );
@@ -215,23 +223,23 @@ impl AttributeSource for DocumentSource {
         attribute_id: Uuid,
         context: &SourceContext,
     ) -> Result<Option<ExtractedValue>, SourceError> {
-        let document_id = context
-            .document_id
-            .ok_or_else(|| SourceError::ExtractionFailed("No document_id in context".to_string()))?;
+        let doc_id = context.document_id.ok_or_else(|| {
+            SourceError::ExtractionFailed("No document_id in context".to_string())
+        })?;
 
         // Check if this attribute was already extracted from this document
-        // Live DB: document_id (not doc_id), extracted_value (not value), no extraction_confidence
+        // DB schema: doc_id, attribute_id (uuid), value (jsonb), extraction_confidence, extraction_method
         let existing = sqlx::query!(
             r#"
-            SELECT 
+            SELECT
                 dm.attribute_id,
-                dm.extracted_value,
-                dm.confidence,
+                dm.value,
+                dm.extraction_confidence,
                 dm.extraction_method
             FROM "ob-poc".document_metadata dm
-            WHERE dm.document_id = $1 AND dm.attribute_id = $2
+            WHERE dm.doc_id = $1 AND dm.attribute_id = $2
             "#,
-            document_id,
+            doc_id,
             attribute_id
         )
         .fetch_optional(&self.pool)
@@ -240,9 +248,14 @@ impl AttributeSource for DocumentSource {
         if let Some(row) = existing {
             Ok(Some(ExtractedValue {
                 attribute_id: row.attribute_id,
-                value: row.extracted_value.map(|v| serde_json::json!(v)).unwrap_or(serde_json::Value::Null),
-                confidence: row.confidence.unwrap_or(0.0),
-                extraction_method: parse_extraction_method(&row.extraction_method.unwrap_or_default()),
+                value: row.value,
+                confidence: row
+                    .extraction_confidence
+                    .map(|d| d.to_string().parse().unwrap_or(0.0))
+                    .unwrap_or(0.0),
+                extraction_method: parse_extraction_method(
+                    &row.extraction_method.unwrap_or_default(),
+                ),
                 metadata: None,
             }))
         } else {
@@ -252,12 +265,12 @@ impl AttributeSource for DocumentSource {
 
     async fn can_provide(&self, attribute_id: Uuid) -> bool {
         // Check if any document type can provide this attribute
-        // Live DB: uses attribute_id (not attribute_uuid)
+        // DB schema: uses attribute_uuid
         let result = sqlx::query!(
             r#"
             SELECT COUNT(*) as count
             FROM "ob-poc".document_attribute_mappings
-            WHERE attribute_id = $1
+            WHERE attribute_uuid = $1
             "#,
             attribute_id
         )
