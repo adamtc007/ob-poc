@@ -233,6 +233,18 @@ impl DslExecutor {
                 self.execute_role_link(junction, from_col, to_col, &resolved_args)
                     .await?
             }
+            Behavior::RoleUnlink {
+                junction,
+                from_col,
+                to_col,
+            } => {
+                self.execute_role_unlink(junction, from_col, to_col, &resolved_args)
+                    .await?
+            }
+            Behavior::ListParties { junction, fk_col } => {
+                self.execute_list_parties(junction, fk_col, &resolved_args)
+                    .await?
+            }
         };
 
         // Handle symbol capture if specified
@@ -961,6 +973,104 @@ impl DslExecutor {
             .await?;
 
         Ok(ExecutionResult::Uuid(returned_id))
+    }
+
+    /// Execute role unlink - removes a specific role assignment from an entity within a CBU
+    /// 1. Look up role_id from roles table by name
+    /// 2. DELETE from junction table matching cbu_id, entity_id, and role_id
+    #[cfg(feature = "database")]
+    async fn execute_role_unlink(
+        &self,
+        junction: &str,
+        from_col: &str,
+        to_col: &str,
+        args: &HashMap<String, ResolvedValue>,
+    ) -> Result<ExecutionResult> {
+        // Get from/to values
+        let from_key = from_col.replace('_', "-");
+        let to_key = to_col.replace('_', "-");
+
+        let from_val = args
+            .get(&from_key)
+            .ok_or_else(|| anyhow!("Missing {} argument", from_key))?
+            .as_uuid()?;
+        let to_val = args
+            .get(&to_key)
+            .ok_or_else(|| anyhow!("Missing {} argument", to_key))?
+            .as_uuid()?;
+
+        // Get role name and look up role_id
+        let role_name = args
+            .get("role")
+            .ok_or_else(|| anyhow!("Missing role argument"))?
+            .as_string()?;
+
+        let role_id: Uuid =
+            sqlx::query_scalar(r#"SELECT role_id FROM "ob-poc".roles WHERE name = $1"#)
+                .bind(role_name)
+                .fetch_optional(&self.pool)
+                .await?
+                .ok_or_else(|| anyhow!("Unknown role: {}", role_name))?;
+
+        // DELETE from junction table
+        let sql = format!(
+            "DELETE FROM {} WHERE {} = $1 AND {} = $2 AND role_id = $3",
+            qualified_table(junction),
+            from_col,
+            to_col
+        );
+
+        let result = sqlx::query(&sql)
+            .bind(from_val)
+            .bind(to_val)
+            .bind(role_id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(ExecutionResult::Affected(result.rows_affected()))
+    }
+
+    /// Execute list parties - returns enriched party data with entity and role info
+    /// JOINs cbu_entity_roles with entities and roles tables
+    #[cfg(feature = "database")]
+    async fn execute_list_parties(
+        &self,
+        junction: &str,
+        fk_col: &str,
+        args: &HashMap<String, ResolvedValue>,
+    ) -> Result<ExecutionResult> {
+        let fk_key = fk_col.replace('_', "-");
+        let fk_val = args
+            .get(&fk_key)
+            .ok_or_else(|| anyhow!("Missing {} argument", fk_key))?
+            .as_uuid()?;
+
+        // Join to get enriched party data
+        let sql = format!(
+            r#"SELECT
+                cer.cbu_entity_role_id,
+                cer.cbu_id,
+                cer.entity_id,
+                e.name as entity_name,
+                et.name as entity_type,
+                r.role_id,
+                r.name as role_name,
+                r.description as role_description,
+                cer.created_at
+            FROM {} cer
+            JOIN "ob-poc".entities e ON e.entity_id = cer.entity_id
+            JOIN "ob-poc".entity_types et ON et.entity_type_id = e.entity_type_id
+            JOIN "ob-poc".roles r ON r.role_id = cer.role_id
+            WHERE cer.{} = $1
+            ORDER BY e.name, r.name"#,
+            qualified_table(junction),
+            fk_col
+        );
+
+        let rows = sqlx::query(&sql).bind(fk_val).fetch_all(&self.pool).await?;
+
+        let records: Result<Vec<_>> = rows.iter().map(row_to_json).collect();
+        Ok(ExecutionResult::RecordSet(records?))
     }
 }
 

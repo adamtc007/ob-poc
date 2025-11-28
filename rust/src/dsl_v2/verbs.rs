@@ -90,6 +90,28 @@ pub enum Behavior {
         /// Column for the "to" entity (e.g., entity_id)
         to_col: &'static str,
     },
+
+    /// DELETE from junction table with role lookup
+    /// For removing a specific role assignment
+    /// 1. Look up role_id from roles table by name
+    /// 2. DELETE from junction table matching all three keys
+    RoleUnlink {
+        /// Junction table name
+        junction: &'static str,
+        /// Column for the "from" entity (e.g., cbu_id)
+        from_col: &'static str,
+        /// Column for the "to" entity (e.g., entity_id)
+        to_col: &'static str,
+    },
+
+    /// SELECT with JOINs to roles and entities tables
+    /// Returns enriched party data for a CBU
+    ListParties {
+        /// Junction table (cbu_entity_roles)
+        junction: &'static str,
+        /// FK column to filter by (cbu_id)
+        fk_col: &'static str,
+    },
 }
 
 /// Complete verb definition
@@ -377,28 +399,28 @@ pub static STANDARD_VERBS: &[VerbDef] = &[
     },
     VerbDef {
         domain: "cbu",
-        verb: "unlink",
-        behavior: Behavior::Unlink {
+        verb: "remove-role",
+        behavior: Behavior::RoleUnlink {
             junction: "cbu_entity_roles",
             from_col: "cbu_id",
             to_col: "entity_id",
         },
-        required_args: &["cbu-id", "entity-id"],
-        optional_args: &["role"],
+        required_args: &["cbu-id", "entity-id", "role"],
+        optional_args: &[],
         returns: ReturnType::Affected,
-        description: "Unlink an entity from a CBU (optionally by specific role)",
+        description: "Remove a specific role from an entity within a CBU",
     },
     VerbDef {
         domain: "cbu",
-        verb: "entities",
-        behavior: Behavior::ListByFk {
-            table: "cbu_entity_roles",
+        verb: "parties",
+        behavior: Behavior::ListParties {
+            junction: "cbu_entity_roles",
             fk_col: "cbu_id",
         },
         required_args: &["cbu-id"],
-        optional_args: &["role"],
+        optional_args: &[],
         returns: ReturnType::RecordSet,
-        description: "List all entities linked to a CBU",
+        description: "List all parties (entities with their roles) for a CBU",
     },
     // =========================================================================
     // DOCUMENT DOMAIN - Note: catalog and extract are CUSTOM
