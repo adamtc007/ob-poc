@@ -225,6 +225,14 @@ impl DslExecutor {
                 )
                 .await?
             }
+            Behavior::RoleLink {
+                junction,
+                from_col,
+                to_col,
+            } => {
+                self.execute_role_link(junction, from_col, to_col, &resolved_args)
+                    .await?
+            }
         };
 
         // Handle symbol capture if specified
@@ -889,6 +897,70 @@ impl DslExecutor {
 
         // Return entity_id (the master table ID, not the extension table ID)
         Ok(ExecutionResult::Uuid(entity_id))
+    }
+
+    /// Execute role link - assigns a role to an entity within a CBU
+    /// 1. Look up role_id from roles table by name
+    /// 2. INSERT into junction table with role_id UUID
+    #[cfg(feature = "database")]
+    async fn execute_role_link(
+        &self,
+        junction: &str,
+        from_col: &str,
+        to_col: &str,
+        args: &HashMap<String, ResolvedValue>,
+    ) -> Result<ExecutionResult> {
+        let pk_col = get_pk_column(junction)
+            .ok_or_else(|| anyhow!("Unknown junction table: {}", junction))?;
+
+        // Get from/to values
+        let from_key = from_col.replace('_', "-");
+        let to_key = to_col.replace('_', "-");
+
+        let from_val = args
+            .get(&from_key)
+            .ok_or_else(|| anyhow!("Missing {} argument", from_key))?
+            .as_uuid()?;
+        let to_val = args
+            .get(&to_key)
+            .ok_or_else(|| anyhow!("Missing {} argument", to_key))?
+            .as_uuid()?;
+
+        // Get role name and look up role_id
+        let role_name = args
+            .get("role")
+            .ok_or_else(|| anyhow!("Missing role argument"))?
+            .as_string()?;
+
+        let role_id: Uuid =
+            sqlx::query_scalar(r#"SELECT role_id FROM "ob-poc".roles WHERE name = $1"#)
+                .bind(role_name)
+                .fetch_optional(&self.pool)
+                .await?
+                .ok_or_else(|| anyhow!("Unknown role: {}", role_name))?;
+
+        // Generate new PK
+        let new_id = Uuid::new_v4();
+
+        // INSERT into junction table
+        let sql = format!(
+            "INSERT INTO {} ({}, {}, {}, role_id) VALUES ($1, $2, $3, $4) RETURNING {}",
+            qualified_table(junction),
+            pk_col,
+            from_col,
+            to_col,
+            pk_col
+        );
+
+        let returned_id = sqlx::query_scalar::<_, Uuid>(&sql)
+            .bind(new_id)
+            .bind(from_val)
+            .bind(to_val)
+            .bind(role_id)
+            .fetch_one(&self.pool)
+            .await?;
+
+        Ok(ExecutionResult::Uuid(returned_id))
     }
 }
 

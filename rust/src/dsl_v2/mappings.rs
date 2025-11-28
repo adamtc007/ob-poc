@@ -384,16 +384,10 @@ pub static CBU_ENTITY_ROLES_MAPPINGS: TableMappings = TableMappings {
             aliases: &[],
         },
         ColumnMapping {
-            dsl_key: "role",
-            db_column: "role",
-            db_type: DbType::Text,
-            aliases: &[],
-        },
-        ColumnMapping {
-            dsl_key: "ownership-percent",
-            db_column: "ownership_percent",
-            db_type: DbType::Decimal,
-            aliases: &["ownership-percentage", "ownership"],
+            dsl_key: "role-id",
+            db_column: "role_id",
+            db_type: DbType::Uuid,
+            aliases: &["role"],
         },
         ColumnMapping {
             dsl_key: "effective-date",

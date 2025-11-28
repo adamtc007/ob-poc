@@ -77,6 +77,19 @@ pub enum Behavior {
         /// The entity type name to look up in entity_types table
         entity_type_name: &'static str,
     },
+
+    /// INSERT into junction table with role lookup
+    /// For CBU entity roles where role is a FK to roles table
+    /// 1. Look up role_id from roles table by name
+    /// 2. INSERT into junction table with role_id UUID
+    RoleLink {
+        /// Junction table name
+        junction: &'static str,
+        /// Column for the "from" entity (e.g., cbu_id)
+        from_col: &'static str,
+        /// Column for the "to" entity (e.g., entity_id)
+        to_col: &'static str,
+    },
 }
 
 /// Complete verb definition
@@ -348,20 +361,19 @@ pub static STANDARD_VERBS: &[VerbDef] = &[
     // Taxonomy: Link entities to CBU with roles
     VerbDef {
         domain: "cbu",
-        verb: "link",
-        behavior: Behavior::Link {
+        verb: "assign-role",
+        behavior: Behavior::RoleLink {
             junction: "cbu_entity_roles",
             from_col: "cbu_id",
             to_col: "entity_id",
-            role_col: Some("role"),
         },
         required_args: &["cbu-id", "entity-id", "role"],
-        optional_args: &["ownership-percent", "effective-date", "notes"],
+        optional_args: &[],
         returns: ReturnType::Uuid {
             name: "cbu_entity_role_id",
             capture: false,
         },
-        description: "Link an entity to a CBU with a role",
+        description: "Assign a role to an entity within a CBU (e.g., INVESTMENT_MANAGER, DIRECTOR)",
     },
     VerbDef {
         domain: "cbu",
