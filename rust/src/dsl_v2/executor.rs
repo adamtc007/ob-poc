@@ -298,6 +298,7 @@ impl DslExecutor {
     }
 
     /// Resolve a single value, looking up references
+    #[allow(clippy::only_used_in_recursion)] // &self needed for consistent API
     fn resolve_value(&self, value: &Value, ctx: &ExecutionContext) -> Result<ResolvedValue> {
         match value {
             Value::String(s) => Ok(ResolvedValue::String(s.clone())),
@@ -327,6 +328,11 @@ impl DslExecutor {
                     })
                     .collect();
                 Ok(ResolvedValue::Map(resolved?))
+            }
+            Value::NestedCall(_) => {
+                // NestedCalls should have been extracted and compiled into the execution plan.
+                // If we see one at resolve time, it means the DSL was executed without compilation.
+                bail!("NestedCall found during value resolution. Use compile() + execute_plan() for nested DSL.")
             }
         }
     }
@@ -669,7 +675,7 @@ impl DslExecutor {
         };
 
         // Add other optional columns
-        for (key, _value) in args {
+        for key in args.keys() {
             if let Some((db_col, _db_type)) = resolve_column(junction, key) {
                 if db_col == pk_col || db_col == from_col || db_col == to_col {
                     continue;
@@ -753,12 +759,10 @@ impl DslExecutor {
             .ok_or_else(|| anyhow!("Missing {} argument", fk_key))?
             .as_uuid()?;
 
-        let conditions = vec![format!("{} = $1", fk_col)];
-
         let sql = format!(
-            "SELECT * FROM {} WHERE {}",
+            "SELECT * FROM {} WHERE {} = $1",
             qualified_table(table),
-            conditions.join(" AND ")
+            fk_col
         );
 
         let rows = sqlx::query(&sql).bind(fk_val).fetch_all(&self.pool).await?;
@@ -1128,6 +1132,7 @@ impl ResolvedValue {
 
 /// Enum for dynamic SQL binding
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Json variant reserved for future JSONB column support
 enum BindValue {
     String(String),
     Integer(i64),
@@ -1224,6 +1229,79 @@ fn row_to_json(row: &sqlx::postgres::PgRow) -> Result<JsonValue> {
     }
 
     Ok(JsonValue::Object(map))
+}
+
+// ============================================================================
+// Plan Execution
+// ============================================================================
+
+#[cfg(feature = "database")]
+impl DslExecutor {
+    /// Execute a compiled execution plan
+    ///
+    /// This is the preferred method for executing DSL with nested/composite operations.
+    /// The plan has already been dependency-sorted by the compiler.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let program = parse_program(dsl_source)?;
+    /// let plan = compile(&program)?;
+    /// let results = executor.execute_plan(&plan, &mut ctx).await?;
+    /// ```
+    pub async fn execute_plan(
+        &self,
+        plan: &super::execution_plan::ExecutionPlan,
+        ctx: &mut ExecutionContext,
+    ) -> Result<Vec<ExecutionResult>> {
+        let mut results: Vec<ExecutionResult> = Vec::with_capacity(plan.steps.len());
+
+        for step in &plan.steps {
+            // Clone the verb call so we can inject values
+            let mut vc = step.verb_call.clone();
+
+            // Inject values from previous steps
+            for inj in &step.injections {
+                if let Some(ExecutionResult::Uuid(id)) = results.get(inj.from_step) {
+                    // Add the injected argument
+                    vc.arguments.push(super::ast::Argument {
+                        key: super::ast::Key::Simple(inj.into_arg.clone()),
+                        value: super::ast::Value::String(id.to_string()),
+                    });
+                }
+            }
+
+            // Execute the verb call
+            let result = self.execute_verb(&vc, ctx).await?;
+
+            // Handle explicit :as binding (in addition to verb's default capture)
+            if let Some(ref binding_name) = step.bind_as {
+                if let ExecutionResult::Uuid(id) = &result {
+                    ctx.bind(binding_name, *id);
+                }
+            }
+
+            results.push(result);
+        }
+
+        Ok(results)
+    }
+
+    /// Convenience method: parse, compile, and execute DSL source
+    ///
+    /// This is the all-in-one method for executing DSL strings.
+    pub async fn execute_dsl(
+        &self,
+        source: &str,
+        ctx: &mut ExecutionContext,
+    ) -> Result<Vec<ExecutionResult>> {
+        let program =
+            super::parser::parse_program(source).map_err(|e| anyhow!("Parse error: {}", e))?;
+
+        let plan = super::execution_plan::compile(&program)
+            .map_err(|e| anyhow!("Compile error: {}", e))?;
+
+        self.execute_plan(&plan, ctx).await
+    }
 }
 
 #[cfg(test)]

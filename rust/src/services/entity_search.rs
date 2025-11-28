@@ -37,7 +37,7 @@ impl EntityType {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_uppercase().as_str() {
             "CBU" => Some(EntityType::Cbu),
             "PERSON" => Some(EntityType::Person),
@@ -317,7 +317,7 @@ impl From<EntitySearchRow> for EntityMatch {
     fn from(row: EntitySearchRow) -> Self {
         EntityMatch {
             id: row.id,
-            entity_type: EntityType::from_str(&row.entity_type).unwrap_or(EntityType::Person),
+            entity_type: EntityType::parse(&row.entity_type).unwrap_or(EntityType::Person),
             display_name: row.display_name,
             subtitle: row.subtitle_1,
             detail: row.subtitle_2,
@@ -337,8 +337,8 @@ mod tests {
     #[test]
     fn test_entity_type_serde() {
         assert_eq!(EntityType::Person.as_str(), "PERSON");
-        assert_eq!(EntityType::from_str("PERSON"), Some(EntityType::Person));
-        assert_eq!(EntityType::from_str("person"), Some(EntityType::Person));
+        assert_eq!(EntityType::parse("PERSON"), Some(EntityType::Person));
+        assert_eq!(EntityType::parse("person"), Some(EntityType::Person));
     }
 
     #[test]

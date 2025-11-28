@@ -109,6 +109,9 @@ fn verb_call<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
     let (input, (domain, verb)) = word(input)?;
     let (input, arguments) = many0(argument)(input)?;
     let (input, _) = multispace0(input)?;
+    // Parse optional :as @symbol binding
+    let (input, as_binding) = opt(as_binding_parser)(input)?;
+    let (input, _) = multispace0(input)?;
     let (input, _) = cut(context("closing parenthesis", char(')')))(input)?;
 
     let end_pos = input.len();
@@ -119,9 +122,19 @@ fn verb_call<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
             domain,
             verb,
             arguments,
+            as_binding,
             span: Span::new(start_pos, end_pos),
         },
     ))
+}
+
+/// Parse the :as @symbol binding directive
+fn as_binding_parser<'a, E: NomParseError<&'a str>>(input: &'a str) -> IResult<&'a str, String, E> {
+    let (input, _) = tag(":as")(input)?;
+    let (input, _) = multispace1(input)?;
+    let (input, _) = char('@')(input)?;
+    let (input, name) = identifier(input)?;
+    Ok((input, name.to_string()))
 }
 
 fn word<'a, E: NomParseError<&'a str>>(input: &'a str) -> IResult<&'a str, (String, String), E> {
@@ -139,6 +152,15 @@ fn argument<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
     input: &'a str,
 ) -> IResult<&'a str, Argument, E> {
     let (input, _) = multispace0(input)?;
+
+    // Don't match :as - it's reserved for symbol binding
+    if input.starts_with(":as") && input[3..].starts_with(|c: char| c.is_whitespace()) {
+        return Err(nom::Err::Error(E::from_error_kind(
+            input,
+            nom::error::ErrorKind::Verify,
+        )));
+    }
+
     let (input, key) = keyword(input)?;
     let (input, _) = multispace1(input)?;
     let (input, val) = context("value", value_parser)(input)?;
@@ -209,6 +231,8 @@ fn value_parser<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
         map(reference, Value::Reference),
         map(string_literal, Value::String),
         number_literal, // Returns Value directly (Integer or Decimal)
+        // Nested verb call - allows (verb.call ...) as a value
+        map(verb_call, |vc| Value::NestedCall(Box::new(vc))),
         map(list_literal, Value::List),
         map(map_literal, Value::Map),
     ))(input)
@@ -328,24 +352,18 @@ fn list_literal<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
     let mut values = Vec::new();
     let mut remaining = input;
 
-    loop {
-        // Try to parse a value
-        match value_parser::<E>(remaining) {
-            Ok((rest, val)) => {
-                values.push(val);
-                remaining = rest;
+    while let Ok((rest, val)) = value_parser::<E>(remaining) {
+        values.push(val);
+        remaining = rest;
 
-                // Skip whitespace
-                let (rest, _) = multispace0::<_, E>(remaining)?;
-                remaining = rest;
+        // Skip whitespace
+        let (rest, _) = multispace0::<_, E>(remaining)?;
+        remaining = rest;
 
-                // Check for comma separator (optional)
-                if let Ok((rest, _)) = char::<_, E>(',')(remaining) {
-                    let (rest, _) = multispace0::<_, E>(rest)?;
-                    remaining = rest;
-                }
-            }
-            Err(_) => break,
+        // Check for comma separator (optional)
+        if let Ok((rest, _)) = char::<_, E>(',')(remaining) {
+            let (rest, _) = multispace0::<_, E>(rest)?;
+            remaining = rest;
         }
     }
 
@@ -563,5 +581,60 @@ mod tests {
         let vc = parse_single_verb(input).unwrap();
         assert_eq!(vc.domain, "cbu");
         assert_eq!(vc.verb, "create");
+    }
+
+    #[test]
+    fn test_nested_verb_call() {
+        // Nested verb calls in a list - the core use case for CBU with roles
+        let input = r#"(cbu.create :name "Fund" :roles [(cbu.assign-role :entity-id @aviva :role "Manager")])"#;
+        let result = parse_program(input).unwrap();
+
+        if let Statement::VerbCall(vc) = &result.statements[0] {
+            assert_eq!(vc.domain, "cbu");
+            assert_eq!(vc.verb, "create");
+
+            // Find the :roles argument
+            let roles_arg = vc.arguments.iter().find(|a| a.key.canonical() == "roles");
+            assert!(roles_arg.is_some());
+
+            if let Value::List(items) = &roles_arg.unwrap().value {
+                assert_eq!(items.len(), 1);
+                if let Value::NestedCall(nested) = &items[0] {
+                    assert_eq!(nested.domain, "cbu");
+                    assert_eq!(nested.verb, "assign-role");
+                } else {
+                    panic!("Expected NestedCall in list");
+                }
+            } else {
+                panic!("Expected List for :roles");
+            }
+        } else {
+            panic!("Expected VerbCall");
+        }
+    }
+
+    #[test]
+    fn test_nested_verb_call_multiple() {
+        // Multiple nested verb calls
+        let input = r#"(cbu.create :name "Fund" :roles [
+            (cbu.assign-role :entity-id @aviva :role "Manager")
+            (cbu.assign-role :entity-id @bob :role "Director")
+        ])"#;
+        let result = parse_program(input).unwrap();
+
+        if let Statement::VerbCall(vc) = &result.statements[0] {
+            let roles_arg = vc
+                .arguments
+                .iter()
+                .find(|a| a.key.canonical() == "roles")
+                .unwrap();
+            if let Value::List(items) = &roles_arg.value {
+                assert_eq!(items.len(), 2);
+                assert!(matches!(&items[0], Value::NestedCall(_)));
+                assert!(matches!(&items[1], Value::NestedCall(_)));
+            } else {
+                panic!("Expected List");
+            }
+        }
     }
 }

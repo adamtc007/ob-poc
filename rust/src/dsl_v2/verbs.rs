@@ -70,6 +70,7 @@ pub enum Behavior {
     /// CREATE entity with Class Table Inheritance pattern
     /// 1. INSERT into entities (base table) with entity_type_id
     /// 2. INSERT into extension_table with entity_id FK
+    ///
     /// Returns entity_id from base table
     EntityCreate {
         /// The extension table (e.g., "entity_limited_companies")

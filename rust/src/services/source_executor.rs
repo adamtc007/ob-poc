@@ -91,7 +91,7 @@ impl SourceExecutor for DocumentSource {
         .await
         .map_err(|e| format!("Database error: {}", e))?;
 
-        Ok(result.and_then(|row| Some(row.value)))
+        Ok(result.map(|row| row.value))
     }
 }
 

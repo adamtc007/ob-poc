@@ -20,12 +20,15 @@ pub enum Statement {
     Comment(String),
 }
 
-/// A verb call: (domain.verb :key value ...)
+/// A verb call: (domain.verb :key value ... :as @symbol)
 #[derive(Debug, Clone, PartialEq)]
 pub struct VerbCall {
     pub domain: String,
     pub verb: String,
     pub arguments: Vec<Argument>,
+    /// Optional symbol binding: captures the result UUID into @symbol
+    /// Syntax: :as @symbol at the end of the verb call
+    pub as_binding: Option<String>,
     /// Source location for error reporting
     pub span: Span,
 }
@@ -97,6 +100,12 @@ pub enum Value {
 
     /// Map: {:key value :key2 value2}
     Map(HashMap<String, Value>),
+    
+    /// Nested verb call - compiled and executed before parent
+    /// Example: (cbu.create :roles [(cbu.assign-role :entity-id @e :role "Mgr")])
+    /// The nested call is extracted during compilation and its result
+    /// is injected into the parent's arguments at execution time.
+    NestedCall(Box<VerbCall>),
 }
 
 impl Value {

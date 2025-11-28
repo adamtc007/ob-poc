@@ -299,7 +299,6 @@ impl From<anyhow::Error> for DSLError {
 }
 
 /// Result type aliases for convenience
-pub(crate) type DSLResult<T> = Result<T, DSLError>;
 pub type ParseResult<T> = Result<T, ParseError>;
 pub type ValidationResult<T> = Result<T, ValidationError>;
 
@@ -340,63 +339,6 @@ macro_rules! validation_error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::forth_engine::errors::{CompileError, EngineError, VmError};
-
-    #[test]
-    fn test_vm_error_to_dsl_error() {
-        let vm_err = VmError::StackUnderflow {
-            expected: 2,
-            found: 0,
-        };
-        let dsl_err: DSLError = vm_err.into();
-        match dsl_err {
-            DSLError::Runtime(RuntimeError::ExecutionFailed { statement, .. }) => {
-                assert_eq!(statement, "vm");
-            }
-            _ => panic!("Expected Runtime error"),
-        }
-    }
-
-    #[test]
-    fn test_compile_error_to_dsl_error() {
-        let compile_err = CompileError::UnknownWord("unknown.verb".to_string());
-        let dsl_err: DSLError = compile_err.into();
-        match dsl_err {
-            DSLError::Runtime(RuntimeError::ExecutionFailed { statement, .. }) => {
-                assert_eq!(statement, "compile");
-            }
-            _ => panic!("Expected Runtime error"),
-        }
-    }
-
-    #[test]
-    fn test_engine_error_parse_to_dsl_error() {
-        let engine_err = EngineError::Parse("syntax error".to_string());
-        let dsl_err: DSLError = engine_err.into();
-        match dsl_err {
-            DSLError::Parse(ParseError::Internal { message }) => {
-                assert_eq!(message, "syntax error");
-            }
-            _ => panic!("Expected Parse error"),
-        }
-    }
-
-    #[test]
-    fn test_engine_error_vm_to_dsl_error() {
-        let vm_err = VmError::TypeError {
-            expected: "String".to_string(),
-            found: "Int".to_string(),
-        };
-        let engine_err = EngineError::Vm(vm_err);
-        let dsl_err: DSLError = engine_err.into();
-        match dsl_err {
-            DSLError::Runtime(RuntimeError::ExecutionFailed { statement, message }) => {
-                assert_eq!(statement, "vm");
-                assert!(message.contains("String"));
-            }
-            _ => panic!("Expected Runtime error"),
-        }
-    }
 
     #[test]
     fn test_parse_error_creation() {
