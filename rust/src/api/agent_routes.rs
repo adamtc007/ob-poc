@@ -24,6 +24,7 @@ use crate::api::session::{
     SessionStore,
 };
 use crate::dsl_source::agentic::{LlmDslGenerator, RagContextProvider};
+use crate::dsl_v2::{parse_program, DslExecutor, ExecutionContext, ExecutionResult as DslV2Result};
 use crate::forth_engine::ast::DslParser;
 use crate::forth_engine::env::{OnboardingRequestId, RuntimeEnv};
 use crate::forth_engine::parser_nom::NomDslParser;
@@ -161,16 +162,20 @@ pub struct HealthResponse {
 pub struct AgentState {
     pub pool: PgPool,
     pub rag_provider: Arc<RagContextProvider>,
+    #[deprecated(note = "Use dsl_v2_executor instead")]
     pub runtime: Arc<crate::forth_engine::runtime::Runtime>,
+    pub dsl_v2_executor: Arc<DslExecutor>,
     pub sessions: SessionStore,
     pub extractor: Arc<IntentExtractor>,
     pub assembler: Arc<DslAssembler>,
 }
 
 impl AgentState {
+    #[allow(deprecated)]
     pub fn new(pool: PgPool) -> Self {
         let rag_provider = Arc::new(RagContextProvider::new(pool.clone()));
         let runtime = Arc::new(create_standard_runtime());
+        let dsl_v2_executor = Arc::new(DslExecutor::new(pool.clone()));
         let sessions = create_session_store();
         let extractor = Arc::new(IntentExtractor::new(rag_provider.clone(), runtime.clone()));
         let assembler = Arc::new(DslAssembler::new(runtime.clone()));
@@ -178,6 +183,7 @@ impl AgentState {
             pool,
             rag_provider,
             runtime,
+            dsl_v2_executor,
             sessions,
             extractor,
             assembler,
@@ -604,7 +610,7 @@ async fn chat_in_session(
 }
 
 /// POST /api/session/:id/execute
-/// Execute all accumulated DSL in the session using the real Runtime
+/// Execute all accumulated DSL in the session using dsl_v2 executor
 /// Re-assembles each intent at execution time to resolve @refs with updated context
 async fn execute_session_dsl(
     State(state): State<AgentState>,
@@ -630,18 +636,19 @@ async fn execute_session_dsl(
         }));
     }
 
-    let parser = NomDslParser::new();
     let mut results = Vec::new();
     let mut all_success = true;
     let mut errors = Vec::new();
 
-    // Create a RuntimeEnv with database connection for real execution
-    let request_id = OnboardingRequestId(format!("session-{}", session_id));
-    let mut env = RuntimeEnv::with_pool(request_id, state.pool.clone());
+    // Create execution context for dsl_v2
+    let mut exec_ctx = ExecutionContext::new().with_audit_user(&format!("session-{}", session_id));
 
-    // Set CBU ID if we have one from previous executions
+    // Pre-bind symbols from session context
     if let Some(id) = context.last_cbu_id {
-        env.set_cbu_id(id);
+        exec_ctx.bind("last_cbu", id);
+    }
+    if let Some(id) = context.last_entity_id {
+        exec_ctx.bind("last_entity", id);
     }
 
     // Execute each intent - assemble DSL at execution time with current context
@@ -649,59 +656,41 @@ async fn execute_session_dsl(
         // Assemble DSL with current context (resolves @last_cbu, @last_entity)
         let dsl = state.assembler.render_sexpr(intent, &context);
 
-        // Validate
-        let validation = validate_dsl_internal(&dsl, &state.runtime);
+        // Parse using dsl_v2 parser
+        match parse_program(&dsl) {
+            Ok(program) => {
+                // Execute using dsl_v2 executor
+                match state
+                    .dsl_v2_executor
+                    .execute_program(&program, &mut exec_ctx)
+                    .await
+                {
+                    Ok(exec_results) => {
+                        // Extract entity ID from execution results
+                        let mut result_entity_id: Option<Uuid> = None;
+                        for exec_result in &exec_results {
+                            if let DslV2Result::Uuid(uuid) = exec_result {
+                                result_entity_id = Some(*uuid);
+                            }
+                        }
 
-        if !validation.valid {
-            all_success = false;
-            let error_msg = validation
-                .errors
-                .iter()
-                .map(|e| e.message.clone())
-                .collect::<Vec<_>>()
-                .join("; ");
-            errors.push(error_msg.clone());
-            results.push(ExecutionResult {
-                statement_index: idx,
-                dsl: dsl.clone(),
-                success: false,
-                message: format!("Validation failed: {}", error_msg),
-                entity_id: None,
-                entity_type: None,
-            });
-            continue;
-        }
-
-        // Parse DSL
-        match parser.parse(&dsl) {
-            Ok(exprs) => {
-                // Execute using the real Runtime
-                match state.runtime.execute_sheet(&exprs, &mut env) {
-                    Ok(()) => {
-                        // Get entity ID from env based on verb type
+                        // Determine entity type and update context
                         let entity_type = if intent.verb.starts_with("cbu.") {
-                            // CBU verbs store in env.cbu_id
-                            if let Some(id) = env.cbu_id {
+                            if let Some(id) = result_entity_id {
                                 context.last_cbu_id = Some(id);
                                 context.cbu_ids.push(id);
+                                exec_ctx.bind("last_cbu", id);
                             }
                             Some("CBU".to_string())
                         } else if intent.verb.starts_with("entity.") {
-                            // Entity verbs store in env.entity_id
-                            if let Some(id) = env.entity_id {
+                            if let Some(id) = result_entity_id {
                                 context.last_entity_id = Some(id);
                                 context.entity_ids.push(id);
+                                exec_ctx.bind("last_entity", id);
                             }
                             Some("ENTITY".to_string())
                         } else {
                             None
-                        };
-                        
-                        // Use the appropriate ID for results
-                        let result_entity_id = if intent.verb.starts_with("cbu.") {
-                            env.cbu_id
-                        } else {
-                            env.entity_id
                         };
 
                         results.push(ExecutionResult {
@@ -750,7 +739,7 @@ async fn execute_session_dsl(
         if let Some(session) = sessions.get_mut(&session_id) {
             // Update session context with final state
             session.context = context;
-            
+
             // Convert results to session format
             let session_results: Vec<crate::api::session::ExecutionResult> = results
                 .iter()
