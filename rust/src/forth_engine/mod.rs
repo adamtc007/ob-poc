@@ -2,6 +2,24 @@
 //!
 //! This module provides the main entry points for DSL execution using
 //! direct AST interpretation (no stack machine).
+//!
+//! # Deprecation Notice
+//!
+//! **This module is deprecated in favor of `dsl_v2`.**
+//!
+//! The `dsl_v2` module provides:
+//! - Unified S-expression parser (`dsl_v2::parser`)
+//! - Data-driven verb definitions (`dsl_v2::verbs`)
+//! - Generic CRUD executor (`dsl_v2::executor`)
+//! - Custom operations framework (`dsl_v2::custom_ops`)
+//!
+//! Migration guide:
+//! - `forth_engine::runtime::Runtime` → `dsl_v2::DslExecutor`
+//! - `forth_engine::vocab_registry` → `dsl_v2::verbs` (static data)
+//! - `forth_engine::parser_nom` → `dsl_v2::parser`
+//! - `forth_engine::words` → `dsl_v2::custom_ops`
+//!
+//! See `DSL_V2_REFACTORING_SPEC.md` for full migration details.
 
 use crate::forth_engine::env::RuntimeEnv;
 use crate::forth_engine::parser_nom::NomDslParser;
@@ -22,10 +40,10 @@ pub mod env;
 pub mod errors;
 pub mod parser_nom;
 pub mod runtime;
+pub mod schema;
 pub mod value;
 pub mod vocab_registry;
 pub mod words;
-pub mod schema;
 
 // Re-export key types
 pub use ast::{DslParser, DslSheet, Expr};
@@ -34,6 +52,7 @@ pub use errors::EngineError;
 pub use value::Value;
 
 /// Result of DSL execution
+#[deprecated(since = "0.2.0", note = "Use dsl_v2::ExecutionResult instead")]
 #[derive(Debug)]
 pub struct ExecutionResult {
     /// Execution logs
@@ -48,6 +67,7 @@ pub struct ExecutionResult {
 
 /// Executes a DSL Sheet without database connection.
 /// This is the main entry point for the Forth-style engine.
+#[deprecated(since = "0.2.0", note = "Use dsl_v2::DslExecutor::execute() instead")]
 pub fn execute_sheet(sheet: &DslSheet) -> Result<Vec<String>, EngineError> {
     let result = execute_sheet_internal(sheet, None)?;
     Ok(result.logs)
@@ -57,6 +77,7 @@ pub fn execute_sheet(sheet: &DslSheet) -> Result<Vec<String>, EngineError> {
 /// This is async because it persists results to the database.
 /// Uses DslRepository for fully transactional saves - all operations
 /// (DSL, AST, CBU, attributes) are saved atomically.
+#[deprecated(since = "0.2.0", note = "Use dsl_v2::DslExecutor::execute() instead")]
 #[cfg(feature = "database")]
 pub async fn execute_sheet_with_db(
     sheet: &DslSheet,

@@ -51,6 +51,9 @@ pub mod services;
 // Forth-style DSL execution engine - THE single DSL processing path
 pub mod forth_engine;
 
+// DSL v2 - Unified S-expression DSL with data-driven execution
+pub mod dsl_v2;
+
 // CBU Model DSL - specification DSL for CBU business models
 pub mod cbu_model_dsl;
 
@@ -98,6 +101,14 @@ pub use ast::{EdgeType, EntityLabel};
 // Forth engine types - the canonical DSL interface
 pub use forth_engine::ast::{DslParser, DslSheet, Expr};
 pub use forth_engine::parser_nom::NomDslParser;
+
+// DSL v2 types - unified S-expression DSL
+pub use dsl_v2::{
+    domains, find_verb, get_table_mappings, parse_program, parse_single_verb, resolve_column,
+    verb_count, verbs_for_domain, Argument, Behavior, ColumnMapping, DbType, DslExecutor,
+    ExecutionContext, ExecutionResult as DslV2ExecutionResult, Key, Program, ReturnType, Span,
+    Statement, TableMappings, Value, VerbCall, VerbDef,
+};
 
 // CBU Model DSL types
 #[cfg(feature = "database")]

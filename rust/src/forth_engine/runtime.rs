@@ -2,6 +2,12 @@
 //!
 //! Replaces the Forth stack machine with direct interpretation.
 //! S-expressions with named arguments don't need stack threading.
+//!
+//! # Deprecation Notice
+//!
+//! **This module is deprecated in favor of `dsl_v2::executor`.**
+//!
+//! Use `dsl_v2::DslExecutor` instead of this `Runtime`.
 
 use crate::forth_engine::ast::Expr;
 use crate::forth_engine::env::RuntimeEnv;
@@ -30,6 +36,7 @@ pub struct WordEntry {
 }
 
 /// Direct AST runtime - no stack machine
+#[deprecated(since = "0.2.0", note = "Use dsl_v2::DslExecutor instead")]
 pub struct Runtime {
     vocab: HashMap<&'static str, WordEntry>,
 }

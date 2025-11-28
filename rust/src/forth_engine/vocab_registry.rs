@@ -2,11 +2,22 @@
 //!
 //! This module registers all DSL vocabulary words with their metadata
 //! for both execution and RAG context building.
+//!
+//! # Deprecation Notice
+//!
+//! **This module is deprecated in favor of `dsl_v2::verbs`.**
+//!
+//! Use `dsl_v2::find_verb()`, `dsl_v2::verbs_for_domain()`, and
+//! `dsl_v2::STANDARD_VERBS` instead of this runtime-based vocabulary.
 
 use crate::forth_engine::runtime::{Runtime, WordEntry};
 use crate::forth_engine::words;
 
 /// Create the standard DSL runtime with all vocabulary
+#[deprecated(
+    since = "0.2.0",
+    note = "Use dsl_v2::find_verb() and dsl_v2::STANDARD_VERBS instead"
+)]
 pub fn create_standard_runtime() -> Runtime {
     Runtime::new(vec![
         // ============ CASE Domain ============
