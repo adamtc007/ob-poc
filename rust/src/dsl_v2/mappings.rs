@@ -96,7 +96,13 @@ pub static LIMITED_COMPANIES_MAPPINGS: TableMappings = TableMappings {
             dsl_key: "limited-company-id",
             db_column: "limited_company_id",
             db_type: DbType::Uuid,
-            aliases: &["id", "entity-id"],
+            aliases: &["id"],
+        },
+        ColumnMapping {
+            dsl_key: "entity-id",
+            db_column: "entity_id",
+            db_type: DbType::Uuid,
+            aliases: &[],
         },
         ColumnMapping {
             dsl_key: "name",
@@ -145,7 +151,13 @@ pub static PROPER_PERSONS_MAPPINGS: TableMappings = TableMappings {
             dsl_key: "proper-person-id",
             db_column: "proper_person_id",
             db_type: DbType::Uuid,
-            aliases: &["id", "entity-id"],
+            aliases: &["id"],
+        },
+        ColumnMapping {
+            dsl_key: "entity-id",
+            db_column: "entity_id",
+            db_type: DbType::Uuid,
+            aliases: &[],
         },
         ColumnMapping {
             dsl_key: "first-name",
@@ -200,7 +212,13 @@ pub static PARTNERSHIPS_MAPPINGS: TableMappings = TableMappings {
             dsl_key: "partnership-id",
             db_column: "partnership_id",
             db_type: DbType::Uuid,
-            aliases: &["id", "entity-id"],
+            aliases: &["id"],
+        },
+        ColumnMapping {
+            dsl_key: "entity-id",
+            db_column: "entity_id",
+            db_type: DbType::Uuid,
+            aliases: &[],
         },
         ColumnMapping {
             dsl_key: "name",
@@ -243,7 +261,13 @@ pub static TRUSTS_MAPPINGS: TableMappings = TableMappings {
             dsl_key: "trust-id",
             db_column: "trust_id",
             db_type: DbType::Uuid,
-            aliases: &["id", "entity-id"],
+            aliases: &["id"],
+        },
+        ColumnMapping {
+            dsl_key: "entity-id",
+            db_column: "entity_id",
+            db_type: DbType::Uuid,
+            aliases: &[],
         },
         ColumnMapping {
             dsl_key: "name",

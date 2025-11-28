@@ -213,6 +213,18 @@ impl DslExecutor {
                 self.execute_select_with_join(primary_table, join_table, join_col, &resolved_args)
                     .await?
             }
+            Behavior::EntityCreate {
+                extension_table,
+                entity_type_name,
+            } => {
+                self.execute_entity_create(
+                    extension_table,
+                    entity_type_name,
+                    &resolved_args,
+                    verb_def,
+                )
+                .await?
+            }
         };
 
         // Handle symbol capture if specified
@@ -769,6 +781,114 @@ impl DslExecutor {
 
         let records: Result<Vec<_>> = rows.iter().map(row_to_json).collect();
         Ok(ExecutionResult::RecordSet(records?))
+    }
+
+    /// Execute entity creation with Class Table Inheritance pattern
+    /// 1. Look up entity_type_id from entity_types table
+    /// 2. INSERT into entities base table
+    /// 3. INSERT into extension table with entity_id FK
+    #[cfg(feature = "database")]
+    async fn execute_entity_create(
+        &self,
+        extension_table: &str,
+        default_entity_type: &str,
+        args: &HashMap<String, ResolvedValue>,
+        _verb_def: &VerbDef,
+    ) -> Result<ExecutionResult> {
+        // 1. Determine entity type (allow override via entity-type arg)
+        let entity_type_name = args
+            .get("entity-type")
+            .and_then(|v| v.as_string().ok())
+            .unwrap_or(default_entity_type);
+
+        // 2. Look up entity_type_id from entity_types table
+        let entity_type_id: Uuid = sqlx::query_scalar(
+            r#"SELECT entity_type_id FROM "ob-poc".entity_types WHERE name = $1"#,
+        )
+        .bind(entity_type_name)
+        .fetch_optional(&self.pool)
+        .await?
+        .ok_or_else(|| anyhow!("Unknown entity type: {}", entity_type_name))?;
+
+        // 3. Generate entity_id and get name for base table
+        let entity_id = Uuid::new_v4();
+
+        // Get the name - for proper_persons it's constructed from first/last name
+        let entity_name = if extension_table == "entity_proper_persons" {
+            let first = args
+                .get("first-name")
+                .and_then(|v| v.as_string().ok())
+                .unwrap_or("");
+            let last = args
+                .get("last-name")
+                .and_then(|v| v.as_string().ok())
+                .unwrap_or("");
+            format!("{} {}", first, last)
+        } else {
+            args.get("name")
+                .and_then(|v| v.as_string().ok())
+                .unwrap_or("Unknown")
+                .to_string()
+        };
+
+        // 4. INSERT into entities base table
+        sqlx::query(
+            r#"INSERT INTO "ob-poc".entities (entity_id, entity_type_id, name) VALUES ($1, $2, $3)"#,
+        )
+        .bind(entity_id)
+        .bind(entity_type_id)
+        .bind(&entity_name)
+        .execute(&self.pool)
+        .await?;
+
+        // 5. INSERT into extension table
+        let ext_pk_col = get_pk_column(extension_table)
+            .ok_or_else(|| anyhow!("Unknown extension table: {}", extension_table))?;
+
+        let ext_pk_id = Uuid::new_v4();
+
+        // Build column list and values for extension table
+        let mut columns = vec![ext_pk_col.to_string(), "entity_id".to_string()];
+        let mut placeholders = vec!["$1".to_string(), "$2".to_string()];
+        let mut bind_values: Vec<BindValue> =
+            vec![BindValue::Uuid(ext_pk_id), BindValue::Uuid(entity_id)];
+        let mut idx = 3;
+
+        // Add provided arguments (skip entity-type, name for proper persons handled differently)
+        for (key, value) in args {
+            // Skip special keys
+            if key == "entity-type" || key == "entity-id" {
+                continue;
+            }
+
+            if let Some((db_col, _db_type)) = resolve_column(extension_table, key) {
+                // Skip if it's the PK or entity_id (already added)
+                if db_col == ext_pk_col || db_col == "entity_id" {
+                    continue;
+                }
+                columns.push(db_col.to_string());
+                placeholders.push(format!("${}", idx));
+                bind_values.push(value.to_bind_value());
+                idx += 1;
+            }
+        }
+
+        let sql = format!(
+            "INSERT INTO {} ({}) VALUES ({})",
+            qualified_table(extension_table),
+            columns.join(", "),
+            placeholders.join(", ")
+        );
+
+        let mut query = sqlx::query(&sql);
+        for bv in &bind_values {
+            query = bind_value_to_query_regular(query, bv);
+        }
+
+        query.execute(&self.pool).await?;
+
+        // Return entity_id (the master table ID, not the extension table ID)
+        Ok(ExecutionResult::Uuid(entity_id))
     }
 }
 

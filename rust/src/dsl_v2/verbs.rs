@@ -66,6 +66,17 @@ pub enum Behavior {
         join_table: &'static str,
         join_col: &'static str,
     },
+
+    /// CREATE entity with Class Table Inheritance pattern
+    /// 1. INSERT into entities (base table) with entity_type_id
+    /// 2. INSERT into extension_table with entity_id FK
+    /// Returns entity_id from base table
+    EntityCreate {
+        /// The extension table (e.g., "entity_limited_companies")
+        extension_table: &'static str,
+        /// The entity type name to look up in entity_types table
+        entity_type_name: &'static str,
+    },
 }
 
 /// Complete verb definition
@@ -106,8 +117,9 @@ pub static STANDARD_VERBS: &[VerbDef] = &[
     VerbDef {
         domain: "entity",
         verb: "create-limited-company",
-        behavior: Behavior::Insert {
-            table: "entity_limited_companies",
+        behavior: Behavior::EntityCreate {
+            extension_table: "entity_limited_companies",
+            entity_type_name: "LIMITED_COMPANY_PRIVATE",
         },
         required_args: &["name"],
         optional_args: &[
@@ -116,9 +128,10 @@ pub static STANDARD_VERBS: &[VerbDef] = &[
             "incorporation-date",
             "registered-address",
             "business-nature",
+            "entity-type", // Override: LIMITED_COMPANY_PRIVATE, LIMITED_COMPANY_PUBLIC, etc.
         ],
         returns: ReturnType::Uuid {
-            name: "limited_company_id",
+            name: "entity_id",
             capture: true,
         },
         description: "Create a new limited company entity",
@@ -126,19 +139,22 @@ pub static STANDARD_VERBS: &[VerbDef] = &[
     VerbDef {
         domain: "entity",
         verb: "create-proper-person",
-        behavior: Behavior::Insert {
-            table: "entity_proper_persons",
+        behavior: Behavior::EntityCreate {
+            extension_table: "entity_proper_persons",
+            entity_type_name: "PROPER_PERSON_NATURAL",
         },
         required_args: &["first-name", "last-name"],
         optional_args: &[
             "middle-names",
             "date-of-birth",
             "nationality",
-            "tax-id",
+            "id-document-type",
+            "id-document-number",
             "residence-address",
+            "entity-type", // Override: PROPER_PERSON_NATURAL, PROPER_PERSON_BENEFICIAL_OWNER
         ],
         returns: ReturnType::Uuid {
-            name: "proper_person_id",
+            name: "entity_id",
             capture: true,
         },
         description: "Create a new natural person entity",
@@ -146,8 +162,9 @@ pub static STANDARD_VERBS: &[VerbDef] = &[
     VerbDef {
         domain: "entity",
         verb: "create-partnership",
-        behavior: Behavior::Insert {
-            table: "entity_partnerships",
+        behavior: Behavior::EntityCreate {
+            extension_table: "entity_partnerships",
+            entity_type_name: "PARTNERSHIP_LIMITED",
         },
         required_args: &["name"],
         optional_args: &[
@@ -155,9 +172,10 @@ pub static STANDARD_VERBS: &[VerbDef] = &[
             "partnership-type",
             "formation-date",
             "principal-place-business",
+            "entity-type", // Override: PARTNERSHIP_GENERAL, PARTNERSHIP_LIMITED, PARTNERSHIP_LLP
         ],
         returns: ReturnType::Uuid {
-            name: "partnership_id",
+            name: "entity_id",
             capture: true,
         },
         description: "Create a new partnership entity (LP, LLP, GP)",
@@ -165,8 +183,9 @@ pub static STANDARD_VERBS: &[VerbDef] = &[
     VerbDef {
         domain: "entity",
         verb: "create-trust",
-        behavior: Behavior::Insert {
-            table: "entity_trusts",
+        behavior: Behavior::EntityCreate {
+            extension_table: "entity_trusts",
+            entity_type_name: "TRUST_DISCRETIONARY",
         },
         required_args: &["name", "jurisdiction"],
         optional_args: &[
@@ -174,9 +193,10 @@ pub static STANDARD_VERBS: &[VerbDef] = &[
             "establishment-date",
             "governing-law",
             "trust-purpose",
+            "entity-type", // Override: TRUST_DISCRETIONARY, TRUST_FIXED_INTEREST, etc.
         ],
         returns: ReturnType::Uuid {
-            name: "trust_id",
+            name: "entity_id",
             capture: true,
         },
         description: "Create a new trust entity",
