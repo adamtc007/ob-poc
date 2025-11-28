@@ -99,7 +99,7 @@ async fn upload_document(
     // TODO: Implement proper document upload when schema is aligned
     // For now, return a mock response
     let doc_id = Uuid::new_v4();
-    
+
     Ok(Json(UploadDocumentResponse {
         doc_id,
         file_hash,
@@ -159,25 +159,24 @@ async fn validate_value(
     }
 }
 
-/// GET /api/attributes/:cbu_id
-/// Get all attributes for a CBU
+/// GET /api/attributes/:entity_id
+/// Get all attributes for an entity
 async fn get_cbu_attributes(
     State(pool): State<PgPool>,
-    Path(cbu_id): Path<Uuid>,
+    Path(entity_id): Path<Uuid>,
 ) -> Result<Json<AttributeListResponse>, StatusCode> {
-    // Live DB schema: cbu_id (UUID), attribute_id (UUID), string_value, etc.
     let values = sqlx::query!(
         r#"
         SELECT
             av.attribute_id,
-            av.string_value,
-            d.name as attribute_name
+            av.value_text,
+            ar.display_name as attribute_name
         FROM "ob-poc".attribute_values_typed av
-        JOIN "ob-poc".dictionary d ON d.attribute_id = av.attribute_id
-        WHERE av.cbu_id = $1
-        ORDER BY d.name
+        JOIN "ob-poc".attribute_registry ar ON ar.id = av.attribute_id
+        WHERE av.entity_id = $1
+        ORDER BY ar.display_name
         "#,
-        cbu_id
+        entity_id
     )
     .fetch_all(&pool)
     .await
@@ -191,8 +190,8 @@ async fn get_cbu_attributes(
         .map(|v| AttributeValue {
             attribute_id: v.attribute_id.to_string(),
             attribute_name: v.attribute_name,
-            value: v.string_value.unwrap_or_default(),
-            confidence: 1.0, // Default confidence
+            value: v.value_text.unwrap_or_default(),
+            confidence: 1.0,
             source_doc_id: None,
         })
         .collect();
@@ -200,7 +199,7 @@ async fn get_cbu_attributes(
     let count = attributes.len();
 
     Ok(Json(AttributeListResponse {
-        cbu_id: cbu_id.to_string(),
+        cbu_id: entity_id.to_string(),
         attributes,
         count,
     }))
@@ -212,16 +211,15 @@ async fn get_document_attributes(
     State(pool): State<PgPool>,
     Path(doc_id): Path<Uuid>,
 ) -> Result<Json<Vec<AttributeValue>>, StatusCode> {
-    // Live DB: document_id (not doc_id), extracted_value (not value)
     let values = sqlx::query!(
         r#"
         SELECT
             dm.attribute_id,
-            dm.extracted_value,
+            dm.value,
             d.name as attribute_name
         FROM "ob-poc".document_metadata dm
         JOIN "ob-poc".dictionary d ON d.attribute_id = dm.attribute_id
-        WHERE dm.document_id = $1
+        WHERE dm.doc_id = $1
         ORDER BY d.name
         "#,
         doc_id
@@ -238,8 +236,8 @@ async fn get_document_attributes(
         .map(|v| AttributeValue {
             attribute_id: v.attribute_id.to_string(),
             attribute_name: v.attribute_name,
-            value: v.extracted_value.unwrap_or_default(),
-            confidence: 1.0, // Default confidence since schema doesn't have it
+            value: serde_json::to_string(&v.value).unwrap_or_default(),
+            confidence: 1.0,
             source_doc_id: Some(doc_id.to_string()),
         })
         .collect();

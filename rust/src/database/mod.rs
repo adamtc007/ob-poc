@@ -3,12 +3,9 @@
 //! This module provides database connection management, connection pooling,
 //! and configuration for the DSL architecture.
 //!
-//! ## Architecture (November 2025)
-//! All database operations are centralized in domain services:
-//! - `CrudExecutor` orchestrates CRUD operations via domain services
-//! - Domain services (`CbuService`, `EntityService`, etc.) own all SQL
-//! - Forth engine and RuntimeEnv never call SQL directly - they emit CRUD IR
-//! - DSL layers are free of SQLx dependencies
+//! ## Architecture
+//! Database operations flow through dsl_v2::DslExecutor which generates SQL
+//! from verb definitions. Domain services provide specialized operations.
 
 use sqlx::Row;
 use sqlx::{postgres::PgPoolOptions, PgPool};
@@ -18,7 +15,6 @@ use tracing::{info, warn};
 pub mod attribute_values_service;
 pub mod cbu_entity_roles_service;
 pub mod cbu_service;
-pub mod crud_executor;
 pub mod crud_service;
 pub mod decision_service;
 pub mod dictionary_service;
@@ -42,7 +38,6 @@ pub mod service_service;
 pub use attribute_values_service::{AttributeValueRow, AttributeValuesService};
 pub use cbu_entity_roles_service::{CbuEntityRoleExpanded, CbuEntityRolesService, RoleRow};
 pub use cbu_service::{CbuRow, CbuService, NewCbuFields};
-pub use crud_executor::{CrudExecutionResult, CrudExecutor, ExecutionContext};
 pub use crud_service::{AssetType, CrudOperation, CrudService, OperationType};
 pub use dictionary_service::DictionaryDatabaseService;
 pub use document_service::{

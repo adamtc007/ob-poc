@@ -16,7 +16,7 @@
 // Domain modules will be implemented as needed
 // For now, providing stub implementations
 
-use crate::forth_engine::value::Value;
+use crate::dsl_v2::Value;
 type PropertyMap = std::collections::HashMap<String, Value>;
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -74,7 +74,7 @@ impl DomainResult {
         result.success = false;
         result
             .result_data
-            .insert("error".to_string(), Value::Str(reason.to_string()));
+            .insert("error".to_string(), Value::String(reason.to_string()));
         result
     }
 

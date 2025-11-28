@@ -288,55 +288,11 @@ pub enum RuntimeError {
     PermissionDenied { operation: String },
 }
 
-// Conversions from Forth engine errors to DSLError
-impl From<crate::forth_engine::errors::EngineError> for DSLError {
-    fn from(err: crate::forth_engine::errors::EngineError) -> Self {
-        use crate::forth_engine::errors::EngineError;
-        match err {
-            EngineError::Parse(msg) => DSLError::Parse(ParseError::Internal { message: msg }),
-            EngineError::Compile(e) => DSLError::Runtime(RuntimeError::ExecutionFailed {
-                statement: "compile".to_string(),
-                message: e.to_string(),
-            }),
-            EngineError::Vm(e) => DSLError::Runtime(RuntimeError::ExecutionFailed {
-                statement: "vm".to_string(),
-                message: e.to_string(),
-            }),
-            EngineError::Database(msg) => {
-                #[cfg(feature = "database")]
-                {
-                    DSLError::Database(msg)
-                }
-                #[cfg(not(feature = "database"))]
-                {
-                    DSLError::Runtime(RuntimeError::Database { message: msg })
-                }
-            }
-            EngineError::UnknownWord(word) => DSLError::Runtime(RuntimeError::ExecutionFailed {
-                statement: "word_lookup".to_string(),
-                message: format!("Unknown word: {}", word),
-            }),
-            EngineError::MissingArgument(arg) => DSLError::Runtime(RuntimeError::ExecutionFailed {
-                statement: "argument".to_string(),
-                message: format!("Missing required argument: {}", arg),
-            }),
-        }
-    }
-}
-
-impl From<crate::forth_engine::errors::VmError> for DSLError {
-    fn from(err: crate::forth_engine::errors::VmError) -> Self {
+// Conversion from anyhow::Error for dsl_v2 executor errors
+impl From<anyhow::Error> for DSLError {
+    fn from(err: anyhow::Error) -> Self {
         DSLError::Runtime(RuntimeError::ExecutionFailed {
-            statement: "vm".to_string(),
-            message: err.to_string(),
-        })
-    }
-}
-
-impl From<crate::forth_engine::errors::CompileError> for DSLError {
-    fn from(err: crate::forth_engine::errors::CompileError) -> Self {
-        DSLError::Runtime(RuntimeError::ExecutionFailed {
-            statement: "compile".to_string(),
+            statement: "dsl_v2".to_string(),
             message: err.to_string(),
         })
     }
