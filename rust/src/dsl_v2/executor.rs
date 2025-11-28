@@ -13,6 +13,14 @@ use super::custom_ops::CustomOperationRegistry;
 use super::mappings::{get_pk_column, resolve_column};
 use super::verbs::{find_verb, Behavior, VerbDef};
 
+/// Schema prefix for all tables
+const SCHEMA: &str = "\"ob-poc\"";
+
+/// Format a table name with schema prefix
+fn qualified_table(table: &str) -> String {
+    format!("{}.{}", SCHEMA, table)
+}
+
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
@@ -334,7 +342,7 @@ impl DslExecutor {
 
         let sql = format!(
             "INSERT INTO {} ({}) VALUES ({}) RETURNING {}",
-            table,
+            qualified_table(table),
             columns.join(", "),
             placeholders.join(", "),
             pk_col
@@ -391,7 +399,12 @@ impl DslExecutor {
             pagination.push_str(&format!(" OFFSET {}", offset));
         }
 
-        let sql = format!("SELECT * FROM {}{}{}", table, where_clause, pagination);
+        let sql = format!(
+            "SELECT * FROM {}{}{}",
+            qualified_table(table),
+            where_clause,
+            pagination
+        );
 
         // Determine if we expect single or multiple results
         match &verb_def.returns {
@@ -462,7 +475,7 @@ impl DslExecutor {
 
         let sql = format!(
             "UPDATE {} SET {} WHERE {} = ${}",
-            table,
+            qualified_table(table),
             sets.join(", "),
             pk_col,
             idx
@@ -490,7 +503,11 @@ impl DslExecutor {
             .get(&pk_key)
             .ok_or_else(|| anyhow!("Missing primary key argument: {}", pk_key))?;
 
-        let sql = format!("DELETE FROM {} WHERE {} = $1", table, pk_col);
+        let sql = format!(
+            "DELETE FROM {} WHERE {} = $1",
+            qualified_table(table),
+            pk_col
+        );
 
         let result = sqlx::query(&sql)
             .bind(pk_value.as_uuid()?)
@@ -554,7 +571,7 @@ impl DslExecutor {
             "INSERT INTO {} ({}) VALUES ({}) \
              ON CONFLICT ({}) DO UPDATE SET {} \
              RETURNING {}",
-            table,
+            qualified_table(table),
             columns.join(", "),
             placeholders.join(", "),
             conflict_cols.join(", "),
@@ -636,7 +653,7 @@ impl DslExecutor {
 
         let sql = format!(
             "INSERT INTO {} ({}) VALUES ({}) RETURNING {}",
-            junction,
+            qualified_table(junction),
             columns.join(", "),
             placeholders.join(", "),
             pk_col
@@ -677,7 +694,9 @@ impl DslExecutor {
 
         let sql = format!(
             "DELETE FROM {} WHERE {} = $1 AND {} = $2",
-            junction, from_col, to_col
+            qualified_table(junction),
+            from_col,
+            to_col
         );
 
         let result = sqlx::query(&sql)
@@ -704,7 +723,11 @@ impl DslExecutor {
 
         let conditions = vec![format!("{} = $1", fk_col)];
 
-        let sql = format!("SELECT * FROM {} WHERE {}", table, conditions.join(" AND "));
+        let sql = format!(
+            "SELECT * FROM {} WHERE {}",
+            qualified_table(table),
+            conditions.join(" AND ")
+        );
 
         let rows = sqlx::query(&sql).bind(fk_val).fetch_all(&self.pool).await?;
 
@@ -728,7 +751,10 @@ impl DslExecutor {
             "SELECT p.* FROM {} p \
              INNER JOIN {} j ON p.{} = j.{} \
              WHERE j.entity_id = $1",
-            primary_table, join_table, primary_pk, join_col
+            qualified_table(primary_table),
+            qualified_table(join_table),
+            primary_pk,
+            join_col
         );
 
         let entity_id = args

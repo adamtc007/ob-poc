@@ -89,18 +89,18 @@ pub static ENTITIES_MAPPINGS: TableMappings = TableMappings {
 };
 
 pub static LIMITED_COMPANIES_MAPPINGS: TableMappings = TableMappings {
-    table: "limited_companies",
-    pk_column: "entity_id",
+    table: "entity_limited_companies",
+    pk_column: "limited_company_id",
     columns: &[
         ColumnMapping {
-            dsl_key: "entity-id",
-            db_column: "entity_id",
+            dsl_key: "limited-company-id",
+            db_column: "limited_company_id",
             db_type: DbType::Uuid,
-            aliases: &["id"],
+            aliases: &["id", "entity-id"],
         },
         ColumnMapping {
             dsl_key: "name",
-            db_column: "name",
+            db_column: "company_name",
             db_type: DbType::Text,
             aliases: &["company-name", "legal-name"],
         },
@@ -138,14 +138,14 @@ pub static LIMITED_COMPANIES_MAPPINGS: TableMappings = TableMappings {
 };
 
 pub static PROPER_PERSONS_MAPPINGS: TableMappings = TableMappings {
-    table: "proper_persons",
-    pk_column: "entity_id",
+    table: "entity_proper_persons",
+    pk_column: "proper_person_id",
     columns: &[
         ColumnMapping {
-            dsl_key: "entity-id",
-            db_column: "entity_id",
+            dsl_key: "proper-person-id",
+            db_column: "proper_person_id",
             db_type: DbType::Uuid,
-            aliases: &["id"],
+            aliases: &["id", "entity-id"],
         },
         ColumnMapping {
             dsl_key: "first-name",
@@ -193,18 +193,18 @@ pub static PROPER_PERSONS_MAPPINGS: TableMappings = TableMappings {
 };
 
 pub static PARTNERSHIPS_MAPPINGS: TableMappings = TableMappings {
-    table: "partnerships",
-    pk_column: "entity_id",
+    table: "entity_partnerships",
+    pk_column: "partnership_id",
     columns: &[
         ColumnMapping {
-            dsl_key: "entity-id",
-            db_column: "entity_id",
+            dsl_key: "partnership-id",
+            db_column: "partnership_id",
             db_type: DbType::Uuid,
-            aliases: &["id"],
+            aliases: &["id", "entity-id"],
         },
         ColumnMapping {
             dsl_key: "name",
-            db_column: "name",
+            db_column: "partnership_name",
             db_type: DbType::Text,
             aliases: &["partnership-name"],
         },
@@ -236,18 +236,18 @@ pub static PARTNERSHIPS_MAPPINGS: TableMappings = TableMappings {
 };
 
 pub static TRUSTS_MAPPINGS: TableMappings = TableMappings {
-    table: "trusts",
-    pk_column: "entity_id",
+    table: "entity_trusts",
+    pk_column: "trust_id",
     columns: &[
         ColumnMapping {
-            dsl_key: "entity-id",
-            db_column: "entity_id",
+            dsl_key: "trust-id",
+            db_column: "trust_id",
             db_type: DbType::Uuid,
-            aliases: &["id"],
+            aliases: &["id", "entity-id"],
         },
         ColumnMapping {
             dsl_key: "name",
-            db_column: "name",
+            db_column: "trust_name",
             db_type: DbType::Text,
             aliases: &["trust-name"],
         },

@@ -107,7 +107,7 @@ pub static STANDARD_VERBS: &[VerbDef] = &[
         domain: "entity",
         verb: "create-limited-company",
         behavior: Behavior::Insert {
-            table: "limited_companies",
+            table: "entity_limited_companies",
         },
         required_args: &["name"],
         optional_args: &[
@@ -118,7 +118,7 @@ pub static STANDARD_VERBS: &[VerbDef] = &[
             "business-nature",
         ],
         returns: ReturnType::Uuid {
-            name: "entity_id",
+            name: "limited_company_id",
             capture: true,
         },
         description: "Create a new limited company entity",
@@ -127,7 +127,7 @@ pub static STANDARD_VERBS: &[VerbDef] = &[
         domain: "entity",
         verb: "create-proper-person",
         behavior: Behavior::Insert {
-            table: "proper_persons",
+            table: "entity_proper_persons",
         },
         required_args: &["first-name", "last-name"],
         optional_args: &[
@@ -138,7 +138,7 @@ pub static STANDARD_VERBS: &[VerbDef] = &[
             "residence-address",
         ],
         returns: ReturnType::Uuid {
-            name: "entity_id",
+            name: "proper_person_id",
             capture: true,
         },
         description: "Create a new natural person entity",
@@ -147,7 +147,7 @@ pub static STANDARD_VERBS: &[VerbDef] = &[
         domain: "entity",
         verb: "create-partnership",
         behavior: Behavior::Insert {
-            table: "partnerships",
+            table: "entity_partnerships",
         },
         required_args: &["name"],
         optional_args: &[
@@ -157,7 +157,7 @@ pub static STANDARD_VERBS: &[VerbDef] = &[
             "principal-place-business",
         ],
         returns: ReturnType::Uuid {
-            name: "entity_id",
+            name: "partnership_id",
             capture: true,
         },
         description: "Create a new partnership entity (LP, LLP, GP)",
@@ -165,7 +165,9 @@ pub static STANDARD_VERBS: &[VerbDef] = &[
     VerbDef {
         domain: "entity",
         verb: "create-trust",
-        behavior: Behavior::Insert { table: "trusts" },
+        behavior: Behavior::Insert {
+            table: "entity_trusts",
+        },
         required_args: &["name", "jurisdiction"],
         optional_args: &[
             "trust-type",
@@ -174,7 +176,7 @@ pub static STANDARD_VERBS: &[VerbDef] = &[
             "trust-purpose",
         ],
         returns: ReturnType::Uuid {
-            name: "entity_id",
+            name: "trust_id",
             capture: true,
         },
         description: "Create a new trust entity",
@@ -220,32 +222,37 @@ pub static STANDARD_VERBS: &[VerbDef] = &[
         domain: "entity",
         verb: "ensure-limited-company",
         behavior: Behavior::Upsert {
-            table: "limited_companies",
-            conflict_keys: &["company-number", "jurisdiction"],
+            table: "entity_limited_companies",
+            conflict_keys: &["registration-number", "jurisdiction"],
         },
         required_args: &["name"],
         optional_args: &["jurisdiction", "company-number", "incorporation-date"],
         returns: ReturnType::Uuid {
-            name: "entity_id",
+            name: "limited_company_id",
             capture: true,
         },
         description:
-            "Create or update a limited company by natural key (company-number + jurisdiction)",
+            "Create or update a limited company by natural key (registration-number + jurisdiction)",
     },
     VerbDef {
         domain: "entity",
         verb: "ensure-proper-person",
         behavior: Behavior::Upsert {
-            table: "proper_persons",
-            conflict_keys: &["tax-id"],
+            table: "entity_proper_persons",
+            conflict_keys: &["id-document-type", "id-document-number"],
         },
         required_args: &["first-name", "last-name"],
-        optional_args: &["nationality", "tax-id", "date-of-birth"],
+        optional_args: &[
+            "nationality",
+            "id-document-type",
+            "id-document-number",
+            "date-of-birth",
+        ],
         returns: ReturnType::Uuid {
-            name: "entity_id",
+            name: "proper_person_id",
             capture: true,
         },
-        description: "Create or update a proper person by tax ID",
+        description: "Create or update a proper person by ID document",
     },
     // =========================================================================
     // CBU DOMAIN - Singleton + Taxonomy operations
