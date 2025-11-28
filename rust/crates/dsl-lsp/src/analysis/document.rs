@@ -11,8 +11,6 @@ pub struct ParsedExpr {
     pub kind: ExprKind,
     /// Source range
     pub range: Range,
-    /// Children expressions
-    pub children: Vec<ParsedExpr>,
 }
 
 /// Kind of expression.
@@ -24,30 +22,18 @@ pub enum ExprKind {
         verb_range: Range,
         args: Vec<ParsedArg>,
     },
-    /// Symbol definition: :as @name
-    SymbolDef {
-        name: String,
-    },
     /// Symbol reference: @name
-    SymbolRef {
-        name: String,
-    },
-    /// Keyword: :name
-    Keyword {
-        name: String,
-    },
+    SymbolRef { name: String },
     /// String literal
-    String {
-        value: String,
-    },
+    String { value: String },
     /// Number literal
-    Number {
-        value: String,
-    },
+    Number { value: String },
+    /// Identifier (true, false, nil, etc.)
+    Identifier { value: String },
+    /// List: [...]
+    List { items: Vec<ParsedExpr> },
     /// Comment
-    Comment {
-        text: String,
-    },
+    Comment { text: String },
 }
 
 /// Parsed argument in a call.
@@ -59,8 +45,6 @@ pub struct ParsedArg {
     pub keyword_range: Range,
     /// Value expression
     pub value: Option<Box<ParsedExpr>>,
-    /// Value range
-    pub value_range: Option<Range>,
 }
 
 /// State of a parsed document.
@@ -81,8 +65,8 @@ pub struct DocumentState {
 pub struct SymbolDef {
     pub name: String,
     pub range: Range,
-    pub verb_name: String,
-    pub line: u32,
+    pub defined_by: String,
+    pub id_type: String,
 }
 
 /// Symbol reference location.
@@ -90,7 +74,6 @@ pub struct SymbolDef {
 pub struct SymbolRef {
     pub name: String,
     pub range: Range,
-    pub line: u32,
 }
 
 impl DocumentState {
@@ -165,7 +148,10 @@ impl DocumentState {
     /// Find verb call at position.
     pub fn find_call_at_position(&self, position: Position) -> Option<(&str, &[ParsedArg])> {
         for expr in &self.expressions {
-            if let ExprKind::Call { verb_name, args, .. } = &expr.kind {
+            if let ExprKind::Call {
+                verb_name, args, ..
+            } = &expr.kind
+            {
                 if contains_position(&expr.range, position) {
                     return Some((verb_name.as_str(), args.as_slice()));
                 }

@@ -6,16 +6,12 @@ use super::document::DocumentState;
 
 /// Context for completion.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum CompletionContext {
     /// Completing a verb name (after open paren)
-    VerbName {
-        prefix: String,
-    },
+    VerbName { prefix: String },
     /// Completing a keyword name (after colon)
-    Keyword {
-        verb_name: String,
-        prefix: String,
-    },
+    Keyword { verb_name: String, prefix: String },
     /// Completing a keyword value
     KeywordValue {
         verb_name: String,
@@ -24,9 +20,7 @@ pub enum CompletionContext {
         in_string: bool,
     },
     /// Completing a symbol reference (after @)
-    SymbolRef {
-        prefix: String,
-    },
+    SymbolRef { prefix: String },
     /// No specific completion context
     None,
 }
@@ -48,7 +42,10 @@ pub fn detect_completion_context(doc: &DocumentState, position: Position) -> Com
     // Check for symbol reference: @
     if let Some(at_pos) = prefix.rfind('@') {
         let after_at = &prefix[at_pos + 1..];
-        if after_at.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
+        if after_at
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+        {
             return CompletionContext::SymbolRef {
                 prefix: after_at.to_string(),
             };
@@ -62,16 +59,16 @@ pub fn detect_completion_context(doc: &DocumentState, position: Position) -> Com
         // After open paren or word prefix - complete verb names
         (None, None) => {
             let word_prefix = extract_word_prefix(prefix);
-            CompletionContext::VerbName { prefix: word_prefix }
+            CompletionContext::VerbName {
+                prefix: word_prefix,
+            }
         }
 
         // After keyword colon - complete keyword names
-        (Some(verb), None) if prefix.trim_end().ends_with(':') => {
-            CompletionContext::Keyword {
-                verb_name: verb,
-                prefix: String::new(),
-            }
-        }
+        (Some(verb), None) if prefix.trim_end().ends_with(':') => CompletionContext::Keyword {
+            verb_name: verb,
+            prefix: String::new(),
+        },
 
         // Typing keyword name
         (Some(verb), None) => {
@@ -176,15 +173,16 @@ fn parse_sexp_context(prefix: &str) -> (Option<String>, Option<String>) {
         i += 1;
     }
 
-    // Handle token at end of prefix
+    // Handle token at end of prefix - this is the token being typed
+    // Don't set verb_name for incomplete tokens - we want verb completion
     if let Some(start) = token_start {
         let token: String = chars[start..].iter().collect();
         if token.strip_prefix(':').is_some() {
-            // We're typing a keyword
+            // We're typing a keyword - don't set current_keyword yet
             current_keyword = None;
-        } else if verb_name.is_none() && depth > 0 {
-            verb_name = Some(token);
         }
+        // Note: we intentionally don't set verb_name here for incomplete tokens
+        // This allows verb completion to work when still typing the verb
     }
 
     (verb_name, current_keyword)
@@ -244,7 +242,13 @@ mod tests {
     #[test]
     fn test_verb_completion() {
         let doc = make_doc("(cbu");
-        let ctx = detect_completion_context(&doc, Position { line: 0, character: 4 });
+        let ctx = detect_completion_context(
+            &doc,
+            Position {
+                line: 0,
+                character: 4,
+            },
+        );
         match ctx {
             CompletionContext::VerbName { prefix } => assert_eq!(prefix, "cbu"),
             _ => panic!("Expected VerbName context"),
@@ -254,7 +258,13 @@ mod tests {
     #[test]
     fn test_keyword_completion() {
         let doc = make_doc("(cbu.ensure :cbu");
-        let ctx = detect_completion_context(&doc, Position { line: 0, character: 16 });
+        let ctx = detect_completion_context(
+            &doc,
+            Position {
+                line: 0,
+                character: 16,
+            },
+        );
         match ctx {
             CompletionContext::Keyword { verb_name, prefix } => {
                 assert_eq!(verb_name, "cbu.ensure");
@@ -267,7 +277,13 @@ mod tests {
     #[test]
     fn test_symbol_ref_completion() {
         let doc = make_doc("(cbu.attach-entity :entity-id @co");
-        let ctx = detect_completion_context(&doc, Position { line: 0, character: 33 });
+        let ctx = detect_completion_context(
+            &doc,
+            Position {
+                line: 0,
+                character: 33,
+            },
+        );
         match ctx {
             CompletionContext::SymbolRef { prefix } => assert_eq!(prefix, "co"),
             _ => panic!("Expected SymbolRef context"),

@@ -4,7 +4,7 @@
 //!
 //! ## Architecture Update (November 2025)
 //! Legacy models (business_request, document, domain, entity) have been removed.
-//! The Forth engine uses simplified direct database operations.
+//! DSL v2 uses data-driven execution with direct database operations.
 
 pub mod dictionary_models;
 

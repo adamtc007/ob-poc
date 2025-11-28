@@ -51,8 +51,8 @@ impl SymbolTable {
                     uri: uri.clone(),
                     range: def.range,
                 },
-                defined_by: def.verb_name.clone(),
-                id_type: infer_id_type(&def.verb_name),
+                defined_by: def.defined_by.clone(),
+                id_type: def.id_type.clone(),
                 references: Vec::new(),
             };
             self.symbols.insert(def.name.clone(), info);
@@ -109,8 +109,10 @@ impl SymbolTable {
 fn infer_id_type(verb_name: &str) -> String {
     match verb_name {
         "cbu.ensure" | "cbu.create" => "CbuId".to_string(),
-        "entity.create-limited-company" | "entity.create-proper-person" 
-        | "entity.create-partnership" | "entity.create-trust" => "EntityId".to_string(),
+        "entity.create-limited-company"
+        | "entity.create-proper-person"
+        | "entity.create-partnership"
+        | "entity.create-trust" => "EntityId".to_string(),
         "investigation.create" => "InvestigationId".to_string(),
         "document.request" => "DocumentRequestId".to_string(),
         "screening.pep" | "screening.sanctions" => "ScreeningId".to_string(),

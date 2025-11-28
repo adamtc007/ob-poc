@@ -8,8 +8,7 @@ use crate::analysis::document::{
     DocumentState, ExprKind, ParsedArg, ParsedExpr, SymbolDef, SymbolRef,
 };
 
-use ob_poc::forth_engine::schema::registry::VERB_REGISTRY;
-use ob_poc::forth_engine::schema::types::RequiredRule;
+use ob_poc::dsl_v2::{find_verb, STANDARD_VERBS};
 
 /// Analyze a document and return state + diagnostics.
 pub fn analyze_document(text: &str) -> (DocumentState, Vec<Diagnostic>) {
@@ -33,7 +32,11 @@ pub fn analyze_document(text: &str) -> (DocumentState, Vec<Diagnostic>) {
     }
 
     // Extract symbols
-    extract_symbols(&state.expressions, &mut state.symbol_defs, &mut state.symbol_refs);
+    extract_symbols(
+        &state.expressions,
+        &mut state.symbol_defs,
+        &mut state.symbol_refs,
+    );
 
     // Validate expressions
     for expr in &state.expressions {
@@ -57,7 +60,8 @@ pub fn analyze_document(text: &str) -> (DocumentState, Vec<Diagnostic>) {
                         },
                         message: format!(
                             "defined symbols: {}",
-                            state.symbol_defs
+                            state
+                                .symbol_defs
                                 .iter()
                                 .map(|d| format!("@{}", d.name))
                                 .collect::<Vec<_>>()
@@ -81,12 +85,13 @@ struct ParseError {
     message: String,
 }
 
-/// Parse a DSL document into expressions.
+/// Parse the document into expressions.
 fn parse_document(text: &str) -> (Vec<ParsedExpr>, Vec<ParseError>) {
     let mut expressions = Vec::new();
     let mut errors = Vec::new();
-    let mut pos = 0;
+
     let chars: Vec<char> = text.chars().collect();
+    let mut pos = 0;
 
     while pos < chars.len() {
         // Skip whitespace
@@ -98,270 +103,344 @@ fn parse_document(text: &str) -> (Vec<ParsedExpr>, Vec<ParseError>) {
             break;
         }
 
-        // Comment
-        if chars[pos] == ';' {
-            let start_pos = pos;
-            let start = offset_to_position(text, pos);
+        // Skip comments
+        if pos + 1 < chars.len() && chars[pos] == ';' && chars[pos + 1] == ';' {
             while pos < chars.len() && chars[pos] != '\n' {
                 pos += 1;
             }
-            let end = offset_to_position(text, pos);
-            let comment_text: String = chars[start_pos..pos].iter().collect();
-            expressions.push(ParsedExpr {
-                kind: ExprKind::Comment { text: comment_text },
-                range: Range { start, end },
-                children: vec![],
-            });
             continue;
         }
 
-        // S-expression
+        // Parse expression
         if chars[pos] == '(' {
-            match parse_sexp(&chars, &mut pos, text) {
+            match parse_expression(&chars, &mut pos, text) {
                 Ok(expr) => expressions.push(expr),
-                Err(err) => errors.push(err),
+                Err(e) => errors.push(e),
             }
-            continue;
-        }
-
-        // Unexpected character
-        let start = offset_to_position(text, pos);
-        errors.push(ParseError {
-            range: Range {
-                start,
-                end: Position {
-                    line: start.line,
-                    character: start.character + 1,
+        } else {
+            // Unexpected character
+            let position = offset_to_position(pos, text);
+            errors.push(ParseError {
+                range: Range {
+                    start: position,
+                    end: Position {
+                        line: position.line,
+                        character: position.character + 1,
+                    },
                 },
-            },
-            message: format!("unexpected character: '{}'", chars[pos]),
-        });
-        pos += 1;
+                message: format!("unexpected character '{}'", chars[pos]),
+            });
+            pos += 1;
+        }
     }
 
     (expressions, errors)
 }
 
-/// Parse an s-expression.
-fn parse_sexp(chars: &[char], pos: &mut usize, text: &str) -> Result<ParsedExpr, ParseError> {
-    let start = offset_to_position(text, *pos);
-    *pos += 1; // Skip '('
+/// Parse a single expression starting at '('.
+fn parse_expression(chars: &[char], pos: &mut usize, text: &str) -> Result<ParsedExpr, ParseError> {
+    let start_pos = *pos;
+    let start_position = offset_to_position(start_pos, text);
+
+    // Consume '('
+    *pos += 1;
 
     // Skip whitespace
-    while *pos < chars.len() && chars[*pos].is_whitespace() {
+    skip_whitespace(chars, pos);
+
+    // Parse verb name (domain.verb)
+    let verb_start = *pos;
+    let verb_start_position = offset_to_position(verb_start, text);
+
+    while *pos < chars.len()
+        && !chars[*pos].is_whitespace()
+        && chars[*pos] != ')'
+        && chars[*pos] != '('
+    {
         *pos += 1;
     }
 
-    // Parse verb name
-    let verb_start = offset_to_position(text, *pos);
-    let mut verb_name = String::new();
-    while *pos < chars.len() && is_symbol_char(chars[*pos]) {
-        verb_name.push(chars[*pos]);
-        *pos += 1;
+    let verb_name: String = chars[verb_start..*pos].iter().collect();
+    let verb_end_position = offset_to_position(*pos, text);
+    let verb_range = Range {
+        start: verb_start_position,
+        end: verb_end_position,
+    };
+
+    if verb_name.is_empty() {
+        return Err(ParseError {
+            range: Range {
+                start: start_position,
+                end: verb_end_position,
+            },
+            message: "expected verb name".to_string(),
+        });
     }
-    let verb_end = offset_to_position(text, *pos);
 
     // Parse arguments
     let mut args = Vec::new();
-    let mut children = Vec::new();
 
-    while *pos < chars.len() {
-        // Skip whitespace
-        while *pos < chars.len() && chars[*pos].is_whitespace() {
-            *pos += 1;
-        }
+    loop {
+        skip_whitespace(chars, pos);
 
         if *pos >= chars.len() {
             return Err(ParseError {
-                range: Range { start, end: offset_to_position(text, *pos) },
-                message: "unclosed s-expression".to_string(),
+                range: Range {
+                    start: start_position,
+                    end: offset_to_position(*pos, text),
+                },
+                message: "unclosed expression, expected ')'".to_string(),
             });
         }
 
-        // End of s-expression
         if chars[*pos] == ')' {
             *pos += 1;
             break;
         }
 
-        // Keyword argument
+        // Parse keyword
         if chars[*pos] == ':' {
-            let _kw_start = *pos;
-            let kw_start_pos = offset_to_position(text, *pos);
+            let kw_start = *pos;
+            let kw_start_pos = offset_to_position(kw_start, text);
             *pos += 1;
-            let mut keyword = String::from(":");
-            while *pos < chars.len() && is_symbol_char(chars[*pos]) {
-                keyword.push(chars[*pos]);
-                *pos += 1;
-            }
-            let kw_end_pos = offset_to_position(text, *pos);
 
-            // Skip whitespace before value
-            while *pos < chars.len() && chars[*pos].is_whitespace() {
+            while *pos < chars.len() && !chars[*pos].is_whitespace() && chars[*pos] != ')' {
                 *pos += 1;
             }
+
+            let keyword: String = chars[kw_start..*pos].iter().collect();
+            let kw_end_pos = offset_to_position(*pos, text);
+            let keyword_range = Range {
+                start: kw_start_pos,
+                end: kw_end_pos,
+            };
+
+            skip_whitespace(chars, pos);
 
             // Parse value
-            let (value, value_range) = if *pos < chars.len() && chars[*pos] != ':' && chars[*pos] != ')' {
-                parse_value(chars, pos, text)?
+            let value = if *pos < chars.len() && chars[*pos] != ')' && chars[*pos] != ':' {
+                Some(Box::new(parse_value(chars, pos, text)?))
             } else {
-                (None, None)
+                None
             };
 
             args.push(ParsedArg {
-                keyword: keyword.clone(),
-                keyword_range: Range { start: kw_start_pos, end: kw_end_pos },
+                keyword,
+                keyword_range,
                 value,
-                value_range,
             });
-
-            // Check for :as @symbol pattern
-            if keyword == ":as" {
-                if let Some(val) = args.last().and_then(|a| a.value.as_ref()) {
-                    if let ExprKind::SymbolRef { name } = &val.kind {
-                        children.push(ParsedExpr {
-                            kind: ExprKind::SymbolDef { name: name.clone() },
-                            range: val.range,
-                            children: vec![],
-                        });
-                    }
-                }
-            }
-            continue;
-        }
-
-        // Nested s-expression
-        if chars[*pos] == '(' {
-            let nested = parse_sexp(chars, pos, text)?;
-            children.push(nested);
-            continue;
-        }
-
-        // Other value (shouldn't happen in well-formed DSL)
-        let (value, _) = parse_value(chars, pos, text)?;
-        if let Some(v) = value {
-            children.push(*v);
+        } else if chars[*pos] == '(' {
+            // Nested expression
+            let nested = parse_expression(chars, pos, text)?;
+            // Store as a value - not typical but handles nested calls
+            args.push(ParsedArg {
+                keyword: String::new(),
+                keyword_range: Range::default(),
+                value: Some(Box::new(nested)),
+            });
+        } else {
+            // Unexpected
+            let ch = chars[*pos];
+            *pos += 1;
+            return Err(ParseError {
+                range: Range {
+                    start: offset_to_position(*pos - 1, text),
+                    end: offset_to_position(*pos, text),
+                },
+                message: format!("expected keyword starting with ':', got '{}'", ch),
+            });
         }
     }
 
-    let end = offset_to_position(text, *pos);
+    let end_position = offset_to_position(*pos, text);
 
     Ok(ParsedExpr {
+        range: Range {
+            start: start_position,
+            end: end_position,
+        },
         kind: ExprKind::Call {
             verb_name,
-            verb_range: Range { start: verb_start, end: verb_end },
+            verb_range,
             args,
         },
-        range: Range { start, end },
-        children,
     })
 }
 
-/// Parse a value (string, number, symbol ref, etc.).
-fn parse_value(
-    chars: &[char],
-    pos: &mut usize,
-    text: &str,
-) -> Result<(Option<Box<ParsedExpr>>, Option<Range>), ParseError> {
-    let start = offset_to_position(text, *pos);
+/// Parse a value (string, number, symbol ref, list, or nested expression).
+fn parse_value(chars: &[char], pos: &mut usize, text: &str) -> Result<ParsedExpr, ParseError> {
+    let start = *pos;
+    let start_position = offset_to_position(start, text);
 
-    // String
     if chars[*pos] == '"' {
+        // String literal
         *pos += 1;
-        let mut value = String::new();
+        let str_start = *pos;
+
         while *pos < chars.len() && chars[*pos] != '"' {
             if chars[*pos] == '\\' && *pos + 1 < chars.len() {
-                value.push(chars[*pos + 1]);
                 *pos += 2;
             } else {
-                value.push(chars[*pos]);
                 *pos += 1;
             }
         }
-        if *pos < chars.len() {
-            *pos += 1; // Skip closing quote
-        }
-        let end = offset_to_position(text, *pos);
-        let range = Range { start, end };
-        return Ok((
-            Some(Box::new(ParsedExpr {
-                kind: ExprKind::String { value },
-                range,
-                children: vec![],
-            })),
-            Some(range),
-        ));
-    }
 
-    // Symbol reference
-    if chars[*pos] == '@' {
+        if *pos >= chars.len() {
+            return Err(ParseError {
+                range: Range {
+                    start: start_position,
+                    end: offset_to_position(*pos, text),
+                },
+                message: "unclosed string literal".to_string(),
+            });
+        }
+
+        let value: String = chars[str_start..*pos].iter().collect();
+        *pos += 1; // consume closing "
+
+        Ok(ParsedExpr {
+            range: Range {
+                start: start_position,
+                end: offset_to_position(*pos, text),
+            },
+            kind: ExprKind::String { value },
+        })
+    } else if chars[*pos] == '@' {
+        // Symbol reference
         *pos += 1;
-        let mut name = String::new();
-        while *pos < chars.len() && is_symbol_char(chars[*pos]) {
-            name.push(chars[*pos]);
+        let sym_start = *pos;
+
+        while *pos < chars.len()
+            && (chars[*pos].is_alphanumeric() || chars[*pos] == '_' || chars[*pos] == '-')
+        {
             *pos += 1;
         }
-        let end = offset_to_position(text, *pos);
-        let range = Range { start, end };
-        return Ok((
-            Some(Box::new(ParsedExpr {
-                kind: ExprKind::SymbolRef { name },
-                range,
-                children: vec![],
-            })),
-            Some(range),
-        ));
-    }
 
-    // Number or symbol
-    let mut value = String::new();
-    while *pos < chars.len() && !chars[*pos].is_whitespace() && chars[*pos] != ')' && chars[*pos] != ':' {
-        value.push(chars[*pos]);
+        let name: String = chars[sym_start..*pos].iter().collect();
+
+        Ok(ParsedExpr {
+            range: Range {
+                start: start_position,
+                end: offset_to_position(*pos, text),
+            },
+            kind: ExprKind::SymbolRef { name },
+        })
+    } else if chars[*pos] == '[' {
+        // List
+        *pos += 1;
+        let mut items = Vec::new();
+
+        loop {
+            skip_whitespace(chars, pos);
+
+            if *pos >= chars.len() {
+                return Err(ParseError {
+                    range: Range {
+                        start: start_position,
+                        end: offset_to_position(*pos, text),
+                    },
+                    message: "unclosed list, expected ']'".to_string(),
+                });
+            }
+
+            if chars[*pos] == ']' {
+                *pos += 1;
+                break;
+            }
+
+            // Skip commas
+            if chars[*pos] == ',' {
+                *pos += 1;
+                continue;
+            }
+
+            items.push(parse_value(chars, pos, text)?);
+        }
+
+        Ok(ParsedExpr {
+            range: Range {
+                start: start_position,
+                end: offset_to_position(*pos, text),
+            },
+            kind: ExprKind::List { items },
+        })
+    } else if chars[*pos] == '(' {
+        // Nested expression
+        parse_expression(chars, pos, text)
+    } else if chars[*pos].is_ascii_digit()
+        || (chars[*pos] == '-' && *pos + 1 < chars.len() && chars[*pos + 1].is_ascii_digit())
+    {
+        // Number
+        let num_start = *pos;
+        if chars[*pos] == '-' {
+            *pos += 1;
+        }
+        while *pos < chars.len() && (chars[*pos].is_ascii_digit() || chars[*pos] == '.') {
+            *pos += 1;
+        }
+        let value: String = chars[num_start..*pos].iter().collect();
+
+        Ok(ParsedExpr {
+            range: Range {
+                start: start_position,
+                end: offset_to_position(*pos, text),
+            },
+            kind: ExprKind::Number { value },
+        })
+    } else if chars[*pos].is_alphabetic() {
+        // Identifier (true, false, nil, or bare word)
+        let id_start = *pos;
+        while *pos < chars.len()
+            && (chars[*pos].is_alphanumeric() || chars[*pos] == '_' || chars[*pos] == '-')
+        {
+            *pos += 1;
+        }
+        let value: String = chars[id_start..*pos].iter().collect();
+
+        Ok(ParsedExpr {
+            range: Range {
+                start: start_position,
+                end: offset_to_position(*pos, text),
+            },
+            kind: ExprKind::Identifier { value },
+        })
+    } else {
+        Err(ParseError {
+            range: Range {
+                start: start_position,
+                end: offset_to_position(*pos + 1, text),
+            },
+            message: format!("unexpected character '{}' in value", chars[*pos]),
+        })
+    }
+}
+
+fn skip_whitespace(chars: &[char], pos: &mut usize) {
+    while *pos < chars.len() && chars[*pos].is_whitespace() {
         *pos += 1;
     }
-    let end = offset_to_position(text, *pos);
-    let range = Range { start, end };
-
-    if value.is_empty() {
-        return Ok((None, None));
-    }
-
-    // Check if it's a number
-    if value.parse::<f64>().is_ok() {
-        return Ok((
-            Some(Box::new(ParsedExpr {
-                kind: ExprKind::Number { value },
-                range,
-                children: vec![],
-            })),
-            Some(range),
-        ));
-    }
-
-    Ok((None, Some(range)))
 }
 
-/// Check if a character is valid in a symbol/keyword name.
-fn is_symbol_char(c: char) -> bool {
-    c.is_alphanumeric() || c == '-' || c == '_' || c == '.'
-}
-
-/// Convert byte offset to LSP position.
-fn offset_to_position(text: &str, offset: usize) -> Position {
+fn offset_to_position(offset: usize, text: &str) -> Position {
     let mut line = 0u32;
     let mut col = 0u32;
-    for (i, c) in text.chars().enumerate() {
+
+    for (i, ch) in text.chars().enumerate() {
         if i >= offset {
             break;
         }
-        if c == '\n' {
+        if ch == '\n' {
             line += 1;
             col = 0;
         } else {
             col += 1;
         }
     }
-    Position { line, character: col }
+
+    Position {
+        line,
+        character: col,
+    }
 }
 
 /// Extract symbol definitions and references from expressions.
@@ -371,60 +450,107 @@ fn extract_symbols(
     refs: &mut Vec<SymbolRef>,
 ) {
     for expr in expressions {
-        if let ExprKind::Call { verb_name, args, .. } = &expr.kind {
-            // Check for :as @symbol
+        extract_symbols_from_expr(expr, defs, refs);
+    }
+}
+
+fn extract_symbols_from_expr(
+    expr: &ParsedExpr,
+    defs: &mut Vec<SymbolDef>,
+    refs: &mut Vec<SymbolRef>,
+) {
+    match &expr.kind {
+        ExprKind::Call {
+            verb_name, args, ..
+        } => {
+            // Check for :as @symbol binding
             for arg in args {
                 if arg.keyword == ":as" {
-                    if let Some(ref val) = arg.value {
-                        if let ExprKind::SymbolRef { name } = &val.kind {
+                    if let Some(value) = &arg.value {
+                        if let ExprKind::SymbolRef { name } = &value.kind {
                             defs.push(SymbolDef {
                                 name: name.clone(),
-                                range: val.range,
-                                verb_name: verb_name.clone(),
-                                line: val.range.start.line,
+                                range: value.range,
+                                defined_by: verb_name.clone(),
+                                id_type: "uuid".to_string(),
                             });
                         }
                     }
-                }
-
-                // Check for symbol refs in values
-                if let Some(ref val) = arg.value {
-                    if let ExprKind::SymbolRef { name } = &val.kind {
-                        if arg.keyword != ":as" {
-                            refs.push(SymbolRef {
-                                name: name.clone(),
-                                range: val.range,
-                                line: val.range.start.line,
-                            });
-                        }
-                    }
+                } else if let Some(value) = &arg.value {
+                    extract_symbols_from_expr(value, defs, refs);
                 }
             }
         }
-
-        // Recurse into children
-        extract_symbols(&expr.children, defs, refs);
+        ExprKind::SymbolRef { name } => {
+            refs.push(SymbolRef {
+                name: name.clone(),
+                range: expr.range,
+            });
+        }
+        ExprKind::List { items } => {
+            for item in items {
+                extract_symbols_from_expr(item, defs, refs);
+            }
+        }
+        _ => {}
     }
 }
 
 /// Validate an expression against verb schema.
-#[allow(clippy::only_used_in_recursion)]
 fn validate_expression(
     expr: &ParsedExpr,
     symbol_defs: &[SymbolDef],
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    if let ExprKind::Call { verb_name, verb_range, args } = &expr.kind {
+    if let ExprKind::Call {
+        verb_name,
+        verb_range,
+        args,
+    } = &expr.kind
+    {
+        // Parse domain.verb
+        let parts: Vec<&str> = verb_name.split('.').collect();
+        if parts.len() != 2 {
+            diagnostics.push(Diagnostic {
+                range: *verb_range,
+                severity: Some(DiagnosticSeverity::ERROR),
+                code: Some(NumberOrString::String("E001".to_string())),
+                source: Some("dsl-lsp".to_string()),
+                message: format!(
+                    "invalid verb format '{}', expected 'domain.verb'",
+                    verb_name
+                ),
+                ..Default::default()
+            });
+            return;
+        }
+
         // Check verb exists
-        let verb = match VERB_REGISTRY.get(verb_name) {
+        let verb = match find_verb(parts[0], parts[1]) {
             Some(v) => v,
             None => {
-                let suggestions = VERB_REGISTRY.suggest(verb_name);
+                // Suggest similar verbs
+                let suggestions: Vec<String> = STANDARD_VERBS
+                    .iter()
+                    .filter(|v| {
+                        v.domain == parts[0]
+                            || v.verb.contains(parts[1])
+                            || format!("{}.{}", v.domain, v.verb).contains(verb_name)
+                    })
+                    .take(3)
+                    .map(|v| format!("{}.{}", v.domain, v.verb))
+                    .collect();
+
                 let message = if suggestions.is_empty() {
                     format!("unknown verb '{}'", verb_name)
                 } else {
-                    format!("unknown verb '{}'. Did you mean: {}?", verb_name, suggestions.join(", "))
+                    format!(
+                        "unknown verb '{}'. Did you mean: {}?",
+                        verb_name,
+                        suggestions.join(", ")
+                    )
                 };
+
                 diagnostics.push(Diagnostic {
                     range: *verb_range,
                     severity: Some(DiagnosticSeverity::ERROR),
@@ -438,103 +564,81 @@ fn validate_expression(
         };
 
         // Check for unknown arguments
+        let all_known_args: Vec<&str> = verb
+            .required_args
+            .iter()
+            .chain(verb.optional_args.iter())
+            .copied()
+            .collect();
+
         for arg in args {
-            let is_known = verb.args.iter().any(|a| a.name == arg.keyword) || arg.keyword == ":as";
+            if arg.keyword.is_empty() {
+                continue; // Skip nested expressions without keyword
+            }
+
+            let arg_name = arg.keyword.trim_start_matches(':');
+            let is_known = all_known_args.contains(&arg_name) || arg_name == "as";
+
             if !is_known {
-                let suggestions: Vec<_> = verb.args
-                    .iter()
-                    .filter(|a| {
-                        let dist = levenshtein(a.name, &arg.keyword);
-                        dist <= 3 || a.name.contains(&arg.keyword[1..])
-                    })
-                    .map(|a| a.name)
-                    .collect();
-
-                let message = if suggestions.is_empty() {
-                    format!("unknown argument '{}' for verb '{}'", arg.keyword, verb_name)
-                } else {
-                    format!(
-                        "unknown argument '{}' for verb '{}'. Did you mean: {}?",
-                        arg.keyword, verb_name, suggestions.join(", ")
-                    )
-                };
-
                 diagnostics.push(Diagnostic {
                     range: arg.keyword_range,
-                    severity: Some(DiagnosticSeverity::ERROR),
+                    severity: Some(DiagnosticSeverity::WARNING),
                     code: Some(NumberOrString::String("E002".to_string())),
                     source: Some("dsl-lsp".to_string()),
-                    message,
+                    message: format!(
+                        "unknown argument '{}' for verb '{}'",
+                        arg.keyword, verb_name
+                    ),
                     ..Default::default()
                 });
             }
         }
 
         // Check for missing required arguments
-        let provided: std::collections::HashSet<_> = args.iter().map(|a| a.keyword.as_str()).collect();
+        let provided: std::collections::HashSet<&str> = args
+            .iter()
+            .map(|a| a.keyword.trim_start_matches(':'))
+            .collect();
 
-        for spec in verb.args {
-            let is_required = match &spec.required {
-                RequiredRule::Always => true,
-                RequiredRule::Never => false,
-                RequiredRule::UnlessProvided(other) => !provided.contains(other),
-                RequiredRule::IfProvided(other) => provided.contains(other),
-                RequiredRule::IfEquals { arg, value } => {
-                    // Check if arg equals value
-                    args.iter()
-                        .find(|a| a.keyword == *arg)
-                        .and_then(|a| a.value.as_ref())
-                        .map(|v| {
-                            if let ExprKind::String { value: s } = &v.kind {
-                                s == *value
-                            } else {
-                                false
-                            }
-                        })
-                        .unwrap_or(false)
-                }
-            };
-
-            if is_required && !provided.contains(spec.name) {
+        for required_arg in verb.required_args {
+            if !provided.contains(required_arg) {
                 diagnostics.push(Diagnostic {
                     range: expr.range,
                     severity: Some(DiagnosticSeverity::ERROR),
                     code: Some(NumberOrString::String("E003".to_string())),
                     source: Some("dsl-lsp".to_string()),
-                    message: format!("missing required argument '{}' for '{}'", spec.name, verb_name),
+                    message: format!(
+                        "missing required argument '{}' for '{}'",
+                        required_arg, verb_name
+                    ),
                     ..Default::default()
                 });
             }
         }
-    }
 
-    // Validate children
-    for child in &expr.children {
-        validate_expression(child, symbol_defs, diagnostics);
+        // Recursively validate nested expressions
+        for arg in args {
+            if let Some(value) = &arg.value {
+                validate_nested_expr(value, symbol_defs, diagnostics);
+            }
+        }
     }
 }
 
-/// Simple Levenshtein distance.
-fn levenshtein(a: &str, b: &str) -> usize {
-    let a_len = a.chars().count();
-    let b_len = b.chars().count();
-
-    if a_len == 0 { return b_len; }
-    if b_len == 0 { return a_len; }
-
-    let mut matrix = vec![vec![0usize; b_len + 1]; a_len + 1];
-
-    (0..=a_len).for_each(|i| matrix[i][0] = i);
-    (0..=b_len).for_each(|j| matrix[0][j] = j);
-
-    for (i, ca) in a.chars().enumerate() {
-        for (j, cb) in b.chars().enumerate() {
-            let cost = if ca == cb { 0 } else { 1 };
-            matrix[i + 1][j + 1] = (matrix[i][j + 1] + 1)
-                .min(matrix[i + 1][j] + 1)
-                .min(matrix[i][j] + cost);
+fn validate_nested_expr(
+    expr: &ParsedExpr,
+    symbol_defs: &[SymbolDef],
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    match &expr.kind {
+        ExprKind::Call { .. } => {
+            validate_expression(expr, symbol_defs, diagnostics);
         }
+        ExprKind::List { items } => {
+            for item in items {
+                validate_nested_expr(item, symbol_defs, diagnostics);
+            }
+        }
+        _ => {}
     }
-
-    matrix[a_len][b_len]
 }

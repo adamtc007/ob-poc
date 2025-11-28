@@ -2,8 +2,8 @@
 
 use tower_lsp::lsp_types::*;
 
-use crate::analysis::DocumentState;
 use crate::analysis::document::ExprKind;
+use crate::analysis::DocumentState;
 
 /// Get document symbols (outline).
 #[allow(deprecated)]
@@ -11,13 +11,21 @@ pub fn get_document_symbols(doc: &DocumentState) -> Vec<SymbolInformation> {
     let mut symbols = Vec::new();
 
     for expr in &doc.expressions {
-        if let ExprKind::Call { verb_name, verb_range: _, args } = &expr.kind {
+        if let ExprKind::Call {
+            verb_name,
+            verb_range: _,
+            args,
+        } = &expr.kind
+        {
             // Add the verb call as a symbol
             let mut name = verb_name.clone();
 
             // Try to add a meaningful identifier (e.g., :cbu-name value)
             for arg in args {
-                if arg.keyword == ":cbu-name" || arg.keyword == ":name" || arg.keyword == ":first-name" {
+                if arg.keyword == ":cbu-name"
+                    || arg.keyword == ":name"
+                    || arg.keyword == ":first-name"
+                {
                     if let Some(ref val) = arg.value {
                         if let ExprKind::String { value } = &val.kind {
                             name = format!("{} \"{}\"", verb_name, value);
@@ -64,7 +72,7 @@ pub fn get_document_symbols(doc: &DocumentState) -> Vec<SymbolInformation> {
                 uri: Url::parse("file:///").unwrap(),
                 range: def.range,
             },
-            container_name: Some(def.verb_name.clone()),
+            container_name: Some(def.defined_by.clone()),
         });
     }
 

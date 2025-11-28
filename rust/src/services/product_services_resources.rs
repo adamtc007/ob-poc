@@ -1,6 +1,6 @@
 //! Product Services Resources - DSL Generation Service
-//! 
-//! Generates DSL that flows through Forth engine instead of direct database operations.
+//!
+//! Generates DSL that flows through DSL v2 executor instead of direct database operations.
 //! This maintains the DSL-as-State architecture.
 
 use serde::{Deserialize, Serialize};
@@ -176,7 +176,10 @@ impl ProductServicesResourcesDsl {
     /// Generate DSL for deleting a lifecycle resource
     pub fn generate_lifecycle_resource_delete_dsl(&self, resource_id: Uuid) -> DslGenerationResult {
         let start = Instant::now();
-        let dsl = format!(r#":resource-id "{}" lifecycle-resource.delete"#, resource_id);
+        let dsl = format!(
+            r#":resource-id "{}" lifecycle-resource.delete"#,
+            resource_id
+        );
         DslGenerationResult {
             dsl,
             operation: "delete_lifecycle_resource".to_string(),
@@ -186,7 +189,11 @@ impl ProductServicesResourcesDsl {
     }
 
     /// Generate DSL for linking service to product
-    pub fn generate_service_link_product_dsl(&self, service_id: Uuid, product_id: Uuid) -> DslGenerationResult {
+    pub fn generate_service_link_product_dsl(
+        &self,
+        service_id: Uuid,
+        product_id: Uuid,
+    ) -> DslGenerationResult {
         let start = Instant::now();
         let dsl = format!(
             r#":service-id "{}" :product-id "{}" service.link-product"#,
@@ -201,7 +208,11 @@ impl ProductServicesResourcesDsl {
     }
 
     /// Generate DSL for linking lifecycle resource to service
-    pub fn generate_resource_link_service_dsl(&self, resource_id: Uuid, service_id: Uuid) -> DslGenerationResult {
+    pub fn generate_resource_link_service_dsl(
+        &self,
+        resource_id: Uuid,
+        service_id: Uuid,
+    ) -> DslGenerationResult {
         let start = Instant::now();
         let dsl = format!(
             r#":resource-id "{}" :service-id "{}" lifecycle-resource.link-service"#,

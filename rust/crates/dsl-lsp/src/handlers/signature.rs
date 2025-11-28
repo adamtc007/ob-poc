@@ -1,72 +1,74 @@
-//! Signature help handler.
+//! Signature help handler for the DSL Language Server.
 
 use tower_lsp::lsp_types::*;
 
 use crate::analysis::DocumentState;
 
-
-use ob_poc::forth_engine::schema::registry::VERB_REGISTRY;
-use ob_poc::forth_engine::schema::types::RequiredRule;
+use ob_poc::dsl_v2::find_verb;
 
 /// Get signature help at position.
 pub fn get_signature_help(doc: &DocumentState, position: Position) -> Option<SignatureHelp> {
-    // Find the enclosing call
-    let (verb_name, args) = doc.find_call_at_position(position)?;
+    // Find which verb call we're in
+    for expr in &doc.expressions {
+        if let crate::analysis::document::ExprKind::Call {
+            verb_name,
+            verb_range: _,
+            args: _,
+        } = &expr.kind
+        {
+            if position_in_range(position, &expr.range) {
+                let parts: Vec<&str> = verb_name.split('.').collect();
+                if parts.len() != 2 {
+                    continue;
+                }
 
-    // Get verb definition
-    let verb = VERB_REGISTRY.get(verb_name)?;
+                let verb = find_verb(parts[0], parts[1])?;
 
-    // Build signature
-    let mut label_parts = vec![format!("({}", verb.name)];
-    let mut parameters = Vec::new();
+                // Build signature
+                let mut params = Vec::new();
 
-    for arg in verb.args {
-        let required = matches!(arg.required, RequiredRule::Always);
-        let param_label = if required {
-            format!("{} <{}>", arg.name, arg.sem_type.type_name())
-        } else {
-            format!("[{} <{}>]", arg.name, arg.sem_type.type_name())
-        };
+                for arg in verb.required_args {
+                    params.push(ParameterInformation {
+                        label: ParameterLabel::Simple(format!(":{}", arg)),
+                        documentation: Some(Documentation::String("(required)".to_string())),
+                    });
+                }
 
-        let param_start = label_parts.join(" ").len() + 1;
-        label_parts.push(param_label.clone());
-        let param_end = label_parts.join(" ").len();
+                for arg in verb.optional_args {
+                    params.push(ParameterInformation {
+                        label: ParameterLabel::Simple(format!(":{}", arg)),
+                        documentation: Some(Documentation::String("(optional)".to_string())),
+                    });
+                }
 
-        parameters.push(ParameterInformation {
-            label: ParameterLabel::LabelOffsets([param_start as u32, param_end as u32]),
-            documentation: Some(Documentation::String(arg.description.to_string())),
-        });
+                let signature = SignatureInformation {
+                    label: format!("({} ...)", verb_name),
+                    documentation: Some(Documentation::String(verb.description.to_string())),
+                    parameters: Some(params),
+                    active_parameter: None,
+                };
+
+                return Some(SignatureHelp {
+                    signatures: vec![signature],
+                    active_signature: Some(0),
+                    active_parameter: None,
+                });
+            }
+        }
     }
 
-    label_parts.push(")".to_string());
-    let label = label_parts.join(" ");
-
-    // Determine active parameter based on cursor position
-    let active_parameter = determine_active_parameter(doc, position, args.len());
-
-    Some(SignatureHelp {
-        signatures: vec![SignatureInformation {
-            label,
-            documentation: Some(Documentation::MarkupContent(MarkupContent {
-                kind: MarkupKind::Markdown,
-                value: verb.description.to_string(),
-            })),
-            parameters: Some(parameters),
-            active_parameter: Some(active_parameter),
-        }],
-        active_signature: Some(0),
-        active_parameter: Some(active_parameter),
-    })
+    None
 }
 
-/// Determine which parameter is active based on cursor position.
-fn determine_active_parameter(
-    _doc: &DocumentState,
-    _position: Position,
-    num_provided_args: usize,
-) -> u32 {
-    // Simple heuristic: use the number of provided args
-    // In a more sophisticated implementation, we'd track which keyword
-    // the cursor is currently after
-    num_provided_args as u32
+fn position_in_range(position: Position, range: &Range) -> bool {
+    if position.line < range.start.line || position.line > range.end.line {
+        return false;
+    }
+    if position.line == range.start.line && position.character < range.start.character {
+        return false;
+    }
+    if position.line == range.end.line && position.character > range.end.character {
+        return false;
+    }
+    true
 }

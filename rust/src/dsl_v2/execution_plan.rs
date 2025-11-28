@@ -4,7 +4,7 @@
 //! that respects data dependencies. This is analogous to:
 //! - Lisp's evaluation order with let-bindings
 //! - SQL query planner's CTE ordering
-//! - Forth's compile-time stack analysis
+//! - Stack-based compile-time analysis
 //!
 //! # Architecture
 //!
