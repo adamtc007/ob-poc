@@ -126,6 +126,14 @@ impl DslExecutor {
             match statement {
                 Statement::VerbCall(vc) => {
                     let result = self.execute_verb(vc, ctx).await?;
+                    
+                    // Handle :as @symbol binding
+                    if let Some(ref binding_name) = vc.as_binding {
+                        if let ExecutionResult::Uuid(id) = &result {
+                            ctx.bind(binding_name, *id);
+                        }
+                    }
+                    
                     results.push(result);
                 }
                 Statement::Comment(_) => {
