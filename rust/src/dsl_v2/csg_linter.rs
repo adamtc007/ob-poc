@@ -143,6 +143,18 @@ impl CsgLinter {
         }
     }
 
+    /// Create a linter without database connection (for offline validation)
+    /// Uses default/empty rules - no CSG database lookups will be performed
+    #[cfg(feature = "database")]
+    pub fn new_without_db() -> Self {
+        Self {
+            pool: sqlx::PgPool::connect_lazy("postgresql://invalid").unwrap(),
+            rules: ApplicabilityRules::default(),
+            semantic_store: SemanticContextStore::new_empty(),
+            initialized: false,
+        }
+    }
+
     /// Initialize linter by loading rules from database
     #[cfg(feature = "database")]
     pub async fn initialize(&mut self) -> Result<(), String> {

@@ -112,6 +112,30 @@ enum Commands {
         #[arg(default_value = "all")]
         category: String,
     },
+
+    /// Execute DSL against the database
+    #[cfg(feature = "database")]
+    Execute {
+        /// Input file (reads stdin if not provided)
+        #[arg(short, long)]
+        file: Option<PathBuf>,
+
+        /// Database URL (or use DATABASE_URL env var)
+        #[arg(long, env = "DATABASE_URL")]
+        db_url: String,
+
+        /// Dry run - show what would happen without executing
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Client type context: individual, corporate, fund, trust
+        #[arg(long)]
+        client_type: Option<String>,
+
+        /// Jurisdiction context (ISO 2-letter code)
+        #[arg(long)]
+        jurisdiction: Option<String>,
+    },
 }
 
 // =============================================================================
@@ -132,6 +156,29 @@ fn main() -> ExitCode {
         Commands::Demo { scenario } => cmd_demo(&scenario, cli.format, cli.quiet),
         Commands::Verbs { domain, verbose } => cmd_verbs(domain, verbose, cli.format),
         Commands::Examples { category } => cmd_examples(&category, cli.format),
+        #[cfg(feature = "database")]
+        Commands::Execute {
+            file,
+            db_url,
+            dry_run,
+            client_type,
+            jurisdiction,
+        } => {
+            // Run async runtime for database operations
+            let rt = tokio::runtime::Runtime::new()
+                .map_err(|e| format!("Failed to create runtime: {}", e));
+            match rt {
+                Ok(rt) => rt.block_on(cmd_execute(
+                    file,
+                    db_url,
+                    dry_run,
+                    client_type,
+                    jurisdiction,
+                    cli.format,
+                )),
+                Err(e) => Err(e),
+            }
+        }
     };
 
     match result {
@@ -205,6 +252,9 @@ fn cmd_validate(
     }
 
     // CSG Lint (without database, uses empty rules but still checks symbols)
+    #[cfg(feature = "database")]
+    let linter = ob_poc::dsl_v2::CsgLinter::new_without_db();
+    #[cfg(not(feature = "database"))]
     let linter = ob_poc::dsl_v2::CsgLinter::new();
     let source_clone = source.clone();
 
@@ -450,6 +500,9 @@ fn cmd_demo(scenario: &str, format: OutputFormat, quiet: bool) -> Result<(), Str
 
     // Validate with CSG
     let context = ValidationContext::default();
+    #[cfg(feature = "database")]
+    let linter = ob_poc::dsl_v2::CsgLinter::new_without_db();
+    #[cfg(not(feature = "database"))]
     let linter = ob_poc::dsl_v2::CsgLinter::new();
 
     let lint_result = futures::executor::block_on(async {
@@ -702,5 +755,283 @@ fn parse_client_type(s: &str) -> Result<ClientType, String> {
             "Unknown client type: '{}'. Use: individual, corporate, fund, trust",
             s
         )),
+    }
+}
+
+// =============================================================================
+// DATABASE EXECUTE COMMAND
+// =============================================================================
+
+#[cfg(feature = "database")]
+async fn cmd_execute(
+    file: Option<PathBuf>,
+    db_url: String,
+    dry_run: bool,
+    client_type: Option<String>,
+    jurisdiction: Option<String>,
+    format: OutputFormat,
+) -> Result<(), String> {
+    use ob_poc::dsl_v2::{
+        executor::{DslExecutor, ExecutionContext, ExecutionResult},
+        CsgLinter,
+    };
+
+    let source = read_input(file)?;
+
+    // 1. Connect to database
+    if format == OutputFormat::Pretty {
+        println!("{}", "Connecting to database...".dimmed());
+    }
+
+    let pool = sqlx::PgPool::connect(&db_url)
+        .await
+        .map_err(|e| format!("Database connection failed: {}", e))?;
+
+    // 2. Parse
+    if format == OutputFormat::Pretty {
+        println!("{}", "Parsing DSL...".dimmed());
+    }
+
+    let ast = parse_program(&source).map_err(|e| format!("Parse error: {:?}", e))?;
+
+    if format == OutputFormat::Pretty {
+        println!(
+            "{} Parsed {} statement(s)",
+            "✓".green(),
+            ast.statements.len()
+        );
+    }
+
+    // 3. Build validation context
+    let mut context = ValidationContext::default();
+    if let Some(ct) = client_type {
+        context.client_type = Some(parse_client_type(&ct)?);
+    }
+    if let Some(j) = jurisdiction {
+        context.jurisdiction = Some(j);
+    }
+
+    // 4. CSG Lint with database rules
+    if format == OutputFormat::Pretty {
+        println!("{}", "Running CSG validation...".dimmed());
+    }
+
+    let mut linter = CsgLinter::new(pool.clone());
+    linter
+        .initialize()
+        .await
+        .map_err(|e| format!("Linter initialization failed: {}", e))?;
+
+    let lint_result = linter.lint(ast.clone(), &context, &source).await;
+
+    if lint_result.has_errors() {
+        let formatted = RustStyleFormatter::format(&source, &lint_result.diagnostics);
+        if format == OutputFormat::Json {
+            let output = serde_json::json!({
+                "success": false,
+                "stage": "validation",
+                "diagnostics": lint_result.diagnostics.iter().map(|d| {
+                    serde_json::json!({
+                        "severity": format!("{:?}", d.severity),
+                        "code": d.code.as_str(),
+                        "message": d.message,
+                        "line": d.span.line,
+                        "column": d.span.column,
+                    })
+                }).collect::<Vec<_>>(),
+            });
+            println!("{}", serde_json::to_string_pretty(&output).unwrap());
+        } else {
+            eprintln!("{}", formatted);
+        }
+        return Err("Validation failed".to_string());
+    }
+
+    if format == OutputFormat::Pretty && lint_result.has_warnings() {
+        let formatted = RustStyleFormatter::format(&source, &lint_result.diagnostics);
+        eprintln!("{}", formatted);
+    }
+
+    if format == OutputFormat::Pretty {
+        println!("{} CSG validation passed", "✓".green());
+    }
+
+    // 5. Compile to execution plan
+    if format == OutputFormat::Pretty {
+        println!("{}", "Compiling execution plan...".dimmed());
+    }
+
+    let plan = compile(&ast).map_err(|e| format!("Compile error: {:?}", e))?;
+
+    if format == OutputFormat::Pretty {
+        println!("{} Compiled {} step(s)", "✓".green(), plan.steps.len());
+    }
+
+    // 6. Dry run - stop here
+    if dry_run {
+        if format == OutputFormat::Json {
+            let output = serde_json::json!({
+                "success": true,
+                "dry_run": true,
+                "steps": plan.steps.len(),
+                "plan": plan.steps.iter().enumerate().map(|(i, s)| {
+                    serde_json::json!({
+                        "step": i,
+                        "verb": format!("{}.{}", s.verb_call.domain, s.verb_call.verb),
+                        "binding": s.bind_as,
+                        "behavior": format!("{:?}", s.behavior),
+                    })
+                }).collect::<Vec<_>>(),
+            });
+            println!("{}", serde_json::to_string_pretty(&output).unwrap());
+        } else {
+            println!();
+            println!(
+                "{} Dry run complete - {} step(s) would execute:",
+                "✓".green().bold(),
+                plan.steps.len()
+            );
+            println!();
+            for (i, step) in plan.steps.iter().enumerate() {
+                let binding = step
+                    .bind_as
+                    .as_ref()
+                    .map(|b| format!(" → @{}", b))
+                    .unwrap_or_default();
+                let behavior_tag = match step.behavior {
+                    VerbBehavior::Crud => "[CRUD]".dimmed(),
+                    VerbBehavior::CustomOp => "[CUSTOM]".yellow(),
+                    VerbBehavior::Composite => "[COMPOSITE]".blue(),
+                };
+                println!(
+                    "  [{}] {}.{}{} {}",
+                    i,
+                    step.verb_call.domain.cyan(),
+                    step.verb_call.verb.cyan().bold(),
+                    binding.yellow(),
+                    behavior_tag
+                );
+            }
+        }
+        return Ok(());
+    }
+
+    // 7. Execute for real
+    if format == OutputFormat::Pretty {
+        println!();
+        println!("{}", "Executing...".yellow().bold());
+        println!();
+    }
+
+    let executor = DslExecutor::new(pool);
+    let mut exec_ctx = ExecutionContext::default();
+
+    // Execute the entire plan
+    match executor.execute_plan(&plan, &mut exec_ctx).await {
+        Ok(results) => {
+            // 8. Success output
+            if format == OutputFormat::Json {
+                let result_data: Vec<_> = results
+                    .iter()
+                    .enumerate()
+                    .map(|(i, r)| {
+                        let step = &plan.steps[i];
+                        serde_json::json!({
+                            "step": i,
+                            "verb": format!("{}.{}", step.verb_call.domain, step.verb_call.verb),
+                            "success": true,
+                            "result": match r {
+                                ExecutionResult::Uuid(id) => serde_json::json!({"id": id.to_string()}),
+                                ExecutionResult::Record(j) => j.clone(),
+                                ExecutionResult::RecordSet(rs) => serde_json::json!(rs),
+                                ExecutionResult::Affected(n) => serde_json::json!({"rows_affected": n}),
+                                ExecutionResult::Void => serde_json::json!(null),
+                            },
+                        })
+                    })
+                    .collect();
+
+                let bindings: std::collections::HashMap<_, _> = exec_ctx
+                    .symbols
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.to_string()))
+                    .collect();
+
+                let output = serde_json::json!({
+                    "success": true,
+                    "steps_executed": results.len(),
+                    "bindings": bindings,
+                    "results": result_data,
+                });
+                println!("{}", serde_json::to_string_pretty(&output).unwrap());
+            } else {
+                // Pretty print step results
+                for (i, result) in results.iter().enumerate() {
+                    let step = &plan.steps[i];
+                    let verb_name = format!("{}.{}", step.verb_call.domain, step.verb_call.verb);
+
+                    match result {
+                        ExecutionResult::Uuid(id) => {
+                            let binding_info = step
+                                .bind_as
+                                .as_ref()
+                                .map(|b| format!(" @{} =", b))
+                                .unwrap_or_default();
+                            println!(
+                                "  [{}] {}{} {} {}",
+                                i,
+                                verb_name.cyan(),
+                                binding_info.yellow(),
+                                id.to_string().dimmed(),
+                                "✓".green()
+                            );
+                        }
+                        ExecutionResult::Affected(n) => {
+                            println!(
+                                "  [{}] {} ({} rows) {}",
+                                i,
+                                verb_name.cyan(),
+                                n,
+                                "✓".green()
+                            );
+                        }
+                        _ => {
+                            println!("  [{}] {} {}", i, verb_name.cyan(), "✓".green());
+                        }
+                    }
+                }
+
+                println!();
+                println!(
+                    "{} Executed {} step(s) successfully",
+                    "✓".green().bold(),
+                    results.len()
+                );
+
+                if !exec_ctx.symbols.is_empty() {
+                    println!();
+                    println!("Bindings created:");
+                    for (name, value) in &exec_ctx.symbols {
+                        println!("  @{} = {}", name.yellow(), value.to_string().dimmed());
+                    }
+                }
+            }
+
+            Ok(())
+        }
+        Err(e) => {
+            if format == OutputFormat::Json {
+                let output = serde_json::json!({
+                    "success": false,
+                    "stage": "execution",
+                    "error": e.to_string(),
+                });
+                println!("{}", serde_json::to_string_pretty(&output).unwrap());
+            } else {
+                eprintln!("{} {}", "✗".red(), e.to_string().red());
+            }
+
+            Err(format!("Execution failed: {}", e))
+        }
     }
 }

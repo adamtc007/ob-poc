@@ -22,8 +22,22 @@ impl SemanticContextStore {
         }
     }
 
+    /// Create an empty store without database (for offline validation)
+    #[cfg(feature = "database")]
+    pub fn new_empty() -> Self {
+        Self {
+            pool: sqlx::PgPool::connect_lazy("postgresql://invalid").unwrap(),
+            initialized: false,
+        }
+    }
+
     #[cfg(not(feature = "database"))]
     pub fn new() -> Self {
+        Self { initialized: false }
+    }
+
+    #[cfg(not(feature = "database"))]
+    pub fn new_empty() -> Self {
         Self { initialized: false }
     }
 

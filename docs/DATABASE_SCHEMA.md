@@ -1,10 +1,10 @@
 # OB-POC Database Schema Reference
 
 **Generated:** 2025-11-29  
-**Last Updated:** 2025-11-29 (CSG Linter additions)  
+**Last Updated:** 2025-11-29 (Entity search indexes, attribute sources/sinks)  
 **Database:** data_designer  
 **Schema:** ob-poc  
-**Total Tables:** 99  
+**Total Tables:** 101  
 **PostgreSQL Version:** 14.19
 
 ## Extensions
@@ -12,6 +12,7 @@
 | Extension | Version | Purpose |
 |-----------|---------|---------|
 | **pgvector** | 0.8.0 | Vector embeddings for RAG |
+| **pg_trgm** | - | Trigram fuzzy text search |
 
 ---
 
@@ -124,6 +125,7 @@ nationality         varchar(100)
 residence_address   text
 id_document_type    varchar(100)
 id_document_number  varchar(100)
+search_name         text GENERATED ALWAYS AS (first_name || ' ' || last_name) STORED  -- For trigram search
 created_at          timestamptz
 updated_at          timestamptz
 -- Plus additional columns
@@ -232,6 +234,7 @@ category            varchar(100) NOT NULL
 domain              varchar(100)
 description         text
 required_attributes jsonb DEFAULT '{}'
+parent_type_code    varchar(100) FK -> document_types(type_code)  -- Hierarchy: PASSPORT_GBR.parent = PASSPORT
 created_at          timestamptz
 updated_at          timestamptz
 ```
@@ -317,7 +320,7 @@ created_at          timestamptz
 
 ---
 
-### 4. Attributes - 4 tables
+### 4. Attributes - 6 tables
 
 #### attribute_registry
 Type-safe attribute registry with dual-key pattern.
@@ -383,6 +386,31 @@ source              jsonb
 sink                jsonb
 created_at          timestamptz
 updated_at          timestamptz
+```
+
+#### attribute_sources
+Sparse matrix: defines where each attribute CAN come from.
+```
+source_id           uuid PK DEFAULT gen_random_uuid()
+attribute_id        uuid NOT NULL FK -> dictionary
+source_type         varchar(50) NOT NULL  -- document, api, manual, derived, user_input, registry_lookup
+source_config       jsonb  -- Contains document_category, field_hints, validation rules
+priority            integer DEFAULT 5  -- Lower = preferred source
+confidence_weight   numeric(3,2) DEFAULT 1.0
+is_authoritative    boolean DEFAULT false
+created_at          timestamptz
+```
+
+#### attribute_sinks
+Defines where attribute values GO (KYC reports, screening, filings).
+```
+sink_id             uuid PK DEFAULT gen_random_uuid()
+attribute_id        uuid NOT NULL FK -> dictionary
+sink_type           varchar(50) NOT NULL  -- kyc_report, sanctions_screening, pep_screening, regulatory_filing, account_opening
+sink_config         jsonb  -- Contains section, field, match rules, etc.
+is_required         boolean DEFAULT false
+transform_rule      jsonb
+created_at          timestamptz
 ```
 
 ---
@@ -1162,6 +1190,32 @@ The schema includes several views for convenience:
 | `blocking_conditions` | Pending conditions with urgency status |
 | `decisions` | Bridge view mapping kyc_decisions to DECISION crud_asset |
 | `attribute_uuid_map` | Maps semantic IDs to UUIDs in attribute_registry |
+| `entity_search_view` | Unified cross-type entity search with trigram support |
+
+#### entity_search_view
+Unified view for cross-entity-type fuzzy search.
+```sql
+-- Returns: id, entity_type, display_name, subtitle_1, subtitle_2, search_text
+-- Entity types: PERSON, COMPANY, CBU, TRUST
+-- Usage: WHERE search_text % 'query' ORDER BY similarity(search_text, 'query') DESC
+```
+
+---
+
+## Indexes
+
+### Trigram Indexes (pg_trgm)
+For fuzzy text search and typeahead/autocomplete.
+
+| Index | Table | Column | Type |
+|-------|-------|--------|------|
+| `idx_persons_search_name_trgm` | entity_proper_persons | search_name | GIN |
+| `idx_persons_first_name_trgm` | entity_proper_persons | first_name | GIN |
+| `idx_persons_last_name_trgm` | entity_proper_persons | last_name | GIN |
+| `idx_companies_name_trgm` | entity_limited_companies | company_name | GIN |
+| `idx_companies_reg_number` | entity_limited_companies | registration_number | B-tree |
+| `idx_cbu_name_trgm` | cbus | name | GIN |
+| `idx_trusts_name_trgm` | entity_trusts | trust_name | GIN |
 
 ---
 
