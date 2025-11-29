@@ -389,6 +389,22 @@ pub enum DiagnosticCode {
     UndefinedSymbol,
     DuplicateBinding,
 
+    // CSG Context Errors (C0xx series)
+    /// Document type not applicable to entity type
+    DocumentNotApplicableToEntityType,
+    /// Document type not applicable to jurisdiction
+    DocumentNotApplicableToJurisdiction,
+    /// Document type not applicable to client type
+    DocumentNotApplicableToClientType,
+    /// Attribute not applicable to entity type
+    AttributeNotApplicableToEntityType,
+    /// Missing prerequisite operation
+    MissingPrerequisiteOperation,
+    /// Symbol type mismatch
+    SymbolTypeMismatch,
+    /// Internal error
+    InternalError,
+
     // Warnings
     DeprecatedVerb,
     UnusedBinding,
@@ -398,6 +414,7 @@ impl DiagnosticCode {
     pub fn default_severity(&self) -> Severity {
         match self {
             DiagnosticCode::DeprecatedVerb | DiagnosticCode::UnusedBinding => Severity::Warning,
+            DiagnosticCode::InternalError => Severity::Error,
             _ => Severity::Error,
         }
     }
@@ -426,6 +443,15 @@ impl DiagnosticCode {
             DiagnosticCode::InvalidDocumentState => "E044",
             DiagnosticCode::UndefinedSymbol => "E050",
             DiagnosticCode::DuplicateBinding => "E051",
+            // CSG Context Errors
+            DiagnosticCode::DocumentNotApplicableToEntityType => "C001",
+            DiagnosticCode::DocumentNotApplicableToJurisdiction => "C002",
+            DiagnosticCode::DocumentNotApplicableToClientType => "C003",
+            DiagnosticCode::AttributeNotApplicableToEntityType => "C004",
+            DiagnosticCode::MissingPrerequisiteOperation => "C005",
+            DiagnosticCode::SymbolTypeMismatch => "C006",
+            DiagnosticCode::InternalError => "C099",
+            // Warnings
             DiagnosticCode::DeprecatedVerb => "W001",
             DiagnosticCode::UnusedBinding => "W002",
         }

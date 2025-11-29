@@ -40,8 +40,10 @@
 //! - `executor`: DslExecutor + generic CRUD functions
 //! - `custom_ops`: Custom operation trait and implementations (Tier 2)
 
+pub mod applicability_rules;
 pub mod assembly;
 pub mod ast;
+pub mod csg_linter;
 pub mod custom_ops;
 pub mod execution_plan;
 pub mod executor;
@@ -49,6 +51,7 @@ pub mod mappings;
 pub mod parser;
 #[cfg(feature = "database")]
 pub mod ref_resolver;
+pub mod semantic_context;
 pub mod semantic_intent;
 #[cfg(feature = "database")]
 pub mod semantic_validator;
@@ -57,11 +60,14 @@ pub mod verb_schema;
 pub mod verbs;
 
 // Re-export key types for convenience
+pub use applicability_rules::{ApplicabilityRules, AttributeApplicability, DocumentApplicability};
 pub use ast::{Argument, Key, Program, Span, Statement, Value, VerbCall};
+pub use csg_linter::{CsgLinter, InferredContext, LintResult};
 pub use execution_plan::{compile, CompileError, ExecutionPlan, ExecutionStep, Injection};
 pub use executor::{DslExecutor, ExecutionContext, ExecutionResult, ReturnType};
 pub use mappings::{get_table_mappings, resolve_column, ColumnMapping, DbType, TableMappings};
 pub use parser::{parse_program, parse_single_verb};
+pub use semantic_context::SemanticContextStore;
 pub use verbs::{
     domains, find_verb, verb_count, verbs_for_domain, Behavior, VerbDef, STANDARD_VERBS,
 };

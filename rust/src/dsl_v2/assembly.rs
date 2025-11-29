@@ -47,7 +47,6 @@
 //! ```
 
 use std::marker::PhantomData;
-use uuid::Uuid;
 
 // =============================================================================
 // TYPESTATE MARKERS - Encode valid states at compile time
@@ -58,7 +57,7 @@ pub struct NoCbu;
 
 /// CBU has been created - can now add documents/entities
 pub struct CbuCreated {
-    pub cbu_id: String,  // Binding like "@cbu"
+    pub cbu_id: String, // Binding like "@cbu"
 }
 
 /// Documents have been added - can extract attributes
@@ -119,7 +118,12 @@ impl DslOperation {
     /// Convert to DSL string
     pub fn to_dsl(&self) -> String {
         match self {
-            DslOperation::CreateCbu { name, binding, jurisdiction, client_type } => {
+            DslOperation::CreateCbu {
+                name,
+                binding,
+                jurisdiction,
+                client_type,
+            } => {
                 let mut args = format!(r#"(cbu.create :name "{}" :as {}"#, name, binding);
                 if let Some(j) = jurisdiction {
                     args.push_str(&format!(r#" :jurisdiction "{}""#, j));
@@ -130,7 +134,12 @@ impl DslOperation {
                 args.push(')');
                 args
             }
-            DslOperation::CatalogDocument { document_type, cbu_id_ref, binding, title } => {
+            DslOperation::CatalogDocument {
+                document_type,
+                cbu_id_ref,
+                binding,
+                title,
+            } => {
                 let mut args = format!(
                     r#"(document.catalog :document-type "{}" :cbu-id {} :as {}"#,
                     document_type, cbu_id_ref, binding
@@ -144,19 +153,30 @@ impl DslOperation {
             DslOperation::ExtractDocument { document_id_ref } => {
                 format!("(document.extract :document-id {})", document_id_ref)
             }
-            DslOperation::CreateEntity { entity_type, name, binding } => {
+            DslOperation::CreateEntity {
+                entity_type,
+                name,
+                binding,
+            } => {
                 format!(
                     r#"(entity.create-{} :name "{}" :as {})"#,
                     entity_type, name, binding
                 )
             }
-            DslOperation::LinkEntityToCbu { cbu_id_ref, entity_id_ref, role } => {
+            DslOperation::LinkEntityToCbu {
+                cbu_id_ref,
+                entity_id_ref,
+                role,
+            } => {
                 format!(
                     r#"(cbu.assign-role :cbu-id {} :entity-id {} :role "{}")"#,
                     cbu_id_ref, entity_id_ref, role
                 )
             }
-            DslOperation::LinkDocumentToEntity { document_id_ref, entity_id_ref } => {
+            DslOperation::LinkDocumentToEntity {
+                document_id_ref,
+                entity_id_ref,
+            } => {
                 format!(
                     "(document.link-entity :document-id {} :entity-id {})",
                     document_id_ref, entity_id_ref
@@ -498,11 +518,11 @@ pub enum KycIntent {
 pub struct OnboardingSlots {
     pub client_name: Option<String>,
     pub jurisdiction: Option<String>,
-    pub client_type: Option<String>,  // individual, corporate
+    pub client_type: Option<String>,   // individual, corporate
     pub document_type: Option<String>, // PASSPORT_GBR, DRIVERS_LICENSE_USA_CA
     pub entity_type: Option<String>,   // natural-person, limited-company
     pub entity_name: Option<String>,
-    pub entity_role: Option<String>,   // beneficial_owner, director, signatory
+    pub entity_role: Option<String>, // beneficial_owner, director, signatory
     pub existing_cbu_id: Option<String>,
     pub existing_document_id: Option<String>,
     pub existing_entity_id: Option<String>,
@@ -528,17 +548,15 @@ impl DslAssemblyFactory {
     }
 
     fn assemble_individual_onboarding(slots: &OnboardingSlots) -> Result<DslProgram, String> {
-        let name = slots.client_name.as_ref()
+        let name = slots
+            .client_name
+            .as_ref()
             .ok_or("client_name is required for individual onboarding")?;
 
         // Add document if provided
         if let Some(doc_type) = &slots.document_type {
             let program = OnboardingBuilder::new()
-                .create_cbu_with(
-                    name,
-                    slots.jurisdiction.as_deref(),
-                    Some("individual"),
-                )
+                .create_cbu_with(name, slots.jurisdiction.as_deref(), Some("individual"))
                 .add_document(doc_type)
                 .extract_attributes()
                 .finalize()
@@ -546,11 +564,7 @@ impl DslAssemblyFactory {
             Ok(program)
         } else {
             let program = OnboardingBuilder::new()
-                .create_cbu_with(
-                    name,
-                    slots.jurisdiction.as_deref(),
-                    Some("individual"),
-                )
+                .create_cbu_with(name, slots.jurisdiction.as_deref(), Some("individual"))
                 .finalize()
                 .build();
             Ok(program)
@@ -558,15 +572,16 @@ impl DslAssemblyFactory {
     }
 
     fn assemble_corporate_onboarding(slots: &OnboardingSlots) -> Result<DslProgram, String> {
-        let name = slots.client_name.as_ref()
+        let name = slots
+            .client_name
+            .as_ref()
             .ok_or("client_name is required for corporate onboarding")?;
 
-        let builder = OnboardingBuilder::new()
-            .create_cbu_with(
-                name,
-                slots.jurisdiction.as_deref(),
-                Some("corporate"),
-            );
+        let builder = OnboardingBuilder::new().create_cbu_with(
+            name,
+            slots.jurisdiction.as_deref(),
+            Some("corporate"),
+        );
 
         // Add certificate of incorporation by default for corporate
         let builder = if let Some(doc_type) = &slots.document_type {
@@ -576,7 +591,8 @@ impl DslAssemblyFactory {
         };
 
         // Add entity if provided
-        let builder = if let (Some(ent_name), Some(role)) = (&slots.entity_name, &slots.entity_role) {
+        let builder = if let (Some(ent_name), Some(role)) = (&slots.entity_name, &slots.entity_role)
+        {
             let ent_type = slots.entity_type.as_deref().unwrap_or("limited-company");
             builder.add_entity(ent_type, ent_name, role).finalize()
         } else {
@@ -587,9 +603,13 @@ impl DslAssemblyFactory {
     }
 
     fn assemble_add_document(slots: &OnboardingSlots) -> Result<DslProgram, String> {
-        let cbu_id = slots.existing_cbu_id.as_ref()
+        let cbu_id = slots
+            .existing_cbu_id
+            .as_ref()
             .ok_or("existing_cbu_id is required to add document")?;
-        let doc_type = slots.document_type.as_ref()
+        let doc_type = slots
+            .document_type
+            .as_ref()
             .ok_or("document_type is required")?;
 
         // For adding to existing CBU, we generate simpler DSL
@@ -611,11 +631,17 @@ impl DslAssemblyFactory {
     }
 
     fn assemble_add_entity_role(slots: &OnboardingSlots) -> Result<DslProgram, String> {
-        let cbu_id = slots.existing_cbu_id.as_ref()
+        let cbu_id = slots
+            .existing_cbu_id
+            .as_ref()
             .ok_or("existing_cbu_id is required")?;
-        let entity_name = slots.entity_name.as_ref()
+        let entity_name = slots
+            .entity_name
+            .as_ref()
             .ok_or("entity_name is required")?;
-        let role = slots.entity_role.as_ref()
+        let role = slots
+            .entity_role
+            .as_ref()
             .ok_or("entity_role is required")?;
         let entity_type = slots.entity_type.as_deref().unwrap_or("natural-person");
 
@@ -706,10 +732,7 @@ mod tests {
             ..Default::default()
         };
 
-        let program = DslAssemblyFactory::assemble(
-            KycIntent::OnboardIndividual,
-            &slots,
-        ).unwrap();
+        let program = DslAssemblyFactory::assemble(KycIntent::OnboardIndividual, &slots).unwrap();
 
         let dsl = program.to_dsl();
         println!("Factory DSL:\n{}", dsl);

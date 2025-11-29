@@ -13,6 +13,7 @@
 //! providing a complete diagnostic report (like rustc).
 
 use crate::dsl_v2::ast::{Span, Statement, Value, VerbCall};
+use crate::dsl_v2::csg_linter::{CsgLinter, LintResult};
 use crate::dsl_v2::parser::parse_program;
 use crate::dsl_v2::ref_resolver::{arg_to_ref_type, RefTypeResolver, ResolveResult};
 use crate::dsl_v2::validation::{
@@ -27,13 +28,76 @@ use std::collections::HashMap;
 /// Semantic validator that checks AST against live database
 pub struct SemanticValidator {
     resolver: RefTypeResolver,
+    csg_linter: Option<CsgLinter>,
+    pool: PgPool,
 }
 
 impl SemanticValidator {
     pub fn new(pool: PgPool) -> Self {
         Self {
-            resolver: RefTypeResolver::new(pool),
+            resolver: RefTypeResolver::new(pool.clone()),
+            csg_linter: None,
+            pool,
         }
+    }
+
+    /// Initialize with CSG linter for context-sensitive validation
+    pub async fn with_csg_linter(mut self) -> Result<Self, String> {
+        let mut linter = CsgLinter::new(self.pool.clone());
+        linter.initialize().await?;
+        self.csg_linter = Some(linter);
+        Ok(self)
+    }
+
+    /// Run CSG linting pass on parsed AST
+    pub async fn lint_csg(
+        &self,
+        source: &str,
+        context: &ValidationContext,
+    ) -> Result<LintResult, String> {
+        let program = parse_program(source).map_err(|e| format!("Parse error: {}", e))?;
+
+        if let Some(ref linter) = self.csg_linter {
+            Ok(linter.lint(program, context, source).await)
+        } else {
+            // Return empty result if linter not initialized
+            Ok(LintResult {
+                ast: program,
+                diagnostics: vec![],
+                inferred_context: Default::default(),
+            })
+        }
+    }
+
+    /// Full validation pipeline with CSG linting
+    /// Runs: Parse -> CSG Lint -> Semantic Validation
+    pub async fn validate_with_csg(&mut self, request: &ValidationRequest) -> ValidationResult {
+        // Step 1: Parse
+        let program = match parse_program(&request.source) {
+            Ok(p) => p,
+            Err(e) => {
+                return ValidationResult::Err(vec![Diagnostic {
+                    severity: Severity::Error,
+                    span: SourceSpan::at(1, 0),
+                    code: DiagnosticCode::SyntaxError,
+                    message: format!("Parse error: {}", e),
+                    suggestions: vec![],
+                }]);
+            }
+        };
+
+        // Step 2: CSG Lint (if linter initialized)
+        if let Some(ref linter) = self.csg_linter {
+            let lint_result = linter
+                .lint(program.clone(), &request.context, &request.source)
+                .await;
+            if lint_result.has_errors() {
+                return ValidationResult::Err(lint_result.diagnostics);
+            }
+        }
+
+        // Step 3: Continue with semantic validation
+        self.validate(request).await
     }
 
     /// Validate DSL source - parse and validate in one step
@@ -547,6 +611,29 @@ pub async fn validate_dsl(
     };
 
     match validator.validate(&request).await {
+        ValidationResult::Ok(program) => Ok(program),
+        ValidationResult::Err(diagnostics) => Err(RustStyleFormatter::format(source, &diagnostics)),
+    }
+}
+
+/// Validate DSL source with CSG context-sensitive linting
+/// Runs full pipeline: Parse -> CSG Lint -> Semantic Validation
+/// Returns Ok(validated_program) or Err(formatted_error_string)
+pub async fn validate_dsl_with_csg(
+    pool: &PgPool,
+    source: &str,
+    context: ValidationContext,
+) -> Result<ValidatedProgram, String> {
+    let mut validator = SemanticValidator::new(pool.clone())
+        .with_csg_linter()
+        .await?;
+
+    let request = ValidationRequest {
+        source: source.to_string(),
+        context,
+    };
+
+    match validator.validate_with_csg(&request).await {
         ValidationResult::Ok(program) => Ok(program),
         ValidationResult::Err(diagnostics) => Err(RustStyleFormatter::format(source, &diagnostics)),
     }

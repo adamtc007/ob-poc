@@ -1,10 +1,11 @@
 # CSG Linter Implementation Specification
 ## Context-Sensitive Grammar Validation with Vector & Semantic Metadata
 
-**Version**: 1.0  
+**Version**: 2.0 (Schema-Corrected)  
 **Target**: Claude Code Agent Execution  
 **Project**: ob-poc KYC/UBO Onboarding Platform  
-**Date**: 2025-11-29
+**Date**: 2025-11-29  
+**Schema Reference**: docs/DATABASE_SCHEMA.md (2025-11-29)
 
 ---
 
@@ -23,7 +24,7 @@
 ## 1. Executive Summary
 
 ### Problem
-The current DSL validation pipeline checks syntax (NOM parser) and existence (RefTypeResolver queries DB), but cannot enforce **context-sensitive business rules**:
+The current DSL validation pipeline checks syntax (NOM parser) and existence (RefResolver queries DB), but cannot enforce **context-sensitive business rules**:
 
 ```clojure
 ;; Currently passes all validation, but is semantically wrong:
@@ -82,17 +83,24 @@ rust/src/dsl_v2/
 
 ## 3. Database Schema Changes
 
-### 3.1 Core Philosophy
+### 3.1 Current Schema Summary (from DATABASE_SCHEMA.md)
 
-We're adding three categories of metadata:
+**Key Tables We're Extending:**
 
-| Category | Purpose | Storage |
-|----------|---------|---------|
-| **Applicability Rules** | Hard constraints (passport → person only) | JSONB |
-| **Semantic Context** | Descriptive metadata for AI/search | JSONB |
-| **Vector Embeddings** | Similarity search, fuzzy matching | pgvector |
+| Table | PK | Key Columns Already Present |
+|-------|----|-----------------------------|
+| `document_types` | `type_id` (uuid) | `type_code`, `display_name`, `category`, `domain`, `required_attributes` (jsonb) |
+| `attribute_registry` | `id` (text) | `uuid`, `display_name`, `category`, `value_type`, `validation_rules` (jsonb), `metadata` (jsonb) |
+| `entity_types` | `entity_type_id` (uuid) | `name`, `description`, `table_name` |
+| `cbus` | `cbu_id` (uuid) | `client_type`, `jurisdiction` (ALREADY EXIST) |
+| `rag_embeddings` | `embedding_id` (uuid) | `source_type`, `source_id`, `embedding` (vector 1536) |
 
-### 3.2 Migration: document_types Table
+**What We DON'T Need to Add:**
+- `cbus.client_type` - Already exists
+- `cbus.jurisdiction` - Already exists  
+- Basic embedding infrastructure - `rag_embeddings` exists
+
+### 3.2 Migration: document_types - Add CSG Columns
 
 ```sql
 -- File: sql/migrations/001_csg_document_types_metadata.sql
@@ -102,20 +110,22 @@ BEGIN;
 -- ============================================
 -- DOCUMENT_TYPES: Add CSG Metadata Columns
 -- ============================================
+-- Current PK: type_id (uuid)
+-- Current columns: type_code, display_name, category, domain, description, required_attributes
 
--- 1. Applicability Rules (hard constraints)
+-- 1. Applicability Rules (hard constraints for CSG linting)
 ALTER TABLE "ob-poc".document_types
 ADD COLUMN IF NOT EXISTS applicability JSONB DEFAULT '{}'::jsonb;
 
 COMMENT ON COLUMN "ob-poc".document_types.applicability IS 
 'CSG applicability rules: entity_types[], jurisdictions[], client_types[], required_for[], excludes[]';
 
--- 2. Semantic Context (soft/descriptive metadata)
+-- 2. Semantic Context (soft/descriptive metadata for AI/suggestions)
 ALTER TABLE "ob-poc".document_types
 ADD COLUMN IF NOT EXISTS semantic_context JSONB DEFAULT '{}'::jsonb;
 
 COMMENT ON COLUMN "ob-poc".document_types.semantic_context IS 
-'Rich semantic metadata: category, purpose, synonyms[], related_documents[], extraction_hints{}';
+'Rich semantic metadata: purpose, synonyms[], related_documents[], extraction_hints{}, keywords[]';
 
 -- 3. Vector Embedding for similarity search
 ALTER TABLE "ob-poc".document_types
@@ -145,7 +155,7 @@ WITH (lists = 100);
 COMMIT;
 ```
 
-### 3.3 Migration: attribute_registry Table
+### 3.3 Migration: attribute_registry - Add CSG Columns
 
 ```sql
 -- File: sql/migrations/002_csg_attribute_registry_metadata.sql
@@ -155,6 +165,9 @@ BEGIN;
 -- ============================================
 -- ATTRIBUTE_REGISTRY: Add CSG Metadata Columns
 -- ============================================
+-- Current PK: id (text) - semantic ID like 'attr.identity.first_name'
+-- Also has: uuid (for FK relationships)
+-- Current columns: display_name, category, value_type, validation_rules, metadata
 
 -- 1. Applicability Rules
 ALTER TABLE "ob-poc".attribute_registry
@@ -163,14 +176,7 @@ ADD COLUMN IF NOT EXISTS applicability JSONB DEFAULT '{}'::jsonb;
 COMMENT ON COLUMN "ob-poc".attribute_registry.applicability IS 
 'CSG applicability rules: entity_types[], required_for[], source_documents[], depends_on[]';
 
--- 2. Semantic Context
-ALTER TABLE "ob-poc".attribute_registry
-ADD COLUMN IF NOT EXISTS semantic_context JSONB DEFAULT '{}'::jsonb;
-
-COMMENT ON COLUMN "ob-poc".attribute_registry.semantic_context IS 
-'Rich semantic metadata: category, synonyms[], extraction_patterns[], validation_hints{}';
-
--- 3. Vector Embedding
+-- 2. Vector Embedding (semantic_context can go in existing metadata column)
 ALTER TABLE "ob-poc".attribute_registry
 ADD COLUMN IF NOT EXISTS embedding vector(1536);
 
@@ -184,9 +190,6 @@ ADD COLUMN IF NOT EXISTS embedding_updated_at TIMESTAMPTZ;
 CREATE INDEX IF NOT EXISTS idx_attribute_registry_applicability 
 ON "ob-poc".attribute_registry USING GIN (applicability);
 
-CREATE INDEX IF NOT EXISTS idx_attribute_registry_semantic_context 
-ON "ob-poc".attribute_registry USING GIN (semantic_context);
-
 CREATE INDEX IF NOT EXISTS idx_attribute_registry_embedding 
 ON "ob-poc".attribute_registry USING ivfflat (embedding vector_cosine_ops)
 WITH (lists = 100);
@@ -194,7 +197,7 @@ WITH (lists = 100);
 COMMIT;
 ```
 
-### 3.4 Migration: entity_types Table
+### 3.4 Migration: entity_types - Add Hierarchy & Semantic Context
 
 ```sql
 -- File: sql/migrations/003_csg_entity_types_metadata.sql
@@ -204,15 +207,30 @@ BEGIN;
 -- ============================================
 -- ENTITY_TYPES: Add CSG Metadata Columns
 -- ============================================
+-- Current PK: entity_type_id (uuid)
+-- Current columns: name, description, table_name
 
--- 1. Semantic Context (entity types don't need applicability - they ARE the context)
+-- 1. Type Code (normalized identifier for rules matching)
+ALTER TABLE "ob-poc".entity_types
+ADD COLUMN IF NOT EXISTS type_code VARCHAR(100);
+
+-- Populate type_code from name (uppercase, underscores)
+UPDATE "ob-poc".entity_types 
+SET type_code = UPPER(REPLACE(REPLACE(name, ' ', '_'), '-', '_'))
+WHERE type_code IS NULL;
+
+-- Make it unique after population
+CREATE UNIQUE INDEX IF NOT EXISTS idx_entity_types_type_code 
+ON "ob-poc".entity_types(type_code);
+
+-- 2. Semantic Context
 ALTER TABLE "ob-poc".entity_types
 ADD COLUMN IF NOT EXISTS semantic_context JSONB DEFAULT '{}'::jsonb;
 
 COMMENT ON COLUMN "ob-poc".entity_types.semantic_context IS 
 'Rich semantic metadata: category, parent_type, synonyms[], typical_documents[], typical_attributes[]';
 
--- 2. Type Hierarchy (for wildcard matching)
+-- 3. Type Hierarchy (for wildcard matching)
 ALTER TABLE "ob-poc".entity_types
 ADD COLUMN IF NOT EXISTS parent_type_id UUID REFERENCES "ob-poc".entity_types(entity_type_id);
 
@@ -222,7 +240,7 @@ ADD COLUMN IF NOT EXISTS type_hierarchy_path TEXT[];
 COMMENT ON COLUMN "ob-poc".entity_types.type_hierarchy_path IS 
 'Materialized path for efficient ancestor queries, e.g., ["ENTITY", "LEGAL_ENTITY", "LIMITED_COMPANY"]';
 
--- 3. Vector Embedding
+-- 4. Vector Embedding
 ALTER TABLE "ob-poc".entity_types
 ADD COLUMN IF NOT EXISTS embedding vector(1536);
 
@@ -249,52 +267,41 @@ WITH (lists = 50);
 COMMIT;
 ```
 
-### 3.5 Migration: cbus Table
+### 3.5 Migration: cbus - Add Risk & Onboarding Context
 
 ```sql
--- File: sql/migrations/004_csg_cbus_metadata.sql
+-- File: sql/migrations/004_csg_cbus_context.sql
 
 BEGIN;
 
 -- ============================================
--- CBUS: Add CSG Metadata Columns
+-- CBUS: Add CSG Context Columns
 -- ============================================
+-- Current PK: cbu_id (uuid)
+-- ALREADY HAS: client_type, jurisdiction (no migration needed for these!)
 
--- 1. Client Classification (for applicability rules)
-ALTER TABLE "ob-poc".cbus
-ADD COLUMN IF NOT EXISTS client_type VARCHAR(50);
-
-COMMENT ON COLUMN "ob-poc".cbus.client_type IS 
-'Client classification: individual, corporate, fund, trust, partnership';
-
-ALTER TABLE "ob-poc".cbus
-ADD COLUMN IF NOT EXISTS jurisdiction VARCHAR(10);
-
-COMMENT ON COLUMN "ob-poc".cbus.jurisdiction IS 
-'Primary jurisdiction code (FK to master_jurisdictions)';
-
--- 2. Risk Context
+-- 1. Risk Context (for risk-aware validation)
 ALTER TABLE "ob-poc".cbus
 ADD COLUMN IF NOT EXISTS risk_context JSONB DEFAULT '{}'::jsonb;
 
 COMMENT ON COLUMN "ob-poc".cbus.risk_context IS 
 'Risk-related context: risk_rating, pep_exposure, sanctions_exposure, industry_codes[]';
 
--- 3. Onboarding Context (for state-aware validation)
+-- 2. Onboarding Context (for state-aware validation)
 ALTER TABLE "ob-poc".cbus
 ADD COLUMN IF NOT EXISTS onboarding_context JSONB DEFAULT '{}'::jsonb;
 
 COMMENT ON COLUMN "ob-poc".cbus.onboarding_context IS 
 'Onboarding state: stage, completed_steps[], pending_requirements[], override_rules[]';
 
--- 4. Semantic Context (for AI-assisted operations)
+-- 3. Semantic Context (for AI-assisted operations)
 ALTER TABLE "ob-poc".cbus
 ADD COLUMN IF NOT EXISTS semantic_context JSONB DEFAULT '{}'::jsonb;
 
 COMMENT ON COLUMN "ob-poc".cbus.semantic_context IS 
 'Rich semantic metadata: business_description, industry_keywords[], related_entities[]';
 
--- 5. Vector Embedding (for similarity search across CBUs)
+-- 4. Vector Embedding (for similarity search across CBUs)
 ALTER TABLE "ob-poc".cbus
 ADD COLUMN IF NOT EXISTS embedding vector(1536);
 
@@ -305,8 +312,6 @@ ALTER TABLE "ob-poc".cbus
 ADD COLUMN IF NOT EXISTS embedding_updated_at TIMESTAMPTZ;
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS idx_cbus_client_type ON "ob-poc".cbus(client_type);
-CREATE INDEX IF NOT EXISTS idx_cbus_jurisdiction ON "ob-poc".cbus(jurisdiction);
 CREATE INDEX IF NOT EXISTS idx_cbus_risk_context ON "ob-poc".cbus USING GIN (risk_context);
 CREATE INDEX IF NOT EXISTS idx_cbus_onboarding_context ON "ob-poc".cbus USING GIN (onboarding_context);
 CREATE INDEX IF NOT EXISTS idx_cbus_semantic_context ON "ob-poc".cbus USING GIN (semantic_context);
@@ -314,12 +319,6 @@ CREATE INDEX IF NOT EXISTS idx_cbus_semantic_context ON "ob-poc".cbus USING GIN 
 CREATE INDEX IF NOT EXISTS idx_cbus_embedding 
 ON "ob-poc".cbus USING ivfflat (embedding vector_cosine_ops)
 WITH (lists = 100);
-
--- Add FK constraint for jurisdiction
-ALTER TABLE "ob-poc".cbus
-ADD CONSTRAINT fk_cbus_jurisdiction 
-FOREIGN KEY (jurisdiction) REFERENCES "ob-poc".master_jurisdictions(jurisdiction_code)
-ON DELETE SET NULL;
 
 COMMIT;
 ```
@@ -394,10 +393,17 @@ CREATE TABLE IF NOT EXISTS "ob-poc".csg_validation_rules (
 );
 
 -- Indexes
-CREATE INDEX idx_csg_rules_target ON "ob-poc".csg_validation_rules(target_type, target_code);
-CREATE INDEX idx_csg_rules_type ON "ob-poc".csg_validation_rules(rule_type);
-CREATE INDEX idx_csg_rules_active ON "ob-poc".csg_validation_rules(is_active) WHERE is_active = true;
-CREATE INDEX idx_csg_rules_params ON "ob-poc".csg_validation_rules USING GIN (rule_params);
+CREATE INDEX IF NOT EXISTS idx_csg_rules_target 
+ON "ob-poc".csg_validation_rules(target_type, target_code);
+
+CREATE INDEX IF NOT EXISTS idx_csg_rules_type 
+ON "ob-poc".csg_validation_rules(rule_type);
+
+CREATE INDEX IF NOT EXISTS idx_csg_rules_active 
+ON "ob-poc".csg_validation_rules(is_active) WHERE is_active = true;
+
+CREATE INDEX IF NOT EXISTS idx_csg_rules_params 
+ON "ob-poc".csg_validation_rules USING GIN (rule_params);
 
 -- ============================================
 -- CSG_RULE_OVERRIDES: Per-CBU Rule Overrides
@@ -431,8 +437,11 @@ CREATE TABLE IF NOT EXISTS "ob-poc".csg_rule_overrides (
     UNIQUE(rule_id, cbu_id)
 );
 
-CREATE INDEX idx_csg_overrides_cbu ON "ob-poc".csg_rule_overrides(cbu_id);
-CREATE INDEX idx_csg_overrides_rule ON "ob-poc".csg_rule_overrides(rule_id);
+CREATE INDEX IF NOT EXISTS idx_csg_overrides_cbu 
+ON "ob-poc".csg_rule_overrides(cbu_id);
+
+CREATE INDEX IF NOT EXISTS idx_csg_overrides_rule 
+ON "ob-poc".csg_rule_overrides(rule_id);
 
 COMMIT;
 ```
@@ -448,6 +457,7 @@ BEGIN;
 -- CSG_SEMANTIC_SIMILARITY_CACHE
 -- ============================================
 -- Pre-computed similarity scores for fast suggestions
+-- Complements the existing rag_embeddings table
 
 CREATE TABLE IF NOT EXISTS "ob-poc".csg_semantic_similarity_cache (
     cache_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -475,10 +485,17 @@ CREATE TABLE IF NOT EXISTS "ob-poc".csg_semantic_similarity_cache (
     UNIQUE(source_type, source_code, target_type, target_code)
 );
 
-CREATE INDEX idx_similarity_source ON "ob-poc".csg_semantic_similarity_cache(source_type, source_code);
-CREATE INDEX idx_similarity_target ON "ob-poc".csg_semantic_similarity_cache(target_type, target_code);
-CREATE INDEX idx_similarity_score ON "ob-poc".csg_semantic_similarity_cache(cosine_similarity DESC);
-CREATE INDEX idx_similarity_expires ON "ob-poc".csg_semantic_similarity_cache(expires_at);
+CREATE INDEX IF NOT EXISTS idx_similarity_source 
+ON "ob-poc".csg_semantic_similarity_cache(source_type, source_code);
+
+CREATE INDEX IF NOT EXISTS idx_similarity_target 
+ON "ob-poc".csg_semantic_similarity_cache(target_type, target_code);
+
+CREATE INDEX IF NOT EXISTS idx_similarity_score 
+ON "ob-poc".csg_semantic_similarity_cache(cosine_similarity DESC);
+
+CREATE INDEX IF NOT EXISTS idx_similarity_expires 
+ON "ob-poc".csg_semantic_similarity_cache(expires_at);
 
 -- ============================================
 -- FUNCTION: Refresh similarity cache for document types
@@ -493,7 +510,8 @@ BEGIN
     
     -- Insert new similarities based on embeddings
     INSERT INTO "ob-poc".csg_semantic_similarity_cache 
-        (source_type, source_code, target_type, target_code, cosine_similarity, relationship_type, computed_at, expires_at)
+        (source_type, source_code, target_type, target_code, 
+         cosine_similarity, relationship_type, computed_at, expires_at)
     SELECT 
         'document_type', dt1.type_code,
         'document_type', dt2.type_code,
@@ -506,7 +524,7 @@ BEGIN
     WHERE dt1.type_code != dt2.type_code
       AND dt1.embedding IS NOT NULL
       AND dt2.embedding IS NOT NULL
-      AND 1 - (dt1.embedding <=> dt2.embedding) > 0.5  -- Only store if reasonably similar
+      AND 1 - (dt1.embedding <=> dt2.embedding) > 0.5
     ON CONFLICT (source_type, source_code, target_type, target_code) 
     DO UPDATE SET 
         cosine_similarity = EXCLUDED.cosine_similarity,
@@ -518,11 +536,11 @@ $$ LANGUAGE plpgsql;
 COMMIT;
 ```
 
-### 3.8 JSONB Schema Definitions
+### 3.8 JSONB Schema Reference
 
 ```sql
 -- File: sql/migrations/007_csg_jsonb_schemas.sql
--- This file documents the expected JSONB structures (for reference, not executable)
+-- This file documents the expected JSONB structures (reference only, not executable)
 
 /*
 ============================================
@@ -541,13 +559,11 @@ APPLICABILITY JSONB SCHEMA (document_types, attribute_registry)
 }
 
 ============================================
-SEMANTIC_CONTEXT JSONB SCHEMA (all tables)
+SEMANTIC_CONTEXT JSONB SCHEMA
 ============================================
 
 {
-    "category": "IDENTITY",                          -- High-level grouping
-    "subcategory": "GOVERNMENT_ISSUED",              -- Finer grouping
-    "purpose": "Verify identity of natural person",  -- Human-readable purpose
+    "purpose": "Verify identity of natural person",           -- Human-readable purpose
     "synonyms": ["ID", "identification", "passport document"],
     "related_items": ["NATIONAL_ID", "DRIVERS_LICENSE"],
     "extraction_hints": {
@@ -633,14 +649,14 @@ CSG_VALIDATION_RULES.rule_params JSONB SCHEMA
 -- For rule_type = 'co_occurrence':
 {
     "must_have_all": ["CERT_OF_INCORPORATION", "ARTICLES_ASSOC"],
-    "within_scope": "cbu"  -- Must all exist for same CBU
+    "within_scope": "cbu"
 }
 
 -- For rule_type = 'cardinality':
 {
     "min": 1,
     "max": 3,
-    "scope": "entity"  -- Per entity
+    "scope": "entity"
 }
 */
 ```
@@ -667,15 +683,14 @@ CSG_VALIDATION_RULES.rule_params JSONB SCHEMA
 //! 2. **Reference Validation**: Check cross-statement references
 //! 3. **Applicability Validation**: Enforce business rules from DB
 
-use crate::dsl_v2::ast::{Argument, Program, Span, Statement, Value, VerbCall};
+use crate::dsl_v2::ast::{Program, Statement, VerbCall, Value, Span};
 use crate::dsl_v2::validation::{
-    Diagnostic, DiagnosticBuilder, DiagnosticCode, Severity, SourceSpan, ValidationContext,
+    Diagnostic, DiagnosticCode, Severity, SourceSpan, ValidationContext,
 };
 use crate::dsl_v2::applicability_rules::{ApplicabilityRules, DocumentApplicability};
 use crate::dsl_v2::semantic_context::SemanticContextStore;
 use sqlx::PgPool;
 use std::collections::HashMap;
-use uuid::Uuid;
 
 // =============================================================================
 // PUBLIC TYPES
@@ -723,7 +738,6 @@ pub struct SymbolInfo {
     pub domain: String,              // "cbu", "entity", "document"
     pub entity_type: Option<String>, // e.g., "LIMITED_COMPANY", "PROPER_PERSON"
     pub defined_at: SourceSpan,
-    pub used: bool,                  // For unused symbol warnings
 }
 
 #[derive(Debug)]
@@ -739,14 +753,14 @@ pub struct CbuCreate {
 pub struct EntityCreate {
     pub symbol: Option<String>,
     pub name: Option<String>,
-    pub entity_type: String,
+    pub entity_type: String,        // Inferred or explicit type code
     pub span: SourceSpan,
 }
 
 #[derive(Debug)]
 pub struct EntityRef {
     pub symbol: String,
-    pub argument_key: String,        // Which argument referenced this
+    pub argument_key: String,
     pub expected_type: Option<String>,
     pub span: SourceSpan,
 }
@@ -754,7 +768,7 @@ pub struct EntityRef {
 #[derive(Debug)]
 pub struct DocumentCatalog {
     pub symbol: Option<String>,
-    pub document_type: String,
+    pub document_type: String,      // type_code from document_types
     pub cbu_ref: Option<String>,
     pub entity_ref: Option<String>,
     pub span: SourceSpan,
@@ -810,7 +824,7 @@ impl CsgLinter {
             };
         }
 
-        let mut diagnostics = DiagnosticBuilder::new();
+        let mut diagnostics = Vec::new();
         let mut inferred = InferredContext::default();
 
         // Pass 1: Symbol analysis
@@ -824,14 +838,14 @@ impl CsgLinter {
         self.validate_references(&inferred, source, &mut diagnostics);
 
         // Pass 3: Applicability validation
-        self.validate_applicability(&ast, &inferred, context, source, &mut diagnostics).await;
+        self.validate_applicability(&inferred, context, &mut diagnostics).await;
 
         // Pass 4: Unused symbol warnings
         self.check_unused_symbols(&inferred, &mut diagnostics);
 
         LintResult {
             ast,
-            diagnostics: diagnostics.build(),
+            diagnostics,
             inferred_context: inferred,
         }
     }
@@ -846,7 +860,9 @@ impl CsgLinter {
         source: &str,
         inferred: &mut InferredContext,
     ) {
-        // Extract symbol binding
+        let span = self.span_to_source_span(&vc.span, source);
+        
+        // Extract symbol binding (:as @name)
         if let Some(ref binding) = vc.as_binding {
             let entity_type = self.infer_entity_type(vc);
             inferred.symbols.insert(
@@ -855,8 +871,7 @@ impl CsgLinter {
                     name: binding.clone(),
                     domain: vc.domain.clone(),
                     entity_type,
-                    defined_at: self.span_to_source_span(&vc.span, source),
-                    used: false,
+                    defined_at: span,
                 },
             );
         }
@@ -869,16 +884,16 @@ impl CsgLinter {
                     name: self.extract_string_arg(vc, "name"),
                     client_type: self.extract_string_arg(vc, "client-type"),
                     jurisdiction: self.extract_string_arg(vc, "jurisdiction"),
-                    span: self.span_to_source_span(&vc.span, source),
+                    span,
                 });
             }
             ("entity", verb) if verb.starts_with("create") => {
-                let entity_type = self.infer_entity_type_from_verb_and_args(vc);
+                let entity_type = self.infer_entity_type_from_verb(verb, vc);
                 inferred.entity_creates.push(EntityCreate {
                     symbol: vc.as_binding.clone(),
                     name: self.extract_string_arg(vc, "name"),
                     entity_type,
-                    span: self.span_to_source_span(&vc.span, source),
+                    span,
                 });
             }
             ("document", "catalog") => {
@@ -888,7 +903,7 @@ impl CsgLinter {
                         document_type: doc_type,
                         cbu_ref: self.extract_ref_arg(vc, "cbu-id"),
                         entity_ref: self.extract_ref_arg(vc, "entity-id"),
-                        span: self.span_to_source_span(&vc.span, source),
+                        span,
                     });
                 }
             }
@@ -901,7 +916,7 @@ impl CsgLinter {
                 inferred.entity_refs.push(EntityRef {
                     symbol: name.clone(),
                     argument_key: arg.key.canonical(),
-                    expected_type: self.expected_type_for_arg(&vc.domain, &vc.verb, &arg.key.canonical()),
+                    expected_type: self.expected_type_for_arg(&arg.key.canonical()),
                     span: self.span_to_source_span(&arg.value_span, source),
                 });
             }
@@ -916,20 +931,18 @@ impl CsgLinter {
         &self,
         inferred: &InferredContext,
         _source: &str,
-        diagnostics: &mut DiagnosticBuilder,
+        diagnostics: &mut Vec<Diagnostic>,
     ) {
         for entity_ref in &inferred.entity_refs {
-            // Mark symbol as used
-            // (Note: we can't mutate inferred here, would need interior mutability)
-            
-            // Check symbol is defined
             match inferred.symbols.get(&entity_ref.symbol) {
                 None => {
-                    diagnostics.error(
-                        DiagnosticCode::UndefinedSymbol,
-                        entity_ref.span,
-                        format!("undefined symbol '@{}'", entity_ref.symbol),
-                    );
+                    diagnostics.push(Diagnostic {
+                        severity: Severity::Error,
+                        span: entity_ref.span,
+                        code: DiagnosticCode::UndefinedSymbol,
+                        message: format!("undefined symbol '@{}'", entity_ref.symbol),
+                        suggestions: self.suggest_similar_symbols(&entity_ref.symbol, inferred),
+                    });
                 }
                 Some(symbol_info) => {
                     // Check type compatibility if we expect a specific type
@@ -937,17 +950,16 @@ impl CsgLinter {
                         (&entity_ref.expected_type, &symbol_info.entity_type) 
                     {
                         if !self.types_compatible(expected, actual) {
-                            diagnostics.error(
-                                DiagnosticCode::SymbolTypeMismatch,
-                                entity_ref.span,
-                                format!(
+                            diagnostics.push(Diagnostic {
+                                severity: Severity::Error,
+                                span: entity_ref.span,
+                                code: DiagnosticCode::SymbolTypeMismatch,
+                                message: format!(
                                     "type mismatch: '{}' expects {}, but '@{}' has type {}",
-                                    entity_ref.argument_key,
-                                    expected,
-                                    entity_ref.symbol,
-                                    actual
+                                    entity_ref.argument_key, expected, entity_ref.symbol, actual
                                 ),
-                            );
+                                suggestions: vec![],
+                            });
                         }
                     }
                 }
@@ -961,13 +973,10 @@ impl CsgLinter {
 
     async fn validate_applicability(
         &self,
-        _ast: &Program,
         inferred: &InferredContext,
         context: &ValidationContext,
-        _source: &str,
-        diagnostics: &mut DiagnosticBuilder,
+        diagnostics: &mut Vec<Diagnostic>,
     ) {
-        // Validate each document catalog operation
         for doc_catalog in &inferred.document_catalogs {
             self.validate_document_applicability(doc_catalog, inferred, context, diagnostics).await;
         }
@@ -978,11 +987,10 @@ impl CsgLinter {
         doc_catalog: &DocumentCatalog,
         inferred: &InferredContext,
         context: &ValidationContext,
-        diagnostics: &mut DiagnosticBuilder,
+        diagnostics: &mut Vec<Diagnostic>,
     ) {
         let Some(rule) = self.rules.document_rules.get(&doc_catalog.document_type) else {
-            // No rule = no constraint (or unknown doc type, but that's caught by SemanticValidator)
-            return;
+            return; // No rule = no constraint
         };
 
         // Check entity type constraint
@@ -990,56 +998,54 @@ impl CsgLinter {
             if let Some(symbol_info) = inferred.symbols.get(entity_sym) {
                 if let Some(ref entity_type) = symbol_info.entity_type {
                     if !rule.applies_to_entity_type(entity_type) {
-                        let suggestions = self.suggest_documents_for_entity(entity_type).await;
-                        diagnostics.error(
-                            DiagnosticCode::DocumentNotApplicableToEntityType,
-                            doc_catalog.span,
-                            format!(
+                        let valid_docs = self.rules.valid_documents_for_entity(entity_type);
+                        diagnostics.push(Diagnostic {
+                            severity: Severity::Error,
+                            span: doc_catalog.span,
+                            code: DiagnosticCode::DocumentNotApplicableToEntityType,
+                            message: format!(
                                 "document type '{}' is not applicable to entity type '{}'",
                                 doc_catalog.document_type, entity_type
                             ),
-                        ).suggest(
-                            "valid document types for this entity",
-                            suggestions.join(", "),
-                            0.8,
-                        );
+                            suggestions: vec![format!(
+                                "valid document types for {}: {}",
+                                entity_type, valid_docs.join(", ")
+                            )],
+                        });
                     }
                 }
             }
         }
 
-        // Check jurisdiction constraint (using CBU's jurisdiction or context)
-        let jurisdiction = doc_catalog.cbu_ref
-            .as_ref()
-            .and_then(|sym| inferred.symbols.get(sym))
-            .and_then(|_| context.jurisdiction.clone())
-            .or_else(|| context.jurisdiction.clone());
-
-        if let Some(ref jurisdiction) = jurisdiction {
+        // Check jurisdiction constraint
+        if let Some(ref jurisdiction) = context.jurisdiction {
             if !rule.applies_to_jurisdiction(jurisdiction) {
-                diagnostics.error(
-                    DiagnosticCode::DocumentNotApplicableToJurisdiction,
-                    doc_catalog.span,
-                    format!(
+                diagnostics.push(Diagnostic {
+                    severity: Severity::Error,
+                    span: doc_catalog.span,
+                    code: DiagnosticCode::DocumentNotApplicableToJurisdiction,
+                    message: format!(
                         "document type '{}' is not valid in jurisdiction '{}'",
                         doc_catalog.document_type, jurisdiction
                     ),
-                );
+                    suggestions: vec![],
+                });
             }
         }
 
         // Check client type constraint
         if let Some(ref client_type) = context.client_type {
-            let client_type_str = format!("{:?}", client_type).to_lowercase();
-            if !rule.applies_to_client_type(&client_type_str) {
-                diagnostics.error(
-                    DiagnosticCode::DocumentNotApplicableToClientType,
-                    doc_catalog.span,
-                    format!(
+            if !rule.applies_to_client_type(client_type) {
+                diagnostics.push(Diagnostic {
+                    severity: Severity::Error,
+                    span: doc_catalog.span,
+                    code: DiagnosticCode::DocumentNotApplicableToClientType,
+                    message: format!(
                         "document type '{}' is not valid for client type '{}'",
-                        doc_catalog.document_type, client_type_str
+                        doc_catalog.document_type, client_type
                     ),
-                );
+                    suggestions: vec![],
+                });
             }
         }
     }
@@ -1051,9 +1057,8 @@ impl CsgLinter {
     fn check_unused_symbols(
         &self,
         inferred: &InferredContext,
-        diagnostics: &mut DiagnosticBuilder,
+        diagnostics: &mut Vec<Diagnostic>,
     ) {
-        // Build set of used symbols
         let used_symbols: std::collections::HashSet<_> = inferred.entity_refs
             .iter()
             .map(|r| &r.symbol)
@@ -1061,11 +1066,13 @@ impl CsgLinter {
 
         for (name, info) in &inferred.symbols {
             if !used_symbols.contains(name) {
-                diagnostics.warning(
-                    DiagnosticCode::UnusedBinding,
-                    info.defined_at,
-                    format!("symbol '@{}' is defined but never used", name),
-                );
+                diagnostics.push(Diagnostic {
+                    severity: Severity::Warning,
+                    span: info.defined_at,
+                    code: DiagnosticCode::UnusedBinding,
+                    message: format!("symbol '@{}' is defined but never used", name),
+                    suggestions: vec![],
+                });
             }
         }
     }
@@ -1078,10 +1085,10 @@ impl CsgLinter {
         if vc.domain != "entity" {
             return None;
         }
-        self.infer_entity_type_from_verb_and_args(vc).into()
+        Some(self.infer_entity_type_from_verb(&vc.verb, vc))
     }
 
-    fn infer_entity_type_from_verb_and_args(&self, vc: &VerbCall) -> String {
+    fn infer_entity_type_from_verb(&self, verb: &str, vc: &VerbCall) -> String {
         // First check explicit :type argument
         if let Some(explicit_type) = self.extract_string_arg(vc, "type")
             .or_else(|| self.extract_string_arg(vc, "entity-type"))
@@ -1090,12 +1097,12 @@ impl CsgLinter {
         }
 
         // Infer from verb name
-        match vc.verb.as_str() {
+        match verb {
             "create-limited-company" => "LIMITED_COMPANY".to_string(),
             "create-proper-person" | "create-natural-person" => "PROPER_PERSON".to_string(),
             "create-partnership" => "PARTNERSHIP".to_string(),
             "create-trust" => "TRUST".to_string(),
-            "create" => "ENTITY".to_string(), // Generic
+            "create" => "ENTITY".to_string(),
             _ => "UNKNOWN".to_string(),
         }
     }
@@ -1112,80 +1119,66 @@ impl CsgLinter {
             .and_then(|a| a.value.as_reference().map(|s| s.to_string()))
     }
 
-    fn expected_type_for_arg(&self, domain: &str, verb: &str, arg_key: &str) -> Option<String> {
-        // Map argument keys to expected entity types
+    fn expected_type_for_arg(&self, arg_key: &str) -> Option<String> {
         match arg_key {
             "person-id" => Some("PROPER_PERSON".to_string()),
             "company-id" => Some("LIMITED_COMPANY".to_string()),
             "partnership-id" => Some("PARTNERSHIP".to_string()),
             "trust-id" => Some("TRUST".to_string()),
-            // entity-id is polymorphic - could be any entity
-            "entity-id" if domain == "document" && verb == "catalog" => None,
             _ => None,
         }
     }
 
     fn types_compatible(&self, expected: &str, actual: &str) -> bool {
-        // Direct match
         if expected == actual {
             return true;
         }
-        
-        // Wildcard match: "LIMITED_COMPANY_*" matches "LIMITED_COMPANY_PRIVATE"
+        // Wildcard: "LIMITED_COMPANY_*" matches "LIMITED_COMPANY_PRIVATE"
         if expected.ends_with('*') {
             let prefix = &expected[..expected.len() - 1];
             return actual.starts_with(prefix);
         }
-        
-        // Hierarchy match: "PROPER_PERSON" matches "PROPER_PERSON_NATURAL"
+        // Hierarchy: "PROPER_PERSON" matches "PROPER_PERSON_NATURAL"
         if actual.starts_with(expected) && actual.len() > expected.len() {
-            let suffix = &actual[expected.len()..];
-            return suffix.starts_with('_');
+            return actual[expected.len()..].starts_with('_');
         }
-        
         false
     }
 
-    async fn suggest_documents_for_entity(&self, entity_type: &str) -> Vec<String> {
-        // First try exact matches from rules
-        let mut suggestions: Vec<String> = self.rules.document_rules.iter()
-            .filter(|(_, rule)| rule.applies_to_entity_type(entity_type))
-            .map(|(code, _)| code.clone())
-            .collect();
+    fn suggest_similar_symbols(&self, name: &str, inferred: &InferredContext) -> Vec<String> {
+        inferred.symbols.keys()
+            .filter(|k| self.levenshtein(k, name) <= 2)
+            .map(|k| format!("did you mean '@{}'?", k))
+            .collect()
+    }
 
-        // If few results, supplement with semantic similarity
-        if suggestions.len() < 3 {
-            if let Ok(similar) = self.semantic_store
-                .find_similar_documents(entity_type, 5)
-                .await
-            {
-                for doc in similar {
-                    if !suggestions.contains(&doc) {
-                        suggestions.push(doc);
-                    }
-                }
+    fn levenshtein(&self, a: &str, b: &str) -> usize {
+        let a: Vec<char> = a.chars().collect();
+        let b: Vec<char> = b.chars().collect();
+        let mut dp = vec![vec![0; b.len() + 1]; a.len() + 1];
+        for i in 0..=a.len() { dp[i][0] = i; }
+        for j in 0..=b.len() { dp[0][j] = j; }
+        for i in 1..=a.len() {
+            for j in 1..=b.len() {
+                let cost = if a[i-1] == b[j-1] { 0 } else { 1 };
+                dp[i][j] = (dp[i-1][j] + 1)
+                    .min(dp[i][j-1] + 1)
+                    .min(dp[i-1][j-1] + cost);
             }
         }
-
-        suggestions.truncate(5);
-        suggestions
+        dp[a.len()][b.len()]
     }
 
     fn span_to_source_span(&self, span: &Span, source: &str) -> SourceSpan {
-        // Calculate line and column from byte offset
         let mut line = 1u32;
         let mut last_newline = 0usize;
-
         for (i, ch) in source.char_indices() {
-            if i >= span.start {
-                break;
-            }
+            if i >= span.start { break; }
             if ch == '\n' {
                 line += 1;
                 last_newline = i + 1;
             }
         }
-
         SourceSpan {
             line,
             column: (span.start - last_newline) as u32,
@@ -1195,24 +1188,31 @@ impl CsgLinter {
     }
 }
 
-// =============================================================================
-// TESTS
-// =============================================================================
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn make_linter() -> CsgLinter {
+        CsgLinter {
+            pool: sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap(),
+            rules: ApplicabilityRules::default(),
+            semantic_store: SemanticContextStore::new(
+                sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap()
+            ),
+            initialized: false,
+        }
+    }
+
     #[test]
     fn test_types_compatible_exact() {
-        let linter = CsgLinter::new(sqlx::PgPool::connect_lazy("").unwrap());
+        let linter = make_linter();
         assert!(linter.types_compatible("LIMITED_COMPANY", "LIMITED_COMPANY"));
         assert!(!linter.types_compatible("LIMITED_COMPANY", "PROPER_PERSON"));
     }
 
     #[test]
     fn test_types_compatible_wildcard() {
-        let linter = CsgLinter::new(sqlx::PgPool::connect_lazy("").unwrap());
+        let linter = make_linter();
         assert!(linter.types_compatible("LIMITED_COMPANY_*", "LIMITED_COMPANY_PRIVATE"));
         assert!(linter.types_compatible("LIMITED_COMPANY_*", "LIMITED_COMPANY_PUBLIC"));
         assert!(!linter.types_compatible("LIMITED_COMPANY_*", "PROPER_PERSON"));
@@ -1220,13 +1220,22 @@ mod tests {
 
     #[test]
     fn test_types_compatible_hierarchy() {
-        let linter = CsgLinter::new(sqlx::PgPool::connect_lazy("").unwrap());
+        let linter = make_linter();
         assert!(linter.types_compatible("PROPER_PERSON", "PROPER_PERSON_NATURAL"));
-        assert!(linter.types_compatible("PROPER_PERSON", "PROPER_PERSON_BENEFICIAL_OWNER"));
         assert!(!linter.types_compatible("PROPER_PERSON_NATURAL", "PROPER_PERSON"));
+    }
+
+    #[test]
+    fn test_levenshtein() {
+        let linter = make_linter();
+        assert_eq!(linter.levenshtein("company", "company"), 0);
+        assert_eq!(linter.levenshtein("company", "compny"), 1);
+        assert_eq!(linter.levenshtein("company", "comapny"), 1);
     }
 }
 ```
+
+
 
 ### 4.2 File: `rust/src/dsl_v2/applicability_rules.rs`
 
@@ -1363,23 +1372,19 @@ impl ApplicabilityRules {
     pub async fn load(pool: &PgPool) -> Result<Self, String> {
         let mut rules = Self::default();
 
-        // Load document type rules
         rules.document_rules = Self::load_document_rules(pool).await?;
-        
-        // Load attribute rules
         rules.attribute_rules = Self::load_attribute_rules(pool).await?;
-        
-        // Load entity type hierarchy
         rules.entity_type_hierarchy = Self::load_entity_hierarchy(pool).await?;
 
         Ok(rules)
     }
 
     async fn load_document_rules(pool: &PgPool) -> Result<HashMap<String, DocumentApplicability>, String> {
+        // Note: PK is type_id, we SELECT type_code for the HashMap key
         let rows = sqlx::query!(
             r#"SELECT type_code, applicability
                FROM "ob-poc".document_types
-               WHERE is_active = true"#
+               WHERE applicability IS NOT NULL"#
         )
         .fetch_all(pool)
         .await
@@ -1397,9 +1402,11 @@ impl ApplicabilityRules {
     }
 
     async fn load_attribute_rules(pool: &PgPool) -> Result<HashMap<String, AttributeApplicability>, String> {
+        // Note: PK is id (text), we use it as the HashMap key
         let rows = sqlx::query!(
-            r#"SELECT semantic_id, applicability
-               FROM "ob-poc".attribute_registry"#
+            r#"SELECT id, applicability
+               FROM "ob-poc".attribute_registry
+               WHERE applicability IS NOT NULL"#
         )
         .fetch_all(pool)
         .await
@@ -1410,7 +1417,7 @@ impl ApplicabilityRules {
             let applicability = row.applicability
                 .and_then(|v| serde_json::from_value::<AttributeApplicability>(v).ok())
                 .unwrap_or_default();
-            rules.insert(row.semantic_id, applicability);
+            rules.insert(row.id, applicability);
         }
 
         Ok(rules)
@@ -1420,7 +1427,7 @@ impl ApplicabilityRules {
         let rows = sqlx::query!(
             r#"SELECT type_code, type_hierarchy_path
                FROM "ob-poc".entity_types
-               WHERE is_active = true"#
+               WHERE type_code IS NOT NULL"#
         )
         .fetch_all(pool)
         .await
@@ -1428,8 +1435,10 @@ impl ApplicabilityRules {
 
         let mut hierarchy = HashMap::new();
         for row in rows {
-            let path = row.type_hierarchy_path.unwrap_or_default();
-            hierarchy.insert(row.type_code, path);
+            if let Some(type_code) = row.type_code {
+                let path = row.type_hierarchy_path.unwrap_or_default();
+                hierarchy.insert(type_code, path);
+            }
         }
 
         Ok(hierarchy)
@@ -1452,10 +1461,6 @@ impl ApplicabilityRules {
     }
 }
 
-// =============================================================================
-// TESTS
-// =============================================================================
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1474,7 +1479,7 @@ mod tests {
             ..Default::default()
         };
         assert!(rule.applies_to_entity_type("PROPER_PERSON"));
-        assert!(rule.applies_to_entity_type("PROPER_PERSON_NATURAL")); // Hierarchy
+        assert!(rule.applies_to_entity_type("PROPER_PERSON_NATURAL"));
         assert!(!rule.applies_to_entity_type("LIMITED_COMPANY"));
     }
 
@@ -1486,7 +1491,7 @@ mod tests {
         };
         assert!(rule.applies_to_entity_type("LIMITED_COMPANY_PRIVATE"));
         assert!(rule.applies_to_entity_type("LIMITED_COMPANY_PUBLIC"));
-        assert!(!rule.applies_to_entity_type("LIMITED_COMPANY")); // Exact doesn't match wildcard
+        assert!(!rule.applies_to_entity_type("LIMITED_COMPANY"));
         assert!(!rule.applies_to_entity_type("PROPER_PERSON"));
     }
 
@@ -1509,9 +1514,9 @@ mod tests {
 //! Semantic Context Store
 //!
 //! Provides vector-based semantic similarity for enhanced suggestions.
+//! Leverages the existing rag_embeddings infrastructure.
 
 use sqlx::PgPool;
-use std::collections::HashMap;
 
 /// Store for semantic context and vector operations
 pub struct SemanticContextStore {
@@ -1529,12 +1534,17 @@ impl SemanticContextStore {
 
     pub async fn initialize(&mut self) -> Result<(), String> {
         // Verify vector extension is available
-        let _ = sqlx::query_scalar!(
-            r#"SELECT COUNT(*) FROM pg_extension WHERE extname = 'vector'"#
+        let count: i64 = sqlx::query_scalar!(
+            r#"SELECT COUNT(*)::bigint FROM pg_extension WHERE extname = 'vector'"#
         )
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| format!("pgvector not available: {}", e))?;
+        .map_err(|e| format!("pgvector check failed: {}", e))?
+        .unwrap_or(0);
+
+        if count == 0 {
+            return Err("pgvector extension not installed".to_string());
+        }
 
         self.initialized = true;
         Ok(())
@@ -1543,64 +1553,31 @@ impl SemanticContextStore {
     /// Find semantically similar document types using vector embeddings
     pub async fn find_similar_documents(
         &self,
-        query: &str,
+        entity_type: &str,
         limit: usize,
     ) -> Result<Vec<String>, String> {
         if !self.initialized {
             return Ok(vec![]);
         }
 
-        // For now, return empty - full implementation requires embedding generation
-        // In production, this would:
-        // 1. Generate embedding for query
-        // 2. Query document_types using cosine similarity
-        // 3. Return top N results
-        
+        // Query documents similar to the entity type's typical documents
         let results = sqlx::query_scalar!(
             r#"
-            SELECT type_code
-            FROM "ob-poc".document_types
-            WHERE embedding IS NOT NULL
-            ORDER BY embedding <=> (
-                SELECT embedding FROM "ob-poc".entity_types 
-                WHERE type_code = $1
+            SELECT dt.type_code
+            FROM "ob-poc".document_types dt
+            WHERE dt.embedding IS NOT NULL
+              AND EXISTS (
+                  SELECT 1 FROM "ob-poc".entity_types et
+                  WHERE et.type_code = $1 AND et.embedding IS NOT NULL
+              )
+            ORDER BY dt.embedding <=> (
+                SELECT et.embedding FROM "ob-poc".entity_types et 
+                WHERE et.type_code = $1
                 LIMIT 1
             )
             LIMIT $2
             "#,
-            query,
-            limit as i64
-        )
-        .fetch_all(&self.pool)
-        .await
-        .unwrap_or_default();
-
-        Ok(results)
-    }
-
-    /// Find semantically similar attributes
-    pub async fn find_similar_attributes(
-        &self,
-        document_type: &str,
-        limit: usize,
-    ) -> Result<Vec<String>, String> {
-        if !self.initialized {
-            return Ok(vec![]);
-        }
-
-        let results = sqlx::query_scalar!(
-            r#"
-            SELECT ar.semantic_id
-            FROM "ob-poc".attribute_registry ar
-            WHERE ar.embedding IS NOT NULL
-            ORDER BY ar.embedding <=> (
-                SELECT dt.embedding FROM "ob-poc".document_types dt
-                WHERE dt.type_code = $1
-                LIMIT 1
-            )
-            LIMIT $2
-            "#,
-            document_type,
+            entity_type,
             limit as i64
         )
         .fetch_all(&self.pool)
@@ -1645,14 +1622,14 @@ impl SemanticContextStore {
 }
 ```
 
-### 4.4 Update: `rust/src/dsl_v2/validation.rs` (Add New Error Codes)
+### 4.4 Update: `rust/src/dsl_v2/validation.rs`
 
 Add these variants to the `DiagnosticCode` enum:
 
 ```rust
-// Add to DiagnosticCode enum:
+// Add to existing DiagnosticCode enum:
 
-    // CSG Context Errors (C0xx)
+    // CSG Context Errors (C0xx series)
     /// Document type not applicable to entity type
     DocumentNotApplicableToEntityType,  // C001
     /// Document type not applicable to jurisdiction  
@@ -1666,19 +1643,29 @@ Add these variants to the `DiagnosticCode` enum:
     /// Symbol type mismatch
     SymbolTypeMismatch,                  // C006
     /// Forward reference to undefined symbol
-    ForwardReferenceError,               // C007
+    UndefinedSymbol,                     // C007
+    /// Unused symbol binding
+    UnusedBinding,                       // C008
     /// Internal error
     InternalError,                       // C099
 
-// Add to as_str() impl:
-    DiagnosticCode::DocumentNotApplicableToEntityType => "C001",
-    DiagnosticCode::DocumentNotApplicableToJurisdiction => "C002",
-    DiagnosticCode::DocumentNotApplicableToClientType => "C003",
-    DiagnosticCode::AttributeNotApplicableToEntityType => "C004",
-    DiagnosticCode::MissingPrerequisiteOperation => "C005",
-    DiagnosticCode::SymbolTypeMismatch => "C006",
-    DiagnosticCode::ForwardReferenceError => "C007",
-    DiagnosticCode::InternalError => "C099",
+// Add to as_str() implementation:
+impl DiagnosticCode {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            // ... existing codes ...
+            DiagnosticCode::DocumentNotApplicableToEntityType => "C001",
+            DiagnosticCode::DocumentNotApplicableToJurisdiction => "C002",
+            DiagnosticCode::DocumentNotApplicableToClientType => "C003",
+            DiagnosticCode::AttributeNotApplicableToEntityType => "C004",
+            DiagnosticCode::MissingPrerequisiteOperation => "C005",
+            DiagnosticCode::SymbolTypeMismatch => "C006",
+            DiagnosticCode::UndefinedSymbol => "C007",
+            DiagnosticCode::UnusedBinding => "C008",
+            DiagnosticCode::InternalError => "C099",
+        }
+    }
+}
 ```
 
 ### 4.5 Update: `rust/src/dsl_v2/mod.rs`
@@ -1699,32 +1686,32 @@ pub use semantic_context::SemanticContextStore;
 
 ## 5. Seed Data & Migrations
 
-### 5.1 Run Order
+### 5.1 Migration Run Order
 
-Execute migrations in order:
-1. `001_csg_document_types_metadata.sql`
-2. `002_csg_attribute_registry_metadata.sql`
-3. `003_csg_entity_types_metadata.sql`
-4. `004_csg_cbus_metadata.sql`
-5. `005_csg_validation_rules_table.sql`
-6. `006_csg_similarity_cache.sql`
+Execute migrations in this order:
+```
+1. 001_csg_document_types_metadata.sql
+2. 002_csg_attribute_registry_metadata.sql
+3. 003_csg_entity_types_metadata.sql
+4. 004_csg_cbus_context.sql
+5. 005_csg_validation_rules_table.sql
+6. 006_csg_similarity_cache.sql
+```
 
 ### 5.2 Seed: Document Type Applicability
 
 ```sql
--- File: sql/seeds/008_csg_document_applicability.sql
+-- File: sql/seeds/010_csg_document_applicability.sql
 
 BEGIN;
 
 -- Identity documents (person only)
 UPDATE "ob-poc".document_types SET 
     applicability = '{
-        "entity_types": ["PROPER_PERSON", "PROPER_PERSON_NATURAL", "PROPER_PERSON_BENEFICIAL_OWNER"],
+        "entity_types": ["PROPER_PERSON", "PROPER_PERSON_NATURAL", "BENEFICIAL_OWNER"],
         "category": "IDENTITY"
     }'::jsonb,
     semantic_context = '{
-        "category": "IDENTITY",
-        "subcategory": "GOVERNMENT_ISSUED",
         "purpose": "Verify identity of natural person",
         "synonyms": ["ID", "identification document"],
         "keywords": ["identity", "photo", "government"]
@@ -1733,12 +1720,10 @@ WHERE type_code = 'PASSPORT';
 
 UPDATE "ob-poc".document_types SET 
     applicability = '{
-        "entity_types": ["PROPER_PERSON", "PROPER_PERSON_NATURAL", "PROPER_PERSON_BENEFICIAL_OWNER"],
+        "entity_types": ["PROPER_PERSON", "PROPER_PERSON_NATURAL", "BENEFICIAL_OWNER"],
         "category": "IDENTITY"
     }'::jsonb,
     semantic_context = '{
-        "category": "IDENTITY",
-        "subcategory": "GOVERNMENT_ISSUED",
         "purpose": "Verify identity via driving license",
         "synonyms": ["driving licence", "license"],
         "keywords": ["identity", "photo", "driving"]
@@ -1747,12 +1732,10 @@ WHERE type_code = 'DRIVERS_LICENSE';
 
 UPDATE "ob-poc".document_types SET 
     applicability = '{
-        "entity_types": ["PROPER_PERSON", "PROPER_PERSON_NATURAL", "PROPER_PERSON_BENEFICIAL_OWNER"],
+        "entity_types": ["PROPER_PERSON", "PROPER_PERSON_NATURAL", "BENEFICIAL_OWNER"],
         "category": "IDENTITY"
     }'::jsonb,
     semantic_context = '{
-        "category": "IDENTITY",
-        "subcategory": "GOVERNMENT_ISSUED",
         "purpose": "Verify identity via national ID card",
         "synonyms": ["national identity card", "ID card"],
         "keywords": ["identity", "photo", "government", "national"]
@@ -1767,8 +1750,6 @@ UPDATE "ob-poc".document_types SET
         "category": "FORMATION"
     }'::jsonb,
     semantic_context = '{
-        "category": "FORMATION",
-        "subcategory": "INCORPORATION",
         "purpose": "Prove legal formation of company",
         "synonyms": ["incorporation certificate", "certificate of formation"],
         "keywords": ["formation", "incorporation", "company", "legal"]
@@ -1781,8 +1762,6 @@ UPDATE "ob-poc".document_types SET
         "category": "FORMATION"
     }'::jsonb,
     semantic_context = '{
-        "category": "FORMATION",
-        "subcategory": "CONSTITUTIONAL",
         "purpose": "Define company governance rules",
         "synonyms": ["bylaws", "memorandum", "constitution"],
         "keywords": ["governance", "rules", "constitution", "company"]
@@ -1797,8 +1776,6 @@ UPDATE "ob-poc".document_types SET
         "category": "FORMATION"
     }'::jsonb,
     semantic_context = '{
-        "category": "FORMATION",
-        "subcategory": "TRUST",
         "purpose": "Establish trust and define terms",
         "synonyms": ["trust agreement", "declaration of trust"],
         "keywords": ["trust", "deed", "settlor", "trustee", "beneficiary"]
@@ -1813,8 +1790,6 @@ UPDATE "ob-poc".document_types SET
         "category": "FORMATION"
     }'::jsonb,
     semantic_context = '{
-        "category": "FORMATION",
-        "subcategory": "PARTNERSHIP",
         "purpose": "Define partnership terms and ownership",
         "synonyms": ["LPA", "partnership deed"],
         "keywords": ["partnership", "partners", "agreement", "ownership"]
@@ -1827,8 +1802,6 @@ UPDATE "ob-poc".document_types SET
         "category": "ADDRESS"
     }'::jsonb,
     semantic_context = '{
-        "category": "ADDRESS",
-        "subcategory": "PROOF",
         "purpose": "Verify residential or business address",
         "synonyms": ["address verification", "residence proof"],
         "keywords": ["address", "residence", "proof", "utility"]
@@ -1841,8 +1814,6 @@ UPDATE "ob-poc".document_types SET
         "category": "FINANCIAL"
     }'::jsonb,
     semantic_context = '{
-        "category": "FINANCIAL",
-        "subcategory": "AUDIT",
         "purpose": "Show financial position and health",
         "synonyms": ["accounts", "annual report", "audited accounts"],
         "keywords": ["financial", "statements", "audit", "accounts"]
@@ -1855,8 +1826,6 @@ UPDATE "ob-poc".document_types SET
         "category": "COMPLIANCE"
     }'::jsonb,
     semantic_context = '{
-        "category": "COMPLIANCE",
-        "subcategory": "UBO",
         "purpose": "Declare ultimate beneficial owners",
         "synonyms": ["UBO declaration", "beneficial owner form"],
         "keywords": ["beneficial", "owner", "UBO", "declaration"]
@@ -1869,24 +1838,29 @@ COMMIT;
 ### 5.3 Seed: Entity Type Hierarchy
 
 ```sql
--- File: sql/seeds/009_csg_entity_type_hierarchy.sql
+-- File: sql/seeds/011_csg_entity_type_hierarchy.sql
 
 BEGIN;
 
--- Set up parent relationships and hierarchy paths
+-- Update type_code from name if not already set
+UPDATE "ob-poc".entity_types 
+SET type_code = UPPER(REPLACE(REPLACE(name, ' ', '_'), '-', '_'))
+WHERE type_code IS NULL;
+
+-- Set up hierarchy paths
 UPDATE "ob-poc".entity_types SET 
     type_hierarchy_path = ARRAY['ENTITY'],
     semantic_context = '{"category": "BASE", "is_abstract": true}'::jsonb
 WHERE type_code = 'ENTITY';
 
 UPDATE "ob-poc".entity_types SET 
-    type_hierarchy_path = ARRAY['ENTITY', 'PERSON'],
+    type_hierarchy_path = ARRAY['ENTITY', 'PROPER_PERSON'],
     semantic_context = '{
         "category": "NATURAL_PERSON",
         "typical_documents": ["PASSPORT", "DRIVERS_LICENSE", "NATIONAL_ID", "PROOF_ADDRESS"],
-        "typical_attributes": ["full_name", "date_of_birth", "nationality", "address"]
+        "typical_attributes": ["first_name", "last_name", "date_of_birth", "nationality"]
     }'::jsonb
-WHERE type_code IN ('PERSON', 'PROPER_PERSON', 'PROPER_PERSON_NATURAL');
+WHERE type_code IN ('PROPER_PERSON', 'PROPER_PERSON_NATURAL');
 
 UPDATE "ob-poc".entity_types SET 
     type_hierarchy_path = ARRAY['ENTITY', 'LEGAL_ENTITY', 'LIMITED_COMPANY'],
@@ -1895,7 +1869,7 @@ UPDATE "ob-poc".entity_types SET
         "typical_documents": ["CERT_INCORPORATION", "ARTICLES_ASSOC", "FINANCIAL_STATEMENTS"],
         "typical_attributes": ["company_name", "registration_number", "incorporation_date", "jurisdiction"]
     }'::jsonb
-WHERE type_code IN ('LIMITED_COMPANY', 'LLC');
+WHERE type_code LIKE 'LIMITED_COMPANY%' OR type_code = 'LLC';
 
 UPDATE "ob-poc".entity_types SET 
     type_hierarchy_path = ARRAY['ENTITY', 'LEGAL_ENTITY', 'PARTNERSHIP'],
@@ -1904,7 +1878,7 @@ UPDATE "ob-poc".entity_types SET
         "typical_documents": ["PARTNERSHIP_AGREEMENT", "FINANCIAL_STATEMENTS"],
         "typical_attributes": ["partnership_name", "formation_date", "partnership_type"]
     }'::jsonb
-WHERE type_code = 'PARTNERSHIP';
+WHERE type_code LIKE 'PARTNERSHIP%';
 
 UPDATE "ob-poc".entity_types SET 
     type_hierarchy_path = ARRAY['ENTITY', 'LEGAL_ENTITY', 'TRUST'],
@@ -1913,16 +1887,7 @@ UPDATE "ob-poc".entity_types SET
         "typical_documents": ["TRUST_DEED", "FINANCIAL_STATEMENTS"],
         "typical_attributes": ["trust_name", "formation_date", "governing_law"]
     }'::jsonb
-WHERE type_code = 'TRUST';
-
-UPDATE "ob-poc".entity_types SET 
-    type_hierarchy_path = ARRAY['ENTITY', 'LEGAL_ENTITY', 'FOUNDATION'],
-    semantic_context = '{
-        "category": "FOUNDATION",
-        "typical_documents": ["CERT_INCORPORATION", "ARTICLES_ASSOC"],
-        "typical_attributes": ["foundation_name", "formation_date", "purpose"]
-    }'::jsonb
-WHERE type_code = 'FOUNDATION';
+WHERE type_code LIKE 'TRUST%';
 
 COMMIT;
 ```
@@ -1934,11 +1899,11 @@ COMMIT;
 ### 6.1 Unit Tests (Rust)
 
 ```rust
-// tests/csg_linter_tests.rs
+// File: rust/tests/csg_linter_tests.rs
 
 #[cfg(test)]
 mod tests {
-    use ob_poc::dsl_v2::{parse_program, CsgLinter, ValidationContext};
+    use ob_poc::dsl_v2::{parse_program, CsgLinter, ValidationContext, DiagnosticCode};
     use sqlx::PgPool;
 
     async fn setup_test_linter() -> CsgLinter {
@@ -1964,7 +1929,7 @@ mod tests {
         
         assert!(result.has_errors());
         assert!(result.diagnostics.iter().any(|d| 
-            d.code == DiagnosticCode::DocumentNotApplicableToEntityType
+            matches!(d.code, DiagnosticCode::DocumentNotApplicableToEntityType)
         ));
     }
 
@@ -1996,7 +1961,24 @@ mod tests {
         
         assert!(result.has_errors());
         assert!(result.diagnostics.iter().any(|d| 
-            d.code == DiagnosticCode::UndefinedSymbol
+            matches!(d.code, DiagnosticCode::UndefinedSymbol)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_unused_symbol_warning() {
+        let linter = setup_test_linter().await;
+        
+        let dsl = r#"
+            (entity.create-proper-person :first-name "John" :last-name "Doe" :as @unused_person)
+        "#;
+        
+        let ast = parse_program(dsl).unwrap();
+        let result = linter.lint(ast, &ValidationContext::default(), dsl).await;
+        
+        assert!(result.has_warnings());
+        assert!(result.diagnostics.iter().any(|d| 
+            matches!(d.code, DiagnosticCode::UnusedBinding)
         ));
     }
 }
@@ -2005,15 +1987,15 @@ mod tests {
 ### 6.2 Integration Tests (SQL)
 
 ```sql
--- tests/test_applicability_rules.sql
+-- File: sql/tests/test_csg_applicability.sql
 
--- Test: Passport should apply to PROPER_PERSON
+-- Test: PASSPORT should apply to PROPER_PERSON
 DO $$
 DECLARE
     v_applies boolean;
 BEGIN
     SELECT 
-        (applicability->'entity_types') ? 'PROPER_PERSON'
+        applicability->'entity_types' ? 'PROPER_PERSON'
         OR EXISTS (
             SELECT 1 FROM jsonb_array_elements_text(applicability->'entity_types') et
             WHERE 'PROPER_PERSON' LIKE REPLACE(et, '*', '%')
@@ -2022,21 +2004,44 @@ BEGIN
     FROM "ob-poc".document_types
     WHERE type_code = 'PASSPORT';
     
-    ASSERT v_applies, 'PASSPORT should apply to PROPER_PERSON';
+    IF NOT v_applies THEN
+        RAISE EXCEPTION 'PASSPORT should apply to PROPER_PERSON';
+    END IF;
 END $$;
 
 -- Test: CERT_INCORPORATION should NOT apply to PROPER_PERSON
 DO $$
 DECLARE
-    v_applies boolean;
+    v_entity_types jsonb;
+    v_applies boolean := false;
 BEGIN
-    SELECT 
-        (applicability->'entity_types') ? 'PROPER_PERSON'
-    INTO v_applies
+    SELECT applicability->'entity_types'
+    INTO v_entity_types
     FROM "ob-poc".document_types
     WHERE type_code = 'CERT_INCORPORATION';
     
-    ASSERT NOT v_applies, 'CERT_INCORPORATION should NOT apply to PROPER_PERSON';
+    -- Check if PROPER_PERSON or any wildcard matches
+    IF v_entity_types ? 'PROPER_PERSON' THEN
+        v_applies := true;
+    END IF;
+    
+    IF v_applies THEN
+        RAISE EXCEPTION 'CERT_INCORPORATION should NOT apply to PROPER_PERSON';
+    END IF;
+END $$;
+
+-- Test: Verify type_code populated for all entity_types
+DO $$
+DECLARE
+    v_missing_count integer;
+BEGIN
+    SELECT COUNT(*) INTO v_missing_count
+    FROM "ob-poc".entity_types
+    WHERE type_code IS NULL;
+    
+    IF v_missing_count > 0 THEN
+        RAISE EXCEPTION '% entity_types missing type_code', v_missing_count;
+    END IF;
 END $$;
 ```
 
@@ -2046,57 +2051,145 @@ END $$;
 
 ### For Claude Code Agent
 
-Execute in order. Check off each step.
+Execute in order. Mark each step complete before proceeding.
 
-```
-## Phase 1: Database Migrations
+```markdown
+## Phase 1: Database Migrations (6 steps)
 
-[ ] 1.1 Run migration: 001_csg_document_types_metadata.sql
-[ ] 1.2 Run migration: 002_csg_attribute_registry_metadata.sql  
-[ ] 1.3 Run migration: 003_csg_entity_types_metadata.sql
-[ ] 1.4 Run migration: 004_csg_cbus_metadata.sql
-[ ] 1.5 Run migration: 005_csg_validation_rules_table.sql
-[ ] 1.6 Run migration: 006_csg_similarity_cache.sql
-[ ] 1.7 Verify all columns exist: 
-      SELECT column_name FROM information_schema.columns 
-      WHERE table_schema = 'ob-poc' AND table_name = 'document_types';
+- [ ] 1.1 Run migration: `001_csg_document_types_metadata.sql`
+      ```bash
+      psql -d data_designer -f sql/migrations/001_csg_document_types_metadata.sql
+      ```
 
-## Phase 2: Seed Data
+- [ ] 1.2 Run migration: `002_csg_attribute_registry_metadata.sql`
+      ```bash
+      psql -d data_designer -f sql/migrations/002_csg_attribute_registry_metadata.sql
+      ```
 
-[ ] 2.1 Run seed: 008_csg_document_applicability.sql
-[ ] 2.2 Run seed: 009_csg_entity_type_hierarchy.sql
-[ ] 2.3 Verify seed data:
-      SELECT type_code, applicability->>'entity_types' 
-      FROM "ob-poc".document_types WHERE applicability IS NOT NULL;
+- [ ] 1.3 Run migration: `003_csg_entity_types_metadata.sql`
+      ```bash
+      psql -d data_designer -f sql/migrations/003_csg_entity_types_metadata.sql
+      ```
 
-## Phase 3: Rust Implementation
+- [ ] 1.4 Run migration: `004_csg_cbus_context.sql`
+      ```bash
+      psql -d data_designer -f sql/migrations/004_csg_cbus_context.sql
+      ```
 
-[ ] 3.1 Create file: rust/src/dsl_v2/applicability_rules.rs
-[ ] 3.2 Create file: rust/src/dsl_v2/semantic_context.rs
-[ ] 3.3 Create file: rust/src/dsl_v2/csg_linter.rs
-[ ] 3.4 Update file: rust/src/dsl_v2/validation.rs (add DiagnosticCodes)
-[ ] 3.5 Update file: rust/src/dsl_v2/mod.rs (add module exports)
-[ ] 3.6 Run: cargo check --features database
-[ ] 3.7 Run: cargo test csg
+- [ ] 1.5 Run migration: `005_csg_validation_rules_table.sql`
+      ```bash
+      psql -d data_designer -f sql/migrations/005_csg_validation_rules_table.sql
+      ```
 
-## Phase 4: Integration
+- [ ] 1.6 Run migration: `006_csg_similarity_cache.sql`
+      ```bash
+      psql -d data_designer -f sql/migrations/006_csg_similarity_cache.sql
+      ```
 
-[ ] 4.1 Update SemanticValidator to use CsgLinter
-[ ] 4.2 Run full test suite: cargo test
-[ ] 4.3 Run integration test with real DB
+## Phase 2: Verify Migrations (3 steps)
 
-## Phase 5: Verification
+- [ ] 2.1 Verify document_types columns:
+      ```sql
+      SELECT column_name, data_type 
+      FROM information_schema.columns 
+      WHERE table_schema = 'ob-poc' 
+        AND table_name = 'document_types'
+        AND column_name IN ('applicability', 'semantic_context', 'embedding');
+      ```
 
-[ ] 5.1 Test: Passport rejected for company
-[ ] 5.2 Test: Passport accepted for person
-[ ] 5.3 Test: Undefined symbol detected
-[ ] 5.4 Test: Unused symbol warning
-[ ] 5.5 Verify error messages include suggestions
+- [ ] 2.2 Verify new tables created:
+      ```sql
+      SELECT table_name FROM information_schema.tables 
+      WHERE table_schema = 'ob-poc' 
+        AND table_name LIKE 'csg_%';
+      ```
+
+- [ ] 2.3 Verify indexes created:
+      ```sql
+      SELECT indexname FROM pg_indexes 
+      WHERE schemaname = 'ob-poc' 
+        AND indexname LIKE '%csg%' OR indexname LIKE '%applicability%';
+      ```
+
+## Phase 3: Seed Data (2 steps)
+
+- [ ] 3.1 Run seed: `010_csg_document_applicability.sql`
+      ```bash
+      psql -d data_designer -f sql/seeds/010_csg_document_applicability.sql
+      ```
+
+- [ ] 3.2 Run seed: `011_csg_entity_type_hierarchy.sql`
+      ```bash
+      psql -d data_designer -f sql/seeds/011_csg_entity_type_hierarchy.sql
+      ```
+
+## Phase 4: Verify Seed Data (2 steps)
+
+- [ ] 4.1 Verify document applicability populated:
+      ```sql
+      SELECT type_code, applicability->>'entity_types' as entity_types
+      FROM "ob-poc".document_types 
+      WHERE applicability IS NOT NULL AND applicability != '{}'::jsonb
+      LIMIT 10;
+      ```
+
+- [ ] 4.2 Verify entity type hierarchy:
+      ```sql
+      SELECT type_code, type_hierarchy_path
+      FROM "ob-poc".entity_types 
+      WHERE type_hierarchy_path IS NOT NULL
+      LIMIT 10;
+      ```
+
+## Phase 5: Rust Implementation (5 steps)
+
+- [ ] 5.1 Create file: `rust/src/dsl_v2/applicability_rules.rs`
+      (Copy from Section 4.2)
+
+- [ ] 5.2 Create file: `rust/src/dsl_v2/semantic_context.rs`
+      (Copy from Section 4.3)
+
+- [ ] 5.3 Create file: `rust/src/dsl_v2/csg_linter.rs`
+      (Copy from Section 4.1)
+
+- [ ] 5.4 Update file: `rust/src/dsl_v2/validation.rs`
+      Add DiagnosticCode variants (Section 4.4)
+
+- [ ] 5.5 Update file: `rust/src/dsl_v2/mod.rs`
+      Add module declarations (Section 4.5)
+
+## Phase 6: Build & Test (4 steps)
+
+- [ ] 6.1 Run cargo check:
+      ```bash
+      cd rust && cargo check
+      ```
+
+- [ ] 6.2 Run unit tests:
+      ```bash
+      cd rust && cargo test csg
+      ```
+
+- [ ] 6.3 Run SQL tests:
+      ```bash
+      psql -d data_designer -f sql/tests/test_csg_applicability.sql
+      ```
+
+- [ ] 6.4 Run integration tests (if DATABASE_URL set):
+      ```bash
+      cd rust && cargo test --test csg_linter_tests
+      ```
+
+## Phase 7: Validation (3 steps)
+
+- [ ] 7.1 Test: Passport rejected for company
+- [ ] 7.2 Test: Passport accepted for person  
+- [ ] 7.3 Verify error messages include suggestions
 ```
 
 ---
 
-## Appendix: Error Message Examples
+## Appendix A: Error Message Examples
 
 ### C001: Document Not Applicable to Entity Type
 ```
@@ -2112,18 +2205,38 @@ error[C001]: document type not applicable to entity type
           CERT_INCORPORATION, ARTICLES_ASSOC, FINANCIAL_STATEMENTS
 ```
 
-### C006: Symbol Type Mismatch
+### C007: Undefined Symbol
 ```
-error[C006]: symbol type mismatch
- --> input:5:45
+error[C007]: undefined symbol '@person'
+ --> input:2:45
   |
-5 | (cbu.assign-role :cbu-id @cbu :entity-id @company :role "Director")
-  |                                          ^^^^^^^^
+2 | (document.catalog :document-type "PASSPORT" :entity-id @person)
+  |                                              ^^^^^^^^^^^^^^^^^^
   |
-  = note: argument 'entity-id' expects PROPER_PERSON for role 'Director'
-  = note: symbol @company has type: LIMITED_COMPANY
+  = help: did you mean '@proper_person'?
+```
+
+### C008: Unused Binding
+```
+warning[C008]: symbol '@unused_entity' is defined but never used
+ --> input:1:50
+  |
+1 | (entity.create-limited-company :name "Acme" :as @unused_entity)
+  |                                                 ^^^^^^^^^^^^^^^
 ```
 
 ---
 
-*End of Specification*
+## Appendix B: Key Schema Corrections from V1
+
+| Item | V1 (Incorrect) | V2 (Correct) |
+|------|----------------|--------------|
+| `document_types` PK | `document_type_id` | `type_id` |
+| `attribute_registry` PK | `attribute_id` | `id` (text) + `uuid` column |
+| `cbus.client_type` | Needed to add | Already exists |
+| `cbus.jurisdiction` | Needed to add | Already exists |
+| `entity_types` identifier | `type_code` column | `name` column (added `type_code`) |
+
+---
+
+*End of Specification v2.0*

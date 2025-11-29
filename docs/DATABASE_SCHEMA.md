@@ -1,9 +1,10 @@
 # OB-POC Database Schema Reference
 
 **Generated:** 2025-11-29  
+**Last Updated:** 2025-11-29 (CSG Linter additions)  
 **Database:** data_designer  
 **Schema:** ob-poc  
-**Total Tables:** 96  
+**Total Tables:** 99  
 **PostgreSQL Version:** 14.19
 
 ## Extensions
@@ -29,6 +30,9 @@
 | `kyc_investigations` | `investigation_id` | uuid | KYC investigations |
 | `kyc_decisions` | `decision_id` | uuid | KYC decisions |
 | `screenings` | `screening_id` | uuid | Screening records |
+| `csg_validation_rules` | `rule_id` | uuid | CSG validation rules |
+| `csg_rule_overrides` | `override_id` | uuid | Per-CBU rule overrides |
+| `csg_semantic_similarity_cache` | `cache_id` | uuid | Similarity cache |
 
 ---
 
@@ -1173,6 +1177,117 @@ Key database functions:
 | `resolve_uuid_to_semantic(uuid)` | Convert UUID to semantic ID |
 | `get_next_version_number(domain_name)` | Get next DSL version number |
 | `invalidate_ast_cache()` | Trigger to invalidate AST on DSL change |
+| `refresh_document_type_similarities()` | Refresh CSG similarity cache for document types |
+
+---
+
+### 16. CSG (Context-Sensitive Grammar) Linter - 3 tables
+
+The CSG Linter validates DSL programs against business rules that depend on runtime context.
+
+#### csg_validation_rules
+Centralized rule store for CSG validation.
+```
+rule_id             uuid PK DEFAULT gen_random_uuid()
+rule_code           varchar(100) NOT NULL UNIQUE
+rule_name           varchar(255) NOT NULL
+rule_version        integer DEFAULT 1
+target_type         varchar(50) NOT NULL  -- document_type, attribute, entity_type, verb, cross_reference
+target_code         varchar(100)
+rule_type           varchar(50) NOT NULL  -- entity_type_constraint, jurisdiction_constraint, client_type_constraint, prerequisite, exclusion, co_occurrence, sequence, cardinality, custom
+rule_params         jsonb NOT NULL
+error_code          varchar(10) NOT NULL  -- e.g., "C001"
+error_message_template text NOT NULL
+suggestion_template text
+severity            varchar(20) DEFAULT 'error'  -- error, warning, info
+description         text
+rationale           text
+documentation_url   text
+is_active           boolean DEFAULT true
+effective_from      timestamptz
+effective_until     timestamptz
+created_by          varchar(255)
+created_at          timestamptz
+updated_at          timestamptz
+```
+
+#### csg_rule_overrides
+Per-CBU rule overrides for custom behavior.
+```
+override_id         uuid PK DEFAULT gen_random_uuid()
+rule_id             uuid NOT NULL FK -> csg_validation_rules
+cbu_id              uuid NOT NULL FK -> cbus
+override_type       varchar(50) NOT NULL  -- disable, downgrade, modify_params, add_exception
+override_params     jsonb
+approved_by         varchar(255)
+approval_reason     text NOT NULL
+approved_at         timestamptz
+expires_at          timestamptz
+created_by          varchar(255)
+created_at          timestamptz
+UNIQUE(rule_id, cbu_id)
+```
+
+#### csg_semantic_similarity_cache
+Pre-computed similarity scores for fast suggestions.
+```
+cache_id            uuid PK DEFAULT gen_random_uuid()
+source_type         varchar(50) NOT NULL  -- document_type, attribute, entity_type
+source_code         varchar(100) NOT NULL
+target_type         varchar(50) NOT NULL
+target_code         varchar(100) NOT NULL
+cosine_similarity   float NOT NULL
+levenshtein_distance integer
+semantic_relatedness float
+relationship_type   varchar(50)  -- alternative, complement, parent, child
+computed_at         timestamptz
+expires_at          timestamptz
+UNIQUE(source_type, source_code, target_type, target_code)
+```
+
+---
+
+### CSG Metadata Columns (added to existing tables)
+
+The following columns were added to support CSG linting:
+
+#### document_types (additional columns)
+```
+applicability       jsonb DEFAULT '{}'  -- CSG rules: entity_types[], jurisdictions[], client_types[], required_for[], excludes[]
+semantic_context    jsonb DEFAULT '{}'  -- Rich metadata: purpose, synonyms[], keywords[]
+embedding           vector(1536)        -- Vector embedding for similarity search
+embedding_model     varchar(100)
+embedding_updated_at timestamptz
+```
+
+#### attribute_registry (additional columns)
+```
+applicability       jsonb DEFAULT '{}'  -- CSG rules: entity_types[], required_for[], source_documents[], depends_on[]
+embedding           vector(1536)
+embedding_model     varchar(100)
+embedding_updated_at timestamptz
+```
+
+#### entity_types (additional columns)
+```
+type_code           varchar(100) UNIQUE -- Normalized identifier (e.g., "LIMITED_COMPANY_PRIVATE")
+semantic_context    jsonb DEFAULT '{}'  -- Rich metadata: category, synonyms[], typical_documents[]
+parent_type_id      uuid FK -> entity_types  -- Type hierarchy
+type_hierarchy_path text[]              -- Materialized path, e.g., ["ENTITY", "LEGAL_ENTITY", "LIMITED_COMPANY"]
+embedding           vector(1536)
+embedding_model     varchar(100)
+embedding_updated_at timestamptz
+```
+
+#### cbus (additional columns)
+```
+risk_context        jsonb DEFAULT '{}'  -- Risk metadata: risk_rating, pep_exposure, sanctions_exposure
+onboarding_context  jsonb DEFAULT '{}'  -- State: stage, completed_steps[], pending_requirements[]
+semantic_context    jsonb DEFAULT '{}'  -- Rich metadata: business_description, industry_keywords[]
+embedding           vector(1536)
+embedding_model     varchar(100)
+embedding_updated_at timestamptz
+```
 
 ---
 
@@ -1183,3 +1298,5 @@ Key database functions:
 3. **Temporal attributes** - `attribute_values_typed` uses `effective_from`/`effective_to` for temporal validity
 4. **Entity types** - All entities link to `entity_types` via `entity_type_id`, specific data in type-specific tables
 5. **pgvector enabled** - Use `vector(1536)` type for embeddings in `rag_embeddings`
+6. **CSG applicability rules** - `document_types.applicability` and `attribute_registry.applicability` contain JSONB with `entity_types[]` arrays for context-sensitive validation
+7. **Entity type hierarchy** - `entity_types.type_hierarchy_path` contains materialized path arrays for wildcard matching (e.g., `PROPER_PERSON_*` matches `PROPER_PERSON_NATURAL`)

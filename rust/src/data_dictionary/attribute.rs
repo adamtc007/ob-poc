@@ -218,8 +218,14 @@ pub struct DbAttributeDefinition {
     pub name: String,
     pub long_description: Option<String>,
     pub data_type: String,
+    #[cfg(feature = "database")]
     pub source_config: Option<sqlx::types::Json<SourceConfig>>,
+    #[cfg(not(feature = "database"))]
+    pub source_config: Option<serde_json::Value>,
+    #[cfg(feature = "database")]
     pub sink_config: Option<sqlx::types::Json<SinkConfig>>,
+    #[cfg(not(feature = "database"))]
+    pub sink_config: Option<serde_json::Value>,
     pub group_id: Option<String>,
     pub domain: Option<String>,
 }
