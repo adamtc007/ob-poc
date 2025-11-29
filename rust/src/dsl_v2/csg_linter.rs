@@ -19,6 +19,7 @@ use crate::dsl_v2::semantic_context::SemanticContextStore;
 use crate::dsl_v2::validation::{
     Diagnostic, DiagnosticCode, Severity, SourceSpan, Suggestion, ValidationContext,
 };
+use crate::dsl_v2::verb_registry::registry;
 use std::collections::HashMap;
 
 #[cfg(feature = "database")]
@@ -247,18 +248,23 @@ impl CsgLinter {
                     span,
                 });
             }
-            ("document", "catalog") | ("document", "request") => {
-                if let Some(doc_type) = self.extract_string_arg(vc, "document-type") {
-                    inferred.document_catalogs.push(DocumentCatalog {
-                        symbol: vc.as_binding.clone(),
-                        document_type: doc_type,
-                        cbu_ref: self.extract_ref_arg(vc, "cbu-id"),
-                        entity_ref: self.extract_ref_arg(vc, "entity-id"),
-                        span,
-                    });
+            _ => {
+                // Use unified registry to check if verb has document-type argument
+                // This handles document.catalog, document.request, and any future document verbs
+                if let Some(verb_def) = registry().get(&vc.domain, &vc.verb) {
+                    if verb_def.accepts_arg("document-type") {
+                        if let Some(doc_type) = self.extract_string_arg(vc, "document-type") {
+                            inferred.document_catalogs.push(DocumentCatalog {
+                                symbol: vc.as_binding.clone(),
+                                document_type: doc_type,
+                                cbu_ref: self.extract_ref_arg(vc, "cbu-id"),
+                                entity_ref: self.extract_ref_arg(vc, "entity-id"),
+                                span,
+                            });
+                        }
+                    }
                 }
             }
-            _ => {}
         }
 
         // Track all entity references

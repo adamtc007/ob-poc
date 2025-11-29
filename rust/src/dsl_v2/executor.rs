@@ -11,6 +11,7 @@ use uuid::Uuid;
 use super::ast::{Program, Statement, Value, VerbCall};
 use super::custom_ops::CustomOperationRegistry;
 use super::mappings::{get_pk_column, resolve_column};
+use super::verb_registry::{registry, VerbBehavior};
 use super::verbs::{find_verb, Behavior, VerbDef};
 
 /// Schema prefix for all tables
@@ -143,12 +144,26 @@ impl DslExecutor {
         vc: &VerbCall,
         ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        // First check for custom operations
-        if let Some(op) = self.custom_ops.get(&vc.domain, &vc.verb) {
-            return op.execute(vc, ctx, &self.pool).await;
+        // Look up verb in unified registry first
+        let unified_verb = registry().get(&vc.domain, &vc.verb);
+
+        // Check if this is a custom operation
+        if let Some(uv) = unified_verb {
+            if uv.behavior == VerbBehavior::CustomOp {
+                // Dispatch to custom operations handler
+                if let Some(op) = self.custom_ops.get(&vc.domain, &vc.verb) {
+                    return op.execute(vc, ctx, &self.pool).await;
+                }
+                // Custom op registered but no handler - fall through to error
+                return Err(anyhow!(
+                    "Custom operation {}.{} has no handler implementation",
+                    vc.domain,
+                    vc.verb
+                ));
+            }
         }
 
-        // Look up standard verb definition
+        // Look up standard verb definition (for CRUD behavior)
         let verb_def = find_verb(&vc.domain, &vc.verb)
             .ok_or_else(|| anyhow!("Unknown verb: {}.{}", vc.domain, vc.verb))?;
 

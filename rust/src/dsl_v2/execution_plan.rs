@@ -19,7 +19,7 @@
 //! ```
 
 use super::ast::{Argument, Program, Statement, Value, VerbCall};
-use super::verbs::find_verb;
+use super::verb_registry::{registry, VerbBehavior};
 
 /// A compiled execution plan - dependency sorted sequence of steps
 #[derive(Debug, Clone)]
@@ -41,6 +41,12 @@ pub struct ExecutionStep {
 
     /// Step index (for debugging/logging)
     pub step_index: usize,
+
+    /// How this step should be executed (CRUD, CustomOp, Composite)
+    pub behavior: VerbBehavior,
+
+    /// For custom ops, the handler ID (e.g., "document.catalog")
+    pub custom_op_id: Option<String>,
 }
 
 /// Instruction to inject a previous step's result into this step's arguments
@@ -178,13 +184,14 @@ impl Compiler {
         vc: &VerbCall,
         parent: Option<ParentInfo>,
     ) -> Result<usize, CompileError> {
-        // Validate verb exists
-        if find_verb(&vc.domain, &vc.verb).is_none() {
-            return Err(CompileError::UnknownVerb {
-                domain: vc.domain.clone(),
-                verb: vc.verb.clone(),
-            });
-        }
+        // Look up verb in unified registry (includes both CRUD and custom ops)
+        let verb_def =
+            registry()
+                .get(&vc.domain, &vc.verb)
+                .ok_or_else(|| CompileError::UnknownVerb {
+                    domain: vc.domain.clone(),
+                    verb: vc.verb.clone(),
+                })?;
 
         // Build injections from parent
         let mut injections = Vec::new();
@@ -212,6 +219,8 @@ impl Compiler {
             injections,
             bind_as: vc.as_binding.clone(),
             step_index: my_step_index,
+            behavior: verb_def.behavior,
+            custom_op_id: verb_def.custom_op_id.map(|s| s.to_string()),
         });
 
         // Recursively compile children with this step as parent

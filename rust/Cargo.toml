@@ -58,7 +58,12 @@ rand = "0.8"
 # For attribute API endpoints
 base64 = "0.22"
 sha2 = "0.10"
-clap = { version = "4.5.53", features = ["derive"] }
+
+# CLI dependencies
+clap = { version = "4.5", features = ["derive", "env"], optional = true }
+colored = { version = "2.1", optional = true }
+atty = { version = "0.2", optional = true }
+futures = "0.3"
 
 # Serialization/Deserialization
 # serde is already included above
@@ -80,12 +85,18 @@ name = "agentic_server"
 path = "src/bin/agentic_server.rs"
 required-features = ["server"]
 
+[[bin]]
+name = "dsl_cli"
+path = "src/bin/dsl_cli.rs"
+required-features = ["cli"]
+
 # Features for conditional compilation
 [features]
 default = []
 
 database = ["dep:sqlx", "dep:bigdecimal"]  # Only enable database functionality when needed
 server = ["database", "dep:axum", "dep:tower", "dep:tower-http"]  # REST API server with database
+cli = ["dep:clap", "dep:colored", "dep:atty"]  # CLI tool for DSL testing
 
 
 

@@ -56,6 +56,7 @@ pub mod semantic_intent;
 #[cfg(feature = "database")]
 pub mod semantic_validator;
 pub mod validation;
+pub mod verb_registry;
 pub mod verb_schema;
 pub mod verbs;
 
@@ -68,6 +69,10 @@ pub use executor::{DslExecutor, ExecutionContext, ExecutionResult, ReturnType};
 pub use mappings::{get_table_mappings, resolve_column, ColumnMapping, DbType, TableMappings};
 pub use parser::{parse_program, parse_single_verb};
 pub use semantic_context::SemanticContextStore;
+pub use verb_registry::{
+    find_unified_verb, registry, verb_exists, ArgDef, UnifiedVerbDef, UnifiedVerbRegistry,
+    VerbBehavior,
+};
 pub use verbs::{
     domains, find_verb, verb_count, verbs_for_domain, Behavior, VerbDef, STANDARD_VERBS,
 };
