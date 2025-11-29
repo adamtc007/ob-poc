@@ -9,49 +9,97 @@ This file provides guidance to Claude Code when working with this repository.
 ## Architecture
 
 ```
-DSL Source -> Verb Schema Validator -> Runtime -> CRUD Statements -> Database
+┌─────────────────────────────────────────────────────────────────┐
+│                     DSL Source Text                              │
+│  (cbu.create :name "Fund" :jurisdiction "LU" :as @fund)         │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   Parser (Nom) → AST                             │
+│  rust/src/dsl_v2/parser.rs                                      │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                CSG Linter (Validation)                           │
+│  - Verb existence, argument validation                          │
+│  - Entity type constraints (passport→person, cert→company)      │
+│  - Symbol resolution (@ref must be defined before use)          │
+│  rust/src/dsl_v2/csg_linter.rs                                  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              Compiler → Execution Plan                           │
+│  rust/src/dsl_v2/execution_plan.rs                              │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   DslExecutor                                    │
+│  - Type-aware binding (String→Date, UUID, Decimal)              │
+│  - Symbol table management                                       │
+│  - CRUD generation and execution                                │
+│  rust/src/dsl_v2/executor.rs                                    │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    PostgreSQL (ob-poc schema)                    │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### Key Concepts
-- **Verb Schema**: 53 verbs across 8 domains with typed arguments
-- **RefType Lookups**: Document types, roles, jurisdictions etc from DB
-- **Symbol Binding**: @symbol references for data flow between verbs
-- **LSP Server**: IDE integration for completions, hover, diagnostics
+### Key Components
 
-## Codebase Stats
-
-- **54,500 lines of Rust** (src/ + crates/)
-- **53 verbs** across 8 domains
-- **PostgreSQL** backend with ob-poc schema
+| Component | File | Purpose |
+|-----------|------|---------|
+| Parser | `dsl_v2/parser.rs` | Nom-based S-expression parser |
+| AST | `dsl_v2/ast.rs` | Program, Statement, VerbCall, Value types |
+| Verb Registry | `dsl_v2/verb_registry.rs` | 53+ verbs across 8 domains |
+| CSG Linter | `dsl_v2/csg_linter.rs` | Context-sensitive validation |
+| Compiler | `dsl_v2/execution_plan.rs` | AST → ExecutionPlan |
+| Executor | `dsl_v2/executor.rs` | Plan execution with DB |
+| MCP Server | `mcp/` | Claude integration (8 tools) |
+| LSP Server | `crates/dsl-lsp/` | IDE integration |
 
 ## Directory Structure
 
 ```
 rust/
-  src/
-    forth_engine/
-      schema/
-        types.rs        # VerbDef, ArgSpec, SemType, RefType
-        registry.rs     # VERB_REGISTRY (53 verbs)
-        validator.rs    # Schema validation
-        cache.rs        # SchemaCache for lookups
-        verbs/          # Verb definitions by domain
-          cbu.rs        # 9 verbs
-          entity.rs     # 5 verbs
-          document.rs   # 6 verbs
-          kyc.rs        # 5 verbs
-          screening.rs  # 7 verbs
-          decision.rs   # 7 verbs
-          monitoring.rs # 7 verbs
-          attribute.rs  # 7 verbs
-      runtime.rs        # DSL execution
-      words.rs          # Word implementations
-    database/           # DB services
-    services/           # Business logic
-    dsl_test_harness/   # Testing framework
-  crates/
-    dsl-lsp/            # LSP server (2,200 lines)
-  Cargo.toml
+├── src/
+│   ├── dsl_v2/                 # Core DSL implementation
+│   │   ├── mod.rs              # Module exports
+│   │   ├── ast.rs              # AST types
+│   │   ├── parser.rs           # Nom parser
+│   │   ├── verb_registry.rs    # Unified verb registry
+│   │   ├── verbs.rs            # Standard verb definitions
+│   │   ├── mappings.rs         # DSL key → DB column mappings
+│   │   ├── csg_linter.rs       # CSG validation
+│   │   ├── execution_plan.rs   # Compiler
+│   │   ├── executor.rs         # Database executor
+│   │   ├── custom_ops/         # Non-CRUD operations
+│   │   └── ref_resolver.rs     # Reference type resolution
+│   ├── mcp/                    # MCP server for Claude
+│   │   ├── server.rs           # JSON-RPC server loop
+│   │   ├── handlers.rs         # Tool implementations
+│   │   ├── tools.rs            # Tool definitions
+│   │   └── protocol.rs         # MCP protocol types
+│   ├── database/               # Database services
+│   ├── services/               # Business logic
+│   ├── intent/                 # Semantic intent schema
+│   └── bin/
+│       ├── dsl_cli.rs          # CLI tool
+│       └── dsl_mcp.rs          # MCP server binary
+├── crates/
+│   └── dsl-lsp/                # LSP server
+├── tests/
+│   ├── db_integration.rs       # Database integration tests
+│   ├── db_cli_test.sh          # CLI integration tests
+│   └── scenarios/              # DSL test scenarios
+│       ├── valid/              # 8 valid scenarios
+│       └── error/              # 5 error scenarios
+└── Cargo.toml
 ```
 
 ## Commands
@@ -61,17 +109,46 @@ cd rust/
 
 # Build
 cargo build --features database
-cargo check --features database
+cargo build --features mcp --bin dsl_mcp
+cargo build -p dsl-lsp
 
 # Test
-cargo test --features database --lib
+cargo test --features database --lib              # 115 unit tests
+cargo test --features database --test db_integration  # 10 DB tests
+./tests/db_cli_test.sh                            # 11 CLI tests
+./tests/scenarios/run_tests.sh                    # 13 DSL scenarios
+
+# Run
+./target/debug/dsl_cli lint file.dsl
+./target/debug/dsl_cli execute file.dsl
+DATABASE_URL="postgresql:///data_designer" ./target/debug/dsl_mcp
 
 # Clippy
 cargo clippy --features database
+cargo clippy --features mcp
+```
 
-# LSP server
-cargo build -p dsl-lsp
-./target/debug/dsl-lsp
+## DSL Syntax
+
+```clojure
+;; Create a CBU and bind to @fund
+(cbu.create :name "Acme Fund" :jurisdiction "LU" :client-type "fund" :as @fund)
+
+;; Create entities with type-specific verbs
+(entity.create-limited-company :cbu-id @fund :name "Acme Holdings Ltd" :as @company)
+(entity.create-proper-person :cbu-id @fund :name "John Smith" :date-of-birth "1980-01-15" :as @john)
+
+;; Assign roles (with ownership percentage for UBOs)
+(cbu.assign-role :cbu-id @fund :entity-id @john :target-entity-id @company 
+                 :role "BENEFICIAL_OWNER" :ownership-percentage 60)
+
+;; Document operations
+(document.catalog :cbu-id @fund :entity-id @john :document-type "PASSPORT")
+(document.request :cbu-id @fund :entity-id @company :document-type "CERTIFICATE_OF_INCORPORATION")
+
+;; Screening
+(screening.pep :entity-id @john)
+(screening.sanctions :entity-id @company)
 ```
 
 ## Verb Domains
@@ -79,50 +156,73 @@ cargo build -p dsl-lsp
 | Domain | Verbs | Purpose |
 |--------|-------|---------|
 | cbu | 9 | Client Business Unit lifecycle |
-| entity | 5 | Legal entity creation |
-| document | 6 | Document management |
-| kyc | 5 | Investigation and risk |
-| screening | 7 | PEP/sanctions/adverse media |
-| decision | 7 | Approval workflow |
-| monitoring | 7 | Ongoing monitoring |
-| attribute | 7 | Attribute management |
+| entity | 15+ | Dynamic verbs from entity_types table |
+| document | 6 | Document catalog, request, extract |
+| screening | 3 | PEP, sanctions, adverse-media |
+| kyc | 2 | Investigation initiate, decide |
+| ubo | 2 | Calculate, validate ownership |
 
-## DSL Example
+## Database Schema (ob-poc)
 
-```clojure
-(cbu.ensure :cbu-name "Acme Fund" :jurisdiction "LU" :as @fund)
+### Core Tables
 
-(entity.create-limited-company
-  :name "Acme Holdings Ltd"
-  :jurisdiction "GB"
-  :as @company)
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| cbus | Client Business Units | cbu_id, name, jurisdiction, client_type |
+| entities | Legal entities | entity_id, entity_type_id, name |
+| entity_types | Entity type definitions | entity_type_id, type_code, name |
+| cbu_entity_roles | Entity-CBU relationships | cbu_id, entity_id, role_id |
+| roles | Role definitions | role_id, name |
+| document_catalog | Documents | doc_id, cbu_id, document_type_code, status |
+| document_types | Document type definitions | type_id, type_code, display_name |
+| screenings | Screening records | screening_id, entity_id, screening_type, status |
 
-(cbu.attach-entity :cbu-id @fund :entity-id @company :role "InvestmentManager")
+### Key Relationships
 
-(document.request :document-type "CERT_OF_INCORP" :entity-id @company)
+```
+cbus ←── cbu_entity_roles ──→ entities
+              │
+              ▼
+            roles
 
-(screening.pep :entity-id @person)
-(screening.sanctions :entity-id @company)
+entities ──→ entity_types
 
-(decision.approve :investigation-id @inv :rationale "All checks passed")
+document_catalog ──→ document_types
 ```
 
-## Database
+## MCP Server Tools
 
-Schema: ob-poc in PostgreSQL
+The MCP server exposes 8 tools for Claude integration:
 
-Key tables:
-- cbus - Client Business Units
-- entities - Legal entities
-- document_catalog - Documents
-- document_types - Document type definitions
-- roles - Entity roles
-- master_jurisdictions - Jurisdiction codes
-- screening_results - Screening outcomes
-- decisions - Decision records
+| Tool | Description |
+|------|-------------|
+| `dsl_validate` | Parse and validate DSL source |
+| `dsl_execute` | Execute DSL against database |
+| `dsl_plan` | Show execution plan |
+| `cbu_get` | Get CBU with entities, roles, documents |
+| `cbu_list` | List/search CBUs |
+| `entity_get` | Get entity details |
+| `verbs_list` | List available DSL verbs |
+| `schema_info` | Get entity types, roles, document types |
 
 ## Environment
 
 ```bash
 export DATABASE_URL="postgresql:///data_designer"
 ```
+
+## Test Coverage
+
+| Suite | Tests | Description |
+|-------|-------|-------------|
+| Unit tests | 115 | Core DSL functionality |
+| DB integration | 10 | Database round-trips |
+| CLI integration | 11 | End-to-end CLI tests |
+| DSL scenarios | 13 | Valid (8) + error (5) scenarios |
+| **Total** | **149** | |
+
+## Reference Docs
+
+- `docs/DATABASE_SCHEMA.md` - Complete database schema reference
+- `docs/DSL_TEST_SCENARIOS.md` - Test scenario documentation
+- `docs/DSL_CONFIG_DRIVEN_ARCHITECTURE.md` - Future: YAML-driven config
