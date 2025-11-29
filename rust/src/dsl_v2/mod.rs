@@ -40,20 +40,28 @@
 //! - `executor`: DslExecutor + generic CRUD functions
 //! - `custom_ops`: Custom operation trait and implementations (Tier 2)
 
-pub mod ast;
-pub mod parser;
-pub mod execution_plan;
-pub mod verbs;
-pub mod mappings;
-pub mod executor;
-pub mod custom_ops;
 pub mod assembly;
+pub mod ast;
+pub mod custom_ops;
+pub mod execution_plan;
+pub mod executor;
+pub mod mappings;
+pub mod parser;
+#[cfg(feature = "database")]
+pub mod ref_resolver;
 pub mod semantic_intent;
+#[cfg(feature = "database")]
+pub mod semantic_validator;
+pub mod validation;
+pub mod verb_schema;
+pub mod verbs;
 
 // Re-export key types for convenience
-pub use ast::{Program, Statement, VerbCall, Argument, Key, Value, Span};
-pub use parser::{parse_program, parse_single_verb};
-pub use execution_plan::{ExecutionPlan, ExecutionStep, Injection, CompileError, compile};
-pub use verbs::{VerbDef, Behavior, find_verb, verbs_for_domain, domains, verb_count, STANDARD_VERBS};
-pub use mappings::{DbType, ColumnMapping, TableMappings, get_table_mappings, resolve_column};
+pub use ast::{Argument, Key, Program, Span, Statement, Value, VerbCall};
+pub use execution_plan::{compile, CompileError, ExecutionPlan, ExecutionStep, Injection};
 pub use executor::{DslExecutor, ExecutionContext, ExecutionResult, ReturnType};
+pub use mappings::{get_table_mappings, resolve_column, ColumnMapping, DbType, TableMappings};
+pub use parser::{parse_program, parse_single_verb};
+pub use verbs::{
+    domains, find_verb, verb_count, verbs_for_domain, Behavior, VerbDef, STANDARD_VERBS,
+};
