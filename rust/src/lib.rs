@@ -55,6 +55,10 @@ pub mod api;
 #[cfg(feature = "server")]
 pub mod templates;
 
+// MCP server module (when mcp feature is enabled)
+#[cfg(feature = "mcp")]
+pub mod mcp;
+
 // Database integration re-exports (when database feature is enabled)
 #[cfg(feature = "database")]
 pub use database::DictionaryDatabaseService;

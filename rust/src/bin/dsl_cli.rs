@@ -252,14 +252,22 @@ fn cmd_validate(
     }
 
     // CSG Lint (without database, uses empty rules but still checks symbols)
-    #[cfg(feature = "database")]
-    let linter = ob_poc::dsl_v2::CsgLinter::new_without_db();
-    #[cfg(not(feature = "database"))]
-    let linter = ob_poc::dsl_v2::CsgLinter::new();
     let source_clone = source.clone();
 
+    #[cfg(feature = "database")]
+    let lint_result = {
+        let rt = tokio::runtime::Runtime::new()
+            .map_err(|e| format!("Failed to create runtime: {}", e))?;
+        rt.block_on(async {
+            let mut linter = ob_poc::dsl_v2::CsgLinter::new_without_db();
+            let _ = linter.initialize().await;
+            linter.lint(ast.clone(), &context, &source_clone).await
+        })
+    };
+
+    #[cfg(not(feature = "database"))]
     let lint_result = futures::executor::block_on(async {
-        let mut linter = linter;
+        let mut linter = ob_poc::dsl_v2::CsgLinter::new();
         let _ = linter.initialize().await;
         linter.lint(ast.clone(), &context, &source_clone).await
     });
@@ -500,13 +508,21 @@ fn cmd_demo(scenario: &str, format: OutputFormat, quiet: bool) -> Result<(), Str
 
     // Validate with CSG
     let context = ValidationContext::default();
-    #[cfg(feature = "database")]
-    let linter = ob_poc::dsl_v2::CsgLinter::new_without_db();
-    #[cfg(not(feature = "database"))]
-    let linter = ob_poc::dsl_v2::CsgLinter::new();
 
+    #[cfg(feature = "database")]
+    let lint_result = {
+        let rt = tokio::runtime::Runtime::new()
+            .map_err(|e| format!("Failed to create runtime: {}", e))?;
+        rt.block_on(async {
+            let mut linter = ob_poc::dsl_v2::CsgLinter::new_without_db();
+            let _ = linter.initialize().await;
+            linter.lint(ast.clone(), &context, dsl).await
+        })
+    };
+
+    #[cfg(not(feature = "database"))]
     let lint_result = futures::executor::block_on(async {
-        let mut linter = linter;
+        let mut linter = ob_poc::dsl_v2::CsgLinter::new();
         let _ = linter.initialize().await;
         linter.lint(ast.clone(), &context, dsl).await
     });

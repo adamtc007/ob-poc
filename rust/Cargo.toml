@@ -90,6 +90,11 @@ name = "dsl_cli"
 path = "src/bin/dsl_cli.rs"
 required-features = ["cli"]
 
+[[bin]]
+name = "dsl_mcp"
+path = "src/bin/dsl_mcp.rs"
+required-features = ["mcp"]
+
 # Features for conditional compilation
 [features]
 default = []
@@ -97,6 +102,7 @@ default = []
 database = ["dep:sqlx", "dep:bigdecimal"]  # Only enable database functionality when needed
 server = ["database", "dep:axum", "dep:tower", "dep:tower-http"]  # REST API server with database
 cli = ["dep:clap", "dep:colored", "dep:atty"]  # CLI tool for DSL testing
+mcp = ["database"]  # MCP server for Claude integration
 
 
 

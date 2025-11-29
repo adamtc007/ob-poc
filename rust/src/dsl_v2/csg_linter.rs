@@ -145,19 +145,24 @@ impl CsgLinter {
 
     /// Create a linter without database connection (for offline validation)
     /// Uses default/empty rules - no CSG database lookups will be performed
+    /// Note: Already initialized - no need to call initialize()
     #[cfg(feature = "database")]
     pub fn new_without_db() -> Self {
         Self {
-            pool: sqlx::PgPool::connect_lazy("postgresql://invalid").unwrap(),
+            pool: sqlx::PgPool::connect_lazy("postgresql://localhost/invalid").unwrap(),
             rules: ApplicabilityRules::default(),
             semantic_store: SemanticContextStore::new_empty(),
-            initialized: false,
+            initialized: true, // Pre-initialized with empty rules
         }
     }
 
     /// Initialize linter by loading rules from database
     #[cfg(feature = "database")]
     pub async fn initialize(&mut self) -> Result<(), String> {
+        // Skip if already initialized (e.g., from new_without_db)
+        if self.initialized {
+            return Ok(());
+        }
         self.rules = ApplicabilityRules::load(&self.pool).await?;
         self.semantic_store.initialize().await?;
         self.initialized = true;
@@ -201,13 +206,20 @@ impl CsgLinter {
             }
         }
 
-        // Pass 2: Reference validation
+        // Pass 2: Required argument validation
+        for statement in &ast.statements {
+            if let Statement::VerbCall(vc) = statement {
+                self.validate_required_args(vc, source, &mut diagnostics);
+            }
+        }
+
+        // Pass 3: Reference validation
         self.validate_references(&inferred, &mut diagnostics);
 
-        // Pass 3: Applicability validation
+        // Pass 4: Applicability validation
         self.validate_applicability(&inferred, context, &mut diagnostics);
 
-        // Pass 4: Unused symbol warnings
+        // Pass 5: Unused symbol warnings
         self.check_unused_symbols(&inferred, &mut diagnostics);
 
         LintResult {
@@ -293,7 +305,44 @@ impl CsgLinter {
     }
 
     // =========================================================================
-    // PASS 2: REFERENCE VALIDATION
+    // PASS 2: REQUIRED ARGUMENT VALIDATION
+    // =========================================================================
+
+    fn validate_required_args(
+        &self,
+        vc: &VerbCall,
+        source: &str,
+        diagnostics: &mut Vec<Diagnostic>,
+    ) {
+        // Look up verb definition in registry
+        let verb_def = match registry().get(&vc.domain, &vc.verb) {
+            Some(def) => def,
+            None => return, // Unknown verb - handled elsewhere
+        };
+
+        // Collect provided argument keys
+        let provided_keys: Vec<String> = vc.arguments.iter().map(|a| a.key.canonical()).collect();
+
+        // Check each required argument is present
+        for required_arg in verb_def.required_args() {
+            let arg_name = required_arg.name.to_string();
+            if !provided_keys.contains(&arg_name) {
+                diagnostics.push(Diagnostic {
+                    severity: Severity::Error,
+                    span: self.span_to_source_span(&vc.span, source),
+                    code: DiagnosticCode::MissingRequiredArg,
+                    message: format!(
+                        "missing required argument '{}' for verb '{}.{}'",
+                        arg_name, vc.domain, vc.verb
+                    ),
+                    suggestions: vec![],
+                });
+            }
+        }
+    }
+
+    // =========================================================================
+    // PASS 3: REFERENCE VALIDATION
     // =========================================================================
 
     fn validate_references(&self, inferred: &InferredContext, diagnostics: &mut Vec<Diagnostic>) {

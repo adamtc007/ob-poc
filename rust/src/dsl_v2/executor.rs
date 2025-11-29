@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use super::ast::{Program, Statement, Value, VerbCall};
 use super::custom_ops::CustomOperationRegistry;
-use super::mappings::{get_pk_column, resolve_column};
+use super::mappings::{get_pk_column, resolve_column, DbType};
 use super::verb_registry::{registry, VerbBehavior};
 use super::verbs::{find_verb, Behavior, VerbDef};
 
@@ -381,14 +381,14 @@ impl DslExecutor {
 
         // Add provided arguments
         for (key, value) in args {
-            if let Some((db_col, _db_type)) = resolve_column(table, key) {
+            if let Some((db_col, db_type)) = resolve_column(table, key) {
                 // Skip if it's the PK (we already added it)
                 if db_col == pk_col {
                     continue;
                 }
                 columns.push(db_col.to_string());
                 placeholders.push(format!("${}", idx));
-                bind_values.push(value.to_bind_value());
+                bind_values.push(value.to_bind_value_typed(db_type));
                 idx += 1;
             }
         }
@@ -426,13 +426,13 @@ impl DslExecutor {
         let mut idx = 1;
 
         for (key, value) in args {
-            if let Some((db_col, _db_type)) = resolve_column(table, key) {
+            if let Some((db_col, db_type)) = resolve_column(table, key) {
                 // Skip pagination args
                 if key == "limit" || key == "offset" {
                     continue;
                 }
                 conditions.push(format!("{} = ${}", db_col, idx));
-                bind_values.push(value.to_bind_value());
+                bind_values.push(value.to_bind_value_typed(db_type));
                 idx += 1;
             }
         }
@@ -503,13 +503,13 @@ impl DslExecutor {
         let mut idx = 1;
 
         for (key, value) in args {
-            if let Some((db_col, _db_type)) = resolve_column(table, key) {
+            if let Some((db_col, db_type)) = resolve_column(table, key) {
                 // Skip the PK - it goes in WHERE clause
                 if db_col == pk_col {
                     continue;
                 }
                 sets.push(format!("{} = ${}", db_col, idx));
-                bind_values.push(value.to_bind_value());
+                bind_values.push(value.to_bind_value_typed(db_type));
                 idx += 1;
             }
         }
@@ -523,8 +523,8 @@ impl DslExecutor {
             sets.push("updated_at = NOW()".to_string());
         }
 
-        // Add PK to values for WHERE clause
-        bind_values.push(pk_value.to_bind_value());
+        // Add PK to values for WHERE clause (UUID type)
+        bind_values.push(pk_value.to_bind_value_typed(DbType::Uuid));
 
         let sql = format!(
             "UPDATE {} SET {} WHERE {} = ${}",
@@ -603,7 +603,7 @@ impl DslExecutor {
 
         // Add provided arguments
         for (key, value) in args {
-            if let Some((db_col, _db_type)) = resolve_column(table, key) {
+            if let Some((db_col, db_type)) = resolve_column(table, key) {
                 if db_col == pk_col {
                     continue;
                 }
@@ -615,7 +615,7 @@ impl DslExecutor {
                     update_sets.push(format!("{} = EXCLUDED.{}", db_col, db_col));
                 }
 
-                bind_values.push(value.to_bind_value());
+                bind_values.push(value.to_bind_value_typed(db_type));
                 idx += 1;
             }
         }
@@ -900,14 +900,14 @@ impl DslExecutor {
                 continue;
             }
 
-            if let Some((db_col, _db_type)) = resolve_column(extension_table, key) {
+            if let Some((db_col, db_type)) = resolve_column(extension_table, key) {
                 // Skip if it's the PK or entity_id (already added)
                 if db_col == ext_pk_col || db_col == "entity_id" {
                     continue;
                 }
                 columns.push(db_col.to_string());
                 placeholders.push(format!("${}", idx));
-                bind_values.push(value.to_bind_value());
+                bind_values.push(value.to_bind_value_typed(db_type));
                 idx += 1;
             }
         }
@@ -1143,11 +1143,88 @@ impl ResolvedValue {
             }
         }
     }
+
+    /// Convert to BindValue with type coercion based on target DB type
+    fn to_bind_value_typed(&self, db_type: DbType) -> BindValue {
+        match (self, db_type) {
+            // Date: parse string to NaiveDate
+            (ResolvedValue::String(s), DbType::Date) => {
+                match chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d") {
+                    Ok(d) => BindValue::Date(d),
+                    Err(_) => BindValue::String(s.clone()), // Fall back to string
+                }
+            }
+            // Timestamp: parse string to DateTime
+            (ResolvedValue::String(s), DbType::Timestamp) => {
+                match chrono::DateTime::parse_from_rfc3339(s) {
+                    Ok(dt) => BindValue::Timestamp(dt.with_timezone(&chrono::Utc)),
+                    Err(_) => BindValue::String(s.clone()), // Fall back to string
+                }
+            }
+            // UUID: parse string to UUID
+            (ResolvedValue::String(s), DbType::Uuid) => match Uuid::parse_str(s) {
+                Ok(u) => BindValue::Uuid(u),
+                Err(_) => BindValue::String(s.clone()),
+            },
+            // Integer: try to parse string
+            (ResolvedValue::String(s), DbType::Integer) => match s.parse::<i64>() {
+                Ok(i) => BindValue::Integer(i),
+                Err(_) => BindValue::String(s.clone()),
+            },
+            // Decimal: try to parse string
+            (ResolvedValue::String(s), DbType::Decimal) => {
+                match s.parse::<rust_decimal::Decimal>() {
+                    Ok(d) => BindValue::Decimal(d),
+                    Err(_) => BindValue::String(s.clone()),
+                }
+            }
+            // Boolean: handle string "true"/"false"
+            (ResolvedValue::String(s), DbType::Boolean) => match s.to_lowercase().as_str() {
+                "true" | "1" | "yes" => BindValue::Boolean(true),
+                "false" | "0" | "no" => BindValue::Boolean(false),
+                _ => BindValue::String(s.clone()),
+            },
+            // JSONB: serialize maps and lists
+            (ResolvedValue::Map(m), DbType::Jsonb) => {
+                let json: serde_json::Map<String, JsonValue> = m
+                    .iter()
+                    .map(|(k, v)| (k.clone(), resolved_to_json(v)))
+                    .collect();
+                BindValue::Json(JsonValue::Object(json))
+            }
+            (ResolvedValue::List(items), DbType::Jsonb) => {
+                let json: Vec<JsonValue> = items.iter().map(resolved_to_json).collect();
+                BindValue::Json(JsonValue::Array(json))
+            }
+            // Default: use standard conversion
+            _ => self.to_bind_value(),
+        }
+    }
+}
+
+/// Helper to convert ResolvedValue to serde_json::Value
+fn resolved_to_json(rv: &ResolvedValue) -> JsonValue {
+    match rv {
+        ResolvedValue::String(s) => JsonValue::String(s.clone()),
+        ResolvedValue::Integer(i) => JsonValue::Number((*i).into()),
+        ResolvedValue::Decimal(d) => JsonValue::String(d.to_string()),
+        ResolvedValue::Boolean(b) => JsonValue::Bool(*b),
+        ResolvedValue::Uuid(u) => JsonValue::String(u.to_string()),
+        ResolvedValue::Null => JsonValue::Null,
+        ResolvedValue::List(items) => {
+            JsonValue::Array(items.iter().map(resolved_to_json).collect())
+        }
+        ResolvedValue::Map(m) => JsonValue::Object(
+            m.iter()
+                .map(|(k, v)| (k.clone(), resolved_to_json(v)))
+                .collect(),
+        ),
+    }
 }
 
 /// Enum for dynamic SQL binding
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Json variant reserved for future JSONB column support
+#[allow(dead_code)] // Some variants reserved for future use
 enum BindValue {
     String(String),
     Integer(i64),
@@ -1155,6 +1232,8 @@ enum BindValue {
     Boolean(bool),
     Uuid(Uuid),
     Json(JsonValue),
+    Date(chrono::NaiveDate),
+    Timestamp(chrono::DateTime<chrono::Utc>),
     Null,
 }
 
@@ -1170,6 +1249,8 @@ fn bind_value_to_query<'q>(
         BindValue::Boolean(b) => query.bind(*b),
         BindValue::Uuid(u) => query.bind(*u),
         BindValue::Json(j) => query.bind(j.clone()),
+        BindValue::Date(d) => query.bind(*d),
+        BindValue::Timestamp(t) => query.bind(*t),
         BindValue::Null => query.bind(Option::<String>::None),
     }
 }
@@ -1186,6 +1267,8 @@ fn bind_value_to_query_regular<'q>(
         BindValue::Boolean(b) => query.bind(*b),
         BindValue::Uuid(u) => query.bind(*u),
         BindValue::Json(j) => query.bind(j.clone()),
+        BindValue::Date(d) => query.bind(*d),
+        BindValue::Timestamp(t) => query.bind(*t),
         BindValue::Null => query.bind(Option::<String>::None),
     }
 }
