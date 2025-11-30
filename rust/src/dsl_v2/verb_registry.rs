@@ -1040,6 +1040,29 @@ mod tests {
     }
 
     #[test]
+    fn test_product_ensure_exists() {
+        let reg = registry();
+        let verb = reg.get("product", "ensure");
+        assert!(verb.is_some(), "product.ensure should exist in registry");
+        let v = verb.unwrap();
+        assert_eq!(v.behavior, VerbBehavior::Crud);
+        assert!(v.crud_behavior.is_some(), "Should have crud_behavior");
+        // The crud_behavior should be Upsert
+        if let Some(ref b) = v.crud_behavior {
+            match b {
+                Behavior::Upsert {
+                    table,
+                    conflict_keys,
+                } => {
+                    assert_eq!(*table, "products");
+                    assert!(conflict_keys.contains(&"product-code"));
+                }
+                _ => panic!("Expected Upsert behavior, got {:?}", b),
+            }
+        }
+    }
+
+    #[test]
     fn test_infer_arg_type() {
         assert_eq!(infer_arg_type("cbu-id"), "ref:cbu");
         assert_eq!(infer_arg_type("entity-id"), "ref:entity");

@@ -504,4 +504,30 @@ mod tests {
         let result = compile(&program);
         assert!(matches!(result, Err(CompileError::UnknownVerb { .. })));
     }
+
+    #[test]
+    fn test_product_ensure_compiles() {
+        // product.ensure should compile successfully
+        let program = Program {
+            statements: vec![Statement::VerbCall(make_verb_call(
+                "product",
+                "ensure",
+                vec![
+                    ("name", Value::String("Test Product".into())),
+                    ("product-code", Value::String("TEST".into())),
+                ],
+            ))],
+        };
+
+        let result = compile(&program);
+        assert!(
+            result.is_ok(),
+            "product.ensure should compile: {:?}",
+            result
+        );
+        let plan = result.unwrap();
+        assert_eq!(plan.len(), 1);
+        assert_eq!(plan.steps[0].verb_call.domain, "product");
+        assert_eq!(plan.steps[0].verb_call.verb, "ensure");
+    }
 }
