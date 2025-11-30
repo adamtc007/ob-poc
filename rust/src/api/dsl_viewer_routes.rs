@@ -97,12 +97,12 @@ pub fn create_dsl_viewer_router(pool: PgPool) -> Router {
 
     Router::new()
         .route("/api/dsl/list", get(list_instances))
-        .route("/api/dsl/show/{business_ref}", get(show_dsl))
+        .route("/api/dsl/show/:business_ref", get(show_dsl))
         .route(
-            "/api/dsl/show/{business_ref}/{version}",
+            "/api/dsl/show/:business_ref/:version",
             get(show_dsl_version),
         )
-        .route("/api/dsl/history/{business_ref}", get(dsl_history))
+        .route("/api/dsl/history/:business_ref", get(dsl_history))
         .with_state(state)
 }
 

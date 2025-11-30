@@ -137,11 +137,11 @@ pub fn create_agent_router(pool: PgPool) -> Router {
     Router::new()
         // Session management
         .route("/api/session", post(create_session))
-        .route("/api/session/{id}", get(get_session))
-        .route("/api/session/{id}", delete(delete_session))
-        .route("/api/session/{id}/chat", post(chat_session))
-        .route("/api/session/{id}/execute", post(execute_session_dsl))
-        .route("/api/session/{id}/clear", post(clear_session_dsl))
+        .route("/api/session/:id", get(get_session))
+        .route("/api/session/:id", delete(delete_session))
+        .route("/api/session/:id/chat", post(chat_session))
+        .route("/api/session/:id/execute", post(execute_session_dsl))
+        .route("/api/session/:id/clear", post(clear_session_dsl))
         // Vocabulary and metadata
         .route("/api/agent/validate", post(validate_dsl))
         .route("/api/agent/domains", get(list_domains))
