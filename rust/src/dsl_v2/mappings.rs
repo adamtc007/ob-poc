@@ -671,6 +671,169 @@ pub static PRODUCT_SERVICES_MAPPINGS: TableMappings = TableMappings {
 };
 
 // ============================================================================
+// Lifecycle Resource / Product Taxonomy Mappings
+// ============================================================================
+
+pub static PROD_RESOURCES_MAPPINGS: TableMappings = TableMappings {
+    table: "prod_resources",
+    pk_column: "resource_id",
+    columns: &[
+        ColumnMapping {
+            dsl_key: "resource-id",
+            db_column: "resource_id",
+            db_type: DbType::Uuid,
+            aliases: &["id"],
+        },
+        ColumnMapping {
+            dsl_key: "name",
+            db_column: "name",
+            db_type: DbType::Text,
+            aliases: &["resource-name"],
+        },
+        ColumnMapping {
+            dsl_key: "resource-code",
+            db_column: "resource_code",
+            db_type: DbType::Text,
+            aliases: &["code"],
+        },
+        ColumnMapping {
+            dsl_key: "description",
+            db_column: "description",
+            db_type: DbType::Text,
+            aliases: &[],
+        },
+        ColumnMapping {
+            dsl_key: "owner",
+            db_column: "owner",
+            db_type: DbType::Text,
+            aliases: &[],
+        },
+        ColumnMapping {
+            dsl_key: "resource-type",
+            db_column: "resource_type",
+            db_type: DbType::Text,
+            aliases: &["type"],
+        },
+        ColumnMapping {
+            dsl_key: "vendor",
+            db_column: "vendor",
+            db_type: DbType::Text,
+            aliases: &[],
+        },
+        ColumnMapping {
+            dsl_key: "api-endpoint",
+            db_column: "api_endpoint",
+            db_type: DbType::Text,
+            aliases: &["endpoint"],
+        },
+        ColumnMapping {
+            dsl_key: "capabilities",
+            db_column: "capabilities",
+            db_type: DbType::Jsonb,
+            aliases: &[],
+        },
+        ColumnMapping {
+            dsl_key: "is-active",
+            db_column: "is_active",
+            db_type: DbType::Boolean,
+            aliases: &["active"],
+        },
+    ],
+};
+
+pub static SERVICE_RESOURCES_MAPPINGS: TableMappings = TableMappings {
+    table: "service_resources",
+    pk_column: "service_resource_id",
+    columns: &[
+        ColumnMapping {
+            dsl_key: "service-resource-id",
+            db_column: "service_resource_id",
+            db_type: DbType::Uuid,
+            aliases: &["id", "link-id"],
+        },
+        ColumnMapping {
+            dsl_key: "service-id",
+            db_column: "service_id",
+            db_type: DbType::Uuid,
+            aliases: &[],
+        },
+        ColumnMapping {
+            dsl_key: "resource-id",
+            db_column: "resource_id",
+            db_type: DbType::Uuid,
+            aliases: &[],
+        },
+        ColumnMapping {
+            dsl_key: "is-primary",
+            db_column: "is_primary",
+            db_type: DbType::Boolean,
+            aliases: &["primary"],
+        },
+    ],
+};
+
+pub static RESOURCE_ATTRIBUTE_REQUIREMENTS_MAPPINGS: TableMappings = TableMappings {
+    table: "resource_attribute_requirements",
+    pk_column: "requirement_id",
+    columns: &[
+        ColumnMapping {
+            dsl_key: "requirement-id",
+            db_column: "requirement_id",
+            db_type: DbType::Uuid,
+            aliases: &["id"],
+        },
+        ColumnMapping {
+            dsl_key: "resource-id",
+            db_column: "resource_id",
+            db_type: DbType::Uuid,
+            aliases: &[],
+        },
+        ColumnMapping {
+            dsl_key: "attribute-id",
+            db_column: "attribute_id",
+            db_type: DbType::Uuid,
+            aliases: &[],
+        },
+        ColumnMapping {
+            dsl_key: "resource-field-name",
+            db_column: "resource_field_name",
+            db_type: DbType::Text,
+            aliases: &["field-name", "field"],
+        },
+        ColumnMapping {
+            dsl_key: "is-mandatory",
+            db_column: "is_mandatory",
+            db_type: DbType::Boolean,
+            aliases: &["mandatory", "required"],
+        },
+        ColumnMapping {
+            dsl_key: "transformation-rule",
+            db_column: "transformation_rule",
+            db_type: DbType::Jsonb,
+            aliases: &["transform"],
+        },
+        ColumnMapping {
+            dsl_key: "validation-override",
+            db_column: "validation_override",
+            db_type: DbType::Jsonb,
+            aliases: &["validation"],
+        },
+        ColumnMapping {
+            dsl_key: "default-value",
+            db_column: "default_value",
+            db_type: DbType::Text,
+            aliases: &["default"],
+        },
+        ColumnMapping {
+            dsl_key: "display-order",
+            db_column: "display_order",
+            db_type: DbType::Integer,
+            aliases: &["order"],
+        },
+    ],
+};
+
+// ============================================================================
 // Investigation/Screening/Risk/Decision/Monitoring Mappings
 // ============================================================================
 
@@ -1170,6 +1333,9 @@ static ALL_TABLE_MAPPINGS: &[&TableMappings] = &[
     &PRODUCTS_MAPPINGS,
     &SERVICES_MAPPINGS,
     &PRODUCT_SERVICES_MAPPINGS,
+    &PROD_RESOURCES_MAPPINGS,
+    &SERVICE_RESOURCES_MAPPINGS,
+    &RESOURCE_ATTRIBUTE_REQUIREMENTS_MAPPINGS,
     &INVESTIGATIONS_MAPPINGS,
     &SCREENING_RESULTS_MAPPINGS,
     &RISK_RATINGS_MAPPINGS,

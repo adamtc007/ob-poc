@@ -851,6 +851,95 @@ pub static STANDARD_VERBS: &[VerbDef] = &[
         returns: ReturnType::RecordSet,
         description: "List lifecycle resource types for a service",
     },
+    // -------------------------------------------------------------------------
+    // Lifecycle Resource ↔ Attribute Dictionary linkage
+    // (resource_attribute_requirements junction table)
+    // -------------------------------------------------------------------------
+    VerbDef {
+        domain: "lifecycle-resource",
+        verb: "add-attribute",
+        behavior: Behavior::Insert {
+            table: "resource_attribute_requirements",
+        },
+        required_args: &["resource-id", "attribute-id"],
+        optional_args: &[
+            "resource-field-name",
+            "is-mandatory",
+            "transformation-rule",
+            "validation-override",
+            "default-value",
+            "display-order",
+        ],
+        returns: ReturnType::Uuid {
+            name: "requirement_id",
+            capture: false,
+        },
+        description: "Add an attribute requirement to a lifecycle resource type",
+    },
+    VerbDef {
+        domain: "lifecycle-resource",
+        verb: "remove-attribute",
+        behavior: Behavior::Delete {
+            table: "resource_attribute_requirements",
+        },
+        required_args: &["requirement-id"],
+        optional_args: &[],
+        returns: ReturnType::Affected,
+        description: "Remove an attribute requirement from a lifecycle resource type",
+    },
+    VerbDef {
+        domain: "lifecycle-resource",
+        verb: "update-attribute",
+        behavior: Behavior::Update {
+            table: "resource_attribute_requirements",
+        },
+        required_args: &["requirement-id"],
+        optional_args: &[
+            "resource-field-name",
+            "is-mandatory",
+            "transformation-rule",
+            "validation-override",
+            "default-value",
+            "display-order",
+        ],
+        returns: ReturnType::Affected,
+        description: "Update an attribute requirement configuration",
+    },
+    VerbDef {
+        domain: "lifecycle-resource",
+        verb: "list-attributes",
+        behavior: Behavior::ListByFk {
+            table: "resource_attribute_requirements",
+            fk_col: "resource_id",
+        },
+        required_args: &["resource-id"],
+        optional_args: &["is-mandatory"],
+        returns: ReturnType::RecordSet,
+        description: "List attribute requirements for a lifecycle resource type",
+    },
+    VerbDef {
+        domain: "lifecycle-resource",
+        verb: "ensure-attribute",
+        behavior: Behavior::Upsert {
+            table: "resource_attribute_requirements",
+            conflict_keys: &["resource-id", "attribute-id"],
+        },
+        required_args: &["resource-id", "attribute-id"],
+        optional_args: &[
+            "resource-field-name",
+            "is-mandatory",
+            "transformation-rule",
+            "validation-override",
+            "default-value",
+            "display-order",
+        ],
+        returns: ReturnType::Uuid {
+            name: "requirement_id",
+            capture: false,
+        },
+        description:
+            "Ensure an attribute requirement exists for a lifecycle resource type (upsert)",
+    },
     // =========================================================================
     // INVESTIGATION DOMAIN
     // =========================================================================
