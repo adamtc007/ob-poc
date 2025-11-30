@@ -21,6 +21,7 @@ pub mod dictionary_service;
 pub mod document_service;
 pub mod dsl_repository;
 pub mod entity_service;
+pub mod generation_log_repository;
 pub mod investigation_service;
 pub mod lifecycle_resource_service;
 pub mod monitoring_service;
@@ -48,6 +49,10 @@ pub use entity_service::{
     CbuEntityRoleRow, EntityRow, EntityService, LimitedCompanyRow, NewEntityFields,
     NewLimitedCompanyFields, NewPartnershipFields, NewProperPersonFields, NewTrustFields,
     PartnershipRow, TrustRow,
+};
+pub use generation_log_repository::{
+    CompileResult, CorrectionPair, GenerationAttempt, GenerationLogRepository, GenerationLogRow,
+    GenerationStatsSummary, LintResult, ParseResult, PromptStats, TrainingPair,
 };
 pub use lifecycle_resource_service::{
     LifecycleResourceRow, LifecycleResourceService, NewLifecycleResourceFields,

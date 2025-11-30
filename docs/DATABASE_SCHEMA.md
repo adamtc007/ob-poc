@@ -3,7 +3,7 @@
 **Generated:** 2025-11-29
 **Database:** data_designer
 **Schema:** ob-poc
-**Total Tables:** 99
+**Total Tables:** 100
 **Total Views:** 12
 
 ## Extensions
@@ -30,6 +30,7 @@
 | `kyc_investigations` | `investigation_id` | uuid | KYC investigations |
 | `screenings` | `screening_id` | uuid | Screening records |
 | `csg_validation_rules` | `rule_id` | uuid | CSG validation rules |
+| `dsl_generation_log` | `log_id` | uuid | Agent generation audit trail |
 
 ---
 
@@ -790,7 +791,7 @@ resolved_at               timestamptz
 resolution_notes          text
 ```
 
-### DSL Management - 8 tables
+### DSL Management - 9 tables
 
 #### dsl_instances
 ```
@@ -893,6 +894,45 @@ started_at                timestamptz DEFAULT NOW()
 completed_at              timestamptz
 duration_ms               int4
 ```
+
+#### dsl_generation_log
+Captures agent DSL generation iterations for training data extraction and audit trail.
+```
+log_id                    uuid PK NOT NULL DEFAULT gen_random_uuid()
+instance_id               uuid FK -> dsl_instances(instance_id)
+user_intent               text NOT NULL           -- Natural language input (training pair input)
+final_valid_dsl           text                    -- Successfully validated DSL (training pair output)
+iterations                jsonb NOT NULL DEFAULT '[]'  -- Array of generation attempts
+domain_name               varchar(50) NOT NULL    -- Primary domain: cbu, entity, document
+session_id                uuid                    -- Link to agent session
+cbu_id                    uuid                    -- Target CBU if applicable
+model_used                varchar(100)            -- LLM model identifier
+total_attempts            int4 NOT NULL DEFAULT 1
+success                   bool NOT NULL DEFAULT false
+total_latency_ms          int4                    -- Sum of all attempt latencies
+total_input_tokens        int4
+total_output_tokens       int4
+created_at                timestamptz DEFAULT NOW()
+completed_at              timestamptz
+```
+**Iterations JSONB Structure:**
+```json
+[{
+  "attempt": 1,
+  "timestamp": "2025-01-15T10:30:00Z",
+  "prompt_template": "cbu_create_v2",
+  "prompt_text": "Given the vocabulary...",
+  "raw_response": "I'll create a CBU...",
+  "extracted_dsl": "(cbu.create :name ...)",
+  "parse_result": {"success": true, "error": null},
+  "lint_result": {"valid": false, "errors": ["Unknown verb"], "warnings": []},
+  "compile_result": {"success": false, "error": "Unknown verb", "step_count": 0},
+  "latency_ms": 1500,
+  "input_tokens": 500,
+  "output_tokens": 200
+}]
+```
+**Indexes:** success (partial), domain_name, created_at DESC, instance_id (partial), session_id (partial), iterations (GIN), user_intent (GIN trigram)
 
 #### parsed_asts
 ```
