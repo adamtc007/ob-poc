@@ -55,7 +55,7 @@ async fn search_entities(
         .as_deref()
         .map(|t| {
             t.split(',')
-                .filter_map(|s| EntityType::from_str(s.trim()))
+                .filter_map(|s| EntityType::parse(s.trim()))
                 .collect()
         })
         .unwrap_or_default();

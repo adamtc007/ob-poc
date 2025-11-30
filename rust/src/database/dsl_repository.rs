@@ -47,6 +47,31 @@ pub struct DslInstanceVersionRow {
     pub created_at: Option<DateTime<Utc>>,
 }
 
+/// Data for DSL visualization - used by DSL Viewer UI
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DslDisplayData {
+    pub instance_id: Uuid,
+    pub business_reference: String,
+    pub domain_name: String,
+    pub version_number: i32,
+    pub dsl_content: String,
+    pub ast_json: Option<serde_json::Value>,
+    pub compilation_status: String,
+    pub operation_type: String,
+    pub created_at: Option<DateTime<Utc>>,
+}
+
+/// Summary for listing DSL instances in the viewer UI
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DslInstanceSummary {
+    pub instance_id: Uuid,
+    pub business_reference: String,
+    pub domain_name: String,
+    pub current_version: i32,
+    pub status: String,
+    pub updated_at: Option<DateTime<Utc>>,
+}
+
 /// DSL Repository for database operations
 pub struct DslRepository {
     pool: PgPool,
@@ -339,5 +364,131 @@ impl DslRepository {
         .bind(limit.unwrap_or(100))
         .fetch_all(&self.pool)
         .await
+    }
+
+    /// Get DSL for display/visualization
+    /// If version is None, returns latest version
+    pub async fn get_dsl_for_display(
+        &self,
+        business_reference: &str,
+        version: Option<i32>,
+    ) -> Result<Option<DslDisplayData>, sqlx::Error> {
+        #[derive(FromRow)]
+        struct DisplayRow {
+            instance_id: Uuid,
+            business_reference: String,
+            domain_name: String,
+            version_number: i32,
+            dsl_content: String,
+            ast_json: Option<serde_json::Value>,
+            compilation_status: String,
+            operation_type: String,
+            created_at: Option<DateTime<Utc>>,
+        }
+
+        let result = if let Some(ver) = version {
+            // Get specific version
+            sqlx::query_as::<_, DisplayRow>(
+                r#"
+                SELECT i.instance_id, i.business_reference, i.domain_name,
+                       v.version_number, v.dsl_content, v.ast_json,
+                       v.compilation_status, v.operation_type, v.created_at
+                FROM "ob-poc".dsl_instances i
+                JOIN "ob-poc".dsl_instance_versions v ON i.instance_id = v.instance_id
+                WHERE i.business_reference = $1 AND v.version_number = $2
+                "#,
+            )
+            .bind(business_reference)
+            .bind(ver)
+            .fetch_optional(&self.pool)
+            .await?
+        } else {
+            // Get latest version
+            sqlx::query_as::<_, DisplayRow>(
+                r#"
+                SELECT i.instance_id, i.business_reference, i.domain_name,
+                       v.version_number, v.dsl_content, v.ast_json,
+                       v.compilation_status, v.operation_type, v.created_at
+                FROM "ob-poc".dsl_instances i
+                JOIN "ob-poc".dsl_instance_versions v ON i.instance_id = v.instance_id
+                WHERE i.business_reference = $1
+                ORDER BY v.version_number DESC
+                LIMIT 1
+                "#,
+            )
+            .bind(business_reference)
+            .fetch_optional(&self.pool)
+            .await?
+        };
+
+        Ok(result.map(|r| DslDisplayData {
+            instance_id: r.instance_id,
+            business_reference: r.business_reference,
+            domain_name: r.domain_name,
+            version_number: r.version_number,
+            dsl_content: r.dsl_content,
+            ast_json: r.ast_json,
+            compilation_status: r.compilation_status,
+            operation_type: r.operation_type,
+            created_at: r.created_at,
+        }))
+    }
+
+    /// List all DSL instances for the viewer UI
+    pub async fn list_instances_for_display(
+        &self,
+        limit: Option<i32>,
+        domain_filter: Option<&str>,
+    ) -> Result<Vec<DslInstanceSummary>, sqlx::Error> {
+        #[derive(FromRow)]
+        struct SummaryRow {
+            instance_id: Uuid,
+            business_reference: String,
+            domain_name: String,
+            current_version: i32,
+            status: String,
+            updated_at: Option<DateTime<Utc>>,
+        }
+
+        let rows = if let Some(domain) = domain_filter {
+            sqlx::query_as::<_, SummaryRow>(
+                r#"
+                SELECT instance_id, business_reference, domain_name, current_version, status, updated_at
+                FROM "ob-poc".dsl_instances
+                WHERE domain_name = $1 AND status = 'ACTIVE'
+                ORDER BY updated_at DESC
+                LIMIT $2
+                "#,
+            )
+            .bind(domain)
+            .bind(limit.unwrap_or(100))
+            .fetch_all(&self.pool)
+            .await?
+        } else {
+            sqlx::query_as::<_, SummaryRow>(
+                r#"
+                SELECT instance_id, business_reference, domain_name, current_version, status, updated_at
+                FROM "ob-poc".dsl_instances
+                WHERE status = 'ACTIVE'
+                ORDER BY updated_at DESC
+                LIMIT $1
+                "#,
+            )
+            .bind(limit.unwrap_or(100))
+            .fetch_all(&self.pool)
+            .await?
+        };
+
+        Ok(rows
+            .into_iter()
+            .map(|r| DslInstanceSummary {
+                instance_id: r.instance_id,
+                business_reference: r.business_reference,
+                domain_name: r.domain_name,
+                current_version: r.current_version,
+                status: r.status,
+                updated_at: r.updated_at,
+            })
+            .collect())
     }
 }

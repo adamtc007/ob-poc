@@ -33,7 +33,8 @@ use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
 
 use ob_poc::api::{
-    create_agent_router, create_attribute_router, create_entity_router, create_template_router,
+    create_agent_router, create_attribute_router, create_dsl_viewer_router, create_entity_router,
+    create_template_router,
 };
 
 #[tokio::main]
@@ -72,7 +73,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // IMPORTANT: Use fallback_service for static files so API routes take precedence
     let app = create_agent_router(pool.clone())
         .merge(create_attribute_router(pool.clone()))
-        .merge(create_entity_router(pool))
+        .merge(create_entity_router(pool.clone()))
+        .merge(create_dsl_viewer_router(pool))
         .merge(create_template_router())
         .layer(
             CorsLayer::new()
@@ -123,6 +125,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!(
         "    POST   http://localhost:3000/api/templates/:id/render     - Render template to DSL"
     );
+    println!("\n  DSL Viewer:");
+    println!("    GET    http://localhost:3000/api/dsl/list                 - List DSL instances");
+    println!(
+        "    GET    http://localhost:3000/api/dsl/show/:ref            - Get latest DSL version"
+    );
+    println!(
+        "    GET    http://localhost:3000/api/dsl/show/:ref/:ver       - Get specific version"
+    );
+    println!("    GET    http://localhost:3000/api/dsl/history/:ref         - Get version history");
     println!("\nPress Ctrl+C to stop\n");
 
     // Start server (Axum 0.7+ style)

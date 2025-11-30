@@ -15,6 +15,7 @@
 
 use crate::dsl_v2::applicability_rules::ApplicabilityRules;
 use crate::dsl_v2::ast::{Program, Span, Statement, Value, VerbCall};
+#[cfg(feature = "database")]
 use crate::dsl_v2::semantic_context::SemanticContextStore;
 use crate::dsl_v2::validation::{
     Diagnostic, DiagnosticCode, Severity, SourceSpan, Suggestion, ValidationContext,

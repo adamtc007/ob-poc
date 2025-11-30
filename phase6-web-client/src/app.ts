@@ -1,28 +1,27 @@
-// Phase 6: DSL/AST Visualization - Main Application Class
-// TypeScript application class that manages the entire DSL/AST visualizer
+// DSL Viewer - Main Application Class
+// TypeScript application class for visualizing persisted agent-generated DSL
 
 import {
   AppState,
   AppEvent,
-  DslManagerApi,
+  DslViewerApi,
   UiConfig,
-  DslDomain,
-  DslRequest,
-  DEFAULT_APP_STATE
-} from './types';
+  ExecutionStepInfo,
+  DEFAULT_APP_STATE,
+} from "./types";
 
 /**
- * Main application class for the DSL/AST Visualizer
+ * Main application class for the DSL Viewer
  * Manages state, UI components, and API interactions
  */
 export class DslVisualizerApp {
   private state: AppState;
-  private apiClient: DslManagerApi;
+  private apiClient: DslViewerApi;
   private uiConfig: UiConfig;
   private mountElement: HTMLElement | null = null;
   private eventListeners: Map<string, EventListener> = new Map();
 
-  constructor(apiClient: DslManagerApi, uiConfig: UiConfig) {
+  constructor(apiClient: DslViewerApi, uiConfig: UiConfig) {
     this.apiClient = apiClient;
     this.uiConfig = uiConfig;
     this.state = { ...DEFAULT_APP_STATE };
@@ -37,83 +36,101 @@ export class DslVisualizerApp {
     this.render();
 
     // Load initial data
-    await this.loadDomains();
+    await this.loadInstances();
   }
 
   /**
    * Handle application events and update state
    */
   private handleEvent(event: AppEvent): void {
-    console.log('🔄 Handling event:', event.type, event.payload);
+    console.log("Handling event:", event.type);
 
     switch (event.type) {
-      case 'LOAD_DOMAINS':
+      case "LOAD_INSTANCES":
         this.state = {
           ...this.state,
-          domains: event.payload,
+          instances: event.payload,
           loading: false,
-          error: null
+          error: null,
         };
         break;
 
-      case 'SELECT_DOMAIN':
+      case "SELECT_INSTANCE":
         this.state = {
           ...this.state,
-          selectedDomain: event.payload,
+          selectedInstance: event.payload,
           selectedVersion: null,
-          dslSource: '',
-          astText: '',
-          error: null
+          displayData: null,
+          versionHistory: [],
+          error: null,
         };
-        this.updateVersionSelector();
+        this.loadHistory(event.payload);
         break;
 
-      case 'SELECT_VERSION':
+      case "SELECT_VERSION":
         this.state = {
           ...this.state,
           selectedVersion: event.payload,
-          error: null
+          error: null,
         };
-        if (this.state.selectedDomain) {
-          this.loadDslContent();
+        if (this.state.selectedInstance) {
+          this.loadDsl(this.state.selectedInstance, event.payload);
         }
         break;
 
-      case 'LOAD_DSL_START':
+      case "LOAD_DSL_START":
         this.state = {
           ...this.state,
           loading: true,
-          error: null
+          error: null,
         };
         break;
 
-      case 'LOAD_DSL_SUCCESS':
+      case "LOAD_DSL_SUCCESS":
         this.state = {
           ...this.state,
-          dslSource: event.payload.dslSource,
-          astText: event.payload.astText,
+          displayData: event.payload,
           loading: false,
           error: null,
-          lastUpdated: new Date()
         };
         break;
 
-      case 'LOAD_DSL_ERROR':
+      case "LOAD_HISTORY_SUCCESS":
+        this.state = {
+          ...this.state,
+          versionHistory: event.payload,
+          loading: false,
+          error: null,
+        };
+        // Auto-select latest version
+        if (event.payload.length > 0) {
+          const latestVersion = Math.max(
+            ...event.payload.map((v) => v.version),
+          );
+          this.handleEvent({ type: "SELECT_VERSION", payload: latestVersion });
+        }
+        break;
+
+      case "LOAD_DSL_ERROR":
         this.state = {
           ...this.state,
           loading: false,
-          error: event.payload
+          error: event.payload,
         };
         break;
 
-      case 'CLEAR_ERROR':
+      case "CLEAR_ERROR":
         this.state = {
           ...this.state,
-          error: null
+          error: null,
         };
         break;
 
-      case 'UPDATE_UI_CONFIG':
+      case "REFRESH":
+        this.loadInstances();
+        break;
+
+      case "UPDATE_UI_CONFIG":
         this.uiConfig = { ...this.uiConfig, ...event.payload };
         this.saveUiConfig();
         break;
@@ -123,79 +140,55 @@ export class DslVisualizerApp {
   }
 
   /**
-   * Load available domains from the API
+   * Load available DSL instances from the API
    */
-  private async loadDomains(): Promise<void> {
+  private async loadInstances(): Promise<void> {
     try {
-      this.handleEvent({ type: 'LOAD_DSL_START' });
-      const domains = await this.apiClient.getDomains();
-      this.handleEvent({ type: 'LOAD_DOMAINS', payload: domains });
+      this.handleEvent({ type: "LOAD_DSL_START" });
+      const instances = await this.apiClient.listInstances();
+      this.handleEvent({ type: "LOAD_INSTANCES", payload: instances });
 
-      // Auto-select first domain and version if available
-      if (domains.length > 0 && domains[0].versions.length > 0) {
-        this.handleEvent({ type: 'SELECT_DOMAIN', payload: domains[0].name });
-        this.handleEvent({ type: 'SELECT_VERSION', payload: domains[0].versions[0].version });
+      // Auto-select first instance if available
+      if (instances.length > 0) {
+        this.handleEvent({
+          type: "SELECT_INSTANCE",
+          payload: instances[0].businessReference,
+        });
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to load domains';
-      this.handleEvent({ type: 'LOAD_DSL_ERROR', payload: message });
+      const message =
+        error instanceof Error ? error.message : "Failed to load instances";
+      this.handleEvent({ type: "LOAD_DSL_ERROR", payload: message });
     }
   }
 
   /**
-   * Load DSL content for selected domain and version
+   * Load version history for selected instance
    */
-  private async loadDslContent(): Promise<void> {
-    if (!this.state.selectedDomain || !this.state.selectedVersion) {
-      return;
-    }
-
+  private async loadHistory(businessRef: string): Promise<void> {
     try {
-      this.handleEvent({ type: 'LOAD_DSL_START' });
-
-      const request: DslRequest = {
-        domain: this.state.selectedDomain,
-        version: this.state.selectedVersion
-      };
-
-      const response = await this.apiClient.getDslAndAst(request);
-      this.handleEvent({ type: 'LOAD_DSL_SUCCESS', payload: response });
+      this.handleEvent({ type: "LOAD_DSL_START" });
+      const history = await this.apiClient.getHistory(businessRef);
+      this.handleEvent({ type: "LOAD_HISTORY_SUCCESS", payload: history });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to load DSL content';
-      this.handleEvent({ type: 'LOAD_DSL_ERROR', payload: message });
+      const message =
+        error instanceof Error ? error.message : "Failed to load history";
+      this.handleEvent({ type: "LOAD_DSL_ERROR", payload: message });
     }
   }
 
   /**
-   * Update version selector based on selected domain
+   * Load DSL content for selected instance and version
    */
-  private updateVersionSelector(): void {
-    const versionSelect = document.getElementById('version-select') as HTMLSelectElement;
-    if (!versionSelect || !this.state.selectedDomain) return;
-
-    const domain = this.state.domains.find(d => d.name === this.state.selectedDomain);
-    if (!domain) return;
-
-    versionSelect.innerHTML = '';
-
-    if (domain.versions.length === 0) {
-      const option = document.createElement('option');
-      option.value = '';
-      option.textContent = 'No versions available';
-      versionSelect.appendChild(option);
-    } else {
-      domain.versions.forEach(version => {
-        const option = document.createElement('option');
-        option.value = version.version;
-        option.textContent = `${version.version} (${version.exampleCount} examples)`;
-        versionSelect.appendChild(option);
-      });
-
-      // Auto-select first version
-      if (domain.versions.length > 0) {
-        versionSelect.value = domain.versions[0].version;
-        this.handleEvent({ type: 'SELECT_VERSION', payload: domain.versions[0].version });
-      }
+  private async loadDsl(businessRef: string, version: number): Promise<void> {
+    try {
+      this.handleEvent({ type: "LOAD_DSL_START" });
+      const displayData = await this.apiClient.showDsl(businessRef, version);
+      this.handleEvent({ type: "LOAD_DSL_SUCCESS", payload: displayData });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to load DSL";
+      this.handleEvent({ type: "LOAD_DSL_ERROR", payload: message });
     }
   }
 
@@ -203,42 +196,42 @@ export class DslVisualizerApp {
    * Set up event listeners for UI interactions
    */
   private setupEventListeners(): void {
-    // Domain selector change
-    const domainChangeHandler = (event: Event) => {
+    // Instance selector change
+    const instanceChangeHandler = (event: Event) => {
       const select = event.target as HTMLSelectElement;
-      this.handleEvent({ type: 'SELECT_DOMAIN', payload: select.value });
+      this.handleEvent({ type: "SELECT_INSTANCE", payload: select.value });
     };
-    this.eventListeners.set('domain-change', domainChangeHandler);
+    this.eventListeners.set("instance-change", instanceChangeHandler);
 
     // Version selector change
     const versionChangeHandler = (event: Event) => {
       const select = event.target as HTMLSelectElement;
-      this.handleEvent({ type: 'SELECT_VERSION', payload: select.value });
+      this.handleEvent({
+        type: "SELECT_VERSION",
+        payload: parseInt(select.value),
+      });
     };
-    this.eventListeners.set('version-change', versionChangeHandler);
+    this.eventListeners.set("version-change", versionChangeHandler);
 
     // Refresh button click
     const refreshHandler = () => {
-      if (this.state.selectedDomain && this.state.selectedVersion) {
-        this.loadDslContent();
-      }
+      this.handleEvent({ type: "REFRESH" });
     };
-    this.eventListeners.set('refresh', refreshHandler);
+    this.eventListeners.set("refresh", refreshHandler);
 
     // Error dismiss
     const errorDismissHandler = () => {
-      this.handleEvent({ type: 'CLEAR_ERROR' });
+      this.handleEvent({ type: "CLEAR_ERROR" });
     };
-    this.eventListeners.set('error-dismiss', errorDismissHandler);
+    this.eventListeners.set("error-dismiss", errorDismissHandler);
 
     // Font size change
     const fontSizeHandler = (event: Event) => {
       const input = event.target as HTMLInputElement;
       const fontSize = parseInt(input.value);
-      this.handleEvent({ type: 'UPDATE_UI_CONFIG', payload: { fontSize } });
-      this.updateEditorFontSize(fontSize);
+      this.handleEvent({ type: "UPDATE_UI_CONFIG", payload: { fontSize } });
     };
-    this.eventListeners.set('font-size', fontSizeHandler);
+    this.eventListeners.set("font-size", fontSizeHandler);
   }
 
   /**
@@ -249,8 +242,6 @@ export class DslVisualizerApp {
 
     this.mountElement.innerHTML = this.getTemplate();
     this.attachEventListeners();
-    this.updateEditorContent();
-    this.updateStatus();
   }
 
   /**
@@ -260,69 +251,54 @@ export class DslVisualizerApp {
     return `
       <div class="app-container">
         <header class="app-header">
-          <h1>🚀 Phase 6: DSL/AST Visualization</h1>
+          <h1>DSL Viewer</h1>
           <div class="controls">
             <div class="control-group">
-              <label for="domain-select">Domain:</label>
-              <select id="domain-select">
-                ${this.renderDomainOptions()}
+              <label for="instance-select">Onboarding:</label>
+              <select id="instance-select">
+                ${this.renderInstanceOptions()}
               </select>
             </div>
             <div class="control-group">
               <label for="version-select">Version:</label>
               <select id="version-select">
-                <option value="">Select domain first</option>
+                ${this.renderVersionOptions()}
               </select>
             </div>
-            <button id="refresh-btn" ${this.state.loading ? 'disabled' : ''}>
-              🔄 Refresh
+            <button id="refresh-btn" ${this.state.loading ? "disabled" : ""}>
+              Refresh
             </button>
-            <div class="control-group">
-              <label for="font-size">Font Size:</label>
-              <input id="font-size" type="range" min="10" max="24" value="${this.uiConfig.fontSize}">
-              <span>${this.uiConfig.fontSize}px</span>
-            </div>
           </div>
         </header>
 
-        ${this.state.error ? this.renderErrorBanner() : ''}
+        ${this.state.error ? this.renderErrorBanner() : ""}
 
         <main class="main-content">
           <div class="panel dsl-panel">
-            <div class="panel-header">📄 DSL Source Code</div>
+            <div class="panel-header">DSL Source</div>
             <div class="panel-content">
-              <textarea
-                id="dsl-editor"
-                class="code-editor"
-                readonly
-                placeholder="Select a domain and version to view DSL source code..."
-                style="font-size: ${this.uiConfig.fontSize}px;"
-              ></textarea>
+              <pre class="code-display" style="font-size: ${this.uiConfig.fontSize}px;">${this.escapeHtml(this.state.displayData?.dslSource || "Select an onboarding instance to view DSL...")}</pre>
             </div>
           </div>
 
           <div class="panel-divider"></div>
 
-          <div class="panel ast-panel">
-            <div class="panel-header">🌳 Generated AST</div>
+          <div class="panel plan-panel">
+            <div class="panel-header">Execution Plan</div>
             <div class="panel-content">
-              <textarea
-                id="ast-editor"
-                class="code-editor"
-                readonly
-                placeholder="Generated AST will appear here when DSL is loaded..."
-                style="font-size: ${this.uiConfig.fontSize}px;"
-              ></textarea>
+              ${this.renderExecutionPlan()}
             </div>
           </div>
         </main>
 
         <footer class="status-bar">
           <div class="status-left">
-            <span id="status-text">Ready</span>
+            ${this.renderStatusText()}
           </div>
           <div class="status-right">
-            Phase 6 Web Client v1.0 - TypeScript Edition
+            <label>Font: </label>
+            <input id="font-size" type="range" min="10" max="20" value="${this.uiConfig.fontSize}">
+            <span>${this.uiConfig.fontSize}px</span>
           </div>
         </footer>
       </div>
@@ -337,7 +313,8 @@ export class DslVisualizerApp {
         body, html {
           height: 100%;
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          background-color: #f5f5f5;
+          background-color: #1a1a2e;
+          color: #eee;
         }
 
         .app-container {
@@ -347,157 +324,215 @@ export class DslVisualizerApp {
         }
 
         .app-header {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
+          background: #16213e;
           padding: 1rem 2rem;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+          border-bottom: 1px solid #0f3460;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
         }
 
         .app-header h1 {
           font-size: 1.5rem;
-          margin-bottom: 1rem;
+          color: #e94560;
         }
 
         .controls {
           display: flex;
-          gap: 1rem;
+          gap: 1.5rem;
           align-items: center;
-          flex-wrap: wrap;
         }
 
         .control-group {
           display: flex;
-          flex-direction: column;
-          gap: 0.25rem;
+          align-items: center;
+          gap: 0.5rem;
         }
 
         .control-group label {
           font-size: 0.875rem;
-          font-weight: 500;
+          color: #aaa;
         }
 
-        select, button, input {
-          padding: 0.5rem;
-          border: none;
+        select, button {
+          padding: 0.5rem 1rem;
+          border: 1px solid #0f3460;
           border-radius: 4px;
-          background: rgba(255,255,255,0.2);
-          color: white;
+          background: #1a1a2e;
+          color: #eee;
           font-size: 0.875rem;
         }
 
-        select option {
-          color: black;
+        select {
+          min-width: 200px;
         }
 
         button {
-          background: rgba(255,255,255,0.3);
+          background: #0f3460;
           cursor: pointer;
           transition: background-color 0.2s;
         }
 
         button:hover:not(:disabled) {
-          background: rgba(255,255,255,0.4);
+          background: #e94560;
         }
 
         button:disabled {
-          opacity: 0.6;
+          opacity: 0.5;
           cursor: not-allowed;
         }
 
-        input[type="range"] {
-          width: 80px;
-        }
-
         .error-banner {
-          background: #dc3545;
+          background: #e94560;
           color: white;
-          padding: 1rem 2rem;
+          padding: 0.75rem 2rem;
           display: flex;
           align-items: center;
           justify-content: space-between;
         }
 
         .error-banner button {
-          background: rgba(255,255,255,0.2);
-          border: none;
+          background: transparent;
+          border: 1px solid white;
           color: white;
           padding: 0.25rem 0.5rem;
-          border-radius: 4px;
-          cursor: pointer;
         }
 
         .main-content {
           flex: 1;
           display: flex;
-          gap: 0;
           min-height: 0;
         }
 
         .panel {
           flex: 1;
-          background: white;
           display: flex;
           flex-direction: column;
           overflow: hidden;
         }
 
-        .dsl-panel {
-          border-right: 1px solid #e9ecef;
-        }
-
         .panel-header {
-          background: #f8f9fa;
-          padding: 1rem;
-          border-bottom: 1px solid #e9ecef;
+          background: #0f3460;
+          padding: 0.75rem 1rem;
           font-weight: 600;
-          font-size: 1.1rem;
+          font-size: 0.9rem;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          color: #e94560;
         }
 
         .panel-content {
           flex: 1;
-          overflow: hidden;
+          overflow: auto;
+          background: #16213e;
         }
 
         .panel-divider {
           width: 4px;
-          background: #dee2e6;
-          cursor: col-resize;
-          user-select: none;
+          background: #0f3460;
         }
 
-        .panel-divider:hover {
-          background: #6c757d;
-        }
-
-        .code-editor {
-          width: 100%;
-          height: 100%;
-          border: none;
+        .code-display {
+          margin: 0;
           padding: 1rem;
           font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-          line-height: 1.5;
-          resize: none;
-          outline: none;
-          background: #fafafa;
-          color: #2d3436;
+          line-height: 1.6;
+          color: #b8c5d9;
+          white-space: pre-wrap;
+          word-break: break-word;
         }
 
-        .dsl-panel .code-editor {
-          background: #f8f9fa;
+        .execution-plan {
+          padding: 1rem;
         }
 
-        .ast-panel .code-editor {
-          background: #fff5f5;
+        .plan-step {
+          background: #1a1a2e;
+          border: 1px solid #0f3460;
+          border-radius: 6px;
+          padding: 0.75rem 1rem;
+          margin-bottom: 0.75rem;
         }
 
-        .status-bar {
-          background: #343a40;
-          color: white;
-          padding: 0.5rem 2rem;
-          font-size: 0.875rem;
+        .plan-step:hover {
+          border-color: #e94560;
+        }
+
+        .step-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
+          margin-bottom: 0.5rem;
+        }
+
+        .step-number {
+          background: #e94560;
+          color: white;
+          padding: 0.25rem 0.5rem;
+          border-radius: 4px;
+          font-size: 0.75rem;
+          font-weight: bold;
+        }
+
+        .step-verb {
+          font-family: 'Monaco', 'Menlo', monospace;
+          font-size: 0.95rem;
+          color: #4db8ff;
+        }
+
+        .step-binding {
+          color: #ffc107;
+          font-family: 'Monaco', 'Menlo', monospace;
+          font-size: 0.85rem;
+        }
+
+        .step-injections {
+          margin-top: 0.5rem;
+          padding-left: 1rem;
+        }
+
+        .injection {
+          color: #888;
+          font-family: 'Monaco', 'Menlo', monospace;
+          font-size: 0.8rem;
+          margin: 0.25rem 0;
+        }
+
+        .injection::before {
+          content: "\\2190  ";
+          color: #e94560;
+        }
+
+        .empty-plan {
+          color: #666;
+          text-align: center;
+          padding: 2rem;
+        }
+
+        .status-bar {
+          background: #0f3460;
+          padding: 0.5rem 2rem;
+          font-size: 0.8rem;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border-top: 1px solid #16213e;
+        }
+
+        .status-left {
+          color: #aaa;
+        }
+
+        .status-right {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          color: #888;
+        }
+
+        .status-right input[type="range"] {
+          width: 80px;
+          background: transparent;
         }
 
         .loading {
@@ -508,29 +543,19 @@ export class DslVisualizerApp {
           color: #28a745;
         }
 
-        .error {
-          color: #dc3545;
-        }
-
-        @media (max-width: 768px) {
+        @media (max-width: 900px) {
           .main-content {
             flex-direction: column;
           }
 
           .panel-divider {
-            display: none;
+            height: 4px;
+            width: 100%;
           }
 
           .controls {
-            flex-direction: column;
-            align-items: stretch;
-            gap: 0.5rem;
-          }
-
-          .control-group {
-            flex-direction: row;
-            justify-content: space-between;
-            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.75rem;
           }
         }
       </style>
@@ -538,20 +563,83 @@ export class DslVisualizerApp {
   }
 
   /**
-   * Render domain selector options
+   * Render instance selector options
    */
-  private renderDomainOptions(): string {
-    if (this.state.domains.length === 0) {
-      return '<option value="">Loading domains...</option>';
+  private renderInstanceOptions(): string {
+    if (this.state.instances.length === 0) {
+      return '<option value="">Loading instances...</option>';
     }
 
-    return this.state.domains
-      .map(domain =>
-        `<option value="${domain.name}" ${domain.name === this.state.selectedDomain ? 'selected' : ''}>
-          ${domain.name}
-        </option>`
+    return this.state.instances
+      .map(
+        (inst) =>
+          `<option value="${inst.businessReference}" ${inst.businessReference === this.state.selectedInstance ? "selected" : ""}>
+          ${inst.businessReference} (v${inst.currentVersion})
+        </option>`,
       )
-      .join('');
+      .join("");
+  }
+
+  /**
+   * Render version selector options
+   */
+  private renderVersionOptions(): string {
+    if (this.state.versionHistory.length === 0) {
+      return '<option value="">Select instance first</option>';
+    }
+
+    return this.state.versionHistory
+      .map(
+        (v) =>
+          `<option value="${v.version}" ${v.version === this.state.selectedVersion ? "selected" : ""}>
+          v${v.version} - ${v.operationType}
+        </option>`,
+      )
+      .join("");
+  }
+
+  /**
+   * Render execution plan panel
+   */
+  private renderExecutionPlan(): string {
+    const plan = this.state.displayData?.executionPlan;
+
+    if (!plan || plan.length === 0) {
+      return '<div class="empty-plan">No execution plan available</div>';
+    }
+
+    return `
+      <div class="execution-plan">
+        ${plan.map((step) => this.renderPlanStep(step)).join("")}
+      </div>
+    `;
+  }
+
+  /**
+   * Render a single execution plan step
+   */
+  private renderPlanStep(step: ExecutionStepInfo): string {
+    const bindingHtml = step.bindAs
+      ? `<span class="step-binding">${step.bindAs}</span>`
+      : "";
+
+    const injectionsHtml =
+      step.injections.length > 0
+        ? `<div class="step-injections">
+          ${step.injections.map((inj) => `<div class="injection">${this.escapeHtml(inj)}</div>`).join("")}
+        </div>`
+        : "";
+
+    return `
+      <div class="plan-step">
+        <div class="step-header">
+          <span class="step-number">Step ${step.step}</span>
+          <span class="step-verb">${this.escapeHtml(step.verb)}</span>
+          ${bindingHtml}
+        </div>
+        ${injectionsHtml}
+      </div>
+    `;
   }
 
   /**
@@ -560,92 +648,85 @@ export class DslVisualizerApp {
   private renderErrorBanner(): string {
     return `
       <div class="error-banner">
-        <span>❌ ${this.state.error}</span>
-        <button id="dismiss-error">✕</button>
+        <span>${this.escapeHtml(this.state.error || "")}</span>
+        <button id="dismiss-error">Dismiss</button>
       </div>
     `;
+  }
+
+  /**
+   * Render status text
+   */
+  private renderStatusText(): string {
+    if (this.state.loading) {
+      return '<span class="loading">Loading...</span>';
+    }
+
+    const data = this.state.displayData;
+    if (data) {
+      const stepCount = data.executionPlan?.length || 0;
+      return `<span class="success">Loaded v${data.version} | ${stepCount} steps | ${data.compilationStatus}</span>`;
+    }
+
+    return "Ready";
+  }
+
+  /**
+   * Escape HTML to prevent XSS
+   */
+  private escapeHtml(text: string): string {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
   }
 
   /**
    * Attach event listeners to rendered elements
    */
   private attachEventListeners(): void {
-    const domainSelect = document.getElementById('domain-select');
-    if (domainSelect) {
-      domainSelect.addEventListener('change', this.eventListeners.get('domain-change')!);
+    const instanceSelect = document.getElementById("instance-select");
+    if (instanceSelect) {
+      instanceSelect.addEventListener(
+        "change",
+        this.eventListeners.get("instance-change")!,
+      );
     }
 
-    const versionSelect = document.getElementById('version-select');
+    const versionSelect = document.getElementById("version-select");
     if (versionSelect) {
-      versionSelect.addEventListener('change', this.eventListeners.get('version-change')!);
+      versionSelect.addEventListener(
+        "change",
+        this.eventListeners.get("version-change")!,
+      );
     }
 
-    const refreshBtn = document.getElementById('refresh-btn');
+    const refreshBtn = document.getElementById("refresh-btn");
     if (refreshBtn) {
-      refreshBtn.addEventListener('click', this.eventListeners.get('refresh')!);
+      refreshBtn.addEventListener("click", this.eventListeners.get("refresh")!);
     }
 
-    const dismissError = document.getElementById('dismiss-error');
+    const dismissError = document.getElementById("dismiss-error");
     if (dismissError) {
-      dismissError.addEventListener('click', this.eventListeners.get('error-dismiss')!);
+      dismissError.addEventListener(
+        "click",
+        this.eventListeners.get("error-dismiss")!,
+      );
     }
 
-    const fontSizeInput = document.getElementById('font-size');
+    const fontSizeInput = document.getElementById("font-size");
     if (fontSizeInput) {
-      fontSizeInput.addEventListener('input', this.eventListeners.get('font-size')!);
+      fontSizeInput.addEventListener(
+        "input",
+        this.eventListeners.get("font-size")!,
+      );
     }
-  }
-
-  /**
-   * Update editor content
-   */
-  private updateEditorContent(): void {
-    const dslEditor = document.getElementById('dsl-editor') as HTMLTextAreaElement;
-    const astEditor = document.getElementById('ast-editor') as HTMLTextAreaElement;
-
-    if (dslEditor) {
-      dslEditor.value = this.state.dslSource;
-    }
-
-    if (astEditor) {
-      astEditor.value = this.state.astText;
-    }
-  }
-
-  /**
-   * Update status bar
-   */
-  private updateStatus(): void {
-    const statusText = document.getElementById('status-text');
-    if (!statusText) return;
-
-    if (this.state.loading) {
-      statusText.innerHTML = '<span class="loading">🔄 Loading...</span>';
-    } else if (this.state.error) {
-      statusText.innerHTML = '<span class="error">❌ Error occurred</span>';
-    } else if (this.state.lastUpdated) {
-      const time = this.state.lastUpdated.toLocaleTimeString();
-      statusText.innerHTML = `<span class="success">✅ Updated at ${time}</span>`;
-    } else {
-      statusText.textContent = 'Ready - Select a domain to begin';
-    }
-  }
-
-  /**
-   * Update editor font size
-   */
-  private updateEditorFontSize(fontSize: number): void {
-    const editors = document.querySelectorAll('.code-editor') as NodeListOf<HTMLTextAreaElement>;
-    editors.forEach(editor => {
-      editor.style.fontSize = `${fontSize}px`;
-    });
   }
 
   /**
    * Save UI configuration to localStorage
    */
   private saveUiConfig(): void {
-    localStorage.setItem('dsl-visualizer-config', JSON.stringify(this.uiConfig));
+    localStorage.setItem("dsl-viewer-config", JSON.stringify(this.uiConfig));
   }
 
   /**
@@ -653,7 +734,7 @@ export class DslVisualizerApp {
    */
   handleGlobalError(error: Error | string): void {
     const message = error instanceof Error ? error.message : error;
-    this.handleEvent({ type: 'LOAD_DSL_ERROR', payload: message });
+    this.handleEvent({ type: "LOAD_DSL_ERROR", payload: message });
   }
 
   /**
@@ -661,8 +742,5 @@ export class DslVisualizerApp {
    */
   cleanup(): void {
     this.eventListeners.clear();
-    if (this.apiClient.cancelRequests) {
-      this.apiClient.cancelRequests();
-    }
   }
 }

@@ -1,21 +1,61 @@
-// Phase 6: DSL/AST Visualization - API Client
-// TypeScript API client for communicating with the DSL Manager backend
+// DSL Viewer - API Client
+// TypeScript API client for communicating with the DSL Viewer backend
 
 import {
-  DslDomain,
-  DslRequest,
-  DslResponse,
-  DslManagerApi,
+  DslInstance,
+  DslDisplayData,
+  DslVersionInfo,
+  DslViewerApi,
   DslApiError,
   ApiConfig,
-  DEFAULT_API_CONFIG
-} from './types';
+  DEFAULT_API_CONFIG,
+} from "./types";
 
 /**
- * HTTP API client for the DSL Manager backend
- * Handles all communication with the Rust backend server
+ * API response types (snake_case from backend)
  */
-export class DslManagerApiClient implements DslManagerApi {
+interface ListResponse {
+  instances: Array<{
+    instance_id: string;
+    business_reference: string;
+    domain_name: string;
+    current_version: number;
+    status: string;
+    updated_at: string | null;
+  }>;
+  total: number;
+}
+
+interface ShowResponse {
+  business_reference: string;
+  domain_name: string;
+  version: number;
+  dsl_source: string;
+  ast_json: object | null;
+  execution_plan: Array<{
+    step: number;
+    verb: string;
+    bind_as: string | null;
+    injections: string[];
+  }>;
+  compilation_status: string;
+  created_at: string | null;
+}
+
+interface HistoryResponse {
+  business_reference: string;
+  versions: Array<{
+    version: number;
+    operation_type: string;
+    compilation_status: string;
+    created_at: string | null;
+  }>;
+}
+
+/**
+ * HTTP API client for the DSL Viewer backend
+ */
+export class DslViewerApiClient implements DslViewerApi {
   private config: ApiConfig;
   private abortController?: AbortController;
 
@@ -24,77 +64,154 @@ export class DslManagerApiClient implements DslManagerApi {
   }
 
   /**
-   * Fetch available DSL domains from the backend
+   * List all DSL instances
    */
-  async getDomains(): Promise<DslDomain[]> {
-    const url = `${this.config.baseUrl}/domains`;
+  async listInstances(): Promise<DslInstance[]> {
+    const url = `${this.config.baseUrl}/list`;
 
     try {
       const response = await this.fetchWithRetry(url, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
       });
 
       if (!response.ok) {
         throw new DslApiError(
-          `Failed to fetch domains: ${response.statusText}`,
-          response.status
+          `Failed to list instances: ${response.statusText}`,
+          response.status,
         );
       }
 
-      const domains = await response.json() as DslDomain[];
-      return this.validateDomainsResponse(domains);
+      const data = (await response.json()) as ListResponse;
+      return data.instances.map((inst) => ({
+        instanceId: inst.instance_id,
+        businessReference: inst.business_reference,
+        domainName: inst.domain_name,
+        currentVersion: inst.current_version,
+        status: inst.status,
+        updatedAt: inst.updated_at,
+      }));
     } catch (error) {
       if (error instanceof DslApiError) {
         throw error;
       }
       throw new DslApiError(
-        `Network error while fetching domains: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        `Network error while listing instances: ${error instanceof Error ? error.message : "Unknown error"}`,
         0,
-        'NETWORK_ERROR'
+        "NETWORK_ERROR",
       );
     }
   }
 
   /**
-   * Fetch DSL source and generated AST for a specific domain and version
+   * Get DSL for display (optionally with specific version)
    */
-  async getDslAndAst(request: DslRequest): Promise<DslResponse> {
-    this.validateRequest(request);
-
-    const url = new URL(`${this.config.baseUrl}/dsl`);
-    url.searchParams.set('domain', request.domain);
-    url.searchParams.set('version', request.version);
+  async showDsl(
+    businessRef: string,
+    version?: number,
+  ): Promise<DslDisplayData> {
+    const url = version
+      ? `${this.config.baseUrl}/show/${encodeURIComponent(businessRef)}/${version}`
+      : `${this.config.baseUrl}/show/${encodeURIComponent(businessRef)}`;
 
     try {
-      const response = await this.fetchWithRetry(url.toString(), {
-        method: 'GET',
+      const response = await this.fetchWithRetry(url, {
+        method: "GET",
         headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
       });
 
       if (!response.ok) {
+        if (response.status === 404) {
+          throw new DslApiError(
+            `DSL instance not found: ${businessRef}`,
+            404,
+            "NOT_FOUND",
+          );
+        }
         throw new DslApiError(
-          `Failed to fetch DSL content: ${response.statusText}`,
-          response.status
+          `Failed to fetch DSL: ${response.statusText}`,
+          response.status,
         );
       }
 
-      const dslResponse = await response.json() as DslResponse;
-      return this.validateDslResponse(dslResponse);
+      const data = (await response.json()) as ShowResponse;
+      return {
+        businessReference: data.business_reference,
+        domainName: data.domain_name,
+        version: data.version,
+        dslSource: data.dsl_source,
+        astJson: data.ast_json,
+        executionPlan: data.execution_plan.map((step) => ({
+          step: step.step,
+          verb: step.verb,
+          bindAs: step.bind_as,
+          injections: step.injections,
+        })),
+        compilationStatus: data.compilation_status,
+        createdAt: data.created_at,
+      };
     } catch (error) {
       if (error instanceof DslApiError) {
         throw error;
       }
       throw new DslApiError(
-        `Network error while fetching DSL content: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        `Network error while fetching DSL: ${error instanceof Error ? error.message : "Unknown error"}`,
         0,
-        'NETWORK_ERROR'
+        "NETWORK_ERROR",
+      );
+    }
+  }
+
+  /**
+   * Get version history for a business reference
+   */
+  async getHistory(businessRef: string): Promise<DslVersionInfo[]> {
+    const url = `${this.config.baseUrl}/history/${encodeURIComponent(businessRef)}`;
+
+    try {
+      const response = await this.fetchWithRetry(url, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new DslApiError(
+            `DSL instance not found: ${businessRef}`,
+            404,
+            "NOT_FOUND",
+          );
+        }
+        throw new DslApiError(
+          `Failed to fetch history: ${response.statusText}`,
+          response.status,
+        );
+      }
+
+      const data = (await response.json()) as HistoryResponse;
+      return data.versions.map((v) => ({
+        version: v.version,
+        operationType: v.operation_type,
+        compilationStatus: v.compilation_status,
+        createdAt: v.created_at,
+      }));
+    } catch (error) {
+      if (error instanceof DslApiError) {
+        throw error;
+      }
+      throw new DslApiError(
+        `Network error while fetching history: ${error instanceof Error ? error.message : "Unknown error"}`,
+        0,
+        "NETWORK_ERROR",
       );
     }
   }
@@ -120,12 +237,8 @@ export class DslManagerApiClient implements DslManagerApi {
    */
   async healthCheck(): Promise<boolean> {
     try {
-      const url = `${this.config.baseUrl}/health`;
-      const response = await fetch(url, {
-        method: 'GET',
-        signal: AbortSignal.timeout(5000) // 5 second timeout
-      });
-      return response.ok;
+      await this.listInstances();
+      return true;
     } catch {
       return false;
     }
@@ -134,13 +247,19 @@ export class DslManagerApiClient implements DslManagerApi {
   /**
    * Fetch with retry logic and timeout handling
    */
-  private async fetchWithRetry(url: string, options: RequestInit): Promise<Response> {
+  private async fetchWithRetry(
+    url: string,
+    options: RequestInit,
+  ): Promise<Response> {
     this.abortController = new AbortController();
-    const timeoutId = setTimeout(() => this.abortController?.abort(), this.config.timeout);
+    const timeoutId = setTimeout(
+      () => this.abortController?.abort(),
+      this.config.timeout,
+    );
 
     const fetchOptions: RequestInit = {
       ...options,
-      signal: this.abortController.signal
+      signal: this.abortController.signal,
     };
 
     let lastError: Error | null = null;
@@ -151,11 +270,16 @@ export class DslManagerApiClient implements DslManagerApi {
         clearTimeout(timeoutId);
         return response;
       } catch (error) {
-        lastError = error instanceof Error ? error : new Error('Unknown fetch error');
+        lastError =
+          error instanceof Error ? error : new Error("Unknown fetch error");
 
         // Don't retry on abort signal (user cancelled or timeout)
-        if (error instanceof DOMException && error.name === 'AbortError') {
-          throw new DslApiError('Request was cancelled or timed out', 0, 'TIMEOUT');
+        if (error instanceof DOMException && error.name === "AbortError") {
+          throw new DslApiError(
+            "Request was cancelled or timed out",
+            0,
+            "TIMEOUT",
+          );
         }
 
         // Wait before retrying (exponential backoff)
@@ -166,331 +290,168 @@ export class DslManagerApiClient implements DslManagerApi {
     }
 
     clearTimeout(timeoutId);
-    throw lastError || new Error('All retry attempts failed');
-  }
-
-  /**
-   * Validate domains API response
-   */
-  private validateDomainsResponse(domains: any): DslDomain[] {
-    if (!Array.isArray(domains)) {
-      throw new DslApiError('Invalid domains response: expected array', 0, 'VALIDATION_ERROR');
-    }
-
-    return domains.map((domain, index) => {
-      if (!domain.name || typeof domain.name !== 'string') {
-        throw new DslApiError(`Invalid domain at index ${index}: missing or invalid name`, 0, 'VALIDATION_ERROR');
-      }
-
-      if (!domain.description || typeof domain.description !== 'string') {
-        throw new DslApiError(`Invalid domain at index ${index}: missing or invalid description`, 0, 'VALIDATION_ERROR');
-      }
-
-      if (!Array.isArray(domain.versions)) {
-        throw new DslApiError(`Invalid domain at index ${index}: versions must be an array`, 0, 'VALIDATION_ERROR');
-      }
-
-      const validatedVersions = domain.versions.map((version: any, vIndex: number) => {
-        if (!version.version || typeof version.version !== 'string') {
-          throw new DslApiError(`Invalid version at domain ${index}, version ${vIndex}: missing or invalid version`, 0, 'VALIDATION_ERROR');
-        }
-
-        return {
-          version: version.version,
-          description: version.description || '',
-          exampleCount: typeof version.exampleCount === 'number' ? version.exampleCount : 0,
-          lastUpdated: version.lastUpdated || new Date().toISOString()
-        };
-      });
-
-      return {
-        name: domain.name,
-        description: domain.description,
-        versions: validatedVersions
-      };
-    });
-  }
-
-  /**
-   * Validate DSL response
-   */
-  private validateDslResponse(response: any): DslResponse {
-    if (typeof response !== 'object' || response === null) {
-      throw new DslApiError('Invalid DSL response: expected object', 0, 'VALIDATION_ERROR');
-    }
-
-    if (typeof response.dslSource !== 'string') {
-      throw new DslApiError('Invalid DSL response: dslSource must be a string', 0, 'VALIDATION_ERROR');
-    }
-
-    if (typeof response.astText !== 'string') {
-      throw new DslApiError('Invalid DSL response: astText must be a string', 0, 'VALIDATION_ERROR');
-    }
-
-    if (typeof response.domain !== 'string') {
-      throw new DslApiError('Invalid DSL response: domain must be a string', 0, 'VALIDATION_ERROR');
-    }
-
-    if (typeof response.version !== 'string') {
-      throw new DslApiError('Invalid DSL response: version must be a string', 0, 'VALIDATION_ERROR');
-    }
-
-    return {
-      dslSource: response.dslSource,
-      astText: response.astText,
-      domain: response.domain,
-      version: response.version,
-      metadata: {
-        parseTime: response.metadata?.parseTime || undefined,
-        verbCount: response.metadata?.verbCount || 0,
-        commentCount: response.metadata?.commentCount || 0,
-        domainCount: response.metadata?.domainCount || 1,
-        lastGenerated: response.metadata?.lastGenerated || new Date().toISOString()
-      }
-    };
-  }
-
-  /**
-   * Validate request parameters
-   */
-  private validateRequest(request: DslRequest): void {
-    if (!request.domain || typeof request.domain !== 'string') {
-      throw new DslApiError('Invalid request: domain is required and must be a string', 0, 'VALIDATION_ERROR');
-    }
-
-    if (!request.version || typeof request.version !== 'string') {
-      throw new DslApiError('Invalid request: version is required and must be a string', 0, 'VALIDATION_ERROR');
-    }
+    throw lastError || new Error("All retry attempts failed");
   }
 
   /**
    * Utility method for delays
    */
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 
 /**
  * Mock API client for development and testing
- * Provides sample data without requiring a backend server
  */
-export class MockDslManagerApiClient implements DslManagerApi {
-  private domains: DslDomain[] = [
+export class MockDslViewerApiClient implements DslViewerApi {
+  private mockInstances: DslInstance[] = [
     {
-      name: 'Document',
-      description: 'Document management and verification workflows',
-      versions: [
-        {
-          version: 'v3.1',
-          description: 'Latest document DSL with enhanced verification',
-          exampleCount: 5,
-          lastUpdated: '2024-11-22'
-        },
-        {
-          version: 'v3.0',
-          description: 'Stable document DSL with basic operations',
-          exampleCount: 3,
-          lastUpdated: '2024-10-15'
-        }
-      ]
+      instanceId: "mock-uuid-1",
+      businessReference: "test-hedge-fund-alpha",
+      domainName: "cbu",
+      currentVersion: 3,
+      status: "ACTIVE",
+      updatedAt: new Date().toISOString(),
     },
     {
-      name: 'ISDA',
-      description: 'Derivative trading and ISDA documentation workflows',
-      versions: [
-        {
-          version: 'v3.1',
-          description: 'Complete ISDA derivative lifecycle support',
-          exampleCount: 8,
-          lastUpdated: '2024-11-22'
-        }
-      ]
+      instanceId: "mock-uuid-2",
+      businessReference: "onboarding-acme-corp",
+      domainName: "cbu",
+      currentVersion: 1,
+      status: "ACTIVE",
+      updatedAt: new Date(Date.now() - 86400000).toISOString(),
     },
-    {
-      name: 'Multi-Domain',
-      description: 'Cross-domain integrated workflows',
-      versions: [
-        {
-          version: 'v3.1',
-          description: 'Unified multi-domain workflow examples',
-          exampleCount: 3,
-          lastUpdated: '2024-11-22'
-        }
-      ]
-    }
   ];
 
-  async getDomains(): Promise<DslDomain[]> {
-    // Simulate network delay
-    await this.delay(300);
-    return [...this.domains];
+  async listInstances(): Promise<DslInstance[]> {
+    await this.delay(200);
+    return [...this.mockInstances];
   }
 
-  async getDslAndAst(request: DslRequest): Promise<DslResponse> {
-    // Simulate network delay
-    await this.delay(500);
+  async showDsl(
+    businessRef: string,
+    version?: number,
+  ): Promise<DslDisplayData> {
+    await this.delay(300);
 
-    const { dslSource, astText } = this.getMockContent(request.domain, request.version);
+    const instance = this.mockInstances.find(
+      (i) => i.businessReference === businessRef,
+    );
+    if (!instance) {
+      throw new DslApiError(
+        `Instance not found: ${businessRef}`,
+        404,
+        "NOT_FOUND",
+      );
+    }
+
+    const ver = version ?? instance.currentVersion;
 
     return {
-      dslSource,
-      astText,
-      domain: request.domain,
-      version: request.version,
-      metadata: {
-        parseTime: Math.random() * 1000,
-        verbCount: (dslSource.match(/^\(/gm) || []).length,
-        commentCount: (dslSource.match(/^;;/gm) || []).length,
-        domainCount: new Set(dslSource.match(/\w+\./g) || []).size,
-        lastGenerated: new Date().toISOString()
-      }
+      businessReference: businessRef,
+      domainName: instance.domainName,
+      version: ver,
+      dslSource: `;; DSL for ${businessRef} v${ver}
+;; Generated by agent session
+
+(cbu.create
+  :name "Hedge Fund Alpha"
+  :jurisdiction "LU"
+  :client-type "fund"
+  :as @fund)
+
+(entity.create-proper-person
+  :cbu-id @fund
+  :first-name "John"
+  :last-name "Smith"
+  :date-of-birth "1980-01-15"
+  :as @john)
+
+(cbu.assign-role
+  :cbu-id @fund
+  :entity-id @john
+  :role "BENEFICIAL_OWNER"
+  :ownership-percentage 60)
+
+(document.catalog
+  :cbu-id @fund
+  :entity-id @john
+  :document-type "PASSPORT")`,
+      astJson: null,
+      executionPlan: [
+        { step: 0, verb: "cbu.create", bindAs: "@fund", injections: [] },
+        {
+          step: 1,
+          verb: "entity.create-proper-person",
+          bindAs: "@john",
+          injections: ["cbu-id <- $0"],
+        },
+        {
+          step: 2,
+          verb: "cbu.assign-role",
+          bindAs: null,
+          injections: ["cbu-id <- $0", "entity-id <- $1"],
+        },
+        {
+          step: 3,
+          verb: "document.catalog",
+          bindAs: null,
+          injections: ["cbu-id <- $0", "entity-id <- $1"],
+        },
+      ],
+      compilationStatus: "COMPILED",
+      createdAt: new Date().toISOString(),
     };
   }
 
-  private getMockContent(domain: string, version: string): { dslSource: string; astText: string } {
-    const examples = {
-      'Document': {
-        dslSource: `;; Document Management Workflow
-;; Phase 6 mock example
+  async getHistory(businessRef: string): Promise<DslVersionInfo[]> {
+    await this.delay(200);
 
-(document.catalog
-  :document-id "doc-mock-001"
-  :document-type "CONTRACT"
-  :issuer "mock-authority"
-  :title "Phase 6 Mock Demo"
-  :parties ["party-a" "party-b"]
-  :jurisdiction "US")
+    const instance = this.mockInstances.find(
+      (i) => i.businessReference === businessRef,
+    );
+    if (!instance) {
+      throw new DslApiError(
+        `Instance not found: ${businessRef}`,
+        404,
+        "NOT_FOUND",
+      );
+    }
 
-(document.verify
-  :document-id "doc-mock-001"
-  :verification-method "DIGITAL_SIGNATURE"
-  :verification-result "AUTHENTIC")`,
-
-        astText: `Program {
-  forms: [
-    Comment(" Document Management Workflow"),
-    Comment(" Phase 6 mock example"),
-    Verb(VerbForm {
-      verb: "document.catalog",
-      pairs: {
-        Key("document-id"): Literal(String("doc-mock-001")),
-        Key("document-type"): Literal(String("CONTRACT")),
-        Key("issuer"): Literal(String("mock-authority")),
-        Key("title"): Literal(String("Phase 6 Mock Demo")),
-        Key("parties"): List([
-          Literal(String("party-a")),
-          Literal(String("party-b"))
-        ]),
-        Key("jurisdiction"): Literal(String("US"))
-      }
-    }),
-    Verb(VerbForm {
-      verb: "document.verify",
-      pairs: {
-        Key("document-id"): Literal(String("doc-mock-001")),
-        Key("verification-method"): Literal(String("DIGITAL_SIGNATURE")),
-        Key("verification-result"): Literal(String("AUTHENTIC"))
-      }
-    })
-  ]
-}`
-      },
-      'ISDA': {
-        dslSource: `;; ISDA Derivative Workflow
-;; Mock ISDA example
-
-(isda.establish_master
-  :agreement-id "ISDA-MOCK-001"
-  :party-a "bank-mock"
-  :party-b "fund-mock"
-  :version "2002")
-
-(isda.execute_trade
-  :trade-id "TRADE-MOCK-001"
-  :product-type "IRS"
-  :notional-amount 50000000.0)`,
-
-        astText: `Program {
-  forms: [
-    Comment(" ISDA Derivative Workflow"),
-    Comment(" Mock ISDA example"),
-    Verb(VerbForm {
-      verb: "isda.establish_master",
-      pairs: {
-        Key("agreement-id"): Literal(String("ISDA-MOCK-001")),
-        Key("party-a"): Literal(String("bank-mock")),
-        Key("party-b"): Literal(String("fund-mock")),
-        Key("version"): Literal(String("2002"))
-      }
-    }),
-    Verb(VerbForm {
-      verb: "isda.execute_trade",
-      pairs: {
-        Key("trade-id"): Literal(String("TRADE-MOCK-001")),
-        Key("product-type"): Literal(String("IRS")),
-        Key("notional-amount"): Literal(Number(50000000.0))
-      }
-    })
-  ]
-}`
-      },
-      'Multi-Domain': {
-        dslSource: `;; Multi-Domain Mock Workflow
-
-(entity :id "mock-entity" :label "Company")
-(document.catalog :document-id "mock-doc" :document-type "CONTRACT")
-(kyc.verify :customer-id "mock-entity" :outcome "APPROVED")`,
-
-        astText: `Program {
-  forms: [
-    Comment(" Multi-Domain Mock Workflow"),
-    Verb(VerbForm {
-      verb: "entity",
-      pairs: {
-        Key("id"): Literal(String("mock-entity")),
-        Key("label"): Literal(String("Company"))
-      }
-    }),
-    Verb(VerbForm {
-      verb: "document.catalog",
-      pairs: {
-        Key("document-id"): Literal(String("mock-doc")),
-        Key("document-type"): Literal(String("CONTRACT"))
-      }
-    }),
-    Verb(VerbForm {
-      verb: "kyc.verify",
-      pairs: {
-        Key("customer-id"): Literal(String("mock-entity")),
-        Key("outcome"): Literal(String("APPROVED"))
-      }
-    })
-  ]
-}`
-      }
-    };
-
-    return examples[domain as keyof typeof examples] || {
-      dslSource: ';; No mock data available',
-      astText: 'Program { forms: [] }'
-    };
+    const versions: DslVersionInfo[] = [];
+    for (let v = 1; v <= instance.currentVersion; v++) {
+      versions.push({
+        version: v,
+        operationType: v === 1 ? "CREATE" : "EXECUTE",
+        compilationStatus: "COMPILED",
+        createdAt: new Date(
+          Date.now() - (instance.currentVersion - v) * 3600000,
+        ).toISOString(),
+      });
+    }
+    return versions;
   }
 
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 
 /**
  * Factory function to create the appropriate API client
  */
-export function createApiClient(useMock: boolean = false, config?: Partial<ApiConfig>): DslManagerApi {
-  if (useMock || !config?.baseUrl) {
-    console.log('🔧 Using Mock API Client for Phase 6 development');
-    return new MockDslManagerApiClient();
+export function createApiClient(
+  useMock: boolean = false,
+  config?: Partial<ApiConfig>,
+): DslViewerApi {
+  if (useMock) {
+    console.log("Using Mock API Client for DSL Viewer development");
+    return new MockDslViewerApiClient();
   } else {
-    console.log(`🌐 Using Real API Client - Backend: ${config.baseUrl}`);
-    return new DslManagerApiClient(config);
+    console.log(
+      `Using Real API Client - Backend: ${config?.baseUrl || DEFAULT_API_CONFIG.baseUrl}`,
+    );
+    return new DslViewerApiClient(config);
   }
 }

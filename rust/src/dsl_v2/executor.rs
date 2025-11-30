@@ -8,16 +8,23 @@ use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use super::ast::{Program, Statement, Value, VerbCall};
+#[cfg(feature = "database")]
+use super::ast::{Value, VerbCall};
+#[cfg(feature = "database")]
 use super::custom_ops::CustomOperationRegistry;
+#[cfg(feature = "database")]
 use super::mappings::{get_pk_column, resolve_column, DbType};
+#[cfg(feature = "database")]
 use super::verb_registry::{registry, VerbBehavior};
+#[cfg(feature = "database")]
 use super::verbs::{find_verb, Behavior, VerbDef};
 
 /// Schema prefix for all tables
+#[cfg(feature = "database")]
 const SCHEMA: &str = "\"ob-poc\"";
 
 /// Format a table name with schema prefix
+#[cfg(feature = "database")]
 fn qualified_table(table: &str) -> String {
     format!("{}.{}", SCHEMA, table)
 }
@@ -92,6 +99,7 @@ impl ExecutionContext {
 pub struct DslExecutor {
     #[cfg(feature = "database")]
     pool: PgPool,
+    #[cfg(feature = "database")]
     custom_ops: CustomOperationRegistry,
 }
 
@@ -108,41 +116,7 @@ impl DslExecutor {
     /// Create an executor without database (for testing/parsing only)
     #[cfg(not(feature = "database"))]
     pub fn new_without_db() -> Self {
-        Self {
-            custom_ops: CustomOperationRegistry::new(),
-        }
-    }
-
-    /// Execute a complete DSL program
-    #[cfg(feature = "database")]
-    pub async fn execute_program(
-        &self,
-        program: &Program,
-        ctx: &mut ExecutionContext,
-    ) -> Result<Vec<ExecutionResult>> {
-        let mut results = Vec::new();
-
-        for statement in &program.statements {
-            match statement {
-                Statement::VerbCall(vc) => {
-                    let result = self.execute_verb(vc, ctx).await?;
-                    
-                    // Handle :as @symbol binding
-                    if let Some(ref binding_name) = vc.as_binding {
-                        if let ExecutionResult::Uuid(id) = &result {
-                            ctx.bind(binding_name, *id);
-                        }
-                    }
-                    
-                    results.push(result);
-                }
-                Statement::Comment(_) => {
-                    // Comments are no-ops
-                }
-            }
-        }
-
-        Ok(results)
+        Self {}
     }
 
     /// Execute a single verb call
@@ -285,6 +259,7 @@ impl DslExecutor {
     }
 
     /// Validate that required arguments are present
+    #[cfg(feature = "database")]
     fn validate_args(&self, vc: &VerbCall, verb_def: &VerbDef) -> Result<()> {
         for required in verb_def.required_args {
             let found = vc
@@ -304,6 +279,7 @@ impl DslExecutor {
     }
 
     /// Resolve @references in arguments
+    #[cfg(feature = "database")]
     fn resolve_args(
         &self,
         args: &[super::ast::Argument],
@@ -321,6 +297,7 @@ impl DslExecutor {
     }
 
     /// Resolve a single value, looking up references
+    #[cfg(feature = "database")]
     #[allow(clippy::only_used_in_recursion)] // &self needed for consistent API
     fn resolve_value(&self, value: &Value, ctx: &ExecutionContext) -> Result<ResolvedValue> {
         match value {
@@ -1136,6 +1113,7 @@ impl ResolvedValue {
         }
     }
 
+    #[cfg(feature = "database")]
     fn to_bind_value(&self) -> BindValue {
         match self {
             ResolvedValue::String(s) => BindValue::String(s.clone()),
@@ -1153,6 +1131,7 @@ impl ResolvedValue {
     }
 
     /// Convert to BindValue with type coercion based on target DB type
+    #[cfg(feature = "database")]
     fn to_bind_value_typed(&self, db_type: DbType) -> BindValue {
         match (self, db_type) {
             // Date: parse string to NaiveDate
@@ -1211,6 +1190,7 @@ impl ResolvedValue {
 }
 
 /// Helper to convert ResolvedValue to serde_json::Value
+#[cfg(feature = "database")]
 fn resolved_to_json(rv: &ResolvedValue) -> JsonValue {
     match rv {
         ResolvedValue::String(s) => JsonValue::String(s.clone()),

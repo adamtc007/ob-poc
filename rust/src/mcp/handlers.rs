@@ -112,7 +112,7 @@ impl ToolHandlers {
         let executor = DslExecutor::new(self.pool.clone());
         let mut ctx = ExecutionContext::new();
 
-        match executor.execute_program(&ast, &mut ctx).await {
+        match executor.execute_plan(&plan, &mut ctx).await {
             Ok(results) => {
                 let bindings: serde_json::Map<_, _> = ctx
                     .symbols

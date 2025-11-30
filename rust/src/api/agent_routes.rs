@@ -17,7 +17,7 @@ use crate::api::session::{
     ExecuteResponse, ExecutionResult, SessionState, SessionStateResponse, SessionStore,
 };
 use crate::dsl_v2::{
-    domains as dsl_domains, parse_program, verb_count, verbs_for_domain, DslExecutor,
+    compile, domains as dsl_domains, parse_program, verb_count, verbs_for_domain, DslExecutor,
     ExecutionContext, ExecutionResult as DslV2Result,
 };
 use axum::{
@@ -286,6 +286,19 @@ async fn execute_session_dsl(
         }
     };
 
+    // Compile to execution plan (handles dependency ordering)
+    let plan = match compile(&program) {
+        Ok(p) => p,
+        Err(e) => {
+            return Ok(Json(ExecuteResponse {
+                success: false,
+                results: Vec::new(),
+                errors: vec![format!("Compile error: {}", e)],
+                new_state: current_state,
+            }));
+        }
+    };
+
     // Execute
     let mut results = Vec::new();
     let mut all_success = true;
@@ -293,7 +306,7 @@ async fn execute_session_dsl(
 
     match state
         .dsl_v2_executor
-        .execute_program(&program, &mut exec_ctx)
+        .execute_plan(&plan, &mut exec_ctx)
         .await
     {
         Ok(exec_results) => {
