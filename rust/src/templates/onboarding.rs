@@ -388,11 +388,10 @@ impl OnboardingRenderer {
 
         // Validate required parameters
         for param in &template.parameters {
-            if param.required && !params.contains_key(&param.name) {
-                if param.default.is_none() {
+            if param.required && !params.contains_key(&param.name)
+                && param.default.is_none() {
                     return Err(format!("Missing required parameter: {}", param.name));
                 }
-            }
         }
 
         // Apply parameter substitutions

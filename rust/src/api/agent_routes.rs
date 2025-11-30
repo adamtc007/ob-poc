@@ -1074,7 +1074,7 @@ async fn generate_onboarding_dsl(
 
     let gen_response = generate_dsl(Json(generate_req)).await;
 
-    match (gen_response.dsl, gen_response.error) {
+    match (gen_response.dsl.clone(), gen_response.error.clone()) {
         (Some(dsl), None) => {
             // Validate the generated DSL
             let validation = match parse_program(&dsl) {
@@ -1258,11 +1258,15 @@ async fn execute_onboarding_dsl(
         .map_err(|e| format!("Execution error: {}", e))?;
 
     // Count resources and deliveries from bindings
-    let cbu_id = ctx.get("cbu_id").or_else(|| ctx.get("client")).copied();
+    let cbu_id = ctx
+        .symbols
+        .get("cbu_id")
+        .or_else(|| ctx.symbols.get("client"))
+        .copied();
 
     // Count resource instances (symbols starting with custody, settle, swift, nav, ibor, pnl)
     let resource_count = ctx
-        .bindings()
+        .symbols
         .keys()
         .filter(|k| {
             k.contains("custody")
@@ -1277,7 +1281,7 @@ async fn execute_onboarding_dsl(
 
     // Count deliveries
     let delivery_count = ctx
-        .bindings()
+        .symbols
         .keys()
         .filter(|k| k.contains("delivery"))
         .count();

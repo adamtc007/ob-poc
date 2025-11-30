@@ -18,8 +18,10 @@ use uuid::Uuid;
 /// Session lifecycle states
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum SessionState {
     /// Just created, no intents yet
+    #[default]
     New,
     /// Has pending intents awaiting validation
     PendingValidation,
@@ -33,11 +35,6 @@ pub enum SessionState {
     Closed,
 }
 
-impl Default for SessionState {
-    fn default() -> Self {
-        SessionState::New
-    }
-}
 
 // ============================================================================
 // Session Types
