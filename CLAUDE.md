@@ -10,8 +10,39 @@ This file provides guidance to Claude Code when working with this repository.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
+│                   Web UI (localhost:3000)                       │
+│  Server-rendered HTML with embedded JS/CSS                      │
+│  Three panels: Chat | DSL Editor | Results                      │
+│  rust/src/ui/                                                   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   Agentic Server (Axum)                         │
+│  rust/src/bin/agentic_server.rs                                 │
+│  - /api/agent/generate → Claude API → DSL                       │
+│  - /api/session/* → Session management                          │
+│  - /api/templates/* → Template rendering                        │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     DSL Pipeline                                 │
+│  Parser (Nom) → CSG Linter → Compiler → Executor                │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    PostgreSQL (ob-poc)                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### DSL Pipeline Detail
+
+```
+┌─────────────────────────────────────────────────────────────────┐
 │                     DSL Source Text                              │
-│  (cbu.create :name "Fund" :jurisdiction "LU" :as @fund)         │
+│  (cbu.ensure :name "Fund" :jurisdiction "LU" :as @fund)         │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -43,24 +74,23 @@ This file provides guidance to Claude Code when working with this repository.
 │  - CRUD generation and execution                                │
 │  rust/src/dsl_v2/executor.rs                                    │
 └─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    PostgreSQL (ob-poc schema)                    │
-└─────────────────────────────────────────────────────────────────┘
 ```
 
 ### Key Components
 
-| Component | File | Purpose |
-|-----------|------|---------|
-| Parser | `dsl_v2/parser.rs` | Nom-based S-expression parser |
-| AST | `dsl_v2/ast.rs` | Program, Statement, VerbCall, Value types |
-| Verb Registry | `dsl_v2/verb_registry.rs` | 53+ verbs across 8 domains |
-| CSG Linter | `dsl_v2/csg_linter.rs` | Context-sensitive validation |
-| Compiler | `dsl_v2/execution_plan.rs` | AST → ExecutionPlan |
-| Executor | `dsl_v2/executor.rs` | Plan execution with DB |
-| MCP Server | `mcp/` | Claude integration (8 tools) |
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| Web UI | `src/ui/` | Server-rendered HTML pages |
+| Agentic Server | `src/bin/agentic_server.rs` | Main HTTP server |
+| Agent Routes | `src/api/agent_routes.rs` | Claude API integration |
+| Parser | `src/dsl_v2/parser.rs` | Nom-based S-expression parser |
+| AST | `src/dsl_v2/ast.rs` | Program, Statement, VerbCall, Value types |
+| Verb Registry | `src/dsl_v2/verb_registry.rs` | 53+ verbs across 8 domains |
+| CSG Linter | `src/dsl_v2/csg_linter.rs` | Context-sensitive validation |
+| Compiler | `src/dsl_v2/execution_plan.rs` | AST → ExecutionPlan |
+| Executor | `src/dsl_v2/executor.rs` | Plan execution with DB |
+| Templates | `src/templates/` | Pre-built DSL templates |
+| MCP Server | `src/mcp/` | Claude Desktop integration |
 | LSP Server | `crates/dsl-lsp/` | IDE integration |
 
 ## Directory Structure
@@ -68,6 +98,14 @@ This file provides guidance to Claude Code when working with this repository.
 ```
 rust/
 ├── src/
+│   ├── ui/                     # Server-rendered UI
+│   │   ├── mod.rs              # Module exports
+│   │   ├── pages.rs            # HTML generation
+│   │   └── routes.rs           # Axum routes
+│   ├── api/                    # REST API routes
+│   │   ├── agent_routes.rs     # /api/agent/* (generate, validate)
+│   │   ├── session_routes.rs   # /api/session/* (chat, execute)
+│   │   └── template_routes.rs  # /api/templates/*
 │   ├── dsl_v2/                 # Core DSL implementation
 │   │   ├── mod.rs              # Module exports
 │   │   ├── ast.rs              # AST types
@@ -80,15 +118,18 @@ rust/
 │   │   ├── executor.rs         # Database executor
 │   │   ├── custom_ops/         # Non-CRUD operations
 │   │   └── ref_resolver.rs     # Reference type resolution
-│   ├── mcp/                    # MCP server for Claude
+│   ├── templates/              # DSL templates
+│   │   ├── registry.rs         # Template definitions
+│   │   └── renderer.rs         # Template → DSL
+│   ├── mcp/                    # MCP server for Claude Desktop
 │   │   ├── server.rs           # JSON-RPC server loop
 │   │   ├── handlers.rs         # Tool implementations
 │   │   ├── tools.rs            # Tool definitions
 │   │   └── protocol.rs         # MCP protocol types
 │   ├── database/               # Database services
 │   ├── services/               # Business logic
-│   ├── intent/                 # Semantic intent schema
 │   └── bin/
+│       ├── agentic_server.rs   # Main server binary
 │       ├── dsl_cli.rs          # CLI tool
 │       └── dsl_mcp.rs          # MCP server binary
 ├── crates/
@@ -96,10 +137,28 @@ rust/
 ├── tests/
 │   ├── db_integration.rs       # Database integration tests
 │   ├── db_cli_test.sh          # CLI integration tests
+│   ├── mcp_test.sh             # MCP protocol tests
 │   └── scenarios/              # DSL test scenarios
 │       ├── valid/              # 8 valid scenarios
 │       └── error/              # 5 error scenarios
 └── Cargo.toml
+```
+
+## Running the Server
+
+```bash
+cd rust/
+
+# Build the server
+cargo build --features server --bin agentic_server
+
+# Run (requires DATABASE_URL and ANTHROPIC_API_KEY)
+DATABASE_URL="postgresql:///data_designer" \
+ANTHROPIC_API_KEY="your-key" \
+./target/debug/agentic_server
+
+# Open in browser
+open http://localhost:3000
 ```
 
 ## Commands
@@ -108,25 +167,68 @@ rust/
 cd rust/
 
 # Build
-cargo build --features database
-cargo build --features mcp --bin dsl_mcp
-cargo build -p dsl-lsp
+cargo build --features server --bin agentic_server   # Main server
+cargo build --features database                       # DSL library only
+cargo build --features mcp --bin dsl_mcp             # MCP server
+cargo build -p dsl-lsp                               # LSP server
 
 # Test
 cargo test --features database --lib              # 115 unit tests
 cargo test --features database --test db_integration  # 10 DB tests
 ./tests/db_cli_test.sh                            # 11 CLI tests
 ./tests/scenarios/run_tests.sh                    # 13 DSL scenarios
+./tests/mcp_test.sh                               # 12 MCP protocol tests
 
-# Run
+# Run CLI
 ./target/debug/dsl_cli lint file.dsl
 ./target/debug/dsl_cli execute file.dsl
-DATABASE_URL="postgresql:///data_designer" ./target/debug/dsl_mcp
 
 # Clippy
+cargo clippy --features server
 cargo clippy --features database
 cargo clippy --features mcp
 ```
+
+## API Endpoints
+
+### Web UI
+| Endpoint | Description |
+|----------|-------------|
+| `GET /` | Agent session UI (Chat / DSL Editor / Results) |
+| `GET /verbs` | Verb reference page |
+
+### Agent DSL Generation
+| Endpoint | Description |
+|----------|-------------|
+| `POST /api/agent/generate` | Generate DSL from natural language |
+| `POST /api/agent/validate` | Validate DSL syntax/semantics |
+| `GET /api/agent/domains` | List available DSL domains |
+| `GET /api/agent/vocabulary` | Get vocabulary (optionally by domain) |
+| `GET /api/agent/health` | Health check |
+
+### Session Management
+| Endpoint | Description |
+|----------|-------------|
+| `POST /api/session` | Create new session |
+| `GET /api/session/:id` | Get session state |
+| `DELETE /api/session/:id` | Delete session |
+| `POST /api/session/:id/chat` | Send chat message |
+| `POST /api/session/:id/execute` | Execute accumulated DSL |
+
+### Templates
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/templates` | List all templates |
+| `GET /api/templates/:id` | Get template details |
+| `POST /api/templates/:id/render` | Render template to DSL |
+
+### DSL Viewer
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/dsl/list` | List DSL instances |
+| `GET /api/dsl/show/:ref` | Get latest DSL version |
+| `GET /api/dsl/show/:ref/:ver` | Get specific version |
+| `GET /api/dsl/history/:ref` | Get version history |
 
 ## DSL Syntax
 
@@ -162,37 +264,28 @@ cargo clippy --features mcp
 | kyc | 2 | Investigation initiate, decide |
 | ubo | 2 | Calculate, validate ownership |
 
-## Database Schema (ob-poc)
+## Database Schema
+
+See `docs/DATABASE_SCHEMA.md` for complete schema reference.
 
 ### Core Tables
 
-| Table | Purpose | Key Columns |
-|-------|---------|-------------|
-| cbus | Client Business Units | cbu_id, name, jurisdiction, client_type |
-| entities | Legal entities | entity_id, entity_type_id, name |
-| entity_types | Entity type definitions | entity_type_id, type_code, name |
-| cbu_entity_roles | Entity-CBU relationships | cbu_id, entity_id, role_id |
-| roles | Role definitions | role_id, name |
-| document_catalog | Documents | doc_id, cbu_id, document_type_code, status |
-| document_types | Document type definitions | type_id, type_code, display_name |
-| screenings | Screening records | screening_id, entity_id, screening_type, status |
-
-### Key Relationships
-
-```
-cbus ←── cbu_entity_roles ──→ entities
-              │
-              ▼
-            roles
-
-entities ──→ entity_types
-
-document_catalog ──→ document_types
-```
+| Table | Purpose |
+|-------|---------|
+| cbus | Client Business Units |
+| entities | Base entity table (Class Table Inheritance) |
+| entity_types | Entity type definitions |
+| entity_proper_persons | Natural person extension |
+| entity_limited_companies | Company extension |
+| cbu_entity_roles | Entity-CBU-Role relationships |
+| roles | Role definitions |
+| document_catalog | Document records |
+| document_types | Document type definitions |
+| screenings | Screening records |
 
 ## MCP Server Tools
 
-The MCP server exposes 8 tools for Claude integration:
+The MCP server (for Claude Desktop integration) exposes 8 tools:
 
 | Tool | Description |
 |------|-------------|
@@ -205,10 +298,15 @@ The MCP server exposes 8 tools for Claude integration:
 | `verbs_list` | List available DSL verbs |
 | `schema_info` | Get entity types, roles, document types |
 
-## Environment
+## Environment Variables
 
 ```bash
+# Required for server
 export DATABASE_URL="postgresql:///data_designer"
+export ANTHROPIC_API_KEY="your-anthropic-key"
+
+# Alternative LLM (optional)
+export OPENAI_API_KEY="your-openai-key"
 ```
 
 ## Test Coverage
@@ -222,17 +320,7 @@ export DATABASE_URL="postgresql:///data_designer"
 | MCP protocol | 12 | MCP server JSON-RPC tests |
 | **Total** | **161** | |
 
-### Running MCP Protocol Tests
-
-```bash
-cd rust/
-./tests/mcp_test.sh
-```
-
-Tests cover: initialize, tools/list, all 8 tools, and full execution scenario.
-
 ## Reference Docs
 
 - `docs/DATABASE_SCHEMA.md` - Complete database schema reference
 - `docs/DSL_TEST_SCENARIOS.md` - Test scenario documentation
-- `docs/DSL_CONFIG_DRIVEN_ARCHITECTURE.md` - Future: YAML-driven config
