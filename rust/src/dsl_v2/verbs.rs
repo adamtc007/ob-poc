@@ -545,19 +545,25 @@ pub static STANDARD_VERBS: &[VerbDef] = &[
         description: "List documents linked to an entity",
     },
     // =========================================================================
-    // PRODUCT DOMAIN
+    // PRODUCT DOMAIN - Product catalog/taxonomy
     // =========================================================================
     VerbDef {
         domain: "product",
         verb: "create",
         behavior: Behavior::Insert { table: "products" },
         required_args: &["name", "product-code"],
-        optional_args: &["description", "product-category", "regulatory-framework"],
+        optional_args: &[
+            "description",
+            "product-category",
+            "regulatory-framework",
+            "min-asset-requirement",
+            "metadata",
+        ],
         returns: ReturnType::Uuid {
             name: "product_id",
             capture: true,
         },
-        description: "Create a new product",
+        description: "Create a new product in the catalog",
     },
     VerbDef {
         domain: "product",
@@ -573,7 +579,7 @@ pub static STANDARD_VERBS: &[VerbDef] = &[
         verb: "update",
         behavior: Behavior::Update { table: "products" },
         required_args: &["product-id"],
-        optional_args: &["name", "description", "is-active"],
+        optional_args: &["name", "description", "is-active", "product-category"],
         returns: ReturnType::Affected,
         description: "Update a product",
     },
@@ -595,20 +601,35 @@ pub static STANDARD_VERBS: &[VerbDef] = &[
         returns: ReturnType::RecordSet,
         description: "List products with optional filters",
     },
+    VerbDef {
+        domain: "product",
+        verb: "ensure",
+        behavior: Behavior::Upsert {
+            table: "products",
+            conflict_keys: &["product-code"],
+        },
+        required_args: &["name", "product-code"],
+        optional_args: &["description", "product-category", "regulatory-framework"],
+        returns: ReturnType::Uuid {
+            name: "product_id",
+            capture: true,
+        },
+        description: "Create or update a product by product-code",
+    },
     // =========================================================================
-    // SERVICE DOMAIN
+    // SERVICE DOMAIN - Service catalog/taxonomy
     // =========================================================================
     VerbDef {
         domain: "service",
         verb: "create",
         behavior: Behavior::Insert { table: "services" },
         required_args: &["name", "service-code"],
-        optional_args: &["description", "service-category"],
+        optional_args: &["description", "service-type", "is-active"],
         returns: ReturnType::Uuid {
             name: "service_id",
             capture: true,
         },
-        description: "Create a new service",
+        description: "Create a new service in the catalog",
     },
     VerbDef {
         domain: "service",
@@ -621,6 +642,48 @@ pub static STANDARD_VERBS: &[VerbDef] = &[
     },
     VerbDef {
         domain: "service",
+        verb: "update",
+        behavior: Behavior::Update { table: "services" },
+        required_args: &["service-id"],
+        optional_args: &["name", "description", "is-active", "service-type"],
+        returns: ReturnType::Affected,
+        description: "Update a service",
+    },
+    VerbDef {
+        domain: "service",
+        verb: "delete",
+        behavior: Behavior::Delete { table: "services" },
+        required_args: &["service-id"],
+        optional_args: &[],
+        returns: ReturnType::Affected,
+        description: "Delete a service",
+    },
+    VerbDef {
+        domain: "service",
+        verb: "list",
+        behavior: Behavior::Select { table: "services" },
+        required_args: &[],
+        optional_args: &["service-type", "is-active", "limit", "offset"],
+        returns: ReturnType::RecordSet,
+        description: "List services with optional filters",
+    },
+    VerbDef {
+        domain: "service",
+        verb: "ensure",
+        behavior: Behavior::Upsert {
+            table: "services",
+            conflict_keys: &["service-code"],
+        },
+        required_args: &["name", "service-code"],
+        optional_args: &["description", "service-type"],
+        returns: ReturnType::Uuid {
+            name: "service_id",
+            capture: true,
+        },
+        description: "Create or update a service by service-code",
+    },
+    VerbDef {
+        domain: "service",
         verb: "link-product",
         behavior: Behavior::Link {
             junction: "product_services",
@@ -629,11 +692,8 @@ pub static STANDARD_VERBS: &[VerbDef] = &[
             role_col: None,
         },
         required_args: &["service-id", "product-id"],
-        optional_args: &["is-required"],
-        returns: ReturnType::Uuid {
-            name: "link_id",
-            capture: false,
-        },
+        optional_args: &["is-mandatory", "is-default", "display-order"],
+        returns: ReturnType::Void,
         description: "Link a service to a product",
     },
     VerbDef {
@@ -648,6 +708,148 @@ pub static STANDARD_VERBS: &[VerbDef] = &[
         optional_args: &[],
         returns: ReturnType::Affected,
         description: "Unlink a service from a product",
+    },
+    VerbDef {
+        domain: "service",
+        verb: "list-by-product",
+        behavior: Behavior::SelectWithJoin {
+            primary_table: "services",
+            join_table: "product_services",
+            join_col: "service_id",
+        },
+        required_args: &["product-id"],
+        optional_args: &["is-mandatory"],
+        returns: ReturnType::RecordSet,
+        description: "List services for a product",
+    },
+    // =========================================================================
+    // LIFECYCLE-RESOURCE DOMAIN - Resource type catalog/taxonomy
+    // (These are the resource TYPES, not instances - prod_resources table)
+    // =========================================================================
+    VerbDef {
+        domain: "lifecycle-resource",
+        verb: "create",
+        behavior: Behavior::Insert {
+            table: "prod_resources",
+        },
+        required_args: &["name", "resource-code", "owner"],
+        optional_args: &[
+            "description",
+            "resource-type",
+            "vendor",
+            "api-endpoint",
+            "capabilities",
+        ],
+        returns: ReturnType::Uuid {
+            name: "resource_id",
+            capture: true,
+        },
+        description: "Create a new lifecycle resource type in the catalog",
+    },
+    VerbDef {
+        domain: "lifecycle-resource",
+        verb: "read",
+        behavior: Behavior::Select {
+            table: "prod_resources",
+        },
+        required_args: &[],
+        optional_args: &["resource-id", "resource-code"],
+        returns: ReturnType::Record,
+        description: "Read a lifecycle resource type by ID or code",
+    },
+    VerbDef {
+        domain: "lifecycle-resource",
+        verb: "update",
+        behavior: Behavior::Update {
+            table: "prod_resources",
+        },
+        required_args: &["resource-id"],
+        optional_args: &[
+            "name",
+            "description",
+            "is-active",
+            "api-endpoint",
+            "capabilities",
+        ],
+        returns: ReturnType::Affected,
+        description: "Update a lifecycle resource type",
+    },
+    VerbDef {
+        domain: "lifecycle-resource",
+        verb: "delete",
+        behavior: Behavior::Delete {
+            table: "prod_resources",
+        },
+        required_args: &["resource-id"],
+        optional_args: &[],
+        returns: ReturnType::Affected,
+        description: "Delete a lifecycle resource type",
+    },
+    VerbDef {
+        domain: "lifecycle-resource",
+        verb: "list",
+        behavior: Behavior::Select {
+            table: "prod_resources",
+        },
+        required_args: &[],
+        optional_args: &["resource-type", "owner", "is-active", "limit", "offset"],
+        returns: ReturnType::RecordSet,
+        description: "List lifecycle resource types with optional filters",
+    },
+    VerbDef {
+        domain: "lifecycle-resource",
+        verb: "ensure",
+        behavior: Behavior::Upsert {
+            table: "prod_resources",
+            conflict_keys: &["resource-code"],
+        },
+        required_args: &["name", "resource-code", "owner"],
+        optional_args: &["description", "resource-type", "vendor"],
+        returns: ReturnType::Uuid {
+            name: "resource_id",
+            capture: true,
+        },
+        description: "Create or update a lifecycle resource type by resource-code",
+    },
+    VerbDef {
+        domain: "lifecycle-resource",
+        verb: "link-service",
+        behavior: Behavior::Link {
+            junction: "service_resources",
+            from_col: "resource_id",
+            to_col: "service_id",
+            role_col: None,
+        },
+        required_args: &["resource-id", "service-id"],
+        optional_args: &["is-primary"],
+        returns: ReturnType::Void,
+        description: "Link a lifecycle resource type to a service",
+    },
+    VerbDef {
+        domain: "lifecycle-resource",
+        verb: "unlink-service",
+        behavior: Behavior::Unlink {
+            junction: "service_resources",
+            from_col: "resource_id",
+            to_col: "service_id",
+        },
+        required_args: &["resource-id", "service-id"],
+        optional_args: &[],
+        returns: ReturnType::Affected,
+        description: "Unlink a lifecycle resource type from a service",
+    },
+    VerbDef {
+        domain: "lifecycle-resource",
+        verb: "list-by-service",
+        behavior: Behavior::SelectWithJoin {
+            primary_table: "prod_resources",
+            join_table: "service_resources",
+            join_col: "resource_id",
+        },
+        required_args: &["service-id"],
+        optional_args: &[],
+        returns: ReturnType::RecordSet,
+        description: "List lifecycle resource types for a service",
     },
     // =========================================================================
     // INVESTIGATION DOMAIN
