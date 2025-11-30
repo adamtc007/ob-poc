@@ -113,6 +113,7 @@ impl TemplateRegistry {
                     slot_type: SlotType::Country,
                     required: true,
                     placeholder: Some("GB".into()),
+                    dsl_param: Some("jurisdiction".into()),
                     ..Default::default()
                 },
                 SlotDefinition {
@@ -136,7 +137,7 @@ impl TemplateRegistry {
             id: "cbu.attach-entity".into(),
             name: "Attach Entity to CBU".into(),
             description: "Link an existing entity to a CBU with a specific role".into(),
-            verb: "cbu.attach-entity".into(),
+            verb: "cbu.assign-role".into(),
             domain: "cbu".into(),
             tags: vec!["cbu".into(), "entity".into(), "relationship".into()],
             slots: vec![
@@ -208,6 +209,7 @@ impl TemplateRegistry {
                         ],
                     },
                     required: true,
+                    dsl_param: Some("role".into()),
                     ..Default::default()
                 },
             ],
@@ -219,7 +221,7 @@ impl TemplateRegistry {
             id: "cbu.attach-beneficial-owner".into(),
             name: "Attach Beneficial Owner".into(),
             description: "Link a beneficial owner (>25% ownership) to a CBU".into(),
-            verb: "cbu.attach-entity".into(),
+            verb: "cbu.assign-role".into(),
             domain: "cbu".into(),
             tags: vec!["cbu".into(), "beneficial-owner".into(), "compliance".into()],
             slots: vec![
@@ -248,15 +250,6 @@ impl TemplateRegistry {
                     ..Default::default()
                 },
                 SlotDefinition {
-                    name: "ownership_percentage".into(),
-                    label: "Ownership %".into(),
-                    slot_type: SlotType::Percentage,
-                    required: true,
-                    help_text: Some("Must be >25% for beneficial owner".into()),
-                    dsl_param: Some("ownership-percentage".into()),
-                    ..Default::default()
-                },
-                SlotDefinition {
                     name: "role".into(),
                     label: "Role".into(),
                     slot_type: SlotType::Enum {
@@ -268,6 +261,7 @@ impl TemplateRegistry {
                     },
                     required: true,
                     default_value: Some(serde_json::json!("BENEFICIAL_OWNER")),
+                    dsl_param: Some("role".into()),
                     ..Default::default()
                 },
             ],
@@ -288,27 +282,27 @@ impl TemplateRegistry {
             tags: vec!["entity".into(), "person".into(), "create".into()],
             slots: vec![
                 SlotDefinition {
-                    name: "given_name".into(),
-                    label: "Given Name".into(),
+                    name: "first_name".into(),
+                    label: "First Name".into(),
                     slot_type: SlotType::Text {
                         max_length: Some(100),
                         multiline: false,
                     },
                     required: true,
                     placeholder: Some("John".into()),
-                    dsl_param: Some("given-name".into()),
+                    dsl_param: Some("first-name".into()),
                     ..Default::default()
                 },
                 SlotDefinition {
-                    name: "family_name".into(),
-                    label: "Family Name".into(),
+                    name: "last_name".into(),
+                    label: "Last Name".into(),
                     slot_type: SlotType::Text {
                         max_length: Some(100),
                         multiline: false,
                     },
                     required: true,
                     placeholder: Some("Smith".into()),
-                    dsl_param: Some("family-name".into()),
+                    dsl_param: Some("last-name".into()),
                     ..Default::default()
                 },
                 SlotDefinition {
@@ -340,7 +334,7 @@ impl TemplateRegistry {
             tags: vec!["entity".into(), "company".into(), "create".into()],
             slots: vec![
                 SlotDefinition {
-                    name: "company_name".into(),
+                    name: "name".into(),
                     label: "Company Name".into(),
                     slot_type: SlotType::Text {
                         max_length: Some(200),
@@ -348,11 +342,11 @@ impl TemplateRegistry {
                     },
                     required: true,
                     placeholder: Some("Acme Holdings Ltd".into()),
-                    dsl_param: Some("company-name".into()),
+                    dsl_param: Some("name".into()),
                     ..Default::default()
                 },
                 SlotDefinition {
-                    name: "registration_number".into(),
+                    name: "company_number".into(),
                     label: "Registration Number".into(),
                     slot_type: SlotType::Text {
                         max_length: Some(50),
@@ -360,7 +354,7 @@ impl TemplateRegistry {
                     },
                     required: false,
                     placeholder: Some("12345678".into()),
-                    dsl_param: Some("registration-number".into()),
+                    dsl_param: Some("company-number".into()),
                     ..Default::default()
                 },
                 SlotDefinition {
@@ -368,6 +362,7 @@ impl TemplateRegistry {
                     label: "Jurisdiction".into(),
                     slot_type: SlotType::Country,
                     required: true,
+                    dsl_param: Some("jurisdiction".into()),
                     ..Default::default()
                 },
                 SlotDefinition {
@@ -388,23 +383,23 @@ impl TemplateRegistry {
 
     fn request_document_template() -> FormTemplate {
         FormTemplate {
-            id: "document.request".into(),
-            name: "Request Document".into(),
-            description: "Request a document from an entity".into(),
-            verb: "document.request".into(),
+            id: "document.catalog".into(),
+            name: "Catalog Document".into(),
+            description: "Catalog a document for an entity".into(),
+            verb: "document.catalog".into(),
             domain: "document".into(),
-            tags: vec!["document".into(), "request".into()],
+            tags: vec!["document".into(), "catalog".into()],
             slots: vec![
                 SlotDefinition {
-                    name: "entity_id".into(),
-                    label: "From Entity".into(),
+                    name: "cbu_id".into(),
+                    label: "CBU".into(),
                     slot_type: SlotType::EntityRef {
-                        allowed_types: vec![EntityType::Person, EntityType::Company],
-                        scope: RefScope::WithinCbu,
+                        allowed_types: vec![EntityType::Cbu],
+                        scope: RefScope::WithinSession,
                         allow_create: false,
                     },
-                    required: true,
-                    dsl_param: Some("entity-id".into()),
+                    required: false,
+                    dsl_param: Some("cbu-id".into()),
                     ..Default::default()
                 },
                 SlotDefinition {
@@ -445,7 +440,19 @@ impl TemplateRegistry {
                         ],
                     },
                     required: true,
-                    dsl_param: Some("document-type".into()),
+                    dsl_param: Some("doc-type".into()),
+                    ..Default::default()
+                },
+                SlotDefinition {
+                    name: "title".into(),
+                    label: "Document Title".into(),
+                    slot_type: SlotType::Text {
+                        max_length: Some(200),
+                        multiline: false,
+                    },
+                    required: false,
+                    placeholder: Some("Passport - John Smith".into()),
+                    dsl_param: Some("title".into()),
                     ..Default::default()
                 },
             ],

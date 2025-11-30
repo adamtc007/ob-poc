@@ -45,6 +45,19 @@ pub struct ValidateDslRequest {
     pub dsl: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct GenerateDslRequest {
+    pub instruction: String,
+    pub domain: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct GenerateDslResponse {
+    pub dsl: Option<String>,
+    pub explanation: Option<String>,
+    pub error: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ValidationResult {
     pub valid: bool,
@@ -143,6 +156,7 @@ pub fn create_agent_router(pool: PgPool) -> Router {
         .route("/api/session/:id/execute", post(execute_session_dsl))
         .route("/api/session/:id/clear", post(clear_session_dsl))
         // Vocabulary and metadata
+        .route("/api/agent/generate", post(generate_dsl))
         .route("/api/agent/validate", post(validate_dsl))
         .route("/api/agent/domains", get(list_domains))
         .route("/api/agent/vocabulary", get(get_vocabulary))
@@ -575,6 +589,147 @@ async fn clear_session_dsl(
 // ============================================================================
 
 /// POST /api/agent/validate - Validate DSL
+/// POST /api/agent/generate - Generate DSL from natural language
+async fn generate_dsl(Json(req): Json<GenerateDslRequest>) -> Json<GenerateDslResponse> {
+    // Get vocabulary for the prompt
+    let vocab = build_vocab_prompt(req.domain.as_deref());
+
+    // Build the system prompt
+    let system_prompt = format!(
+        r#"You are a DSL generator for a KYC/AML onboarding system.
+Generate valid DSL S-expressions from natural language instructions.
+
+AVAILABLE VERBS:
+{}
+
+DSL SYNTAX:
+- Format: (domain.verb :key "value" :key2 value2)
+- Strings must be quoted: "text"
+- Numbers are unquoted: 42, 25.5
+- References start with @: @entity-ref
+- Use :as @name to capture results
+
+EXAMPLES:
+(cbu.ensure :name "Acme Corp" :jurisdiction "GB" :client-type "COMPANY" :as @cbu)
+(entity.create-proper-person :first-name "John" :last-name "Smith" :date-of-birth "1980-01-15" :as @john)
+(entity.create-limited-company :name "Holdings Ltd" :jurisdiction "GB" :as @company)
+(cbu.assign-role :cbu-id @cbu :entity-id @john :role "DIRECTOR")
+
+Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, respond with: ERROR: <reason>"#,
+        vocab
+    );
+
+    // Try to call Claude API
+    let api_key = match std::env::var("ANTHROPIC_API_KEY") {
+        Ok(key) => key,
+        Err(_) => {
+            return Json(GenerateDslResponse {
+                dsl: None,
+                explanation: None,
+                error: Some("ANTHROPIC_API_KEY not configured".to_string()),
+            });
+        }
+    };
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post("https://api.anthropic.com/v1/messages")
+        .header("x-api-key", &api_key)
+        .header("anthropic-version", "2023-06-01")
+        .header("content-type", "application/json")
+        .json(&serde_json::json!({
+            "model": "claude-sonnet-4-20250514",
+            "max_tokens": 1024,
+            "system": system_prompt,
+            "messages": [
+                {"role": "user", "content": req.instruction}
+            ]
+        }))
+        .send()
+        .await;
+
+    match response {
+        Ok(resp) => {
+            if resp.status().is_success() {
+                match resp.json::<serde_json::Value>().await {
+                    Ok(json) => {
+                        let content = json["content"][0]["text"]
+                            .as_str()
+                            .unwrap_or("")
+                            .trim()
+                            .to_string();
+
+                        if content.starts_with("ERROR:") {
+                            Json(GenerateDslResponse {
+                                dsl: None,
+                                explanation: None,
+                                error: Some(content),
+                            })
+                        } else {
+                            // Validate the generated DSL
+                            match parse_program(&content) {
+                                Ok(_) => Json(GenerateDslResponse {
+                                    dsl: Some(content),
+                                    explanation: Some("DSL generated successfully".to_string()),
+                                    error: None,
+                                }),
+                                Err(e) => Json(GenerateDslResponse {
+                                    dsl: Some(content),
+                                    explanation: None,
+                                    error: Some(format!("Generated DSL has syntax error: {}", e)),
+                                }),
+                            }
+                        }
+                    }
+                    Err(e) => Json(GenerateDslResponse {
+                        dsl: None,
+                        explanation: None,
+                        error: Some(format!("Failed to parse API response: {}", e)),
+                    }),
+                }
+            } else {
+                let status = resp.status();
+                let body = resp.text().await.unwrap_or_default();
+                Json(GenerateDslResponse {
+                    dsl: None,
+                    explanation: None,
+                    error: Some(format!("API error {}: {}", status, body)),
+                })
+            }
+        }
+        Err(e) => Json(GenerateDslResponse {
+            dsl: None,
+            explanation: None,
+            error: Some(format!("Request failed: {}", e)),
+        }),
+    }
+}
+
+/// Build vocabulary prompt for a domain
+fn build_vocab_prompt(domain: Option<&str>) -> String {
+    let mut lines = Vec::new();
+
+    let domain_list = if let Some(d) = domain {
+        vec![d.to_string()]
+    } else {
+        dsl_domains().iter().map(|s| s.to_string()).collect()
+    };
+
+    for domain_name in domain_list {
+        for verb in verbs_for_domain(&domain_name) {
+            let required = verb.required_args.join(", ");
+            let optional = verb.optional_args.join(", ");
+            lines.push(format!(
+                "{}.{}: {} [required: {}] [optional: {}]",
+                verb.domain, verb.verb, verb.description, required, optional
+            ));
+        }
+    }
+
+    lines.join("\n")
+}
+
+/// POST /api/agent/validate - Validate DSL syntax
 async fn validate_dsl(
     Json(req): Json<ValidateDslRequest>,
 ) -> Result<Json<ValidationResult>, StatusCode> {

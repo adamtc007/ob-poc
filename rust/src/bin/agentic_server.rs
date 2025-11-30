@@ -29,13 +29,13 @@ use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
-use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
 
 use ob_poc::api::{
     create_agent_router, create_attribute_router, create_dsl_viewer_router, create_entity_router,
     create_template_router,
 };
+use ob_poc::ui::create_ui_router;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -70,8 +70,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Database connection established");
 
     // Create routers and merge them
-    // IMPORTANT: Use fallback_service for static files so API routes take precedence
-    let app = create_agent_router(pool.clone())
+    // UI router provides server-rendered HTML pages at / and /verbs
+    let app = create_ui_router()
+        .merge(create_agent_router(pool.clone()))
         .merge(create_attribute_router(pool.clone()))
         .merge(create_entity_router(pool.clone()))
         .merge(create_dsl_viewer_router(pool))
@@ -82,9 +83,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .allow_methods(Any)
                 .allow_headers(Any),
         )
-        .layer(TraceLayer::new_for_http())
-        // Static files as fallback - only serves if no API route matches
-        .fallback_service(ServeDir::new("static").append_index_html_on_directories(true));
+        .layer(TraceLayer::new_for_http());
 
     // Bind to address
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));

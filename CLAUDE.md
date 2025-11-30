@@ -132,19 +132,19 @@ cargo clippy --features mcp
 
 ```clojure
 ;; Create a CBU and bind to @fund
-(cbu.create :name "Acme Fund" :jurisdiction "LU" :client-type "fund" :as @fund)
+(cbu.ensure :name "Acme Fund" :jurisdiction "LU" :client-type "FUND" :as @fund)
 
 ;; Create entities with type-specific verbs
-(entity.create-limited-company :cbu-id @fund :name "Acme Holdings Ltd" :as @company)
-(entity.create-proper-person :cbu-id @fund :name "John Smith" :date-of-birth "1980-01-15" :as @john)
+(entity.create-limited-company :name "Acme Holdings Ltd" :jurisdiction "LU" :as @company)
+(entity.create-proper-person :first-name "John" :last-name "Smith" :date-of-birth "1980-01-15" :as @john)
 
-;; Assign roles (with ownership percentage for UBOs)
-(cbu.assign-role :cbu-id @fund :entity-id @john :target-entity-id @company 
-                 :role "BENEFICIAL_OWNER" :ownership-percentage 60)
+;; Assign roles to link entities to CBU
+(cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")
+(cbu.assign-role :cbu-id @fund :entity-id @company :role "PRINCIPAL")
 
 ;; Document operations
-(document.catalog :cbu-id @fund :entity-id @john :document-type "PASSPORT")
-(document.request :cbu-id @fund :entity-id @company :document-type "CERTIFICATE_OF_INCORPORATION")
+(document.catalog :cbu-id @fund :doc-type "PASSPORT" :title "John Smith Passport")
+(document.catalog :cbu-id @fund :doc-type "CERT_OF_INCORP" :title "Acme Holdings Certificate")
 
 ;; Screening
 (screening.pep :entity-id @john)

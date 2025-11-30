@@ -55,6 +55,10 @@ pub mod api;
 #[cfg(feature = "server")]
 pub mod templates;
 
+// Server-rendered UI
+#[cfg(feature = "server")]
+pub mod ui;
+
 // MCP server module (when mcp feature is enabled)
 #[cfg(feature = "mcp")]
 pub mod mcp;
