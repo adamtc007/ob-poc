@@ -237,8 +237,15 @@ export class DslViewerApiClient implements DslViewerApi {
    */
   async healthCheck(): Promise<boolean> {
     try {
-      await this.listInstances();
-      return true;
+      // Use the agent health endpoint instead of listing instances
+      const healthUrl = this.config.baseUrl.replace(
+        "/api/dsl",
+        "/api/agent/health",
+      );
+      const response = await fetch(healthUrl, {
+        signal: AbortSignal.timeout(5000),
+      });
+      return response.ok;
     } catch {
       return false;
     }
