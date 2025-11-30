@@ -219,7 +219,17 @@ export DATABASE_URL="postgresql:///data_designer"
 | DB integration | 10 | Database round-trips |
 | CLI integration | 11 | End-to-end CLI tests |
 | DSL scenarios | 13 | Valid (8) + error (5) scenarios |
-| **Total** | **149** | |
+| MCP protocol | 12 | MCP server JSON-RPC tests |
+| **Total** | **161** | |
+
+### Running MCP Protocol Tests
+
+```bash
+cd rust/
+./tests/mcp_test.sh
+```
+
+Tests cover: initialize, tools/list, all 8 tools, and full execution scenario.
 
 ## Reference Docs
 
