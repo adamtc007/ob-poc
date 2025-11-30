@@ -1075,10 +1075,11 @@ impl CustomOperation for ResourceActivateOp {
 
             if !missing.is_empty() {
                 // Look up attribute names for error message
+                let missing_uuids: Vec<Uuid> = missing.iter().map(|u| **u).collect();
                 let missing_names: Vec<String> = sqlx::query_scalar(
                     r#"SELECT name FROM "ob-poc".dictionary WHERE attribute_id = ANY($1)"#,
                 )
-                .bind(&missing.iter().map(|u| **u).collect::<Vec<_>>())
+                .bind(missing_uuids)
                 .fetch_all(pool)
                 .await?;
 

@@ -41,7 +41,6 @@ pub enum KycIntent {
     // -------------------------------------------------------------------------
     // CBU Lifecycle
     // -------------------------------------------------------------------------
-    
     /// Create a new individual client (natural person)
     OnboardIndividual {
         client: IndividualClient,
@@ -76,7 +75,6 @@ pub enum KycIntent {
     // -------------------------------------------------------------------------
     // Document Operations
     // -------------------------------------------------------------------------
-
     /// Add a document to an existing CBU
     AddDocument {
         cbu_id: CbuReference,
@@ -94,9 +92,7 @@ pub enum KycIntent {
     },
 
     /// Extract/re-extract attributes from a document
-    ExtractDocument {
-        document_id: DocumentReference,
-    },
+    ExtractDocument { document_id: DocumentReference },
 
     /// Link a document to an entity (e.g., passport to beneficial owner)
     LinkDocumentToEntity {
@@ -107,7 +103,6 @@ pub enum KycIntent {
     // -------------------------------------------------------------------------
     // Entity/Role Operations
     // -------------------------------------------------------------------------
-
     /// Add a beneficial owner to a corporate CBU
     AddBeneficialOwner {
         cbu_id: CbuReference,
@@ -143,7 +138,6 @@ pub enum KycIntent {
     // -------------------------------------------------------------------------
     // KYC/Verification Operations
     // -------------------------------------------------------------------------
-
     /// Run KYC checks on a CBU
     RunKycChecks {
         cbu_id: CbuReference,
@@ -168,11 +162,8 @@ pub enum KycIntent {
     // -------------------------------------------------------------------------
     // Query Operations (read-only)
     // -------------------------------------------------------------------------
-
     /// Get CBU status and summary
-    GetCbuStatus {
-        cbu_id: CbuReference,
-    },
+    GetCbuStatus { cbu_id: CbuReference },
 
     /// List documents for a CBU
     ListDocuments {
@@ -182,9 +173,7 @@ pub enum KycIntent {
     },
 
     /// List beneficial owners for a CBU
-    ListBeneficialOwners {
-        cbu_id: CbuReference,
-    },
+    ListBeneficialOwners { cbu_id: CbuReference },
 }
 
 fn default_true() -> bool {
@@ -217,12 +206,12 @@ impl KycIntent {
 
     /// Check if this intent mutates state
     pub fn is_mutating(&self) -> bool {
-        match self {
+        !matches!(
+            self,
             KycIntent::GetCbuStatus { .. }
-            | KycIntent::ListDocuments { .. }
-            | KycIntent::ListBeneficialOwners { .. } => false,
-            _ => true,
-        }
+                | KycIntent::ListDocuments { .. }
+                | KycIntent::ListBeneficialOwners { .. }
+        )
     }
 }
 
@@ -249,9 +238,11 @@ mod tests {
         }"#;
 
         let intent: KycIntent = serde_json::from_str(json).unwrap();
-        
+
         match intent {
-            KycIntent::OnboardIndividual { client, documents, .. } => {
+            KycIntent::OnboardIndividual {
+                client, documents, ..
+            } => {
                 assert_eq!(client.name, "John Smith");
                 assert_eq!(client.jurisdiction, Some("UK".to_string()));
                 assert_eq!(documents.len(), 1);
@@ -294,9 +285,14 @@ mod tests {
 
         let intent: KycIntent = serde_json::from_str(json).unwrap();
         assert_eq!(intent.intent_name(), "onboard_corporate");
-        
+
         match intent {
-            KycIntent::OnboardCorporate { client, beneficial_owners, directors, .. } => {
+            KycIntent::OnboardCorporate {
+                client,
+                beneficial_owners,
+                directors,
+                ..
+            } => {
                 assert_eq!(client.name, "Acme Holdings Ltd");
                 assert_eq!(beneficial_owners.len(), 1);
                 assert_eq!(beneficial_owners[0].ownership_percentage, 51.0);
@@ -317,9 +313,13 @@ mod tests {
         }"#;
 
         let intent: KycIntent = serde_json::from_str(json).unwrap();
-        
+
         match intent {
-            KycIntent::AddDocument { cbu_id, document, extract_attributes } => {
+            KycIntent::AddDocument {
+                cbu_id,
+                document,
+                extract_attributes,
+            } => {
                 assert!(matches!(cbu_id, CbuReference::ById { .. }));
                 assert_eq!(document.document_type, "PASSPORT_USA");
                 assert!(extract_attributes);
@@ -337,14 +337,12 @@ mod tests {
         }"#;
 
         let intent: KycIntent = serde_json::from_str(json).unwrap();
-        
+
         match intent {
-            KycIntent::AddDocument { cbu_id, .. } => {
-                match cbu_id {
-                    CbuReference::ByCode { code } => assert_eq!(code, "CBU-2024-001"),
-                    _ => panic!("Expected ByCode reference"),
-                }
-            }
+            KycIntent::AddDocument { cbu_id, .. } => match cbu_id {
+                CbuReference::ByCode { code } => assert_eq!(code, "CBU-2024-001"),
+                _ => panic!("Expected ByCode reference"),
+            },
             _ => panic!("Wrong intent type"),
         }
     }

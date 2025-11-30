@@ -205,15 +205,21 @@ struct StateData {
     entity_bindings: Vec<String>,
 }
 
-impl OnboardingBuilder<NoCbu> {
-    /// Start a new onboarding flow - initial state
-    pub fn new() -> Self {
+impl Default for OnboardingBuilder<NoCbu> {
+    fn default() -> Self {
         Self {
             operations: Vec::new(),
             binding_counter: 0,
             _state: PhantomData,
             state_data: None,
         }
+    }
+}
+
+impl OnboardingBuilder<NoCbu> {
+    /// Start a new onboarding flow - initial state
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Create CBU - transitions to CbuCreated state

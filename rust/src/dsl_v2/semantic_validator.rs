@@ -323,6 +323,7 @@ impl SemanticValidator {
     }
 
     /// Validate an argument value - check refs against DB
+    #[allow(clippy::too_many_arguments)]
     async fn validate_argument_value(
         &mut self,
         verb: &str,

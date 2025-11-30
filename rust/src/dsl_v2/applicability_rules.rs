@@ -132,13 +132,11 @@ impl ApplicabilityRules {
     /// Load all rules from database
     #[cfg(feature = "database")]
     pub async fn load(pool: &PgPool) -> Result<Self, String> {
-        let mut rules = Self::default();
-
-        rules.document_rules = Self::load_document_rules(pool).await?;
-        rules.attribute_rules = Self::load_attribute_rules(pool).await?;
-        rules.entity_type_hierarchy = Self::load_entity_hierarchy(pool).await?;
-
-        Ok(rules)
+        Ok(Self {
+            document_rules: Self::load_document_rules(pool).await?,
+            attribute_rules: Self::load_attribute_rules(pool).await?,
+            entity_type_hierarchy: Self::load_entity_hierarchy(pool).await?,
+        })
     }
 
     #[cfg(feature = "database")]
