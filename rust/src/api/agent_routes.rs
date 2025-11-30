@@ -14,7 +14,11 @@
 
 use crate::api::session::{
     create_session_store, ChatRequest, ChatResponse, CreateSessionRequest, CreateSessionResponse,
-    ExecuteResponse, ExecutionResult, SessionState, SessionStateResponse, SessionStore,
+    ExecuteResponse, ExecutionResult, MessageRole, SessionState, SessionStateResponse,
+    SessionStore,
+};
+use crate::database::generation_log_repository::{
+    CompileResult, GenerationAttempt, GenerationLogRepository, LintResult, ParseResult,
 };
 use crate::dsl_v2::{
     compile, domains as dsl_domains, parse_program, verb_count, verbs_for_domain, DslExecutor,
@@ -106,16 +110,19 @@ pub struct AgentState {
     pub pool: PgPool,
     pub dsl_v2_executor: Arc<DslExecutor>,
     pub sessions: SessionStore,
+    pub generation_log: Arc<GenerationLogRepository>,
 }
 
 impl AgentState {
     pub fn new(pool: PgPool) -> Self {
         let dsl_v2_executor = Arc::new(DslExecutor::new(pool.clone()));
         let sessions = create_session_store();
+        let generation_log = Arc::new(GenerationLogRepository::new(pool.clone()));
         Self {
             pool,
             dsl_v2_executor,
             sessions,
+            generation_log,
         }
     }
 }
@@ -238,10 +245,20 @@ async fn execute_session_dsl(
     Json(req): Json<Option<ExecuteDslRequest>>,
 ) -> Result<Json<ExecuteResponse>, StatusCode> {
     // Get or create execution context
-    let (mut context, current_state) = {
+    let (mut context, current_state, user_intent) = {
         let sessions = state.sessions.read().await;
         let session = sessions.get(&session_id).ok_or(StatusCode::NOT_FOUND)?;
-        (session.context.clone(), session.state.clone())
+
+        // Extract user intent from last user message
+        let user_intent = session
+            .messages
+            .iter()
+            .rev()
+            .find(|m| m.role == MessageRole::User)
+            .map(|m| m.content.clone())
+            .unwrap_or_else(|| "Direct DSL execution".to_string());
+
+        (session.context.clone(), session.state.clone(), user_intent)
     };
 
     // Get DSL to execute - either from request or pending in session
@@ -262,6 +279,23 @@ async fn execute_session_dsl(
         }));
     }
 
+    // =========================================================================
+    // START GENERATION LOG
+    // =========================================================================
+    let log_id = state
+        .generation_log
+        .start_log(
+            &user_intent,
+            "session",
+            Some(session_id),
+            context.last_cbu_id,
+            None,
+        )
+        .await
+        .ok();
+
+    let start_time = std::time::Instant::now();
+
     // Create execution context
     let mut exec_ctx = ExecutionContext::new().with_audit_user(&format!("session-{}", session_id));
 
@@ -273,33 +307,105 @@ async fn execute_session_dsl(
         exec_ctx.bind("last_entity", id);
     }
 
-    // Parse DSL
+    // =========================================================================
+    // PARSE DSL
+    // =========================================================================
     let program = match parse_program(&dsl) {
         Ok(p) => p,
         Err(e) => {
+            let parse_error = format!("Parse error: {}", e);
+
+            // Log failed attempt
+            if let Some(lid) = log_id {
+                let attempt = GenerationAttempt {
+                    attempt: 1,
+                    timestamp: chrono::Utc::now(),
+                    prompt_template: None,
+                    prompt_text: String::new(),
+                    raw_response: String::new(),
+                    extracted_dsl: Some(dsl.clone()),
+                    parse_result: ParseResult {
+                        success: false,
+                        error: Some(parse_error.clone()),
+                    },
+                    lint_result: LintResult {
+                        valid: false,
+                        errors: vec![],
+                        warnings: vec![],
+                    },
+                    compile_result: CompileResult {
+                        success: false,
+                        error: None,
+                        step_count: 0,
+                    },
+                    latency_ms: Some(start_time.elapsed().as_millis() as i32),
+                    input_tokens: None,
+                    output_tokens: None,
+                };
+                let _ = state.generation_log.add_attempt(lid, &attempt).await;
+                let _ = state.generation_log.mark_failed(lid).await;
+            }
+
             return Ok(Json(ExecuteResponse {
                 success: false,
                 results: Vec::new(),
-                errors: vec![format!("Parse error: {}", e)],
+                errors: vec![parse_error],
                 new_state: current_state,
             }));
         }
     };
 
-    // Compile to execution plan (handles dependency ordering)
+    // =========================================================================
+    // COMPILE (includes lint)
+    // =========================================================================
     let plan = match compile(&program) {
         Ok(p) => p,
         Err(e) => {
+            let compile_error = format!("Compile error: {}", e);
+
+            // Log failed attempt
+            if let Some(lid) = log_id {
+                let attempt = GenerationAttempt {
+                    attempt: 1,
+                    timestamp: chrono::Utc::now(),
+                    prompt_template: None,
+                    prompt_text: String::new(),
+                    raw_response: String::new(),
+                    extracted_dsl: Some(dsl.clone()),
+                    parse_result: ParseResult {
+                        success: true,
+                        error: None,
+                    },
+                    lint_result: LintResult {
+                        valid: false,
+                        errors: vec![compile_error.clone()],
+                        warnings: vec![],
+                    },
+                    compile_result: CompileResult {
+                        success: false,
+                        error: Some(compile_error.clone()),
+                        step_count: 0,
+                    },
+                    latency_ms: Some(start_time.elapsed().as_millis() as i32),
+                    input_tokens: None,
+                    output_tokens: None,
+                };
+                let _ = state.generation_log.add_attempt(lid, &attempt).await;
+                let _ = state.generation_log.mark_failed(lid).await;
+            }
+
             return Ok(Json(ExecuteResponse {
                 success: false,
                 results: Vec::new(),
-                errors: vec![format!("Compile error: {}", e)],
+                errors: vec![compile_error],
                 new_state: current_state,
             }));
         }
     };
 
-    // Execute
+    // =========================================================================
+    // EXECUTE
+    // =========================================================================
     let mut results = Vec::new();
     let mut all_success = true;
     let mut errors = Vec::new();
@@ -328,11 +434,76 @@ async fn execute_session_dsl(
                     entity_type: None,
                 });
             }
+
+            // =========================================================================
+            // LOG SUCCESS
+            // =========================================================================
+            if let Some(lid) = log_id {
+                let attempt = GenerationAttempt {
+                    attempt: 1,
+                    timestamp: chrono::Utc::now(),
+                    prompt_template: None,
+                    prompt_text: String::new(),
+                    raw_response: String::new(),
+                    extracted_dsl: Some(dsl.clone()),
+                    parse_result: ParseResult {
+                        success: true,
+                        error: None,
+                    },
+                    lint_result: LintResult {
+                        valid: true,
+                        errors: vec![],
+                        warnings: vec![],
+                    },
+                    compile_result: CompileResult {
+                        success: true,
+                        error: None,
+                        step_count: plan.len() as i32,
+                    },
+                    latency_ms: Some(start_time.elapsed().as_millis() as i32),
+                    input_tokens: None,
+                    output_tokens: None,
+                };
+                let _ = state.generation_log.add_attempt(lid, &attempt).await;
+                let _ = state.generation_log.mark_success(lid, &dsl, None).await;
+            }
         }
         Err(e) => {
             all_success = false;
             let error_msg = format!("Execution error: {}", e);
             errors.push(error_msg.clone());
+
+            // Log execution failure
+            if let Some(lid) = log_id {
+                let attempt = GenerationAttempt {
+                    attempt: 1,
+                    timestamp: chrono::Utc::now(),
+                    prompt_template: None,
+                    prompt_text: String::new(),
+                    raw_response: String::new(),
+                    extracted_dsl: Some(dsl.clone()),
+                    parse_result: ParseResult {
+                        success: true,
+                        error: None,
+                    },
+                    lint_result: LintResult {
+                        valid: true,
+                        errors: vec![],
+                        warnings: vec![],
+                    },
+                    compile_result: CompileResult {
+                        success: true,
+                        error: None,
+                        step_count: plan.len() as i32,
+                    },
+                    latency_ms: Some(start_time.elapsed().as_millis() as i32),
+                    input_tokens: None,
+                    output_tokens: None,
+                };
+                let _ = state.generation_log.add_attempt(lid, &attempt).await;
+                let _ = state.generation_log.mark_failed(lid).await;
+            }
+
             results.push(ExecutionResult {
                 statement_index: 0,
                 dsl: dsl.clone(),

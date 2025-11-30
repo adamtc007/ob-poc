@@ -64,6 +64,7 @@ clap = { version = "4.5", features = ["derive", "env"], optional = true }
 colored = { version = "2.1", optional = true }
 atty = { version = "0.2", optional = true }
 futures = "0.3"
+dotenvy = "0.15"
 
 # Serialization/Deserialization
 # serde is already included above
@@ -94,6 +95,11 @@ required-features = ["cli"]
 name = "dsl_mcp"
 path = "src/bin/dsl_mcp.rs"
 required-features = ["mcp"]
+
+[[bin]]
+name = "run_e2e_tests"
+path = "src/bin/run_e2e_tests.rs"
+required-features = ["database"]
 
 # Features for conditional compilation
 [features]

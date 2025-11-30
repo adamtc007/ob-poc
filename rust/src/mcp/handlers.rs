@@ -7,6 +7,9 @@ use serde_json::{json, Value};
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::database::generation_log_repository::{
+    CompileResult, GenerationAttempt, GenerationLogRepository, LintResult, ParseResult,
+};
 use crate::dsl_v2::{compile, parse_program, registry, DslExecutor, ExecutionContext};
 
 use super::protocol::ToolCallResult;
@@ -14,11 +17,15 @@ use super::protocol::ToolCallResult;
 /// Tool handlers with database access
 pub struct ToolHandlers {
     pool: PgPool,
+    generation_log: GenerationLogRepository,
 }
 
 impl ToolHandlers {
     pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+        Self {
+            generation_log: GenerationLogRepository::new(pool.clone()),
+            pool,
+        }
     }
 
     /// Handle a tool call by name
@@ -85,10 +92,138 @@ impl ToolHandlers {
             .ok_or_else(|| anyhow!("source required"))?;
         let dry_run = args["dry_run"].as_bool().unwrap_or(false);
 
-        let ast = parse_program(source).map_err(|e| anyhow!("Parse error: {:?}", e))?;
-        let plan = compile(&ast).map_err(|e| anyhow!("Compile error: {:?}", e))?;
+        // Extract user_intent if provided, otherwise use a default
+        let user_intent = args["intent"].as_str().unwrap_or("MCP tool execution");
+
+        // Start generation log
+        let log_id = self
+            .generation_log
+            .start_log(
+                user_intent,
+                "mcp",
+                None, // session_id
+                None, // cbu_id
+                None, // model
+            )
+            .await
+            .ok();
+
+        let start_time = std::time::Instant::now();
+
+        // Parse
+        let ast = match parse_program(source) {
+            Ok(a) => a,
+            Err(e) => {
+                let parse_error = format!("{:?}", e);
+
+                // Log parse failure
+                if let Some(lid) = log_id {
+                    let attempt = GenerationAttempt {
+                        attempt: 1,
+                        timestamp: chrono::Utc::now(),
+                        prompt_template: None,
+                        prompt_text: String::new(),
+                        raw_response: String::new(),
+                        extracted_dsl: Some(source.to_string()),
+                        parse_result: ParseResult {
+                            success: false,
+                            error: Some(parse_error.clone()),
+                        },
+                        lint_result: LintResult {
+                            valid: false,
+                            errors: vec![],
+                            warnings: vec![],
+                        },
+                        compile_result: CompileResult {
+                            success: false,
+                            error: None,
+                            step_count: 0,
+                        },
+                        latency_ms: Some(start_time.elapsed().as_millis() as i32),
+                        input_tokens: None,
+                        output_tokens: None,
+                    };
+                    let _ = self.generation_log.add_attempt(lid, &attempt).await;
+                    let _ = self.generation_log.mark_failed(lid).await;
+                }
+
+                return Err(anyhow!("Parse error: {:?}", e));
+            }
+        };
+
+        // Compile
+        let plan = match compile(&ast) {
+            Ok(p) => p,
+            Err(e) => {
+                let compile_error = format!("{:?}", e);
+
+                // Log compile failure
+                if let Some(lid) = log_id {
+                    let attempt = GenerationAttempt {
+                        attempt: 1,
+                        timestamp: chrono::Utc::now(),
+                        prompt_template: None,
+                        prompt_text: String::new(),
+                        raw_response: String::new(),
+                        extracted_dsl: Some(source.to_string()),
+                        parse_result: ParseResult {
+                            success: true,
+                            error: None,
+                        },
+                        lint_result: LintResult {
+                            valid: false,
+                            errors: vec![compile_error.clone()],
+                            warnings: vec![],
+                        },
+                        compile_result: CompileResult {
+                            success: false,
+                            error: Some(compile_error.clone()),
+                            step_count: 0,
+                        },
+                        latency_ms: Some(start_time.elapsed().as_millis() as i32),
+                        input_tokens: None,
+                        output_tokens: None,
+                    };
+                    let _ = self.generation_log.add_attempt(lid, &attempt).await;
+                    let _ = self.generation_log.mark_failed(lid).await;
+                }
+
+                return Err(anyhow!("Compile error: {:?}", e));
+            }
+        };
 
         if dry_run {
+            // Mark as successful for dry_run (no execution needed)
+            if let Some(lid) = log_id {
+                let attempt = GenerationAttempt {
+                    attempt: 1,
+                    timestamp: chrono::Utc::now(),
+                    prompt_template: None,
+                    prompt_text: String::new(),
+                    raw_response: String::new(),
+                    extracted_dsl: Some(source.to_string()),
+                    parse_result: ParseResult {
+                        success: true,
+                        error: None,
+                    },
+                    lint_result: LintResult {
+                        valid: true,
+                        errors: vec![],
+                        warnings: vec![],
+                    },
+                    compile_result: CompileResult {
+                        success: true,
+                        error: None,
+                        step_count: plan.len() as i32,
+                    },
+                    latency_ms: Some(start_time.elapsed().as_millis() as i32),
+                    input_tokens: None,
+                    output_tokens: None,
+                };
+                let _ = self.generation_log.add_attempt(lid, &attempt).await;
+                let _ = self.generation_log.mark_success(lid, source, None).await;
+            }
+
             let steps: Vec<_> = plan
                 .steps
                 .iter()
@@ -114,6 +249,37 @@ impl ToolHandlers {
 
         match executor.execute_plan(&plan, &mut ctx).await {
             Ok(results) => {
+                // Log success
+                if let Some(lid) = log_id {
+                    let attempt = GenerationAttempt {
+                        attempt: 1,
+                        timestamp: chrono::Utc::now(),
+                        prompt_template: None,
+                        prompt_text: String::new(),
+                        raw_response: String::new(),
+                        extracted_dsl: Some(source.to_string()),
+                        parse_result: ParseResult {
+                            success: true,
+                            error: None,
+                        },
+                        lint_result: LintResult {
+                            valid: true,
+                            errors: vec![],
+                            warnings: vec![],
+                        },
+                        compile_result: CompileResult {
+                            success: true,
+                            error: None,
+                            step_count: plan.len() as i32,
+                        },
+                        latency_ms: Some(start_time.elapsed().as_millis() as i32),
+                        input_tokens: None,
+                        output_tokens: None,
+                    };
+                    let _ = self.generation_log.add_attempt(lid, &attempt).await;
+                    let _ = self.generation_log.mark_success(lid, source, None).await;
+                }
+
                 let bindings: serde_json::Map<_, _> = ctx
                     .symbols
                     .iter()
@@ -126,11 +292,44 @@ impl ToolHandlers {
                     "bindings": bindings
                 }))
             }
-            Err(e) => Ok(json!({
-                "success": false,
-                "error": e.to_string(),
-                "completed": ctx.symbols.len()
-            })),
+            Err(e) => {
+                // Log execution failure
+                if let Some(lid) = log_id {
+                    let attempt = GenerationAttempt {
+                        attempt: 1,
+                        timestamp: chrono::Utc::now(),
+                        prompt_template: None,
+                        prompt_text: String::new(),
+                        raw_response: String::new(),
+                        extracted_dsl: Some(source.to_string()),
+                        parse_result: ParseResult {
+                            success: true,
+                            error: None,
+                        },
+                        lint_result: LintResult {
+                            valid: true,
+                            errors: vec![],
+                            warnings: vec![],
+                        },
+                        compile_result: CompileResult {
+                            success: true,
+                            error: None,
+                            step_count: plan.len() as i32,
+                        },
+                        latency_ms: Some(start_time.elapsed().as_millis() as i32),
+                        input_tokens: None,
+                        output_tokens: None,
+                    };
+                    let _ = self.generation_log.add_attempt(lid, &attempt).await;
+                    let _ = self.generation_log.mark_failed(lid).await;
+                }
+
+                Ok(json!({
+                    "success": false,
+                    "error": e.to_string(),
+                    "completed": ctx.symbols.len()
+                }))
+            }
         }
     }
 

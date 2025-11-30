@@ -13,6 +13,12 @@ pub use entity_search::{
     EntityMatch, EntitySearchRequest, EntitySearchResponse, EntitySearchService, EntityType,
 };
 
+// Agent E2E test harness
+#[cfg(feature = "database")]
+pub mod agent_e2e_test_harness;
+#[cfg(feature = "database")]
+pub use agent_e2e_test_harness::{AgentE2ETestHarness, E2ETestScenario, TestResult};
+
 // Attribute services
 pub mod attribute_executor;
 pub mod attribute_lifecycle;
