@@ -11,6 +11,11 @@
 //! - GET    /api/agent/domains      - List available DSL domains
 //! - GET    /api/agent/vocabulary   - Get vocabulary for a domain
 //! - GET    /api/agent/health       - Health check
+//!
+//! Onboarding endpoints:
+//! - POST   /api/agent/onboard           - Generate onboarding DSL from natural language
+//! - GET    /api/agent/onboard/templates - List available onboarding templates
+//! - POST   /api/agent/onboard/render    - Render an onboarding template with parameters
 
 use crate::api::session::{
     create_session_store, ChatRequest, ChatResponse, CreateSessionRequest, CreateSessionResponse,
@@ -24,6 +29,7 @@ use crate::dsl_v2::{
     compile, domains as dsl_domains, parse_program, verb_count, verbs_for_domain, DslExecutor,
     ExecutionContext, ExecutionResult as DslV2Result,
 };
+use crate::templates::{OnboardingRenderer, OnboardingTemplateRegistry};
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
@@ -115,6 +121,83 @@ pub struct HealthResponse {
 }
 
 // ============================================================================
+// Onboarding Request/Response Types
+// ============================================================================
+
+/// Request to generate onboarding DSL from natural language
+#[derive(Debug, Deserialize)]
+pub struct OnboardingRequest {
+    /// Natural language description of the onboarding request
+    pub description: String,
+    /// Whether to execute the DSL after generation
+    #[serde(default)]
+    pub execute: bool,
+}
+
+/// Response from onboarding DSL generation
+#[derive(Debug, Serialize)]
+pub struct OnboardingResponse {
+    /// Generated DSL code
+    pub dsl: Option<String>,
+    /// Explanation of what was generated
+    pub explanation: Option<String>,
+    /// Validation result
+    pub validation: Option<ValidationResult>,
+    /// Execution result (if execute=true)
+    pub execution: Option<OnboardingExecutionResult>,
+    /// Error message if generation failed
+    pub error: Option<String>,
+}
+
+/// Result of executing onboarding DSL
+#[derive(Debug, Serialize)]
+pub struct OnboardingExecutionResult {
+    pub success: bool,
+    pub cbu_id: Option<Uuid>,
+    pub resource_count: usize,
+    pub delivery_count: usize,
+    pub errors: Vec<String>,
+}
+
+/// Request to render a specific onboarding template
+#[derive(Debug, Deserialize)]
+pub struct RenderTemplateRequest {
+    /// Template ID (e.g., "onboarding_global_custody")
+    pub template_id: String,
+    /// Parameters for the template
+    pub parameters: std::collections::HashMap<String, String>,
+    /// Whether to execute the rendered DSL
+    #[serde(default)]
+    pub execute: bool,
+}
+
+/// Response listing available onboarding templates
+#[derive(Debug, Serialize)]
+pub struct OnboardingTemplatesResponse {
+    pub templates: Vec<OnboardingTemplateInfo>,
+}
+
+/// Information about an onboarding template
+#[derive(Debug, Serialize)]
+pub struct OnboardingTemplateInfo {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub product_code: String,
+    pub parameters: Vec<OnboardingParamInfo>,
+}
+
+/// Information about a template parameter
+#[derive(Debug, Serialize)]
+pub struct OnboardingParamInfo {
+    pub name: String,
+    pub display: String,
+    pub required: bool,
+    pub default: Option<String>,
+    pub options: Option<Vec<String>>,
+}
+
+// ============================================================================
 // State
 // ============================================================================
 
@@ -161,6 +244,16 @@ pub fn create_agent_router(pool: PgPool) -> Router {
         .route("/api/agent/domains", get(list_domains))
         .route("/api/agent/vocabulary", get(get_vocabulary))
         .route("/api/agent/health", get(health_check))
+        // Onboarding
+        .route("/api/agent/onboard", post(generate_onboarding_dsl))
+        .route(
+            "/api/agent/onboard/templates",
+            get(list_onboarding_templates),
+        )
+        .route(
+            "/api/agent/onboard/render",
+            post(render_onboarding_template),
+        )
         .with_state(state)
 }
 
@@ -594,7 +687,7 @@ async fn generate_dsl(Json(req): Json<GenerateDslRequest>) -> Json<GenerateDslRe
     // Get vocabulary for the prompt
     let vocab = build_vocab_prompt(req.domain.as_deref());
 
-    // Build the system prompt
+    // Build the system prompt with onboarding context
     let system_prompt = format!(
         r#"You are a DSL generator for a KYC/AML onboarding system.
 Generate valid DSL S-expressions from natural language instructions.
@@ -606,11 +699,152 @@ DSL SYNTAX:
 - Format: (domain.verb :key "value" :key2 value2)
 - Strings must be quoted: "text"
 - Numbers are unquoted: 42, 25.5
-- References start with @: @entity-ref
+- References start with @: @symbol_name (use underscores, not hyphens)
 - Use :as @name to capture results
 
-EXAMPLES:
-(cbu.ensure :name "Acme Corp" :jurisdiction "GB" :client-type "COMPANY" :as @cbu)
+## ONBOARDING DSL GENERATION
+
+You can generate DSL to onboard clients to financial services products. The taxonomy is:
+
+**Product** → **Service** → **Resource Instance**
+
+### Available Products
+
+| Code | Name | Description |
+|------|------|-------------|
+| `GLOB_CUSTODY` | Global Custody | Asset safekeeping, settlement, corporate actions |
+| `FUND_ACCT` | Fund Accounting | NAV calculation, investor accounting, reporting |
+| `MO_IBOR` | Middle Office IBOR | Position management, trade capture, P&L attribution |
+
+### Product → Service Mappings
+
+**Global Custody (GLOB_CUSTODY):**
+- `SAFEKEEPING` - Asset Safekeeping (mandatory) → uses CUSTODY_ACCT
+- `SETTLEMENT` - Trade Settlement (mandatory) → uses SETTLE_ACCT, SWIFT_CONN
+- `CORP_ACTIONS` - Corporate Actions (mandatory)
+
+**Fund Accounting (FUND_ACCT):**
+- `NAV_CALC` - NAV Calculation (mandatory) → uses NAV_ENGINE
+- `INVESTOR_ACCT` - Investor Accounting (mandatory) → uses INVESTOR_LEDGER
+- `FUND_REPORTING` - Fund Reporting (mandatory)
+
+**Middle Office IBOR (MO_IBOR):**
+- `POSITION_MGMT` - Position Management (mandatory) → uses IBOR_SYSTEM
+- `TRADE_CAPTURE` - Trade Capture (mandatory) → uses IBOR_SYSTEM
+- `PNL_ATTRIB` - P&L Attribution (mandatory) → uses PNL_ENGINE
+
+### Resource Types and Required Attributes
+
+**CUSTODY_ACCT** (Custody Account):
+- `resource.account.account_number` (required)
+- `resource.account.account_name` (required)
+- `resource.account.base_currency` (required) - USD, EUR, GBP, etc.
+- `resource.account.account_type` (required) - SEGREGATED or OMNIBUS
+
+**SETTLE_ACCT** (Settlement Account):
+- `resource.account.account_number` (required)
+- `resource.settlement.bic_code` (required)
+- `resource.settlement.settlement_currency` (required)
+
+**SWIFT_CONN** (SWIFT Connection):
+- `resource.settlement.bic_code` (required)
+- `resource.swift.logical_terminal` (required)
+- `resource.swift.message_types` (required) - JSON array like "[\"MT540\", \"MT541\", \"MT950\"]"
+
+**NAV_ENGINE** (NAV Calculation Engine):
+- `resource.fund.fund_code` (required)
+- `resource.fund.valuation_frequency` (required) - DAILY, WEEKLY, or MONTHLY
+- `resource.fund.pricing_source` (required) - Bloomberg, Reuters, ICE
+- `resource.fund.nav_cutoff_time` (required) - e.g., "16:00 CET"
+
+**IBOR_SYSTEM** (IBOR System):
+- `resource.ibor.portfolio_code` (required)
+- `resource.ibor.accounting_basis` (required) - TRADE_DATE or SETTLEMENT_DATE
+- `resource.account.base_currency` (required)
+- `resource.ibor.position_source` (required)
+
+### Onboarding DSL Pattern
+
+Always follow this sequence for onboarding:
+1. Create CBU with `cbu.ensure`
+2. Create Resource Instances with `resource.create`
+3. Set Attributes with `resource.set-attr` for all required attributes
+4. Activate Resources with `resource.activate`
+5. Record Deliveries with `delivery.record`
+6. Complete Deliveries with `delivery.complete`
+
+### Client Types
+- `fund` - Investment fund
+- `corporate` - Corporate client
+- `individual` - Individual client
+
+### Common Jurisdictions
+- `US` - United States
+- `UK` - United Kingdom
+- `LU` - Luxembourg
+- `IE` - Ireland
+
+### ONBOARDING EXAMPLE: Global Custody
+
+User: "Onboard Apex Capital as a US hedge fund for Global Custody with a segregated USD account"
+
+```
+;; Create the client
+(cbu.ensure
+    :name "Apex Capital"
+    :jurisdiction "US"
+    :client-type "fund"
+    :as @apex)
+
+;; Create Custody Account
+(resource.create
+    :cbu-id @apex
+    :resource-type "CUSTODY_ACCT"
+    :instance-url "https://custody.bank.com/accounts/apex-capital-001"
+    :instance-id "APEX-CUSTODY-001"
+    :instance-name "Apex Capital Custody Account"
+    :as @custody)
+
+;; Set required attributes
+(resource.set-attr :instance-id @custody :attr "resource.account.account_number" :value "CUST-APEX-001")
+(resource.set-attr :instance-id @custody :attr "resource.account.account_name" :value "Apex Capital - Main Custody")
+(resource.set-attr :instance-id @custody :attr "resource.account.base_currency" :value "USD")
+(resource.set-attr :instance-id @custody :attr "resource.account.account_type" :value "SEGREGATED")
+
+;; Activate and deliver
+(resource.activate :instance-id @custody)
+(delivery.record :cbu-id @apex :product "GLOB_CUSTODY" :service "SAFEKEEPING" :instance-id @custody)
+(delivery.complete :cbu-id @apex :product "GLOB_CUSTODY" :service "SAFEKEEPING")
+```
+
+### ONBOARDING EXAMPLE: Fund Accounting
+
+User: "Set up Pacific Growth Fund for daily NAV with Bloomberg pricing"
+
+```
+(cbu.ensure :name "Pacific Growth Fund" :jurisdiction "LU" :client-type "fund" :as @pgf)
+
+(resource.create
+    :cbu-id @pgf
+    :resource-type "NAV_ENGINE"
+    :instance-url "https://nav.fundservices.com/funds/pgf-001"
+    :instance-id "PGF-NAV-001"
+    :instance-name "Pacific Growth Fund NAV"
+    :as @nav)
+
+(resource.set-attr :instance-id @nav :attr "resource.fund.fund_code" :value "PGF-LU-001")
+(resource.set-attr :instance-id @nav :attr "resource.fund.valuation_frequency" :value "DAILY")
+(resource.set-attr :instance-id @nav :attr "resource.fund.pricing_source" :value "Bloomberg")
+(resource.set-attr :instance-id @nav :attr "resource.fund.nav_cutoff_time" :value "16:00 CET")
+
+(resource.activate :instance-id @nav)
+(delivery.record :cbu-id @pgf :product "FUND_ACCT" :service "NAV_CALC" :instance-id @nav)
+(delivery.complete :cbu-id @pgf :product "FUND_ACCT" :service "NAV_CALC")
+```
+
+### NON-ONBOARDING EXAMPLES
+
+(cbu.ensure :name "Acme Corp" :jurisdiction "GB" :client-type "corporate" :as @cbu)
 (entity.create-proper-person :first-name "John" :last-name "Smith" :date-of-birth "1980-01-15" :as @john)
 (entity.create-limited-company :name "Holdings Ltd" :jurisdiction "GB" :as @company)
 (cbu.assign-role :cbu-id @cbu :entity-id @john :role "DIRECTOR")
@@ -821,6 +1055,243 @@ async fn health_check() -> Json<HealthResponse> {
 }
 
 // ============================================================================
+// Onboarding Handlers
+// ============================================================================
+
+/// POST /api/agent/onboard - Generate onboarding DSL from natural language
+///
+/// Uses the enhanced system prompt with onboarding context to generate
+/// complete onboarding workflows from natural language descriptions.
+async fn generate_onboarding_dsl(
+    State(state): State<AgentState>,
+    Json(req): Json<OnboardingRequest>,
+) -> Json<OnboardingResponse> {
+    // Use the existing generate_dsl logic with onboarding-focused instruction
+    let generate_req = GenerateDslRequest {
+        instruction: req.description.clone(),
+        domain: None, // Let it use all domains including resource and delivery
+    };
+
+    let gen_response = generate_dsl(Json(generate_req)).await;
+
+    match (gen_response.dsl, gen_response.error) {
+        (Some(dsl), None) => {
+            // Validate the generated DSL
+            let validation = match parse_program(&dsl) {
+                Ok(_) => ValidationResult {
+                    valid: true,
+                    errors: vec![],
+                    warnings: vec![],
+                },
+                Err(e) => ValidationResult {
+                    valid: false,
+                    errors: vec![ValidationError {
+                        line: None,
+                        column: None,
+                        message: e,
+                        suggestion: None,
+                    }],
+                    warnings: vec![],
+                },
+            };
+
+            // Execute if requested and valid
+            let execution = if req.execute && validation.valid {
+                match execute_onboarding_dsl(&state, &dsl).await {
+                    Ok(result) => Some(result),
+                    Err(e) => Some(OnboardingExecutionResult {
+                        success: false,
+                        cbu_id: None,
+                        resource_count: 0,
+                        delivery_count: 0,
+                        errors: vec![e],
+                    }),
+                }
+            } else {
+                None
+            };
+
+            Json(OnboardingResponse {
+                dsl: Some(dsl),
+                explanation: Some("Onboarding DSL generated successfully".to_string()),
+                validation: Some(validation),
+                execution,
+                error: None,
+            })
+        }
+        (_, Some(error)) => Json(OnboardingResponse {
+            dsl: None,
+            explanation: None,
+            validation: None,
+            execution: None,
+            error: Some(error),
+        }),
+        _ => Json(OnboardingResponse {
+            dsl: None,
+            explanation: None,
+            validation: None,
+            execution: None,
+            error: Some("Unknown error generating DSL".to_string()),
+        }),
+    }
+}
+
+/// GET /api/agent/onboard/templates - List available onboarding templates
+async fn list_onboarding_templates() -> Json<OnboardingTemplatesResponse> {
+    let registry = OnboardingTemplateRegistry::new();
+    let templates: Vec<OnboardingTemplateInfo> = registry
+        .list()
+        .iter()
+        .map(|t| OnboardingTemplateInfo {
+            id: t.id.clone(),
+            name: t.name.clone(),
+            description: t.description.clone(),
+            product_code: t.product_code.clone(),
+            parameters: t
+                .parameters
+                .iter()
+                .map(|p| OnboardingParamInfo {
+                    name: p.name.clone(),
+                    display: p.display.clone(),
+                    required: p.required,
+                    default: p.default.clone(),
+                    options: p.options.clone(),
+                })
+                .collect(),
+        })
+        .collect();
+
+    Json(OnboardingTemplatesResponse { templates })
+}
+
+/// POST /api/agent/onboard/render - Render an onboarding template with parameters
+async fn render_onboarding_template(
+    State(state): State<AgentState>,
+    Json(req): Json<RenderTemplateRequest>,
+) -> Json<OnboardingResponse> {
+    let registry = OnboardingTemplateRegistry::new();
+
+    let template = match registry.get(&req.template_id) {
+        Some(t) => t,
+        None => {
+            return Json(OnboardingResponse {
+                dsl: None,
+                explanation: None,
+                validation: None,
+                execution: None,
+                error: Some(format!("Template not found: {}", req.template_id)),
+            });
+        }
+    };
+
+    // Render the template
+    let dsl = match OnboardingRenderer::render(template, &req.parameters) {
+        Ok(rendered) => rendered,
+        Err(e) => {
+            return Json(OnboardingResponse {
+                dsl: None,
+                explanation: None,
+                validation: None,
+                execution: None,
+                error: Some(format!("Failed to render template: {}", e)),
+            });
+        }
+    };
+
+    // Validate
+    let validation = match parse_program(&dsl) {
+        Ok(_) => ValidationResult {
+            valid: true,
+            errors: vec![],
+            warnings: vec![],
+        },
+        Err(e) => ValidationResult {
+            valid: false,
+            errors: vec![ValidationError {
+                line: None,
+                column: None,
+                message: e,
+                suggestion: None,
+            }],
+            warnings: vec![],
+        },
+    };
+
+    // Execute if requested
+    let execution = if req.execute && validation.valid {
+        match execute_onboarding_dsl(&state, &dsl).await {
+            Ok(result) => Some(result),
+            Err(e) => Some(OnboardingExecutionResult {
+                success: false,
+                cbu_id: None,
+                resource_count: 0,
+                delivery_count: 0,
+                errors: vec![e],
+            }),
+        }
+    } else {
+        None
+    };
+
+    Json(OnboardingResponse {
+        dsl: Some(dsl),
+        explanation: Some(format!("Rendered template: {}", template.name)),
+        validation: Some(validation),
+        execution,
+        error: None,
+    })
+}
+
+/// Helper: Execute onboarding DSL and count results
+async fn execute_onboarding_dsl(
+    state: &AgentState,
+    dsl: &str,
+) -> Result<OnboardingExecutionResult, String> {
+    let program = parse_program(dsl).map_err(|e| format!("Parse error: {}", e))?;
+    let plan = compile(&program).map_err(|e| format!("Compile error: {}", e))?;
+
+    let mut ctx = ExecutionContext::new();
+    state
+        .dsl_v2_executor
+        .execute_plan(&plan, &mut ctx)
+        .await
+        .map_err(|e| format!("Execution error: {}", e))?;
+
+    // Count resources and deliveries from bindings
+    let cbu_id = ctx.get("cbu_id").or_else(|| ctx.get("client")).copied();
+
+    // Count resource instances (symbols starting with custody, settle, swift, nav, ibor, pnl)
+    let resource_count = ctx
+        .bindings()
+        .keys()
+        .filter(|k| {
+            k.contains("custody")
+                || k.contains("settle")
+                || k.contains("swift")
+                || k.contains("nav")
+                || k.contains("ibor")
+                || k.contains("pnl")
+                || k.contains("ledger")
+        })
+        .count();
+
+    // Count deliveries
+    let delivery_count = ctx
+        .bindings()
+        .keys()
+        .filter(|k| k.contains("delivery"))
+        .count();
+
+    Ok(OnboardingExecutionResult {
+        success: true,
+        cbu_id,
+        resource_count,
+        delivery_count,
+        errors: vec![],
+    })
+}
+
+// ============================================================================
 // Helpers
 // ============================================================================
 
@@ -834,6 +1305,8 @@ fn get_domain_description(domain: &str) -> String {
         "decision" => "Approval workflow and decision management".to_string(),
         "monitoring" => "Ongoing monitoring and periodic reviews".to_string(),
         "attribute" => "Attribute value management".to_string(),
+        "resource" => "Resource instance management for onboarding".to_string(),
+        "delivery" => "Service delivery tracking for onboarding".to_string(),
         _ => format!("{} domain operations", domain),
     }
 }
