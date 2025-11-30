@@ -521,6 +521,260 @@ fn custom_ops_definitions() -> Vec<CustomOpStaticDef> {
                 },
             ],
         },
+        // =====================================================================
+        // Resource Instance operations
+        // =====================================================================
+        CustomOpStaticDef {
+            domain: "resource",
+            verb: "create",
+            op_id: "resource.create",
+            description: "Create a resource instance for a CBU",
+            args: vec![
+                ArgDef {
+                    name: "cbu-id",
+                    arg_type: "ref:cbu",
+                    required: true,
+                    description: "CBU reference",
+                },
+                ArgDef {
+                    name: "resource-type",
+                    arg_type: "string",
+                    required: true,
+                    description: "Resource type code (e.g., DTCC_SETTLE)",
+                },
+                ArgDef {
+                    name: "instance-url",
+                    arg_type: "string",
+                    required: true,
+                    description: "Unique URL/endpoint for this instance",
+                },
+                ArgDef {
+                    name: "instance-id",
+                    arg_type: "string",
+                    required: false,
+                    description: "Instance identifier (account #, user ID)",
+                },
+                ArgDef {
+                    name: "instance-name",
+                    arg_type: "string",
+                    required: false,
+                    description: "Human-readable instance name",
+                },
+                ArgDef {
+                    name: "product-id",
+                    arg_type: "ref:product",
+                    required: false,
+                    description: "Product reference",
+                },
+                ArgDef {
+                    name: "service-id",
+                    arg_type: "ref:service",
+                    required: false,
+                    description: "Service reference",
+                },
+                ArgDef {
+                    name: "config",
+                    arg_type: "map",
+                    required: false,
+                    description: "Instance configuration JSON",
+                },
+            ],
+        },
+        CustomOpStaticDef {
+            domain: "resource",
+            verb: "set-attr",
+            op_id: "resource.set_attr",
+            description: "Set an attribute value on a resource instance",
+            args: vec![
+                ArgDef {
+                    name: "instance-id",
+                    arg_type: "ref:instance",
+                    required: true,
+                    description: "Resource instance reference",
+                },
+                ArgDef {
+                    name: "attr",
+                    arg_type: "string",
+                    required: true,
+                    description: "Attribute name from dictionary",
+                },
+                ArgDef {
+                    name: "value",
+                    arg_type: "string",
+                    required: true,
+                    description: "Attribute value",
+                },
+                ArgDef {
+                    name: "state",
+                    arg_type: "string",
+                    required: false,
+                    description: "Value state: proposed, confirmed, derived, system",
+                },
+                ArgDef {
+                    name: "source",
+                    arg_type: "map",
+                    required: false,
+                    description: "Value provenance metadata",
+                },
+            ],
+        },
+        CustomOpStaticDef {
+            domain: "resource",
+            verb: "activate",
+            op_id: "resource.activate",
+            description: "Activate a resource instance (PENDING -> ACTIVE)",
+            args: vec![ArgDef {
+                name: "instance-id",
+                arg_type: "ref:instance",
+                required: true,
+                description: "Resource instance reference",
+            }],
+        },
+        CustomOpStaticDef {
+            domain: "resource",
+            verb: "suspend",
+            op_id: "resource.suspend",
+            description: "Suspend a resource instance",
+            args: vec![
+                ArgDef {
+                    name: "instance-id",
+                    arg_type: "ref:instance",
+                    required: true,
+                    description: "Resource instance reference",
+                },
+                ArgDef {
+                    name: "reason",
+                    arg_type: "string",
+                    required: false,
+                    description: "Suspension reason",
+                },
+            ],
+        },
+        CustomOpStaticDef {
+            domain: "resource",
+            verb: "decommission",
+            op_id: "resource.decommission",
+            description: "Decommission a resource instance",
+            args: vec![
+                ArgDef {
+                    name: "instance-id",
+                    arg_type: "ref:instance",
+                    required: true,
+                    description: "Resource instance reference",
+                },
+                ArgDef {
+                    name: "reason",
+                    arg_type: "string",
+                    required: false,
+                    description: "Decommission reason",
+                },
+            ],
+        },
+        // =====================================================================
+        // Service Delivery operations
+        // =====================================================================
+        CustomOpStaticDef {
+            domain: "delivery",
+            verb: "record",
+            op_id: "delivery.record",
+            description: "Record a service delivery for a CBU",
+            args: vec![
+                ArgDef {
+                    name: "cbu-id",
+                    arg_type: "ref:cbu",
+                    required: true,
+                    description: "CBU reference",
+                },
+                ArgDef {
+                    name: "product",
+                    arg_type: "string",
+                    required: true,
+                    description: "Product code",
+                },
+                ArgDef {
+                    name: "service",
+                    arg_type: "string",
+                    required: true,
+                    description: "Service code",
+                },
+                ArgDef {
+                    name: "instance-id",
+                    arg_type: "ref:instance",
+                    required: false,
+                    description: "Resource instance reference",
+                },
+                ArgDef {
+                    name: "config",
+                    arg_type: "map",
+                    required: false,
+                    description: "Service configuration options",
+                },
+            ],
+        },
+        CustomOpStaticDef {
+            domain: "delivery",
+            verb: "complete",
+            op_id: "delivery.complete",
+            description: "Mark a service delivery as complete",
+            args: vec![
+                ArgDef {
+                    name: "cbu-id",
+                    arg_type: "ref:cbu",
+                    required: true,
+                    description: "CBU reference",
+                },
+                ArgDef {
+                    name: "product",
+                    arg_type: "string",
+                    required: true,
+                    description: "Product code",
+                },
+                ArgDef {
+                    name: "service",
+                    arg_type: "string",
+                    required: true,
+                    description: "Service code",
+                },
+                ArgDef {
+                    name: "instance-id",
+                    arg_type: "ref:instance",
+                    required: false,
+                    description: "Resource instance reference (optional update)",
+                },
+            ],
+        },
+        CustomOpStaticDef {
+            domain: "delivery",
+            verb: "fail",
+            op_id: "delivery.fail",
+            description: "Mark a service delivery as failed",
+            args: vec![
+                ArgDef {
+                    name: "cbu-id",
+                    arg_type: "ref:cbu",
+                    required: true,
+                    description: "CBU reference",
+                },
+                ArgDef {
+                    name: "product",
+                    arg_type: "string",
+                    required: true,
+                    description: "Product code",
+                },
+                ArgDef {
+                    name: "service",
+                    arg_type: "string",
+                    required: true,
+                    description: "Service code",
+                },
+                ArgDef {
+                    name: "reason",
+                    arg_type: "string",
+                    required: true,
+                    description: "Failure reason",
+                },
+            ],
+        },
     ]
 }
 
@@ -550,6 +804,8 @@ fn infer_arg_type(arg_name: &str) -> &'static str {
             "event" => "ref:event",
             "link" => "ref:link",
             "result" => "ref:result",
+            "instance" => "ref:instance",
+            "delivery" => "ref:delivery",
             _ => "uuid",
         }
     } else {

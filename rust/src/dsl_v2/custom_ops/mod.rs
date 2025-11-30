@@ -78,6 +78,18 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(ScreeningPepOp));
         registry.register(Arc::new(ScreeningSanctionsOp));
 
+        // Resource instance operations
+        registry.register(Arc::new(ResourceCreateOp));
+        registry.register(Arc::new(ResourceSetAttrOp));
+        registry.register(Arc::new(ResourceActivateOp));
+        registry.register(Arc::new(ResourceSuspendOp));
+        registry.register(Arc::new(ResourceDecommissionOp));
+
+        // Service delivery operations
+        registry.register(Arc::new(DeliveryRecordOp));
+        registry.register(Arc::new(DeliveryCompleteOp));
+        registry.register(Arc::new(DeliveryFailOp));
+
         registry
     }
 
@@ -728,6 +740,821 @@ impl CustomOperation for ScreeningSanctionsOp {
     }
 }
 
+// ============================================================================
+// Resource Instance Operations
+// ============================================================================
+
+/// Create a resource instance for a CBU
+///
+/// Rationale: Requires lookup of resource_type_id from prod_resources by code,
+/// creates the instance record with proper FK relationships.
+pub struct ResourceCreateOp;
+
+#[async_trait]
+impl CustomOperation for ResourceCreateOp {
+    fn domain(&self) -> &'static str {
+        "resource"
+    }
+    fn verb(&self) -> &'static str {
+        "create"
+    }
+    fn rationale(&self) -> &'static str {
+        "Requires resource_type lookup by code and CBU/product/service FK resolution"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use uuid::Uuid;
+
+        // Get CBU ID (required)
+        let cbu_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("cbu-id"))
+            .and_then(|a| {
+                if let Some(name) = a.value.as_reference() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
+
+        // Get resource type code (required)
+        let resource_type_code = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("resource-type"))
+            .and_then(|a| a.value.as_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing resource-type argument"))?;
+
+        // Get instance URL (required)
+        let instance_url = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("instance-url"))
+            .and_then(|a| a.value.as_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing instance-url argument"))?;
+
+        // Look up resource type ID
+        let resource_type_id: Option<Uuid> = sqlx::query_scalar(
+            r#"SELECT resource_id FROM "ob-poc".prod_resources WHERE resource_code = $1"#,
+        )
+        .bind(resource_type_code)
+        .fetch_optional(pool)
+        .await?;
+
+        let resource_type_id = resource_type_id
+            .ok_or_else(|| anyhow::anyhow!("Unknown resource type: {}", resource_type_code))?;
+
+        // Get optional arguments
+        let instance_identifier = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("instance-id"))
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        let instance_name = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("instance-name"))
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        // Get product-id if provided
+        let product_id: Option<Uuid> = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("product-id"))
+            .and_then(|a| {
+                if let Some(name) = a.value.as_reference() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            });
+
+        // Get service-id if provided
+        let service_id: Option<Uuid> = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("service-id"))
+            .and_then(|a| {
+                if let Some(name) = a.value.as_reference() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            });
+
+        // Create instance
+        let instance_id = Uuid::new_v4();
+
+        sqlx::query(
+            r#"INSERT INTO "ob-poc".cbu_resource_instances
+               (instance_id, cbu_id, product_id, service_id, resource_type_id,
+                instance_url, instance_identifier, instance_name, status)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING')"#,
+        )
+        .bind(instance_id)
+        .bind(cbu_id)
+        .bind(product_id)
+        .bind(service_id)
+        .bind(resource_type_id)
+        .bind(instance_url)
+        .bind(&instance_identifier)
+        .bind(&instance_name)
+        .execute(pool)
+        .await?;
+
+        ctx.bind("instance", instance_id);
+
+        Ok(ExecutionResult::Uuid(instance_id))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
+    }
+}
+
+/// Set an attribute on a resource instance
+///
+/// Rationale: Requires lookup of attribute_id from dictionary by name,
+/// then upsert into resource_instance_attributes with typed value.
+pub struct ResourceSetAttrOp;
+
+#[async_trait]
+impl CustomOperation for ResourceSetAttrOp {
+    fn domain(&self) -> &'static str {
+        "resource"
+    }
+    fn verb(&self) -> &'static str {
+        "set-attr"
+    }
+    fn rationale(&self) -> &'static str {
+        "Requires attribute lookup by name and typed value storage"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use uuid::Uuid;
+
+        // Get instance ID (required)
+        let instance_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("instance-id"))
+            .and_then(|a| {
+                if let Some(name) = a.value.as_reference() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing instance-id argument"))?;
+
+        // Get attribute name (required)
+        let attr_name = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("attr"))
+            .and_then(|a| a.value.as_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing attr argument"))?;
+
+        // Get value (required)
+        let value = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("value"))
+            .and_then(|a| a.value.as_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing value argument"))?;
+
+        // Look up attribute ID
+        let attribute_id: Option<Uuid> =
+            sqlx::query_scalar(r#"SELECT attribute_id FROM "ob-poc".dictionary WHERE name = $1"#)
+                .bind(attr_name)
+                .fetch_optional(pool)
+                .await?;
+
+        let attribute_id =
+            attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
+
+        // Get optional state
+        let state = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("state"))
+            .and_then(|a| a.value.as_string())
+            .unwrap_or("proposed");
+
+        // Upsert attribute value (storing as text for simplicity)
+        let value_id = Uuid::new_v4();
+
+        sqlx::query(
+            r#"INSERT INTO "ob-poc".resource_instance_attributes
+               (value_id, instance_id, attribute_id, value_text, state, observed_at)
+               VALUES ($1, $2, $3, $4, $5, NOW())
+               ON CONFLICT (instance_id, attribute_id) DO UPDATE SET
+                   value_text = EXCLUDED.value_text,
+                   state = EXCLUDED.state,
+                   observed_at = NOW()"#,
+        )
+        .bind(value_id)
+        .bind(instance_id)
+        .bind(attribute_id)
+        .bind(value)
+        .bind(state)
+        .execute(pool)
+        .await?;
+
+        Ok(ExecutionResult::Uuid(value_id))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
+    }
+}
+
+/// Activate a resource instance
+///
+/// Rationale: Validates required attributes are set before activation.
+pub struct ResourceActivateOp;
+
+#[async_trait]
+impl CustomOperation for ResourceActivateOp {
+    fn domain(&self) -> &'static str {
+        "resource"
+    }
+    fn verb(&self) -> &'static str {
+        "activate"
+    }
+    fn rationale(&self) -> &'static str {
+        "Validates required attributes before status transition"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use uuid::Uuid;
+
+        // Get instance ID
+        let instance_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("instance-id"))
+            .and_then(|a| {
+                if let Some(name) = a.value.as_reference() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing instance-id argument"))?;
+
+        // Get resource type for this instance
+        let instance_row: Option<(Option<Uuid>,)> = sqlx::query_as(
+            r#"SELECT resource_type_id FROM "ob-poc".cbu_resource_instances WHERE instance_id = $1"#,
+        )
+        .bind(instance_id)
+        .fetch_optional(pool)
+        .await?;
+
+        let instance_row =
+            instance_row.ok_or_else(|| anyhow::anyhow!("Instance not found: {}", instance_id))?;
+
+        // If resource type is set, validate required attributes
+        if let Some(resource_type_id) = instance_row.0 {
+            // Get required attributes for this resource type
+            let required_attrs: Vec<Uuid> = sqlx::query_scalar(
+                r#"SELECT attribute_id FROM "ob-poc".resource_attribute_requirements
+                   WHERE resource_id = $1 AND is_mandatory = true"#,
+            )
+            .bind(resource_type_id)
+            .fetch_all(pool)
+            .await?;
+
+            // Get set attributes for this instance
+            let set_attrs: Vec<Uuid> = sqlx::query_scalar(
+                r#"SELECT attribute_id FROM "ob-poc".resource_instance_attributes
+                   WHERE instance_id = $1"#,
+            )
+            .bind(instance_id)
+            .fetch_all(pool)
+            .await?;
+
+            // Check for missing required attributes
+            let missing: Vec<_> = required_attrs
+                .iter()
+                .filter(|a| !set_attrs.contains(a))
+                .collect();
+
+            if !missing.is_empty() {
+                // Look up attribute names for error message
+                let missing_names: Vec<String> = sqlx::query_scalar(
+                    r#"SELECT name FROM "ob-poc".dictionary WHERE attribute_id = ANY($1)"#,
+                )
+                .bind(&missing.iter().map(|u| **u).collect::<Vec<_>>())
+                .fetch_all(pool)
+                .await?;
+
+                return Err(anyhow::anyhow!(
+                    "Cannot activate: missing required attributes: {}",
+                    missing_names.join(", ")
+                ));
+            }
+        }
+
+        // Update status to ACTIVE
+        sqlx::query(
+            r#"UPDATE "ob-poc".cbu_resource_instances
+               SET status = 'ACTIVE', activated_at = NOW(), updated_at = NOW()
+               WHERE instance_id = $1"#,
+        )
+        .bind(instance_id)
+        .execute(pool)
+        .await?;
+
+        Ok(ExecutionResult::Void)
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Void)
+    }
+}
+
+/// Suspend a resource instance
+pub struct ResourceSuspendOp;
+
+#[async_trait]
+impl CustomOperation for ResourceSuspendOp {
+    fn domain(&self) -> &'static str {
+        "resource"
+    }
+    fn verb(&self) -> &'static str {
+        "suspend"
+    }
+    fn rationale(&self) -> &'static str {
+        "Status transition with optional reason logging"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use uuid::Uuid;
+
+        let instance_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("instance-id"))
+            .and_then(|a| {
+                if let Some(name) = a.value.as_reference() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing instance-id argument"))?;
+
+        sqlx::query(
+            r#"UPDATE "ob-poc".cbu_resource_instances
+               SET status = 'SUSPENDED', updated_at = NOW()
+               WHERE instance_id = $1"#,
+        )
+        .bind(instance_id)
+        .execute(pool)
+        .await?;
+
+        Ok(ExecutionResult::Void)
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Void)
+    }
+}
+
+/// Decommission a resource instance
+pub struct ResourceDecommissionOp;
+
+#[async_trait]
+impl CustomOperation for ResourceDecommissionOp {
+    fn domain(&self) -> &'static str {
+        "resource"
+    }
+    fn verb(&self) -> &'static str {
+        "decommission"
+    }
+    fn rationale(&self) -> &'static str {
+        "Terminal status transition with timestamp"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use uuid::Uuid;
+
+        let instance_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("instance-id"))
+            .and_then(|a| {
+                if let Some(name) = a.value.as_reference() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing instance-id argument"))?;
+
+        sqlx::query(
+            r#"UPDATE "ob-poc".cbu_resource_instances
+               SET status = 'DECOMMISSIONED', decommissioned_at = NOW(), updated_at = NOW()
+               WHERE instance_id = $1"#,
+        )
+        .bind(instance_id)
+        .execute(pool)
+        .await?;
+
+        Ok(ExecutionResult::Void)
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Void)
+    }
+}
+
+// ============================================================================
+// Service Delivery Operations
+// ============================================================================
+
+/// Record a service delivery for a CBU
+pub struct DeliveryRecordOp;
+
+#[async_trait]
+impl CustomOperation for DeliveryRecordOp {
+    fn domain(&self) -> &'static str {
+        "delivery"
+    }
+    fn verb(&self) -> &'static str {
+        "record"
+    }
+    fn rationale(&self) -> &'static str {
+        "Requires product/service code lookup and upsert logic"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use uuid::Uuid;
+
+        // Get CBU ID
+        let cbu_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("cbu-id"))
+            .and_then(|a| {
+                if let Some(name) = a.value.as_reference() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
+
+        // Get product code and look up ID
+        let product_code = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("product"))
+            .and_then(|a| a.value.as_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing product argument"))?;
+
+        let product_id: Option<Uuid> = sqlx::query_scalar(
+            r#"SELECT product_id FROM "ob-poc".products WHERE product_code = $1"#,
+        )
+        .bind(product_code)
+        .fetch_optional(pool)
+        .await?;
+
+        let product_id =
+            product_id.ok_or_else(|| anyhow::anyhow!("Unknown product: {}", product_code))?;
+
+        // Get service code and look up ID
+        let service_code = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("service"))
+            .and_then(|a| a.value.as_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing service argument"))?;
+
+        let service_id: Option<Uuid> = sqlx::query_scalar(
+            r#"SELECT service_id FROM "ob-poc".services WHERE service_code = $1"#,
+        )
+        .bind(service_code)
+        .fetch_optional(pool)
+        .await?;
+
+        let service_id =
+            service_id.ok_or_else(|| anyhow::anyhow!("Unknown service: {}", service_code))?;
+
+        // Get optional instance-id
+        let instance_id: Option<Uuid> = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("instance-id"))
+            .and_then(|a| {
+                if let Some(name) = a.value.as_reference() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            });
+
+        // Create delivery record
+        let delivery_id = Uuid::new_v4();
+
+        sqlx::query(
+            r#"INSERT INTO "ob-poc".service_delivery_map
+               (delivery_id, cbu_id, product_id, service_id, instance_id, delivery_status)
+               VALUES ($1, $2, $3, $4, $5, 'PENDING')
+               ON CONFLICT (cbu_id, product_id, service_id) DO UPDATE SET
+                   instance_id = EXCLUDED.instance_id,
+                   updated_at = NOW()"#,
+        )
+        .bind(delivery_id)
+        .bind(cbu_id)
+        .bind(product_id)
+        .bind(service_id)
+        .bind(instance_id)
+        .execute(pool)
+        .await?;
+
+        ctx.bind("delivery", delivery_id);
+
+        Ok(ExecutionResult::Uuid(delivery_id))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
+    }
+}
+
+/// Mark service delivery as complete
+pub struct DeliveryCompleteOp;
+
+#[async_trait]
+impl CustomOperation for DeliveryCompleteOp {
+    fn domain(&self) -> &'static str {
+        "delivery"
+    }
+    fn verb(&self) -> &'static str {
+        "complete"
+    }
+    fn rationale(&self) -> &'static str {
+        "Updates delivery status with timestamp"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use uuid::Uuid;
+
+        let cbu_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("cbu-id"))
+            .and_then(|a| {
+                if let Some(name) = a.value.as_reference() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
+
+        let product_code = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("product"))
+            .and_then(|a| a.value.as_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing product argument"))?;
+
+        let service_code = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("service"))
+            .and_then(|a| a.value.as_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing service argument"))?;
+
+        // Look up product and service IDs
+        let product_id: Option<Uuid> = sqlx::query_scalar(
+            r#"SELECT product_id FROM "ob-poc".products WHERE product_code = $1"#,
+        )
+        .bind(product_code)
+        .fetch_optional(pool)
+        .await?;
+
+        let product_id =
+            product_id.ok_or_else(|| anyhow::anyhow!("Unknown product: {}", product_code))?;
+
+        let service_id: Option<Uuid> = sqlx::query_scalar(
+            r#"SELECT service_id FROM "ob-poc".services WHERE service_code = $1"#,
+        )
+        .bind(service_code)
+        .fetch_optional(pool)
+        .await?;
+
+        let service_id =
+            service_id.ok_or_else(|| anyhow::anyhow!("Unknown service: {}", service_code))?;
+
+        sqlx::query(
+            r#"UPDATE "ob-poc".service_delivery_map
+               SET delivery_status = 'DELIVERED', delivered_at = NOW(), updated_at = NOW()
+               WHERE cbu_id = $1 AND product_id = $2 AND service_id = $3"#,
+        )
+        .bind(cbu_id)
+        .bind(product_id)
+        .bind(service_id)
+        .execute(pool)
+        .await?;
+
+        Ok(ExecutionResult::Void)
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Void)
+    }
+}
+
+/// Mark service delivery as failed
+pub struct DeliveryFailOp;
+
+#[async_trait]
+impl CustomOperation for DeliveryFailOp {
+    fn domain(&self) -> &'static str {
+        "delivery"
+    }
+    fn verb(&self) -> &'static str {
+        "fail"
+    }
+    fn rationale(&self) -> &'static str {
+        "Updates delivery status with failure reason"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use uuid::Uuid;
+
+        let cbu_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("cbu-id"))
+            .and_then(|a| {
+                if let Some(name) = a.value.as_reference() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
+
+        let product_code = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("product"))
+            .and_then(|a| a.value.as_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing product argument"))?;
+
+        let service_code = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("service"))
+            .and_then(|a| a.value.as_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing service argument"))?;
+
+        let reason = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("reason"))
+            .and_then(|a| a.value.as_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing reason argument"))?;
+
+        // Look up product and service IDs
+        let product_id: Option<Uuid> = sqlx::query_scalar(
+            r#"SELECT product_id FROM "ob-poc".products WHERE product_code = $1"#,
+        )
+        .bind(product_code)
+        .fetch_optional(pool)
+        .await?;
+
+        let product_id =
+            product_id.ok_or_else(|| anyhow::anyhow!("Unknown product: {}", product_code))?;
+
+        let service_id: Option<Uuid> = sqlx::query_scalar(
+            r#"SELECT service_id FROM "ob-poc".services WHERE service_code = $1"#,
+        )
+        .bind(service_code)
+        .fetch_optional(pool)
+        .await?;
+
+        let service_id =
+            service_id.ok_or_else(|| anyhow::anyhow!("Unknown service: {}", service_code))?;
+
+        sqlx::query(
+            r#"UPDATE "ob-poc".service_delivery_map
+               SET delivery_status = 'FAILED', failed_at = NOW(), failure_reason = $4, updated_at = NOW()
+               WHERE cbu_id = $1 AND product_id = $2 AND service_id = $3"#,
+        )
+        .bind(cbu_id)
+        .bind(product_id)
+        .bind(service_id)
+        .bind(reason)
+        .execute(pool)
+        .await?;
+
+        Ok(ExecutionResult::Void)
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Void)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -740,12 +1567,22 @@ mod tests {
         assert!(registry.has("ubo", "calculate"));
         assert!(registry.has("screening", "pep"));
         assert!(registry.has("screening", "sanctions"));
+        // New resource operations
+        assert!(registry.has("resource", "create"));
+        assert!(registry.has("resource", "set-attr"));
+        assert!(registry.has("resource", "activate"));
+        assert!(registry.has("resource", "suspend"));
+        assert!(registry.has("resource", "decommission"));
+        // New delivery operations
+        assert!(registry.has("delivery", "record"));
+        assert!(registry.has("delivery", "complete"));
+        assert!(registry.has("delivery", "fail"));
     }
 
     #[test]
     fn test_registry_list() {
         let registry = CustomOperationRegistry::new();
         let ops = registry.list();
-        assert_eq!(ops.len(), 6); // entity.create, document.catalog, document.extract, ubo.calculate, screening.pep, screening.sanctions
+        assert_eq!(ops.len(), 14); // 6 original + 5 resource + 3 delivery
     }
 }

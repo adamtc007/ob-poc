@@ -26,6 +26,7 @@ pub mod investigation_service;
 pub mod lifecycle_resource_service;
 pub mod monitoring_service;
 pub mod product_service;
+pub mod resource_instance_service;
 pub mod risk_service;
 pub mod screening_service;
 pub mod service_service;
@@ -58,6 +59,10 @@ pub use lifecycle_resource_service::{
     LifecycleResourceRow, LifecycleResourceService, NewLifecycleResourceFields,
 };
 pub use product_service::{NewProductFields, ProductRow, ProductService};
+pub use resource_instance_service::{
+    NewResourceInstance, ResourceInstanceAttributeRow, ResourceInstanceRow,
+    ResourceInstanceService, ServiceDeliveryRow, SetInstanceAttribute,
+};
 pub use service_service::{NewServiceFields, ServiceRow, ServiceService};
 
 // KYC Investigation services

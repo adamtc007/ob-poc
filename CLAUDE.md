@@ -263,6 +263,8 @@ cargo clippy --features mcp
 | screening | 3 | PEP, sanctions, adverse-media |
 | kyc | 2 | Investigation initiate, decide |
 | ubo | 2 | Calculate, validate ownership |
+| resource | 5 | Resource instance create, set-attr, activate, suspend, decommission |
+| delivery | 3 | Service delivery record, complete, fail |
 
 ## Database Schema
 
@@ -282,6 +284,9 @@ See `docs/DATABASE_SCHEMA.md` for complete schema reference.
 | document_catalog | Document records |
 | document_types | Document type definitions |
 | screenings | Screening records |
+| cbu_resource_instances | Delivered resource instances (accounts, connections) |
+| resource_instance_attributes | Typed attribute values for instances |
+| service_delivery_map | Service delivery tracking (CBU → Product → Service → Instance) |
 
 ## MCP Server Tools
 

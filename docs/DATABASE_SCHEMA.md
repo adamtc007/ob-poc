@@ -209,6 +209,64 @@ Persisted DSL for CBUs.
 | version | integer | Version number |
 | status | varchar | Status |
 
+## Resource Instance Tables
+
+### cbu_resource_instances
+Production resource instances - the actual delivered artifacts for a CBU (accounts, connections, platform access).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| instance_id | uuid | Primary key |
+| cbu_id | uuid | FK to cbus |
+| product_id | uuid | FK to products |
+| service_id | uuid | FK to services |
+| resource_type_id | uuid | FK to prod_resources |
+| instance_url | varchar | Unique URL/endpoint for this instance |
+| instance_identifier | varchar | Account #, User ID, etc. |
+| instance_name | varchar | Human-readable name |
+| instance_config | jsonb | Instance-specific settings |
+| status | varchar | PENDING, PROVISIONING, ACTIVE, SUSPENDED, DECOMMISSIONED |
+| requested_at | timestamp | When instance was requested |
+| provisioned_at | timestamp | When provisioning started |
+| activated_at | timestamp | When instance became active |
+| decommissioned_at | timestamp | When instance was decommissioned |
+
+### resource_instance_attributes
+Attribute values for resource instances (dense storage - row exists = value set).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| value_id | uuid | Primary key |
+| instance_id | uuid | FK to cbu_resource_instances |
+| attribute_id | uuid | FK to dictionary |
+| value_text | varchar | String value |
+| value_number | numeric | Numeric value |
+| value_boolean | boolean | Boolean value |
+| value_date | date | Date value |
+| value_timestamp | timestamp | Timestamp value |
+| value_json | jsonb | JSON value |
+| state | varchar | proposed, confirmed, derived, system |
+| source | jsonb | Value provenance metadata |
+| observed_at | timestamp | When value was set |
+
+### service_delivery_map
+Tracks service delivery for CBU onboarding - links CBU → Product → Service → Instance.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| delivery_id | uuid | Primary key |
+| cbu_id | uuid | FK to cbus |
+| product_id | uuid | FK to products |
+| service_id | uuid | FK to services |
+| instance_id | uuid | FK to cbu_resource_instances |
+| service_config | jsonb | Service configuration options |
+| delivery_status | varchar | PENDING, IN_PROGRESS, DELIVERED, FAILED, CANCELLED |
+| requested_at | timestamp | Request timestamp |
+| started_at | timestamp | When delivery started |
+| delivered_at | timestamp | When delivery completed |
+| failed_at | timestamp | When delivery failed |
+| failure_reason | text | Failure description |
+
 ## Ownership Tables
 
 ### ownership_relationships
@@ -256,12 +314,21 @@ Strongly-typed attribute values.
 
 ```
 cbus ←── cbu_entity_roles ──→ entities ──→ entity_types
-              │                    │
-              ▼                    ▼
-            roles          entity_proper_persons
-                           entity_limited_companies
-                           entity_partnerships
-                           entity_trusts
+  │            │                    │
+  │            ▼                    ▼
+  │          roles          entity_proper_persons
+  │                         entity_limited_companies
+  │                         entity_partnerships
+  │                         entity_trusts
+  │
+  ├──→ cbu_resource_instances ──→ prod_resources
+  │            │
+  │            ▼
+  │    resource_instance_attributes ──→ dictionary
+  │
+  └──→ service_delivery_map ──→ products
+                           ──→ services
+                           ──→ cbu_resource_instances
 
 document_catalog ──→ document_types
        │
@@ -290,5 +357,6 @@ ownership_relationships ──→ entities (owner)
 | Attribute | 5 |
 | Monitoring | 8 |
 | Orchestration | 5 |
+| Resource Instance | 3 |
 | Other | 50 |
-| **Total** | **112** |
+| **Total** | **115** |
