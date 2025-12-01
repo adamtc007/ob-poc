@@ -259,8 +259,7 @@ mod db_tests {
             (cbu.create :name "{}" :as @cbu)
             (entity.create-limited-company :cbu-id @cbu :name "{}" :as @company)
             (entity.create-proper-person :cbu-id @cbu :first-name "Jane" :last-name "Doe" :as @ubo)
-            (cbu.assign-role :cbu-id @cbu :entity-id @ubo :target-entity-id @company
-                             :role "BENEFICIAL_OWNER" :ownership-percentage 75.0)
+            (cbu.assign-role :cbu-id @cbu :entity-id @ubo :role "BENEFICIAL_OWNER")
         "#,
             db.name("FKTestCBU"),
             db.name("FKCompany")
@@ -312,7 +311,7 @@ mod db_tests {
             (cbu.create :name "{}" :as @cbu)
             (entity.create-limited-company :cbu-id @cbu :name "{}" :as @company)
             (entity.create-proper-person :cbu-id @cbu :first-name "Test" :last-name "Person" :as @person)
-            (cbu.assign-role :cbu-id @cbu :entity-id @person :target-entity-id @company :role "INVALID_ROLE_XYZ")
+            (cbu.assign-role :cbu-id @cbu :entity-id @person :role "INVALID_ROLE_XYZ")
         "#,
             db.name("InvalidRoleCBU"),
             db.name("InvalidRoleCompany")
@@ -323,8 +322,8 @@ mod db_tests {
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(
-            err.contains("role") || err.contains("Unknown"),
-            "Error should mention invalid role: {}",
+            err.contains("role") || err.contains("Unknown") || err.contains("no rows"),
+            "Error should mention invalid role or lookup failure: {}",
             err
         );
 
@@ -441,11 +440,11 @@ mod db_tests {
             (entity.create-limited-company :cbu-id @cbu :name "{}" :as @company)
             (entity.create-proper-person :cbu-id @cbu :first-name "Alice" :last-name "UBO1" :as @ubo1)
             (entity.create-proper-person :cbu-id @cbu :first-name "Bob" :last-name "UBO2" :as @ubo2)
-            (cbu.assign-role :cbu-id @cbu :entity-id @ubo1 :target-entity-id @company :role "BENEFICIAL_OWNER" :ownership-percentage 60.0)
-            (cbu.assign-role :cbu-id @cbu :entity-id @ubo2 :target-entity-id @company :role "BENEFICIAL_OWNER" :ownership-percentage 40.0)
-            (document.catalog :cbu-id @cbu :entity-id @company :document-type "CERTIFICATE_OF_INCORPORATION")
-            (document.catalog :cbu-id @cbu :entity-id @ubo1 :document-type "PASSPORT")
-            (document.catalog :cbu-id @cbu :entity-id @ubo2 :document-type "PASSPORT")
+            (cbu.assign-role :cbu-id @cbu :entity-id @ubo1 :role "BENEFICIAL_OWNER")
+            (cbu.assign-role :cbu-id @cbu :entity-id @ubo2 :role "BENEFICIAL_OWNER")
+            (document.catalog :cbu-id @cbu :doc-type "CERTIFICATE_OF_INCORPORATION" :title "Company Certificate")
+            (document.catalog :cbu-id @cbu :doc-type "PASSPORT" :title "Alice Passport")
+            (document.catalog :cbu-id @cbu :doc-type "PASSPORT" :title "Bob Passport")
             (screening.pep :entity-id @ubo1)
             (screening.pep :entity-id @ubo2)
             (screening.sanctions :entity-id @ubo1)

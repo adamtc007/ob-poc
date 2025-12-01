@@ -1085,15 +1085,21 @@ impl GenericCrudExecutor {
             .ok_or_else(|| anyhow!("Invalid entity create verb name: {}", verb.verb))?;
 
         // Look up entity_type_id and table_name
+        // First try exact match, then try prefix match for shortened verb names
+        // (e.g., "LIMITED_COMPANY" matches "LIMITED_COMPANY_PRIVATE")
         let type_sql = format!(
-            r#"SELECT entity_type_id, table_name FROM "{}".entity_types WHERE type_code = $1"#,
+            r#"SELECT entity_type_id, table_name FROM "{}".entity_types
+               WHERE type_code = $1 OR type_code LIKE $1 || '_%'
+               ORDER BY CASE WHEN type_code = $1 THEN 0 ELSE 1 END
+               LIMIT 1"#,
             crud.schema
         );
 
         let type_row = sqlx::query(&type_sql)
             .bind(&type_code)
             .fetch_one(&self.pool)
-            .await?;
+            .await
+            .map_err(|e| anyhow!("Entity type not found for '{}': {}", type_code, e))?;
 
         let entity_type_id: Uuid = type_row.try_get("entity_type_id")?;
         let extension_table: String = type_row.try_get("table_name")?;

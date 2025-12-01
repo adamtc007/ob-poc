@@ -195,10 +195,6 @@ domains:
               table: roles
               code_column: name
               id_column: role_id
-          - name: ownership-percentage
-            type: decimal
-            required: false
-            maps_to: ownership_percentage
         returns:
           type: uuid
           name: cbu_entity_role_id
@@ -280,6 +276,73 @@ domains:
             maps_to: jurisdiction
 
     verbs:
+      # Static fallback verbs for common entity types (used when DB not available)
+      create-limited-company:
+        description: "Create a limited company entity"
+        behavior: crud
+        crud:
+          operation: entity_create
+          base_table: entities
+          schema: ob-poc
+          extension_table_column: table_name
+          type_id_column: entity_type_id
+          returning: entity_id
+        args:
+          - name: name
+            type: string
+            required: true
+            maps_to: company_name
+          - name: cbu-id
+            type: uuid
+            required: false
+          - name: company-number
+            type: string
+            required: false
+            maps_to: registration_number
+          - name: jurisdiction
+            type: string
+            required: false
+            maps_to: jurisdiction
+        returns:
+          type: uuid
+          name: entity_id
+          capture: true
+
+      create-proper-person:
+        description: "Create a natural person entity"
+        behavior: crud
+        crud:
+          operation: entity_create
+          base_table: entities
+          schema: ob-poc
+          extension_table_column: table_name
+          type_id_column: entity_type_id
+          returning: entity_id
+        args:
+          - name: first-name
+            type: string
+            required: true
+            maps_to: first_name
+          - name: last-name
+            type: string
+            required: true
+            maps_to: last_name
+          - name: cbu-id
+            type: uuid
+            required: false
+          - name: date-of-birth
+            type: date
+            required: false
+            maps_to: date_of_birth
+          - name: nationality
+            type: string
+            required: false
+            maps_to: nationality
+        returns:
+          type: uuid
+          name: entity_id
+          capture: true
+
       read:
         description: "Read an entity by ID"
         behavior: crud
