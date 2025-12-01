@@ -1,0 +1,181 @@
+version: "1.0"
+
+# =============================================================================
+# CONSTRAINT RULES (Block Execution)
+# =============================================================================
+constraints:
+
+  - id: CSG-C001
+    name: passport_requires_person
+    description: "PASSPORT document requires PROPER_PERSON entity"
+    when:
+      verb: document.catalog
+      arg: document-type
+      value: PASSPORT
+    requires:
+      entity_type: PROPER_PERSON
+      via_arg: entity-id
+    error: "Cannot catalog PASSPORT for non-person entity. Entity must be PROPER_PERSON type."
+
+  - id: CSG-C002
+    name: certificate_requires_company
+    description: "Certificate of incorporation requires company entity"
+    when:
+      verb: document.catalog
+      arg: document-type
+      value: CERTIFICATE_OF_INCORPORATION
+    requires:
+      entity_type_in: [LIMITED_COMPANY, PLC, LLP]
+      via_arg: entity-id
+    error: "Cannot catalog CERTIFICATE_OF_INCORPORATION for non-company entity."
+
+  - id: CSG-C003
+    name: ubo_requires_person
+    description: "BENEFICIAL_OWNER role requires natural person"
+    when:
+      verb: cbu.assign-role
+      arg: role
+      value: BENEFICIAL_OWNER
+    requires:
+      entity_type: PROPER_PERSON
+      via_arg: entity-id
+    error: "BENEFICIAL_OWNER role can only be assigned to natural persons."
+
+  - id: CSG-C004
+    name: director_requires_person
+    description: "DIRECTOR role requires natural person"
+    when:
+      verb: cbu.assign-role
+      arg: role
+      value: DIRECTOR
+    requires:
+      entity_type: PROPER_PERSON
+      via_arg: entity-id
+    error: "DIRECTOR role can only be assigned to natural persons."
+
+  - id: CSG-C005
+    name: trust_deed_requires_trust
+    description: "Trust deed requires trust entity"
+    when:
+      verb: document.catalog
+      arg: document-type
+      value: TRUST_DEED
+    requires:
+      entity_type_in: [TRUST_DISCRETIONARY, TRUST_FIXED_INTEREST, TRUST_UNIT]
+      via_arg: entity-id
+    error: "TRUST_DEED can only be cataloged for trust entities."
+
+# =============================================================================
+# WARNING RULES (Allow Execution with Warning)
+# =============================================================================
+warnings:
+
+  - id: CSG-W001
+    name: high_ownership_percentage
+    description: "Ownership percentage exceeds 100%"
+    when:
+      verb: cbu.assign-role
+      arg: ownership-percentage
+      greater_than: 100
+    message: "Warning: Ownership percentage {value}% exceeds 100%. Please verify."
+
+  - id: CSG-W002
+    name: missing_jurisdiction
+    description: "Entity created without jurisdiction"
+    when:
+      verb_pattern: "entity.create-*"
+      missing_arg: jurisdiction
+    message: "Entity created without jurisdiction. Consider adding jurisdiction for compliance."
+
+  - id: CSG-W003
+    name: missing_screening
+    description: "Person entity without screening scheduled"
+    check: person_has_screening
+    message: "Person entity has no PEP/sanctions screening scheduled."
+
+  - id: CSG-W004
+    name: missing_identity_doc
+    description: "Person entity without identity document"
+    check: person_has_identity_document
+    message: "Person entity has no identity document cataloged."
+
+  - id: CSG-W005
+    name: low_ubo_threshold
+    description: "UBO threshold below standard"
+    when:
+      verb: ubo.calculate
+      arg: threshold
+      less_than: 25
+    message: "UBO threshold {value}% is below standard 25%. Verify regulatory requirements."
+
+# =============================================================================
+# JURISDICTION RULES
+# =============================================================================
+jurisdiction_rules:
+
+  - id: CSG-J001
+    name: us_person_fatca
+    description: "US persons require FATCA documentation"
+    severity: warning
+    when:
+      entity_type: PROPER_PERSON
+      jurisdiction: US
+    requires_document: W9_FORM
+    message: "US person may require W-9 for FATCA compliance."
+
+  - id: CSG-J002
+    name: uk_company_psc
+    description: "UK companies require PSC register"
+    severity: info
+    when:
+      entity_type_in: [LIMITED_COMPANY, PLC]
+      jurisdiction: GB
+    message: "UK company - consider requesting PSC register."
+
+  - id: CSG-J003
+    name: eu_entity_gdpr
+    description: "EU entities subject to GDPR"
+    severity: info
+    when:
+      jurisdiction_in: [DE, FR, IT, ES, NL, BE, AT, IE, LU, PT, GR, FI, SE, DK, PL, CZ, HU, RO, BG, HR, SK, SI, EE, LV, LT, CY, MT]
+    message: "EU entity - ensure GDPR compliance for data handling."
+
+  - id: CSG-J004
+    name: cayman_aml
+    description: "Cayman entities require enhanced AML"
+    severity: warning
+    when:
+      jurisdiction: KY
+    message: "Cayman entity - enhanced AML/KYC requirements apply."
+
+# =============================================================================
+# COMPOSITE RULES (Multi-condition Checks)
+# =============================================================================
+composite_rules:
+
+  - id: CSG-X001
+    name: complete_corporate_onboarding
+    description: "Corporate onboarding completeness check"
+    severity: info
+    applies_to:
+      client_type: corporate
+    checks:
+      - has_company_entity
+      - has_at_least_one_ubo
+      - all_ubos_have_identity_docs
+      - all_ubos_screened
+      - company_has_formation_docs
+    message: "Corporate onboarding incomplete: {missing_items}"
+
+  - id: CSG-X002
+    name: complete_individual_onboarding
+    description: "Individual onboarding completeness check"
+    severity: info
+    applies_to:
+      client_type: individual
+    checks:
+      - has_person_entity
+      - person_has_identity_doc
+      - person_screened
+      - person_has_address_proof
+    message: "Individual onboarding incomplete: {missing_items}"

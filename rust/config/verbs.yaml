@@ -1,0 +1,1477 @@
+version: "1.0"
+
+# =============================================================================
+# DOMAIN: cbu (Client Business Unit)
+# =============================================================================
+domains:
+  cbu:
+    description: "Client Business Unit operations"
+
+    verbs:
+      create:
+        description: "Create a new Client Business Unit"
+        behavior: crud
+        crud:
+          operation: insert
+          table: cbus
+          schema: ob-poc
+          returning: cbu_id
+        args:
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+          - name: jurisdiction
+            type: string
+            required: false
+            maps_to: jurisdiction
+          - name: client-type
+            type: string
+            required: false
+            maps_to: client_type
+          - name: nature-purpose
+            type: string
+            required: false
+            maps_to: nature_purpose
+          - name: description
+            type: string
+            required: false
+            maps_to: description
+        returns:
+          type: uuid
+          name: cbu_id
+          capture: true
+
+      read:
+        description: "Read a CBU by ID"
+        behavior: crud
+        crud:
+          operation: select
+          table: cbus
+          schema: ob-poc
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+        returns:
+          type: record
+
+      update:
+        description: "Update a CBU"
+        behavior: crud
+        crud:
+          operation: update
+          table: cbus
+          schema: ob-poc
+          key: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+          - name: name
+            type: string
+            required: false
+            maps_to: name
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+          - name: client-type
+            type: string
+            required: false
+            maps_to: client_type
+          - name: jurisdiction
+            type: string
+            required: false
+            maps_to: jurisdiction
+        returns:
+          type: affected
+
+      delete:
+        description: "Delete a CBU"
+        behavior: crud
+        crud:
+          operation: delete
+          table: cbus
+          schema: ob-poc
+          key: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+        returns:
+          type: affected
+
+      list:
+        description: "List CBUs with optional filters"
+        behavior: crud
+        crud:
+          operation: select
+          table: cbus
+          schema: ob-poc
+        args:
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+          - name: client-type
+            type: string
+            required: false
+            maps_to: client_type
+          - name: jurisdiction
+            type: string
+            required: false
+            maps_to: jurisdiction
+          - name: limit
+            type: integer
+            required: false
+            default: 100
+          - name: offset
+            type: integer
+            required: false
+            default: 0
+        returns:
+          type: record_set
+
+      ensure:
+        description: "Create or update a CBU by natural key"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: cbus
+          schema: ob-poc
+          conflict_keys: [name, jurisdiction]
+          returning: cbu_id
+        args:
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+          - name: jurisdiction
+            type: string
+            required: false
+            maps_to: jurisdiction
+          - name: client-type
+            type: string
+            required: false
+            maps_to: client_type
+          - name: nature-purpose
+            type: string
+            required: false
+            maps_to: nature_purpose
+        returns:
+          type: uuid
+          name: cbu_id
+          capture: true
+
+      assign-role:
+        description: "Assign a role to an entity within a CBU"
+        behavior: crud
+        crud:
+          operation: role_link
+          junction: cbu_entity_roles
+          schema: ob-poc
+          from_col: cbu_id
+          to_col: entity_id
+          role_table: roles
+          role_col: role_id
+          returning: cbu_entity_role_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+          - name: role
+            type: lookup
+            required: true
+            lookup:
+              table: roles
+              code_column: name
+              id_column: role_id
+          - name: ownership-percentage
+            type: decimal
+            required: false
+            maps_to: ownership_percentage
+        returns:
+          type: uuid
+          name: cbu_entity_role_id
+          capture: false
+
+      remove-role:
+        description: "Remove a specific role from an entity within a CBU"
+        behavior: crud
+        crud:
+          operation: role_unlink
+          junction: cbu_entity_roles
+          schema: ob-poc
+          from_col: cbu_id
+          to_col: entity_id
+          role_table: roles
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: entity-id
+            type: uuid
+            required: true
+          - name: role
+            type: lookup
+            required: true
+            lookup:
+              table: roles
+              code_column: name
+              id_column: role_id
+        returns:
+          type: affected
+
+      parties:
+        description: "List all parties (entities with their roles) for a CBU"
+        behavior: crud
+        crud:
+          operation: list_parties
+          junction: cbu_entity_roles
+          schema: ob-poc
+          fk_col: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+        returns:
+          type: record_set
+
+  # ===========================================================================
+  # DOMAIN: entity
+  # ===========================================================================
+  entity:
+    description: "Entity management operations"
+
+    # Dynamic verb generation from entity_types table
+    dynamic_verbs:
+      - pattern: "create-{type_code}"
+        source:
+          table: entity_types
+          schema: ob-poc
+          code_column: type_code
+          name_column: name
+          transform: kebab_case
+        behavior: crud
+        crud:
+          operation: entity_create
+          base_table: entities
+          schema: ob-poc
+          extension_table_column: table_name
+          type_id_column: entity_type_id
+          returning: entity_id
+        base_args:
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+          - name: jurisdiction
+            type: string
+            required: false
+            maps_to: jurisdiction
+
+    verbs:
+      read:
+        description: "Read an entity by ID"
+        behavior: crud
+        crud:
+          operation: select
+          table: entities
+          schema: ob-poc
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+        returns:
+          type: record
+
+      update:
+        description: "Update an entity's base fields"
+        behavior: crud
+        crud:
+          operation: update
+          table: entities
+          schema: ob-poc
+          key: entity_id
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+          - name: name
+            type: string
+            required: false
+            maps_to: name
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+          - name: jurisdiction
+            type: string
+            required: false
+            maps_to: jurisdiction
+        returns:
+          type: affected
+
+      delete:
+        description: "Delete an entity (cascades to type extension)"
+        behavior: crud
+        crud:
+          operation: delete
+          table: entities
+          schema: ob-poc
+          key: entity_id
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+        returns:
+          type: affected
+
+      list:
+        description: "List entities with optional filters"
+        behavior: crud
+        crud:
+          operation: select
+          table: entities
+          schema: ob-poc
+        args:
+          - name: entity-type
+            type: string
+            required: false
+          - name: jurisdiction
+            type: string
+            required: false
+            maps_to: jurisdiction
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+          - name: limit
+            type: integer
+            required: false
+            default: 100
+          - name: offset
+            type: integer
+            required: false
+            default: 0
+        returns:
+          type: record_set
+
+  # ===========================================================================
+  # DOMAIN: product
+  # ===========================================================================
+  product:
+    description: "Product catalog operations"
+
+    verbs:
+      create:
+        description: "Create a new product in the catalog"
+        behavior: crud
+        crud:
+          operation: insert
+          table: products
+          schema: ob-poc
+          returning: product_id
+        args:
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+          - name: product-code
+            type: string
+            required: true
+            maps_to: product_code
+          - name: description
+            type: string
+            required: false
+            maps_to: description
+          - name: product-category
+            type: string
+            required: false
+            maps_to: product_category
+          - name: regulatory-framework
+            type: string
+            required: false
+            maps_to: regulatory_framework
+          - name: min-asset-requirement
+            type: decimal
+            required: false
+            maps_to: min_asset_requirement
+          - name: metadata
+            type: json
+            required: false
+            maps_to: metadata
+        returns:
+          type: uuid
+          name: product_id
+          capture: true
+
+      read:
+        description: "Read a product by ID or code"
+        behavior: crud
+        crud:
+          operation: select
+          table: products
+          schema: ob-poc
+        args:
+          - name: product-id
+            type: uuid
+            required: false
+            maps_to: product_id
+          - name: product-code
+            type: string
+            required: false
+            maps_to: product_code
+        returns:
+          type: record
+
+      update:
+        description: "Update a product"
+        behavior: crud
+        crud:
+          operation: update
+          table: products
+          schema: ob-poc
+          key: product_id
+        args:
+          - name: product-id
+            type: uuid
+            required: true
+            maps_to: product_id
+          - name: name
+            type: string
+            required: false
+            maps_to: name
+          - name: description
+            type: string
+            required: false
+            maps_to: description
+          - name: is-active
+            type: boolean
+            required: false
+            maps_to: is_active
+          - name: product-category
+            type: string
+            required: false
+            maps_to: product_category
+        returns:
+          type: affected
+
+      delete:
+        description: "Delete a product"
+        behavior: crud
+        crud:
+          operation: delete
+          table: products
+          schema: ob-poc
+          key: product_id
+        args:
+          - name: product-id
+            type: uuid
+            required: true
+            maps_to: product_id
+        returns:
+          type: affected
+
+      list:
+        description: "List products with optional filters"
+        behavior: crud
+        crud:
+          operation: select
+          table: products
+          schema: ob-poc
+        args:
+          - name: product-category
+            type: string
+            required: false
+            maps_to: product_category
+          - name: is-active
+            type: boolean
+            required: false
+            maps_to: is_active
+          - name: limit
+            type: integer
+            required: false
+            default: 100
+          - name: offset
+            type: integer
+            required: false
+            default: 0
+        returns:
+          type: record_set
+
+      ensure:
+        description: "Create or update a product by product-code"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: products
+          schema: ob-poc
+          conflict_keys: [product_code]
+          returning: product_id
+        args:
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+          - name: product-code
+            type: string
+            required: true
+            maps_to: product_code
+          - name: description
+            type: string
+            required: false
+            maps_to: description
+          - name: product-category
+            type: string
+            required: false
+            maps_to: product_category
+          - name: regulatory-framework
+            type: string
+            required: false
+            maps_to: regulatory_framework
+        returns:
+          type: uuid
+          name: product_id
+          capture: true
+
+  # ===========================================================================
+  # DOMAIN: service
+  # ===========================================================================
+  service:
+    description: "Service catalog operations"
+
+    verbs:
+      create:
+        description: "Create a new service in the catalog"
+        behavior: crud
+        crud:
+          operation: insert
+          table: services
+          schema: ob-poc
+          returning: service_id
+        args:
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+          - name: service-code
+            type: string
+            required: true
+            maps_to: service_code
+          - name: description
+            type: string
+            required: false
+            maps_to: description
+          - name: service-type
+            type: string
+            required: false
+            maps_to: service_type
+          - name: is-active
+            type: boolean
+            required: false
+            maps_to: is_active
+            default: true
+        returns:
+          type: uuid
+          name: service_id
+          capture: true
+
+      read:
+        description: "Read a service by ID or code"
+        behavior: crud
+        crud:
+          operation: select
+          table: services
+          schema: ob-poc
+        args:
+          - name: service-id
+            type: uuid
+            required: false
+            maps_to: service_id
+          - name: service-code
+            type: string
+            required: false
+            maps_to: service_code
+        returns:
+          type: record
+
+      update:
+        description: "Update a service"
+        behavior: crud
+        crud:
+          operation: update
+          table: services
+          schema: ob-poc
+          key: service_id
+        args:
+          - name: service-id
+            type: uuid
+            required: true
+            maps_to: service_id
+          - name: name
+            type: string
+            required: false
+            maps_to: name
+          - name: description
+            type: string
+            required: false
+            maps_to: description
+          - name: is-active
+            type: boolean
+            required: false
+            maps_to: is_active
+          - name: service-type
+            type: string
+            required: false
+            maps_to: service_type
+        returns:
+          type: affected
+
+      delete:
+        description: "Delete a service"
+        behavior: crud
+        crud:
+          operation: delete
+          table: services
+          schema: ob-poc
+          key: service_id
+        args:
+          - name: service-id
+            type: uuid
+            required: true
+            maps_to: service_id
+        returns:
+          type: affected
+
+      list:
+        description: "List services with optional filters"
+        behavior: crud
+        crud:
+          operation: select
+          table: services
+          schema: ob-poc
+        args:
+          - name: service-type
+            type: string
+            required: false
+            maps_to: service_type
+          - name: is-active
+            type: boolean
+            required: false
+            maps_to: is_active
+          - name: limit
+            type: integer
+            required: false
+            default: 100
+          - name: offset
+            type: integer
+            required: false
+            default: 0
+        returns:
+          type: record_set
+
+      ensure:
+        description: "Create or update a service by service-code"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: services
+          schema: ob-poc
+          conflict_keys: [service_code]
+          returning: service_id
+        args:
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+          - name: service-code
+            type: string
+            required: true
+            maps_to: service_code
+          - name: description
+            type: string
+            required: false
+            maps_to: description
+          - name: service-type
+            type: string
+            required: false
+            maps_to: service_type
+        returns:
+          type: uuid
+          name: service_id
+          capture: true
+
+      link-product:
+        description: "Link a service to a product"
+        behavior: crud
+        crud:
+          operation: link
+          junction: product_services
+          schema: ob-poc
+          from_col: service_id
+          to_col: product_id
+        args:
+          - name: service-id
+            type: uuid
+            required: true
+            maps_to: service_id
+          - name: product-id
+            type: uuid
+            required: true
+            maps_to: product_id
+          - name: is-mandatory
+            type: boolean
+            required: false
+            maps_to: is_mandatory
+          - name: is-default
+            type: boolean
+            required: false
+            maps_to: is_default
+          - name: display-order
+            type: integer
+            required: false
+            maps_to: display_order
+        returns:
+          type: void
+
+      unlink-product:
+        description: "Unlink a service from a product"
+        behavior: crud
+        crud:
+          operation: unlink
+          junction: product_services
+          schema: ob-poc
+          from_col: service_id
+          to_col: product_id
+        args:
+          - name: service-id
+            type: uuid
+            required: true
+          - name: product-id
+            type: uuid
+            required: true
+        returns:
+          type: affected
+
+      list-by-product:
+        description: "List services for a product"
+        behavior: crud
+        crud:
+          operation: select_with_join
+          primary_table: services
+          join_table: product_services
+          join_col: service_id
+          filter_col: product_id
+          schema: ob-poc
+        args:
+          - name: product-id
+            type: uuid
+            required: true
+          - name: is-mandatory
+            type: boolean
+            required: false
+        returns:
+          type: record_set
+
+  # ===========================================================================
+  # DOMAIN: lifecycle-resource
+  # ===========================================================================
+  lifecycle-resource:
+    description: "Lifecycle resource type operations (taxonomy)"
+
+    verbs:
+      create:
+        description: "Create a new lifecycle resource type"
+        behavior: crud
+        crud:
+          operation: insert
+          table: prod_resources
+          schema: ob-poc
+          returning: resource_id
+        args:
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+          - name: resource-code
+            type: string
+            required: true
+            maps_to: resource_code
+          - name: owner
+            type: string
+            required: true
+            maps_to: owner
+          - name: description
+            type: string
+            required: false
+            maps_to: description
+          - name: resource-type
+            type: string
+            required: false
+            maps_to: resource_type
+          - name: vendor
+            type: string
+            required: false
+            maps_to: vendor
+          - name: api-endpoint
+            type: string
+            required: false
+            maps_to: api_endpoint
+          - name: capabilities
+            type: json
+            required: false
+            maps_to: capabilities
+        returns:
+          type: uuid
+          name: resource_id
+          capture: true
+
+      read:
+        description: "Read a lifecycle resource type by ID or code"
+        behavior: crud
+        crud:
+          operation: select
+          table: prod_resources
+          schema: ob-poc
+        args:
+          - name: resource-id
+            type: uuid
+            required: false
+            maps_to: resource_id
+          - name: resource-code
+            type: string
+            required: false
+            maps_to: resource_code
+        returns:
+          type: record
+
+      update:
+        description: "Update a lifecycle resource type"
+        behavior: crud
+        crud:
+          operation: update
+          table: prod_resources
+          schema: ob-poc
+          key: resource_id
+        args:
+          - name: resource-id
+            type: uuid
+            required: true
+            maps_to: resource_id
+          - name: name
+            type: string
+            required: false
+            maps_to: name
+          - name: description
+            type: string
+            required: false
+            maps_to: description
+          - name: is-active
+            type: boolean
+            required: false
+            maps_to: is_active
+          - name: api-endpoint
+            type: string
+            required: false
+            maps_to: api_endpoint
+          - name: capabilities
+            type: json
+            required: false
+            maps_to: capabilities
+        returns:
+          type: affected
+
+      delete:
+        description: "Delete a lifecycle resource type"
+        behavior: crud
+        crud:
+          operation: delete
+          table: prod_resources
+          schema: ob-poc
+          key: resource_id
+        args:
+          - name: resource-id
+            type: uuid
+            required: true
+            maps_to: resource_id
+        returns:
+          type: affected
+
+      list:
+        description: "List lifecycle resource types with optional filters"
+        behavior: crud
+        crud:
+          operation: select
+          table: prod_resources
+          schema: ob-poc
+        args:
+          - name: resource-type
+            type: string
+            required: false
+            maps_to: resource_type
+          - name: owner
+            type: string
+            required: false
+            maps_to: owner
+          - name: is-active
+            type: boolean
+            required: false
+            maps_to: is_active
+          - name: limit
+            type: integer
+            required: false
+            default: 100
+          - name: offset
+            type: integer
+            required: false
+            default: 0
+        returns:
+          type: record_set
+
+      ensure:
+        description: "Create or update a lifecycle resource type by resource-code"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: prod_resources
+          schema: ob-poc
+          conflict_keys: [resource_code]
+          returning: resource_id
+        args:
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+          - name: resource-code
+            type: string
+            required: true
+            maps_to: resource_code
+          - name: owner
+            type: string
+            required: true
+            maps_to: owner
+          - name: description
+            type: string
+            required: false
+            maps_to: description
+          - name: resource-type
+            type: string
+            required: false
+            maps_to: resource_type
+          - name: vendor
+            type: string
+            required: false
+            maps_to: vendor
+        returns:
+          type: uuid
+          name: resource_id
+          capture: true
+
+      link-service:
+        description: "Link a lifecycle resource type to a service"
+        behavior: crud
+        crud:
+          operation: link
+          junction: service_resources
+          schema: ob-poc
+          from_col: resource_id
+          to_col: service_id
+        args:
+          - name: resource-id
+            type: uuid
+            required: true
+            maps_to: resource_id
+          - name: service-id
+            type: uuid
+            required: true
+            maps_to: service_id
+          - name: is-primary
+            type: boolean
+            required: false
+            maps_to: is_primary
+        returns:
+          type: void
+
+      unlink-service:
+        description: "Unlink a lifecycle resource type from a service"
+        behavior: crud
+        crud:
+          operation: unlink
+          junction: service_resources
+          schema: ob-poc
+          from_col: resource_id
+          to_col: service_id
+        args:
+          - name: resource-id
+            type: uuid
+            required: true
+          - name: service-id
+            type: uuid
+            required: true
+        returns:
+          type: affected
+
+      list-by-service:
+        description: "List lifecycle resource types for a service"
+        behavior: crud
+        crud:
+          operation: select_with_join
+          primary_table: prod_resources
+          join_table: service_resources
+          join_col: resource_id
+          filter_col: service_id
+          schema: ob-poc
+        args:
+          - name: service-id
+            type: uuid
+            required: true
+        returns:
+          type: record_set
+
+      # Attribute dictionary linkage (5 new verbs)
+      add-attribute:
+        description: "Add an attribute requirement to a lifecycle resource type"
+        behavior: crud
+        crud:
+          operation: insert
+          table: resource_attribute_requirements
+          schema: ob-poc
+          returning: requirement_id
+        args:
+          - name: resource-id
+            type: uuid
+            required: true
+            maps_to: resource_id
+          - name: attribute-id
+            type: uuid
+            required: true
+            maps_to: attribute_id
+          - name: resource-field-name
+            type: string
+            required: false
+            maps_to: resource_field_name
+          - name: is-mandatory
+            type: boolean
+            required: false
+            maps_to: is_mandatory
+            default: true
+          - name: transformation-rule
+            type: json
+            required: false
+            maps_to: transformation_rule
+          - name: validation-override
+            type: json
+            required: false
+            maps_to: validation_override
+          - name: default-value
+            type: string
+            required: false
+            maps_to: default_value
+          - name: display-order
+            type: integer
+            required: false
+            maps_to: display_order
+        returns:
+          type: uuid
+          name: requirement_id
+          capture: false
+
+      remove-attribute:
+        description: "Remove an attribute requirement from a lifecycle resource type"
+        behavior: crud
+        crud:
+          operation: delete
+          table: resource_attribute_requirements
+          schema: ob-poc
+          key: requirement_id
+        args:
+          - name: requirement-id
+            type: uuid
+            required: true
+            maps_to: requirement_id
+        returns:
+          type: affected
+
+      update-attribute:
+        description: "Update an attribute requirement configuration"
+        behavior: crud
+        crud:
+          operation: update
+          table: resource_attribute_requirements
+          schema: ob-poc
+          key: requirement_id
+        args:
+          - name: requirement-id
+            type: uuid
+            required: true
+            maps_to: requirement_id
+          - name: resource-field-name
+            type: string
+            required: false
+            maps_to: resource_field_name
+          - name: is-mandatory
+            type: boolean
+            required: false
+            maps_to: is_mandatory
+          - name: transformation-rule
+            type: json
+            required: false
+            maps_to: transformation_rule
+          - name: validation-override
+            type: json
+            required: false
+            maps_to: validation_override
+          - name: default-value
+            type: string
+            required: false
+            maps_to: default_value
+          - name: display-order
+            type: integer
+            required: false
+            maps_to: display_order
+        returns:
+          type: affected
+
+      list-attributes:
+        description: "List attribute requirements for a lifecycle resource type"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: resource_attribute_requirements
+          schema: ob-poc
+          fk_col: resource_id
+        args:
+          - name: resource-id
+            type: uuid
+            required: true
+          - name: is-mandatory
+            type: boolean
+            required: false
+        returns:
+          type: record_set
+
+      ensure-attribute:
+        description: "Ensure an attribute requirement exists (upsert)"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: resource_attribute_requirements
+          schema: ob-poc
+          conflict_keys: [resource_id, attribute_id]
+          returning: requirement_id
+        args:
+          - name: resource-id
+            type: uuid
+            required: true
+            maps_to: resource_id
+          - name: attribute-id
+            type: uuid
+            required: true
+            maps_to: attribute_id
+          - name: resource-field-name
+            type: string
+            required: false
+            maps_to: resource_field_name
+          - name: is-mandatory
+            type: boolean
+            required: false
+            maps_to: is_mandatory
+          - name: transformation-rule
+            type: json
+            required: false
+            maps_to: transformation_rule
+          - name: validation-override
+            type: json
+            required: false
+            maps_to: validation_override
+          - name: default-value
+            type: string
+            required: false
+            maps_to: default_value
+          - name: display-order
+            type: integer
+            required: false
+            maps_to: display_order
+        returns:
+          type: uuid
+          name: requirement_id
+          capture: false
+
+# =============================================================================
+# PLUGINS (Custom operations requiring Rust code)
+# =============================================================================
+plugins:
+  document.catalog:
+    description: "Catalog a document for an entity within a CBU"
+    handler: document_catalog
+    args:
+      - name: cbu-id
+        type: uuid
+        required: true
+      - name: entity-id
+        type: uuid
+        required: true
+      - name: document-type
+        type: lookup
+        required: true
+        lookup:
+          table: document_types
+          code_column: type_code
+          id_column: type_id
+      - name: file-path
+        type: string
+        required: false
+      - name: metadata
+        type: json
+        required: false
+    returns:
+      type: uuid
+      name: doc_id
+
+  document.extract:
+    description: "Extract attributes from a cataloged document"
+    handler: document_extract
+    args:
+      - name: document-id
+        type: uuid
+        required: true
+      - name: attributes
+        type: string_list
+        required: false
+      - name: use-ocr
+        type: boolean
+        required: false
+        default: false
+
+  ubo.calculate:
+    description: "Calculate ultimate beneficial ownership chain"
+    handler: ubo_calculate
+    args:
+      - name: cbu-id
+        type: uuid
+        required: true
+      - name: entity-id
+        type: uuid
+        required: true
+      - name: threshold
+        type: decimal
+        required: false
+        default: 25.0
+
+  ubo.validate:
+    description: "Validate UBO structure completeness"
+    handler: ubo_validate
+    args:
+      - name: cbu-id
+        type: uuid
+        required: true
+
+  screening.pep:
+    description: "Run PEP screening"
+    handler: screening_pep
+    args:
+      - name: entity-id
+        type: uuid
+        required: true
+      - name: provider
+        type: string
+        required: false
+
+  screening.sanctions:
+    description: "Run sanctions list screening"
+    handler: screening_sanctions
+    args:
+      - name: entity-id
+        type: uuid
+        required: true
+      - name: lists
+        type: string_list
+        required: false
+
+  screening.adverse-media:
+    description: "Run adverse media screening"
+    handler: screening_adverse_media
+    args:
+      - name: entity-id
+        type: uuid
+        required: true
+      - name: lookback-months
+        type: integer
+        required: false
+        default: 24
+
+  kyc.initiate:
+    description: "Initiate KYC investigation"
+    handler: kyc_initiate
+    args:
+      - name: cbu-id
+        type: uuid
+        required: true
+      - name: investigation-type
+        type: string
+        required: true
+
+  kyc.decide:
+    description: "Record KYC decision"
+    handler: kyc_decide
+    args:
+      - name: investigation-id
+        type: uuid
+        required: true
+      - name: decision
+        type: string
+        required: true
+        valid_values: [approve, reject, escalate]
+      - name: rationale
+        type: string
+        required: true
+
+  resource.create:
+    description: "Create a resource instance for a CBU"
+    handler: resource_instance_create
+    args:
+      - name: cbu-id
+        type: uuid
+        required: true
+      - name: resource-type
+        type: string
+        required: true
+      - name: instance-url
+        type: string
+        required: true
+      - name: instance-id
+        type: string
+        required: false
+      - name: instance-name
+        type: string
+        required: false
+      - name: product-id
+        type: uuid
+        required: false
+      - name: service-id
+        type: uuid
+        required: false
+      - name: config
+        type: json
+        required: false
+    returns:
+      type: uuid
+      name: instance_id
+
+  resource.set-attr:
+    description: "Set an attribute value on a resource instance"
+    handler: resource_set_attr
+    args:
+      - name: instance-id
+        type: uuid
+        required: true
+      - name: attr
+        type: string
+        required: true
+      - name: value
+        type: string
+        required: true
+      - name: state
+        type: string
+        required: false
+        valid_values: [proposed, confirmed, derived, system]
+      - name: source
+        type: json
+        required: false
+
+  resource.activate:
+    description: "Activate a resource instance"
+    handler: resource_activate
+    args:
+      - name: instance-id
+        type: uuid
+        required: true
+
+  resource.suspend:
+    description: "Suspend a resource instance"
+    handler: resource_suspend
+    args:
+      - name: instance-id
+        type: uuid
+        required: true
+      - name: reason
+        type: string
+        required: false
+
+  resource.decommission:
+    description: "Decommission a resource instance"
+    handler: resource_decommission
+    args:
+      - name: instance-id
+        type: uuid
+        required: true
+      - name: reason
+        type: string
+        required: false
+
+  delivery.record:
+    description: "Record a service delivery for a CBU"
+    handler: delivery_record
+    args:
+      - name: cbu-id
+        type: uuid
+        required: true
+      - name: product
+        type: string
+        required: true
+      - name: service
+        type: string
+        required: true
+      - name: instance-id
+        type: uuid
+        required: false
+      - name: config
+        type: json
+        required: false
+
+  delivery.complete:
+    description: "Mark a service delivery as complete"
+    handler: delivery_complete
+    args:
+      - name: cbu-id
+        type: uuid
+        required: true
+      - name: product
+        type: string
+        required: true
+      - name: service
+        type: string
+        required: true
+      - name: instance-id
+        type: uuid
+        required: false
+
+  delivery.fail:
+    description: "Mark a service delivery as failed"
+    handler: delivery_fail
+    args:
+      - name: cbu-id
+        type: uuid
+        required: true
+      - name: product
+        type: string
+        required: true
+      - name: service
+        type: string
+        required: true
+      - name: reason
+        type: string
+        required: true

@@ -43,6 +43,7 @@
 pub mod applicability_rules;
 pub mod assembly;
 pub mod ast;
+pub mod config;
 pub mod csg_linter;
 pub mod custom_ops;
 pub mod execution_plan;
@@ -51,6 +52,7 @@ pub mod mappings;
 pub mod parser;
 #[cfg(feature = "database")]
 pub mod ref_resolver;
+pub mod runtime_registry;
 pub mod semantic_context;
 pub mod semantic_intent;
 #[cfg(feature = "database")]
