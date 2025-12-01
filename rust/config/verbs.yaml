@@ -2450,6 +2450,601 @@ domains:
           name: entity_ssi_id
           capture: true
 
+  # ===========================================================================
+  # DOMAIN: kyc (KYC Document Collection and Status)
+  # ===========================================================================
+  kyc:
+    description: "KYC document requirements and status management"
+
+    verbs:
+      # Document Requirements
+      require-document:
+        description: "Add a document requirement for KYC"
+        behavior: crud
+        crud:
+          operation: insert
+          table: document_requests
+          schema: ob-poc
+          returning: request_id
+        args:
+          - name: investigation-id
+            type: uuid
+            required: true
+            maps_to: investigation_id
+          - name: document-type
+            type: string
+            required: true
+            maps_to: document_type
+          - name: entity-id
+            type: uuid
+            required: false
+            maps_to: requested_from_entity_id
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+        returns:
+          type: uuid
+          name: request_id
+          capture: true
+
+      fulfill-requirement:
+        description: "Mark a document requirement as fulfilled"
+        behavior: crud
+        crud:
+          operation: update
+          table: document_requests
+          schema: ob-poc
+          key: request_id
+        args:
+          - name: request-id
+            type: uuid
+            required: true
+            maps_to: request_id
+          - name: doc-id
+            type: uuid
+            required: true
+            maps_to: doc_id
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+            default: "RECEIVED"
+        returns:
+          type: affected
+
+      list-requirements:
+        description: "List document requirements for an investigation"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: document_requests
+          schema: ob-poc
+          fk_col: investigation_id
+        args:
+          - name: investigation-id
+            type: uuid
+            required: true
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+        returns:
+          type: record_set
+
+      # KYC Status per Entity
+      set-status:
+        description: "Set KYC status for an entity within a CBU"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: entity_kyc_status
+          schema: ob-poc
+          conflict_keys: [entity_id, cbu_id]
+          returning: status_id
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+          - name: status
+            type: string
+            required: true
+            maps_to: kyc_status
+            valid_values:
+              [
+                NOT_STARTED,
+                IN_PROGRESS,
+                PENDING_REVIEW,
+                APPROVED,
+                REJECTED,
+                EXPIRED,
+              ]
+          - name: risk-rating
+            type: string
+            required: false
+            maps_to: risk_rating
+            valid_values: [LOW, MEDIUM, HIGH, PROHIBITED]
+          - name: reviewer
+            type: string
+            required: false
+            maps_to: reviewer
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+          - name: next-review-date
+            type: date
+            required: false
+            maps_to: next_review_date
+        returns:
+          type: uuid
+          name: status_id
+          capture: false
+
+      get-status:
+        description: "Get KYC status for an entity within a CBU"
+        behavior: crud
+        crud:
+          operation: select
+          table: entity_kyc_status
+          schema: ob-poc
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+        returns:
+          type: record
+
+      list-by-cbu:
+        description: "List all entity KYC statuses for a CBU"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: entity_kyc_status
+          schema: ob-poc
+          fk_col: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: status
+            type: string
+            required: false
+            maps_to: kyc_status
+        returns:
+          type: record_set
+
+      # Screening (uses existing screenings table)
+      record-screening:
+        description: "Record a screening result"
+        behavior: crud
+        crud:
+          operation: insert
+          table: screenings
+          schema: ob-poc
+          returning: screening_id
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+          - name: investigation-id
+            type: uuid
+            required: false
+            maps_to: investigation_id
+          - name: screening-type
+            type: string
+            required: true
+            maps_to: screening_type
+            valid_values: [SANCTIONS, PEP, ADVERSE_MEDIA, FULL]
+          - name: result
+            type: string
+            required: true
+            maps_to: result
+            valid_values: [CLEAR, MATCH, POTENTIAL_MATCH, ERROR]
+          - name: match-details
+            type: json
+            required: false
+            maps_to: match_details
+        returns:
+          type: uuid
+          name: screening_id
+          capture: true
+
+      resolve-screening:
+        description: "Resolve a screening hit"
+        behavior: crud
+        crud:
+          operation: update
+          table: screenings
+          schema: ob-poc
+          key: screening_id
+        args:
+          - name: screening-id
+            type: uuid
+            required: true
+            maps_to: screening_id
+          - name: resolution
+            type: string
+            required: true
+            maps_to: resolution
+            valid_values: [CONFIRMED_MATCH, FALSE_POSITIVE, ESCALATED]
+          - name: rationale
+            type: string
+            required: true
+            maps_to: resolution_rationale
+          - name: resolved-by
+            type: string
+            required: true
+            maps_to: resolved_by
+        returns:
+          type: affected
+
+      list-screenings:
+        description: "List screenings for an entity"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: screenings
+          schema: ob-poc
+          fk_col: entity_id
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+          - name: screening-type
+            type: string
+            required: false
+            maps_to: screening_type
+          - name: result
+            type: string
+            required: false
+            maps_to: result
+        returns:
+          type: record_set
+
+  # ===========================================================================
+  # DOMAIN: ubo (Ultimate Beneficial Ownership)
+  # ===========================================================================
+  ubo:
+    description: "UBO ownership and control chain management"
+
+    verbs:
+      # Ownership Links (uses existing ownership_relationships table)
+      add-ownership:
+        description: "Add ownership relationship between entities"
+        behavior: crud
+        crud:
+          operation: insert
+          table: ownership_relationships
+          schema: ob-poc
+          returning: ownership_id
+        args:
+          - name: owner-entity-id
+            type: uuid
+            required: true
+            maps_to: owner_entity_id
+          - name: owned-entity-id
+            type: uuid
+            required: true
+            maps_to: owned_entity_id
+          - name: percentage
+            type: decimal
+            required: true
+            maps_to: ownership_percent
+          - name: ownership-type
+            type: string
+            required: true
+            maps_to: ownership_type
+            valid_values: [DIRECT, INDIRECT, BENEFICIAL]
+          - name: effective-from
+            type: date
+            required: false
+            maps_to: effective_from
+          - name: evidence-doc-id
+            type: uuid
+            required: false
+            maps_to: evidence_doc_id
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+        returns:
+          type: uuid
+          name: ownership_id
+          capture: true
+
+      update-ownership:
+        description: "Update ownership percentage or end date"
+        behavior: crud
+        crud:
+          operation: update
+          table: ownership_relationships
+          schema: ob-poc
+          key: ownership_id
+        args:
+          - name: ownership-id
+            type: uuid
+            required: true
+            maps_to: ownership_id
+          - name: percentage
+            type: decimal
+            required: false
+            maps_to: ownership_percent
+          - name: effective-to
+            type: date
+            required: false
+            maps_to: effective_to
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+        returns:
+          type: affected
+
+      end-ownership:
+        description: "End an ownership relationship"
+        behavior: crud
+        crud:
+          operation: update
+          table: ownership_relationships
+          schema: ob-poc
+          key: ownership_id
+        args:
+          - name: ownership-id
+            type: uuid
+            required: true
+            maps_to: ownership_id
+          - name: effective-to
+            type: date
+            required: true
+            maps_to: effective_to
+        returns:
+          type: affected
+
+      list-owners:
+        description: "List owners of an entity (who owns this entity)"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: ownership_relationships
+          schema: ob-poc
+          fk_col: owned_entity_id
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: owned_entity_id
+        returns:
+          type: record_set
+
+      list-owned:
+        description: "List entities owned by an entity (what does this entity own)"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: ownership_relationships
+          schema: ob-poc
+          fk_col: owner_entity_id
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: owner_entity_id
+        returns:
+          type: record_set
+
+      # Control Links (uses new control_relationships table)
+      add-control:
+        description: "Add control relationship (non-ownership)"
+        behavior: crud
+        crud:
+          operation: insert
+          table: control_relationships
+          schema: ob-poc
+          returning: control_id
+        args:
+          - name: controller-entity-id
+            type: uuid
+            required: true
+            maps_to: controller_entity_id
+          - name: controlled-entity-id
+            type: uuid
+            required: true
+            maps_to: controlled_entity_id
+          - name: control-type
+            type: string
+            required: true
+            maps_to: control_type
+            valid_values:
+              [
+                BOARD_CONTROL,
+                VOTING_RIGHTS,
+                VETO_POWER,
+                MANAGEMENT,
+                TRUSTEE,
+                PROTECTOR,
+                OTHER,
+              ]
+          - name: description
+            type: string
+            required: false
+            maps_to: description
+          - name: effective-from
+            type: date
+            required: false
+            maps_to: effective_from
+          - name: evidence-doc-id
+            type: uuid
+            required: false
+            maps_to: evidence_doc_id
+        returns:
+          type: uuid
+          name: control_id
+          capture: true
+
+      end-control:
+        description: "End a control relationship"
+        behavior: crud
+        crud:
+          operation: update
+          table: control_relationships
+          schema: ob-poc
+          key: control_id
+          set_values:
+            is_active: false
+        args:
+          - name: control-id
+            type: uuid
+            required: true
+            maps_to: control_id
+          - name: effective-to
+            type: date
+            required: false
+            maps_to: effective_to
+        returns:
+          type: affected
+
+      list-controllers:
+        description: "List controllers of an entity"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: control_relationships
+          schema: ob-poc
+          fk_col: controlled_entity_id
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: controlled_entity_id
+        returns:
+          type: record_set
+
+      # UBO Registry (uses existing ubo_registry table)
+      register-ubo:
+        description: "Register a UBO determination for a CBU"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: ubo_registry
+          schema: ob-poc
+          conflict_keys:
+            [subject_entity_id, ubo_proper_person_id, relationship_type]
+          returning: ubo_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+          - name: subject-entity-id
+            type: uuid
+            required: true
+            maps_to: subject_entity_id
+          - name: ubo-person-id
+            type: uuid
+            required: true
+            maps_to: ubo_proper_person_id
+          - name: relationship-type
+            type: string
+            required: true
+            maps_to: relationship_type
+          - name: qualifying-reason
+            type: string
+            required: true
+            maps_to: qualifying_reason
+            valid_values: [OWNERSHIP_25PCT, CONTROL, SENIOR_MANAGEMENT, OTHER]
+          - name: ownership-percentage
+            type: decimal
+            required: false
+            maps_to: ownership_percentage
+          - name: control-type
+            type: string
+            required: false
+            maps_to: control_type
+          - name: workflow-type
+            type: string
+            required: true
+            maps_to: workflow_type
+          - name: regulatory-framework
+            type: string
+            required: false
+            maps_to: regulatory_framework
+        returns:
+          type: uuid
+          name: ubo_id
+          capture: true
+
+      verify-ubo:
+        description: "Mark a UBO as verified"
+        behavior: crud
+        crud:
+          operation: update
+          table: ubo_registry
+          schema: ob-poc
+          key: ubo_id
+        args:
+          - name: ubo-id
+            type: uuid
+            required: true
+            maps_to: ubo_id
+          - name: verification-status
+            type: string
+            required: true
+            maps_to: verification_status
+            valid_values: [PENDING, VERIFIED, FAILED, DISPUTED]
+          - name: risk-rating
+            type: string
+            required: false
+            maps_to: risk_rating
+            valid_values: [LOW, MEDIUM, HIGH, PROHIBITED]
+        returns:
+          type: affected
+
+      list-ubos:
+        description: "List UBOs for a CBU"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: ubo_registry
+          schema: ob-poc
+          fk_col: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: verification-status
+            type: string
+            required: false
+            maps_to: verification_status
+        returns:
+          type: record_set
+
+      list-by-subject:
+        description: "List UBOs for a subject entity"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: ubo_registry
+          schema: ob-poc
+          fk_col: subject_entity_id
+        args:
+          - name: subject-entity-id
+            type: uuid
+            required: true
+        returns:
+          type: record_set
+
 # =============================================================================
 # PLUGINS (Custom operations requiring Rust code)
 # =============================================================================

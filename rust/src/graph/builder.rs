@@ -566,10 +566,163 @@ impl CbuGraphBuilder {
         Ok(())
     }
 
-    async fn load_kyc_layer(&self, graph: &mut CbuGraph, _pool: &PgPool) -> Result<()> {
-        // KYC layer - document_catalog table exists, load from there
-        // For now, this is a stub - can be expanded when document relationships are needed
-        let _ = graph;
+    async fn load_kyc_layer(&self, graph: &mut CbuGraph, pool: &PgPool) -> Result<()> {
+        // Load entity KYC statuses for this CBU
+        let statuses = sqlx::query!(
+            r#"SELECT
+                ks.status_id,
+                ks.entity_id,
+                ks.kyc_status,
+                ks.risk_rating,
+                ks.next_review_date,
+                e.name as "entity_name?"
+               FROM "ob-poc".entity_kyc_status ks
+               JOIN "ob-poc".entities e ON e.entity_id = ks.entity_id
+               WHERE ks.cbu_id = $1"#,
+            self.cbu_id
+        )
+        .fetch_all(pool)
+        .await?;
+
+        for ks in statuses {
+            let status_id = format!("kyc-status-{}", ks.status_id);
+
+            graph.add_node(GraphNode {
+                id: status_id.clone(),
+                node_type: NodeType::Verification,
+                layer: LayerType::Kyc,
+                label: format!("KYC: {}", ks.kyc_status.as_deref().unwrap_or("N/A")),
+                sublabel: ks.risk_rating.clone(),
+                status: match ks.kyc_status.as_deref() {
+                    Some("APPROVED") => NodeStatus::Active,
+                    Some("IN_PROGRESS") | Some("PENDING_REVIEW") => NodeStatus::Pending,
+                    Some("REJECTED") => NodeStatus::Expired,
+                    Some("EXPIRED") => NodeStatus::Expired,
+                    _ => NodeStatus::Draft,
+                },
+                parent_id: None,
+                data: serde_json::json!({
+                    "kyc_status": ks.kyc_status,
+                    "risk_rating": ks.risk_rating,
+                    "next_review_date": ks.next_review_date
+                }),
+            });
+
+            // Edge: Entity → KYC Status
+            graph.add_edge(GraphEdge {
+                id: format!("{}->{}", ks.entity_id, status_id),
+                source: ks.entity_id.to_string(),
+                target: status_id,
+                edge_type: EdgeType::Validates,
+                label: None,
+            });
+        }
+
+        // Load document requirements from investigations linked to this CBU
+        let doc_reqs = sqlx::query!(
+            r#"SELECT
+                dr.request_id,
+                dr.document_type,
+                dr.status,
+                dr.requested_from_entity_id,
+                e.name as "entity_name?"
+               FROM "ob-poc".document_requests dr
+               JOIN "ob-poc".kyc_investigations ki ON ki.investigation_id = dr.investigation_id
+               LEFT JOIN "ob-poc".entities e ON e.entity_id = dr.requested_from_entity_id
+               WHERE ki.cbu_id = $1"#,
+            self.cbu_id
+        )
+        .fetch_all(pool)
+        .await?;
+
+        for dr in doc_reqs {
+            let doc_req_id = format!("doc-req-{}", dr.request_id);
+
+            graph.add_node(GraphNode {
+                id: doc_req_id.clone(),
+                node_type: NodeType::Document,
+                layer: LayerType::Kyc,
+                label: dr.document_type.clone(),
+                sublabel: dr.status.clone(),
+                status: match dr.status.as_deref() {
+                    Some("RECEIVED") | Some("VERIFIED") => NodeStatus::Active,
+                    Some("PENDING") => NodeStatus::Pending,
+                    Some("REJECTED") => NodeStatus::Expired,
+                    _ => NodeStatus::Draft,
+                },
+                parent_id: None,
+                data: serde_json::json!({
+                    "document_type": dr.document_type,
+                    "status": dr.status
+                }),
+            });
+
+            // Edge: Entity → Document Requirement (if entity specified)
+            if let Some(entity_id) = dr.requested_from_entity_id {
+                graph.add_edge(GraphEdge {
+                    id: format!("{}->{}", entity_id, doc_req_id),
+                    source: entity_id.to_string(),
+                    target: doc_req_id,
+                    edge_type: EdgeType::Requires,
+                    label: None,
+                });
+            }
+        }
+
+        // Load screenings for entities linked to this CBU
+        let screenings = sqlx::query!(
+            r#"SELECT
+                s.screening_id,
+                s.entity_id,
+                s.screening_type,
+                s.result,
+                s.resolution,
+                e.name as "entity_name?"
+               FROM "ob-poc".screenings s
+               JOIN "ob-poc".cbu_entity_roles cer ON cer.entity_id = s.entity_id
+               JOIN "ob-poc".entities e ON e.entity_id = s.entity_id
+               WHERE cer.cbu_id = $1"#,
+            self.cbu_id
+        )
+        .fetch_all(pool)
+        .await?;
+
+        for scr in screenings {
+            let screening_id = format!("screening-{}", scr.screening_id);
+
+            graph.add_node(GraphNode {
+                id: screening_id.clone(),
+                node_type: NodeType::Verification,
+                layer: LayerType::Kyc,
+                label: format!("{}", scr.screening_type),
+                sublabel: scr.result.clone(),
+                status: match scr.result.as_deref() {
+                    Some("CLEAR") => NodeStatus::Active,
+                    Some("MATCH") | Some("POTENTIAL_MATCH") => match scr.resolution.as_deref() {
+                        Some("FALSE_POSITIVE") => NodeStatus::Active,
+                        Some("CONFIRMED_MATCH") => NodeStatus::Expired,
+                        _ => NodeStatus::Pending,
+                    },
+                    _ => NodeStatus::Draft,
+                },
+                parent_id: None,
+                data: serde_json::json!({
+                    "screening_type": scr.screening_type,
+                    "result": scr.result,
+                    "resolution": scr.resolution
+                }),
+            });
+
+            // Edge: Entity → Screening
+            graph.add_edge(GraphEdge {
+                id: format!("{}->{}", scr.entity_id, screening_id),
+                source: scr.entity_id.to_string(),
+                target: screening_id,
+                edge_type: EdgeType::Validates,
+                label: None,
+            });
+        }
+
         Ok(())
     }
 
@@ -694,6 +847,63 @@ impl CbuGraphBuilder {
                 target: owned_id,
                 edge_type: EdgeType::Owns,
                 label: pct_label,
+            });
+        }
+
+        // Load control relationships (non-ownership control like board, trustee, etc.)
+        let controls = sqlx::query!(
+            r#"SELECT
+                c.control_id,
+                c.controller_entity_id,
+                c.controlled_entity_id,
+                c.control_type,
+                c.description,
+                c.is_active,
+                controller.name as "controller_name?",
+                controlled.name as "controlled_name?"
+               FROM "ob-poc".control_relationships c
+               LEFT JOIN "ob-poc".entities controller ON controller.entity_id = c.controller_entity_id
+               LEFT JOIN "ob-poc".entities controlled ON controlled.entity_id = c.controlled_entity_id
+               WHERE c.is_active = true
+                 AND (c.controlled_entity_id IN (
+                       SELECT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1
+                     )
+                  OR c.controller_entity_id IN (
+                       SELECT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1
+                     ))"#,
+            self.cbu_id
+        )
+        .fetch_all(pool)
+        .await?;
+
+        for ctrl in &controls {
+            let controller_id = ctrl.controller_entity_id.to_string();
+            let controlled_id = ctrl.controlled_entity_id.to_string();
+
+            // Add controller node if not present
+            if !graph.has_node(&controller_id) {
+                graph.add_node(GraphNode {
+                    id: controller_id.clone(),
+                    node_type: NodeType::Entity,
+                    layer: LayerType::Ubo,
+                    label: ctrl
+                        .controller_name
+                        .clone()
+                        .unwrap_or_else(|| "Unknown".to_string()),
+                    sublabel: Some(ctrl.control_type.clone()),
+                    status: NodeStatus::Active,
+                    parent_id: None,
+                    data: serde_json::json!({}),
+                });
+            }
+
+            // Add control edge
+            graph.add_edge(GraphEdge {
+                id: ctrl.control_id.to_string(),
+                source: controller_id,
+                target: controlled_id,
+                edge_type: EdgeType::Controls,
+                label: Some(ctrl.control_type.clone()),
             });
         }
 
