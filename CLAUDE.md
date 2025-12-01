@@ -152,9 +152,10 @@ ob-poc/
 cd rust/
 
 # Build
-cargo build --features server --bin agentic_server   # Main server
-cargo build --features database                       # DSL library only
-cargo build --features mcp --bin dsl_mcp             # MCP server
+cargo build --features server --bin agentic_server        # Main server
+cargo build --features cli,database --bin dsl_cli         # CLI tool
+cargo build --features database                            # DSL library only
+cargo build --features mcp --bin dsl_mcp                  # MCP server
 
 # Run server (requires DATABASE_URL and ANTHROPIC_API_KEY)
 DATABASE_URL="postgresql:///data_designer" \
@@ -168,14 +169,194 @@ cargo test --features database --test db_integration  # DB tests
 ./tests/scenarios/run_tests.sh                        # DSL scenarios
 ./tests/mcp_test.sh                                   # MCP protocol tests
 
-# CLI
-./target/debug/dsl_cli lint file.dsl
-./target/debug/dsl_cli execute file.dsl
-
 # Clippy (all features)
 cargo clippy --features server
 cargo clippy --features database
 cargo clippy --features mcp
+```
+
+## DSL CLI (dsl_cli)
+
+The CLI provides headless access to the full DSL pipeline, including AI-powered generation.
+
+### Build
+
+```bash
+cd rust/
+cargo build --features cli,database --bin dsl_cli --release
+```
+
+### Commands Overview
+
+| Command | Description |
+|---------|-------------|
+| `generate` | Generate DSL from natural language using Claude AI |
+| `parse` | Parse DSL source into AST (no validation) |
+| `validate` | Validate DSL source (parse + CSG lint) |
+| `plan` | Compile DSL to execution plan (parse + lint + compile) |
+| `execute` | Execute DSL against the database |
+| `verbs` | List available verbs and their schemas |
+| `examples` | Show example DSL programs |
+| `demo` | Run a built-in demo scenario |
+
+### Global Options
+
+```bash
+-o, --format <FORMAT>  # Output format: json, text, pretty (default)
+-q, --quiet            # Suppress non-essential output
+```
+
+### Generate Command (AI-Powered)
+
+Generate DSL from natural language instructions using Claude AI.
+
+```bash
+# Basic generation
+dsl_cli generate -i "Create a fund called Pacific Growth in Luxembourg"
+
+# Generate and execute immediately
+dsl_cli generate -i "Onboard Apex Capital as a US hedge fund" --execute
+
+# Generate and save to file
+dsl_cli generate -i "Create corporate with John Smith as UBO" -o output.dsl
+
+# Focus on specific domain
+dsl_cli generate -i "Provision custody account" --domain service-resource
+
+# JSON output for scripting
+dsl_cli generate -i "Create a trust in Jersey" --format json
+
+# Pipe instruction from stdin
+echo "Create a fund in Ireland" | dsl_cli generate
+```
+
+**Options:**
+- `-i, --instruction <TEXT>` - Natural language instruction (or reads from stdin)
+- `--execute` - Execute generated DSL after validation
+- `--db-url <URL>` - Database URL (required with --execute, or use DATABASE_URL env)
+- `--domain <DOMAIN>` - Focus generation on specific domain (cbu, entity, service-resource, etc.)
+- `-o, --output <FILE>` - Save generated DSL to file
+
+**Environment Variables:**
+- `ANTHROPIC_API_KEY` - Required for generation
+- `DATABASE_URL` - Required for --execute
+
+### Validate Command
+
+Validate DSL syntax and semantics without execution.
+
+```bash
+# Validate from file
+dsl_cli validate -f program.dsl
+
+# Validate from stdin
+echo '(cbu.ensure :name "Test" :jurisdiction "US")' | dsl_cli validate
+
+# With context
+dsl_cli validate -f program.dsl --client-type fund --jurisdiction LU
+
+# JSON output
+dsl_cli validate -f program.dsl --format json
+```
+
+### Plan Command
+
+Compile DSL to execution plan (shows what would execute).
+
+```bash
+# Show execution plan
+dsl_cli plan -f program.dsl
+
+# JSON output for inspection
+dsl_cli plan -f program.dsl --format json
+```
+
+### Execute Command
+
+Execute DSL against the database.
+
+```bash
+# Execute DSL file
+dsl_cli execute -f program.dsl --db-url postgresql:///data_designer
+
+# Dry run (show plan without executing)
+dsl_cli execute -f program.dsl --dry-run
+
+# Execute from stdin
+echo '(cbu.ensure :name "Test Fund" :jurisdiction "LU" :client-type "fund")' | \
+  dsl_cli execute --db-url postgresql:///data_designer
+
+# JSON output with results
+dsl_cli execute -f program.dsl --format json
+```
+
+### Verbs Command
+
+List available DSL verbs.
+
+```bash
+# List all verbs
+dsl_cli verbs
+
+# Filter by domain
+dsl_cli verbs --domain cbu
+dsl_cli verbs --domain entity
+dsl_cli verbs --domain service-resource
+
+# Verbose with full schema
+dsl_cli verbs --domain cbu --verbose
+
+# JSON output
+dsl_cli verbs --format json
+```
+
+### Examples Command
+
+Show example DSL programs.
+
+```bash
+# All examples
+dsl_cli examples
+
+# By category
+dsl_cli examples onboarding
+dsl_cli examples documents
+dsl_cli examples entities
+```
+
+### Full Pipeline Example
+
+```bash
+# 1. Generate DSL from natural language
+dsl_cli generate -i "Onboard Pacific Fund as a Luxembourg fund with custody account" -o pacific.dsl
+
+# 2. Validate the generated DSL
+dsl_cli validate -f pacific.dsl
+
+# 3. View execution plan
+dsl_cli plan -f pacific.dsl
+
+# 4. Execute (dry run first)
+dsl_cli execute -f pacific.dsl --dry-run
+
+# 5. Execute for real
+dsl_cli execute -f pacific.dsl
+
+# Or do it all in one command:
+dsl_cli generate -i "Onboard Pacific Fund as a Luxembourg fund" --execute
+```
+
+### Scripting with JSON Output
+
+```bash
+# Generate and parse with jq
+dsl_cli generate -i "Create a fund" --format json | jq '.dsl'
+
+# Check if execution succeeded
+dsl_cli execute -f program.dsl --format json | jq '.success'
+
+# Get created bindings
+dsl_cli execute -f program.dsl --format json | jq '.bindings'
 ```
 
 ## API Endpoints

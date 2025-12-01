@@ -136,6 +136,30 @@ enum Commands {
         #[arg(long)]
         jurisdiction: Option<String>,
     },
+
+    /// Generate DSL from natural language using Claude AI
+    #[cfg(feature = "database")]
+    Generate {
+        /// Natural language instruction (or reads from stdin if not provided)
+        #[arg(short, long)]
+        instruction: Option<String>,
+
+        /// Execute the generated DSL after validation
+        #[arg(long)]
+        execute: bool,
+
+        /// Database URL (required if --execute, or use DATABASE_URL env var)
+        #[arg(long, env = "DATABASE_URL")]
+        db_url: Option<String>,
+
+        /// Domain hint to focus generation (e.g., cbu, entity, resource)
+        #[arg(long)]
+        domain: Option<String>,
+
+        /// Save generated DSL to file
+        #[arg(long, short)]
+        output: Option<PathBuf>,
+    },
 }
 
 // =============================================================================
@@ -174,6 +198,29 @@ fn main() -> ExitCode {
                     dry_run,
                     client_type,
                     jurisdiction,
+                    cli.format,
+                )),
+                Err(e) => Err(e),
+            }
+        }
+        #[cfg(feature = "database")]
+        Commands::Generate {
+            instruction,
+            execute,
+            db_url,
+            domain,
+            output,
+        } => {
+            // Run async runtime for API calls
+            let rt = tokio::runtime::Runtime::new()
+                .map_err(|e| format!("Failed to create runtime: {}", e));
+            match rt {
+                Ok(rt) => rt.block_on(cmd_generate(
+                    instruction,
+                    execute,
+                    db_url,
+                    domain,
+                    output,
                     cli.format,
                 )),
                 Err(e) => Err(e),
@@ -1050,4 +1097,444 @@ async fn cmd_execute(
             Err(format!("Execution failed: {}", e))
         }
     }
+}
+
+// =============================================================================
+// GENERATE COMMAND (Agent-powered DSL generation)
+// =============================================================================
+
+#[cfg(feature = "database")]
+async fn cmd_generate(
+    instruction: Option<String>,
+    execute: bool,
+    db_url: Option<String>,
+    domain: Option<String>,
+    output: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<(), String> {
+    use ob_poc::dsl_v2::{
+        executor::{DslExecutor, ExecutionContext, ExecutionResult},
+        CsgLinter,
+    };
+
+    // Get instruction from arg or stdin
+    let prompt = match instruction {
+        Some(i) => i,
+        None => {
+            if format == OutputFormat::Pretty {
+                println!("{}", "Reading instruction from stdin...".dimmed());
+            }
+            let mut input = String::new();
+            io::stdin()
+                .read_to_string(&mut input)
+                .map_err(|e| format!("Failed to read stdin: {}", e))?;
+            input.trim().to_string()
+        }
+    };
+
+    if prompt.is_empty() {
+        return Err("No instruction provided. Use --instruction or pipe to stdin.".to_string());
+    }
+
+    // Check for API key
+    let api_key = std::env::var("ANTHROPIC_API_KEY")
+        .map_err(|_| "ANTHROPIC_API_KEY environment variable not set".to_string())?;
+
+    if format == OutputFormat::Pretty {
+        println!("{}", "Generating DSL from instruction...".dimmed());
+        println!("  {}", prompt.cyan());
+        println!();
+    }
+
+    // Build vocabulary for the prompt
+    let vocab = build_vocab_for_generate(domain.as_deref());
+
+    // Build system prompt
+    let system_prompt = build_generation_system_prompt(&vocab);
+
+    // Call Claude API
+    let client = reqwest::Client::new();
+    let response = client
+        .post("https://api.anthropic.com/v1/messages")
+        .header("x-api-key", &api_key)
+        .header("anthropic-version", "2023-06-01")
+        .header("content-type", "application/json")
+        .json(&serde_json::json!({
+            "model": "claude-sonnet-4-20250514",
+            "max_tokens": 2048,
+            "system": system_prompt,
+            "messages": [
+                {"role": "user", "content": prompt}
+            ]
+        }))
+        .send()
+        .await
+        .map_err(|e| format!("API request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("API error {}: {}", status, body));
+    }
+
+    let json: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse API response: {}", e))?;
+
+    let generated = json["content"][0]["text"]
+        .as_str()
+        .unwrap_or("")
+        .trim()
+        .to_string();
+
+    if generated.starts_with("ERROR:") {
+        return Err(generated);
+    }
+
+    // Extract DSL from response (handle markdown code blocks)
+    let dsl = extract_dsl_from_response(&generated);
+
+    if format == OutputFormat::Pretty {
+        println!("{} Generated DSL:", "✓".green());
+        println!();
+        for line in dsl.lines() {
+            println!("  {}", line.cyan());
+        }
+        println!();
+    }
+
+    // Validate the generated DSL
+    let ast = match parse_program(&dsl) {
+        Ok(ast) => {
+            if format == OutputFormat::Pretty {
+                println!(
+                    "{} Parsed {} statement(s)",
+                    "✓".green(),
+                    ast.statements.len()
+                );
+            }
+            ast
+        }
+        Err(e) => {
+            // Show the generated DSL with line numbers for debugging
+            if format == OutputFormat::Pretty {
+                eprintln!("{} Parse error in generated DSL:", "✗".red());
+                eprintln!();
+                for (i, line) in dsl.lines().enumerate() {
+                    eprintln!("{:>4} | {}", (i + 1).to_string().dimmed(), line);
+                }
+                eprintln!();
+                eprintln!("{}: {}", "error".red().bold(), e);
+            } else if format == OutputFormat::Json {
+                let output = serde_json::json!({
+                    "success": false,
+                    "stage": "parse",
+                    "dsl": dsl,
+                    "error": format!("Parse error: {}", e),
+                });
+                println!("{}", serde_json::to_string_pretty(&output).unwrap());
+            }
+            return Err(format!("Generated DSL has syntax error: {}", e));
+        }
+    };
+
+    // Compile to verify
+    let plan = match compile(&ast) {
+        Ok(plan) => {
+            if format == OutputFormat::Pretty {
+                println!("{} Compiled {} step(s)", "✓".green(), plan.steps.len());
+            }
+            plan
+        }
+        Err(e) => {
+            // Show the generated DSL with line numbers for debugging
+            if format == OutputFormat::Pretty {
+                eprintln!("{} Compile error in generated DSL:", "✗".red());
+                eprintln!();
+                for (i, line) in dsl.lines().enumerate() {
+                    eprintln!("{:>4} | {}", (i + 1).to_string().dimmed(), line);
+                }
+                eprintln!();
+                eprintln!("{}: {:?}", "error".red().bold(), e);
+            } else if format == OutputFormat::Json {
+                let output = serde_json::json!({
+                    "success": false,
+                    "stage": "compile",
+                    "dsl": dsl,
+                    "error": format!("Compile error: {:?}", e),
+                });
+                println!("{}", serde_json::to_string_pretty(&output).unwrap());
+            }
+            return Err(format!("Generated DSL compile error: {:?}", e));
+        }
+    };
+
+    // Save to file if requested
+    if let Some(output_path) = &output {
+        std::fs::write(output_path, &dsl)
+            .map_err(|e| format!("Failed to write output file: {}", e))?;
+        if format == OutputFormat::Pretty {
+            println!("{} Saved to {}", "✓".green(), output_path.display());
+        }
+    }
+
+    // Execute if requested
+    if execute {
+        let db_url = db_url.ok_or("--db-url or DATABASE_URL required for --execute")?;
+
+        if format == OutputFormat::Pretty {
+            println!();
+            println!("{}", "Executing generated DSL...".yellow().bold());
+        }
+
+        let pool = sqlx::PgPool::connect(&db_url)
+            .await
+            .map_err(|e| format!("Database connection failed: {}", e))?;
+
+        // CSG validation with database
+        let mut linter = CsgLinter::new(pool.clone());
+        linter
+            .initialize()
+            .await
+            .map_err(|e| format!("Linter init failed: {}", e))?;
+
+        let lint_result = linter
+            .lint(ast.clone(), &ValidationContext::default(), &dsl)
+            .await;
+
+        if lint_result.has_errors() {
+            let formatted = RustStyleFormatter::format(&dsl, &lint_result.diagnostics);
+            if format == OutputFormat::Pretty {
+                eprintln!("{}", formatted);
+            }
+            return Err("CSG validation failed".to_string());
+        }
+
+        // Execute
+        let executor = DslExecutor::new(pool);
+        let mut exec_ctx = ExecutionContext::default();
+
+        match executor.execute_plan(&plan, &mut exec_ctx).await {
+            Ok(results) => {
+                if format == OutputFormat::Json {
+                    let result_data: Vec<_> = results
+                        .iter()
+                        .enumerate()
+                        .map(|(i, r)| {
+                            let step = &plan.steps[i];
+                            serde_json::json!({
+                                "step": i,
+                                "verb": format!("{}.{}", step.verb_call.domain, step.verb_call.verb),
+                                "success": true,
+                                "result": match r {
+                                    ExecutionResult::Uuid(id) => serde_json::json!({"id": id.to_string()}),
+                                    ExecutionResult::Record(j) => j.clone(),
+                                    ExecutionResult::RecordSet(rs) => serde_json::json!(rs),
+                                    ExecutionResult::Affected(n) => serde_json::json!({"rows_affected": n}),
+                                    ExecutionResult::Void => serde_json::json!(null),
+                                },
+                            })
+                        })
+                        .collect();
+
+                    let bindings: std::collections::HashMap<_, _> = exec_ctx
+                        .symbols
+                        .iter()
+                        .map(|(k, v)| (k.clone(), v.to_string()))
+                        .collect();
+
+                    let output = serde_json::json!({
+                        "success": true,
+                        "dsl": dsl,
+                        "steps_executed": results.len(),
+                        "bindings": bindings,
+                        "results": result_data,
+                    });
+                    println!("{}", serde_json::to_string_pretty(&output).unwrap());
+                } else {
+                    println!();
+                    println!(
+                        "{} Executed {} step(s) successfully",
+                        "✓".green().bold(),
+                        results.len()
+                    );
+
+                    if !exec_ctx.symbols.is_empty() {
+                        println!();
+                        println!("Bindings created:");
+                        for (name, value) in &exec_ctx.symbols {
+                            println!("  @{} = {}", name.yellow(), value.to_string().dimmed());
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                return Err(format!("Execution failed: {}", e));
+            }
+        }
+    } else {
+        // Just output the DSL without execution
+        if format == OutputFormat::Json {
+            let output = serde_json::json!({
+                "success": true,
+                "dsl": dsl,
+                "statement_count": ast.statements.len(),
+                "step_count": plan.steps.len(),
+            });
+            println!("{}", serde_json::to_string_pretty(&output).unwrap());
+        }
+    }
+
+    Ok(())
+}
+
+/// Build vocabulary string for generation prompt
+#[cfg(feature = "database")]
+fn build_vocab_for_generate(domain_filter: Option<&str>) -> String {
+    let mut lines = Vec::new();
+    let reg = registry();
+
+    let domains: Vec<String> = if let Some(d) = domain_filter {
+        vec![d.to_string()]
+    } else {
+        reg.domains().to_vec()
+    };
+
+    for domain_name in domains {
+        for verb in reg.verbs_for_domain(&domain_name) {
+            let required = verb.required_arg_names().join(", ");
+            let optional = verb.optional_arg_names().join(", ");
+            lines.push(format!(
+                "{}.{}: {} [required: {}] [optional: {}]",
+                verb.domain, verb.verb, verb.description, required, optional
+            ));
+        }
+    }
+
+    lines.join("\n")
+}
+
+/// Extract DSL from response, handling markdown code blocks
+#[cfg(feature = "database")]
+fn extract_dsl_from_response(response: &str) -> String {
+    // Check for markdown code block
+    if response.contains("```") {
+        // Extract content between ``` markers
+        let parts: Vec<&str> = response.split("```").collect();
+        if parts.len() >= 2 {
+            let code = parts[1];
+            // Remove language identifier if present (e.g., "clojure\n" or "dsl\n")
+            let code = code.trim();
+            if let Some(idx) = code.find('\n') {
+                let first_line = &code[..idx];
+                // If first line looks like a language identifier, skip it
+                if !first_line.contains('(') && !first_line.contains(':') {
+                    return code[idx + 1..].trim().to_string();
+                }
+            }
+            return code.to_string();
+        }
+    }
+    response.to_string()
+}
+
+/// Build system prompt for DSL generation
+#[cfg(feature = "database")]
+fn build_generation_system_prompt(vocab: &str) -> String {
+    format!(
+        r#"You are a DSL generator for a KYC/AML onboarding system.
+Generate valid DSL S-expressions from natural language instructions.
+
+AVAILABLE VERBS:
+{}
+
+DSL SYNTAX:
+- Format: (domain.verb :key "value" :key2 value2)
+- Strings must be quoted: "text"
+- Numbers are unquoted: 42, 25.5
+- References start with @: @symbol-name (hyphens allowed in symbol names)
+- Use :as @name to capture results for later reference
+
+## ONBOARDING DSL GENERATION
+
+You can generate DSL to onboard clients to financial services products. The taxonomy is:
+
+**Product** → **Service** → **Resource Instance**
+
+### Available Products
+
+| Code | Name | Description |
+|------|------|-------------|
+| `GLOB_CUSTODY` | Global Custody | Asset safekeeping, settlement, corporate actions |
+| `FUND_ACCT` | Fund Accounting | NAV calculation, investor accounting, reporting |
+| `MO_IBOR` | Middle Office IBOR | Position management, trade capture, P&L attribution |
+
+### Service Resource Types
+
+Service resources represent platforms/applications that deliver services:
+- `service-resource.ensure` - Create/ensure a service resource type exists
+- `service-resource.provision` - Provision an instance of a service resource for a CBU
+- `service-resource.set-attr` - Set attributes on a provisioned instance
+- `service-resource.activate` - Activate a provisioned instance
+- `service-resource.suspend` - Suspend an active instance
+- `service-resource.decommission` - Decommission an instance
+
+### Entity Types
+
+Dynamic verbs for entity creation based on type:
+- `entity.create-proper-person` - Create a natural person
+- `entity.create-limited-company` - Create a limited company
+- `entity.create-trust-discretionary` - Create a discretionary trust
+- `entity.create-partnership-limited` - Create a limited partnership
+
+### Client Types
+- `fund` - Investment fund
+- `corporate` - Corporate client
+- `individual` - Individual client
+- `trust` - Trust structure
+
+### Common Jurisdictions
+- `US` - United States
+- `UK` - United Kingdom
+- `LU` - Luxembourg
+- `IE` - Ireland
+- `JE` - Jersey
+- `KY` - Cayman Islands
+
+### EXAMPLES
+
+**Simple CBU Creation:**
+```
+(cbu.ensure :name "Acme Fund" :jurisdiction "LU" :client-type "fund" :as @fund)
+```
+
+**Corporate with UBO:**
+```
+(cbu.ensure :name "Acme Holdings" :jurisdiction "GB" :client-type "corporate" :as @cbu)
+(entity.create-limited-company :name "Acme Holdings Ltd" :jurisdiction "GB" :as @company)
+(entity.create-proper-person :first-name "John" :last-name "Smith" :nationality "GB" :as @john)
+(cbu.assign-role :cbu-id @cbu :entity-id @company :role "PRINCIPAL")
+(cbu.assign-role :cbu-id @cbu :entity-id @john :role "BENEFICIAL_OWNER" :target-entity-id @company :ownership-percentage 100)
+```
+
+**Service Resource Provisioning:**
+```
+(cbu.ensure :name "Pacific Fund" :jurisdiction "US" :client-type "fund" :as @fund)
+(service-resource.provision :cbu-id @fund :resource-type "CUSTODY_ACCT" :instance-name "Pacific Custody Account" :as @custody)
+(service-resource.set-attr :instance-id @custody :attr "account_number" :value "CUST-001")
+(service-resource.set-attr :instance-id @custody :attr "base_currency" :value "USD")
+(service-resource.activate :instance-id @custody)
+```
+
+**Document and Screening:**
+```
+(document.catalog :cbu-id @cbu :entity-id @john :document-type "PASSPORT")
+(screening.pep :entity-id @john)
+(screening.sanctions :entity-id @company)
+```
+
+Respond with ONLY the DSL code, no explanations or markdown. If you cannot generate valid DSL, respond with: ERROR: <reason>"#,
+        vocab
+    )
 }
