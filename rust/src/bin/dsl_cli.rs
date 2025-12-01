@@ -1101,6 +1101,12 @@ async fn cmd_execute(
 
 // =============================================================================
 // GENERATE COMMAND (Agent-powered DSL generation)
+// Uses the same full DSL lifecycle as the execute command:
+// 1. Generate (Claude API)
+// 2. Parse
+// 3. CSG Lint (with database rules, clippy-style output)
+// 4. Compile
+// 5. Execute (optional)
 // =============================================================================
 
 #[cfg(feature = "database")]
@@ -1136,10 +1142,17 @@ async fn cmd_generate(
         return Err("No instruction provided. Use --instruction or pipe to stdin.".to_string());
     }
 
+    // Database URL is required for full validation pipeline
+    let db_url = db_url
+        .ok_or("--db-url or DATABASE_URL required for generate (needed for CSG validation)")?;
+
     // Check for API key
     let api_key = std::env::var("ANTHROPIC_API_KEY")
         .map_err(|_| "ANTHROPIC_API_KEY environment variable not set".to_string())?;
 
+    // =========================================================================
+    // STEP 1: GENERATE DSL (Claude API)
+    // =========================================================================
     if format == OutputFormat::Pretty {
         println!("{}", "Generating DSL from instruction...".dimmed());
         println!("  {}", prompt.cyan());
@@ -1204,7 +1217,24 @@ async fn cmd_generate(
         println!();
     }
 
-    // Validate the generated DSL
+    // =========================================================================
+    // STEP 2: CONNECT TO DATABASE
+    // =========================================================================
+    if format == OutputFormat::Pretty {
+        println!("{}", "Connecting to database...".dimmed());
+    }
+
+    let pool = sqlx::PgPool::connect(&db_url)
+        .await
+        .map_err(|e| format!("Database connection failed: {}", e))?;
+
+    // =========================================================================
+    // STEP 3: PARSE DSL
+    // =========================================================================
+    if format == OutputFormat::Pretty {
+        println!("{}", "Parsing DSL...".dimmed());
+    }
+
     let ast = match parse_program(&dsl) {
         Ok(ast) => {
             if format == OutputFormat::Pretty {
@@ -1217,16 +1247,7 @@ async fn cmd_generate(
             ast
         }
         Err(e) => {
-            // Show the generated DSL with line numbers for debugging
-            if format == OutputFormat::Pretty {
-                eprintln!("{} Parse error in generated DSL:", "✗".red());
-                eprintln!();
-                for (i, line) in dsl.lines().enumerate() {
-                    eprintln!("{:>4} | {}", (i + 1).to_string().dimmed(), line);
-                }
-                eprintln!();
-                eprintln!("{}: {}", "error".red().bold(), e);
-            } else if format == OutputFormat::Json {
+            if format == OutputFormat::Json {
                 let output = serde_json::json!({
                     "success": false,
                     "stage": "parse",
@@ -1234,12 +1255,70 @@ async fn cmd_generate(
                     "error": format!("Parse error: {}", e),
                 });
                 println!("{}", serde_json::to_string_pretty(&output).unwrap());
+            } else {
+                eprintln!("{}: Parse error: {}", "error".red().bold(), e);
             }
-            return Err(format!("Generated DSL has syntax error: {}", e));
+            return Err(format!("Parse error: {}", e));
         }
     };
 
-    // Compile to verify
+    // =========================================================================
+    // STEP 4: CSG LINT (with database rules, clippy-style output)
+    // =========================================================================
+    if format == OutputFormat::Pretty {
+        println!("{}", "Running CSG validation...".dimmed());
+    }
+
+    let mut linter = CsgLinter::new(pool.clone());
+    linter
+        .initialize()
+        .await
+        .map_err(|e| format!("Linter initialization failed: {}", e))?;
+
+    let context = ValidationContext::default();
+    let lint_result = linter.lint(ast.clone(), &context, &dsl).await;
+
+    if lint_result.has_errors() {
+        let formatted = RustStyleFormatter::format(&dsl, &lint_result.diagnostics);
+        if format == OutputFormat::Json {
+            let output = serde_json::json!({
+                "success": false,
+                "stage": "validation",
+                "dsl": dsl,
+                "diagnostics": lint_result.diagnostics.iter().map(|d| {
+                    serde_json::json!({
+                        "severity": format!("{:?}", d.severity),
+                        "code": d.code.as_str(),
+                        "message": d.message,
+                        "line": d.span.line,
+                        "column": d.span.column,
+                    })
+                }).collect::<Vec<_>>(),
+            });
+            println!("{}", serde_json::to_string_pretty(&output).unwrap());
+        } else {
+            eprintln!("{}", formatted);
+        }
+        return Err("CSG validation failed".to_string());
+    }
+
+    // Show warnings if any
+    if format == OutputFormat::Pretty && lint_result.has_warnings() {
+        let formatted = RustStyleFormatter::format(&dsl, &lint_result.diagnostics);
+        eprintln!("{}", formatted);
+    }
+
+    if format == OutputFormat::Pretty {
+        println!("{} CSG validation passed", "✓".green());
+    }
+
+    // =========================================================================
+    // STEP 5: COMPILE TO EXECUTION PLAN
+    // =========================================================================
+    if format == OutputFormat::Pretty {
+        println!("{}", "Compiling execution plan...".dimmed());
+    }
+
     let plan = match compile(&ast) {
         Ok(plan) => {
             if format == OutputFormat::Pretty {
@@ -1248,16 +1327,7 @@ async fn cmd_generate(
             plan
         }
         Err(e) => {
-            // Show the generated DSL with line numbers for debugging
-            if format == OutputFormat::Pretty {
-                eprintln!("{} Compile error in generated DSL:", "✗".red());
-                eprintln!();
-                for (i, line) in dsl.lines().enumerate() {
-                    eprintln!("{:>4} | {}", (i + 1).to_string().dimmed(), line);
-                }
-                eprintln!();
-                eprintln!("{}: {:?}", "error".red().bold(), e);
-            } else if format == OutputFormat::Json {
+            if format == OutputFormat::Json {
                 let output = serde_json::json!({
                     "success": false,
                     "stage": "compile",
@@ -1265,12 +1335,16 @@ async fn cmd_generate(
                     "error": format!("Compile error: {:?}", e),
                 });
                 println!("{}", serde_json::to_string_pretty(&output).unwrap());
+            } else {
+                eprintln!("{}: Compile error: {:?}", "error".red().bold(), e);
             }
-            return Err(format!("Generated DSL compile error: {:?}", e));
+            return Err(format!("Compile error: {:?}", e));
         }
     };
 
-    // Save to file if requested
+    // =========================================================================
+    // SAVE TO FILE (if requested)
+    // =========================================================================
     if let Some(output_path) = &output {
         std::fs::write(output_path, &dsl)
             .map_err(|e| format!("Failed to write output file: {}", e))?;
@@ -1279,39 +1353,16 @@ async fn cmd_generate(
         }
     }
 
-    // Execute if requested
+    // =========================================================================
+    // STEP 6: EXECUTE (optional)
+    // =========================================================================
     if execute {
-        let db_url = db_url.ok_or("--db-url or DATABASE_URL required for --execute")?;
-
         if format == OutputFormat::Pretty {
             println!();
-            println!("{}", "Executing generated DSL...".yellow().bold());
+            println!("{}", "Executing...".yellow().bold());
+            println!();
         }
 
-        let pool = sqlx::PgPool::connect(&db_url)
-            .await
-            .map_err(|e| format!("Database connection failed: {}", e))?;
-
-        // CSG validation with database
-        let mut linter = CsgLinter::new(pool.clone());
-        linter
-            .initialize()
-            .await
-            .map_err(|e| format!("Linter init failed: {}", e))?;
-
-        let lint_result = linter
-            .lint(ast.clone(), &ValidationContext::default(), &dsl)
-            .await;
-
-        if lint_result.has_errors() {
-            let formatted = RustStyleFormatter::format(&dsl, &lint_result.diagnostics);
-            if format == OutputFormat::Pretty {
-                eprintln!("{}", formatted);
-            }
-            return Err("CSG validation failed".to_string());
-        }
-
-        // Execute
         let executor = DslExecutor::new(pool);
         let mut exec_ctx = ExecutionContext::default();
 
@@ -1353,6 +1404,43 @@ async fn cmd_generate(
                     });
                     println!("{}", serde_json::to_string_pretty(&output).unwrap());
                 } else {
+                    // Pretty print step results
+                    for (i, result) in results.iter().enumerate() {
+                        let step = &plan.steps[i];
+                        let verb_name =
+                            format!("{}.{}", step.verb_call.domain, step.verb_call.verb);
+
+                        match result {
+                            ExecutionResult::Uuid(id) => {
+                                let binding_info = step
+                                    .bind_as
+                                    .as_ref()
+                                    .map(|b| format!(" @{} =", b))
+                                    .unwrap_or_default();
+                                println!(
+                                    "  [{}] {}{} {} {}",
+                                    i,
+                                    verb_name.cyan(),
+                                    binding_info.yellow(),
+                                    id.to_string().dimmed(),
+                                    "✓".green()
+                                );
+                            }
+                            ExecutionResult::Affected(n) => {
+                                println!(
+                                    "  [{}] {} ({} rows) {}",
+                                    i,
+                                    verb_name.cyan(),
+                                    n,
+                                    "✓".green()
+                                );
+                            }
+                            _ => {
+                                println!("  [{}] {} {}", i, verb_name.cyan(), "✓".green());
+                            }
+                        }
+                    }
+
                     println!();
                     println!(
                         "{} Executed {} step(s) successfully",
@@ -1370,19 +1458,38 @@ async fn cmd_generate(
                 }
             }
             Err(e) => {
+                if format == OutputFormat::Json {
+                    let output = serde_json::json!({
+                        "success": false,
+                        "stage": "execution",
+                        "dsl": dsl,
+                        "error": e.to_string(),
+                    });
+                    println!("{}", serde_json::to_string_pretty(&output).unwrap());
+                } else {
+                    eprintln!("{} {}", "✗".red(), e.to_string().red());
+                }
                 return Err(format!("Execution failed: {}", e));
             }
         }
     } else {
-        // Just output the DSL without execution
+        // Output DSL and validation results without execution
         if format == OutputFormat::Json {
             let output = serde_json::json!({
                 "success": true,
                 "dsl": dsl,
                 "statement_count": ast.statements.len(),
                 "step_count": plan.steps.len(),
+                "validated": true,
             });
             println!("{}", serde_json::to_string_pretty(&output).unwrap());
+        } else if format == OutputFormat::Pretty {
+            println!();
+            println!(
+                "{} DSL generated and validated successfully",
+                "✓".green().bold()
+            );
+            println!("  Use --execute to run against the database");
         }
     }
 
