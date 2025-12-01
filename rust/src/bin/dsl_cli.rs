@@ -160,6 +160,30 @@ enum Commands {
         #[arg(long, short)]
         output: Option<PathBuf>,
     },
+
+    /// Generate custody onboarding DSL from natural language (agentic workflow)
+    #[cfg(feature = "database")]
+    Custody {
+        /// Natural language instruction (or reads from stdin if not provided)
+        #[arg(short, long)]
+        instruction: Option<String>,
+
+        /// Execute the generated DSL after validation
+        #[arg(long)]
+        execute: bool,
+
+        /// Database URL (required if --execute, or use DATABASE_URL env var)
+        #[arg(long, env = "DATABASE_URL")]
+        db_url: Option<String>,
+
+        /// Show plan without generating DSL
+        #[arg(long)]
+        plan_only: bool,
+
+        /// Save generated DSL to file
+        #[arg(long, short)]
+        output: Option<PathBuf>,
+    },
 }
 
 // =============================================================================
@@ -220,6 +244,29 @@ fn main() -> ExitCode {
                     execute,
                     db_url,
                     domain,
+                    output,
+                    cli.format,
+                )),
+                Err(e) => Err(e),
+            }
+        }
+        #[cfg(feature = "database")]
+        Commands::Custody {
+            instruction,
+            execute,
+            db_url,
+            plan_only,
+            output,
+        } => {
+            // Run async runtime for agentic workflow
+            let rt = tokio::runtime::Runtime::new()
+                .map_err(|e| format!("Failed to create runtime: {}", e));
+            match rt {
+                Ok(rt) => rt.block_on(cmd_custody(
+                    instruction,
+                    execute,
+                    db_url,
+                    plan_only,
                     output,
                     cli.format,
                 )),
@@ -1627,6 +1674,317 @@ fn extract_dsl_from_response(response: &str) -> String {
         }
     }
     response.to_string()
+}
+
+// =============================================================================
+// CUSTODY COMMAND (Agentic workflow)
+// Uses the agentic module for pattern-based custody DSL generation:
+// 1. Extract intent from natural language
+// 2. Classify pattern (SimpleEquity, MultiMarket, WithOtc)
+// 3. Derive requirements (deterministic Rust code)
+// 4. Generate DSL (Claude with full schemas)
+// 5. Validate with retry loop
+// 6. Execute (optional)
+// =============================================================================
+
+#[cfg(feature = "database")]
+async fn cmd_custody(
+    instruction: Option<String>,
+    execute: bool,
+    db_url: Option<String>,
+    plan_only: bool,
+    output: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<(), String> {
+    use ob_poc::agentic::{AgentOrchestrator, RequirementPlanner};
+
+    // Get instruction from arg or stdin
+    let prompt = match instruction {
+        Some(i) => i,
+        None => {
+            if format == OutputFormat::Pretty {
+                println!("{}", "Reading instruction from stdin...".dimmed());
+            }
+            let mut input = String::new();
+            io::stdin()
+                .read_to_string(&mut input)
+                .map_err(|e| format!("Failed to read stdin: {}", e))?;
+            input.trim().to_string()
+        }
+    };
+
+    if prompt.is_empty() {
+        return Err("No instruction provided. Use --instruction or pipe to stdin.".to_string());
+    }
+
+    // Check for API key
+    let api_key = std::env::var("ANTHROPIC_API_KEY")
+        .map_err(|_| "ANTHROPIC_API_KEY environment variable not set".to_string())?;
+
+    if format == OutputFormat::Pretty {
+        println!(
+            "{}",
+            "Custody Onboarding DSL Generator (Agentic)".cyan().bold()
+        );
+        println!("{}", "=".repeat(50));
+        println!();
+        println!("{}: {}", "Instruction".yellow(), prompt);
+        println!();
+    }
+
+    // =========================================================================
+    // STEP 1: CREATE ORCHESTRATOR
+    // =========================================================================
+    let orchestrator = if execute {
+        let url = db_url.ok_or("--db-url or DATABASE_URL required for --execute".to_string())?;
+
+        if format == OutputFormat::Pretty {
+            println!("{}", "Connecting to database...".dimmed());
+        }
+
+        let pool = sqlx::PgPool::connect(&url)
+            .await
+            .map_err(|e| format!("Database connection failed: {}", e))?;
+
+        ob_poc::agentic::OrchestratorBuilder::new(api_key)
+            .with_pool(pool)
+            .build()
+            .map_err(|e| format!("Failed to create orchestrator: {}", e))?
+    } else {
+        AgentOrchestrator::new(api_key)
+            .map_err(|e| format!("Failed to create orchestrator: {}", e))?
+    };
+
+    // =========================================================================
+    // STEP 2: EXTRACT INTENT
+    // =========================================================================
+    if format == OutputFormat::Pretty {
+        println!("{}", "Extracting intent from natural language...".dimmed());
+    }
+
+    let intent = orchestrator
+        .extract_intent(&prompt)
+        .await
+        .map_err(|e| format!("Intent extraction failed: {}", e))?;
+
+    if format == OutputFormat::Pretty {
+        println!("{} Extracted intent:", "✓".green());
+        println!(
+            "  Client: {} ({:?})",
+            intent.client.name.cyan(),
+            intent.client.entity_type
+        );
+        println!(
+            "  Markets: {:?}",
+            intent
+                .markets
+                .iter()
+                .map(|m| &m.market_code)
+                .collect::<Vec<_>>()
+        );
+        println!(
+            "  Instruments: {:?}",
+            intent
+                .instruments
+                .iter()
+                .map(|i| &i.class)
+                .collect::<Vec<_>>()
+        );
+        if !intent.otc_counterparties.is_empty() {
+            println!(
+                "  OTC Counterparties: {:?}",
+                intent
+                    .otc_counterparties
+                    .iter()
+                    .map(|c| &c.name)
+                    .collect::<Vec<_>>()
+            );
+        }
+        println!();
+    }
+
+    // =========================================================================
+    // STEP 3: CLASSIFY PATTERN AND PLAN
+    // =========================================================================
+    let plan = RequirementPlanner::plan(&intent);
+
+    if format == OutputFormat::Pretty {
+        println!(
+            "{} Pattern: {} - {}",
+            "✓".green(),
+            plan.pattern.name().cyan().bold(),
+            plan.pattern.description()
+        );
+        println!("  Required domains: {:?}", plan.pattern.required_domains());
+        println!("  Universe entries: {}", plan.universe.len());
+        println!("  SSIs required: {}", plan.ssis.len());
+        println!("  Booking rules: {}", plan.booking_rules.len());
+        if !plan.isdas.is_empty() {
+            println!("  ISDA agreements: {}", plan.isdas.len());
+        }
+        println!();
+    }
+
+    // If plan_only, output the plan and stop
+    if plan_only {
+        if format == OutputFormat::Json {
+            let output = serde_json::json!({
+                "success": true,
+                "intent": intent,
+                "pattern": plan.pattern.name(),
+                "plan": plan,
+            });
+            println!("{}", serde_json::to_string_pretty(&output).unwrap());
+        } else {
+            println!("{}", "Detailed Plan:".yellow().bold());
+            println!();
+
+            println!("  {}:", "CBU".cyan());
+            println!("    Name: {}", plan.cbu.name);
+            println!("    Jurisdiction: {}", plan.cbu.jurisdiction);
+            println!("    Type: {}", plan.cbu.client_type);
+            println!();
+
+            if !plan.entities.is_empty() {
+                println!("  {}:", "Entities".cyan());
+                for e in &plan.entities {
+                    println!("    {} ({:?}) → @{}", e.name, e.action, e.variable);
+                }
+                println!();
+            }
+
+            println!("  {}:", "Universe".cyan());
+            for u in &plan.universe {
+                let market = u.market.as_deref().unwrap_or("OTC");
+                println!(
+                    "    {} in {} ({:?})",
+                    u.instrument_class, market, u.currencies
+                );
+            }
+            println!();
+
+            println!("  {}:", "SSIs".cyan());
+            for s in &plan.ssis {
+                println!(
+                    "    {} ({}, {}) → @{}",
+                    s.name, s.ssi_type, s.currency, s.variable
+                );
+            }
+            println!();
+
+            println!("  {}:", "Booking Rules".cyan());
+            for r in &plan.booking_rules {
+                println!("    [{}] {} → @{}", r.priority, r.name, r.ssi_variable);
+            }
+
+            if !plan.isdas.is_empty() {
+                println!();
+                println!("  {}:", "ISDA Agreements".cyan());
+                for isda in &plan.isdas {
+                    println!(
+                        "    {} ({} law) → @{}",
+                        isda.counterparty_name, isda.governing_law, isda.variable
+                    );
+                    if let Some(csa) = &isda.csa {
+                        println!("      CSA: {} → @{}", csa.csa_type, csa.variable);
+                    }
+                }
+            }
+        }
+        return Ok(());
+    }
+
+    // =========================================================================
+    // STEP 4-5: GENERATE AND VALIDATE DSL
+    // =========================================================================
+    if format == OutputFormat::Pretty {
+        println!("{}", "Generating DSL with validation...".dimmed());
+    }
+
+    let result = orchestrator
+        .generate(&prompt, execute)
+        .await
+        .map_err(|e| format!("Generation failed: {}", e))?;
+
+    if format == OutputFormat::Pretty {
+        println!(
+            "{} Generated valid DSL in {} attempt(s)",
+            "✓".green(),
+            result.dsl.attempts
+        );
+        println!();
+        println!("{}:", "Generated DSL".yellow().bold());
+        println!();
+        for line in result.dsl.source.lines() {
+            if line.trim().starts_with(';') {
+                println!("  {}", line.dimmed());
+            } else if !line.trim().is_empty() {
+                println!("  {}", line.cyan());
+            } else {
+                println!();
+            }
+        }
+        println!();
+    }
+
+    // =========================================================================
+    // SAVE TO FILE (if requested)
+    // =========================================================================
+    if let Some(output_path) = &output {
+        std::fs::write(output_path, &result.dsl.source)
+            .map_err(|e| format!("Failed to write output file: {}", e))?;
+        if format == OutputFormat::Pretty {
+            println!("{} Saved to {}", "✓".green(), output_path.display());
+        }
+    }
+
+    // =========================================================================
+    // STEP 6: EXECUTION RESULTS
+    // =========================================================================
+    if let Some(exec_result) = &result.execution {
+        if format == OutputFormat::Pretty {
+            if exec_result.success {
+                println!("{} Execution successful", "✓".green().bold());
+                println!();
+                println!("Bindings created:");
+                for binding in &exec_result.bindings {
+                    println!(
+                        "  @{} = {}",
+                        binding.variable.yellow(),
+                        binding.uuid.dimmed()
+                    );
+                }
+            } else {
+                println!(
+                    "{} Execution failed: {}",
+                    "✗".red(),
+                    exec_result.error.as_deref().unwrap_or("Unknown error")
+                );
+            }
+        }
+    }
+
+    // Final JSON output
+    if format == OutputFormat::Json {
+        let output = serde_json::json!({
+            "success": true,
+            "intent": result.intent,
+            "pattern": result.plan.pattern.name(),
+            "dsl": result.dsl.source,
+            "attempts": result.dsl.attempts,
+            "execution": result.execution,
+        });
+        println!("{}", serde_json::to_string_pretty(&output).unwrap());
+    } else if format == OutputFormat::Pretty && !execute {
+        println!();
+        println!(
+            "{} DSL generated and validated successfully",
+            "✓".green().bold()
+        );
+        println!("  Use --execute to run against the database");
+    }
+
+    Ok(())
 }
 
 /// Build system prompt for DSL generation

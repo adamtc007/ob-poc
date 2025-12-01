@@ -63,6 +63,9 @@ pub mod ui;
 #[cfg(feature = "mcp")]
 pub mod mcp;
 
+// Agentic DSL generation module
+pub mod agentic;
+
 // Database integration re-exports (when database feature is enabled)
 #[cfg(feature = "database")]
 pub use database::DictionaryDatabaseService;
