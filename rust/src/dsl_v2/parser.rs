@@ -289,9 +289,10 @@ fn simple_identifier<'a, E: NomParseError<&'a str>>(
 }
 
 fn identifier<'a, E: NomParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E> {
+    // Supports alphanumeric, underscores, and hyphens (kebab-case) for symbol names
     recognize(pair(
         alt((alpha1, tag("_"))),
-        many0(alt((alphanumeric1, tag("_")))),
+        many0(alt((alphanumeric1, tag("_"), tag("-")))),
     ))(input)
 }
 

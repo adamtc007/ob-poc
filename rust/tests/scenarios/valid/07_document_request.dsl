@@ -1,6 +1,5 @@
-
 (cbu.create
-    :name "Document Request Test"
+    :name "Document Catalog Test"
     :client-type "corporate"
     :jurisdiction "GB"
     :as @cbu)
@@ -25,32 +24,32 @@
     :role "DIRECTOR"
     :target-entity-id @company)
 
-(document.request
+(document.catalog
     :cbu-id @cbu
     :entity-id @company
     :document-type "CERTIFICATE_OF_INCORPORATION"
-    :as @req1)
+    :as @doc1)
 
-(document.request
+(document.catalog
     :cbu-id @cbu
     :entity-id @company
     :document-type "ARTICLES_OF_ASSOCIATION"
-    :as @req2)
+    :as @doc2)
 
-(document.request
+(document.catalog
     :cbu-id @cbu
     :entity-id @company
     :document-type "REGISTER_OF_DIRECTORS"
-    :as @req3)
+    :as @doc3)
 
-(document.request
+(document.catalog
     :cbu-id @cbu
     :entity-id @person
     :document-type "PASSPORT"
-    :as @req4)
+    :as @doc4)
 
-(document.request
+(document.catalog
     :cbu-id @cbu
     :entity-id @person
     :document-type "PROOF_OF_ADDRESS"
-    :as @req5)
+    :as @doc5)

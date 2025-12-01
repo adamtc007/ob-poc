@@ -633,11 +633,11 @@ fn cmd_verbs(domain: Option<String>, verbose: bool, format: OutputFormat) -> Res
                         let required: Vec<_> = v.args.iter().filter(|a| a.required).collect();
                         let optional: Vec<_> = v.args.iter().filter(|a| !a.required).collect();
                         if !required.is_empty() {
-                            let names: Vec<_> = required.iter().map(|a| a.name).collect();
+                            let names: Vec<_> = required.iter().map(|a| a.name.as_str()).collect();
                             println!("    Required: {:?}", names);
                         }
                         if !optional.is_empty() {
-                            let names: Vec<_> = optional.iter().map(|a| a.name).collect();
+                            let names: Vec<_> = optional.iter().map(|a| a.name.as_str()).collect();
                             println!("    Optional: {:?}", names);
                         }
                     }

@@ -1,14 +1,12 @@
-
 (cbu.create
     :name "Investment Partnership"
     :client-type "fund"
     :jurisdiction "KY"
     :as @cbu)
 
-(entity.create-partnership
+(entity.create-partnership-limited
     :cbu-id @cbu
     :name "Alpha Investment LP"
-    :partnership-type "LIMITED_PARTNERSHIP"
     :jurisdiction "KY"
     :as @partnership)
 

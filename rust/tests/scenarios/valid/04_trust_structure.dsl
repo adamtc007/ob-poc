@@ -1,14 +1,12 @@
-
 (cbu.create
     :name "Family Trust Structure"
     :client-type "trust"
     :jurisdiction "JE"
     :as @cbu)
 
-(entity.create-trust
+(entity.create-trust-discretionary
     :cbu-id @cbu
     :name "Smith Family Trust"
-    :trust-type "DISCRETIONARY"
     :jurisdiction "JE"
     :as @trust)
 
