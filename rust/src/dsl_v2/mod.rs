@@ -26,19 +26,19 @@
 //!
 //! - **Single Grammar**: One S-expression syntax: `(domain.verb :key value ...)`
 //! - **Nested Operations**: Child verb calls compiled with parent dependency injection
-//! - **Data-Driven Execution**: 90% of verbs defined as static data, not code
-//! - **Explicit Custom Operations**: 10% truly custom operations with mandatory rationale
-//! - **Document↔Attribute Integration**: Bidirectional mapping via `document_type_attributes`
+//! - **YAML-Driven Execution**: Verbs defined in `config/verbs.yaml`
+//! - **Explicit Custom Operations**: Plugins for complex logic (external APIs, etc.)
 //!
 //! ## Modules
 //!
 //! - `ast`: AST type definitions
 //! - `parser`: Nom-based parser
 //! - `execution_plan`: Compiler and execution plan types
-//! - `verbs`: Standard verb definitions (Tier 1)
-//! - `mappings`: Column mappings (DSL key → DB column)
-//! - `executor`: DslExecutor + generic CRUD functions
-//! - `custom_ops`: Custom operation trait and implementations (Tier 2)
+//! - `config`: YAML configuration loading
+//! - `runtime_registry`: Runtime verb registry from YAML
+//! - `generic_executor`: YAML-driven CRUD executor
+//! - `executor`: DslExecutor orchestration
+//! - `custom_ops`: Plugin trait and implementations
 
 pub mod applicability_rules;
 pub mod assembly;
@@ -50,7 +50,6 @@ pub mod execution_plan;
 pub mod executor;
 #[cfg(feature = "database")]
 pub mod generic_executor;
-pub mod mappings;
 pub mod parser;
 #[cfg(feature = "database")]
 pub mod ref_resolver;
@@ -62,7 +61,6 @@ pub mod semantic_validator;
 pub mod validation;
 pub mod verb_registry;
 pub mod verb_schema;
-pub mod verbs;
 
 // Re-export key types for convenience
 pub use applicability_rules::{ApplicabilityRules, AttributeApplicability, DocumentApplicability};
@@ -72,13 +70,10 @@ pub use execution_plan::{compile, CompileError, ExecutionPlan, ExecutionStep, In
 pub use executor::{DslExecutor, ExecutionContext, ExecutionResult, ReturnType};
 #[cfg(feature = "database")]
 pub use generic_executor::{GenericCrudExecutor, GenericExecutionResult};
-pub use mappings::{get_table_mappings, resolve_column, ColumnMapping, DbType, TableMappings};
 pub use parser::{parse_program, parse_single_verb};
+pub use runtime_registry::{runtime_registry, RuntimeVerbRegistry};
 pub use semantic_context::SemanticContextStore;
 pub use verb_registry::{
     find_unified_verb, registry, verb_exists, ArgDef, UnifiedVerbDef, UnifiedVerbRegistry,
     VerbBehavior,
-};
-pub use verbs::{
-    domains, find_verb, verb_count, verbs_for_domain, Behavior, VerbDef, STANDARD_VERBS,
 };

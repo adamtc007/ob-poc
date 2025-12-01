@@ -2,12 +2,13 @@
 //!
 //! Server-rendered pages that directly use parse_program, CsgLinter, etc.
 
-use crate::dsl_v2::{domains, verb_count, verbs_for_domain};
+use crate::dsl_v2::verb_registry::registry;
 
 /// Main agent UI page
 pub fn index_page(session_id: Option<&str>) -> String {
-    let domain_list = domains();
-    let total_verbs = verb_count();
+    let reg = registry();
+    let domain_list = reg.domains();
+    let total_verbs = reg.len();
 
     format!(
         r#"<!DOCTYPE html>
@@ -70,10 +71,11 @@ pub fn index_page(session_id: Option<&str>) -> String {
 
 /// Render verb reference page
 pub fn verbs_page() -> String {
-    let domain_list = domains();
+    let reg = registry();
+    let domain_list = reg.domains();
     let mut verb_html = String::new();
 
-    for domain in &domain_list {
+    for domain in domain_list {
         verb_html.push_str(&format!(
             r#"<div class="domain">
             <h3>{}</h3>
@@ -81,7 +83,7 @@ pub fn verbs_page() -> String {
             domain
         ));
 
-        for verb in verbs_for_domain(domain) {
+        for verb in reg.verbs_for_domain(domain) {
             verb_html.push_str(&format!(
                 r#"<li>
                     <code>{}.{}</code>
@@ -94,8 +96,8 @@ pub fn verbs_page() -> String {
                 verb.domain,
                 verb.verb,
                 verb.description,
-                verb.required_args.join(", "),
-                verb.optional_args.join(", "),
+                verb.required_arg_names().join(", "),
+                verb.optional_arg_names().join(", "),
             ));
         }
 

@@ -5,9 +5,9 @@
 
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use tokio::sync::RwLock;
-use tracing::info;
+use tracing::{info, warn};
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
@@ -405,6 +405,44 @@ impl RuntimeVerbRegistry {
     pub fn contains(&self, domain: &str, verb: &str) -> bool {
         self.get(domain, verb).is_some()
     }
+}
+
+// =============================================================================
+// GLOBAL REGISTRY ACCESSOR
+// =============================================================================
+
+/// Global runtime registry instance (loaded once from YAML)
+static RUNTIME_REGISTRY: OnceLock<RuntimeVerbRegistry> = OnceLock::new();
+
+/// Get or initialize the global runtime verb registry
+///
+/// Loads from config/verbs.yaml on first access. Returns an empty registry
+/// if loading fails (with warning logged).
+pub fn runtime_registry() -> &'static RuntimeVerbRegistry {
+    RUNTIME_REGISTRY.get_or_init(|| {
+        use super::config::ConfigLoader;
+
+        let loader = ConfigLoader::from_env();
+        match loader.load_verbs() {
+            Ok(config) => {
+                let registry = RuntimeVerbRegistry::from_config(&config);
+                info!(
+                    "Loaded runtime verb registry: {} verbs across {} domains",
+                    registry.len(),
+                    registry.domains().len()
+                );
+                registry
+            }
+            Err(e) => {
+                warn!("Failed to load verbs.yaml, using empty registry: {}", e);
+                RuntimeVerbRegistry {
+                    verbs: HashMap::new(),
+                    by_domain: HashMap::new(),
+                    domains: vec![],
+                }
+            }
+        }
+    })
 }
 
 // =============================================================================

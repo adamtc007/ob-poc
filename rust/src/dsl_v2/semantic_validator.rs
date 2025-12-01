@@ -21,7 +21,7 @@ use crate::dsl_v2::validation::{
     SourceSpan, ValidatedProgram, ValidatedStatement, ValidationContext, ValidationRequest,
     ValidationResult,
 };
-use crate::dsl_v2::verbs::find_verb;
+use crate::dsl_v2::verb_registry::registry;
 use sqlx::PgPool;
 use std::collections::HashMap;
 
@@ -195,7 +195,7 @@ impl SemanticValidator {
         let full_verb = format!("{}.{}", verb_call.domain, verb_call.verb);
 
         // 1. Check verb exists
-        let verb_def = match find_verb(&verb_call.domain, &verb_call.verb) {
+        let verb_def = match registry().get(&verb_call.domain, &verb_call.verb) {
             Some(v) => v,
             None => {
                 diagnostics.error(
@@ -228,7 +228,8 @@ impl SemanticValidator {
             .map(|a| a.key.canonical())
             .collect();
 
-        for required_arg in verb_def.required_args {
+        let required_args = verb_def.required_arg_names();
+        for required_arg in &required_args {
             if !provided_keys.contains(&required_arg.to_string()) {
                 diagnostics.error(
                     DiagnosticCode::MissingRequiredArg,
@@ -245,10 +246,10 @@ impl SemanticValidator {
         let mut validated_args = HashMap::new();
 
         // Combine required and optional args for lookup
-        let all_args: Vec<&str> = verb_def
-            .required_args
+        let optional_args = verb_def.optional_arg_names();
+        let all_args: Vec<&str> = required_args
             .iter()
-            .chain(verb_def.optional_args.iter())
+            .chain(optional_args.iter())
             .copied()
             .collect();
 

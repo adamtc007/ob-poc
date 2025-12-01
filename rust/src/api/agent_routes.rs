@@ -26,8 +26,8 @@ use crate::database::generation_log_repository::{
     CompileResult, GenerationAttempt, GenerationLogRepository, LintResult, ParseResult,
 };
 use crate::dsl_v2::{
-    compile, domains as dsl_domains, parse_program, verb_count, verbs_for_domain, DslExecutor,
-    ExecutionContext, ExecutionResult as DslV2Result,
+    compile, parse_program, verb_registry::registry, DslExecutor, ExecutionContext,
+    ExecutionResult as DslV2Result,
 };
 use crate::templates::{OnboardingRenderer, OnboardingTemplateRegistry};
 use axum::{
@@ -942,17 +942,18 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
 /// Build vocabulary prompt for a domain
 fn build_vocab_prompt(domain: Option<&str>) -> String {
     let mut lines = Vec::new();
+    let reg = registry();
 
-    let domain_list = if let Some(d) = domain {
+    let domain_list: Vec<String> = if let Some(d) = domain {
         vec![d.to_string()]
     } else {
-        dsl_domains().iter().map(|s| s.to_string()).collect()
+        reg.domains().to_vec()
     };
 
     for domain_name in domain_list {
-        for verb in verbs_for_domain(&domain_name) {
-            let required = verb.required_args.join(", ");
-            let optional = verb.optional_args.join(", ");
+        for verb in reg.verbs_for_domain(&domain_name) {
+            let required = verb.required_arg_names().join(", ");
+            let optional = verb.optional_arg_names().join(", ");
             lines.push(format!(
                 "{}.{}: {} [required: {}] [optional: {}]",
                 verb.domain, verb.verb, verb.description, required, optional
@@ -988,11 +989,12 @@ async fn validate_dsl(
 
 /// GET /api/agent/domains - List available domains
 async fn list_domains() -> Json<DomainsResponse> {
-    let domain_list = dsl_domains();
+    let reg = registry();
+    let domain_list = reg.domains();
     let domains: Vec<DomainInfo> = domain_list
         .iter()
         .map(|name| {
-            let verbs = verbs_for_domain(name);
+            let verbs = reg.verbs_for_domain(name);
             DomainInfo {
                 name: name.to_string(),
                 description: get_domain_description(name),
@@ -1002,39 +1004,56 @@ async fn list_domains() -> Json<DomainsResponse> {
         .collect();
 
     Json(DomainsResponse {
-        total_verbs: verb_count(),
+        total_verbs: reg.len(),
         domains,
     })
 }
 
 /// GET /api/agent/vocabulary - Get vocabulary
 async fn get_vocabulary(Query(query): Query<VocabQuery>) -> Json<VocabResponse> {
+    let reg = registry();
     let verbs: Vec<VerbInfo> = if let Some(domain) = &query.domain {
-        verbs_for_domain(domain)
+        reg.verbs_for_domain(domain)
             .iter()
             .map(|v| VerbInfo {
                 domain: v.domain.to_string(),
                 name: v.verb.to_string(),
                 full_name: format!("{}.{}", v.domain, v.verb),
                 description: v.description.to_string(),
-                required_args: v.required_args.iter().map(|s| s.to_string()).collect(),
-                optional_args: v.optional_args.iter().map(|s| s.to_string()).collect(),
+                required_args: v
+                    .required_arg_names()
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect(),
+                optional_args: v
+                    .optional_arg_names()
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect(),
             })
             .collect()
     } else {
         // Return all verbs
-        dsl_domains()
+        reg.domains()
             .iter()
             .flat_map(|d| {
-                verbs_for_domain(d)
+                reg.verbs_for_domain(d)
                     .iter()
                     .map(|v| VerbInfo {
                         domain: v.domain.to_string(),
                         name: v.verb.to_string(),
                         full_name: format!("{}.{}", v.domain, v.verb),
                         description: v.description.to_string(),
-                        required_args: v.required_args.iter().map(|s| s.to_string()).collect(),
-                        optional_args: v.optional_args.iter().map(|s| s.to_string()).collect(),
+                        required_args: v
+                            .required_arg_names()
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect(),
+                        optional_args: v
+                            .optional_arg_names()
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect(),
                     })
                     .collect::<Vec<_>>()
             })
@@ -1046,11 +1065,12 @@ async fn get_vocabulary(Query(query): Query<VocabQuery>) -> Json<VocabResponse> 
 
 /// GET /api/agent/health - Health check
 async fn health_check() -> Json<HealthResponse> {
+    let reg = registry();
     Json(HealthResponse {
         status: "healthy".to_string(),
         version: env!("CARGO_PKG_VERSION").to_string(),
-        verb_count: verb_count(),
-        domain_count: dsl_domains().len(),
+        verb_count: reg.len(),
+        domain_count: reg.domains().len(),
     })
 }
 
@@ -1337,9 +1357,10 @@ mod tests {
 
     #[test]
     fn test_domain_list() {
-        let domains = dsl_domains();
+        let reg = registry();
+        let domains = reg.domains();
         assert!(!domains.is_empty());
-        assert!(domains.contains(&"cbu"));
-        assert!(domains.contains(&"entity"));
+        assert!(domains.iter().any(|d| d == "cbu"));
+        assert!(domains.iter().any(|d| d == "entity"));
     }
 }

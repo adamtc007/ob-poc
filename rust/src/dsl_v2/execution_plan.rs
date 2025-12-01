@@ -220,7 +220,7 @@ impl Compiler {
             bind_as: vc.as_binding.clone(),
             step_index: my_step_index,
             behavior: verb_def.behavior,
-            custom_op_id: verb_def.custom_op_id.map(|s| s.to_string()),
+            custom_op_id: verb_def.custom_op_id.clone(),
         });
 
         // Recursively compile children with this step as parent
@@ -400,8 +400,8 @@ mod tests {
                 )),
                 Statement::VerbCall(make_verb_call(
                     "entity",
-                    "create-limited-company",
-                    vec![("name", Value::String("Acme Corp".into()))],
+                    "read",
+                    vec![("entity-id", Value::String("some-uuid".into()))],
                 )),
             ],
         };
@@ -413,7 +413,7 @@ mod tests {
         assert!(plan.steps[1].injections.is_empty());
 
         let seq = plan.execution_sequence();
-        assert_eq!(seq, vec!["cbu.create", "entity.create-limited-company"]);
+        assert_eq!(seq, vec!["cbu.create", "entity.read"]);
     }
 
     #[test]

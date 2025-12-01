@@ -78,10 +78,9 @@ pub use ast::{EdgeType, EntityLabel};
 
 // DSL v2 types - unified S-expression DSL
 pub use dsl_v2::{
-    domains, find_verb, get_table_mappings, parse_program, parse_single_verb, resolve_column,
-    verb_count, verbs_for_domain, Argument, Behavior, ColumnMapping, DbType, DslExecutor,
-    ExecutionContext, ExecutionResult as DslV2ExecutionResult, Key, Program, ReturnType, Span,
-    Statement, TableMappings, Value, VerbCall, VerbDef,
+    parse_program, parse_single_verb, Argument, DslExecutor, ExecutionContext,
+    ExecutionResult as DslV2ExecutionResult, Key, Program, ReturnType, Span, Statement, Value,
+    VerbCall,
 };
 
 // System info
