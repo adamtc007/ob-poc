@@ -69,19 +69,42 @@ This file provides guidance to Claude Code when working with this repository.
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                   DslExecutor                                    │
-│  - Type-aware binding (String→Date, UUID, Decimal)              │
-│  - Symbol table management                                       │
-│  - CRUD generation and execution                                │
-│  rust/src/dsl_v2/executor.rs                                    │
+│        GenericCrudExecutor (YAML-driven)                         │
+│  - Reads verb config from config/verbs.yaml                     │
+│  - All 13 CRUD operations driven by YAML config                 │
+│  - Custom ops via plugin pattern                                │
+│  rust/src/dsl_v2/generic_executor.rs                            │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+### YAML-Driven Configuration
+
+The DSL system is entirely YAML-driven. Adding new verbs requires editing YAML, not Rust code.
+
+```
+config/
+├── verbs.yaml      # All verb definitions (1,500+ lines)
+│                   # - Domain definitions
+│                   # - Verb args with maps_to for DB columns
+│                   # - CRUD operations (insert, update, delete, etc.)
+│                   # - Plugin behaviors for custom ops
+└── csg_rules.yaml  # Context-sensitive grammar rules
+```
+
+**Key YAML structures:**
+- `behavior: crud` → GenericCrudExecutor handles it
+- `behavior: plugin` → Routes to custom_ops handler
+- `maps_to:` → DSL arg name → DB column mapping
+- `dynamic_verbs:` → Generated from DB tables (e.g., entity.create-*)
 
 ## Directory Structure
 
 ```
 ob-poc/
 ├── rust/
+│   ├── config/                     # YAML configuration (source of truth)
+│   │   ├── verbs.yaml              # All verb definitions
+│   │   └── csg_rules.yaml          # Validation rules
 │   ├── src/
 │   │   ├── ui/                     # Server-rendered UI (pages.rs, routes.rs)
 │   │   ├── api/                    # REST API routes
@@ -91,13 +114,18 @@ ob-poc/
 │   │   ├── dsl_v2/                 # Core DSL implementation
 │   │   │   ├── parser.rs           # Nom-based S-expression parser
 │   │   │   ├── ast.rs              # Program, Statement, VerbCall, Value
-│   │   │   ├── verb_registry.rs    # 53+ verbs across 8 domains
+│   │   │   ├── config/             # YAML config types and loader
+│   │   │   │   ├── types.rs        # Serde structs for verbs.yaml
+│   │   │   │   └── loader.rs       # ConfigLoader (from env or path)
+│   │   │   ├── runtime_registry.rs # RuntimeVerbRegistry (loads from YAML)
+│   │   │   ├── verb_registry.rs    # UnifiedVerbRegistry (wraps runtime)
+│   │   │   ├── generic_executor.rs # GenericCrudExecutor (13 CRUD ops)
+│   │   │   ├── executor.rs         # DslExecutor (orchestrates execution)
 │   │   │   ├── csg_linter.rs       # Context-sensitive validation
 │   │   │   ├── execution_plan.rs   # AST → ExecutionPlan compiler
-│   │   │   ├── executor.rs         # Plan execution with DB
-│   │   │   └── custom_ops/         # Non-CRUD operations
+│   │   │   └── custom_ops/         # Plugin handlers for non-CRUD ops
 │   │   ├── database/               # Repository pattern services
-│   │   ├── domains/                # Domain-specific logic (attributes)
+│   │   ├── domains/                # Domain-specific logic
 │   │   ├── mcp/                    # MCP server for Claude Desktop
 │   │   ├── planner/                # DSL builder utilities
 │   │   └── bin/
@@ -135,7 +163,7 @@ ANTHROPIC_API_KEY="sk-..." \
 # Open http://localhost:3000
 
 # Test
-cargo test --features database --lib                  # Unit tests
+cargo test --features database --lib                  # Unit tests (~118)
 cargo test --features database --test db_integration  # DB tests
 ./tests/scenarios/run_tests.sh                        # DSL scenarios
 ./tests/mcp_test.sh                                   # MCP protocol tests
@@ -143,6 +171,11 @@ cargo test --features database --test db_integration  # DB tests
 # CLI
 ./target/debug/dsl_cli lint file.dsl
 ./target/debug/dsl_cli execute file.dsl
+
+# Clippy (all features)
+cargo clippy --features server
+cargo clippy --features database
+cargo clippy --features mcp
 ```
 
 ## API Endpoints
@@ -205,9 +238,7 @@ cargo test --features database --test db_integration  # DB tests
 
 Two schemas:
 - **ob-poc**: KYC/AML domain (103 tables)
-- **public**: Runtime API endpoints (16 tables)
-
-Key tables: `cbus`, `entities`, `entity_types`, `cbu_entity_roles`, `document_catalog`, `screenings`, `kyc_investigations`, `cbu_resource_instances`, `service_delivery_map`
+- **public**: Runtime API endpoints
 
 See `docs/DATABASE_SCHEMA.md` for complete schema. Rebuild with:
 ```bash
@@ -232,4 +263,33 @@ For Claude Desktop integration:
 ```bash
 DATABASE_URL="postgresql:///data_designer"
 ANTHROPIC_API_KEY="sk-ant-..."
+DSL_CONFIG_DIR="/path/to/config"  # Optional: override config location
 ```
+
+## Adding New Verbs
+
+To add a new verb, edit `rust/config/verbs.yaml`:
+
+```yaml
+domains:
+  my_domain:
+    verbs:
+      my-verb:
+        description: "What this verb does"
+        behavior: crud
+        crud:
+          operation: insert  # insert, update, delete, upsert, select, etc.
+          table: my_table
+          schema: ob-poc
+          returning: my_id
+        args:
+          - name: my-arg
+            type: string
+            required: true
+            maps_to: my_column  # DB column name
+        returns:
+          type: uuid
+          capture: true
+```
+
+No Rust code changes required for standard CRUD operations.
