@@ -3079,6 +3079,21 @@ domains:
             required: false
             maps_to: currency
             default: "EUR"
+          - name: fund-type
+            type: string
+            required: false
+            maps_to: fund_type
+            valid_values: [HEDGE_FUND, UCITS, AIFMD, PRIVATE_EQUITY, REIT]
+          - name: fund-structure
+            type: string
+            required: false
+            maps_to: fund_structure
+            valid_values: [OPEN_ENDED, CLOSED_ENDED]
+          - name: investor-eligibility
+            type: string
+            required: false
+            maps_to: investor_eligibility
+            valid_values: [RETAIL, PROFESSIONAL, QUALIFIED]
           - name: nav-per-share
             type: decimal
             required: false
@@ -3095,6 +3110,14 @@ domains:
             type: integer
             required: false
             maps_to: performance_fee_bps
+          - name: high-water-mark
+            type: boolean
+            required: false
+            maps_to: high_water_mark
+          - name: hurdle-rate
+            type: decimal
+            required: false
+            maps_to: hurdle_rate
           - name: subscription-frequency
             type: string
             required: false
@@ -3107,6 +3130,14 @@ domains:
             type: integer
             required: false
             maps_to: redemption_notice_days
+          - name: lock-up-period-months
+            type: integer
+            required: false
+            maps_to: lock_up_period_months
+          - name: gate-percentage
+            type: decimal
+            required: false
+            maps_to: gate_percentage
           - name: minimum-investment
             type: decimal
             required: false
@@ -3142,6 +3173,21 @@ domains:
             type: string
             required: false
             maps_to: currency
+          - name: fund-type
+            type: string
+            required: false
+            maps_to: fund_type
+            valid_values: [HEDGE_FUND, UCITS, AIFMD, PRIVATE_EQUITY, REIT]
+          - name: fund-structure
+            type: string
+            required: false
+            maps_to: fund_structure
+            valid_values: [OPEN_ENDED, CLOSED_ENDED]
+          - name: investor-eligibility
+            type: string
+            required: false
+            maps_to: investor_eligibility
+            valid_values: [RETAIL, PROFESSIONAL, QUALIFIED]
           - name: nav-per-share
             type: decimal
             required: false
@@ -3158,6 +3204,14 @@ domains:
             type: integer
             required: false
             maps_to: performance_fee_bps
+          - name: high-water-mark
+            type: boolean
+            required: false
+            maps_to: high_water_mark
+          - name: hurdle-rate
+            type: decimal
+            required: false
+            maps_to: hurdle_rate
           - name: subscription-frequency
             type: string
             required: false
@@ -3170,6 +3224,14 @@ domains:
             type: integer
             required: false
             maps_to: redemption_notice_days
+          - name: lock-up-period-months
+            type: integer
+            required: false
+            maps_to: lock_up_period_months
+          - name: gate-percentage
+            type: decimal
+            required: false
+            maps_to: gate_percentage
           - name: minimum-investment
             type: decimal
             required: false

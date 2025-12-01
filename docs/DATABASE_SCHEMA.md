@@ -562,13 +562,20 @@ Fund share class master data.
 | name | varchar(255) | NOT NULL | | Share class name (e.g., "Class A EUR") |
 | isin | varchar(12) | | | ISIN code |
 | currency | char(3) | NOT NULL | 'EUR' | Share class currency |
+| fund_type | varchar(50) | | | HEDGE_FUND, UCITS, AIFMD, PRIVATE_EQUITY, REIT |
+| fund_structure | varchar(50) | | | OPEN_ENDED, CLOSED_ENDED |
+| investor_eligibility | varchar(50) | | | RETAIL, PROFESSIONAL, QUALIFIED |
 | nav_per_share | numeric(20,6) | | | Current NAV |
 | nav_date | date | | | NAV valuation date |
 | management_fee_bps | integer | | | Management fee in basis points |
 | performance_fee_bps | integer | | | Performance fee in basis points |
+| high_water_mark | boolean | | false | Performance fee uses high water mark |
+| hurdle_rate | numeric(5,2) | | | Hurdle rate for performance fee |
 | subscription_frequency | varchar(50) | | | Daily, Weekly, Monthly |
 | redemption_frequency | varchar(50) | | | Daily, Weekly, Monthly |
 | redemption_notice_days | integer | | | Notice period for redemptions |
+| lock_up_period_months | integer | | | Lock-up period for hedge funds |
+| gate_percentage | numeric(5,2) | | | Redemption gate percentage |
 | minimum_investment | numeric(20,2) | | | Minimum investment amount |
 | status | varchar(50) | NOT NULL | 'active' | active, closed |
 | created_at | timestamptz | NOT NULL | now() | |
