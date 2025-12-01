@@ -850,18 +850,18 @@ domains:
           type: record_set
 
   # ===========================================================================
-  # DOMAIN: lifecycle-resource
+  # DOMAIN: service-resource
   # ===========================================================================
-  lifecycle-resource:
-    description: "Lifecycle resource type operations (taxonomy)"
+  service-resource:
+    description: "Service resource type and instance operations"
 
     verbs:
       create:
-        description: "Create a new lifecycle resource type"
+        description: "Create a new service resource type"
         behavior: crud
         crud:
           operation: insert
-          table: prod_resources
+          table: service_resource_types
           schema: ob-poc
           returning: resource_id
         args:
@@ -903,11 +903,11 @@ domains:
           capture: true
 
       read:
-        description: "Read a lifecycle resource type by ID or code"
+        description: "Read a service resource type by ID or code"
         behavior: crud
         crud:
           operation: select
-          table: prod_resources
+          table: service_resource_types
           schema: ob-poc
         args:
           - name: resource-id
@@ -922,11 +922,11 @@ domains:
           type: record
 
       update:
-        description: "Update a lifecycle resource type"
+        description: "Update a service resource type"
         behavior: crud
         crud:
           operation: update
-          table: prod_resources
+          table: service_resource_types
           schema: ob-poc
           key: resource_id
         args:
@@ -958,11 +958,11 @@ domains:
           type: affected
 
       delete:
-        description: "Delete a lifecycle resource type"
+        description: "Delete a service resource type"
         behavior: crud
         crud:
           operation: delete
-          table: prod_resources
+          table: service_resource_types
           schema: ob-poc
           key: resource_id
         args:
@@ -974,11 +974,11 @@ domains:
           type: affected
 
       list:
-        description: "List lifecycle resource types with optional filters"
+        description: "List service resource types with optional filters"
         behavior: crud
         crud:
           operation: select
-          table: prod_resources
+          table: service_resource_types
           schema: ob-poc
         args:
           - name: resource-type
@@ -1005,11 +1005,11 @@ domains:
           type: record_set
 
       ensure:
-        description: "Create or update a lifecycle resource type by resource-code"
+        description: "Create or update a service resource type by resource-code"
         behavior: crud
         crud:
           operation: upsert
-          table: prod_resources
+          table: service_resource_types
           schema: ob-poc
           conflict_keys: [resource_code]
           returning: resource_id
@@ -1044,7 +1044,7 @@ domains:
           capture: true
 
       link-service:
-        description: "Link a lifecycle resource type to a service"
+        description: "Link a service resource type to a service"
         behavior: crud
         crud:
           operation: link
@@ -1069,7 +1069,7 @@ domains:
           type: void
 
       unlink-service:
-        description: "Unlink a lifecycle resource type from a service"
+        description: "Unlink a service resource type from a service"
         behavior: crud
         crud:
           operation: unlink
@@ -1088,11 +1088,11 @@ domains:
           type: affected
 
       list-by-service:
-        description: "List lifecycle resource types for a service"
+        description: "List service resource types for a service"
         behavior: crud
         crud:
           operation: select_with_join
-          primary_table: prod_resources
+          primary_table: service_resource_types
           join_table: service_resources
           join_col: resource_id
           filter_col: service_id
@@ -1104,9 +1104,9 @@ domains:
         returns:
           type: record_set
 
-      # Attribute dictionary linkage (5 new verbs)
+      # Attribute dictionary linkage
       add-attribute:
-        description: "Add an attribute requirement to a lifecycle resource type"
+        description: "Add an attribute requirement to a service resource type"
         behavior: crud
         crud:
           operation: insert
@@ -1153,7 +1153,7 @@ domains:
           capture: false
 
       remove-attribute:
-        description: "Remove an attribute requirement from a lifecycle resource type"
+        description: "Remove an attribute requirement from a service resource type"
         behavior: crud
         crud:
           operation: delete
@@ -1209,7 +1209,7 @@ domains:
           type: affected
 
       list-attributes:
-        description: "List attribute requirements for a lifecycle resource type"
+        description: "List attribute requirements for a service resource type"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -1272,6 +1272,96 @@ domains:
           type: uuid
           name: requirement_id
           capture: false
+
+      # === Instance Operations (provisioning and lifecycle) ===
+      provision:
+        description: "Provision a service resource instance for a CBU"
+        behavior: plugin
+        handler: resource_instance_create
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: resource-type
+            type: string
+            required: true
+          - name: instance-url
+            type: string
+            required: true
+          - name: instance-id
+            type: string
+            required: false
+          - name: instance-name
+            type: string
+            required: false
+          - name: product-id
+            type: uuid
+            required: false
+          - name: service-id
+            type: uuid
+            required: false
+          - name: config
+            type: json
+            required: false
+        returns:
+          type: uuid
+          name: instance_id
+          capture: true
+
+      set-attr:
+        description: "Set an attribute value on a service resource instance"
+        behavior: plugin
+        handler: resource_set_attr
+        args:
+          - name: instance-id
+            type: uuid
+            required: true
+          - name: attr
+            type: string
+            required: true
+          - name: value
+            type: string
+            required: true
+          - name: state
+            type: string
+            required: false
+            valid_values: [proposed, confirmed, derived, system]
+          - name: source
+            type: json
+            required: false
+
+      activate:
+        description: "Activate a service resource instance"
+        behavior: plugin
+        handler: resource_activate
+        args:
+          - name: instance-id
+            type: uuid
+            required: true
+
+      suspend:
+        description: "Suspend a service resource instance"
+        behavior: plugin
+        handler: resource_suspend
+        args:
+          - name: instance-id
+            type: uuid
+            required: true
+          - name: reason
+            type: string
+            required: false
+
+      decommission:
+        description: "Decommission a service resource instance"
+        behavior: plugin
+        handler: resource_decommission
+        args:
+          - name: instance-id
+            type: uuid
+            required: true
+          - name: reason
+            type: string
+            required: false
 
 # =============================================================================
 # PLUGINS (Custom operations requiring Rust code)
@@ -1401,89 +1491,6 @@ plugins:
       - name: rationale
         type: string
         required: true
-
-  resource.create:
-    description: "Create a resource instance for a CBU"
-    handler: resource_instance_create
-    args:
-      - name: cbu-id
-        type: uuid
-        required: true
-      - name: resource-type
-        type: string
-        required: true
-      - name: instance-url
-        type: string
-        required: true
-      - name: instance-id
-        type: string
-        required: false
-      - name: instance-name
-        type: string
-        required: false
-      - name: product-id
-        type: uuid
-        required: false
-      - name: service-id
-        type: uuid
-        required: false
-      - name: config
-        type: json
-        required: false
-    returns:
-      type: uuid
-      name: instance_id
-
-  resource.set-attr:
-    description: "Set an attribute value on a resource instance"
-    handler: resource_set_attr
-    args:
-      - name: instance-id
-        type: uuid
-        required: true
-      - name: attr
-        type: string
-        required: true
-      - name: value
-        type: string
-        required: true
-      - name: state
-        type: string
-        required: false
-        valid_values: [proposed, confirmed, derived, system]
-      - name: source
-        type: json
-        required: false
-
-  resource.activate:
-    description: "Activate a resource instance"
-    handler: resource_activate
-    args:
-      - name: instance-id
-        type: uuid
-        required: true
-
-  resource.suspend:
-    description: "Suspend a resource instance"
-    handler: resource_suspend
-    args:
-      - name: instance-id
-        type: uuid
-        required: true
-      - name: reason
-        type: string
-        required: false
-
-  resource.decommission:
-    description: "Decommission a resource instance"
-    handler: resource_decommission
-    args:
-      - name: instance-id
-        type: uuid
-        required: true
-      - name: reason
-        type: string
-        required: false
 
   delivery.record:
     description: "Record a service delivery for a CBU"

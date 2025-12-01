@@ -35,7 +35,7 @@ impl TaxonomyRepository {
         let product = sqlx::query_as!(
             Product,
             r#"
-            INSERT INTO "ob-poc".products 
+            INSERT INTO "ob-poc".products
             (product_code, name, product_category, is_active)
             VALUES ($1, $2, $3, true)
             RETURNING *
@@ -111,12 +111,15 @@ impl TaxonomyRepository {
     // Service Options
     // ============================================
 
-    pub async fn get_service_options(&self, service_id: Uuid) -> Result<Vec<ServiceOptionDefinition>> {
+    pub async fn get_service_options(
+        &self,
+        service_id: Uuid,
+    ) -> Result<Vec<ServiceOptionDefinition>> {
         let options = sqlx::query_as!(
             ServiceOptionDefinition,
             r#"
-            SELECT * FROM "ob-poc".service_option_definitions 
-            WHERE service_id = $1 
+            SELECT * FROM "ob-poc".service_option_definitions
+            WHERE service_id = $1
             ORDER BY display_order, option_key
             "#,
             service_id
@@ -127,11 +130,14 @@ impl TaxonomyRepository {
         Ok(options)
     }
 
-    pub async fn get_option_choices(&self, option_def_id: Uuid) -> Result<Vec<ServiceOptionChoice>> {
+    pub async fn get_option_choices(
+        &self,
+        option_def_id: Uuid,
+    ) -> Result<Vec<ServiceOptionChoice>> {
         let choices = sqlx::query_as!(
             ServiceOptionChoice,
             r#"
-            SELECT * FROM "ob-poc".service_option_choices 
+            SELECT * FROM "ob-poc".service_option_choices
             WHERE option_def_id = $1 AND is_active = true
             ORDER BY display_order, choice_value
             "#,
@@ -178,9 +184,9 @@ impl TaxonomyRepository {
         let resources = sqlx::query_as!(
             ProductionResource,
             r#"
-            SELECT pr.* FROM "ob-poc".lifecycle_resources pr
+            SELECT pr.* FROM "ob-poc".service_resource_types pr
             JOIN "ob-poc".service_resource_capabilities src ON pr.resource_id = src.resource_id
-            WHERE src.service_id = $1 
+            WHERE src.service_id = $1
               AND src.is_active = true
               AND pr.is_active = true
               AND src.supported_options @> $2
@@ -226,7 +232,7 @@ impl TaxonomyRepository {
         let request = sqlx::query_as!(
             OnboardingRequest,
             r#"
-            INSERT INTO "ob-poc".onboarding_requests 
+            INSERT INTO "ob-poc".onboarding_requests
             (cbu_id, request_state, created_by, dsl_version)
             VALUES ($1, 'draft', $2, 1)
             RETURNING *
@@ -240,7 +246,10 @@ impl TaxonomyRepository {
         Ok(request)
     }
 
-    pub async fn get_onboarding_request(&self, request_id: Uuid) -> Result<Option<OnboardingRequest>> {
+    pub async fn get_onboarding_request(
+        &self,
+        request_id: Uuid,
+    ) -> Result<Option<OnboardingRequest>> {
         let request = sqlx::query_as!(
             OnboardingRequest,
             r#"SELECT * FROM "ob-poc".onboarding_requests WHERE request_id = $1"#,
@@ -257,11 +266,11 @@ impl TaxonomyRepository {
 
         sqlx::query!(
             r#"
-            INSERT INTO "ob-poc".onboarding_products 
+            INSERT INTO "ob-poc".onboarding_products
             (request_id, product_id, selection_order)
             VALUES ($1, $2, (
-                SELECT COALESCE(MAX(selection_order), 0) + 1 
-                FROM "ob-poc".onboarding_products 
+                SELECT COALESCE(MAX(selection_order), 0) + 1
+                FROM "ob-poc".onboarding_products
                 WHERE request_id = $1
             ))
             ON CONFLICT (request_id, product_id) DO NOTHING
@@ -275,7 +284,7 @@ impl TaxonomyRepository {
         // Update state
         sqlx::query!(
             r#"
-            UPDATE "ob-poc".onboarding_requests 
+            UPDATE "ob-poc".onboarding_requests
             SET request_state = 'products_selected', updated_at = NOW()
             WHERE request_id = $1 AND request_state = 'draft'
             "#,
@@ -315,12 +324,12 @@ impl TaxonomyRepository {
 
         sqlx::query!(
             r#"
-            INSERT INTO "ob-poc".onboarding_service_configs 
+            INSERT INTO "ob-poc".onboarding_service_configs
             (request_id, service_id, option_selections, is_valid)
             VALUES ($1, $2, $3, true)
             ON CONFLICT (request_id, service_id)
-            DO UPDATE SET 
-                option_selections = $3, 
+            DO UPDATE SET
+                option_selections = $3,
                 configured_at = NOW(),
                 is_valid = true
             "#,
@@ -343,9 +352,9 @@ impl TaxonomyRepository {
             FROM "ob-poc".services s
             JOIN "ob-poc".product_services ps ON s.service_id = ps.service_id
             JOIN "ob-poc".onboarding_products op ON ps.product_id = op.product_id
-            LEFT JOIN "ob-poc".onboarding_service_configs osc 
+            LEFT JOIN "ob-poc".onboarding_service_configs osc
                 ON s.service_id = osc.service_id AND osc.request_id = $1
-            WHERE op.request_id = $1 
+            WHERE op.request_id = $1
               AND ps.is_mandatory = true
               AND osc.config_id IS NULL
             "#,
@@ -357,7 +366,7 @@ impl TaxonomyRepository {
         if unconfigured.count.unwrap_or(1) == 0 {
             sqlx::query!(
                 r#"
-                UPDATE "ob-poc".onboarding_requests 
+                UPDATE "ob-poc".onboarding_requests
                 SET request_state = 'services_configured', updated_at = NOW()
                 WHERE request_id = $1
                 "#,
@@ -399,7 +408,7 @@ impl TaxonomyRepository {
 
         sqlx::query!(
             r#"
-            UPDATE "ob-poc".onboarding_requests 
+            UPDATE "ob-poc".onboarding_requests
             SET request_state = 'resources_allocated', updated_at = NOW()
             WHERE request_id = $1
             "#,
@@ -415,8 +424,8 @@ impl TaxonomyRepository {
     pub async fn complete_onboarding(&self, request_id: Uuid, final_dsl: &str) -> Result<()> {
         sqlx::query!(
             r#"
-            UPDATE "ob-poc".onboarding_requests 
-            SET request_state = 'complete', 
+            UPDATE "ob-poc".onboarding_requests
+            SET request_state = 'complete',
                 dsl_draft = $2,
                 completed_at = NOW(),
                 updated_at = NOW()
@@ -431,14 +440,10 @@ impl TaxonomyRepository {
         Ok(())
     }
 
-    pub async fn update_request_state(
-        &self,
-        request_id: Uuid,
-        new_state: &str,
-    ) -> Result<()> {
+    pub async fn update_request_state(&self, request_id: Uuid, new_state: &str) -> Result<()> {
         sqlx::query!(
             r#"
-            UPDATE "ob-poc".onboarding_requests 
+            UPDATE "ob-poc".onboarding_requests
             SET request_state = $2, updated_at = NOW()
             WHERE request_id = $1
             "#,

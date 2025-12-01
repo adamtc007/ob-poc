@@ -198,7 +198,7 @@ fn verb_call_with_span<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
 }
 
 fn word<'a, E: NomParseError<&'a str>>(input: &'a str) -> IResult<&'a str, (String, String), E> {
-    // Use kebab_identifier for domain to support names like "lifecycle-resource"
+    // Use kebab_identifier for domain to support names like "service-resource"
     let (input, domain) = kebab_identifier(input)?;
     let (input, _) = char('.')(input)?;
     let (input, verb) = kebab_identifier(input)?;

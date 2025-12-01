@@ -529,7 +529,7 @@ impl ResourceInstanceService {
 
     pub async fn lookup_resource_type_by_code(&self, code: &str) -> Result<Option<Uuid>> {
         sqlx::query_scalar::<_, Uuid>(
-            r#"SELECT resource_id FROM "ob-poc".prod_resources WHERE resource_code = $1"#,
+            r#"SELECT resource_id FROM "ob-poc".service_resource_types WHERE resource_code = $1"#,
         )
         .bind(code)
         .fetch_optional(&self.pool)

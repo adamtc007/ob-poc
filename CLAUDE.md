@@ -213,10 +213,10 @@ cargo clippy --features mcp
 (screening.pep :entity-id @john)
 (screening.sanctions :entity-id @company)
 
-;; Resource instance lifecycle
-(resource.create :cbu-id @fund :resource-type "CUSTODY_ACCOUNT" :as @account)
-(resource.set-attr :instance-id @account :attr "account_number" :value "ACC-12345")
-(resource.activate :instance-id @account)
+;; Service resource instance lifecycle
+(service-resource.provision :cbu-id @fund :resource-type "CUSTODY_ACCOUNT" :instance-url "https://..." :as @account)
+(service-resource.set-attr :instance-id @account :attr "account_number" :value "ACC-12345")
+(service-resource.activate :instance-id @account)
 ```
 
 ## Verb Domains
@@ -229,7 +229,7 @@ cargo clippy --features mcp
 | screening | PEP, sanctions, adverse-media checks |
 | kyc | Investigation initiate, decide |
 | ubo | Calculate, validate ownership |
-| resource | Resource instance create, set-attr, activate, suspend, decommission |
+| service-resource | Service resource type CRUD + instance provision, set-attr, activate, suspend, decommission |
 | delivery | Service delivery record, complete, fail |
 
 ## Database

@@ -165,59 +165,83 @@ mod tests {
     }
 }
 
-    #[test]
-    fn test_load_verbs_yaml() {
-        // This test loads the actual verbs.yaml file
-        let loader = ConfigLoader::new("config");
-        let result = loader.load_verbs();
-        
-        match result {
-            Ok(config) => {
-                assert_eq!(config.version, "1.0");
-                assert!(config.domains.contains_key("cbu"), "Should have cbu domain");
-                assert!(config.domains.contains_key("entity"), "Should have entity domain");
-                assert!(config.domains.contains_key("product"), "Should have product domain");
-                assert!(config.domains.contains_key("service"), "Should have service domain");
-                assert!(config.domains.contains_key("lifecycle-resource"), "Should have lifecycle-resource domain");
-                
-                // Check CBU verbs
-                let cbu = config.domains.get("cbu").unwrap();
-                assert!(cbu.verbs.contains_key("create"), "CBU should have create verb");
-                assert!(cbu.verbs.contains_key("read"), "CBU should have read verb");
-                assert!(cbu.verbs.contains_key("ensure"), "CBU should have ensure verb");
-                assert!(cbu.verbs.contains_key("assign-role"), "CBU should have assign-role verb");
-                
-                println!("Loaded {} domains", config.domains.len());
-                for (name, domain) in &config.domains {
-                    println!("  {}: {} verbs", name, domain.verbs.len());
-                }
-                println!("Loaded {} plugins", config.plugins.len());
-            }
-            Err(e) => {
-                panic!("Failed to load verbs.yaml: {}", e);
-            }
-        }
-    }
+#[test]
+fn test_load_verbs_yaml() {
+    // This test loads the actual verbs.yaml file
+    let loader = ConfigLoader::new("config");
+    let result = loader.load_verbs();
 
-    #[test]
-    fn test_load_csg_rules_yaml() {
-        // This test loads the actual csg_rules.yaml file
-        let loader = ConfigLoader::new("config");
-        let result = loader.load_csg_rules();
-        
-        match result {
-            Ok(config) => {
-                assert_eq!(config.version, "1.0");
-                assert!(!config.constraints.is_empty(), "Should have constraints");
-                assert!(!config.warnings.is_empty(), "Should have warnings");
-                
-                println!("Loaded {} constraints", config.constraints.len());
-                println!("Loaded {} warnings", config.warnings.len());
-                println!("Loaded {} jurisdiction rules", config.jurisdiction_rules.len());
-                println!("Loaded {} composite rules", config.composite_rules.len());
+    match result {
+        Ok(config) => {
+            assert_eq!(config.version, "1.0");
+            assert!(config.domains.contains_key("cbu"), "Should have cbu domain");
+            assert!(
+                config.domains.contains_key("entity"),
+                "Should have entity domain"
+            );
+            assert!(
+                config.domains.contains_key("product"),
+                "Should have product domain"
+            );
+            assert!(
+                config.domains.contains_key("service"),
+                "Should have service domain"
+            );
+            assert!(
+                config.domains.contains_key("service-resource"),
+                "Should have service-resource domain"
+            );
+
+            // Check CBU verbs
+            let cbu = config.domains.get("cbu").unwrap();
+            assert!(
+                cbu.verbs.contains_key("create"),
+                "CBU should have create verb"
+            );
+            assert!(cbu.verbs.contains_key("read"), "CBU should have read verb");
+            assert!(
+                cbu.verbs.contains_key("ensure"),
+                "CBU should have ensure verb"
+            );
+            assert!(
+                cbu.verbs.contains_key("assign-role"),
+                "CBU should have assign-role verb"
+            );
+
+            println!("Loaded {} domains", config.domains.len());
+            for (name, domain) in &config.domains {
+                println!("  {}: {} verbs", name, domain.verbs.len());
             }
-            Err(e) => {
-                panic!("Failed to load csg_rules.yaml: {}", e);
-            }
+            println!("Loaded {} plugins", config.plugins.len());
+        }
+        Err(e) => {
+            panic!("Failed to load verbs.yaml: {}", e);
         }
     }
+}
+
+#[test]
+fn test_load_csg_rules_yaml() {
+    // This test loads the actual csg_rules.yaml file
+    let loader = ConfigLoader::new("config");
+    let result = loader.load_csg_rules();
+
+    match result {
+        Ok(config) => {
+            assert_eq!(config.version, "1.0");
+            assert!(!config.constraints.is_empty(), "Should have constraints");
+            assert!(!config.warnings.is_empty(), "Should have warnings");
+
+            println!("Loaded {} constraints", config.constraints.len());
+            println!("Loaded {} warnings", config.warnings.len());
+            println!(
+                "Loaded {} jurisdiction rules",
+                config.jurisdiction_rules.len()
+            );
+            println!("Loaded {} composite rules", config.composite_rules.len());
+        }
+        Err(e) => {
+            panic!("Failed to load csg_rules.yaml: {}", e);
+        }
+    }
+}

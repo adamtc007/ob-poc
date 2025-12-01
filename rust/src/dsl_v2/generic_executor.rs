@@ -1193,7 +1193,7 @@ impl GenericCrudExecutor {
             "products" => "product_id",
             "services" => "service_id",
             "roles" => "role_id",
-            "prod_resources" => "resource_id",
+            "service_resource_types" => "resource_id",
             "resource_attribute_requirements" => "requirement_id",
             "cbu_entity_roles" => "cbu_entity_role_id",
             "product_services" => "product_service_id",

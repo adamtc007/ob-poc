@@ -23,12 +23,12 @@ pub mod dsl_repository;
 pub mod entity_service;
 pub mod generation_log_repository;
 pub mod investigation_service;
-pub mod lifecycle_resource_service;
 pub mod monitoring_service;
 pub mod product_service;
 pub mod resource_instance_service;
 pub mod risk_service;
 pub mod screening_service;
+pub mod service_resource_service;
 pub mod service_service;
 
 // Legacy modules not yet integrated - kept for reference but not compiled
@@ -55,13 +55,13 @@ pub use generation_log_repository::{
     CompileResult, CorrectionPair, GenerationAttempt, GenerationLogRepository, GenerationLogRow,
     GenerationStatsSummary, LintResult, ParseResult, PromptStats, TrainingPair,
 };
-pub use lifecycle_resource_service::{
-    LifecycleResourceRow, LifecycleResourceService, NewLifecycleResourceFields,
-};
 pub use product_service::{NewProductFields, ProductRow, ProductService};
 pub use resource_instance_service::{
     NewResourceInstance, ResourceInstanceAttributeRow, ResourceInstanceRow,
     ResourceInstanceService, ServiceDeliveryRow, SetInstanceAttribute,
+};
+pub use service_resource_service::{
+    NewServiceResourceFields, ServiceResourceRow, ServiceResourceService,
 };
 pub use service_service::{NewServiceFields, ServiceRow, ServiceService};
 

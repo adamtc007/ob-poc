@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use uuid::Uuid;
 
-/// Service for generating DSL from product/service/lifecycle-resource operations
+/// Service for generating DSL from product/service/service-resource operations
 pub struct ProductServicesResourcesDsl {
     // No database pool - we generate DSL, not execute DB operations
 }
@@ -137,8 +137,8 @@ impl ProductServicesResourcesDsl {
         }
     }
 
-    /// Generate DSL for creating a lifecycle resource
-    pub fn generate_lifecycle_resource_create_dsl(
+    /// Generate DSL for creating a service resource type
+    pub fn generate_service_resource_create_dsl(
         &self,
         name: &str,
         owner: &str,
@@ -147,7 +147,7 @@ impl ProductServicesResourcesDsl {
     ) -> DslGenerationResult {
         let start = Instant::now();
         let dsl = format!(
-            r#":name "{}" :owner "{}" :resource-type "{}" :description "{}" lifecycle-resource.create"#,
+            r#":name "{}" :owner "{}" :resource-type "{}" :description "{}" service-resource.create"#,
             name,
             owner,
             resource_type.unwrap_or("generic"),
@@ -155,35 +155,32 @@ impl ProductServicesResourcesDsl {
         );
         DslGenerationResult {
             dsl,
-            operation: "create_lifecycle_resource".to_string(),
-            entity_type: "LifecycleResource".to_string(),
+            operation: "create_service_resource".to_string(),
+            entity_type: "ServiceResource".to_string(),
             generation_time_ms: start.elapsed().as_millis() as u64,
         }
     }
 
-    /// Generate DSL for reading a lifecycle resource
-    pub fn generate_lifecycle_resource_read_dsl(&self, resource_id: Uuid) -> DslGenerationResult {
+    /// Generate DSL for reading a service resource type
+    pub fn generate_service_resource_read_dsl(&self, resource_id: Uuid) -> DslGenerationResult {
         let start = Instant::now();
-        let dsl = format!(r#":resource-id "{}" lifecycle-resource.read"#, resource_id);
+        let dsl = format!(r#":resource-id "{}" service-resource.read"#, resource_id);
         DslGenerationResult {
             dsl,
-            operation: "read_lifecycle_resource".to_string(),
-            entity_type: "LifecycleResource".to_string(),
+            operation: "read_service_resource".to_string(),
+            entity_type: "ServiceResource".to_string(),
             generation_time_ms: start.elapsed().as_millis() as u64,
         }
     }
 
-    /// Generate DSL for deleting a lifecycle resource
-    pub fn generate_lifecycle_resource_delete_dsl(&self, resource_id: Uuid) -> DslGenerationResult {
+    /// Generate DSL for deleting a service resource type
+    pub fn generate_service_resource_delete_dsl(&self, resource_id: Uuid) -> DslGenerationResult {
         let start = Instant::now();
-        let dsl = format!(
-            r#":resource-id "{}" lifecycle-resource.delete"#,
-            resource_id
-        );
+        let dsl = format!(r#":resource-id "{}" service-resource.delete"#, resource_id);
         DslGenerationResult {
             dsl,
-            operation: "delete_lifecycle_resource".to_string(),
-            entity_type: "LifecycleResource".to_string(),
+            operation: "delete_service_resource".to_string(),
+            entity_type: "ServiceResource".to_string(),
             generation_time_ms: start.elapsed().as_millis() as u64,
         }
     }
@@ -207,7 +204,7 @@ impl ProductServicesResourcesDsl {
         }
     }
 
-    /// Generate DSL for linking lifecycle resource to service
+    /// Generate DSL for linking service resource to service
     pub fn generate_resource_link_service_dsl(
         &self,
         resource_id: Uuid,
@@ -215,13 +212,13 @@ impl ProductServicesResourcesDsl {
     ) -> DslGenerationResult {
         let start = Instant::now();
         let dsl = format!(
-            r#":resource-id "{}" :service-id "{}" lifecycle-resource.link-service"#,
+            r#":resource-id "{}" :service-id "{}" service-resource.link-service"#,
             resource_id, service_id
         );
         DslGenerationResult {
             dsl,
             operation: "link_resource_service".to_string(),
-            entity_type: "LifecycleResource".to_string(),
+            entity_type: "ServiceResource".to_string(),
             generation_time_ms: start.elapsed().as_millis() as u64,
         }
     }

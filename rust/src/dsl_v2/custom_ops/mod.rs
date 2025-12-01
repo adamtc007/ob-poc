@@ -852,7 +852,7 @@ impl CustomOperation for ScreeningSanctionsOp {
 
 /// Create a resource instance for a CBU (Idempotent)
 ///
-/// Rationale: Requires lookup of resource_type_id from prod_resources by code,
+/// Rationale: Requires lookup of resource_type_id from service_resource_types by code,
 /// creates the instance record with proper FK relationships.
 ///
 /// Idempotency: Uses ON CONFLICT on (instance_url) or (cbu_id, resource_type_id, instance_identifier)
@@ -862,10 +862,10 @@ pub struct ResourceCreateOp;
 #[async_trait]
 impl CustomOperation for ResourceCreateOp {
     fn domain(&self) -> &'static str {
-        "resource"
+        "service-resource"
     }
     fn verb(&self) -> &'static str {
-        "create"
+        "provision"
     }
     fn rationale(&self) -> &'static str {
         "Requires resource_type lookup by code and CBU/product/service FK resolution"
@@ -912,7 +912,7 @@ impl CustomOperation for ResourceCreateOp {
 
         // Look up resource type ID
         let resource_type_id: Option<Uuid> = sqlx::query_scalar(
-            r#"SELECT resource_id FROM "ob-poc".prod_resources WHERE resource_code = $1"#,
+            r#"SELECT resource_id FROM "ob-poc".service_resource_types WHERE resource_code = $1"#,
         )
         .bind(resource_type_code)
         .fetch_optional(pool)
@@ -1017,7 +1017,7 @@ pub struct ResourceSetAttrOp;
 #[async_trait]
 impl CustomOperation for ResourceSetAttrOp {
     fn domain(&self) -> &'static str {
-        "resource"
+        "service-resource"
     }
     fn verb(&self) -> &'static str {
         "set-attr"
@@ -1124,7 +1124,7 @@ pub struct ResourceActivateOp;
 #[async_trait]
 impl CustomOperation for ResourceActivateOp {
     fn domain(&self) -> &'static str {
-        "resource"
+        "service-resource"
     }
     fn verb(&self) -> &'static str {
         "activate"
@@ -1239,7 +1239,7 @@ pub struct ResourceSuspendOp;
 #[async_trait]
 impl CustomOperation for ResourceSuspendOp {
     fn domain(&self) -> &'static str {
-        "resource"
+        "service-resource"
     }
     fn verb(&self) -> &'static str {
         "suspend"
@@ -1298,7 +1298,7 @@ pub struct ResourceDecommissionOp;
 #[async_trait]
 impl CustomOperation for ResourceDecommissionOp {
     fn domain(&self) -> &'static str {
-        "resource"
+        "service-resource"
     }
     fn verb(&self) -> &'static str {
         "decommission"
@@ -1688,12 +1688,12 @@ mod tests {
         assert!(registry.has("ubo", "calculate"));
         assert!(registry.has("screening", "pep"));
         assert!(registry.has("screening", "sanctions"));
-        // New resource operations
-        assert!(registry.has("resource", "create"));
-        assert!(registry.has("resource", "set-attr"));
-        assert!(registry.has("resource", "activate"));
-        assert!(registry.has("resource", "suspend"));
-        assert!(registry.has("resource", "decommission"));
+        // Service resource instance operations
+        assert!(registry.has("service-resource", "provision"));
+        assert!(registry.has("service-resource", "set-attr"));
+        assert!(registry.has("service-resource", "activate"));
+        assert!(registry.has("service-resource", "suspend"));
+        assert!(registry.has("service-resource", "decommission"));
         // New delivery operations
         assert!(registry.has("delivery", "record"));
         assert!(registry.has("delivery", "complete"));
