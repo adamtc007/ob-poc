@@ -2,7 +2,16 @@
 
 **Database**: `data_designer` on PostgreSQL 17  
 **Schemas**: `ob-poc` (103 tables), `custody` (18 tables)  
-**Generated**: 2025-12-01
+**Updated**: 2025-12-01
+
+## Overview
+
+This document describes the database schema used by the OB-POC KYC/AML onboarding system. The schema supports:
+
+- **Core KYC/AML**: CBUs, entities, documents, screening, KYC investigations
+- **Service Delivery**: Products, services, resource instances
+- **Custody & Settlement**: Three-layer model (Universe → SSI → Booking Rules)
+- **Agentic DSL Generation**: The `rust/src/agentic/` module generates DSL that creates records in these tables
 
 ## Core Tables
 
