@@ -55,16 +55,16 @@ pub mod api;
 #[cfg(feature = "server")]
 pub mod templates;
 
-// Server-rendered UI
-#[cfg(feature = "server")]
-pub mod ui;
-
 // MCP server module (when mcp feature is enabled)
 #[cfg(feature = "mcp")]
 pub mod mcp;
 
 // Agentic DSL generation module
 pub mod agentic;
+
+// Graph visualization module
+#[cfg(feature = "database")]
+pub mod graph;
 
 // Database integration re-exports (when database feature is enabled)
 #[cfg(feature = "database")]

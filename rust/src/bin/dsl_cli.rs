@@ -157,7 +157,7 @@ enum Commands {
         domain: Option<String>,
 
         /// Save generated DSL to file
-        #[arg(long, short)]
+        #[arg(long)]
         output: Option<PathBuf>,
     },
 

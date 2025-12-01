@@ -25,17 +25,20 @@
 //! curl http://localhost:3000/api/agent/health
 //! ```
 
+use axum::response::Html;
+use axum::routing::get;
+use axum::Router;
 use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
 
 use ob_poc::api::{
     create_agent_router, create_attribute_router, create_dsl_viewer_router, create_entity_router,
-    create_template_router,
+    create_graph_router, create_template_router,
 };
-use ob_poc::ui::create_ui_router;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -70,8 +73,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Database connection established");
 
     // Create routers and merge them
-    // UI router provides server-rendered HTML pages at / and /verbs
-    let app = create_ui_router()
+    let app = Router::new()
+        // Serve index.html at root - redirect to WASM app
+        .route("/", get(serve_index))
+        // Serve static files for WASM app
+        .nest_service("/pkg", ServeDir::new("crates/ob-poc-ui/pkg"))
+        // API routes
+        .merge(create_graph_router(pool.clone()))
         .merge(create_agent_router(pool.clone()))
         .merge(create_attribute_router(pool.clone()))
         .merge(create_entity_router(pool.clone()))
@@ -90,7 +98,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\nServer running on http://{}", addr);
     println!("\nAvailable endpoints:");
     println!("  Web UI:");
-    println!("    GET    http://localhost:3000/                       - Agent Session UI");
+    println!("    GET    http://localhost:3000/                       - CBU Graph Visualization");
+    println!("\n  CBU Graph API:");
+    println!("    GET    http://localhost:3000/api/cbu                - List all CBUs");
+    println!("    GET    http://localhost:3000/api/cbu/:id            - Get CBU summary");
+    println!("    GET    http://localhost:3000/api/cbu/:id/graph      - Get CBU graph data");
     println!("\n  Session Management:");
     println!("    POST   http://localhost:3000/api/session            - Create new session");
     println!("    GET    http://localhost:3000/api/session/:id        - Get session state");
@@ -141,3 +153,56 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+/// Serve the index.html for the WASM app
+async fn serve_index() -> Html<&'static str> {
+    Html(INDEX_HTML)
+}
+
+const INDEX_HTML: &str = r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OB-POC Visualization</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #1a1a2e;
+        }
+
+        #ob_poc_canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #e94560;
+            font-family: system-ui, -apple-system, sans-serif;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading" id="loading">Loading WASM app...</div>
+    <canvas id="ob_poc_canvas"></canvas>
+    <script type="module">
+        import init from './pkg/ob_poc_ui.js';
+
+        init().then(() => {
+            document.getElementById('loading').style.display = 'none';
+        }).catch(err => {
+            document.getElementById('loading').textContent = 'Failed to load: ' + err;
+            console.error(err);
+        });
+    </script>
+</body>
+</html>"#;

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OB-POC Visualization</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #1a1a2e;
+        }
+
+        #ob_poc_canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #e94560;
+            font-family: system-ui, -apple-system, sans-serif;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading" id="loading">Loading...</div>
+    <canvas id="ob_poc_canvas"></canvas>
+    <script type="module">
+        import init from './pkg/ob_poc_ui.js';
+
+        init().then(() => {
+            document.getElementById('loading').style.display = 'none';
+        }).catch(err => {
+            document.getElementById('loading').textContent = 'Failed to load: ' + err;
+            console.error(err);
+        });
+    </script>
+</body>
+</html>
