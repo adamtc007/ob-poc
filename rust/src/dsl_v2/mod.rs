@@ -48,6 +48,8 @@ pub mod csg_linter;
 pub mod custom_ops;
 pub mod execution_plan;
 pub mod executor;
+#[cfg(feature = "database")]
+pub mod generic_executor;
 pub mod mappings;
 pub mod parser;
 #[cfg(feature = "database")]
@@ -68,6 +70,8 @@ pub use ast::{Argument, Key, Program, Span, Statement, Value, VerbCall};
 pub use csg_linter::{CsgLinter, InferredContext, LintResult};
 pub use execution_plan::{compile, CompileError, ExecutionPlan, ExecutionStep, Injection};
 pub use executor::{DslExecutor, ExecutionContext, ExecutionResult, ReturnType};
+#[cfg(feature = "database")]
+pub use generic_executor::{GenericCrudExecutor, GenericExecutionResult};
 pub use mappings::{get_table_mappings, resolve_column, ColumnMapping, DbType, TableMappings};
 pub use parser::{parse_program, parse_single_verb};
 pub use semantic_context::SemanticContextStore;

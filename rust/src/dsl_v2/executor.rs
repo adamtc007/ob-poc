@@ -13,7 +13,11 @@ use super::ast::{Value, VerbCall};
 #[cfg(feature = "database")]
 use super::custom_ops::CustomOperationRegistry;
 #[cfg(feature = "database")]
+use super::generic_executor::{GenericCrudExecutor, GenericExecutionResult};
+#[cfg(feature = "database")]
 use super::mappings::{get_pk_column, resolve_column, DbType};
+#[cfg(feature = "database")]
+use super::runtime_registry::{RuntimeBehavior, RuntimeVerb};
 #[cfg(feature = "database")]
 use super::verb_registry::{registry, VerbBehavior};
 #[cfg(feature = "database")]
@@ -101,6 +105,8 @@ pub struct DslExecutor {
     pool: PgPool,
     #[cfg(feature = "database")]
     custom_ops: CustomOperationRegistry,
+    #[cfg(feature = "database")]
+    generic_executor: GenericCrudExecutor,
 }
 
 impl DslExecutor {
@@ -108,6 +114,7 @@ impl DslExecutor {
     #[cfg(feature = "database")]
     pub fn new(pool: PgPool) -> Self {
         Self {
+            generic_executor: GenericCrudExecutor::new(pool.clone()),
             pool,
             custom_ops: CustomOperationRegistry::new(),
         }
@@ -256,6 +263,48 @@ impl DslExecutor {
         }
 
         Ok(result)
+    }
+
+    /// Execute a verb using the YAML-driven generic executor
+    ///
+    /// This is the new path for verbs defined in verbs.yaml.
+    /// It takes a RuntimeVerb (from YAML config) and executes it via GenericCrudExecutor.
+    #[cfg(feature = "database")]
+    pub async fn execute_verb_generic(
+        &self,
+        verb: &RuntimeVerb,
+        args: &HashMap<String, JsonValue>,
+        ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        // Check if this is a plugin (custom op)
+        if let RuntimeBehavior::Plugin(handler) = &verb.behavior {
+            // Route to custom ops
+            if let Some(_op) = self.custom_ops.get(&verb.domain, &verb.verb) {
+                // For now, we can't easily bridge JsonValue args to VerbCall
+                // This would require building a VerbCall from the args
+                // For the initial integration, plugins still go through the old path
+                return Err(anyhow!(
+                    "Plugin {} not yet supported via generic executor, use execute_verb instead. Handler: {}",
+                    verb.full_name,
+                    handler
+                ));
+            }
+            return Err(anyhow!("Plugin {} has no handler", handler));
+        }
+
+        // Execute via generic executor
+        let result = self.generic_executor.execute(verb, args).await?;
+
+        // Handle symbol capture
+        if verb.returns.capture {
+            if let GenericExecutionResult::Uuid(uuid) = &result {
+                if let Some(name) = &verb.returns.name {
+                    ctx.bind(name, *uuid);
+                }
+            }
+        }
+
+        Ok(result.to_legacy())
     }
 
     /// Validate that required arguments are present
