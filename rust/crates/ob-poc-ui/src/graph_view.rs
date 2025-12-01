@@ -1,65 +1,73 @@
-//! Graph visualization view with pan/zoom
+//! Hierarchical tree visualization view with pan/zoom
 
 use egui::{Color32, Pos2, Rect, Sense, Stroke, Vec2};
 use serde::Deserialize;
 use std::collections::HashMap;
 
-/// Graph data from the API
-#[derive(Default, Clone, Deserialize)]
-pub struct CbuGraph {
-    pub cbu_id: uuid::Uuid,
-    pub label: String,
-    pub nodes: Vec<GraphNode>,
-    pub edges: Vec<GraphEdge>,
-    pub layers: Vec<LayerInfo>,
+/// View mode - two distinct views
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ViewMode {
+    /// KYC/UBO structure: Who is this client? Who owns/controls it?
+    #[default]
+    KycUbo,
+    /// Service delivery map: What services does this client receive?
+    ServiceDelivery,
 }
 
-#[derive(Clone, Deserialize)]
-pub struct GraphNode {
-    pub id: String,
+/// Tree visualization from the /api/cbu/:id/tree endpoint
+#[derive(Clone, Deserialize, Default)]
+pub struct CbuTreeVisualization {
+    pub cbu_id: uuid::Uuid,
+    pub cbu_name: String,
+    pub client_type: Option<String>,
+    pub jurisdiction: Option<String>,
+    pub view_mode: String,
+    pub root: TreeNode,
+    pub overlay_edges: Vec<TreeEdge>,
+    pub stats: VisualizationStats,
+}
+
+#[derive(Clone, Deserialize, Default)]
+pub struct TreeNode {
+    pub id: uuid::Uuid,
     pub node_type: String,
-    pub layer: String,
     pub label: String,
     pub sublabel: Option<String>,
-    pub status: String,
-    pub data: serde_json::Value,
-    /// Parent node ID for hierarchical grouping (e.g., market groups custody items)
+    pub jurisdiction: Option<String>,
+    pub children: Vec<TreeNode>,
     #[serde(default)]
-    pub parent_id: Option<String>,
+    pub metadata: serde_json::Value,
 }
 
-#[derive(Clone, Deserialize)]
-pub struct GraphEdge {
-    pub id: String,
-    pub source: String,
-    pub target: String,
+#[derive(Clone, Deserialize, Default)]
+pub struct TreeEdge {
+    pub from: uuid::Uuid,
+    pub to: uuid::Uuid,
     pub edge_type: String,
     pub label: Option<String>,
+    pub weight: Option<f32>,
 }
 
-#[derive(Clone, Deserialize)]
-pub struct LayerInfo {
-    pub layer_type: String,
-    pub label: String,
-    pub color: String,
-    pub node_count: usize,
-    pub visible: bool,
+#[derive(Clone, Deserialize, Default)]
+pub struct VisualizationStats {
+    pub total_nodes: usize,
+    pub total_edges: usize,
+    pub max_depth: usize,
+    pub entity_count: usize,
+    pub person_count: usize,
+    pub share_class_count: usize,
 }
 
 /// Graph visualization widget
 pub struct GraphView {
-    pub graph: Option<CbuGraph>,
-    pub show_custody: bool,
-    pub show_kyc: bool,
-    pub show_ubo: bool,
-    pub show_services: bool,
+    tree: Option<CbuTreeVisualization>,
 
     // Pan/zoom state
     offset: Vec2,
     zoom: f32,
 
-    // Layout cache
-    node_positions: HashMap<String, Pos2>,
+    // Layout cache for hierarchical tree
+    tree_positions: HashMap<uuid::Uuid, Pos2>,
     selected_node: Option<String>,
 }
 
@@ -72,157 +80,122 @@ impl Default for GraphView {
 impl GraphView {
     pub fn new() -> Self {
         Self {
-            graph: None,
-            show_custody: true,
-            show_kyc: false,
-            show_ubo: false,
-            show_services: false,
+            tree: None,
             offset: Vec2::ZERO,
             zoom: 1.0,
-            node_positions: HashMap::new(),
+            tree_positions: HashMap::new(),
             selected_node: None,
         }
     }
 
-    pub fn set_graph(&mut self, graph: CbuGraph) {
-        self.graph = Some(graph);
-        self.compute_layout();
+    pub fn set_tree(&mut self, tree: CbuTreeVisualization) {
+        self.tree = Some(tree);
+        self.compute_tree_layout();
     }
 
-    fn compute_layout(&mut self) {
-        let Some(ref graph) = self.graph else {
+    fn compute_tree_layout(&mut self) {
+        let Some(ref tree) = self.tree else {
             return;
         };
 
-        self.node_positions.clear();
+        self.tree_positions.clear();
 
-        use std::f32::consts::PI;
+        // Hierarchical top-down tree layout
+        let node_width = 160.0;
+        let node_height = 60.0;
+        let h_spacing = 40.0;
+        let v_spacing = 100.0;
 
-        // Radial/Orbital layout: CBU at center, layers as rings outward
-        // Markets are grouping nodes - they go on the custody ring, children fan out from them
-
-        let ring_radius = |layer: &str, node_type: &str| -> f32 {
-            match (layer, node_type) {
-                ("core", "cbu") => 0.0,         // CBU at center
-                ("core", _) => 180.0,           // Entities - first ring
-                ("custody", "market") => 320.0, // Markets - inner custody ring
-                ("custody", "isda") => 350.0,   // ISDA on custody ring (not grouped by market)
-                ("custody", "csa") => 420.0,    // CSA outer from ISDA
-                ("custody", _) => 420.0, // Other custody items - outer ring (will be repositioned if parented)
-                ("kyc", _) => 520.0,     // KYC - third ring
-                ("ubo", _) => 520.0,     // UBO - same ring as KYC
-                ("services", _) => 650.0, // Services - outer ring
-                _ => 350.0,
-            }
-        };
-
-        // Group nodes by ring (for non-parented nodes)
-        let node_ring = |layer: &str, node_type: &str| -> String {
-            match (layer, node_type) {
-                ("core", "cbu") => "center".to_string(),
-                ("core", _) => "ring1".to_string(),
-                ("custody", "market") => "ring2_market".to_string(),
-                ("custody", "isda") => "ring2_isda".to_string(),
-                ("custody", "csa") => "ring2_csa".to_string(),
-                ("custody", _) => "ring2_custody".to_string(),
-                ("kyc", _) => "ring3".to_string(),
-                ("ubo", _) => "ring3".to_string(),
-                ("services", _) => "ring4".to_string(),
-                _ => "ring2_custody".to_string(),
-            }
-        };
-
-        // First pass: identify market nodes and their children
-        let mut market_children: HashMap<String, Vec<String>> = HashMap::new();
-        let mut parented_nodes: std::collections::HashSet<String> =
-            std::collections::HashSet::new();
-
-        for node in &graph.nodes {
-            if let Some(ref parent_id) = node.parent_id {
-                market_children
-                    .entry(parent_id.clone())
-                    .or_default()
-                    .push(node.id.clone());
-                parented_nodes.insert(node.id.clone());
-            }
-        }
-
-        // Count nodes per ring (excluding parented nodes)
-        let mut ring_counts: HashMap<String, usize> = HashMap::new();
-        let mut ring_positions: HashMap<String, usize> = HashMap::new();
-
-        for node in &graph.nodes {
-            if parented_nodes.contains(&node.id) {
-                continue; // Skip parented nodes in ring count
-            }
-            let ring = node_ring(&node.layer, &node.node_type);
-            *ring_counts.entry(ring).or_insert(0) += 1;
-        }
-
-        // Position non-parented nodes radially
-        for node in &graph.nodes {
-            if parented_nodes.contains(&node.id) {
-                continue; // Will position later based on parent
-            }
-
-            let ring = node_ring(&node.layer, &node.node_type);
-            let radius = ring_radius(&node.layer, &node.node_type);
-            let count = ring_counts.get(&ring).copied().unwrap_or(1);
-            let pos = ring_positions.entry(ring).or_insert(0);
-
-            let (x, y) = if radius == 0.0 {
-                // Center node (CBU)
-                (0.0, 0.0)
+        // First pass: calculate subtree widths
+        fn calc_subtree_width(node: &TreeNode, node_width: f32, h_spacing: f32) -> f32 {
+            if node.children.is_empty() {
+                node_width
             } else {
-                // Distribute evenly around the ring, starting from top
-                let angle = -PI / 2.0 + (*pos as f32) * 2.0 * PI / (count as f32);
-                (radius * angle.cos(), radius * angle.sin())
-            };
-
-            self.node_positions.insert(node.id.clone(), Pos2::new(x, y));
-            *pos += 1;
-        }
-
-        // Second pass: position children around their parent markets
-        let child_offset_radius = 110.0; // Distance from parent
-        let child_arc_span = PI / 3.0; // 60 degree arc for children
-
-        for (parent_id, children) in &market_children {
-            let Some(parent_pos) = self.node_positions.get(parent_id).copied() else {
-                continue;
-            };
-
-            // Calculate angle from center to parent
-            let parent_angle = parent_pos.y.atan2(parent_pos.x);
-
-            // Distribute children in an arc centered on parent's angle
-            let child_count = children.len();
-            for (i, child_id) in children.iter().enumerate() {
-                let child_angle = if child_count == 1 {
-                    parent_angle // Single child: same angle as parent, just further out
-                } else {
-                    // Fan out children in an arc
-                    let arc_start = parent_angle - child_arc_span / 2.0;
-                    arc_start + (i as f32) * child_arc_span / ((child_count - 1) as f32)
-                };
-
-                // Position child at offset from parent
-                let child_x = parent_pos.x + child_offset_radius * child_angle.cos();
-                let child_y = parent_pos.y + child_offset_radius * child_angle.sin();
-
-                self.node_positions
-                    .insert(child_id.clone(), Pos2::new(child_x, child_y));
+                let children_width: f32 = node
+                    .children
+                    .iter()
+                    .map(|c| calc_subtree_width(c, node_width, h_spacing))
+                    .sum();
+                let gaps = (node.children.len().saturating_sub(1)) as f32 * h_spacing;
+                (children_width + gaps).max(node_width)
             }
         }
+
+        // Second pass: position nodes
+        fn position_nodes(
+            node: &TreeNode,
+            x: f32,
+            y: f32,
+            available_width: f32,
+            node_width: f32,
+            node_height: f32,
+            h_spacing: f32,
+            v_spacing: f32,
+            positions: &mut HashMap<uuid::Uuid, Pos2>,
+        ) {
+            let center_x = x + available_width / 2.0;
+            positions.insert(node.id, Pos2::new(center_x, y));
+
+            if node.children.is_empty() {
+                return;
+            }
+
+            let child_widths: Vec<f32> = node
+                .children
+                .iter()
+                .map(|c| calc_subtree_width(c, node_width, h_spacing))
+                .collect();
+            let total_children_width: f32 = child_widths.iter().sum();
+            let gaps = (node.children.len().saturating_sub(1)) as f32 * h_spacing;
+            let total_width = total_children_width + gaps;
+
+            let mut child_x = center_x - total_width / 2.0;
+            let child_y = y + node_height + v_spacing;
+
+            for (i, child) in node.children.iter().enumerate() {
+                let child_width = child_widths[i];
+                position_nodes(
+                    child,
+                    child_x,
+                    child_y,
+                    child_width,
+                    node_width,
+                    node_height,
+                    h_spacing,
+                    v_spacing,
+                    positions,
+                );
+                child_x += child_width + h_spacing;
+            }
+        }
+
+        let total_width = calc_subtree_width(&tree.root, node_width, h_spacing);
+        position_nodes(
+            &tree.root,
+            -total_width / 2.0,
+            -200.0,
+            total_width,
+            node_width,
+            node_height,
+            h_spacing,
+            v_spacing,
+            &mut self.tree_positions,
+        );
     }
 
     pub fn ui(&mut self, ui: &mut egui::Ui) {
-        let Some(ref graph) = self.graph else {
+        let Some(ref tree) = self.tree else {
             ui.centered_and_justified(|ui| {
                 ui.label("Select a CBU to visualize");
             });
             return;
         };
+
+        // Clone data needed for drawing to avoid borrow issues
+        let root = tree.root.clone();
+        let overlay_edges = tree.overlay_edges.clone();
+        let cbu_name = tree.cbu_name.clone();
+        let stats = tree.stats.clone();
 
         // Get available rect and create painter
         let (response, painter) = ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
@@ -242,126 +215,69 @@ impl GraphView {
             self.zoom = (self.zoom * zoom_factor).clamp(0.2, 3.0);
         }
 
+        // Copy values for transform closure
+        let offset = self.offset;
+        let zoom = self.zoom;
+
         // Transform helper
-        let transform = |pos: Pos2| -> Pos2 { center + (pos.to_vec2() + self.offset) * self.zoom };
-        let transform_center = center + self.offset * self.zoom;
+        let transform = |pos: Pos2| -> Pos2 { center + (pos.to_vec2() + offset) * zoom };
 
-        // Draw faint ring circles (behind everything)
-        let ring_color = Color32::from_rgba_unmultiplied(100, 100, 120, 40);
-        let ring_radii = [180.0, 350.0, 500.0, 650.0]; // Matches layout radii
-        let ring_labels = ["Entities", "Custody", "KYC/UBO", "Services"];
+        // Draw tree edges (parent to children)
+        self.draw_tree_edges(&root, &painter, &transform);
 
-        for (i, &radius) in ring_radii.iter().enumerate() {
-            let scaled_radius = radius * self.zoom;
-            painter.circle_stroke(
-                transform_center,
-                scaled_radius,
-                Stroke::new(1.0, ring_color),
-            );
-
-            // Ring label at top of each ring
-            let label_pos = transform_center + Vec2::new(0.0, -scaled_radius - 12.0 * self.zoom);
-            painter.text(
-                label_pos,
-                egui::Align2::CENTER_BOTTOM,
-                ring_labels[i],
-                egui::FontId::proportional(10.0 * self.zoom),
-                Color32::from_rgba_unmultiplied(150, 150, 170, 80),
-            );
-        }
-
-        // Draw edges first (below nodes)
-        for edge in &graph.edges {
-            let Some(source_pos) = self.node_positions.get(&edge.source) else {
+        // Draw overlay edges (ownership, control relationships)
+        for edge in &overlay_edges {
+            let Some(from_pos) = self.tree_positions.get(&edge.from) else {
                 continue;
             };
-            let Some(target_pos) = self.node_positions.get(&edge.target) else {
+            let Some(to_pos) = self.tree_positions.get(&edge.to) else {
                 continue;
             };
 
-            let from = transform(*source_pos);
-            let to = transform(*target_pos);
+            let from = transform(*from_pos);
+            let to = transform(*to_pos);
 
-            let color = Color32::from_rgb(100, 100, 100);
-            painter.line_segment([from, to], Stroke::new(1.5 * self.zoom, color));
+            let color = match edge.edge_type.as_str() {
+                "owns" => Color32::from_rgb(34, 197, 94),
+                "controls" => Color32::from_rgb(251, 191, 36),
+                "role" => Color32::from_rgb(99, 102, 241),
+                _ => Color32::from_rgb(150, 150, 150),
+            };
 
-            // Draw edge label
+            // Draw curved line for overlay edges
+            let mid = Pos2::new(
+                (from.x + to.x) / 2.0,
+                (from.y + to.y) / 2.0 - 30.0 * self.zoom,
+            );
+            painter.line_segment([from, mid], Stroke::new(2.0 * self.zoom, color));
+            painter.line_segment([mid, to], Stroke::new(2.0 * self.zoom, color));
+
             if let Some(ref label) = edge.label {
-                let mid = Pos2::new((from.x + to.x) / 2.0, (from.y + to.y) / 2.0);
                 painter.text(
                     mid,
-                    egui::Align2::CENTER_CENTER,
+                    egui::Align2::CENTER_BOTTOM,
                     label,
                     egui::FontId::proportional(10.0 * self.zoom),
-                    Color32::GRAY,
+                    color,
                 );
             }
         }
 
-        // Draw nodes
-        for node in &graph.nodes {
-            // Filter by layer visibility
-            let visible = match node.layer.as_str() {
-                "core" => true,
-                "custody" => self.show_custody,
-                "kyc" => self.show_kyc,
-                "ubo" => self.show_ubo,
-                "services" => self.show_services,
-                _ => true,
-            };
+        // Draw tree nodes
+        self.draw_tree_nodes(&root, &response, &painter, &transform);
 
-            if !visible {
-                continue;
-            }
-
-            let Some(pos) = self.node_positions.get(&node.id) else {
-                continue;
-            };
-            let screen_pos = transform(*pos);
-
-            // Node styling based on type
-            let (bg_color, border_color) = node_colors(&node.node_type, &node.status);
-
-            let node_size = Vec2::new(140.0, 50.0) * self.zoom;
-            let node_rect = Rect::from_center_size(screen_pos, node_size);
-
-            // Draw node background
-            painter.rect_filled(node_rect, 8.0 * self.zoom, bg_color);
-            painter.rect_stroke(
-                node_rect,
-                8.0 * self.zoom,
-                Stroke::new(2.0 * self.zoom, border_color),
-            );
-
-            // Draw label
-            painter.text(
-                screen_pos - Vec2::new(0.0, 8.0 * self.zoom),
-                egui::Align2::CENTER_CENTER,
-                &node.label,
-                egui::FontId::proportional(12.0 * self.zoom),
-                Color32::WHITE,
-            );
-
-            // Draw sublabel
-            if let Some(ref sublabel) = node.sublabel {
-                painter.text(
-                    screen_pos + Vec2::new(0.0, 10.0 * self.zoom),
-                    egui::Align2::CENTER_CENTER,
-                    sublabel,
-                    egui::FontId::proportional(10.0 * self.zoom),
-                    Color32::from_rgb(180, 180, 180),
-                );
-            }
-
-            // Handle click
-            if response.clicked() {
-                if let Some(pointer_pos) = response.interact_pointer_pos() {
-                    if node_rect.contains(pointer_pos) {
-                        self.selected_node = Some(node.id.clone());
-                    }
-                }
-            }
-        }
+        // Draw stats in corner
+        let stats_text = format!(
+            "{} | {} entities | {} persons",
+            cbu_name, stats.entity_count, stats.person_count
+        );
+        painter.text(
+            rect.left_top() + Vec2::new(10.0, 20.0),
+            egui::Align2::LEFT_TOP,
+            stats_text,
+            egui::FontId::proportional(12.0),
+            Color32::from_rgb(180, 180, 180),
+        );
 
         // Draw zoom/pan info
         painter.text(
@@ -375,31 +291,148 @@ impl GraphView {
             Color32::GRAY,
         );
     }
+
+    fn draw_tree_edges<F>(&self, node: &TreeNode, painter: &egui::Painter, transform: &F)
+    where
+        F: Fn(Pos2) -> Pos2,
+    {
+        let Some(parent_pos) = self.tree_positions.get(&node.id) else {
+            return;
+        };
+
+        let parent_screen = transform(*parent_pos);
+
+        for child in &node.children {
+            let Some(child_pos) = self.tree_positions.get(&child.id) else {
+                continue;
+            };
+
+            let child_screen = transform(*child_pos);
+
+            let color = Color32::from_rgb(100, 100, 120);
+            painter.line_segment(
+                [parent_screen, child_screen],
+                Stroke::new(1.5 * self.zoom, color),
+            );
+
+            self.draw_tree_edges(child, painter, transform);
+        }
+    }
+
+    fn draw_tree_nodes<F>(
+        &mut self,
+        node: &TreeNode,
+        response: &egui::Response,
+        painter: &egui::Painter,
+        transform: &F,
+    ) where
+        F: Fn(Pos2) -> Pos2,
+    {
+        let Some(pos) = self.tree_positions.get(&node.id) else {
+            return;
+        };
+
+        let screen_pos = transform(*pos);
+        let (bg_color, border_color) = tree_node_colors(&node.node_type);
+
+        let node_size = Vec2::new(150.0, 55.0) * self.zoom;
+        let node_rect = Rect::from_center_size(screen_pos, node_size);
+
+        painter.rect_filled(node_rect, 8.0 * self.zoom, bg_color);
+        painter.rect_stroke(
+            node_rect,
+            8.0 * self.zoom,
+            Stroke::new(2.0 * self.zoom, border_color),
+        );
+
+        painter.text(
+            screen_pos - Vec2::new(0.0, 10.0 * self.zoom),
+            egui::Align2::CENTER_CENTER,
+            &node.label,
+            egui::FontId::proportional(11.0 * self.zoom),
+            Color32::WHITE,
+        );
+
+        if let Some(ref sublabel) = node.sublabel {
+            painter.text(
+                screen_pos + Vec2::new(0.0, 8.0 * self.zoom),
+                egui::Align2::CENTER_CENTER,
+                sublabel,
+                egui::FontId::proportional(9.0 * self.zoom),
+                Color32::from_rgb(180, 180, 180),
+            );
+        }
+
+        let type_label = match node.node_type.as_str() {
+            "cbu" => "CBU",
+            "commercial_client" => "Client",
+            "man_co" => "ManCo",
+            "fund_entity" => "Fund",
+            "trust_entity" => "Trust",
+            "person" => "Person",
+            "share_class" => "Share",
+            _ => "",
+        };
+        if !type_label.is_empty() {
+            painter.text(
+                Pos2::new(
+                    node_rect.right() - 5.0 * self.zoom,
+                    node_rect.top() + 5.0 * self.zoom,
+                ),
+                egui::Align2::RIGHT_TOP,
+                type_label,
+                egui::FontId::proportional(8.0 * self.zoom),
+                Color32::from_rgb(150, 150, 150),
+            );
+        }
+
+        if response.clicked() {
+            if let Some(pointer_pos) = response.interact_pointer_pos() {
+                if node_rect.contains(pointer_pos) {
+                    self.selected_node = Some(node.id.to_string());
+                }
+            }
+        }
+
+        for child in &node.children {
+            self.draw_tree_nodes(child, response, painter, transform);
+        }
+    }
 }
 
-fn node_colors(node_type: &str, status: &str) -> (Color32, Color32) {
-    let base = match node_type {
-        "cbu" => Color32::from_rgb(75, 85, 99),            // Gray
-        "market" => Color32::from_rgb(14, 165, 233),       // Sky blue - grouping node
-        "universe" => Color32::from_rgb(59, 130, 246),     // Blue
-        "ssi" => Color32::from_rgb(16, 185, 129),          // Green
-        "booking_rule" => Color32::from_rgb(245, 158, 11), // Amber
-        "isda" => Color32::from_rgb(139, 92, 246),         // Purple
-        "csa" => Color32::from_rgb(236, 72, 153),          // Pink
-        "entity" => Color32::from_rgb(34, 197, 94),        // Emerald
-        "document" => Color32::from_rgb(99, 102, 241),     // Indigo
-        "resource" => Color32::from_rgb(249, 115, 22),     // Orange
-        _ => Color32::from_rgb(107, 114, 128),             // Gray
-    };
-
-    let border = match status {
-        "active" => Color32::from_rgb(34, 197, 94),    // Green
-        "pending" => Color32::from_rgb(251, 191, 36),  // Yellow
-        "suspended" => Color32::from_rgb(239, 68, 68), // Red
-        "expired" => Color32::from_rgb(107, 114, 128), // Gray
-        "draft" => Color32::from_rgb(156, 163, 175),   // Light gray
-        _ => Color32::WHITE,
-    };
-
-    (base, border)
+fn tree_node_colors(node_type: &str) -> (Color32, Color32) {
+    match node_type {
+        "cbu" => (
+            Color32::from_rgb(75, 85, 99),
+            Color32::from_rgb(156, 163, 175),
+        ),
+        "commercial_client" => (
+            Color32::from_rgb(30, 64, 175),
+            Color32::from_rgb(96, 165, 250),
+        ),
+        "man_co" => (
+            Color32::from_rgb(124, 45, 18),
+            Color32::from_rgb(251, 146, 60),
+        ),
+        "fund_entity" => (
+            Color32::from_rgb(21, 128, 61),
+            Color32::from_rgb(74, 222, 128),
+        ),
+        "trust_entity" => (
+            Color32::from_rgb(88, 28, 135),
+            Color32::from_rgb(192, 132, 252),
+        ),
+        "person" => (
+            Color32::from_rgb(14, 116, 144),
+            Color32::from_rgb(34, 211, 238),
+        ),
+        "share_class" => (
+            Color32::from_rgb(161, 98, 7),
+            Color32::from_rgb(250, 204, 21),
+        ),
+        _ => (
+            Color32::from_rgb(55, 65, 81),
+            Color32::from_rgb(156, 163, 175),
+        ),
+    }
 }

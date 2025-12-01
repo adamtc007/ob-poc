@@ -37,6 +37,10 @@ domains:
             type: string
             required: false
             maps_to: description
+          - name: commercial-client-entity-id
+            type: uuid
+            required: false
+            maps_to: commercial_client_entity_id
         returns:
           type: uuid
           name: cbu_id
@@ -86,6 +90,10 @@ domains:
             type: string
             required: false
             maps_to: jurisdiction
+          - name: commercial-client-entity-id
+            type: uuid
+            required: false
+            maps_to: commercial_client_entity_id
         returns:
           type: affected
 
@@ -162,6 +170,10 @@ domains:
             type: string
             required: false
             maps_to: nature_purpose
+          - name: commercial-client-entity-id
+            type: uuid
+            required: false
+            maps_to: commercial_client_entity_id
         returns:
           type: uuid
           name: cbu_id
@@ -3066,6 +3078,10 @@ domains:
             type: uuid
             required: true
             maps_to: cbu_id
+          - name: entity-id
+            type: uuid
+            required: false
+            maps_to: entity_id
           - name: name
             type: string
             required: true
@@ -3142,6 +3158,11 @@ domains:
             type: decimal
             required: false
             maps_to: minimum_investment
+          - name: class-category
+            type: string
+            required: false
+            maps_to: class_category
+            valid_values: [CORPORATE, FUND]
         returns:
           type: uuid
           name: share_class_id
@@ -3161,6 +3182,10 @@ domains:
             type: uuid
             required: true
             maps_to: cbu_id
+          - name: entity-id
+            type: uuid
+            required: false
+            maps_to: entity_id
           - name: name
             type: string
             required: true
@@ -3236,6 +3261,11 @@ domains:
             type: decimal
             required: false
             maps_to: minimum_investment
+          - name: class-category
+            type: string
+            required: false
+            maps_to: class_category
+            valid_values: [CORPORATE, FUND]
         returns:
           type: uuid
           name: share_class_id

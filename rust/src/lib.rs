@@ -66,6 +66,10 @@ pub mod agentic;
 #[cfg(feature = "database")]
 pub mod graph;
 
+// Hierarchical tree visualization module
+#[cfg(feature = "database")]
+pub mod visualization;
+
 // Database integration re-exports (when database feature is enabled)
 #[cfg(feature = "database")]
 pub use database::DictionaryDatabaseService;

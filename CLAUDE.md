@@ -672,18 +672,28 @@ The `share-class`, `holding`, and `movement` domains implement a Clearstream-sty
 ### Example: Fund Share Class Setup
 
 ```clojure
-;; Create fund CBU
-(cbu.ensure :name "Luxembourg Growth Fund" :jurisdiction "LU" :client-type "FUND" :as @fund)
+;; Create fund CBU with commercial client reference
+(entity.create-limited-company :name "Blackrock Inc" :jurisdiction "US" :as @head-office)
+(cbu.ensure :name "Luxembourg Growth Fund" :jurisdiction "LU" :client-type "FUND" 
+  :commercial-client-entity-id @head-office :as @fund)
 
-;; Create share classes
-(share-class.create :cbu-id @fund :name "Class A EUR" :isin "LU0123456789" :currency "EUR"
-  :nav-per-share 100.00 :management-fee-bps 150 :minimum-investment 10000.00
-  :subscription-frequency "Daily" :redemption-frequency "Weekly" :redemption-notice-days 5
-  :as @class-a)
+;; Create fund entity (legal issuer of shares)
+(entity.create-limited-company :name "Luxembourg Growth Fund SICAV" :jurisdiction "LU" :as @fund-entity)
 
-(share-class.create :cbu-id @fund :name "Class I USD" :isin "LU9876543210" :currency "USD"
-  :nav-per-share 1000.00 :management-fee-bps 75 :minimum-investment 1000000.00
-  :as @class-i)
+;; Create share classes with issuing entity
+(share-class.create :cbu-id @fund :entity-id @fund-entity :name "Class A EUR" :isin "LU0123456789" 
+  :currency "EUR" :class-category "FUND" :nav-per-share 100.00 :management-fee-bps 150 
+  :minimum-investment 10000.00 :subscription-frequency "Daily" :redemption-frequency "Weekly" 
+  :redemption-notice-days 5 :as @class-a)
+
+(share-class.create :cbu-id @fund :entity-id @fund-entity :name "Class I USD" :isin "LU9876543210" 
+  :currency "USD" :class-category "FUND" :nav-per-share 1000.00 :management-fee-bps 75 
+  :minimum-investment 1000000.00 :as @class-i)
+
+;; Create corporate share class (for ManCo ownership tracking)
+(entity.create-limited-company :name "Fund Management Co" :jurisdiction "LU" :as @manco)
+(share-class.create :cbu-id @fund :entity-id @manco :name "Ordinary Shares" 
+  :currency "EUR" :class-category "CORPORATE" :as @manco-shares)
 
 ;; Create investor entity
 (entity.create-limited-company :name "Pension Fund ABC" :jurisdiction "US" :as @investor)

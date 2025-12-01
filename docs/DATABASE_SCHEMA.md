@@ -33,6 +33,7 @@ The central entity representing a client relationship.
 | onboarding_context | jsonb | | '{}' | Onboarding workflow context |
 | semantic_context | jsonb | | '{}' | AI/semantic context |
 | embedding | vector | | | pgvector embedding |
+| commercial_client_entity_id | uuid | YES | | FK to entities - head office that contracted with bank |
 | created_at | timestamptz | | now() | |
 | updated_at | timestamptz | | now() | |
 
@@ -559,9 +560,11 @@ Fund share class master data.
 |--------|------|----------|---------|-------------|
 | id | uuid | NOT NULL | uuid_generate_v4() | Primary key |
 | cbu_id | uuid | NOT NULL | | FK to cbus (the fund) |
+| entity_id | uuid | YES | | FK to entities - legal entity that issues this share class |
 | name | varchar(255) | NOT NULL | | Share class name (e.g., "Class A EUR") |
 | isin | varchar(12) | | | ISIN code |
 | currency | char(3) | NOT NULL | 'EUR' | Share class currency |
+| class_category | varchar(20) | NO | 'FUND' | CORPORATE = company ownership, FUND = investment fund |
 | fund_type | varchar(50) | | | HEDGE_FUND, UCITS, AIFMD, PRIVATE_EQUITY, REIT |
 | fund_structure | varchar(50) | | | OPEN_ENDED, CLOSED_ENDED |
 | investor_eligibility | varchar(50) | | | RETAIL, PROFESSIONAL, QUALIFIED |

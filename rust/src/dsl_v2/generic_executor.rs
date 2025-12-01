@@ -1259,6 +1259,8 @@ impl GenericCrudExecutor {
             "document_catalog" => "document_id",
             "entity_proper_persons" => "proper_person_id",
             "entity_limited_companies" => "limited_company_id",
+            "entity_partnerships" => "partnership_id",
+            "entity_trusts" => "trust_id",
             _ => "id",
         }
     }
