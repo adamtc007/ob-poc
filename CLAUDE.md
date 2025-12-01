@@ -191,6 +191,7 @@ cargo build --features cli,database --bin dsl_cli --release
 | Command | Description |
 |---------|-------------|
 | `generate` | Generate DSL from natural language using Claude AI |
+| `custody` | Generate custody onboarding DSL (agentic workflow with pattern classification) |
 | `parse` | Parse DSL source into AST (no validation) |
 | `validate` | Validate DSL source (parse + CSG lint) |
 | `plan` | Compile DSL to execution plan (parse + lint + compile) |
@@ -582,6 +583,144 @@ For Claude Desktop integration:
 | `cbu_list` | List/search CBUs |
 | `verbs_list` | List available DSL verbs |
 | `schema_info` | Get entity types, roles, document types |
+
+## Agentic DSL Generation
+
+The `rust/src/agentic/` module provides AI-powered DSL generation from natural language, specifically optimized for custody onboarding scenarios.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     USER REQUEST                                 │
+│  "Onboard BlackRock for US and UK equities with IRS to Goldman" │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              PHASE 1: INTENT EXTRACTION (Claude API)            │
+│  Natural language → OnboardingIntent struct                     │
+│  rust/src/agentic/generator.rs (IntentExtractor)               │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              PHASE 2: PATTERN CLASSIFICATION (Deterministic)    │
+│  OnboardingIntent → OnboardingPattern                          │
+│  - SimpleEquity: Single market, single currency                │
+│  - MultiMarket: Multiple markets or cross-currency             │
+│  - WithOtc: OTC derivatives requiring ISDA/CSA                 │
+│  rust/src/agentic/patterns.rs                                  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              PHASE 3: REQUIREMENT PLANNING (Deterministic Rust) │
+│  Intent → OnboardingPlan with:                                  │
+│  - CBU details, entity lookups                                  │
+│  - Universe entries (market × instrument × currency)            │
+│  - SSI requirements                                             │
+│  - Booking rules with priorities and fallbacks                  │
+│  - ISDA/CSA requirements for OTC                               │
+│  rust/src/agentic/planner.rs (RequirementPlanner)              │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              PHASE 4: DSL GENERATION (Claude API)               │
+│  OnboardingPlan → DSL source code                               │
+│  Full verb schemas included in context                          │
+│  Pattern-specific few-shot examples                             │
+│  rust/src/agentic/generator.rs (DslGenerator)                  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              PHASE 5: VALIDATION + RETRY LOOP                   │
+│  Parse → CSG Lint → Compile                                     │
+│  If errors: feed back to Claude (max 3 retries)                │
+│  rust/src/agentic/validator.rs, feedback.rs                    │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              PHASE 6: EXECUTION (Optional)                      │
+│  Execute validated DSL against database                         │
+│  Return created entity UUIDs                                    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Module Structure
+
+```
+rust/src/agentic/
+├── mod.rs              # Module exports
+├── intent.rs           # OnboardingIntent, ClientIntent, MarketIntent, etc.
+├── patterns.rs         # OnboardingPattern enum (SimpleEquity, MultiMarket, WithOtc)
+├── planner.rs          # RequirementPlanner - deterministic business logic
+├── generator.rs        # IntentExtractor & DslGenerator (Claude API)
+├── validator.rs        # AgentValidator - wraps existing parser/linter
+├── feedback.rs         # FeedbackLoop - retry logic
+├── orchestrator.rs     # AgentOrchestrator - coordinates full pipeline
+├── prompts/
+│   └── intent_extraction_system.md   # Claude prompt for intent extraction
+├── schemas/
+│   ├── custody_verbs.md              # Verb reference for DSL generation
+│   └── reference_data.md             # Markets, BICs, currencies
+└── examples/
+    ├── simple_equity.dsl             # Single market example
+    ├── multi_market.dsl              # Multi-market with cross-currency
+    └── with_otc.dsl                  # OTC with ISDA/CSA
+```
+
+### CLI Usage (custody command)
+
+```bash
+# Generate custody DSL from natural language
+dsl_cli custody -i "Set up Apex Capital for US equity trading"
+
+# Show plan without generating DSL
+dsl_cli custody -i "Onboard fund for US, UK, Germany equities" --plan-only
+
+# Generate and execute against database
+dsl_cli custody -i "Onboard TestFund for US equities" --execute
+
+# Save to file
+dsl_cli custody -i "..." -o output.dsl
+
+# JSON output for scripting
+dsl_cli custody -i "..." --format json
+```
+
+### Pattern Examples
+
+**SimpleEquity** - Single market, single currency:
+```
+"Set up Apex Capital for US equity trading"
+→ 1 universe entry, 1 SSI, 3 booking rules
+```
+
+**MultiMarket** - Multiple markets or cross-currency:
+```
+"Onboard Global Fund for UK and Germany equities with USD cross-currency"
+→ 2 universe entries, 4 SSIs, 8 booking rules
+```
+
+**WithOtc** - OTC derivatives with ISDA/CSA:
+```
+"Onboard Pacific Fund for US equities plus IRS exposure to Morgan Stanley under NY law ISDA with VM"
+→ Entity lookup, universe, SSIs, booking rules, ISDA, coverage, CSA
+```
+
+### Key Design Decisions
+
+**No Vector DB**: Direct schema inclusion in prompts. The bounded domain (~30 verbs) fits easily in context - no probabilistic retrieval needed.
+
+**Deterministic Planning**: Business logic for deriving SSIs and booking rules is pure Rust code, not AI. Only intent extraction and DSL generation use Claude.
+
+**Pattern-Based Generation**: Classification enables pattern-specific few-shot examples and complexity scaling.
+
+**Retry Loop**: Validation failures feed back to Claude with error messages for self-correction (max 3 attempts).
 
 ## Environment Variables
 
