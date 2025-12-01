@@ -215,7 +215,7 @@ fn test_load_verbs_yaml() {
             println!("Loaded {} plugins", config.plugins.len());
         }
         Err(e) => {
-            panic!("Failed to load verbs.yaml: {}", e);
+            panic!("Failed to load verbs.yaml: {:?}", e);
         }
     }
 }

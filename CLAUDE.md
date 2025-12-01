@@ -322,6 +322,7 @@ dsl_cli examples
 dsl_cli examples onboarding
 dsl_cli examples documents
 dsl_cli examples entities
+dsl_cli examples custody
 ```
 
 ### Full Pipeline Example
@@ -412,13 +413,156 @@ dsl_cli execute -f program.dsl --format json | jq '.bindings'
 | ubo | Calculate, validate ownership |
 | service-resource | Service resource type CRUD + instance provision, set-attr, activate, suspend, decommission |
 | delivery | Service delivery record, complete, fail |
+| cbu-custody | Custody & settlement: universe, SSI, booking rules |
+
+## Custody & Settlement DSL
+
+The `cbu-custody` domain implements a three-layer model for settlement instruction routing, aligned with SWIFT/ISO standards and ALERT-style booking logic.
+
+### Three-Layer Model
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 1: UNIVERSE                                              │
+│  What does the CBU trade?                                       │
+│  - Instrument classes (EQUITY, GOVT_BOND, CORP_BOND, ETF)       │
+│  - Markets (XNYS, XLON, XFRA, etc.)                            │
+│  - Currencies, settlement types                                 │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 2: SSI DATA                                              │
+│  Pure account information (no routing logic)                    │
+│  - Safekeeping account + BIC                                    │
+│  - Cash account + BIC + currency                                │
+│  - PSET BIC (place of settlement)                              │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 3: BOOKING RULES                                         │
+│  ALERT-style routing: trade characteristics → SSI              │
+│  - Priority-based matching (lower = more specific)              │
+│  - Wildcard support (NULL = match any)                          │
+│  - Specificity scoring for tie-breaking                         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Custody Verbs
+
+| Verb | Type | Description |
+|------|------|-------------|
+| `cbu-custody.add-universe` | CRUD | Define tradeable instrument/market combination |
+| `cbu-custody.list-universe` | CRUD | List CBU's trading universe |
+| `cbu-custody.create-ssi` | CRUD | Create Standing Settlement Instruction |
+| `cbu-custody.activate-ssi` | CRUD | Set SSI status to ACTIVE |
+| `cbu-custody.suspend-ssi` | CRUD | Set SSI status to SUSPENDED |
+| `cbu-custody.list-ssis` | CRUD | List CBU's SSIs |
+| `cbu-custody.add-booking-rule` | CRUD | Add ALERT-style routing rule |
+| `cbu-custody.list-booking-rules` | CRUD | List CBU's booking rules |
+| `cbu-custody.update-rule-priority` | CRUD | Change rule priority |
+| `cbu-custody.deactivate-rule` | CRUD | Deactivate a booking rule |
+| `cbu-custody.validate-booking-coverage` | Plugin | Validate rules cover universe |
+| `cbu-custody.derive-required-coverage` | Plugin | Calculate required coverage |
+| `cbu-custody.lookup-ssi` | Plugin | Find SSI for trade characteristics |
+
+### Example: Full Custody Setup
+
+```clojure
+;; Create CBU
+(cbu.ensure :name "Pension Fund" :jurisdiction "US" :client-type "FUND" :as @fund)
+
+;; Layer 1: Define trading universe
+(cbu-custody.add-universe
+  :cbu-id @fund
+  :instrument-class "EQUITY"
+  :market "XNYS"
+  :currencies ["USD"]
+  :settlement-types ["DVP"])
+
+(cbu-custody.add-universe
+  :cbu-id @fund
+  :instrument-class "EQUITY"
+  :market "XLON"
+  :currencies ["GBP" "USD"]
+  :settlement-types ["DVP"])
+
+;; Layer 2: Create SSIs
+(cbu-custody.create-ssi
+  :cbu-id @fund
+  :name "US Safekeeping"
+  :type "SECURITIES"
+  :safekeeping-account "SAFE-001"
+  :safekeeping-bic "BABOROCP"
+  :cash-account "CASH-001"
+  :cash-bic "BABOROCP"
+  :cash-currency "USD"
+  :pset-bic "DTCYUS33"
+  :effective-date "2024-12-01"
+  :as @ssi-us)
+
+(cbu-custody.activate-ssi :ssi-id @ssi-us)
+
+;; Layer 3: Booking rules
+(cbu-custody.add-booking-rule
+  :cbu-id @fund
+  :ssi-id @ssi-us
+  :name "US Equity DVP"
+  :priority 10
+  :instrument-class "EQUITY"
+  :market "XNYS"
+  :currency "USD"
+  :settlement-type "DVP")
+
+;; Fallback rule (lower specificity)
+(cbu-custody.add-booking-rule
+  :cbu-id @fund
+  :ssi-id @ssi-us
+  :name "USD Fallback"
+  :priority 50
+  :currency "USD")
+
+;; Validate coverage
+(cbu-custody.validate-booking-coverage :cbu-id @fund)
+
+;; Lookup SSI for a trade
+(cbu-custody.lookup-ssi
+  :cbu-id @fund
+  :instrument-class "EQUITY"
+  :market "XNYS"
+  :currency "USD"
+  :settlement-type "DVP")
+```
+
+### Reference Data
+
+**Instrument Classes** (CFI-based):
+- `EQUITY` - Common/preferred stock
+- `GOVT_BOND` - Government debt
+- `CORP_BOND` - Corporate debt
+- `ETF` - Exchange-traded funds
+- `FUND` - Mutual funds
+
+**Markets** (ISO 10383 MIC):
+- `XNYS` - NYSE
+- `XNAS` - NASDAQ
+- `XLON` - London
+- `XPAR` - Euronext Paris
+- `XFRA` - Frankfurt
+
+**Settlement Types**:
+- `DVP` - Delivery vs Payment
+- `FOP` - Free of Payment
+- `RVP` - Receive vs Payment
 
 ## Database
 
 **Database**: `data_designer` on PostgreSQL 17
 
-Two schemas:
+Three schemas:
 - **ob-poc**: KYC/AML domain (103 tables)
+- **custody**: Settlement & custody (18 tables)
 - **public**: Runtime API endpoints
 
 See `docs/DATABASE_SCHEMA.md` for complete schema. Rebuild with:

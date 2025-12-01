@@ -130,9 +130,15 @@ impl DslExecutor {
             .ok_or_else(|| anyhow!("Unknown verb: {}.{}", vc.domain, vc.verb))?;
 
         // Check if this is a plugin (custom operation)
+        eprintln!(
+            "DEBUG executor: {}.{} behavior={:?}",
+            vc.domain, vc.verb, runtime_verb.behavior
+        );
         if let RuntimeBehavior::Plugin(_handler) = &runtime_verb.behavior {
+            eprintln!("DEBUG executor: routing to plugin");
             // Dispatch to custom operations handler
             if let Some(op) = self.custom_ops.get(&vc.domain, &vc.verb) {
+                eprintln!("DEBUG executor: found handler, calling execute");
                 return op.execute(vc, ctx, &self.pool).await;
             }
             return Err(anyhow!(
@@ -141,6 +147,7 @@ impl DslExecutor {
                 vc.verb
             ));
         }
+        eprintln!("DEBUG executor: routing to generic executor");
 
         // Convert VerbCall arguments to JSON for generic executor
         let json_args = Self::verbcall_args_to_json(&vc.arguments, ctx)?;

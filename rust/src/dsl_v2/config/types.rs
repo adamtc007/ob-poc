@@ -49,6 +49,9 @@ pub struct VerbConfig {
     pub behavior: VerbBehavior,
     #[serde(default)]
     pub crud: Option<CrudConfig>,
+    #[serde(default)]
+    pub handler: Option<String>,
+    #[serde(default)]
     pub args: Vec<ArgConfig>,
     #[serde(default)]
     pub returns: Option<ReturnsConfig>,
@@ -103,6 +106,12 @@ pub struct CrudConfig {
     pub extension_table_column: Option<String>,
     #[serde(default)]
     pub type_id_column: Option<String>,
+    // For list operations
+    #[serde(default)]
+    pub order_by: Option<String>,
+    // For update operations with fixed values
+    #[serde(default)]
+    pub set_values: Option<std::collections::HashMap<String, serde_yaml::Value>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -158,6 +167,8 @@ pub enum ArgType {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LookupConfig {
     pub table: String,
+    #[serde(default)]
+    pub schema: Option<String>,
     pub code_column: String,
     pub id_column: String,
 }

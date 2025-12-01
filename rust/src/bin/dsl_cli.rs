@@ -511,12 +511,64 @@ fn cmd_demo(scenario: &str, format: OutputFormat, quiet: bool) -> Result<(), Str
 "#,
             true,
         ),
+        "custody-setup" | "custody" => (
+            "Custody Settlement Setup",
+            r#"
+;; Set up custody for a fund: trading universe, SSI, and booking rules
+
+(cbu.ensure
+    :name "Demo Pension Fund"
+    :jurisdiction "US"
+    :client-type "FUND"
+    :as @fund)
+
+;; Layer 1: What they trade (Universe)
+(cbu-custody.add-universe
+    :cbu-id @fund
+    :instrument-class "EQUITY"
+    :market "XNYS"
+    :currencies ["USD"]
+    :settlement-types ["DVP"])
+
+;; Layer 2: SSI Data (account info)
+(cbu-custody.create-ssi
+    :cbu-id @fund
+    :name "US Primary Safekeeping"
+    :type "SECURITIES"
+    :safekeeping-account "DEMO-SAFE-001"
+    :safekeeping-bic "BABOROCP"
+    :cash-account "DEMO-USD-001"
+    :cash-bic "BABOROCP"
+    :cash-currency "USD"
+    :pset-bic "DTCYUS33"
+    :effective-date "2024-12-01"
+    :as @ssi)
+
+(cbu-custody.activate-ssi :ssi-id @ssi)
+
+;; Layer 3: Booking Rules (routing)
+(cbu-custody.add-booking-rule
+    :cbu-id @fund
+    :ssi-id @ssi
+    :name "US Equity DVP"
+    :priority 10
+    :instrument-class "EQUITY"
+    :market "XNYS"
+    :currency "USD"
+    :settlement-type "DVP")
+
+;; Validate coverage
+(cbu-custody.validate-booking-coverage :cbu-id @fund)
+"#,
+            false,
+        ),
         _ => {
             return Err(format!(
                 "Unknown scenario: '{}'\n\nAvailable scenarios:\n  \
                 onboard-individual  - Individual client with passport\n  \
                 onboard-corporate   - Corporate client with UBO structure\n  \
                 add-document        - Add document to existing entity\n  \
+                custody-setup       - Custody settlement with universe, SSI, booking rules\n  \
                 invalid             - Invalid DSL (passport for company)",
                 scenario
             ));
@@ -734,6 +786,37 @@ fn cmd_examples(category: &str, format: OutputFormat) -> Result<(), String> {
             "Create Partnership",
             "(entity.create-partnership :cbu-id @cbu :name \"Smith & Co\" :as @partnership)",
         ),
+        // Custody examples
+        (
+            "custody",
+            "Add Trading Universe",
+            "(cbu-custody.add-universe :cbu-id @cbu :instrument-class \"EQUITY\" :market \"XNYS\" :currencies [\"USD\"] :settlement-types [\"DVP\"])",
+        ),
+        (
+            "custody",
+            "Create SSI",
+            "(cbu-custody.create-ssi :cbu-id @cbu :name \"US Safekeeping\" :type \"SECURITIES\" :safekeeping-account \"SAFE-001\" :safekeeping-bic \"BABOROCP\" :cash-account \"CASH-001\" :cash-bic \"BABOROCP\" :cash-currency \"USD\" :pset-bic \"DTCYUS33\" :effective-date \"2024-12-01\" :as @ssi)",
+        ),
+        (
+            "custody",
+            "Activate SSI",
+            "(cbu-custody.activate-ssi :ssi-id @ssi)",
+        ),
+        (
+            "custody",
+            "Add Booking Rule",
+            "(cbu-custody.add-booking-rule :cbu-id @cbu :ssi-id @ssi :name \"US Equity DVP\" :priority 10 :instrument-class \"EQUITY\" :market \"XNYS\" :currency \"USD\" :settlement-type \"DVP\")",
+        ),
+        (
+            "custody",
+            "Validate Booking Coverage",
+            "(cbu-custody.validate-booking-coverage :cbu-id @cbu)",
+        ),
+        (
+            "custody",
+            "Lookup SSI for Trade",
+            "(cbu-custody.lookup-ssi :cbu-id @cbu :instrument-class \"EQUITY\" :market \"XNYS\" :currency \"USD\" :settlement-type \"DVP\")",
+        ),
     ];
 
     let filtered: Vec<_> = if category == "all" {
@@ -747,7 +830,7 @@ fn cmd_examples(category: &str, format: OutputFormat) -> Result<(), String> {
 
     if filtered.is_empty() {
         return Err(format!(
-            "Unknown category: '{}'\n\nAvailable: onboarding, documents, entities, all",
+            "Unknown category: '{}'\n\nAvailable: onboarding, documents, entities, custody, all",
             category
         ));
     }
@@ -1639,6 +1722,81 @@ Dynamic verbs for entity creation based on type:
 (document.catalog :cbu-id @cbu :entity-id @john :document-type "PASSPORT")
 (screening.pep :entity-id @john)
 (screening.sanctions :entity-id @company)
+```
+
+## CUSTODY & SETTLEMENT DSL
+
+The custody domain supports a three-layer model for settlement instruction routing:
+- **Layer 1 (Universe)**: What instruments a CBU trades (markets, asset classes)
+- **Layer 2 (SSI Data)**: Account information for securities and cash
+- **Layer 3 (Booking Rules)**: ALERT-style routing rules to match trades to SSIs
+
+### Custody Verbs
+
+| Verb | Description |
+|------|-------------|
+| `cbu-custody.add-universe` | Define what a CBU trades (instrument class, market, currencies) |
+| `cbu-custody.create-ssi` | Create a Standing Settlement Instruction (account info) |
+| `cbu-custody.activate-ssi` | Activate an SSI |
+| `cbu-custody.suspend-ssi` | Suspend an SSI |
+| `cbu-custody.add-booking-rule` | Add ALERT-style booking rule for trade routing |
+| `cbu-custody.validate-booking-coverage` | Validate booking rules cover trading universe |
+| `cbu-custody.lookup-ssi` | Find SSI for trade characteristics |
+| `cbu-custody.derive-required-coverage` | Derive required coverage from universe |
+
+### Instrument Classes (CFI-based)
+- `EQUITY` - Common stock, preferred stock
+- `GOVT_BOND` - Government debt
+- `CORP_BOND` - Corporate debt
+- `ETF` - Exchange-traded funds
+- `FUND` - Mutual funds
+
+### Major Markets (MIC codes)
+- `XNYS` - NYSE
+- `XNAS` - NASDAQ
+- `XLON` - London Stock Exchange
+- `XPAR` - Euronext Paris
+- `XFRA` - Frankfurt Stock Exchange
+
+### Currencies (ISO 4217)
+- `USD`, `EUR`, `GBP`, `CHF`, `JPY`
+
+### Settlement Types
+- `DVP` - Delivery vs Payment
+- `FOP` - Free of Payment
+- `RVP` - Receive vs Payment
+
+### CUSTODY EXAMPLES
+
+**Basic Custody Setup:**
+```
+(cbu.ensure :name "Pension Fund" :jurisdiction "US" :client-type "fund" :as @fund)
+
+;; Layer 1: What they trade
+(cbu-custody.add-universe :cbu-id @fund :instrument-class "EQUITY" :market "XNYS" :currencies ["USD"] :settlement-types ["DVP"])
+
+;; Layer 2: Account info (SSI)
+(cbu-custody.create-ssi :cbu-id @fund :name "US Safekeeping" :type "SECURITIES" :safekeeping-account "SAFE-001" :safekeeping-bic "BABOROCP" :cash-account "CASH-001" :cash-bic "BABOROCP" :cash-currency "USD" :pset-bic "DTCYUS33" :effective-date "2024-12-01" :as @ssi)
+(cbu-custody.activate-ssi :ssi-id @ssi)
+
+;; Layer 3: Booking rules
+(cbu-custody.add-booking-rule :cbu-id @fund :ssi-id @ssi :name "US Equity DVP" :priority 10 :instrument-class "EQUITY" :market "XNYS" :currency "USD" :settlement-type "DVP")
+
+;; Validate
+(cbu-custody.validate-booking-coverage :cbu-id @fund)
+```
+
+**Multi-Market Setup:**
+```
+;; US Equities
+(cbu-custody.add-universe :cbu-id @fund :instrument-class "EQUITY" :market "XNYS" :currencies ["USD"] :settlement-types ["DVP"])
+;; UK Equities with dual currency
+(cbu-custody.add-universe :cbu-id @fund :instrument-class "EQUITY" :market "XLON" :currencies ["GBP" "USD"] :settlement-types ["DVP"])
+```
+
+**Lookup SSI for Trade:**
+```
+(cbu-custody.lookup-ssi :cbu-id @fund :instrument-class "EQUITY" :market "XNYS" :currency "USD" :settlement-type "DVP")
 ```
 
 Respond with ONLY the DSL code, no explanations or markdown. If you cannot generate valid DSL, respond with: ERROR: <reason>"#,

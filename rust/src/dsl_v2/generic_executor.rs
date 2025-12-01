@@ -183,7 +183,18 @@ impl GenericCrudExecutor {
                     }
                     columns.push(format!("\"{}\"", col));
                     placeholders.push(format!("${}", idx));
-                    bind_values.push(self.json_to_sql_value(value, arg_def)?);
+
+                    // Handle lookup args specially - resolve code to UUID
+                    if arg_def.arg_type == ArgType::Lookup && arg_def.lookup.is_some() {
+                        let code = value.as_str().ok_or_else(|| {
+                            anyhow!("Expected string for lookup {}", arg_def.name)
+                        })?;
+                        let uuid = self.resolve_lookup(arg_def, code).await?;
+                        bind_values.push(SqlValue::Uuid(uuid));
+                    } else {
+                        bind_values.push(self.json_to_sql_value(value, arg_def)?);
+                    }
+
                     insert_cols.push(col.clone());
                     idx += 1;
                 }
@@ -312,7 +323,7 @@ impl GenericCrudExecutor {
         let offset_clause = offset.map(|o| format!(" OFFSET {}", o)).unwrap_or_default();
 
         let sql = format!(
-            r#"SELECT * FROM "{}"."{}"{}{}{}""#,
+            "SELECT * FROM \"{}\".\"{}\"{}{}{}",
             crud.schema, crud.table, where_clause, limit_clause, offset_clause
         );
 
@@ -361,10 +372,28 @@ impl GenericCrudExecutor {
             if let Some(value) = args.get(&arg_def.name) {
                 if let Some(col) = &arg_def.maps_to {
                     if col == key_col {
-                        key_value = Some(self.json_to_sql_value(value, arg_def)?);
+                        // Handle lookup args specially - resolve code to UUID
+                        if arg_def.arg_type == ArgType::Lookup && arg_def.lookup.is_some() {
+                            let code = value.as_str().ok_or_else(|| {
+                                anyhow!("Expected string for lookup {}", arg_def.name)
+                            })?;
+                            let uuid = self.resolve_lookup(arg_def, code).await?;
+                            key_value = Some(SqlValue::Uuid(uuid));
+                        } else {
+                            key_value = Some(self.json_to_sql_value(value, arg_def)?);
+                        }
                     } else {
                         sets.push(format!("\"{}\" = ${}", col, idx));
-                        bind_values.push(self.json_to_sql_value(value, arg_def)?);
+                        // Handle lookup args specially - resolve code to UUID
+                        if arg_def.arg_type == ArgType::Lookup && arg_def.lookup.is_some() {
+                            let code = value.as_str().ok_or_else(|| {
+                                anyhow!("Expected string for lookup {}", arg_def.name)
+                            })?;
+                            let uuid = self.resolve_lookup(arg_def, code).await?;
+                            bind_values.push(SqlValue::Uuid(uuid));
+                        } else {
+                            bind_values.push(self.json_to_sql_value(value, arg_def)?);
+                        }
                         idx += 1;
                     }
                 }
@@ -372,6 +401,25 @@ impl GenericCrudExecutor {
         }
 
         let key_val = key_value.ok_or_else(|| anyhow!("Missing key argument for update"))?;
+
+        // Add set_values from config (for status transitions etc.)
+        if let Some(set_values) = &crud.set_values {
+            for (col, value) in set_values {
+                if let Some(s) = value.as_str() {
+                    sets.push(format!("\"{}\" = ${}", col, idx));
+                    bind_values.push(SqlValue::String(s.to_string()));
+                    idx += 1;
+                } else if let Some(b) = value.as_bool() {
+                    sets.push(format!("\"{}\" = ${}", col, idx));
+                    bind_values.push(SqlValue::Boolean(b));
+                    idx += 1;
+                } else if let Some(n) = value.as_i64() {
+                    sets.push(format!("\"{}\" = ${}", col, idx));
+                    bind_values.push(SqlValue::Integer(n));
+                    idx += 1;
+                }
+            }
+        }
 
         if sets.is_empty() {
             bail!("No columns to update for {}.{}", verb.domain, verb.verb);
@@ -479,7 +527,17 @@ impl GenericCrudExecutor {
                         updates.push(format!("\"{}\" = EXCLUDED.\"{}\"", col, col));
                     }
 
-                    bind_values.push(self.json_to_sql_value(value, arg_def)?);
+                    // Handle lookup args specially - resolve code to UUID
+                    if arg_def.arg_type == ArgType::Lookup && arg_def.lookup.is_some() {
+                        let code = value.as_str().ok_or_else(|| {
+                            anyhow!("Expected string for lookup {}", arg_def.name)
+                        })?;
+                        let uuid = self.resolve_lookup(arg_def, code).await?;
+                        bind_values.push(SqlValue::Uuid(uuid));
+                    } else {
+                        bind_values.push(self.json_to_sql_value(value, arg_def)?);
+                    }
+
                     idx += 1;
                 }
             }
@@ -1310,6 +1368,42 @@ impl GenericCrudExecutor {
         }
         let result = query.execute(&self.pool).await?;
         Ok(result.rows_affected())
+    }
+
+    /// Resolve a lookup argument by querying the lookup table
+    /// Returns the UUID (id_column) for the given code (code_column)
+    async fn resolve_lookup(&self, arg: &RuntimeArg, code_value: &str) -> Result<Uuid> {
+        let lookup = arg
+            .lookup
+            .as_ref()
+            .ok_or_else(|| anyhow!("Lookup arg {} missing lookup config", arg.name))?;
+
+        let schema = lookup.schema.as_deref().unwrap_or("public");
+
+        let sql = format!(
+            r#"SELECT "{}" FROM "{}"."{}" WHERE "{}" = $1"#,
+            lookup.id_column, schema, lookup.table, lookup.code_column
+        );
+
+        debug!("LOOKUP SQL: {} with code={}", sql, code_value);
+
+        let row = sqlx::query(&sql)
+            .bind(code_value)
+            .fetch_optional(&self.pool)
+            .await?
+            .ok_or_else(|| {
+                anyhow!(
+                    "Lookup failed: no {} with {} = '{}' in {}.{}",
+                    lookup.table,
+                    lookup.code_column,
+                    code_value,
+                    schema,
+                    lookup.table
+                )
+            })?;
+
+        let uuid: Uuid = row.try_get(&*lookup.id_column)?;
+        Ok(uuid)
     }
 
     /// Bind a SqlValue to a query

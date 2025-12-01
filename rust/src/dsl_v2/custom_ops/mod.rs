@@ -18,6 +18,8 @@
 //! 3. Keep operations focused and single-purpose
 //! 4. Ensure operations are testable in isolation
 
+mod custody;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -25,6 +27,10 @@ use std::sync::Arc;
 
 use super::ast::VerbCall;
 use super::executor::{ExecutionContext, ExecutionResult};
+
+pub use custody::{
+    DeriveRequiredCoverageOp, LookupSsiForTradeOp, SubcustodianLookupOp, ValidateBookingCoverageOp,
+};
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
@@ -89,6 +95,12 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(DeliveryRecordOp));
         registry.register(Arc::new(DeliveryCompleteOp));
         registry.register(Arc::new(DeliveryFailOp));
+
+        // Custody operations
+        registry.register(Arc::new(SubcustodianLookupOp));
+        registry.register(Arc::new(LookupSsiForTradeOp));
+        registry.register(Arc::new(ValidateBookingCoverageOp));
+        registry.register(Arc::new(DeriveRequiredCoverageOp));
 
         registry
     }
@@ -1694,16 +1706,21 @@ mod tests {
         assert!(registry.has("service-resource", "activate"));
         assert!(registry.has("service-resource", "suspend"));
         assert!(registry.has("service-resource", "decommission"));
-        // New delivery operations
+        // Delivery operations
         assert!(registry.has("delivery", "record"));
         assert!(registry.has("delivery", "complete"));
         assert!(registry.has("delivery", "fail"));
+        // Custody operations
+        assert!(registry.has("subcustodian", "lookup"));
+        assert!(registry.has("cbu-custody", "lookup-ssi"));
+        assert!(registry.has("cbu-custody", "validate-booking-coverage"));
+        assert!(registry.has("cbu-custody", "derive-required-coverage"));
     }
 
     #[test]
     fn test_registry_list() {
         let registry = CustomOperationRegistry::new();
         let ops = registry.list();
-        assert_eq!(ops.len(), 14); // 6 original + 5 resource + 3 delivery
+        assert_eq!(ops.len(), 18); // 6 original + 5 resource + 3 delivery + 4 custody
     }
 }

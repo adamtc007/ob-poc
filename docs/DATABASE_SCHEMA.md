@@ -1,7 +1,7 @@
 # Database Schema Reference
 
 **Database**: `data_designer` on PostgreSQL 17  
-**Schema**: `ob-poc` (103 tables)  
+**Schemas**: `ob-poc` (103 tables), `custody` (18 tables)  
 **Generated**: 2025-12-01
 
 ## Core Tables
@@ -363,6 +363,143 @@ Tracks service delivery to CBUs.
 | created_at | timestamptz | | now() | |
 | updated_at | timestamptz | | now() | |
 
+## Custody Schema (`custody`)
+
+The custody schema implements a three-layer model for settlement instruction routing.
+
+### Layer 1: Universe Tables
+
+#### cbu_instrument_universe
+
+Defines what instruments a CBU trades.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| universe_id | uuid | NOT NULL | gen_random_uuid() | Primary key |
+| cbu_id | uuid | NOT NULL | | FK to cbus |
+| instrument_class_id | uuid | NOT NULL | | FK to instrument_classes |
+| market_id | uuid | | | FK to markets |
+| currencies | varchar(3)[] | NOT NULL | '{}' | Supported currencies |
+| settlement_types | varchar(10)[] | | '{DVP}' | DVP, FOP, RVP |
+| counterparty_entity_id | uuid | | | For OTC counterparty-specific |
+| is_held | boolean | | true | Holds positions |
+| is_traded | boolean | | true | Actively trades |
+| is_active | boolean | | true | Active record |
+| effective_date | date | NOT NULL | CURRENT_DATE | |
+
+### Layer 2: SSI Tables
+
+#### cbu_ssi (Standing Settlement Instructions)
+
+Account information for settlement.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| ssi_id | uuid | NOT NULL | gen_random_uuid() | Primary key |
+| cbu_id | uuid | NOT NULL | | FK to cbus |
+| ssi_name | varchar(100) | NOT NULL | | Display name |
+| ssi_type | varchar(20) | NOT NULL | | SECURITIES, CASH, COLLATERAL |
+| safekeeping_account | varchar(35) | | | Securities account |
+| safekeeping_bic | varchar(11) | | | Custodian BIC |
+| safekeeping_account_name | varchar(100) | | | Account name |
+| cash_account | varchar(35) | | | Cash account |
+| cash_account_bic | varchar(11) | | | Cash agent BIC |
+| cash_currency | varchar(3) | | | Settlement currency |
+| pset_bic | varchar(11) | | | Place of settlement BIC |
+| status | varchar(20) | | 'PENDING' | PENDING, ACTIVE, SUSPENDED |
+| effective_date | date | NOT NULL | | Start date |
+| expiry_date | date | | | End date |
+| source | varchar(20) | | 'MANUAL' | MANUAL, SWIFT, DTCC |
+
+### Layer 3: Booking Rules
+
+#### ssi_booking_rules
+
+ALERT-style routing rules matching trade characteristics to SSIs.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| rule_id | uuid | NOT NULL | gen_random_uuid() | Primary key |
+| cbu_id | uuid | NOT NULL | | FK to cbus |
+| ssi_id | uuid | NOT NULL | | FK to cbu_ssi |
+| rule_name | varchar(100) | NOT NULL | | Display name |
+| priority | integer | NOT NULL | 50 | Lower = higher priority |
+| instrument_class_id | uuid | | | NULL = any |
+| security_type_id | uuid | | | NULL = any |
+| market_id | uuid | | | NULL = any |
+| currency | varchar(3) | | | NULL = any |
+| settlement_type | varchar(10) | | | NULL = any |
+| counterparty_entity_id | uuid | | | For OTC |
+| specificity_score | integer | | | Generated: counts non-NULL criteria |
+| is_active | boolean | | true | |
+| effective_date | date | NOT NULL | CURRENT_DATE | |
+
+### Reference Tables
+
+#### instrument_classes
+
+CFI-based instrument classification.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| class_id | uuid | Primary key |
+| class_code | varchar(20) | EQUITY, GOVT_BOND, CORP_BOND, ETF |
+| cfi_prefix | varchar(6) | CFI code prefix |
+| description | text | |
+| smpg_category | varchar(50) | SMPG/ALERT category |
+
+#### markets
+
+ISO 10383 MIC codes.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| market_id | uuid | Primary key |
+| mic | varchar(4) | XNYS, XLON, XNAS |
+| market_name | varchar(100) | |
+| country_code | varchar(2) | |
+| currency | varchar(3) | Primary currency |
+| csd_bic | varchar(11) | CSD BIC |
+
+#### security_types
+
+SMPG/ALERT security type taxonomy.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| security_type_id | uuid | Primary key |
+| type_code | varchar(30) | |
+| instrument_class_id | uuid | FK to instrument_classes |
+| description | text | |
+| smpg_code | varchar(10) | |
+
+#### currencies
+
+ISO 4217 currency codes.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| currency_code | varchar(3) | Primary key (USD, EUR, GBP) |
+| currency_name | varchar(50) | |
+| decimals | integer | Decimal places |
+| is_active | boolean | |
+
+### Supporting Tables
+
+| Table | Purpose |
+|-------|---------|
+| cbu_ssi_agent_override | Override receiving/delivering agents |
+| entity_settlement_identity | BIC/LEI for entity settlement |
+| entity_ssi | Entity-level SSIs (vs CBU-level) |
+| subcustodian_network | Subcustodian relationships |
+| instruction_types | Settlement instruction types |
+| instruction_paths | Settlement message routing |
+| isda_agreements | ISDA master agreements |
+| isda_product_coverage | Products under ISDA |
+| isda_product_taxonomy | OTC product classification |
+| csa_agreements | Credit support annexes |
+| cfi_codes | Full CFI code reference |
+
 ## Table Count by Category
 
 | Category | Tables | Examples |
@@ -376,7 +513,9 @@ Tracks service delivery to CBUs.
 | DSL/Execution | 8 | dsl_instances, dsl_execution_log, verb_registry |
 | Monitoring | 6 | monitoring_setup, monitoring_events, monitoring_cases |
 | Other | 56 | Various support tables |
-| **Total** | **103** | |
+| **ob-poc Total** | **103** | |
+| **Custody** | **18** | cbu_instrument_universe, cbu_ssi, ssi_booking_rules, instrument_classes, markets, security_types, currencies |
+| **Grand Total** | **121** | |
 
 ## Rebuilding the Schema
 

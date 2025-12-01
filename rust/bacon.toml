@@ -8,12 +8,36 @@ need_stdout = false
 command = ["cargo", "check", "--all-targets", "--features", "database", "--color", "always"]
 need_stdout = false
 
+[jobs.check-server]
+command = ["cargo", "check", "--features", "server", "--color", "always"]
+need_stdout = false
+
+[jobs.check-mcp]
+command = ["cargo", "check", "--features", "mcp", "--color", "always"]
+need_stdout = false
+
+[jobs.check-cli]
+command = ["cargo", "check", "--features", "cli,database", "--color", "always"]
+need_stdout = false
+
 [jobs.clippy]
 command = ["cargo", "clippy", "--features", "database", "--color", "always"]
 need_stdout = false
 
 [jobs.clippy-all]
 command = ["cargo", "clippy", "--all-targets", "--features", "database", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-server]
+command = ["cargo", "clippy", "--features", "server", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-mcp]
+command = ["cargo", "clippy", "--features", "mcp", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-cli]
+command = ["cargo", "clippy", "--features", "cli,database", "--color", "always"]
 need_stdout = false
 
 [jobs.test]
@@ -35,6 +59,8 @@ c = "job:check"
 l = "job:clippy"
 t = "job:test"
 a = "job:check-all"
+s = "job:clippy-server"
+m = "job:clippy-mcp"
 
 [settings]
 on_change_strategy = "restart"

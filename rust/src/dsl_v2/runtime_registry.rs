@@ -60,6 +60,10 @@ pub struct RuntimeCrudConfig {
     pub join_col: Option<String>,
     // Entity create config
     pub base_table: Option<String>,
+    // List operations
+    pub order_by: Option<String>,
+    // Update with fixed values
+    pub set_values: Option<std::collections::HashMap<String, serde_yaml::Value>>,
     pub extension_table_column: Option<String>,
     pub type_id_column: Option<String>,
 }
@@ -221,6 +225,8 @@ impl RuntimeVerbRegistry {
                     role_table: None,
                     role_col: None,
                     fk_col: None,
+                    order_by: None,
+                    set_values: None,
                     filter_col: None,
                     primary_table: None,
                     join_table: None,
@@ -260,8 +266,8 @@ impl RuntimeVerbRegistry {
     }
 
     fn build_verb(domain: &str, verb: &str, config: &VerbConfig) -> RuntimeVerb {
-        let behavior = match (&config.behavior, &config.crud) {
-            (VerbBehavior::Crud, Some(crud)) => {
+        let behavior = match (&config.behavior, &config.crud, &config.handler) {
+            (VerbBehavior::Crud, Some(crud), _) => {
                 RuntimeBehavior::Crud(Box::new(RuntimeCrudConfig {
                     operation: crud.operation,
                     table: crud.table.clone().unwrap_or_default(),
@@ -280,31 +286,49 @@ impl RuntimeVerbRegistry {
                     join_table: crud.join_table.clone(),
                     join_col: crud.join_col.clone(),
                     base_table: crud.base_table.clone(),
+                    order_by: crud.order_by.clone(),
+                    set_values: crud.set_values.clone(),
                     extension_table_column: crud.extension_table_column.clone(),
                     type_id_column: crud.type_id_column.clone(),
                 }))
             }
-            _ => RuntimeBehavior::Crud(Box::new(RuntimeCrudConfig {
-                operation: CrudOperation::Select,
-                table: String::new(),
-                schema: "ob-poc".to_string(),
-                key: None,
-                returning: None,
-                conflict_keys: vec![],
-                junction: None,
-                from_col: None,
-                to_col: None,
-                role_table: None,
-                role_col: None,
-                fk_col: None,
-                filter_col: None,
-                primary_table: None,
-                join_table: None,
-                join_col: None,
-                base_table: None,
-                extension_table_column: None,
-                type_id_column: None,
-            })),
+            (VerbBehavior::Plugin, _, Some(handler)) => RuntimeBehavior::Plugin(handler.clone()),
+            (VerbBehavior::Plugin, _, None) => {
+                warn!(
+                    "Plugin verb {}.{} missing handler, using verb name",
+                    domain, verb
+                );
+                RuntimeBehavior::Plugin(verb.replace('-', "_"))
+            }
+            _ => {
+                warn!(
+                    "Verb {}.{} has no valid behavior config, defaulting to empty CRUD",
+                    domain, verb
+                );
+                RuntimeBehavior::Crud(Box::new(RuntimeCrudConfig {
+                    operation: CrudOperation::Select,
+                    table: String::new(),
+                    schema: "ob-poc".to_string(),
+                    key: None,
+                    returning: None,
+                    conflict_keys: vec![],
+                    junction: None,
+                    from_col: None,
+                    to_col: None,
+                    role_table: None,
+                    role_col: None,
+                    fk_col: None,
+                    filter_col: None,
+                    primary_table: None,
+                    join_table: None,
+                    join_col: None,
+                    base_table: None,
+                    order_by: None,
+                    set_values: None,
+                    extension_table_column: None,
+                    type_id_column: None,
+                }))
+            }
         };
 
         RuntimeVerb {
@@ -492,6 +516,7 @@ mod tests {
             VerbConfig {
                 description: "Create a CBU".to_string(),
                 behavior: VerbBehavior::Crud,
+                handler: None,
                 crud: Some(CrudConfig {
                     operation: CrudOperation::Insert,
                     table: Some("cbus".to_string()),
@@ -510,6 +535,8 @@ mod tests {
                     join_table: None,
                     join_col: None,
                     base_table: None,
+                    order_by: None,
+                    set_values: None,
                     extension_table_column: None,
                     type_id_column: None,
                 }),
