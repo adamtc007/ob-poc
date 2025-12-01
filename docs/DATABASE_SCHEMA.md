@@ -1,7 +1,7 @@
 # Database Schema Reference
 
 **Database**: `data_designer` on PostgreSQL 17  
-**Schemas**: `ob-poc` (103 tables), `custody` (18 tables)  
+**Schemas**: `ob-poc` (105 tables), `custody` (18 tables), `kyc` (3 tables)  
 **Updated**: 2025-12-01
 
 ## Overview
@@ -11,6 +11,7 @@ This document describes the database schema used by the OB-POC KYC/AML onboardin
 - **Core KYC/AML**: CBUs, entities, documents, screening, KYC investigations
 - **Service Delivery**: Products, services, resource instances
 - **Custody & Settlement**: Three-layer model (Universe → SSI → Booking Rules)
+- **Investor Registry**: Fund share classes, holdings, and movements (Clearstream-style)
 - **Agentic DSL Generation**: The `rust/src/agentic/` module generates DSL that creates records in these tables
 
 ## Core Tables
@@ -257,6 +258,43 @@ Links entities to CBUs with specific roles.
 | decided_at | timestamptz | | now() | |
 | effective_date | date | | CURRENT_DATE | |
 | review_date | date | | | |
+
+### entity_kyc_status
+
+Per-entity KYC status within a CBU context.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| status_id | uuid | NOT NULL | gen_random_uuid() | Primary key |
+| entity_id | uuid | NOT NULL | | FK to entities |
+| cbu_id | uuid | NOT NULL | | FK to cbus |
+| kyc_status | varchar(50) | NOT NULL | | NOT_STARTED, IN_PROGRESS, PENDING_REVIEW, APPROVED, REJECTED, EXPIRED |
+| risk_rating | varchar(20) | | | LOW, MEDIUM, HIGH, PROHIBITED |
+| reviewer | varchar(255) | | | Reviewer email/ID |
+| notes | text | | | Status notes |
+| next_review_date | date | | | Scheduled review date |
+| created_at | timestamptz | | now() | |
+| updated_at | timestamptz | | now() | |
+
+**Unique constraint**: (entity_id, cbu_id)
+
+### control_relationships
+
+Non-ownership control links between entities.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| control_id | uuid | NOT NULL | gen_random_uuid() | Primary key |
+| controller_entity_id | uuid | NOT NULL | | FK to entities (who controls) |
+| controlled_entity_id | uuid | NOT NULL | | FK to entities (who is controlled) |
+| control_type | varchar(50) | NOT NULL | | BOARD_CONTROL, VOTING_RIGHTS, VETO_POWER, MANAGEMENT, TRUSTEE, PROTECTOR, OTHER |
+| description | text | | | Description of control mechanism |
+| effective_from | date | | | Start date |
+| effective_to | date | | | End date |
+| is_active | boolean | | true | Active record |
+| evidence_doc_id | uuid | | | FK to document_catalog |
+| created_at | timestamptz | | now() | |
+| updated_at | timestamptz | | now() | |
 
 ## Products & Services
 
@@ -509,6 +547,78 @@ ISO 4217 currency codes.
 | csa_agreements | Credit support annexes |
 | cfi_codes | Full CFI code reference |
 
+## KYC Schema (`kyc`)
+
+The kyc schema implements a Clearstream-style investor registry for fund share classes.
+
+### share_classes
+
+Fund share class master data.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| id | uuid | NOT NULL | uuid_generate_v4() | Primary key |
+| cbu_id | uuid | NOT NULL | | FK to cbus (the fund) |
+| name | varchar(255) | NOT NULL | | Share class name (e.g., "Class A EUR") |
+| isin | varchar(12) | | | ISIN code |
+| currency | char(3) | NOT NULL | 'EUR' | Share class currency |
+| nav_per_share | numeric(20,6) | | | Current NAV |
+| nav_date | date | | | NAV valuation date |
+| management_fee_bps | integer | | | Management fee in basis points |
+| performance_fee_bps | integer | | | Performance fee in basis points |
+| subscription_frequency | varchar(50) | | | Daily, Weekly, Monthly |
+| redemption_frequency | varchar(50) | | | Daily, Weekly, Monthly |
+| redemption_notice_days | integer | | | Notice period for redemptions |
+| minimum_investment | numeric(20,2) | | | Minimum investment amount |
+| status | varchar(50) | NOT NULL | 'active' | active, closed |
+| created_at | timestamptz | NOT NULL | now() | |
+| updated_at | timestamptz | NOT NULL | now() | |
+
+**Unique constraint**: (cbu_id, isin)
+
+### holdings
+
+Investor positions in share classes.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| id | uuid | NOT NULL | uuid_generate_v4() | Primary key |
+| share_class_id | uuid | NOT NULL | | FK to share_classes |
+| investor_entity_id | uuid | NOT NULL | | FK to entities (the investor) |
+| units | numeric(20,6) | NOT NULL | 0 | Number of units held |
+| cost_basis | numeric(20,2) | | | Total cost basis |
+| acquisition_date | date | | | Initial acquisition date |
+| status | varchar(50) | NOT NULL | 'active' | active, closed |
+| created_at | timestamptz | NOT NULL | now() | |
+| updated_at | timestamptz | NOT NULL | now() | |
+
+**Unique constraint**: (share_class_id, investor_entity_id)
+
+### movements
+
+Subscription, redemption, and transfer transactions.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| id | uuid | NOT NULL | uuid_generate_v4() | Primary key |
+| holding_id | uuid | NOT NULL | | FK to holdings |
+| movement_type | varchar(50) | NOT NULL | | subscription, redemption, transfer_in, transfer_out, dividend, adjustment |
+| units | numeric(20,6) | NOT NULL | | Number of units |
+| price_per_unit | numeric(20,6) | | | Price at transaction |
+| amount | numeric(20,2) | | | Total amount |
+| currency | char(3) | NOT NULL | 'EUR' | Transaction currency |
+| trade_date | date | NOT NULL | | Trade date |
+| settlement_date | date | | | Settlement date |
+| status | varchar(50) | NOT NULL | 'pending' | pending, confirmed, settled, cancelled, failed |
+| reference | varchar(100) | | | External reference |
+| notes | text | | | Transaction notes |
+| created_at | timestamptz | NOT NULL | now() | |
+| updated_at | timestamptz | NOT NULL | now() | |
+
+**Check constraints**:
+- movement_type IN ('subscription', 'redemption', 'transfer_in', 'transfer_out', 'dividend', 'adjustment')
+- status IN ('pending', 'confirmed', 'settled', 'cancelled', 'failed')
+
 ## Table Count by Category
 
 | Category | Tables | Examples |
@@ -516,15 +626,16 @@ ISO 4217 currency codes.
 | Core | 5 | cbus, entities, entity_types, roles, cbu_entity_roles |
 | Entity Extensions | 4 | entity_proper_persons, entity_limited_companies, entity_partnerships, entity_trusts |
 | Documents | 6 | document_catalog, document_types, document_requests, document_verifications |
-| Screening/KYC | 6 | screenings, kyc_investigations, kyc_decisions, risk_assessments |
+| Screening/KYC | 8 | screenings, kyc_investigations, kyc_decisions, risk_assessments, entity_kyc_status, control_relationships |
 | Products/Services | 8 | products, services, service_delivery_map, cbu_resource_instances |
 | Reference Data | 4 | master_jurisdictions, currencies, roles |
 | DSL/Execution | 8 | dsl_instances, dsl_execution_log, verb_registry |
 | Monitoring | 6 | monitoring_setup, monitoring_events, monitoring_cases |
 | Other | 56 | Various support tables |
-| **ob-poc Total** | **103** | |
+| **ob-poc Total** | **105** | |
 | **Custody** | **18** | cbu_instrument_universe, cbu_ssi, ssi_booking_rules, instrument_classes, markets, security_types, currencies |
-| **Grand Total** | **121** | |
+| **KYC (Investor Registry)** | **3** | share_classes, holdings, movements |
+| **Grand Total** | **126** | |
 
 ## Rebuilding the Schema
 

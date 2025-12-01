@@ -198,7 +198,7 @@ impl CbuGraphBuilder {
 
             // Create market grouping node if not already created
             let market_node_id = if let Some(market_id) = u.market_id {
-                if !market_nodes.contains_key(&market_id) {
+                if let std::collections::hash_map::Entry::Vacant(e) = market_nodes.entry(market_id) {
                     let market_node_id = format!("market-{}", market_id);
                     let mic = u.mic.clone().unwrap_or_else(|| "N/A".to_string());
                     let market_name = u.market_name.clone().unwrap_or_else(|| mic.clone());
@@ -225,7 +225,7 @@ impl CbuGraphBuilder {
                         label: None,
                     });
 
-                    market_nodes.insert(market_id, market_node_id.clone());
+                    e.insert(market_node_id.clone());
                 }
                 market_nodes.get(&market_id).cloned()
             } else {
@@ -304,7 +304,7 @@ impl CbuGraphBuilder {
 
             // Create market node if needed and get parent_id
             let market_node_id = if let Some(market_id) = ssi.market_id {
-                if !market_nodes.contains_key(&market_id) {
+                if let std::collections::hash_map::Entry::Vacant(e) = market_nodes.entry(market_id) {
                     let market_node_id = format!("market-{}", market_id);
                     let mic = ssi.mic.clone().unwrap_or_else(|| "N/A".to_string());
 
@@ -330,7 +330,7 @@ impl CbuGraphBuilder {
                         label: None,
                     });
 
-                    market_nodes.insert(market_id, market_node_id.clone());
+                    e.insert(market_node_id.clone());
                 }
                 market_nodes.get(&market_id).cloned()
             } else {
@@ -406,7 +406,7 @@ impl CbuGraphBuilder {
 
             // Create market node if needed and get parent_id
             let market_node_id = if let Some(market_id) = rule.market_id {
-                if !market_nodes.contains_key(&market_id) {
+                if let std::collections::hash_map::Entry::Vacant(e) = market_nodes.entry(market_id) {
                     let market_node_id = format!("market-{}", market_id);
                     let mic = rule.mic.clone().unwrap_or_else(|| "N/A".to_string());
 
@@ -432,7 +432,7 @@ impl CbuGraphBuilder {
                         label: None,
                     });
 
-                    market_nodes.insert(market_id, market_node_id.clone());
+                    e.insert(market_node_id.clone());
                 }
                 market_nodes.get(&market_id).cloned()
             } else {
@@ -694,7 +694,7 @@ impl CbuGraphBuilder {
                 id: screening_id.clone(),
                 node_type: NodeType::Verification,
                 layer: LayerType::Kyc,
-                label: format!("{}", scr.screening_type),
+                label: scr.screening_type.to_string(),
                 sublabel: scr.result.clone(),
                 status: match scr.result.as_deref() {
                     Some("CLEAR") => NodeStatus::Active,

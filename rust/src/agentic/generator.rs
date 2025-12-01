@@ -217,7 +217,7 @@ S-expression format:
             for e in &plan.entities {
                 prompt.push_str(&format!("- {} → @{}\n", e.name, e.variable));
             }
-            prompt.push_str("\n");
+            prompt.push('\n');
         }
 
         // Universe
@@ -234,7 +234,7 @@ S-expression format:
                 u.instrument_class, market, u.currencies, cp
             ));
         }
-        prompt.push_str("\n");
+        prompt.push('\n');
 
         // SSIs
         prompt.push_str("## SSIs Required\n");
@@ -244,7 +244,7 @@ S-expression format:
                 s.name, s.ssi_type, s.currency, s.variable
             ));
         }
-        prompt.push_str("\n");
+        prompt.push('\n');
 
         // Booking Rules
         prompt.push_str("## Booking Rules\n");
@@ -274,7 +274,7 @@ S-expression format:
                 r.name, r.priority, criteria_str, r.ssi_variable
             ));
         }
-        prompt.push_str("\n");
+        prompt.push('\n');
 
         // ISDA
         if !plan.isdas.is_empty() {
@@ -289,7 +289,7 @@ S-expression format:
                     prompt.push_str(&format!("  CSA: {} → @{}\n", csa.csa_type, csa.variable));
                 }
             }
-            prompt.push_str("\n");
+            prompt.push('\n');
         }
 
         prompt.push_str("Generate the complete DSL now.\n");

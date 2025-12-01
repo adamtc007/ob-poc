@@ -410,11 +410,14 @@ dsl_cli execute -f program.dsl --format json | jq '.bindings'
 | entity | Dynamic verbs from entity_types (create-proper-person, create-limited-company) |
 | document | Document catalog, request, extract |
 | screening | PEP, sanctions, adverse-media checks |
-| kyc | Investigation initiate, decide |
-| ubo | Calculate, validate ownership |
+| kyc | KYC status, document requirements, screenings |
+| ubo | Ownership chains, control relationships, UBO registry |
 | service-resource | Service resource type CRUD + instance provision, set-attr, activate, suspend, decommission |
 | delivery | Service delivery record, complete, fail |
 | cbu-custody | Custody & settlement: universe, SSI, booking rules |
+| share-class | Fund share class master data (ISIN, NAV, fees, liquidity) |
+| holding | Investor positions in share classes |
+| movement | Subscription, redemption, transfer transactions |
 
 ## Custody & Settlement DSL
 
@@ -557,13 +560,164 @@ The `cbu-custody` domain implements a three-layer model for settlement instructi
 - `FOP` - Free of Payment
 - `RVP` - Receive vs Payment
 
+## KYC & UBO DSL
+
+The `kyc` and `ubo` domains manage entity-level KYC status, document requirements, screenings, ownership chains, and UBO determinations.
+
+### KYC Verbs
+
+| Verb | Description |
+|------|-------------|
+| `kyc.require-document` | Add document requirement for KYC |
+| `kyc.fulfill-requirement` | Mark document requirement as fulfilled |
+| `kyc.list-requirements` | List requirements for investigation |
+| `kyc.set-status` | Set KYC status for entity within CBU |
+| `kyc.get-status` | Get KYC status for entity |
+| `kyc.list-by-cbu` | List all entity KYC statuses for CBU |
+| `kyc.record-screening` | Record screening result |
+| `kyc.resolve-screening` | Resolve a screening hit |
+| `kyc.list-screenings` | List screenings for entity |
+
+### UBO Verbs
+
+| Verb | Description |
+|------|-------------|
+| `ubo.add-ownership` | Add ownership relationship |
+| `ubo.update-ownership` | Update ownership percentage |
+| `ubo.end-ownership` | End ownership relationship |
+| `ubo.list-owners` | List owners of entity |
+| `ubo.list-owned` | List entities owned by entity |
+| `ubo.add-control` | Add control relationship (non-ownership) |
+| `ubo.end-control` | End control relationship |
+| `ubo.list-controllers` | List controllers of entity |
+| `ubo.register-ubo` | Register UBO determination |
+| `ubo.verify-ubo` | Mark UBO as verified |
+| `ubo.list-ubos` | List UBOs for CBU |
+| `ubo.list-by-subject` | List UBOs for subject entity |
+
+### Example: KYC Flow
+
+```clojure
+;; Set initial KYC status
+(kyc.set-status :entity-id @investor :cbu-id @fund :status "IN_PROGRESS")
+
+;; Record screening
+(kyc.record-screening :entity-id @investor :screening-type "SANCTIONS" :result "CLEAR" :as @screening)
+
+;; Resolve if there was a match
+(kyc.resolve-screening :screening-id @screening :resolution "FALSE_POSITIVE" :rationale "Name similarity only" :resolved-by "analyst@example.com")
+
+;; Set final status
+(kyc.set-status :entity-id @investor :cbu-id @fund :status "APPROVED" :risk-rating "LOW")
+```
+
+### Example: UBO Chain
+
+```clojure
+;; Build ownership chain: Person → HoldCo → Fund
+(ubo.add-ownership :owner-entity-id @person :owned-entity-id @holdco :percentage 100 :ownership-type "DIRECT" :as @own1)
+(ubo.add-ownership :owner-entity-id @holdco :owned-entity-id @fund-entity :percentage 60 :ownership-type "DIRECT" :as @own2)
+
+;; Add control relationship (trustee, not ownership)
+(ubo.add-control :controller-entity-id @trustee :controlled-entity-id @trust :control-type "TRUSTEE")
+
+;; Register UBO determination
+(ubo.register-ubo :cbu-id @fund :subject-entity-id @fund-entity :ubo-person-id @person :relationship-type "OWNER" :qualifying-reason "OWNERSHIP_25PCT" :ownership-percentage 60 :workflow-type "ONBOARDING")
+
+;; Verify UBO
+(ubo.verify-ubo :ubo-id @ubo1 :verification-status "VERIFIED" :risk-rating "LOW")
+```
+
+## Investor Registry DSL
+
+The `share-class`, `holding`, and `movement` domains implement a Clearstream-style investor registry for fund share classes.
+
+### Share Class Verbs
+
+| Verb | Description |
+|------|-------------|
+| `share-class.create` | Create new share class for fund CBU |
+| `share-class.ensure` | Upsert share class by ISIN |
+| `share-class.update-nav` | Update NAV and date |
+| `share-class.read` | Read share class by ID |
+| `share-class.list` | List share classes for fund |
+| `share-class.close` | Close to new subscriptions |
+
+### Holding Verbs
+
+| Verb | Description |
+|------|-------------|
+| `holding.create` | Create investor holding |
+| `holding.ensure` | Upsert holding by share class + investor |
+| `holding.update-units` | Update position units |
+| `holding.read` | Read holding by ID |
+| `holding.list-by-share-class` | List holdings for share class |
+| `holding.list-by-investor` | List holdings for investor |
+| `holding.close` | Mark holding inactive |
+
+### Movement Verbs
+
+| Verb | Description |
+|------|-------------|
+| `movement.subscribe` | Record subscription |
+| `movement.redeem` | Record redemption |
+| `movement.transfer-in` | Record incoming transfer |
+| `movement.transfer-out` | Record outgoing transfer |
+| `movement.confirm` | Confirm pending movement |
+| `movement.settle` | Mark as settled |
+| `movement.cancel` | Cancel pending movement |
+| `movement.list-by-holding` | List movements for holding |
+| `movement.read` | Read movement by ID |
+
+### Example: Fund Share Class Setup
+
+```clojure
+;; Create fund CBU
+(cbu.ensure :name "Luxembourg Growth Fund" :jurisdiction "LU" :client-type "FUND" :as @fund)
+
+;; Create share classes
+(share-class.create :cbu-id @fund :name "Class A EUR" :isin "LU0123456789" :currency "EUR"
+  :nav-per-share 100.00 :management-fee-bps 150 :minimum-investment 10000.00
+  :subscription-frequency "Daily" :redemption-frequency "Weekly" :redemption-notice-days 5
+  :as @class-a)
+
+(share-class.create :cbu-id @fund :name "Class I USD" :isin "LU9876543210" :currency "USD"
+  :nav-per-share 1000.00 :management-fee-bps 75 :minimum-investment 1000000.00
+  :as @class-i)
+
+;; Create investor entity
+(entity.create-limited-company :name "Pension Fund ABC" :jurisdiction "US" :as @investor)
+
+;; Create holding
+(holding.create :share-class-id @class-a :investor-entity-id @investor :as @holding)
+
+;; Record subscription
+(movement.subscribe :holding-id @holding :units 1000 :price-per-unit 100.00 :amount 100000.00
+  :trade-date "2024-01-15" :settlement-date "2024-01-17" :reference "SUB-2024-001")
+
+;; Confirm and settle
+(movement.confirm :movement-id @sub1)
+(movement.settle :movement-id @sub1)
+
+;; Update holding position
+(holding.update-units :holding-id @holding :units 1000 :cost-basis 100000.00)
+
+;; Update NAV
+(share-class.update-nav :share-class-id @class-a :nav-per-share 102.50 :nav-date "2024-01-31")
+
+;; Record redemption
+(movement.redeem :holding-id @holding :units 500 :price-per-unit 102.50 :amount 51250.00
+  :trade-date "2024-02-01" :reference "RED-2024-001")
+```
+
 ## Database
 
 **Database**: `data_designer` on PostgreSQL 17
 
-Three schemas:
-- **ob-poc**: KYC/AML domain (103 tables)
+Four schemas:
+- **ob-poc**: KYC/AML domain (105 tables)
 - **custody**: Settlement & custody (18 tables)
+- **kyc**: Investor registry (3 tables: share_classes, holdings, movements)
 - **public**: Runtime API endpoints
 
 See `docs/DATABASE_SCHEMA.md` for complete schema. Rebuild with:
