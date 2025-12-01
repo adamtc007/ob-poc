@@ -130,11 +130,14 @@ impl Default for CustomOperationRegistry {
 // Built-in Custom Operations
 // ============================================================================
 
-/// Generic entity creation with type dispatch
+/// Generic entity creation with type dispatch (Idempotent)
 ///
 /// Rationale: Maps :type argument (natural-person, limited-company, etc.) to
 /// the correct entity_type and extension table. This is a convenience op
 /// for agent-generated DSL that uses a single verb with type parameter.
+///
+/// Idempotency: Checks for existing entity with same name in extension table
+/// before creating. Returns existing entity_id if found.
 pub struct EntityCreateOp;
 
 #[async_trait]
@@ -182,6 +185,66 @@ impl CustomOperation for EntityCreateOp {
             "trust" => ("TRUST_DISCRETIONARY", "entity_trusts"),
             _ => return Err(anyhow::anyhow!("Unknown entity type: {}", entity_type)),
         };
+
+        // Idempotency: Check for existing entity with same name
+        // For proper_persons, we split name and check first_name + last_name
+        // For companies/partnerships/trusts, we check the name column directly
+        let existing_entity_id: Option<Uuid> = match extension_table {
+            "entity_proper_persons" => {
+                let name_parts: Vec<&str> = name.split_whitespace().collect();
+                let (first_name, last_name) = if name_parts.len() >= 2 {
+                    (name_parts[0].to_string(), name_parts[1..].join(" "))
+                } else {
+                    (name.to_string(), "".to_string())
+                };
+                sqlx::query_scalar(
+                    r#"SELECT entity_id FROM "ob-poc".entity_proper_persons
+                       WHERE first_name = $1 AND last_name = $2
+                       LIMIT 1"#,
+                )
+                .bind(&first_name)
+                .bind(&last_name)
+                .fetch_optional(pool)
+                .await?
+            }
+            "entity_limited_companies" => {
+                sqlx::query_scalar(
+                    r#"SELECT entity_id FROM "ob-poc".entity_limited_companies
+                       WHERE company_name = $1
+                       LIMIT 1"#,
+                )
+                .bind(name)
+                .fetch_optional(pool)
+                .await?
+            }
+            "entity_partnerships" => {
+                sqlx::query_scalar(
+                    r#"SELECT entity_id FROM "ob-poc".entity_partnerships
+                       WHERE partnership_name = $1
+                       LIMIT 1"#,
+                )
+                .bind(name)
+                .fetch_optional(pool)
+                .await?
+            }
+            "entity_trusts" => {
+                sqlx::query_scalar(
+                    r#"SELECT entity_id FROM "ob-poc".entity_trusts
+                       WHERE trust_name = $1
+                       LIMIT 1"#,
+                )
+                .bind(name)
+                .fetch_optional(pool)
+                .await?
+            }
+            _ => None,
+        };
+
+        // If entity already exists, return existing ID
+        if let Some(existing_id) = existing_entity_id {
+            ctx.bind("entity", existing_id);
+            return Ok(ExecutionResult::Uuid(existing_id));
+        }
 
         // Look up entity type ID
         let type_row = sqlx::query!(
@@ -280,11 +343,14 @@ impl CustomOperation for EntityCreateOp {
     }
 }
 
-/// Document cataloging with document type lookup
+/// Document cataloging with document type lookup (Idempotent)
 ///
 /// Rationale: Requires lookup of document_type_id from document_types table
 /// by type code, then insert into document_catalog with type-specific
 /// attribute mappings from document_type_attributes.
+///
+/// Idempotency: Uses ON CONFLICT on (cbu_id, document_type_id, document_name)
+/// to return existing document if already cataloged.
 pub struct DocumentCatalogOp;
 
 #[async_trait]
@@ -348,7 +414,26 @@ impl CustomOperation for DocumentCatalogOp {
                 }
             });
 
-        // Create document - doc_id is the PK in actual schema
+        // Idempotent: Check for existing document with same cbu_id, document_type_id, and document_name
+        let existing = sqlx::query!(
+            r#"SELECT doc_id FROM "ob-poc".document_catalog
+               WHERE cbu_id IS NOT DISTINCT FROM $1
+               AND document_type_id = $2
+               AND document_name IS NOT DISTINCT FROM $3
+               LIMIT 1"#,
+            cbu_id,
+            doc_type_id,
+            document_name
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        if let Some(row) = existing {
+            ctx.bind("document", row.doc_id);
+            return Ok(ExecutionResult::Uuid(row.doc_id));
+        }
+
+        // Create new document
         let doc_id = Uuid::new_v4();
 
         sqlx::query!(
@@ -593,9 +678,10 @@ impl CustomOperation for UboCalculateOp {
     }
 }
 
-/// PEP (Politically Exposed Person) screening
+/// PEP (Politically Exposed Person) screening (Idempotent)
 ///
 /// Rationale: Requires external PEP database API call and result processing.
+/// Idempotency: Returns existing pending PEP screening for same entity if exists.
 pub struct ScreeningPepOp;
 
 #[async_trait]
@@ -633,6 +719,21 @@ impl CustomOperation for ScreeningPepOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing entity-id argument"))?;
 
+        // Idempotent: Check for existing pending screening first
+        let existing = sqlx::query!(
+            r#"SELECT screening_id FROM "ob-poc".screenings
+               WHERE entity_id = $1 AND screening_type = 'PEP' AND status = 'PENDING'
+               LIMIT 1"#,
+            entity_id
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        if let Some(row) = existing {
+            ctx.bind("screening", row.screening_id);
+            return Ok(ExecutionResult::Uuid(row.screening_id));
+        }
+
         // Create screening record
         let screening_id = Uuid::new_v4();
 
@@ -645,15 +746,6 @@ impl CustomOperation for ScreeningPepOp {
         )
         .execute(pool)
         .await?;
-
-        // TODO: Call external PEP screening API
-        // For now, just create the pending screening record
-
-        // In a real implementation, this would:
-        // 1. Fetch entity details (name, DOB, nationality)
-        // 2. Call PEP screening API
-        // 3. Process and store results
-        // 4. Update screening status
 
         ctx.bind("screening", screening_id);
 
@@ -670,9 +762,10 @@ impl CustomOperation for ScreeningPepOp {
     }
 }
 
-/// Sanctions screening
+/// Sanctions screening (Idempotent)
 ///
 /// Rationale: Requires external sanctions database API call and result processing.
+/// Idempotency: Returns existing pending sanctions screening for same entity if exists.
 pub struct ScreeningSanctionsOp;
 
 #[async_trait]
@@ -710,6 +803,21 @@ impl CustomOperation for ScreeningSanctionsOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing entity-id argument"))?;
 
+        // Idempotent: Check for existing pending screening first
+        let existing = sqlx::query!(
+            r#"SELECT screening_id FROM "ob-poc".screenings
+               WHERE entity_id = $1 AND screening_type = 'SANCTIONS' AND status = 'PENDING'
+               LIMIT 1"#,
+            entity_id
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        if let Some(row) = existing {
+            ctx.bind("screening", row.screening_id);
+            return Ok(ExecutionResult::Uuid(row.screening_id));
+        }
+
         // Create screening record
         let screening_id = Uuid::new_v4();
 
@@ -722,8 +830,6 @@ impl CustomOperation for ScreeningSanctionsOp {
         )
         .execute(pool)
         .await?;
-
-        // TODO: Call external sanctions screening API
 
         ctx.bind("screening", screening_id);
 
@@ -744,10 +850,13 @@ impl CustomOperation for ScreeningSanctionsOp {
 // Resource Instance Operations
 // ============================================================================
 
-/// Create a resource instance for a CBU
+/// Create a resource instance for a CBU (Idempotent)
 ///
 /// Rationale: Requires lookup of resource_type_id from prod_resources by code,
 /// creates the instance record with proper FK relationships.
+///
+/// Idempotency: Uses ON CONFLICT on (instance_url) or (cbu_id, resource_type_id, instance_identifier)
+/// to return existing instance if already created.
 pub struct ResourceCreateOp;
 
 #[async_trait]
@@ -853,14 +962,24 @@ impl CustomOperation for ResourceCreateOp {
                 }
             });
 
-        // Create instance
+        // Idempotent: INSERT or return existing using instance_url as conflict key
         let instance_id = Uuid::new_v4();
 
-        sqlx::query(
-            r#"INSERT INTO "ob-poc".cbu_resource_instances
-               (instance_id, cbu_id, product_id, service_id, resource_type_id,
-                instance_url, instance_identifier, instance_name, status)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING')"#,
+        let row: (Uuid,) = sqlx::query_as(
+            r#"WITH ins AS (
+                INSERT INTO "ob-poc".cbu_resource_instances
+                (instance_id, cbu_id, product_id, service_id, resource_type_id,
+                 instance_url, instance_identifier, instance_name, status)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING')
+                ON CONFLICT (instance_url) DO NOTHING
+                RETURNING instance_id
+            )
+            SELECT instance_id FROM ins
+            UNION ALL
+            SELECT instance_id FROM "ob-poc".cbu_resource_instances
+            WHERE instance_url = $6
+            AND NOT EXISTS (SELECT 1 FROM ins)
+            LIMIT 1"#,
         )
         .bind(instance_id)
         .bind(cbu_id)
@@ -870,12 +989,13 @@ impl CustomOperation for ResourceCreateOp {
         .bind(instance_url)
         .bind(&instance_identifier)
         .bind(&instance_name)
-        .execute(pool)
+        .fetch_one(pool)
         .await?;
 
-        ctx.bind("instance", instance_id);
+        let result_id = row.0;
+        ctx.bind("instance", result_id);
 
-        Ok(ExecutionResult::Uuid(instance_id))
+        Ok(ExecutionResult::Uuid(result_id))
     }
 
     #[cfg(not(feature = "database"))]

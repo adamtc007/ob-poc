@@ -5,6 +5,8 @@
 //!
 //! Run with: cargo test --features database --test csg_pipeline_integration -- --ignored
 
+#![cfg(feature = "database")]
+
 use ob_poc::dsl_v2::{
     parse_program,
     validation::{ClientType, DiagnosticCode, ValidationContext},

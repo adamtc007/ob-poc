@@ -144,6 +144,10 @@ impl GenericCrudExecutor {
     // INSERT
     // =========================================================================
 
+    /// Execute INSERT with idempotency support
+    ///
+    /// If conflict_keys are defined in YAML, uses ON CONFLICT DO UPDATE (upsert behavior).
+    /// Otherwise, uses ON CONFLICT DO NOTHING and returns existing row if conflict.
     async fn execute_insert(
         &self,
         verb: &RuntimeVerb,
@@ -166,6 +170,9 @@ impl GenericCrudExecutor {
         bind_values.push(SqlValue::Uuid(new_id));
         let mut idx = 2;
 
+        // Track which columns we're inserting for conflict detection
+        let mut insert_cols: Vec<String> = vec![pk_col.to_string()];
+
         // Add provided arguments based on verb arg definitions
         for arg_def in &verb.args {
             if let Some(value) = args.get(&arg_def.name) {
@@ -177,6 +184,7 @@ impl GenericCrudExecutor {
                     columns.push(format!("\"{}\"", col));
                     placeholders.push(format!("${}", idx));
                     bind_values.push(self.json_to_sql_value(value, arg_def)?);
+                    insert_cols.push(col.clone());
                     idx += 1;
                 }
             }
@@ -187,26 +195,75 @@ impl GenericCrudExecutor {
             bail!("No columns to insert for {}.{}", verb.domain, verb.verb);
         }
 
-        let returning = crud.returning.as_deref().unwrap_or("*");
-        let sql = format!(
-            r#"INSERT INTO "{}"."{}" ({}) VALUES ({}) RETURNING "{}""#,
-            crud.schema,
-            crud.table,
-            columns.join(", "),
-            placeholders.join(", "),
-            returning
-        );
+        let returning = crud.returning.as_deref().unwrap_or(pk_col);
 
-        debug!("INSERT SQL: {}", sql);
+        // Build idempotent INSERT with ON CONFLICT
+        let sql = if !crud.conflict_keys.is_empty() {
+            // Use explicit conflict keys from YAML config
+            let conflict_cols: Vec<String> = crud
+                .conflict_keys
+                .iter()
+                .map(|c| format!("\"{}\"", c))
+                .collect();
+
+            // Build UPDATE SET for non-conflict columns (upsert behavior)
+            let updates: Vec<String> = insert_cols
+                .iter()
+                .filter(|c| !crud.conflict_keys.contains(*c) && *c != pk_col)
+                .map(|c| format!("\"{}\" = EXCLUDED.\"{}\"", c, c))
+                .collect();
+
+            let update_clause = if updates.is_empty() {
+                // Nothing to update, just return existing
+                format!("\"{}\" = \"{}\".\"{}\"", pk_col, crud.table, pk_col)
+            } else {
+                updates.join(", ")
+            };
+
+            format!(
+                r#"INSERT INTO "{}"."{}" ({}) VALUES ({})
+                   ON CONFLICT ({}) DO UPDATE SET {}
+                   RETURNING "{}""#,
+                crud.schema,
+                crud.table,
+                columns.join(", "),
+                placeholders.join(", "),
+                conflict_cols.join(", "),
+                update_clause,
+                returning
+            )
+        } else {
+            // No conflict keys defined - use DO NOTHING for pure idempotency
+            // First try INSERT, if conflict return existing row
+            format!(
+                r#"WITH ins AS (
+                    INSERT INTO "{}"."{}" ({}) VALUES ({})
+                    ON CONFLICT DO NOTHING
+                    RETURNING "{}"
+                )
+                SELECT "{}" FROM ins
+                UNION ALL
+                SELECT "{}" FROM "{}"."{}"
+                WHERE NOT EXISTS (SELECT 1 FROM ins)
+                LIMIT 1"#,
+                crud.schema,
+                crud.table,
+                columns.join(", "),
+                placeholders.join(", "),
+                returning,
+                returning,
+                returning,
+                crud.schema,
+                crud.table
+            )
+        };
+
+        debug!("INSERT (idempotent) SQL: {}", sql);
 
         let row = self.execute_with_bindings(&sql, &bind_values).await?;
 
-        if returning != "*" {
-            let uuid: Uuid = row.try_get(returning)?;
-            Ok(GenericExecutionResult::Uuid(uuid))
-        } else {
-            Ok(GenericExecutionResult::Record(self.row_to_json(&row)?))
-        }
+        let uuid: Uuid = row.try_get(returning)?;
+        Ok(GenericExecutionResult::Uuid(uuid))
     }
 
     // =========================================================================
@@ -466,6 +523,10 @@ impl GenericCrudExecutor {
     // LINK (Junction table insert)
     // =========================================================================
 
+    /// Execute LINK (junction table insert) with idempotency
+    ///
+    /// Uses ON CONFLICT DO NOTHING and returns existing row if conflict.
+    /// This ensures re-running the same link operation is safe.
     async fn execute_link(
         &self,
         verb: &RuntimeVerb,
@@ -496,21 +557,25 @@ impl GenericCrudExecutor {
         let mut placeholders = vec!["$1".to_string(), "$2".to_string(), "$3".to_string()];
         let mut bind_values: Vec<SqlValue> = vec![SqlValue::Uuid(new_id)];
 
-        // Get from/to values from args (order matters for bind positions)
-        #[allow(clippy::if_same_then_else)]
+        // Collect from/to values separately to ensure correct order
+        let mut from_value: Option<SqlValue> = None;
+        let mut to_value: Option<SqlValue> = None;
+
         for arg_def in &verb.args {
             if let Some(value) = args.get(&arg_def.name) {
                 if arg_def.maps_to.as_deref() == Some(from_col) {
-                    bind_values.push(self.json_to_sql_value(value, arg_def)?);
+                    from_value = Some(self.json_to_sql_value(value, arg_def)?);
                 } else if arg_def.maps_to.as_deref() == Some(to_col) {
-                    bind_values.push(self.json_to_sql_value(value, arg_def)?);
+                    to_value = Some(self.json_to_sql_value(value, arg_def)?);
                 }
             }
         }
 
-        if bind_values.len() < 3 {
-            bail!("Missing from or to argument for link");
-        }
+        let from_val = from_value.ok_or_else(|| anyhow!("Missing from argument for link"))?;
+        let to_val = to_value.ok_or_else(|| anyhow!("Missing to argument for link"))?;
+
+        bind_values.push(from_val.clone());
+        bind_values.push(to_val.clone());
 
         // Add extra junction columns
         let mut idx = 4;
@@ -527,16 +592,35 @@ impl GenericCrudExecutor {
             }
         }
 
+        // Idempotent: INSERT or return existing
         let sql = format!(
-            r#"INSERT INTO "{}"."{}" ({}) VALUES ({}) ON CONFLICT DO NOTHING RETURNING "{}""#,
+            r#"WITH ins AS (
+                INSERT INTO "{}"."{}" ({}) VALUES ({})
+                ON CONFLICT ("{}", "{}") DO NOTHING
+                RETURNING "{}"
+            )
+            SELECT "{}" FROM ins
+            UNION ALL
+            SELECT "{}" FROM "{}"."{}"
+            WHERE "{}" = $2 AND "{}" = $3
+            AND NOT EXISTS (SELECT 1 FROM ins)
+            LIMIT 1"#,
             crud.schema,
             junction,
             columns.join(", "),
             placeholders.join(", "),
-            pk_col
+            from_col,
+            to_col,
+            pk_col,
+            pk_col,
+            pk_col,
+            crud.schema,
+            junction,
+            from_col,
+            to_col
         );
 
-        debug!("LINK SQL: {}", sql);
+        debug!("LINK (idempotent) SQL: {}", sql);
 
         let row = self.execute_with_bindings(&sql, &bind_values).await?;
         let uuid: Uuid = row.try_get(pk_col)?;
@@ -595,9 +679,13 @@ impl GenericCrudExecutor {
     }
 
     // =========================================================================
-    // ROLE LINK (Junction with role lookup)
+    // ROLE LINK (Junction with role lookup) - Idempotent
     // =========================================================================
 
+    /// Execute ROLE_LINK with idempotency
+    ///
+    /// Links entity to CBU with a role. Uses ON CONFLICT to handle
+    /// duplicate role assignments safely (returns existing if already linked).
     async fn execute_role_link(
         &self,
         verb: &RuntimeVerb,
@@ -666,18 +754,25 @@ impl GenericCrudExecutor {
         ];
         let mut bind_values: Vec<SqlValue> = vec![SqlValue::Uuid(new_id)];
 
-        // Get from/to values (order matters for bind positions)
-        #[allow(clippy::if_same_then_else)]
+        // Collect from/to values separately to ensure correct order
+        let mut from_value: Option<SqlValue> = None;
+        let mut to_value: Option<SqlValue> = None;
+
         for arg_def in &verb.args {
             if let Some(value) = args.get(&arg_def.name) {
                 if arg_def.maps_to.as_deref() == Some(from_col) {
-                    bind_values.push(self.json_to_sql_value(value, arg_def)?);
+                    from_value = Some(self.json_to_sql_value(value, arg_def)?);
                 } else if arg_def.maps_to.as_deref() == Some(to_col) {
-                    bind_values.push(self.json_to_sql_value(value, arg_def)?);
+                    to_value = Some(self.json_to_sql_value(value, arg_def)?);
                 }
             }
         }
 
+        let from_val = from_value.ok_or_else(|| anyhow!("Missing from argument for role_link"))?;
+        let to_val = to_value.ok_or_else(|| anyhow!("Missing to argument for role_link"))?;
+
+        bind_values.push(from_val);
+        bind_values.push(to_val);
         bind_values.push(SqlValue::Uuid(role_id));
 
         // Add extra columns (like ownership-percentage)
@@ -700,16 +795,38 @@ impl GenericCrudExecutor {
         }
 
         let returning = crud.returning.as_deref().unwrap_or(pk_col);
+
+        // Idempotent: INSERT or return existing (conflict on cbu_id, entity_id, role_id)
         let sql = format!(
-            r#"INSERT INTO "{}"."{}" ({}) VALUES ({}) RETURNING "{}""#,
+            r#"WITH ins AS (
+                INSERT INTO "{}"."{}" ({}) VALUES ({})
+                ON CONFLICT ("{}", "{}", "{}") DO NOTHING
+                RETURNING "{}"
+            )
+            SELECT "{}" FROM ins
+            UNION ALL
+            SELECT "{}" FROM "{}"."{}"
+            WHERE "{}" = $2 AND "{}" = $3 AND "{}" = $4
+            AND NOT EXISTS (SELECT 1 FROM ins)
+            LIMIT 1"#,
             crud.schema,
             junction,
             columns.join(", "),
             placeholders.join(", "),
-            returning
+            from_col,
+            to_col,
+            role_col,
+            returning,
+            returning,
+            returning,
+            crud.schema,
+            junction,
+            from_col,
+            to_col,
+            role_col
         );
 
-        debug!("ROLE_LINK SQL: {}", sql);
+        debug!("ROLE_LINK (idempotent) SQL: {}", sql);
 
         let row = self.execute_with_bindings(&sql, &bind_values).await?;
         let uuid: Uuid = row.try_get(returning)?;
