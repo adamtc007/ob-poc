@@ -1,0 +1,243 @@
+domains:
+  cbu:
+    description: Client Business Unit operations
+    verbs:
+      create:
+        description: Create a new Client Business Unit
+        behavior: crud
+        crud:
+          operation: insert
+          table: cbus
+          schema: ob-poc
+          returning: cbu_id
+        args:
+        - name: name
+          type: string
+          required: true
+          maps_to: name
+        - name: jurisdiction
+          type: string
+          required: false
+          maps_to: jurisdiction
+        - name: client-type
+          type: string
+          required: false
+          maps_to: client_type
+        - name: nature-purpose
+          type: string
+          required: false
+          maps_to: nature_purpose
+        - name: description
+          type: string
+          required: false
+          maps_to: description
+        - name: commercial-client-entity-id
+          type: uuid
+          required: false
+          maps_to: commercial_client_entity_id
+        returns:
+          type: uuid
+          name: cbu_id
+          capture: true
+      read:
+        description: Read a CBU by ID
+        behavior: crud
+        crud:
+          operation: select
+          table: cbus
+          schema: ob-poc
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+          maps_to: cbu_id
+        returns:
+          type: record
+      update:
+        description: Update a CBU
+        behavior: crud
+        crud:
+          operation: update
+          table: cbus
+          schema: ob-poc
+          key: cbu_id
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+          maps_to: cbu_id
+        - name: name
+          type: string
+          required: false
+          maps_to: name
+        - name: status
+          type: string
+          required: false
+          maps_to: status
+        - name: client-type
+          type: string
+          required: false
+          maps_to: client_type
+        - name: jurisdiction
+          type: string
+          required: false
+          maps_to: jurisdiction
+        - name: commercial-client-entity-id
+          type: uuid
+          required: false
+          maps_to: commercial_client_entity_id
+        returns:
+          type: affected
+      delete:
+        description: Delete a CBU
+        behavior: crud
+        crud:
+          operation: delete
+          table: cbus
+          schema: ob-poc
+          key: cbu_id
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+          maps_to: cbu_id
+        returns:
+          type: affected
+      list:
+        description: List CBUs with optional filters
+        behavior: crud
+        crud:
+          operation: select
+          table: cbus
+          schema: ob-poc
+        args:
+        - name: status
+          type: string
+          required: false
+          maps_to: status
+        - name: client-type
+          type: string
+          required: false
+          maps_to: client_type
+        - name: jurisdiction
+          type: string
+          required: false
+          maps_to: jurisdiction
+        - name: limit
+          type: integer
+          required: false
+          default: 100
+        - name: offset
+          type: integer
+          required: false
+          default: 0
+        returns:
+          type: record_set
+      ensure:
+        description: Create or update a CBU by natural key
+        behavior: crud
+        crud:
+          operation: upsert
+          table: cbus
+          schema: ob-poc
+          conflict_keys:
+          - name
+          - jurisdiction
+          returning: cbu_id
+        args:
+        - name: name
+          type: string
+          required: true
+          maps_to: name
+        - name: jurisdiction
+          type: string
+          required: false
+          maps_to: jurisdiction
+        - name: client-type
+          type: string
+          required: false
+          maps_to: client_type
+        - name: nature-purpose
+          type: string
+          required: false
+          maps_to: nature_purpose
+        - name: commercial-client-entity-id
+          type: uuid
+          required: false
+          maps_to: commercial_client_entity_id
+        returns:
+          type: uuid
+          name: cbu_id
+          capture: true
+      assign-role:
+        description: Assign a role to an entity within a CBU
+        behavior: crud
+        crud:
+          operation: role_link
+          junction: cbu_entity_roles
+          schema: ob-poc
+          from_col: cbu_id
+          to_col: entity_id
+          role_table: roles
+          role_col: role_id
+          returning: cbu_entity_role_id
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+          maps_to: cbu_id
+        - name: entity-id
+          type: uuid
+          required: true
+          maps_to: entity_id
+        - name: role
+          type: lookup
+          required: true
+          lookup:
+            table: roles
+            code_column: name
+            id_column: role_id
+        returns:
+          type: uuid
+          name: cbu_entity_role_id
+          capture: false
+      remove-role:
+        description: Remove a specific role from an entity within a CBU
+        behavior: crud
+        crud:
+          operation: role_unlink
+          junction: cbu_entity_roles
+          schema: ob-poc
+          from_col: cbu_id
+          to_col: entity_id
+          role_table: roles
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+        - name: entity-id
+          type: uuid
+          required: true
+        - name: role
+          type: lookup
+          required: true
+          lookup:
+            table: roles
+            code_column: name
+            id_column: role_id
+        returns:
+          type: affected
+      parties:
+        description: List all parties (entities with their roles) for a CBU
+        behavior: crud
+        crud:
+          operation: list_parties
+          junction: cbu_entity_roles
+          schema: ob-poc
+          fk_col: cbu_id
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+        returns:
+          type: record_set

@@ -1,0 +1,209 @@
+domains:
+  red-flag:
+    description: Risk indicators and issues requiring attention
+    verbs:
+      raise:
+        description: Raise a new red flag
+        behavior: crud
+        crud:
+          operation: insert
+          table: red_flags
+          schema: kyc
+          returning: red_flag_id
+        emits_event: red-flag.raised
+        args:
+        - name: case-id
+          type: uuid
+          required: true
+          maps_to: case_id
+        - name: workstream-id
+          type: uuid
+          required: false
+          maps_to: workstream_id
+        - name: flag-type
+          type: string
+          required: true
+          maps_to: flag_type
+          valid_values:
+          - SANCTIONS_MATCH
+          - PEP_IDENTIFIED
+          - ADVERSE_MEDIA
+          - NOMINEE_UNDISCLOSED
+          - OPAQUE_STRUCTURE
+          - DOCUMENT_FRAUD
+          - INCONSISTENT_INFO
+          - HIGH_RISK_JURISDICTION
+          - COMPLEX_STRUCTURE
+          - SOURCE_OF_WEALTH_UNCLEAR
+          - MISSING_UBO
+          - SHELL_COMPANY
+          - TAX_HAVEN
+          - CASH_INTENSIVE
+          - REGULATORY_ACTION
+          - DOCUMENT_OVERDUE
+          - SLA_BREACH
+        - name: severity
+          type: string
+          required: true
+          maps_to: severity
+          valid_values:
+          - SOFT
+          - ESCALATE
+          - HARD_STOP
+        - name: description
+          type: string
+          required: true
+          maps_to: description
+        - name: source
+          type: string
+          required: false
+          maps_to: source
+          valid_values:
+          - SCREENING
+          - DOCUMENT_REVIEW
+          - ANALYST
+          - SYSTEM
+          - RULE_ENGINE
+          - EXTERNAL
+        - name: source-reference
+          type: string
+          required: false
+          maps_to: source_reference
+        returns:
+          type: uuid
+          name: red_flag_id
+          capture: true
+      mitigate:
+        description: Mark red flag as mitigated
+        behavior: crud
+        crud:
+          operation: update
+          table: red_flags
+          schema: kyc
+          key: red_flag_id
+          set_values:
+            status: MITIGATED
+            resolution_type: MITIGATED
+            resolved_at: now()
+        emits_event: red-flag.mitigated
+        args:
+        - name: red-flag-id
+          type: uuid
+          required: true
+          maps_to: red_flag_id
+        - name: notes
+          type: string
+          required: true
+          maps_to: resolution_notes
+        returns:
+          type: affected
+      waive:
+        description: Waive red flag with justification
+        behavior: crud
+        crud:
+          operation: update
+          table: red_flags
+          schema: kyc
+          key: red_flag_id
+          set_values:
+            status: WAIVED
+            resolution_type: WAIVED
+            resolved_at: now()
+        emits_event: red-flag.waived
+        args:
+        - name: red-flag-id
+          type: uuid
+          required: true
+          maps_to: red_flag_id
+        - name: justification
+          type: string
+          required: true
+          maps_to: waiver_justification
+        - name: approved-by
+          type: uuid
+          required: true
+          maps_to: waiver_approved_by
+        returns:
+          type: affected
+      dismiss:
+        description: Dismiss red flag as false positive
+        behavior: crud
+        crud:
+          operation: update
+          table: red_flags
+          schema: kyc
+          key: red_flag_id
+          set_values:
+            status: CLOSED
+            resolution_type: FALSE_POSITIVE
+            resolved_at: now()
+        emits_event: red-flag.dismissed
+        args:
+        - name: red-flag-id
+          type: uuid
+          required: true
+          maps_to: red_flag_id
+        - name: notes
+          type: string
+          required: true
+          maps_to: resolution_notes
+        returns:
+          type: affected
+      set-blocking:
+        description: Set red flag as blocking the case
+        behavior: crud
+        crud:
+          operation: update
+          table: red_flags
+          schema: kyc
+          key: red_flag_id
+          set_values:
+            status: BLOCKING
+        emits_event: red-flag.blocking
+        args:
+        - name: red-flag-id
+          type: uuid
+          required: true
+          maps_to: red_flag_id
+        returns:
+          type: affected
+      list-by-case:
+        description: List red flags for a case
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: red_flags
+          schema: kyc
+          fk_col: case_id
+        args:
+        - name: case-id
+          type: uuid
+          required: true
+        - name: status
+          type: string
+          required: false
+          maps_to: status
+        - name: severity
+          type: string
+          required: false
+          maps_to: severity
+        returns:
+          type: record_set
+      list-by-workstream:
+        description: List red flags for a workstream
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: red_flags
+          schema: kyc
+          fk_col: workstream_id
+        args:
+        - name: workstream-id
+          type: uuid
+          required: true
+        - name: status
+          type: string
+          required: false
+          maps_to: status
+        returns:
+          type: record_set

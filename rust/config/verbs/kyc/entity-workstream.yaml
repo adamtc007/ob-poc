@@ -1,0 +1,201 @@
+domains:
+  entity-workstream:
+    description: Per-entity workstream within a KYC case
+    verbs:
+      create:
+        description: Create a new entity workstream
+        behavior: crud
+        crud:
+          operation: insert
+          table: entity_workstreams
+          schema: kyc
+          returning: workstream_id
+        emits_event: workstream.created
+        args:
+        - name: case-id
+          type: uuid
+          required: true
+          maps_to: case_id
+        - name: entity-id
+          type: uuid
+          required: true
+          maps_to: entity_id
+        - name: discovery-source-id
+          type: uuid
+          required: false
+          maps_to: discovery_source_workstream_id
+        - name: discovery-reason
+          type: string
+          required: false
+          maps_to: discovery_reason
+        - name: discovery-depth
+          type: integer
+          required: false
+          maps_to: discovery_depth
+          default: 1
+        - name: ownership-percentage
+          type: decimal
+          required: false
+          maps_to: ownership_percentage
+        - name: is-ubo
+          type: boolean
+          required: false
+          maps_to: is_ubo
+          default: false
+        returns:
+          type: uuid
+          name: workstream_id
+          capture: true
+      update-status:
+        description: Update workstream status
+        behavior: crud
+        crud:
+          operation: update
+          table: entity_workstreams
+          schema: kyc
+          key: workstream_id
+        emits_event: workstream.status-changed
+        args:
+        - name: workstream-id
+          type: uuid
+          required: true
+          maps_to: workstream_id
+        - name: status
+          type: string
+          required: true
+          maps_to: status
+          valid_values:
+          - PENDING
+          - COLLECT
+          - VERIFY
+          - SCREEN
+          - ASSESS
+          - COMPLETE
+          - BLOCKED
+          - ENHANCED_DD
+        returns:
+          type: affected
+      block:
+        description: Block workstream with reason
+        behavior: crud
+        crud:
+          operation: update
+          table: entity_workstreams
+          schema: kyc
+          key: workstream_id
+          set_values:
+            status: BLOCKED
+            blocked_at: now()
+        emits_event: workstream.blocked
+        args:
+        - name: workstream-id
+          type: uuid
+          required: true
+          maps_to: workstream_id
+        - name: reason
+          type: string
+          required: true
+          maps_to: blocked_reason
+        returns:
+          type: affected
+      complete:
+        description: Mark workstream as complete
+        behavior: crud
+        crud:
+          operation: update
+          table: entity_workstreams
+          schema: kyc
+          key: workstream_id
+          set_values:
+            status: COMPLETE
+            completed_at: now()
+        emits_event: workstream.completed
+        args:
+        - name: workstream-id
+          type: uuid
+          required: true
+          maps_to: workstream_id
+        - name: risk-rating
+          type: string
+          required: false
+          maps_to: risk_rating
+          valid_values:
+          - LOW
+          - MEDIUM
+          - HIGH
+          - VERY_HIGH
+        returns:
+          type: affected
+      set-enhanced-dd:
+        description: Flag workstream for enhanced due diligence
+        behavior: crud
+        crud:
+          operation: update
+          table: entity_workstreams
+          schema: kyc
+          key: workstream_id
+          set_values:
+            requires_enhanced_dd: true
+            status: ENHANCED_DD
+        emits_event: workstream.enhanced-dd-set
+        args:
+        - name: workstream-id
+          type: uuid
+          required: true
+          maps_to: workstream_id
+        returns:
+          type: affected
+      set-ubo:
+        description: Mark workstream entity as UBO
+        behavior: crud
+        crud:
+          operation: update
+          table: entity_workstreams
+          schema: kyc
+          key: workstream_id
+          set_values:
+            is_ubo: true
+        emits_event: workstream.ubo-set
+        args:
+        - name: workstream-id
+          type: uuid
+          required: true
+          maps_to: workstream_id
+        - name: ownership-percentage
+          type: decimal
+          required: false
+          maps_to: ownership_percentage
+        returns:
+          type: affected
+      list-by-case:
+        description: List workstreams for a case
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: entity_workstreams
+          schema: kyc
+          fk_col: case_id
+        args:
+        - name: case-id
+          type: uuid
+          required: true
+        - name: status
+          type: string
+          required: false
+          maps_to: status
+        returns:
+          type: record_set
+      read:
+        description: Read workstream details
+        behavior: crud
+        crud:
+          operation: select
+          table: entity_workstreams
+          schema: kyc
+        args:
+        - name: workstream-id
+          type: uuid
+          required: true
+          maps_to: workstream_id
+        returns:
+          type: record

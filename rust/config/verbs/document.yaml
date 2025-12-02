@@ -1,0 +1,64 @@
+domains:
+  document:
+    description: Document catalog and extraction operations
+    verbs:
+      catalog:
+        description: Catalog a document for an entity within a CBU
+        behavior: plugin
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+        - name: entity-id
+          type: uuid
+          required: true
+        - name: document-type
+          type: lookup
+          required: true
+          lookup:
+            table: document_types
+            code_column: type_code
+            id_column: type_id
+        - name: file-path
+          type: string
+          required: false
+        - name: metadata
+          type: json
+          required: false
+        returns:
+          type: uuid
+          name: doc_id
+          capture: true
+      extract:
+        description: Extract attributes from a cataloged document
+        behavior: plugin
+        args:
+        - name: document-id
+          type: uuid
+          required: true
+        - name: attributes
+          type: string_list
+          required: false
+        - name: use-ocr
+          type: boolean
+          required: false
+          default: false
+        returns:
+          type: record
+      extract-to-observations:
+        description: Extract document data and create observations
+        behavior: plugin
+        handler: document_extract_observations
+        args:
+        - name: document-id
+          type: uuid
+          required: true
+        - name: entity-id
+          type: uuid
+          required: true
+        - name: auto-verify-allegations
+          type: boolean
+          required: false
+          default: true
+        returns:
+          type: record_set

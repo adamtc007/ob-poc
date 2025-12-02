@@ -4,7 +4,6 @@ version: "1.0"
 # CONSTRAINT RULES (Block Execution)
 # =============================================================================
 constraints:
-
   - id: CSG-C001
     name: passport_requires_person
     description: "PASSPORT document requires PROPER_PERSON entity"
@@ -69,7 +68,6 @@ constraints:
 # WARNING RULES (Allow Execution with Warning)
 # =============================================================================
 warnings:
-
   - id: CSG-W001
     name: high_ownership_percentage
     description: "Ownership percentage exceeds 100%"
@@ -112,7 +110,6 @@ warnings:
 # JURISDICTION RULES
 # =============================================================================
 jurisdiction_rules:
-
   - id: CSG-J001
     name: us_person_fatca
     description: "US persons require FATCA documentation"
@@ -137,7 +134,36 @@ jurisdiction_rules:
     description: "EU entities subject to GDPR"
     severity: info
     when:
-      jurisdiction_in: [DE, FR, IT, ES, NL, BE, AT, IE, LU, PT, GR, FI, SE, DK, PL, CZ, HU, RO, BG, HR, SK, SI, EE, LV, LT, CY, MT]
+      jurisdiction_in:
+        [
+          DE,
+          FR,
+          IT,
+          ES,
+          NL,
+          BE,
+          AT,
+          IE,
+          LU,
+          PT,
+          GR,
+          FI,
+          SE,
+          DK,
+          PL,
+          CZ,
+          HU,
+          RO,
+          BG,
+          HR,
+          SK,
+          SI,
+          EE,
+          LV,
+          LT,
+          CY,
+          MT,
+        ]
     message: "EU entity - ensure GDPR compliance for data handling."
 
   - id: CSG-J004
@@ -152,7 +178,6 @@ jurisdiction_rules:
 # COMPOSITE RULES (Multi-condition Checks)
 # =============================================================================
 composite_rules:
-
   - id: CSG-X001
     name: complete_corporate_onboarding
     description: "Corporate onboarding completeness check"
@@ -179,3 +204,62 @@ composite_rules:
       - person_screened
       - person_has_address_proof
     message: "Individual onboarding incomplete: {missing_items}"
+
+# =============================================================================
+# STATE MACHINES
+# =============================================================================
+# Machine-readable state transitions for documentation, linting, and UI
+state_machines:
+  kyc_case:
+    table: kyc.cases
+    column: status
+    initial: INTAKE
+    terminal: [APPROVED, REJECTED, WITHDRAWN, EXPIRED]
+    transitions:
+      INTAKE: [DISCOVERY, WITHDRAWN]
+      DISCOVERY: [ASSESSMENT, BLOCKED, WITHDRAWN]
+      ASSESSMENT: [REVIEW, BLOCKED, WITHDRAWN]
+      REVIEW: [APPROVED, REJECTED, BLOCKED]
+      BLOCKED: [DISCOVERY, ASSESSMENT, REVIEW, WITHDRAWN]
+      APPROVED: []
+      REJECTED: []
+      WITHDRAWN: []
+      EXPIRED: []
+
+  workstream:
+    table: kyc.entity_workstreams
+    column: status
+    initial: PENDING
+    terminal: [COMPLETE]
+    transitions:
+      PENDING: [COLLECT, BLOCKED]
+      COLLECT: [VERIFY, BLOCKED]
+      VERIFY: [SCREEN, BLOCKED]
+      SCREEN: [ASSESS, BLOCKED]
+      ASSESS: [COMPLETE, ENHANCED_DD, BLOCKED]
+      ENHANCED_DD: [ASSESS, BLOCKED]
+      BLOCKED: [PENDING, COLLECT, VERIFY, SCREEN, ASSESS]
+      COMPLETE: []
+
+  resource_instance:
+    table: ob-poc.cbu_resource_instances
+    column: status
+    initial: PENDING
+    terminal: [DECOMMISSIONED]
+    transitions:
+      PENDING: [PROVISIONING, DECOMMISSIONED]
+      PROVISIONING: [ACTIVE, DECOMMISSIONED]
+      ACTIVE: [SUSPENDED, DECOMMISSIONED]
+      SUSPENDED: [ACTIVE, DECOMMISSIONED]
+      DECOMMISSIONED: []
+
+  ssi:
+    table: custody.cbu_ssi
+    column: status
+    initial: PENDING
+    terminal: [EXPIRED]
+    transitions:
+      PENDING: [ACTIVE, EXPIRED]
+      ACTIVE: [SUSPENDED, EXPIRED]
+      SUSPENDED: [ACTIVE, EXPIRED]
+      EXPIRED: []

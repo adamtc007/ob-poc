@@ -1,0 +1,2 @@
+version: '1.0'
+description: Split verb configuration - load all *.yaml files in this directory

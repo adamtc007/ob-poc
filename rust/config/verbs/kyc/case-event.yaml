@@ -1,0 +1,67 @@
+domains:
+  case-event:
+    description: Audit trail for KYC case activities
+    verbs:
+      log:
+        description: Log a case event
+        behavior: crud
+        crud:
+          operation: insert
+          table: case_events
+          schema: kyc
+          returning: event_id
+        args:
+        - name: case-id
+          type: uuid
+          required: true
+          maps_to: case_id
+        - name: workstream-id
+          type: uuid
+          required: false
+          maps_to: workstream_id
+        - name: event-type
+          type: string
+          required: true
+          maps_to: event_type
+        - name: event-data
+          type: json
+          required: false
+          maps_to: event_data
+        - name: actor-id
+          type: uuid
+          required: false
+          maps_to: actor_id
+        - name: actor-type
+          type: string
+          required: false
+          maps_to: actor_type
+          default: USER
+          valid_values:
+          - USER
+          - SYSTEM
+          - RULE_ENGINE
+          - INTEGRATION
+        - name: comment
+          type: string
+          required: false
+          maps_to: comment
+        returns:
+          type: uuid
+          name: event_id
+          capture: false
+      list-by-case:
+        description: List events for a case
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: case_events
+          schema: kyc
+          fk_col: case_id
+        args:
+        - name: case-id
+          type: uuid
+          required: true
+        - name: event-type
+          type: string
+          required: false
+          maps_to: event_type

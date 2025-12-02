@@ -1,0 +1,60 @@
+domains:
+  security-type:
+    description: SMPG/ALERT security type codes
+    verbs:
+      ensure:
+        description: Create or update ALERT security type
+        behavior: crud
+        crud:
+          operation: upsert
+          table: security_types
+          schema: custody
+          conflict_keys:
+          - code
+          returning: security_type_id
+        args:
+        - name: class
+          type: lookup
+          required: true
+          maps_to: instrument_class_id
+          lookup:
+            table: instrument_classes
+            schema: custody
+            code_column: code
+            id_column: class_id
+        - name: code
+          type: string
+          required: true
+          maps_to: code
+        - name: name
+          type: string
+          required: true
+          maps_to: name
+        - name: cfi-pattern
+          type: string
+          required: false
+          maps_to: cfi_pattern
+        returns:
+          type: uuid
+          name: security_type_id
+          capture: true
+      list:
+        description: List security types for an instrument class
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: security_types
+          schema: custody
+          fk_col: class_id
+        args:
+        - name: class
+          type: lookup
+          required: true
+          maps_to: class_id
+          lookup:
+            table: instrument_classes
+            schema: custody
+            code_column: code
+            id_column: class_id
+        returns:
+          type: record_set

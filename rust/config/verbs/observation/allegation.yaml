@@ -1,0 +1,171 @@
+domains:
+  allegation:
+    description: Client allegations - unverified claims that start the KYC process
+    verbs:
+      record:
+        description: Record a client allegation about an entity attribute
+        behavior: crud
+        crud:
+          operation: insert
+          table: client_allegations
+          schema: ob-poc
+          returning: allegation_id
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+          maps_to: cbu_id
+        - name: entity-id
+          type: uuid
+          required: true
+          maps_to: entity_id
+        - name: attribute-id
+          type: uuid
+          required: true
+          maps_to: attribute_id
+        - name: value
+          type: json
+          required: true
+          maps_to: alleged_value
+        - name: display-value
+          type: string
+          required: false
+          maps_to: alleged_value_display
+        - name: source
+          type: string
+          required: true
+          maps_to: allegation_source
+        - name: source-reference
+          type: string
+          required: false
+          maps_to: allegation_reference
+        - name: case-id
+          type: uuid
+          required: false
+          maps_to: case_id
+        - name: workstream-id
+          type: uuid
+          required: false
+          maps_to: workstream_id
+        returns:
+          type: uuid
+          name: allegation_id
+          capture: true
+      verify:
+        description: Mark allegation as verified by an observation
+        behavior: crud
+        crud:
+          operation: update
+          table: client_allegations
+          schema: ob-poc
+          key: allegation_id
+          set_values:
+            verification_status: VERIFIED
+            verified_at: now()
+        args:
+        - name: allegation-id
+          type: uuid
+          required: true
+          maps_to: allegation_id
+        - name: observation-id
+          type: uuid
+          required: true
+          maps_to: verified_by_observation_id
+        - name: result
+          type: string
+          required: false
+          maps_to: verification_result
+        - name: notes
+          type: string
+          required: false
+          maps_to: verification_notes
+        returns:
+          type: affected
+      contradict:
+        description: Mark allegation as contradicted by evidence
+        behavior: crud
+        crud:
+          operation: update
+          table: client_allegations
+          schema: ob-poc
+          key: allegation_id
+          set_values:
+            verification_status: CONTRADICTED
+            verified_at: now()
+        args:
+        - name: allegation-id
+          type: uuid
+          required: true
+          maps_to: allegation_id
+        - name: observation-id
+          type: uuid
+          required: true
+          maps_to: verified_by_observation_id
+        - name: result
+          type: string
+          required: false
+          maps_to: verification_result
+        - name: notes
+          type: string
+          required: true
+          maps_to: verification_notes
+        returns:
+          type: affected
+      mark-partial:
+        description: Mark allegation as partially verified
+        behavior: crud
+        crud:
+          operation: update
+          table: client_allegations
+          schema: ob-poc
+          key: allegation_id
+          set_values:
+            verification_status: PARTIAL
+            verified_at: now()
+        args:
+        - name: allegation-id
+          type: uuid
+          required: true
+          maps_to: allegation_id
+        - name: observation-id
+          type: uuid
+          required: true
+          maps_to: verified_by_observation_id
+        - name: notes
+          type: string
+          required: true
+          maps_to: verification_notes
+        returns:
+          type: affected
+      list-by-entity:
+        description: List allegations for an entity
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: client_allegations
+          schema: ob-poc
+          fk_col: entity_id
+        args:
+        - name: entity-id
+          type: uuid
+          required: true
+        - name: status
+          type: string
+          required: false
+          maps_to: verification_status
+        returns:
+          type: record_set
+      list-pending:
+        description: List pending allegations for a CBU
+        behavior: crud
+        crud:
+          operation: select
+          table: client_allegations
+          schema: ob-poc
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+          maps_to: cbu_id
+        returns:
+          type: record_set

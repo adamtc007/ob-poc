@@ -1,0 +1,203 @@
+domains:
+  observation:
+    description: Attribute observations from various sources
+    verbs:
+      record:
+        description: Record an attribute observation
+        behavior: crud
+        crud:
+          operation: insert
+          table: attribute_observations
+          schema: ob-poc
+          returning: observation_id
+        args:
+        - name: entity-id
+          type: uuid
+          required: true
+          maps_to: entity_id
+        - name: attribute-id
+          type: uuid
+          required: true
+          maps_to: attribute_id
+        - name: value-text
+          type: string
+          required: false
+          maps_to: value_text
+        - name: value-number
+          type: decimal
+          required: false
+          maps_to: value_number
+        - name: value-boolean
+          type: boolean
+          required: false
+          maps_to: value_boolean
+        - name: value-date
+          type: date
+          required: false
+          maps_to: value_date
+        - name: value-json
+          type: json
+          required: false
+          maps_to: value_json
+        - name: source-type
+          type: string
+          required: true
+          maps_to: source_type
+        - name: source-document-id
+          type: uuid
+          required: false
+          maps_to: source_document_id
+        - name: confidence
+          type: decimal
+          required: false
+          maps_to: confidence
+        - name: is-authoritative
+          type: boolean
+          required: false
+          maps_to: is_authoritative
+        - name: extraction-method
+          type: string
+          required: false
+          maps_to: extraction_method
+        returns:
+          type: uuid
+          name: observation_id
+          capture: true
+      record-from-document:
+        description: Record observation extracted from a document
+        behavior: plugin
+        handler: observation_from_document
+        args:
+        - name: entity-id
+          type: uuid
+          required: true
+        - name: document-id
+          type: uuid
+          required: true
+        - name: attribute
+          type: string
+          required: true
+        - name: value
+          type: string
+          required: true
+        - name: extraction-method
+          type: string
+          required: false
+        - name: confidence
+          type: decimal
+          required: false
+        returns:
+          type: uuid
+          name: observation_id
+          capture: true
+      supersede:
+        description: Supersede an observation with a newer one
+        behavior: crud
+        crud:
+          operation: update
+          table: attribute_observations
+          schema: ob-poc
+          key: observation_id
+          set_values:
+            status: SUPERSEDED
+            superseded_at: now()
+        args:
+        - name: observation-id
+          type: uuid
+          required: true
+          maps_to: observation_id
+        - name: superseded-by
+          type: uuid
+          required: true
+          maps_to: superseded_by
+        returns:
+          type: affected
+      list-for-entity:
+        description: List all observations for an entity
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: attribute_observations
+          schema: ob-poc
+          fk_col: entity_id
+        args:
+        - name: entity-id
+          type: uuid
+          required: true
+        - name: status
+          type: string
+          required: false
+          maps_to: status
+        returns:
+          type: record_set
+      list-for-attribute:
+        description: List observations of a specific attribute for an entity
+        behavior: crud
+        crud:
+          operation: select
+          table: attribute_observations
+          schema: ob-poc
+        args:
+        - name: entity-id
+          type: uuid
+          required: true
+          maps_to: entity_id
+        - name: attribute-id
+          type: uuid
+          required: true
+          maps_to: attribute_id
+        - name: status
+          type: string
+          required: false
+          maps_to: status
+        returns:
+          type: record_set
+      get-current:
+        description: Get current best observation for an attribute
+        behavior: plugin
+        handler: observation_get_current
+        args:
+        - name: entity-id
+          type: uuid
+          required: true
+        - name: attribute
+          type: string
+          required: true
+        returns:
+          type: record
+      reconcile:
+        description: Compare observations for an attribute and auto-create discrepancies
+        behavior: plugin
+        handler: observation_reconcile
+        args:
+        - name: entity-id
+          type: uuid
+          required: true
+        - name: attribute
+          type: string
+          required: true
+        - name: case-id
+          type: uuid
+          required: false
+        - name: auto-create-discrepancies
+          type: boolean
+          required: false
+          default: true
+        returns:
+          type: record_set
+      verify-allegations:
+        description: Batch verify pending allegations against observations
+        behavior: plugin
+        handler: observation_verify_allegations
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+        - name: entity-id
+          type: uuid
+          required: true
+        - name: case-id
+          type: uuid
+          required: false
+        returns:
+          type: record_set

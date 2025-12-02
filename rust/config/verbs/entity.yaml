@@ -1,0 +1,242 @@
+domains:
+  entity:
+    description: Entity management operations
+    dynamic_verbs:
+    - pattern: create-{type_code}
+      source:
+        table: entity_types
+        schema: ob-poc
+        code_column: type_code
+        name_column: name
+        transform: kebab_case
+      behavior: crud
+      crud:
+        operation: entity_create
+        base_table: entities
+        schema: ob-poc
+        extension_table_column: table_name
+        type_id_column: entity_type_id
+        returning: entity_id
+      base_args:
+      - name: name
+        type: string
+        required: true
+        maps_to: name
+      - name: jurisdiction
+        type: string
+        required: false
+        maps_to: jurisdiction
+    verbs:
+      create-limited-company:
+        description: Create a limited company entity
+        behavior: crud
+        crud:
+          operation: entity_create
+          base_table: entities
+          schema: ob-poc
+          extension_table_column: table_name
+          type_id_column: entity_type_id
+          returning: entity_id
+        args:
+        - name: name
+          type: string
+          required: true
+          maps_to: company_name
+        - name: cbu-id
+          type: uuid
+          required: false
+        - name: company-number
+          type: string
+          required: false
+          maps_to: registration_number
+        - name: jurisdiction
+          type: string
+          required: false
+          maps_to: jurisdiction
+        returns:
+          type: uuid
+          name: entity_id
+          capture: true
+      create-proper-person:
+        description: Create a natural person entity
+        behavior: crud
+        crud:
+          operation: entity_create
+          base_table: entities
+          schema: ob-poc
+          extension_table_column: table_name
+          type_id_column: entity_type_id
+          returning: entity_id
+        args:
+        - name: first-name
+          type: string
+          required: true
+          maps_to: first_name
+        - name: last-name
+          type: string
+          required: true
+          maps_to: last_name
+        - name: cbu-id
+          type: uuid
+          required: false
+        - name: date-of-birth
+          type: date
+          required: false
+          maps_to: date_of_birth
+        - name: nationality
+          type: string
+          required: false
+          maps_to: nationality
+        returns:
+          type: uuid
+          name: entity_id
+          capture: true
+      create-trust-discretionary:
+        description: Create a discretionary trust entity
+        behavior: crud
+        crud:
+          operation: entity_create
+          base_table: entities
+          schema: ob-poc
+          extension_table_column: table_name
+          type_id_column: entity_type_id
+          returning: entity_id
+        args:
+        - name: name
+          type: string
+          required: true
+          maps_to: trust_name
+        - name: cbu-id
+          type: uuid
+          required: false
+        - name: jurisdiction
+          type: string
+          required: true
+          maps_to: jurisdiction
+        - name: establishment-date
+          type: date
+          required: false
+          maps_to: establishment_date
+        - name: trust-purpose
+          type: string
+          required: false
+          maps_to: trust_purpose
+        returns:
+          type: uuid
+          name: entity_id
+          capture: true
+      create-partnership-limited:
+        description: Create a limited partnership entity
+        behavior: crud
+        crud:
+          operation: entity_create
+          base_table: entities
+          schema: ob-poc
+          extension_table_column: table_name
+          type_id_column: entity_type_id
+          returning: entity_id
+        args:
+        - name: name
+          type: string
+          required: true
+          maps_to: partnership_name
+        - name: cbu-id
+          type: uuid
+          required: false
+        - name: jurisdiction
+          type: string
+          required: false
+          maps_to: jurisdiction
+        - name: formation-date
+          type: date
+          required: false
+          maps_to: formation_date
+        returns:
+          type: uuid
+          name: entity_id
+          capture: true
+      read:
+        description: Read an entity by ID
+        behavior: crud
+        crud:
+          operation: select
+          table: entities
+          schema: ob-poc
+        args:
+        - name: entity-id
+          type: uuid
+          required: true
+          maps_to: entity_id
+        returns:
+          type: record
+      update:
+        description: Update an entity's base fields
+        behavior: crud
+        crud:
+          operation: update
+          table: entities
+          schema: ob-poc
+          key: entity_id
+        args:
+        - name: entity-id
+          type: uuid
+          required: true
+          maps_to: entity_id
+        - name: name
+          type: string
+          required: false
+          maps_to: name
+        - name: status
+          type: string
+          required: false
+          maps_to: status
+        - name: jurisdiction
+          type: string
+          required: false
+          maps_to: jurisdiction
+        returns:
+          type: affected
+      delete:
+        description: Delete an entity (cascades to type extension)
+        behavior: crud
+        crud:
+          operation: delete
+          table: entities
+          schema: ob-poc
+          key: entity_id
+        args:
+        - name: entity-id
+          type: uuid
+          required: true
+          maps_to: entity_id
+        returns:
+          type: affected
+      list:
+        description: List entities with optional filters
+        behavior: crud
+        crud:
+          operation: select
+          table: entities
+          schema: ob-poc
+        args:
+        - name: entity-type
+          type: string
+          required: false
+        - name: jurisdiction
+          type: string
+          required: false
+          maps_to: jurisdiction
+        - name: status
+          type: string
+          required: false
+          maps_to: status
+        - name: limit
+          type: integer
+          required: false
+          default: 100
+        - name: offset
+          type: integer
+          required: false
+          default: 0
+        returns:
+          type: record_set

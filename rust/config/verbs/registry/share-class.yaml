@@ -1,0 +1,306 @@
+domains:
+  share-class:
+    description: Fund share class management and investor registry (Clearstream-style)
+    verbs:
+      create:
+        description: Create a new share class for a fund CBU
+        behavior: crud
+        crud:
+          operation: insert
+          table: share_classes
+          schema: kyc
+          returning: id
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+          maps_to: cbu_id
+        - name: entity-id
+          type: uuid
+          required: false
+          maps_to: entity_id
+        - name: name
+          type: string
+          required: true
+          maps_to: name
+        - name: isin
+          type: string
+          required: false
+          maps_to: isin
+        - name: currency
+          type: string
+          required: false
+          maps_to: currency
+          default: EUR
+        - name: fund-type
+          type: string
+          required: false
+          maps_to: fund_type
+          valid_values:
+          - HEDGE_FUND
+          - UCITS
+          - AIFMD
+          - PRIVATE_EQUITY
+          - REIT
+        - name: fund-structure
+          type: string
+          required: false
+          maps_to: fund_structure
+          valid_values:
+          - OPEN_ENDED
+          - CLOSED_ENDED
+        - name: investor-eligibility
+          type: string
+          required: false
+          maps_to: investor_eligibility
+          valid_values:
+          - RETAIL
+          - PROFESSIONAL
+          - QUALIFIED
+        - name: nav-per-share
+          type: decimal
+          required: false
+          maps_to: nav_per_share
+        - name: nav-date
+          type: date
+          required: false
+          maps_to: nav_date
+        - name: management-fee-bps
+          type: integer
+          required: false
+          maps_to: management_fee_bps
+        - name: performance-fee-bps
+          type: integer
+          required: false
+          maps_to: performance_fee_bps
+        - name: high-water-mark
+          type: boolean
+          required: false
+          maps_to: high_water_mark
+        - name: hurdle-rate
+          type: decimal
+          required: false
+          maps_to: hurdle_rate
+        - name: subscription-frequency
+          type: string
+          required: false
+          maps_to: subscription_frequency
+        - name: redemption-frequency
+          type: string
+          required: false
+          maps_to: redemption_frequency
+        - name: redemption-notice-days
+          type: integer
+          required: false
+          maps_to: redemption_notice_days
+        - name: lock-up-period-months
+          type: integer
+          required: false
+          maps_to: lock_up_period_months
+        - name: gate-percentage
+          type: decimal
+          required: false
+          maps_to: gate_percentage
+        - name: minimum-investment
+          type: decimal
+          required: false
+          maps_to: minimum_investment
+        - name: class-category
+          type: string
+          required: false
+          maps_to: class_category
+          valid_values:
+          - CORPORATE
+          - FUND
+        returns:
+          type: uuid
+          name: share_class_id
+          capture: true
+      ensure:
+        description: Create or update share class by ISIN
+        behavior: crud
+        crud:
+          operation: upsert
+          table: share_classes
+          schema: kyc
+          conflict_keys:
+          - cbu_id
+          - isin
+          returning: id
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+          maps_to: cbu_id
+        - name: entity-id
+          type: uuid
+          required: false
+          maps_to: entity_id
+        - name: name
+          type: string
+          required: true
+          maps_to: name
+        - name: isin
+          type: string
+          required: true
+          maps_to: isin
+        - name: currency
+          type: string
+          required: false
+          maps_to: currency
+        - name: fund-type
+          type: string
+          required: false
+          maps_to: fund_type
+          valid_values:
+          - HEDGE_FUND
+          - UCITS
+          - AIFMD
+          - PRIVATE_EQUITY
+          - REIT
+        - name: fund-structure
+          type: string
+          required: false
+          maps_to: fund_structure
+          valid_values:
+          - OPEN_ENDED
+          - CLOSED_ENDED
+        - name: investor-eligibility
+          type: string
+          required: false
+          maps_to: investor_eligibility
+          valid_values:
+          - RETAIL
+          - PROFESSIONAL
+          - QUALIFIED
+        - name: nav-per-share
+          type: decimal
+          required: false
+          maps_to: nav_per_share
+        - name: nav-date
+          type: date
+          required: false
+          maps_to: nav_date
+        - name: management-fee-bps
+          type: integer
+          required: false
+          maps_to: management_fee_bps
+        - name: performance-fee-bps
+          type: integer
+          required: false
+          maps_to: performance_fee_bps
+        - name: high-water-mark
+          type: boolean
+          required: false
+          maps_to: high_water_mark
+        - name: hurdle-rate
+          type: decimal
+          required: false
+          maps_to: hurdle_rate
+        - name: subscription-frequency
+          type: string
+          required: false
+          maps_to: subscription_frequency
+        - name: redemption-frequency
+          type: string
+          required: false
+          maps_to: redemption_frequency
+        - name: redemption-notice-days
+          type: integer
+          required: false
+          maps_to: redemption_notice_days
+        - name: lock-up-period-months
+          type: integer
+          required: false
+          maps_to: lock_up_period_months
+        - name: gate-percentage
+          type: decimal
+          required: false
+          maps_to: gate_percentage
+        - name: minimum-investment
+          type: decimal
+          required: false
+          maps_to: minimum_investment
+        - name: class-category
+          type: string
+          required: false
+          maps_to: class_category
+          valid_values:
+          - CORPORATE
+          - FUND
+        returns:
+          type: uuid
+          name: share_class_id
+          capture: true
+      update-nav:
+        description: Update NAV for a share class
+        behavior: crud
+        crud:
+          operation: update
+          table: share_classes
+          schema: kyc
+          key: id
+        args:
+        - name: share-class-id
+          type: uuid
+          required: true
+          maps_to: id
+        - name: nav-per-share
+          type: decimal
+          required: true
+          maps_to: nav_per_share
+        - name: nav-date
+          type: date
+          required: true
+          maps_to: nav_date
+        returns:
+          type: affected
+      read:
+        description: Read a share class by ID
+        behavior: crud
+        crud:
+          operation: select
+          table: share_classes
+          schema: kyc
+        args:
+        - name: share-class-id
+          type: uuid
+          required: true
+          maps_to: id
+        returns:
+          type: record
+      list:
+        description: List share classes for a fund
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: share_classes
+          schema: kyc
+          fk_col: cbu_id
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+        - name: status
+          type: string
+          required: false
+          maps_to: status
+        returns:
+          type: record_set
+      close:
+        description: Close a share class to new subscriptions
+        behavior: crud
+        crud:
+          operation: update
+          table: share_classes
+          schema: kyc
+          key: id
+          set_values:
+            status: closed
+        args:
+        - name: share-class-id
+          type: uuid
+          required: true
+          maps_to: id
+        returns:
+          type: affected

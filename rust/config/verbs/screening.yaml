@@ -1,0 +1,44 @@
+domains:
+  screening:
+    description: Entity screening operations (PEP, sanctions, adverse media)
+    verbs:
+      pep:
+        description: Run PEP (Politically Exposed Persons) screening
+        behavior: plugin
+        args:
+        - name: entity-id
+          type: uuid
+          required: true
+        - name: provider
+          type: string
+          required: false
+        returns:
+          type: uuid
+          capture: true
+      sanctions:
+        description: Run sanctions list screening
+        behavior: plugin
+        args:
+        - name: entity-id
+          type: uuid
+          required: true
+        - name: lists
+          type: string_list
+          required: false
+        returns:
+          type: uuid
+          capture: true
+      adverse-media:
+        description: Run adverse media screening
+        behavior: plugin
+        args:
+        - name: entity-id
+          type: uuid
+          required: true
+        - name: lookback-months
+          type: integer
+          required: false
+          default: 24
+        returns:
+          type: uuid
+          capture: true

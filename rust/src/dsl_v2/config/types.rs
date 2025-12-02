@@ -11,8 +11,14 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct VerbsConfig {
+    #[serde(default = "default_version")]
     pub version: String,
+    #[serde(default)]
     pub domains: HashMap<String, DomainConfig>,
+}
+
+fn default_version() -> String {
+    "1.0".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

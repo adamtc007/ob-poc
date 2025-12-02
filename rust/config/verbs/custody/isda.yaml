@@ -1,0 +1,136 @@
+domains:
+  isda:
+    description: ISDA and CSA agreement management for OTC derivatives
+    verbs:
+      create:
+        description: Create ISDA agreement with counterparty
+        behavior: crud
+        crud:
+          operation: insert
+          table: isda_agreements
+          schema: custody
+          returning: isda_id
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+          maps_to: cbu_id
+        - name: counterparty
+          type: uuid
+          required: true
+          maps_to: counterparty_entity_id
+        - name: agreement-date
+          type: date
+          required: true
+          maps_to: agreement_date
+        - name: governing-law
+          type: string
+          required: false
+          maps_to: governing_law
+          valid_values:
+          - NY
+          - ENGLISH
+        - name: effective-date
+          type: date
+          required: true
+          maps_to: effective_date
+        returns:
+          type: uuid
+          name: isda_id
+          capture: true
+      add-coverage:
+        description: Add instrument class coverage to ISDA
+        behavior: crud
+        crud:
+          operation: insert
+          table: isda_product_coverage
+          schema: custody
+          returning: coverage_id
+        args:
+        - name: isda-id
+          type: uuid
+          required: true
+          maps_to: isda_id
+        - name: instrument-class
+          type: lookup
+          required: true
+          maps_to: instrument_class_id
+          lookup:
+            table: instrument_classes
+            schema: custody
+            code_column: code
+            id_column: class_id
+        - name: isda-taxonomy
+          type: lookup
+          required: false
+          maps_to: isda_taxonomy_id
+          lookup:
+            table: isda_product_taxonomy
+            schema: custody
+            code_column: taxonomy_code
+            id_column: taxonomy_id
+        returns:
+          type: uuid
+          name: coverage_id
+      add-csa:
+        description: Add CSA (Credit Support Annex) to ISDA
+        behavior: crud
+        crud:
+          operation: insert
+          table: csa_agreements
+          schema: custody
+          returning: csa_id
+        args:
+        - name: isda-id
+          type: uuid
+          required: true
+          maps_to: isda_id
+        - name: csa-type
+          type: string
+          required: true
+          maps_to: csa_type
+          valid_values:
+          - VM
+          - IM
+        - name: threshold
+          type: decimal
+          required: false
+          maps_to: threshold_amount
+        - name: threshold-currency
+          type: string
+          required: false
+          maps_to: threshold_currency
+        - name: mta
+          type: decimal
+          required: false
+          maps_to: minimum_transfer_amount
+        - name: collateral-ssi
+          type: uuid
+          required: false
+          maps_to: collateral_ssi_id
+        - name: effective-date
+          type: date
+          required: true
+          maps_to: effective_date
+        returns:
+          type: uuid
+          name: csa_id
+          capture: true
+      list:
+        description: List ISDA agreements for CBU
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: isda_agreements
+          schema: custody
+          fk_col: cbu_id
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+        - name: counterparty
+          type: uuid
+          required: false
+          maps_to: counterparty_entity_id
+        returns:
+          type: record_set

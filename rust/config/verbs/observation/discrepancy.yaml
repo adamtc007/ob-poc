@@ -1,0 +1,138 @@
+domains:
+  discrepancy:
+    description: Observation discrepancies - conflicts between attribute observations
+    verbs:
+      record:
+        description: Record a discrepancy between observations
+        behavior: crud
+        crud:
+          operation: insert
+          table: observation_discrepancies
+          schema: ob-poc
+          returning: discrepancy_id
+        args:
+        - name: entity-id
+          type: uuid
+          required: true
+          maps_to: entity_id
+        - name: attribute-id
+          type: uuid
+          required: true
+          maps_to: attribute_id
+        - name: observation-1-id
+          type: uuid
+          required: true
+          maps_to: observation_1_id
+        - name: observation-2-id
+          type: uuid
+          required: true
+          maps_to: observation_2_id
+        - name: type
+          type: string
+          required: true
+          maps_to: discrepancy_type
+        - name: severity
+          type: string
+          required: true
+          maps_to: severity
+        - name: description
+          type: string
+          required: true
+          maps_to: description
+        - name: value-1-display
+          type: string
+          required: false
+          maps_to: value_1_display
+        - name: value-2-display
+          type: string
+          required: false
+          maps_to: value_2_display
+        - name: case-id
+          type: uuid
+          required: false
+          maps_to: case_id
+        - name: workstream-id
+          type: uuid
+          required: false
+          maps_to: workstream_id
+        returns:
+          type: uuid
+          name: discrepancy_id
+          capture: true
+      resolve:
+        description: Resolve a discrepancy
+        behavior: crud
+        crud:
+          operation: update
+          table: observation_discrepancies
+          schema: ob-poc
+          key: discrepancy_id
+          set_values:
+            resolution_status: RESOLVED
+            resolved_at: now()
+        args:
+        - name: discrepancy-id
+          type: uuid
+          required: true
+          maps_to: discrepancy_id
+        - name: resolution-type
+          type: string
+          required: true
+          maps_to: resolution_type
+        - name: accepted-observation-id
+          type: uuid
+          required: false
+          maps_to: accepted_observation_id
+        - name: notes
+          type: string
+          required: false
+          maps_to: resolution_notes
+        - name: resolved-by
+          type: string
+          required: false
+          maps_to: resolved_by
+        returns:
+          type: affected
+      escalate:
+        description: Escalate a discrepancy
+        behavior: crud
+        crud:
+          operation: update
+          table: observation_discrepancies
+          schema: ob-poc
+          key: discrepancy_id
+          set_values:
+            resolution_status: ESCALATED
+        args:
+        - name: discrepancy-id
+          type: uuid
+          required: true
+          maps_to: discrepancy_id
+        - name: notes
+          type: string
+          required: false
+          maps_to: resolution_notes
+        returns:
+          type: affected
+      list-open:
+        description: List open discrepancies
+        behavior: crud
+        crud:
+          operation: select
+          table: observation_discrepancies
+          schema: ob-poc
+        args:
+        - name: entity-id
+          type: uuid
+          required: false
+          maps_to: entity_id
+        - name: case-id
+          type: uuid
+          required: false
+          maps_to: case_id
+        - name: severity
+          type: string
+          required: false
+          maps_to: severity
+        returns:
+          type: record_set

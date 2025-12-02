@@ -1,0 +1,101 @@
+domains:
+  instrument-class:
+    description: Instrument class with industry taxonomy mappings
+    verbs:
+      ensure:
+        description: Create or update instrument class with CFI/SMPG/ISDA mappings
+        behavior: crud
+        crud:
+          operation: upsert
+          table: instrument_classes
+          schema: custody
+          conflict_keys:
+          - code
+          returning: class_id
+        args:
+        - name: code
+          type: string
+          required: true
+          maps_to: code
+        - name: name
+          type: string
+          required: true
+          maps_to: name
+        - name: settlement-cycle
+          type: string
+          required: true
+          maps_to: default_settlement_cycle
+        - name: swift-family
+          type: string
+          required: false
+          maps_to: swift_message_family
+        - name: cfi-category
+          type: string
+          required: false
+          maps_to: cfi_category
+        - name: cfi-group
+          type: string
+          required: false
+          maps_to: cfi_group
+        - name: smpg-group
+          type: string
+          required: false
+          maps_to: smpg_group
+        - name: isda-asset-class
+          type: string
+          required: false
+          maps_to: isda_asset_class
+        - name: requires-isda
+          type: boolean
+          required: false
+          maps_to: requires_isda
+          default: false
+        - name: parent
+          type: lookup
+          required: false
+          maps_to: parent_class_id
+          lookup:
+            table: instrument_classes
+            schema: custody
+            code_column: code
+            id_column: class_id
+        returns:
+          type: uuid
+          name: class_id
+          capture: true
+      read:
+        description: Read instrument class by code
+        behavior: crud
+        crud:
+          operation: select
+          table: instrument_classes
+          schema: custody
+        args:
+        - name: code
+          type: string
+          required: true
+          maps_to: code
+        returns:
+          type: record
+      list:
+        description: List instrument classes with filters
+        behavior: crud
+        crud:
+          operation: select
+          table: instrument_classes
+          schema: custody
+        args:
+        - name: smpg-group
+          type: string
+          required: false
+          maps_to: smpg_group
+        - name: isda-asset-class
+          type: string
+          required: false
+          maps_to: isda_asset_class
+        - name: requires-isda
+          type: boolean
+          required: false
+          maps_to: requires_isda
+        returns:
+          type: record_set

@@ -1,0 +1,127 @@
+domains:
+  case-screening:
+    description: Sanctions, PEP, and adverse media screening for KYC workstreams
+    verbs:
+      run:
+        description: Initiate a screening
+        behavior: crud
+        crud:
+          operation: insert
+          table: screenings
+          schema: kyc
+          returning: screening_id
+        emits_event: screening.started
+        args:
+        - name: workstream-id
+          type: uuid
+          required: true
+          maps_to: workstream_id
+        - name: screening-type
+          type: string
+          required: true
+          maps_to: screening_type
+          valid_values:
+          - SANCTIONS
+          - PEP
+          - ADVERSE_MEDIA
+          - CREDIT
+          - CRIMINAL
+          - REGULATORY
+          - CONSOLIDATED
+        - name: provider
+          type: string
+          required: false
+          maps_to: provider
+        returns:
+          type: uuid
+          name: screening_id
+          capture: true
+      complete:
+        description: Record screening completion
+        behavior: crud
+        crud:
+          operation: update
+          table: screenings
+          schema: kyc
+          key: screening_id
+          set_values:
+            completed_at: now()
+        emits_event: screening.completed
+        args:
+        - name: screening-id
+          type: uuid
+          required: true
+          maps_to: screening_id
+        - name: status
+          type: string
+          required: true
+          maps_to: status
+          valid_values:
+          - CLEAR
+          - HIT_PENDING_REVIEW
+          - ERROR
+        - name: result-summary
+          type: string
+          required: false
+          maps_to: result_summary
+        - name: match-count
+          type: integer
+          required: false
+          maps_to: match_count
+        returns:
+          type: affected
+      review-hit:
+        description: Review a screening hit
+        behavior: crud
+        crud:
+          operation: update
+          table: screenings
+          schema: kyc
+          key: screening_id
+          set_values:
+            reviewed_at: now()
+        emits_event: screening.reviewed
+        args:
+        - name: screening-id
+          type: uuid
+          required: true
+          maps_to: screening_id
+        - name: status
+          type: string
+          required: true
+          maps_to: status
+          valid_values:
+          - HIT_CONFIRMED
+          - HIT_DISMISSED
+        - name: notes
+          type: string
+          required: true
+          maps_to: review_notes
+        - name: red-flag-id
+          type: uuid
+          required: false
+          maps_to: red_flag_id
+        returns:
+          type: affected
+      list-by-workstream:
+        description: List screenings for a workstream
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: screenings
+          schema: kyc
+          fk_col: workstream_id
+        args:
+        - name: workstream-id
+          type: uuid
+          required: true
+        - name: screening-type
+          type: string
+          required: false
+          maps_to: screening_type
+        - name: status
+          type: string
+          required: false
+          maps_to: status
+        returns:
+          type: record_set

@@ -1,0 +1,228 @@
+domains:
+  service:
+    description: Service catalog operations
+    verbs:
+      create:
+        description: Create a new service in the catalog
+        behavior: crud
+        crud:
+          operation: insert
+          table: services
+          schema: ob-poc
+          returning: service_id
+        args:
+        - name: name
+          type: string
+          required: true
+          maps_to: name
+        - name: service-code
+          type: string
+          required: true
+          maps_to: service_code
+        - name: description
+          type: string
+          required: false
+          maps_to: description
+        - name: service-type
+          type: string
+          required: false
+          maps_to: service_type
+        - name: is-active
+          type: boolean
+          required: false
+          maps_to: is_active
+          default: true
+        returns:
+          type: uuid
+          name: service_id
+          capture: true
+      read:
+        description: Read a service by ID or code
+        behavior: crud
+        crud:
+          operation: select
+          table: services
+          schema: ob-poc
+        args:
+        - name: service-id
+          type: uuid
+          required: false
+          maps_to: service_id
+        - name: service-code
+          type: string
+          required: false
+          maps_to: service_code
+        returns:
+          type: record
+      update:
+        description: Update a service
+        behavior: crud
+        crud:
+          operation: update
+          table: services
+          schema: ob-poc
+          key: service_id
+        args:
+        - name: service-id
+          type: uuid
+          required: true
+          maps_to: service_id
+        - name: name
+          type: string
+          required: false
+          maps_to: name
+        - name: description
+          type: string
+          required: false
+          maps_to: description
+        - name: is-active
+          type: boolean
+          required: false
+          maps_to: is_active
+        - name: service-type
+          type: string
+          required: false
+          maps_to: service_type
+        returns:
+          type: affected
+      delete:
+        description: Delete a service
+        behavior: crud
+        crud:
+          operation: delete
+          table: services
+          schema: ob-poc
+          key: service_id
+        args:
+        - name: service-id
+          type: uuid
+          required: true
+          maps_to: service_id
+        returns:
+          type: affected
+      list:
+        description: List services with optional filters
+        behavior: crud
+        crud:
+          operation: select
+          table: services
+          schema: ob-poc
+        args:
+        - name: service-type
+          type: string
+          required: false
+          maps_to: service_type
+        - name: is-active
+          type: boolean
+          required: false
+          maps_to: is_active
+        - name: limit
+          type: integer
+          required: false
+          default: 100
+        - name: offset
+          type: integer
+          required: false
+          default: 0
+        returns:
+          type: record_set
+      ensure:
+        description: Create or update a service by service-code
+        behavior: crud
+        crud:
+          operation: upsert
+          table: services
+          schema: ob-poc
+          conflict_keys:
+          - service_code
+          returning: service_id
+        args:
+        - name: name
+          type: string
+          required: true
+          maps_to: name
+        - name: service-code
+          type: string
+          required: true
+          maps_to: service_code
+        - name: description
+          type: string
+          required: false
+          maps_to: description
+        - name: service-type
+          type: string
+          required: false
+          maps_to: service_type
+        returns:
+          type: uuid
+          name: service_id
+          capture: true
+      link-product:
+        description: Link a service to a product
+        behavior: crud
+        crud:
+          operation: link
+          junction: product_services
+          schema: ob-poc
+          from_col: service_id
+          to_col: product_id
+        args:
+        - name: service-id
+          type: uuid
+          required: true
+          maps_to: service_id
+        - name: product-id
+          type: uuid
+          required: true
+          maps_to: product_id
+        - name: is-mandatory
+          type: boolean
+          required: false
+          maps_to: is_mandatory
+        - name: is-default
+          type: boolean
+          required: false
+          maps_to: is_default
+        - name: display-order
+          type: integer
+          required: false
+          maps_to: display_order
+        returns:
+          type: void
+      unlink-product:
+        description: Unlink a service from a product
+        behavior: crud
+        crud:
+          operation: unlink
+          junction: product_services
+          schema: ob-poc
+          from_col: service_id
+          to_col: product_id
+        args:
+        - name: service-id
+          type: uuid
+          required: true
+        - name: product-id
+          type: uuid
+          required: true
+        returns:
+          type: affected
+      list-by-product:
+        description: List services for a product
+        behavior: crud
+        crud:
+          operation: select_with_join
+          primary_table: services
+          join_table: product_services
+          join_col: service_id
+          filter_col: product_id
+          schema: ob-poc
+        args:
+        - name: product-id
+          type: uuid
+          required: true
+        - name: is-mandatory
+          type: boolean
+          required: false
+        returns:
+          type: record_set

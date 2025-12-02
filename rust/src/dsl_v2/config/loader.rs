@@ -31,7 +31,25 @@ impl ConfigLoader {
     }
 
     /// Load verb configuration
+    ///
+    /// Supports two modes:
+    /// 1. Single file: config/verbs.yaml (legacy)
+    /// 2. Split directory: config/verbs/*.yaml (preferred)
+    ///
+    /// If verbs/ directory exists, loads all .yaml files recursively and merges domains.
+    /// Otherwise falls back to verbs.yaml.
     pub fn load_verbs(&self) -> Result<VerbsConfig> {
+        let verbs_dir = Path::new(&self.config_dir).join("verbs");
+
+        if verbs_dir.exists() && verbs_dir.is_dir() {
+            self.load_verbs_from_directory(&verbs_dir)
+        } else {
+            self.load_verbs_from_file()
+        }
+    }
+
+    /// Load verbs from single verbs.yaml file (legacy mode)
+    fn load_verbs_from_file(&self) -> Result<VerbsConfig> {
         let path = Path::new(&self.config_dir).join("verbs.yaml");
         info!("Loading verb configuration from {}", path.display());
 
@@ -54,6 +72,96 @@ impl ConfigLoader {
         );
 
         Ok(config)
+    }
+
+    /// Load verbs from split directory (config/verbs/*.yaml)
+    fn load_verbs_from_directory(&self, verbs_dir: &Path) -> Result<VerbsConfig> {
+        info!(
+            "Loading verb configuration from directory {}",
+            verbs_dir.display()
+        );
+
+        let mut merged_config = VerbsConfig {
+            version: "1.0".to_string(),
+            domains: std::collections::HashMap::new(),
+        };
+
+        // Recursively find all .yaml files
+        let yaml_files = self.find_yaml_files(verbs_dir)?;
+
+        for path in yaml_files {
+            // Skip _meta.yaml (contains version info, not domains)
+            if path
+                .file_name()
+                .map(|n| n.to_str().unwrap_or(""))
+                .unwrap_or("")
+                .starts_with('_')
+            {
+                // Check for version in _meta.yaml
+                if path.file_name().map(|n| n == "_meta.yaml").unwrap_or(false) {
+                    let content = std::fs::read_to_string(&path)
+                        .with_context(|| format!("Failed to read {}", path.display()))?;
+                    if let Ok(meta) = serde_yaml::from_str::<serde_yaml::Value>(&content) {
+                        if let Some(version) = meta.get("version").and_then(|v| v.as_str()) {
+                            merged_config.version = version.to_string();
+                        }
+                    }
+                }
+                continue;
+            }
+
+            let content = std::fs::read_to_string(&path)
+                .with_context(|| format!("Failed to read {}", path.display()))?;
+
+            let partial: VerbsConfig = serde_yaml::from_str(&content)
+                .with_context(|| format!("Failed to parse {}", path.display()))?;
+
+            // Merge domains
+            for (domain_name, domain_config) in partial.domains {
+                merged_config.domains.insert(domain_name, domain_config);
+            }
+        }
+
+        self.validate_verbs(&merged_config)?;
+
+        info!(
+            "Loaded {} domains with {} total verbs from split config",
+            merged_config.domains.len(),
+            merged_config
+                .domains
+                .values()
+                .map(|d| d.verbs.len())
+                .sum::<usize>()
+        );
+
+        Ok(merged_config)
+    }
+
+    /// Recursively find all .yaml files in a directory
+    fn find_yaml_files(&self, dir: &Path) -> Result<Vec<std::path::PathBuf>> {
+        #![allow(clippy::only_used_in_recursion)]
+        let mut files = Vec::new();
+
+        for entry in std::fs::read_dir(dir)
+            .with_context(|| format!("Failed to read directory {}", dir.display()))?
+        {
+            let entry = entry?;
+            let path = entry.path();
+
+            if path.is_dir() {
+                files.extend(self.find_yaml_files(&path)?);
+            } else if path
+                .extension()
+                .map(|e| e == "yaml" || e == "yml")
+                .unwrap_or(false)
+            {
+                files.push(path);
+            }
+        }
+
+        // Sort for deterministic loading order
+        files.sort();
+        Ok(files)
     }
 
     /// Load CSG rules configuration

@@ -1,0 +1,71 @@
+domains:
+  market:
+    description: Market/Exchange reference data
+    verbs:
+      ensure:
+        description: Create or update market reference
+        behavior: crud
+        crud:
+          operation: upsert
+          table: markets
+          schema: custody
+          conflict_keys:
+          - mic
+          returning: market_id
+        args:
+        - name: mic
+          type: string
+          required: true
+          maps_to: mic
+        - name: name
+          type: string
+          required: true
+          maps_to: name
+        - name: country-code
+          type: string
+          required: true
+          maps_to: country_code
+        - name: primary-currency
+          type: string
+          required: true
+          maps_to: primary_currency
+        - name: csd-bic
+          type: string
+          required: false
+          maps_to: csd_bic
+        - name: timezone
+          type: string
+          required: true
+          maps_to: timezone
+        returns:
+          type: uuid
+          name: market_id
+          capture: true
+      read:
+        description: Read market by MIC
+        behavior: crud
+        crud:
+          operation: select
+          table: markets
+          schema: custody
+        args:
+        - name: mic
+          type: string
+          required: true
+          maps_to: mic
+        returns:
+          type: record
+      list:
+        description: List markets
+        behavior: crud
+        crud:
+          operation: select
+          table: markets
+          schema: custody
+        args:
+        - name: country-code
+          type: string
+          required: false
+          maps_to: country_code
+        returns:
+          type: record_set

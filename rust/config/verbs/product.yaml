@@ -1,0 +1,170 @@
+domains:
+  product:
+    description: Product catalog operations
+    verbs:
+      create:
+        description: Create a new product in the catalog
+        behavior: crud
+        crud:
+          operation: insert
+          table: products
+          schema: ob-poc
+          returning: product_id
+        args:
+        - name: name
+          type: string
+          required: true
+          maps_to: name
+        - name: product-code
+          type: string
+          required: true
+          maps_to: product_code
+        - name: description
+          type: string
+          required: false
+          maps_to: description
+        - name: product-category
+          type: string
+          required: false
+          maps_to: product_category
+        - name: regulatory-framework
+          type: string
+          required: false
+          maps_to: regulatory_framework
+        - name: min-asset-requirement
+          type: decimal
+          required: false
+          maps_to: min_asset_requirement
+        - name: metadata
+          type: json
+          required: false
+          maps_to: metadata
+        returns:
+          type: uuid
+          name: product_id
+          capture: true
+      read:
+        description: Read a product by ID or code
+        behavior: crud
+        crud:
+          operation: select
+          table: products
+          schema: ob-poc
+        args:
+        - name: product-id
+          type: uuid
+          required: false
+          maps_to: product_id
+        - name: product-code
+          type: string
+          required: false
+          maps_to: product_code
+        returns:
+          type: record
+      update:
+        description: Update a product
+        behavior: crud
+        crud:
+          operation: update
+          table: products
+          schema: ob-poc
+          key: product_id
+        args:
+        - name: product-id
+          type: uuid
+          required: true
+          maps_to: product_id
+        - name: name
+          type: string
+          required: false
+          maps_to: name
+        - name: description
+          type: string
+          required: false
+          maps_to: description
+        - name: is-active
+          type: boolean
+          required: false
+          maps_to: is_active
+        - name: product-category
+          type: string
+          required: false
+          maps_to: product_category
+        returns:
+          type: affected
+      delete:
+        description: Delete a product
+        behavior: crud
+        crud:
+          operation: delete
+          table: products
+          schema: ob-poc
+          key: product_id
+        args:
+        - name: product-id
+          type: uuid
+          required: true
+          maps_to: product_id
+        returns:
+          type: affected
+      list:
+        description: List products with optional filters
+        behavior: crud
+        crud:
+          operation: select
+          table: products
+          schema: ob-poc
+        args:
+        - name: product-category
+          type: string
+          required: false
+          maps_to: product_category
+        - name: is-active
+          type: boolean
+          required: false
+          maps_to: is_active
+        - name: limit
+          type: integer
+          required: false
+          default: 100
+        - name: offset
+          type: integer
+          required: false
+          default: 0
+        returns:
+          type: record_set
+      ensure:
+        description: Create or update a product by product-code
+        behavior: crud
+        crud:
+          operation: upsert
+          table: products
+          schema: ob-poc
+          conflict_keys:
+          - product_code
+          returning: product_id
+        args:
+        - name: name
+          type: string
+          required: true
+          maps_to: name
+        - name: product-code
+          type: string
+          required: true
+          maps_to: product_code
+        - name: description
+          type: string
+          required: false
+          maps_to: description
+        - name: product-category
+          type: string
+          required: false
+          maps_to: product_category
+        - name: regulatory-framework
+          type: string
+          required: false
+          maps_to: regulatory_framework
+        returns:
+          type: uuid
+          name: product_id
+          capture: true
