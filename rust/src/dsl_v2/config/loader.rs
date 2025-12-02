@@ -102,19 +102,6 @@ impl ConfigLoader {
             }
         }
 
-        // Validate plugins
-        for (plugin_name, plugin_config) in &config.plugins {
-            for arg in &plugin_config.args {
-                if arg.arg_type == ArgType::Lookup && arg.lookup.is_none() {
-                    return Err(anyhow!(
-                        "plugin {} arg '{}': lookup type requires lookup config",
-                        plugin_name,
-                        arg.name
-                    ));
-                }
-            }
-        }
-
         Ok(())
     }
 
@@ -212,7 +199,6 @@ fn test_load_verbs_yaml() {
             for (name, domain) in &config.domains {
                 println!("  {}: {} verbs", name, domain.verbs.len());
             }
-            println!("Loaded {} plugins", config.plugins.len());
         }
         Err(e) => {
             panic!("Failed to load verbs.yaml: {:?}", e);

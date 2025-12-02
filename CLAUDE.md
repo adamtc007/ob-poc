@@ -488,6 +488,9 @@ dsl_cli execute -f program.dsl --format json | jq '.bindings'
 | doc-request | Document collection and verification |
 | case-screening | Screenings within KYC workstreams |
 | case-event | Audit trail for case activities |
+| allegation | Client allegations - unverified claims that start KYC |
+| observation | Attribute observations from various sources |
+| discrepancy | Conflicts between attribute observations |
 
 ## KYC Case Management DSL
 
@@ -564,6 +567,194 @@ The KYC system includes a YAML-driven rules engine that automatically triggers a
 | screenings | Sanctions/PEP/adverse media checks |
 | case_events | Audit trail of all activities |
 | rule_executions | Audit log of rule engine runs |
+
+
+## KYC Observation Model
+
+The observation model implements evidence-based KYC verification. Instead of storing a single "truth" per attribute, it captures multiple observations from various sources and reconciles them.
+
+### The Observation Triangle
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         CLIENT ALLEGATIONS                                   │
+│  "The client claims..." (unverified starting point)                         │
+│  Source: Onboarding form, KYC questionnaire, email                          │
+└────────────────────────────────────────┬────────────────────────────────────┘
+                                         │
+                                         │ verification
+                                         ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       ATTRIBUTE OBSERVATIONS                                 │
+│  Multiple observations per attribute from different sources                  │
+│  Each with: source_type, source_document, confidence, is_authoritative      │
+└────────────────────────────────────────┬────────────────────────────────────┘
+                                         │
+                            ┌────────────┴────────────┐
+                            │                         │
+                            ▼                         ▼
+              ┌─────────────────────┐   ┌─────────────────────┐
+              │   SOURCE DOCUMENTS  │   │   SINK DOCUMENTS    │
+              │   (extraction)      │   │   (fulfillment)     │
+              │   Passport PROVIDES │   │   Identity REQUIRES │
+              │   name, DOB, etc.   │   │   passport as proof │
+              └─────────────────────┘   └─────────────────────┘
+```
+
+### Key Tables
+
+| Table | Purpose |
+|-------|---------|
+| attribute_observations | Multiple observations per attribute with source provenance |
+| client_allegations | Client's unverified claims (KYC starting point) |
+| document_attribute_links | Bidirectional: which docs provide/require which attrs |
+| observation_discrepancies | Conflicts detected between observations |
+
+### Allegation Verbs
+
+| Verb | Description |
+|------|-------------|
+| `allegation.record` | Record client allegation about an attribute |
+| `allegation.verify` | Mark allegation verified by observation |
+| `allegation.contradict` | Mark allegation contradicted by evidence |
+| `allegation.mark-partial` | Mark allegation partially verified |
+| `allegation.list-by-entity` | List allegations for an entity |
+| `allegation.list-pending` | List pending allegations for CBU |
+
+### Observation Verbs
+
+| Verb | Description |
+|------|-------------|
+| `observation.record` | Record attribute observation |
+| `observation.record-from-document` | Record observation extracted from document |
+| `observation.supersede` | Supersede observation with newer one |
+| `observation.list-for-entity` | List all observations for entity |
+| `observation.list-for-attribute` | List observations of specific attribute |
+| `observation.get-current` | Get current best observation |
+
+### Discrepancy Verbs
+
+| Verb | Description |
+|------|-------------|
+| `discrepancy.record` | Record discrepancy between observations |
+| `discrepancy.resolve` | Resolve a discrepancy |
+| `discrepancy.escalate` | Escalate discrepancy for review |
+| `discrepancy.list-open` | List open discrepancies |
+
+### Example: KYC Verification Flow
+
+```clojure
+;; 1. Record client allegation
+(allegation.record
+  :cbu-id @fund
+  :entity-id @john
+  :attribute-id "attr.identity.full_name"
+  :value {"first": "John", "last": "Smith"}
+  :display-value "John Smith"
+  :source "ONBOARDING_FORM"
+  :case-id @case
+  :as @allegation-name)
+
+;; 2. Extract observation from passport
+(observation.record-from-document
+  :entity-id @john
+  :document-id @passport
+  :attribute "attr.identity.full_name"
+  :value "John A Smith"
+  :extraction-method "MRZ"
+  :confidence 0.95
+  :as @obs-passport)
+
+;; 3. Verify allegation (acceptable variation)
+(allegation.verify
+  :allegation-id @allegation-name
+  :observation-id @obs-passport
+  :result "ACCEPTABLE_VARIATION"
+  :notes "Middle initial difference acceptable")
+
+;; 4. Get current best value
+(observation.get-current
+  :entity-id @john
+  :attribute "attr.identity.full_name")
+```
+
+## Service Resource Taxonomy
+
+The service resource taxonomy provides a three-level hierarchy for managing onboarding deliverables:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  PRODUCT                                                         │
+│  What the client buys (e.g., "Prime Brokerage", "Fund Admin")   │
+│  ob-poc.products                                                │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼ (M:N via product_services)
+┌─────────────────────────────────────────────────────────────────┐
+│  SERVICE                                                         │
+│  Logical capability delivered (e.g., "Trade Settlement",        │
+│  "Asset Safekeeping", "NAV Calculation")                        │
+│  ob-poc.services                                                │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼ (M:N via service_resource_capabilities)
+┌─────────────────────────────────────────────────────────────────┐
+│  SERVICE RESOURCE TYPE                                           │
+│  Technical system/platform that delivers the service            │
+│  (e.g., "DTCC Settlement System", "Custody Account")            │
+│  ob-poc.service_resource_types                                  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼ (1:N)
+┌─────────────────────────────────────────────────────────────────┐
+│  CBU RESOURCE INSTANCE                                           │
+│  Actual provisioned artifact for a specific CBU                 │
+│  (e.g., "Acme Fund's custody account at State Street")          │
+│  ob-poc.cbu_resource_instances                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Attribute Management
+
+Resource instances have typed attributes defined in a unified registry:
+
+| Table | Purpose |
+|-------|---------|
+| attribute_registry | Unified attribute dictionary (all domains) |
+| resource_attribute_requirements | Required/optional attrs per resource type |
+| resource_instance_attributes | Actual values set on instances |
+
+### Service Resource Verbs
+
+| Verb | Description |
+|------|-------------|
+| `service-resource.provision` | Create resource instance for CBU (auto-derives service_id) |
+| `service-resource.set-attr` | Set attribute value on instance |
+| `service-resource.validate-attrs` | Validate all required attributes are set |
+| `service-resource.activate` | Activate instance (validates required attrs first) |
+| `service-resource.suspend` | Suspend active instance |
+| `service-resource.decommission` | Permanently decommission instance |
+
+### Example: Provision and Configure
+
+```clojure
+;; Provision a custody account (service_id auto-derived from capabilities)
+(service-resource.provision
+  :cbu-id @fund
+  :resource-type "CUSTODY_ACCT"
+  :instance-url "https://custody.bank.com/accounts/12345"
+  :as @custody)
+
+;; Set required attributes
+(service-resource.set-attr :instance-id @custody :attr "account_number" :value "ACC-12345")
+(service-resource.set-attr :instance-id @custody :attr "custodian_bic" :value "CITIUS33")
+
+;; Validate before activation
+(service-resource.validate-attrs :instance-id @custody)
+
+;; Activate (will fail if required attrs missing)
+(service-resource.activate :instance-id @custody)
+```
 
 ## Custody & Settlement DSL
 

@@ -511,6 +511,176 @@ domains:
           type: record_set
 
   # ===========================================================================
+  # DOMAIN: document
+  # ===========================================================================
+  document:
+    description: "Document catalog and extraction operations"
+
+    verbs:
+      catalog:
+        description: "Catalog a document for an entity within a CBU"
+        behavior: plugin
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: entity-id
+            type: uuid
+            required: true
+          - name: document-type
+            type: lookup
+            required: true
+            lookup:
+              table: document_types
+              code_column: type_code
+              id_column: type_id
+          - name: file-path
+            type: string
+            required: false
+          - name: metadata
+            type: json
+            required: false
+        returns:
+          type: uuid
+          name: doc_id
+          capture: true
+
+      extract:
+        description: "Extract attributes from a cataloged document"
+        behavior: plugin
+        args:
+          - name: document-id
+            type: uuid
+            required: true
+          - name: attributes
+            type: string_list
+            required: false
+          - name: use-ocr
+            type: boolean
+            required: false
+            default: false
+        returns:
+          type: record
+
+  # ===========================================================================
+  # DOMAIN: screening
+  # ===========================================================================
+  screening:
+    description: "Entity screening operations (PEP, sanctions, adverse media)"
+
+    verbs:
+      pep:
+        description: "Run PEP (Politically Exposed Persons) screening"
+        behavior: plugin
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+          - name: provider
+            type: string
+            required: false
+        returns:
+          type: uuid
+          capture: true
+
+      sanctions:
+        description: "Run sanctions list screening"
+        behavior: plugin
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+          - name: lists
+            type: string_list
+            required: false
+        returns:
+          type: uuid
+          capture: true
+
+      adverse-media:
+        description: "Run adverse media screening"
+        behavior: plugin
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+          - name: lookback-months
+            type: integer
+            required: false
+            default: 24
+        returns:
+          type: uuid
+          capture: true
+
+  # ===========================================================================
+  # DOMAIN: delivery
+  # ===========================================================================
+  delivery:
+    description: "Service delivery tracking operations"
+
+    verbs:
+      record:
+        description: "Record a service delivery for a CBU"
+        behavior: plugin
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: product
+            type: string
+            required: true
+          - name: service
+            type: string
+            required: true
+          - name: instance-id
+            type: uuid
+            required: false
+          - name: config
+            type: json
+            required: false
+        returns:
+          type: uuid
+          capture: true
+
+      complete:
+        description: "Mark a service delivery as complete"
+        behavior: plugin
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: product
+            type: string
+            required: true
+          - name: service
+            type: string
+            required: true
+          - name: instance-id
+            type: uuid
+            required: false
+        returns:
+          type: affected
+
+      fail:
+        description: "Mark a service delivery as failed"
+        behavior: plugin
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: product
+            type: string
+            required: true
+          - name: service
+            type: string
+            required: true
+          - name: reason
+            type: string
+            required: true
+        returns:
+          type: affected
+
+  # ===========================================================================
   # DOMAIN: product
   # ===========================================================================
   product:
@@ -1440,6 +1610,18 @@ domains:
           - name: reason
             type: string
             required: false
+
+      validate-attrs:
+        description: "Validate that all required attributes are set for a resource instance"
+        behavior: plugin
+        handler: resource_validate_attrs
+        args:
+          - name: instance-id
+            type: uuid
+            required: true
+        returns:
+          type: record
+          name: validation_result
 
   # ===========================================================================
   # DOMAIN: instrument-class (Custody Taxonomy Reference)
@@ -2706,6 +2888,24 @@ domains:
           - name: subject-entity-id
             type: uuid
             required: true
+        returns:
+          type: record_set
+
+      # Plugin verbs for complex UBO operations
+      calculate:
+        description: "Calculate ultimate beneficial ownership chain"
+        behavior: plugin
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: entity-id
+            type: uuid
+            required: true
+          - name: threshold
+            type: decimal
+            required: false
+            default: 25.0
         returns:
           type: record_set
 
@@ -4500,188 +4700,504 @@ domains:
             type: string
             required: false
             maps_to: event_type
+
+  # ===========================================================================
+  # DOMAIN: allegation (Client Allegations - KYC starting point)
+  # ===========================================================================
+  allegation:
+    description: "Client allegations - unverified claims that start the KYC process"
+
+    verbs:
+      record:
+        description: "Record a client allegation about an entity attribute"
+        behavior: crud
+        crud:
+          operation: insert
+          table: client_allegations
+          schema: ob-poc
+          returning: allegation_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+          - name: attribute-id
+            type: uuid
+            required: true
+            maps_to: attribute_id
+          - name: value
+            type: json
+            required: true
+            maps_to: alleged_value
+          - name: display-value
+            type: string
+            required: false
+            maps_to: alleged_value_display
+          - name: source
+            type: string
+            required: true
+            maps_to: allegation_source
+          - name: source-reference
+            type: string
+            required: false
+            maps_to: allegation_reference
+          - name: case-id
+            type: uuid
+            required: false
+            maps_to: case_id
+          - name: workstream-id
+            type: uuid
+            required: false
+            maps_to: workstream_id
+        returns:
+          type: uuid
+          name: allegation_id
+          capture: true
+
+      verify:
+        description: "Mark allegation as verified by an observation"
+        behavior: crud
+        crud:
+          operation: update
+          table: client_allegations
+          schema: ob-poc
+          key: allegation_id
+          set_values:
+            verification_status: VERIFIED
+            verified_at: "now()"
+        args:
+          - name: allegation-id
+            type: uuid
+            required: true
+            maps_to: allegation_id
+          - name: observation-id
+            type: uuid
+            required: true
+            maps_to: verified_by_observation_id
+          - name: result
+            type: string
+            required: false
+            maps_to: verification_result
+          - name: notes
+            type: string
+            required: false
+            maps_to: verification_notes
+        returns:
+          type: affected
+
+      contradict:
+        description: "Mark allegation as contradicted by evidence"
+        behavior: crud
+        crud:
+          operation: update
+          table: client_allegations
+          schema: ob-poc
+          key: allegation_id
+          set_values:
+            verification_status: CONTRADICTED
+            verified_at: "now()"
+        args:
+          - name: allegation-id
+            type: uuid
+            required: true
+            maps_to: allegation_id
+          - name: observation-id
+            type: uuid
+            required: true
+            maps_to: verified_by_observation_id
+          - name: result
+            type: string
+            required: false
+            maps_to: verification_result
+          - name: notes
+            type: string
+            required: true
+            maps_to: verification_notes
+        returns:
+          type: affected
+
+      mark-partial:
+        description: "Mark allegation as partially verified"
+        behavior: crud
+        crud:
+          operation: update
+          table: client_allegations
+          schema: ob-poc
+          key: allegation_id
+          set_values:
+            verification_status: PARTIAL
+            verified_at: "now()"
+        args:
+          - name: allegation-id
+            type: uuid
+            required: true
+            maps_to: allegation_id
+          - name: observation-id
+            type: uuid
+            required: true
+            maps_to: verified_by_observation_id
+          - name: notes
+            type: string
+            required: true
+            maps_to: verification_notes
+        returns:
+          type: affected
+
+      list-by-entity:
+        description: "List allegations for an entity"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: client_allegations
+          schema: ob-poc
+          fk_col: entity_id
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+          - name: status
+            type: string
+            required: false
+            maps_to: verification_status
         returns:
           type: record_set
 
-# =============================================================================
-# PLUGINS (Custom operations requiring Rust code)
-# =============================================================================
-plugins:
-  document.catalog:
-    description: "Catalog a document for an entity within a CBU"
-    handler: document_catalog
-    args:
-      - name: cbu-id
-        type: uuid
-        required: true
-      - name: entity-id
-        type: uuid
-        required: true
-      - name: document-type
-        type: lookup
-        required: true
-        lookup:
-          table: document_types
-          code_column: type_code
-          id_column: type_id
-      - name: file-path
-        type: string
-        required: false
-      - name: metadata
-        type: json
-        required: false
-    returns:
-      type: uuid
-      name: doc_id
+      list-pending:
+        description: "List pending allegations for a CBU"
+        behavior: crud
+        crud:
+          operation: select
+          table: client_allegations
+          schema: ob-poc
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+        returns:
+          type: record_set
 
-  document.extract:
-    description: "Extract attributes from a cataloged document"
-    handler: document_extract
-    args:
-      - name: document-id
-        type: uuid
-        required: true
-      - name: attributes
-        type: string_list
-        required: false
-      - name: use-ocr
-        type: boolean
-        required: false
-        default: false
+  # ===========================================================================
+  # DOMAIN: observation (Attribute Observations from various sources)
+  # ===========================================================================
+  observation:
+    description: "Attribute observations from various sources"
 
-  ubo.calculate:
-    description: "Calculate ultimate beneficial ownership chain"
-    handler: ubo_calculate
-    args:
-      - name: cbu-id
-        type: uuid
-        required: true
-      - name: entity-id
-        type: uuid
-        required: true
-      - name: threshold
-        type: decimal
-        required: false
-        default: 25.0
+    verbs:
+      record:
+        description: "Record an attribute observation"
+        behavior: crud
+        crud:
+          operation: insert
+          table: attribute_observations
+          schema: ob-poc
+          returning: observation_id
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+          - name: attribute-id
+            type: uuid
+            required: true
+            maps_to: attribute_id
+          - name: value-text
+            type: string
+            required: false
+            maps_to: value_text
+          - name: value-number
+            type: decimal
+            required: false
+            maps_to: value_number
+          - name: value-boolean
+            type: boolean
+            required: false
+            maps_to: value_boolean
+          - name: value-date
+            type: date
+            required: false
+            maps_to: value_date
+          - name: value-json
+            type: json
+            required: false
+            maps_to: value_json
+          - name: source-type
+            type: string
+            required: true
+            maps_to: source_type
+          - name: source-document-id
+            type: uuid
+            required: false
+            maps_to: source_document_id
+          - name: confidence
+            type: decimal
+            required: false
+            maps_to: confidence
+          - name: is-authoritative
+            type: boolean
+            required: false
+            maps_to: is_authoritative
+          - name: extraction-method
+            type: string
+            required: false
+            maps_to: extraction_method
+        returns:
+          type: uuid
+          name: observation_id
+          capture: true
 
-  ubo.validate:
-    description: "Validate UBO structure completeness"
-    handler: ubo_validate
-    args:
-      - name: cbu-id
-        type: uuid
-        required: true
+      record-from-document:
+        description: "Record observation extracted from a document"
+        behavior: plugin
+        handler: observation_from_document
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+          - name: document-id
+            type: uuid
+            required: true
+          - name: attribute
+            type: string
+            required: true
+          - name: value
+            type: string
+            required: true
+          - name: extraction-method
+            type: string
+            required: false
+          - name: confidence
+            type: decimal
+            required: false
+        returns:
+          type: uuid
+          name: observation_id
+          capture: true
 
-  screening.pep:
-    description: "Run PEP screening"
-    handler: screening_pep
-    args:
-      - name: entity-id
-        type: uuid
-        required: true
-      - name: provider
-        type: string
-        required: false
+      supersede:
+        description: "Supersede an observation with a newer one"
+        behavior: crud
+        crud:
+          operation: update
+          table: attribute_observations
+          schema: ob-poc
+          key: observation_id
+          set_values:
+            status: SUPERSEDED
+            superseded_at: "now()"
+        args:
+          - name: observation-id
+            type: uuid
+            required: true
+            maps_to: observation_id
+          - name: superseded-by
+            type: uuid
+            required: true
+            maps_to: superseded_by
+        returns:
+          type: affected
 
-  screening.sanctions:
-    description: "Run sanctions list screening"
-    handler: screening_sanctions
-    args:
-      - name: entity-id
-        type: uuid
-        required: true
-      - name: lists
-        type: string_list
-        required: false
+      list-for-entity:
+        description: "List all observations for an entity"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: attribute_observations
+          schema: ob-poc
+          fk_col: entity_id
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+        returns:
+          type: record_set
 
-  screening.adverse-media:
-    description: "Run adverse media screening"
-    handler: screening_adverse_media
-    args:
-      - name: entity-id
-        type: uuid
-        required: true
-      - name: lookback-months
-        type: integer
-        required: false
-        default: 24
+      list-for-attribute:
+        description: "List observations of a specific attribute for an entity"
+        behavior: crud
+        crud:
+          operation: select
+          table: attribute_observations
+          schema: ob-poc
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+          - name: attribute-id
+            type: uuid
+            required: true
+            maps_to: attribute_id
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+        returns:
+          type: record_set
 
-  kyc.initiate:
-    description: "Initiate KYC investigation"
-    handler: kyc_initiate
-    args:
-      - name: cbu-id
-        type: uuid
-        required: true
-      - name: investigation-type
-        type: string
-        required: true
+      get-current:
+        description: "Get current best observation for an attribute"
+        behavior: plugin
+        handler: observation_get_current
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+          - name: attribute
+            type: string
+            required: true
+        returns:
+          type: record
 
-  kyc.decide:
-    description: "Record KYC decision"
-    handler: kyc_decide
-    args:
-      - name: investigation-id
-        type: uuid
-        required: true
-      - name: decision
-        type: string
-        required: true
-        valid_values: [approve, reject, escalate]
-      - name: rationale
-        type: string
-        required: true
+  # ===========================================================================
+  # DOMAIN: discrepancy (Observation Discrepancies)
+  # ===========================================================================
+  discrepancy:
+    description: "Observation discrepancies - conflicts between attribute observations"
 
-  delivery.record:
-    description: "Record a service delivery for a CBU"
-    handler: delivery_record
-    args:
-      - name: cbu-id
-        type: uuid
-        required: true
-      - name: product
-        type: string
-        required: true
-      - name: service
-        type: string
-        required: true
-      - name: instance-id
-        type: uuid
-        required: false
-      - name: config
-        type: json
-        required: false
+    verbs:
+      record:
+        description: "Record a discrepancy between observations"
+        behavior: crud
+        crud:
+          operation: insert
+          table: observation_discrepancies
+          schema: ob-poc
+          returning: discrepancy_id
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+          - name: attribute-id
+            type: uuid
+            required: true
+            maps_to: attribute_id
+          - name: observation-1-id
+            type: uuid
+            required: true
+            maps_to: observation_1_id
+          - name: observation-2-id
+            type: uuid
+            required: true
+            maps_to: observation_2_id
+          - name: type
+            type: string
+            required: true
+            maps_to: discrepancy_type
+          - name: severity
+            type: string
+            required: true
+            maps_to: severity
+          - name: description
+            type: string
+            required: true
+            maps_to: description
+          - name: value-1-display
+            type: string
+            required: false
+            maps_to: value_1_display
+          - name: value-2-display
+            type: string
+            required: false
+            maps_to: value_2_display
+          - name: case-id
+            type: uuid
+            required: false
+            maps_to: case_id
+          - name: workstream-id
+            type: uuid
+            required: false
+            maps_to: workstream_id
+        returns:
+          type: uuid
+          name: discrepancy_id
+          capture: true
 
-  delivery.complete:
-    description: "Mark a service delivery as complete"
-    handler: delivery_complete
-    args:
-      - name: cbu-id
-        type: uuid
-        required: true
-      - name: product
-        type: string
-        required: true
-      - name: service
-        type: string
-        required: true
-      - name: instance-id
-        type: uuid
-        required: false
+      resolve:
+        description: "Resolve a discrepancy"
+        behavior: crud
+        crud:
+          operation: update
+          table: observation_discrepancies
+          schema: ob-poc
+          key: discrepancy_id
+          set_values:
+            resolution_status: RESOLVED
+            resolved_at: "now()"
+        args:
+          - name: discrepancy-id
+            type: uuid
+            required: true
+            maps_to: discrepancy_id
+          - name: resolution-type
+            type: string
+            required: true
+            maps_to: resolution_type
+          - name: accepted-observation-id
+            type: uuid
+            required: false
+            maps_to: accepted_observation_id
+          - name: notes
+            type: string
+            required: false
+            maps_to: resolution_notes
+          - name: resolved-by
+            type: string
+            required: false
+            maps_to: resolved_by
+        returns:
+          type: affected
 
-  delivery.fail:
-    description: "Mark a service delivery as failed"
-    handler: delivery_fail
-    args:
-      - name: cbu-id
-        type: uuid
-        required: true
-      - name: product
-        type: string
-        required: true
-      - name: service
-        type: string
-        required: true
-      - name: reason
-        type: string
-        required: true
+      escalate:
+        description: "Escalate a discrepancy"
+        behavior: crud
+        crud:
+          operation: update
+          table: observation_discrepancies
+          schema: ob-poc
+          key: discrepancy_id
+          set_values:
+            resolution_status: ESCALATED
+        args:
+          - name: discrepancy-id
+            type: uuid
+            required: true
+            maps_to: discrepancy_id
+          - name: notes
+            type: string
+            required: false
+            maps_to: resolution_notes
+        returns:
+          type: affected
+
+      list-open:
+        description: "List open discrepancies"
+        behavior: crud
+        crud:
+          operation: select
+          table: observation_discrepancies
+          schema: ob-poc
+        args:
+          - name: entity-id
+            type: uuid
+            required: false
+            maps_to: entity_id
+          - name: case-id
+            type: uuid
+            required: false
+            maps_to: case_id
+          - name: severity
+            type: string
+            required: false
+            maps_to: severity
+        returns:
+          type: record_set

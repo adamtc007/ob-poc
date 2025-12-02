@@ -13,8 +13,6 @@ use std::collections::HashMap;
 pub struct VerbsConfig {
     pub version: String,
     pub domains: HashMap<String, DomainConfig>,
-    #[serde(default)]
-    pub plugins: HashMap<String, PluginConfig>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -220,22 +218,8 @@ pub struct DynamicSourceConfig {
 }
 
 // =============================================================================
-// PLUGIN CONFIG
-// =============================================================================
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct PluginConfig {
-    pub description: String,
-    pub handler: String,
-    pub args: Vec<ArgConfig>,
-    #[serde(default)]
-    pub returns: Option<ReturnsConfig>,
-}
-
-// =============================================================================
 // CSG RULE CONFIGS
 // =============================================================================
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ConstraintRule {
     pub id: String,

@@ -83,6 +83,7 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(UboCalculateOp));
         registry.register(Arc::new(ScreeningPepOp));
         registry.register(Arc::new(ScreeningSanctionsOp));
+        registry.register(Arc::new(ScreeningAdverseMediaOp));
 
         // Resource instance operations
         registry.register(Arc::new(ResourceCreateOp));
@@ -90,6 +91,7 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(ResourceActivateOp));
         registry.register(Arc::new(ResourceSuspendOp));
         registry.register(Arc::new(ResourceDecommissionOp));
+        registry.register(Arc::new(ResourceValidateAttrsOp));
 
         // Service delivery operations
         registry.register(Arc::new(DeliveryRecordOp));
@@ -101,6 +103,10 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(LookupSsiForTradeOp));
         registry.register(Arc::new(ValidateBookingCoverageOp));
         registry.register(Arc::new(DeriveRequiredCoverageOp));
+
+        // Observation operations
+        registry.register(Arc::new(ObservationFromDocumentOp));
+        registry.register(Arc::new(ObservationGetCurrentOp));
 
         registry
     }
@@ -426,6 +432,19 @@ impl CustomOperation for DocumentCatalogOp {
                 }
             });
 
+        // Get Entity ID if provided (resolve reference if needed)
+        let entity_id: Option<Uuid> = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("entity-id"))
+            .and_then(|a| {
+                if let Some(name) = a.value.as_reference() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            });
+
         // Idempotent: Check for existing document with same cbu_id, document_type_id, and document_name
         let existing = sqlx::query!(
             r#"SELECT doc_id FROM "ob-poc".document_catalog
@@ -450,11 +469,12 @@ impl CustomOperation for DocumentCatalogOp {
 
         sqlx::query!(
             r#"INSERT INTO "ob-poc".document_catalog
-               (doc_id, document_type_id, cbu_id, document_name, status)
-               VALUES ($1, $2, $3, $4, 'active')"#,
+               (doc_id, document_type_id, cbu_id, entity_id, document_name, status)
+               VALUES ($1, $2, $3, $4, $5, 'active')"#,
             doc_id,
             doc_type_id,
             cbu_id,
+            entity_id,
             document_name
         )
         .execute(pool)
@@ -906,6 +926,48 @@ impl CustomOperation for ScreeningSanctionsOp {
     }
 }
 
+/// Adverse media screening (Not Implemented)
+///
+/// Rationale: Requires external adverse media API call and result processing.
+/// Status: Stub - returns error indicating not implemented.
+pub struct ScreeningAdverseMediaOp;
+
+#[async_trait]
+impl CustomOperation for ScreeningAdverseMediaOp {
+    fn domain(&self) -> &'static str {
+        "screening"
+    }
+    fn verb(&self) -> &'static str {
+        "adverse-media"
+    }
+    fn rationale(&self) -> &'static str {
+        "Requires external adverse media screening service API call"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "screening.adverse-media is not yet implemented"
+        ))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "screening.adverse-media is not yet implemented"
+        ))
+    }
+}
+
 // ============================================================================
 // Resource Instance Operations
 // ============================================================================
@@ -1009,8 +1071,8 @@ impl CustomOperation for ResourceCreateOp {
                 }
             });
 
-        // Get service-id if provided
-        let service_id: Option<Uuid> = verb_call
+        // Get service-id if provided, otherwise auto-derive from resource type capabilities
+        let mut service_id: Option<Uuid> = verb_call
             .arguments
             .iter()
             .find(|a| a.key.matches("service-id"))
@@ -1021,6 +1083,23 @@ impl CustomOperation for ResourceCreateOp {
                     a.value.as_uuid()
                 }
             });
+
+        // Auto-derive service_id from service_resource_capabilities if not provided
+        if service_id.is_none() {
+            // Look up service(s) that support this resource type
+            let services: Vec<Uuid> = sqlx::query_scalar(
+                r#"SELECT service_id FROM "ob-poc".service_resource_capabilities
+                   WHERE resource_id = $1 AND is_active = true
+                   ORDER BY priority ASC
+                   LIMIT 1"#,
+            )
+            .bind(resource_type_id)
+            .fetch_all(pool)
+            .await?;
+
+            // Use the first (highest priority) service if available
+            service_id = services.into_iter().next();
+        }
 
         // Idempotent: INSERT or return existing using instance_url as conflict key
         let instance_id = Uuid::new_v4();
@@ -1125,9 +1204,9 @@ impl CustomOperation for ResourceSetAttrOp {
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing value argument"))?;
 
-        // Look up attribute ID
+        // Look up attribute ID from unified attribute_registry
         let attribute_id: Option<Uuid> =
-            sqlx::query_scalar(r#"SELECT attribute_id FROM "ob-poc".dictionary WHERE name = $1"#)
+            sqlx::query_scalar(r#"SELECT uuid FROM "ob-poc".attribute_registry WHERE name = $1"#)
                 .bind(attr_name)
                 .fetch_optional(pool)
                 .await?;
@@ -1257,7 +1336,7 @@ impl CustomOperation for ResourceActivateOp {
                 // Look up attribute names for error message
                 let missing_uuids: Vec<Uuid> = missing.iter().map(|u| **u).collect();
                 let missing_names: Vec<String> = sqlx::query_scalar(
-                    r#"SELECT name FROM "ob-poc".dictionary WHERE attribute_id = ANY($1)"#,
+                    r#"SELECT name FROM "ob-poc".attribute_registry WHERE uuid = ANY($1)"#,
                 )
                 .bind(missing_uuids)
                 .fetch_all(pool)
@@ -1408,6 +1487,119 @@ impl CustomOperation for ResourceDecommissionOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
+    }
+}
+
+/// Validate that all required attributes are set for a resource instance
+pub struct ResourceValidateAttrsOp;
+
+#[async_trait]
+impl CustomOperation for ResourceValidateAttrsOp {
+    fn domain(&self) -> &'static str {
+        "service-resource"
+    }
+    fn verb(&self) -> &'static str {
+        "validate-attrs"
+    }
+    fn rationale(&self) -> &'static str {
+        "Validates required attributes against resource_attribute_requirements"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use uuid::Uuid;
+
+        let instance_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("instance-id"))
+            .and_then(|a| {
+                if let Some(name) = a.value.as_reference() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing instance-id argument"))?;
+
+        // Get resource type for this instance
+        let resource_type_id: Option<Option<Uuid>> = sqlx::query_scalar(
+            r#"SELECT resource_type_id FROM "ob-poc".cbu_resource_instances WHERE instance_id = $1"#,
+        )
+        .bind(instance_id)
+        .fetch_optional(pool)
+        .await?;
+
+        let resource_type_id = match resource_type_id.and_then(|r| r) {
+            Some(id) => id,
+            None => {
+                // No resource type = nothing to validate
+                return Ok(ExecutionResult::Record(serde_json::json!({
+                    "valid": true,
+                    "missing": [],
+                    "message": "No resource type defined, skipping validation"
+                })));
+            }
+        };
+
+        // Get required attributes for this resource type
+        let required_attrs: Vec<(Uuid, String)> = sqlx::query_as(
+            r#"SELECT rar.attribute_id, ar.name
+               FROM "ob-poc".resource_attribute_requirements rar
+               JOIN "ob-poc".attribute_registry ar ON rar.attribute_id = ar.uuid
+               WHERE rar.resource_id = $1 AND rar.is_mandatory = true
+               ORDER BY rar.display_order"#,
+        )
+        .bind(resource_type_id)
+        .fetch_all(pool)
+        .await?;
+
+        // Get set attributes for this instance
+        let set_attrs: Vec<Uuid> = sqlx::query_scalar(
+            r#"SELECT attribute_id FROM "ob-poc".resource_instance_attributes
+               WHERE instance_id = $1"#,
+        )
+        .bind(instance_id)
+        .fetch_all(pool)
+        .await?;
+
+        // Find missing required attributes
+        let missing: Vec<String> = required_attrs
+            .iter()
+            .filter(|(id, _)| !set_attrs.contains(id))
+            .map(|(_, name)| name.clone())
+            .collect();
+
+        let valid = missing.is_empty();
+        let result = serde_json::json!({
+            "valid": valid,
+            "missing": missing,
+            "message": if valid {
+                "All required attributes are set".to_string()
+            } else {
+                format!("Missing {} required attribute(s)", missing.len())
+            }
+        });
+
+        Ok(ExecutionResult::Record(result))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(serde_json::json!({
+            "valid": true,
+            "missing": [],
+            "message": "Validation skipped (no database)"
+        })))
     }
 }
 
@@ -1736,6 +1928,273 @@ impl CustomOperation for DeliveryFailOp {
     }
 }
 
+// ============================================================================
+// Observation Operations
+// ============================================================================
+
+/// Record an observation from a document
+pub struct ObservationFromDocumentOp;
+
+#[async_trait]
+impl CustomOperation for ObservationFromDocumentOp {
+    fn domain(&self) -> &'static str {
+        "observation"
+    }
+    fn verb(&self) -> &'static str {
+        "record-from-document"
+    }
+    fn rationale(&self) -> &'static str {
+        "Requires document lookup, attribute lookup, and automatic confidence/authoritative flags"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use uuid::Uuid;
+
+        // Get entity-id (required)
+        let entity_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("entity-id"))
+            .and_then(|a| {
+                if let Some(name) = a.value.as_reference() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing entity-id argument"))?;
+
+        // Get document-id (required)
+        let document_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("document-id"))
+            .and_then(|a| {
+                if let Some(name) = a.value.as_reference() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing document-id argument"))?;
+
+        // Get attribute name (required) and look up ID
+        let attr_name = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("attribute"))
+            .and_then(|a| a.value.as_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing attribute argument"))?;
+
+        let attribute_id: Option<Uuid> = sqlx::query_scalar(
+            r#"SELECT uuid FROM "ob-poc".attribute_registry WHERE id = $1 OR name = $1"#,
+        )
+        .bind(attr_name)
+        .fetch_optional(pool)
+        .await?;
+
+        let attribute_id =
+            attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
+
+        // Get value (required)
+        let value = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("value"))
+            .and_then(|a| a.value.as_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing value argument"))?;
+
+        // Get optional extraction method
+        let extraction_method = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("extraction-method"))
+            .and_then(|a| a.value.as_string());
+
+        // Get optional confidence (default 0.80 for document extractions)
+        let confidence: f64 = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("confidence"))
+            .and_then(|a| a.value.as_string())
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0.80);
+
+        // Look up if this document type is authoritative for this attribute
+        let is_authoritative: bool = sqlx::query_scalar(
+            r#"SELECT COALESCE(dal.is_authoritative, FALSE)
+               FROM "ob-poc".document_catalog dc
+               LEFT JOIN "ob-poc".document_attribute_links dal
+                 ON dal.document_type_id = dc.document_type_id
+                 AND dal.attribute_id = $2
+                 AND dal.direction IN ('SOURCE', 'BOTH')
+               WHERE dc.doc_id = $1
+               LIMIT 1"#,
+        )
+        .bind(document_id)
+        .bind(attribute_id)
+        .fetch_optional(pool)
+        .await?
+        .unwrap_or(false);
+
+        // Insert observation
+        let observation_id = Uuid::new_v4();
+
+        sqlx::query(
+            r#"INSERT INTO "ob-poc".attribute_observations
+               (observation_id, entity_id, attribute_id, value_text, source_type,
+                source_document_id, confidence, is_authoritative, extraction_method,
+                observed_at, status)
+               VALUES ($1, $2, $3, $4, 'DOCUMENT', $5, $6, $7, $8, NOW(), 'ACTIVE')"#,
+        )
+        .bind(observation_id)
+        .bind(entity_id)
+        .bind(attribute_id)
+        .bind(value)
+        .bind(document_id)
+        .bind(confidence)
+        .bind(is_authoritative)
+        .bind(extraction_method)
+        .execute(pool)
+        .await?;
+
+        ctx.bind("observation", observation_id);
+        Ok(ExecutionResult::Uuid(observation_id))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
+    }
+}
+
+/// Get current best observation for an attribute
+pub struct ObservationGetCurrentOp;
+
+#[async_trait]
+impl CustomOperation for ObservationGetCurrentOp {
+    fn domain(&self) -> &'static str {
+        "observation"
+    }
+    fn verb(&self) -> &'static str {
+        "get-current"
+    }
+    fn rationale(&self) -> &'static str {
+        "Requires priority-based selection (authoritative > confidence > recency)"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use uuid::Uuid;
+
+        // Get entity-id (required)
+        let entity_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("entity-id"))
+            .and_then(|a| {
+                if let Some(name) = a.value.as_reference() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing entity-id argument"))?;
+
+        // Get attribute name (required) and look up ID
+        let attr_name = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("attribute"))
+            .and_then(|a| a.value.as_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing attribute argument"))?;
+
+        let attribute_id: Option<Uuid> = sqlx::query_scalar(
+            r#"SELECT uuid FROM "ob-poc".attribute_registry WHERE id = $1 OR name = $1"#,
+        )
+        .bind(attr_name)
+        .fetch_optional(pool)
+        .await?;
+
+        let attribute_id =
+            attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
+
+        // Get current best observation from view
+        let result: Option<(
+            Uuid,
+            Option<String>,
+            Option<rust_decimal::Decimal>,
+            Option<bool>,
+            Option<chrono::NaiveDate>,
+            String,
+            Option<rust_decimal::Decimal>,
+            bool,
+        )> = sqlx::query_as(
+            r#"SELECT observation_id, value_text, value_number, value_boolean, value_date,
+                      source_type, confidence, is_authoritative
+               FROM "ob-poc".v_attribute_current
+               WHERE entity_id = $1 AND attribute_id = $2"#,
+        )
+        .bind(entity_id)
+        .bind(attribute_id)
+        .fetch_optional(pool)
+        .await?;
+
+        match result {
+            Some((
+                obs_id,
+                value_text,
+                value_number,
+                value_boolean,
+                value_date,
+                source_type,
+                confidence,
+                is_authoritative,
+            )) => Ok(ExecutionResult::Record(serde_json::json!({
+                "observation_id": obs_id,
+                "value_text": value_text,
+                "value_number": value_number,
+                "value_boolean": value_boolean,
+                "value_date": value_date,
+                "source_type": source_type,
+                "confidence": confidence,
+                "is_authoritative": is_authoritative
+            }))),
+            None => Ok(ExecutionResult::Record(serde_json::json!({
+                "found": false,
+                "message": "No active observation found for this attribute"
+            }))),
+        }
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(serde_json::json!({
+            "found": false,
+            "message": "No database available"
+        })))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1769,6 +2228,6 @@ mod tests {
     fn test_registry_list() {
         let registry = CustomOperationRegistry::new();
         let ops = registry.list();
-        assert_eq!(ops.len(), 18); // 6 original + 5 resource + 3 delivery + 4 custody
+        assert_eq!(ops.len(), 22); // 6 original + 1 adverse-media + 6 resource + 3 delivery + 4 custody + 2 observation
     }
 }

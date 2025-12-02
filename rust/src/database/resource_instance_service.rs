@@ -539,7 +539,7 @@ impl ResourceInstanceService {
 
     pub async fn lookup_attribute_by_name(&self, name: &str) -> Result<Option<Uuid>> {
         sqlx::query_scalar::<_, Uuid>(
-            r#"SELECT attribute_id FROM "ob-poc".dictionary WHERE name = $1"#,
+            r#"SELECT uuid FROM "ob-poc".attribute_registry WHERE name = $1"#,
         )
         .bind(name)
         .fetch_optional(&self.pool)

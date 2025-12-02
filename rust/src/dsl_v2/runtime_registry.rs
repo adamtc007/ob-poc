@@ -119,24 +119,6 @@ impl RuntimeVerbRegistry {
             }
         }
 
-        // Process plugins
-        for (plugin_name, plugin_config) in &config.plugins {
-            let parts: Vec<&str> = plugin_name.split('.').collect();
-            if parts.len() != 2 {
-                continue;
-            }
-            let domain = parts[0];
-            let verb = parts[1];
-
-            let runtime_verb = Self::build_plugin_verb(domain, verb, plugin_config);
-
-            verbs.insert(plugin_name.clone(), runtime_verb);
-            by_domain
-                .entry(domain.to_string())
-                .or_default()
-                .push(plugin_name.clone());
-        }
-
         // Sort domain lists
         for list in by_domain.values_mut() {
             list.sort();
@@ -354,30 +336,6 @@ impl RuntimeVerbRegistry {
         }
     }
 
-    fn build_plugin_verb(domain: &str, verb: &str, config: &PluginConfig) -> RuntimeVerb {
-        RuntimeVerb {
-            domain: domain.to_string(),
-            verb: verb.to_string(),
-            full_name: format!("{}.{}", domain, verb),
-            description: config.description.clone(),
-            behavior: RuntimeBehavior::Plugin(config.handler.clone()),
-            args: config.args.iter().map(Self::convert_arg).collect(),
-            returns: config
-                .returns
-                .as_ref()
-                .map(|r| RuntimeReturn {
-                    return_type: r.return_type,
-                    name: r.name.clone(),
-                    capture: r.capture.unwrap_or(false),
-                })
-                .unwrap_or(RuntimeReturn {
-                    return_type: ReturnTypeConfig::Void,
-                    name: None,
-                    capture: false,
-                }),
-        }
-    }
-
     fn convert_arg(arg: &ArgConfig) -> RuntimeArg {
         RuntimeArg {
             name: arg.name.clone(),
@@ -569,7 +527,6 @@ mod tests {
         VerbsConfig {
             version: "1.0".to_string(),
             domains,
-            plugins: HashMap::new(),
         }
     }
 
