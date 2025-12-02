@@ -1,29 +1,32 @@
 # DSL & Database Hardening Plan
 
-**Created**: 2025-12-02
+**Created**: 2025-12-02  
+**Updated**: 2025-12-02  
 **Status**: PLAN - Ready for implementation
 
 ---
 
 ## Summary
 
-Five workstreams to harden the DSL pipeline and database schema:
+Seven workstreams to harden the DSL pipeline and database schema:
 
 | # | Workstream | Effort | Priority |
 |---|------------|--------|----------|
 | 1 | Harden statuses | Low | HIGH |
-| 2 | Encode KYC state transitions | Medium | HIGH |
-| 3 | Split verb config + versioning | Medium | MEDIUM |
-| 4 | Current view over observations | Low | LOW (mostly done) |
-| 5 | Standardise event emission | Medium | HIGH |
+| 2 | DSL Idempotency | High | CRITICAL |
+| 3 | Snapshot-based soft delete | Medium | HIGH |
+| 4 | KYC State Snapshots | Medium | HIGH |
+| 5 | Encode KYC state transitions | Medium | HIGH |
+| 6 | Split verb config + versioning | Medium | MEDIUM |
+| 7 | ~~Event emission~~ | - | PARKED (prod only) |
 
 ---
 
 ## 1. Harden Statuses
 
 ### Current State
-- **Good**: Most tables already have CHECK constraints (kyc.cases, kyc.doc_requests, kyc.screenings, ob-poc.attribute_observations, etc.)
-- **Gap**: Some tables missing constraints or using inconsistent values
+- **Good**: Most tables already have CHECK constraints
+- **Gap**: Some tables missing constraints
 
 ### Tables Needing CHECK Constraints
 
@@ -37,33 +40,284 @@ Five workstreams to harden the DSL pipeline and database schema:
 | ob-poc | dsl_execution_log | status | Add CHECK (success, failed, partial) |
 | ob-poc | dsl_instances | status | Add CHECK (draft, active, deprecated) |
 
-### Implementation Steps
-1. Create migration SQL file with ALTER TABLE ADD CONSTRAINT statements
-2. Validate existing data does not violate new constraints
-3. Run migration
-4. Update CLAUDE.md with constraint documentation
-
 ### Files to Change
 - sql/migrations/YYYYMMDD_harden_statuses.sql (new)
-- CLAUDE.md (document constraints)
 
 ---
 
-## 2. Encode KYC State Transitions
+## 2. DSL Idempotency (CRITICAL)
 
-### Current State
-- Status values defined in CHECK constraints
-- **No machine-readable transition rules**
-- CSG linter validates args and entity types, but not state transitions
+### Problem
+DSL programs must be re-runnable without side effects. Currently:
+- `cbu.ensure` is idempotent (upsert by name)
+- Most other verbs are NOT idempotent (insert creates duplicates)
+- If execution fails mid-program, re-run creates partial duplicates
 
-### Proposed Solution
+### Solution: Idempotency Keys
 
-Add state_machines section to csg_rules.yaml:
+Every verb call gets an **idempotency key** derived from:
+1. DSL instance ID (or execution context ID)
+2. Statement index in program
+3. Hash of verb + args
+
+```
+idempotency_key = hash(dsl_instance_id + statement_index + verb + canonical_args)
+```
+
+### Implementation
+
+**Option A: Idempotency table (recommended)**
+```sql
+CREATE TABLE "ob-poc".dsl_idempotency (
+    idempotency_key VARCHAR(64) PRIMARY KEY,
+    execution_id UUID NOT NULL,
+    statement_index INTEGER NOT NULL,
+    verb VARCHAR(100) NOT NULL,
+    result_id UUID,  -- returned ID from original execution
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+Executor flow:
+1. Compute idempotency_key for statement
+2. Check if key exists in dsl_idempotency
+3. If exists: return cached result_id (skip execution)
+4. If not: execute, store result_id with key
+
+**Option B: Natural keys on tables**
+- Add unique constraints on natural business keys
+- Use upsert (ON CONFLICT DO NOTHING/UPDATE)
+- Problem: not all tables have natural keys
+
+### Verb Classification
+
+| Verb Pattern | Idempotent? | Strategy |
+|--------------|-------------|----------|
+| *.ensure | Yes | Upsert by natural key |
+| *.create | No → Yes | Idempotency table |
+| *.update | No → Yes | Idempotency table |
+| *.set-* | No → Yes | Idempotency table |
+| *.delete | Yes | Already idempotent |
+| *.read/* .list/* | Yes | Read-only |
+
+### Files to Change
+- sql/migrations/YYYYMMDD_idempotency.sql (new table)
+- rust/src/dsl_v2/executor.rs - idempotency check before execute
+- rust/src/dsl_v2/generic_executor.rs - record idempotency after execute
+
+---
+
+## 3. Snapshot-Based Soft Delete
+
+### Principle
+**Never update, never delete. Insert new snapshots.**
+
+This is already the pattern in `attribute_observations`:
+- New observation supersedes old one
+- Old row gets `superseded_by` FK and `superseded_at` timestamp
+- `status = 'ACTIVE'` vs `status = 'SUPERSEDED'`
+
+### Apply to Other Tables
+
+Tables that should use snapshot pattern:
+
+| Table | Current | Change |
+|-------|---------|--------|
+| kyc.cases | status column | Add case_snapshots table |
+| kyc.entity_workstreams | status column | Add workstream_snapshots table |
+| ob-poc.entity_kyc_status | single row per entity/cbu | Already snapshot-like, add version |
+| ob-poc.cbu_resource_instances | status column | Add instance_snapshots table |
+
+### Snapshot Table Pattern
+
+```sql
+CREATE TABLE kyc.case_snapshots (
+    snapshot_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    case_id UUID NOT NULL REFERENCES kyc.cases(case_id),
+    
+    -- Snapshot of state at this moment
+    status VARCHAR(30) NOT NULL,
+    escalation_level VARCHAR(30) NOT NULL,
+    risk_rating VARCHAR(20),
+    assigned_analyst_id UUID,
+    assigned_reviewer_id UUID,
+    
+    -- Snapshot metadata
+    snapshot_reason VARCHAR(100),  -- 'STATUS_CHANGE', 'ESCALATION', 'ASSIGNMENT'
+    triggered_by_verb VARCHAR(100),  -- 'kyc-case.set-status'
+    
+    -- Versioning
+    version INTEGER NOT NULL,
+    is_current BOOLEAN DEFAULT true,
+    
+    created_at TIMESTAMPTZ DEFAULT now(),
+    created_by TEXT
+);
+
+-- Only one current snapshot per case
+CREATE UNIQUE INDEX idx_case_current_snapshot 
+ON kyc.case_snapshots(case_id) WHERE is_current = true;
+```
+
+### Current View
+
+```sql
+CREATE VIEW kyc.v_case_current AS
+SELECT c.case_id, c.cbu_id, c.opened_at, c.closed_at, c.case_type,
+       s.status, s.escalation_level, s.risk_rating,
+       s.assigned_analyst_id, s.assigned_reviewer_id,
+       s.version, s.created_at as state_changed_at
+FROM kyc.cases c
+JOIN kyc.case_snapshots s ON s.case_id = c.case_id AND s.is_current = true;
+```
+
+### On State Change
+
+When `kyc-case.set-status` is called:
+1. Mark current snapshot as `is_current = false`
+2. Insert new snapshot with `is_current = true`, `version = old_version + 1`
+3. New snapshot captures full state, not just changed field
+
+### Files to Change
+- sql/migrations/YYYYMMDD_snapshot_tables.sql (new)
+- rust/config/verbs.yaml - modify set-status verbs to use snapshot pattern
+- rust/src/dsl_v2/custom_ops/mod.rs - add snapshot operation handlers
+
+---
+
+## 4. KYC State Snapshots on Transition
+
+### Pattern: Snapshot Function
+
+Instead of updating status directly, call a function that:
+1. Validates transition is allowed
+2. Creates snapshot with old state
+3. Updates to new state
+4. Returns new snapshot_id
+
+```sql
+CREATE FUNCTION kyc.transition_case_status(
+    p_case_id UUID,
+    p_new_status VARCHAR(30),
+    p_reason TEXT DEFAULT NULL,
+    p_actor TEXT DEFAULT 'SYSTEM'
+) RETURNS UUID AS $$
+DECLARE
+    v_current_status VARCHAR(30);
+    v_current_version INTEGER;
+    v_snapshot_id UUID;
+BEGIN
+    -- Get current state
+    SELECT status, version INTO v_current_status, v_current_version
+    FROM kyc.case_snapshots
+    WHERE case_id = p_case_id AND is_current = true;
+    
+    -- Validate transition (could query csg_rules or hardcode)
+    IF NOT kyc.is_valid_transition('case', v_current_status, p_new_status) THEN
+        RAISE EXCEPTION 'Invalid transition: % -> %', v_current_status, p_new_status;
+    END IF;
+    
+    -- Mark old snapshot as not current
+    UPDATE kyc.case_snapshots
+    SET is_current = false
+    WHERE case_id = p_case_id AND is_current = true;
+    
+    -- Insert new snapshot
+    INSERT INTO kyc.case_snapshots (
+        case_id, status, escalation_level, risk_rating,
+        assigned_analyst_id, assigned_reviewer_id,
+        snapshot_reason, version, is_current, created_by
+    )
+    SELECT 
+        case_id, p_new_status, escalation_level, risk_rating,
+        assigned_analyst_id, assigned_reviewer_id,
+        COALESCE(p_reason, 'STATUS_CHANGE'),
+        v_current_version + 1, true, p_actor
+    FROM kyc.case_snapshots
+    WHERE case_id = p_case_id AND version = v_current_version
+    RETURNING snapshot_id INTO v_snapshot_id;
+    
+    RETURN v_snapshot_id;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+### Transition Validation Function
+
+```sql
+CREATE FUNCTION kyc.is_valid_transition(
+    p_machine VARCHAR(50),
+    p_from_status VARCHAR(30),
+    p_to_status VARCHAR(30)
+) RETURNS BOOLEAN AS $$
+BEGIN
+    -- Could query a transitions table or use CASE statement
+    CASE p_machine
+        WHEN 'case' THEN
+            RETURN CASE p_from_status
+                WHEN 'INTAKE' THEN p_to_status IN ('DISCOVERY', 'WITHDRAWN')
+                WHEN 'DISCOVERY' THEN p_to_status IN ('ASSESSMENT', 'BLOCKED', 'WITHDRAWN')
+                WHEN 'ASSESSMENT' THEN p_to_status IN ('REVIEW', 'BLOCKED', 'WITHDRAWN')
+                WHEN 'REVIEW' THEN p_to_status IN ('APPROVED', 'REJECTED', 'BLOCKED')
+                WHEN 'BLOCKED' THEN p_to_status IN ('DISCOVERY', 'ASSESSMENT', 'REVIEW', 'WITHDRAWN')
+                ELSE false
+            END;
+        WHEN 'workstream' THEN
+            -- Similar for workstream
+            RETURN true;  -- Placeholder
+        ELSE
+            RETURN false;
+    END CASE;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+### Wire to DSL Verbs
+
+`kyc-case.set-status` verb becomes:
+```yaml
+set-status:
+  description: "Transition case to new status (creates snapshot)"
+  behavior: plugin
+  handler: kyc_case_transition
+  args:
+    - name: case-id
+      type: uuid
+      required: true
+    - name: status
+      type: string
+      required: true
+    - name: reason
+      type: string
+      required: false
+  returns:
+    type: uuid
+    name: snapshot_id
+```
+
+Custom op calls `kyc.transition_case_status()` function.
+
+### Files to Change
+- sql/migrations/YYYYMMDD_snapshot_functions.sql (new)
+- rust/config/verbs.yaml - change set-status to plugin
+- rust/src/dsl_v2/custom_ops/mod.rs - add KycCaseTransitionOp
+
+---
+
+## 5. Encode State Transitions in csg_rules.yaml
+
+### Purpose
+Machine-readable transitions for:
+1. Documentation
+2. Linter validation (catch invalid transitions at lint time)
+3. UI state machine visualization
+
+### Schema
 
 ```yaml
 state_machines:
   kyc_case:
-    entity: kyc.cases
+    table: kyc.cases
     column: status
     initial: INTAKE
     terminal: [APPROVED, REJECTED, WITHDRAWN, EXPIRED]
@@ -75,7 +329,7 @@ state_machines:
       BLOCKED: [DISCOVERY, ASSESSMENT, REVIEW, WITHDRAWN]
 
   workstream:
-    entity: kyc.entity_workstreams
+    table: kyc.entity_workstreams
     column: status
     initial: PENDING
     terminal: [COMPLETE]
@@ -89,7 +343,7 @@ state_machines:
       BLOCKED: [PENDING, COLLECT, VERIFY, SCREEN, ASSESS]
 
   resource_instance:
-    entity: ob-poc.cbu_resource_instances
+    table: ob-poc.cbu_resource_instances
     column: status
     initial: PENDING
     terminal: [DECOMMISSIONED]
@@ -100,24 +354,26 @@ state_machines:
       SUSPENDED: [ACTIVE, DECOMMISSIONED]
 ```
 
-### Implementation Steps
-1. Add state_machines schema to csg_rules.yaml
-2. Add StateTransitionValidator to CSG linter
-3. Wire linter to check set-status verbs against allowed transitions
-4. Add tests for transition validation
+### Linter Integration
+
+CSG linter checks `set-status` verbs:
+1. Load state machine config
+2. If verb is `*.set-status` and we can resolve current status from context
+3. Warn if transition looks invalid
+
+Note: Full validation happens at DB level via function. Linter is advisory.
 
 ### Files to Change
 - rust/config/csg_rules.yaml - add state_machines section
-- rust/src/dsl_v2/csg_linter.rs - add transition validation
 - rust/src/dsl_v2/config/types.rs - add StateMachine serde types
+- rust/src/dsl_v2/csg_linter.rs - optional transition warnings
 
 ---
 
-## 3. Split Verb Config + DSL Schema Versioning
+## 6. Split Verb Config
 
 ### Current State
-- Single verbs.yaml file: **5,259 lines, 28 domains**
-- No DSL schema versioning
+- Single verbs.yaml: **5,259 lines, 28 domains**
 - Hard to navigate and maintain
 
 ### Proposed Structure
@@ -126,182 +382,58 @@ state_machines:
 rust/config/
 ├── verbs/
 │   ├── _meta.yaml           # version, common definitions
-│   ├── cbu.yaml             # CBU domain
-│   ├── entity.yaml          # Entity domain
-│   ├── document.yaml        # Document domain
+│   ├── cbu.yaml
+│   ├── entity.yaml
+│   ├── document.yaml
 │   ├── kyc/
-│   │   ├── case.yaml        # kyc-case domain
-│   │   ├── workstream.yaml  # entity-workstream domain
-│   │   └── screening.yaml   # screening domain
+│   │   ├── case.yaml
+│   │   ├── workstream.yaml
+│   │   └── screening.yaml
 │   ├── custody/
-│   │   ├── universe.yaml    # cbu-custody domain
+│   │   ├── universe.yaml
 │   │   └── ssi.yaml
 │   └── observation/
 │       ├── allegation.yaml
 │       ├── observation.yaml
 │       └── discrepancy.yaml
-└── csg_rules.yaml           # unchanged
+└── csg_rules.yaml
 ```
-
-### DSL Schema Versioning
-
-Add to dsl_instances table:
-```sql
-ALTER TABLE "ob-poc".dsl_instances 
-ADD COLUMN dsl_schema_version VARCHAR(20) DEFAULT '1.0';
-```
-
-### Implementation Steps
-1. Create directory structure
-2. Split verbs.yaml into domain files (scripted)
-3. Update ConfigLoader to merge multiple files
-4. Add schema version to _meta.yaml
-5. Add dsl_schema_version column to dsl_instances
-6. Update executor to stamp version on new instances
 
 ### Files to Change
 - rust/config/verbs/*.yaml (new, split from verbs.yaml)
 - rust/src/dsl_v2/config/loader.rs - multi-file loading
-- sql/migrations/YYYYMMDD_dsl_schema_version.sql (new)
 
 ---
 
-## 4. Current View Over Observations
+## 7. Event Emission (PARKED)
 
-### Current State
-**Already implemented**: v_attribute_current view exists
-
-```sql
-SELECT DISTINCT ON (entity_id, attribute_id) ...
-FROM "ob-poc".attribute_observations
-WHERE status = 'ACTIVE'
-ORDER BY entity_id, attribute_id, 
-         is_authoritative DESC, 
-         confidence DESC, 
-         observed_at DESC;
-```
-
-### Gaps
-- View does not include CBU context (some use cases need per-CBU values)
-- No view joining allegations to their verifying observations
-
-### Proposed Addition
-
-**v_entity_attribute_summary** - Current values with allegation status:
-```sql
-CREATE VIEW "ob-poc".v_entity_attribute_summary AS
-SELECT 
-    e.entity_id,
-    e.name as entity_name,
-    ar.name as attribute_name,
-    vac.value_text, vac.value_number, vac.value_date,
-    vac.source_type,
-    vac.confidence,
-    ca.verification_status as allegation_status
-FROM "ob-poc".entities e
-CROSS JOIN "ob-poc".attribute_registry ar
-LEFT JOIN "ob-poc".v_attribute_current vac 
-    ON vac.entity_id = e.entity_id AND vac.attribute_id = ar.uuid
-LEFT JOIN "ob-poc".client_allegations ca
-    ON ca.entity_id = e.entity_id AND ca.attribute_id = ar.uuid;
-```
-
-### Implementation Steps
-1. Create v_entity_attribute_summary view
-2. Add DSL verb observation.get-summary to query it
-
-### Files to Change
-- sql/migrations/YYYYMMDD_observation_views.sql (new)
-- rust/config/verbs.yaml - add get-summary verb
-
----
-
-## 5. Standardise Event Emission
-
-### Current State
-- case-event.log verb exists for manual logging
-- **No automatic event emission** from mutating verbs
-- Event emission is opt-in, not automatic
-
-### Proposed Solution
-
-Add emits_event configuration to verb definitions:
-
-```yaml
-kyc-case:
-  verbs:
-    set-status:
-      description: "Update case status"
-      behavior: crud
-      crud:
-        operation: update
-        table: cases
-        schema: kyc
-      emits_event:
-        table: case_events
-        schema: kyc
-        event_type: "CASE_STATUS_CHANGED"
-        include_args: [case-id, status]
-        capture_old_value: status
-```
-
-### Executor Changes
-
-In GenericCrudExecutor, after successful CRUD operation:
-1. Check if verb has emits_event config
-2. If yes, insert row into event table
-3. Include: case_id, event_type, event_data (old + new values), occurred_at
-
-### Implementation Steps
-1. Add emits_event schema to verb config types
-2. Update GenericCrudExecutor to check for and emit events
-3. Add emits_event config to key verbs:
-   - kyc-case.set-status
-   - entity-workstream.set-status
-   - allegation.verify, allegation.contradict
-   - discrepancy.resolve
-   - red-flag.raise, red-flag.resolve
-4. Add tests for event emission
-
-### Files to Change
-- rust/src/dsl_v2/config/types.rs - add EmitsEvent struct
-- rust/src/dsl_v2/generic_executor.rs - emit events after CRUD
-- rust/config/verbs.yaml - add emits_event to key verbs
+Parked for POC. Required for production audit trail.
 
 ---
 
 ## Implementation Order
 
-Recommended sequence:
+```
+1. Idempotency (CRITICAL)     ─────────────────────┐
+                                                    │
+2. Snapshot tables            ──────┐              │
+                                    ├─► 4. State   │
+3. Harden statuses            ──────┘    snapshots │
+                                              │     │
+5. State transitions (csg)    ◄───────────────┘    │
+                                                    │
+6. Split verb config          ◄────────────────────┘
+                              (can be done anytime)
+```
 
-1. **Harden statuses** (1-2 hours)
-   - Quick win, database-only, no Rust changes
-
-2. **Event emission** (4-6 hours)
-   - High value for audit trail
-   - Needed before KYC transitions (transitions should emit events)
-
-3. **KYC state transitions** (4-6 hours)
-   - Depends on event emission
-   - Critical for KYC workflow integrity
-
-4. **Split verb config** (2-4 hours)
-   - Maintenance improvement
-   - Can be done independently
-
-5. **Observation views** (1-2 hours)
-   - Low priority, mostly done
-   - Nice to have
-
----
-
-## Total Estimated Effort
+### Estimated Effort
 
 | Workstream | Effort |
 |------------|--------|
-| Harden statuses | 1-2 hours |
-| Event emission | 4-6 hours |
-| KYC transitions | 4-6 hours |
-| Split verb config | 2-4 hours |
-| Observation views | 1-2 hours |
-| **Total** | **12-20 hours** |
+| 1. Idempotency | 6-8 hours |
+| 2. Snapshot tables | 4-6 hours |
+| 3. Harden statuses | 1-2 hours |
+| 4. State snapshots + functions | 4-6 hours |
+| 5. State transitions (csg) | 2-3 hours |
+| 6. Split verb config | 2-4 hours |
+| **Total** | **19-29 hours** |
