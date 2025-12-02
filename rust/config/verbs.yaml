@@ -562,6 +562,24 @@ domains:
         returns:
           type: record
 
+      extract-to-observations:
+        description: "Extract document data and create observations"
+        behavior: plugin
+        handler: document_extract_observations
+        args:
+          - name: document-id
+            type: uuid
+            required: true
+          - name: entity-id
+            type: uuid
+            required: true
+          - name: auto-verify-allegations
+            type: boolean
+            required: false
+            default: true
+        returns:
+          type: record_set
+
   # ===========================================================================
   # DOMAIN: screening
   # ===========================================================================
@@ -5056,6 +5074,44 @@ domains:
             required: true
         returns:
           type: record
+
+      reconcile:
+        description: "Compare observations for an attribute and auto-create discrepancies"
+        behavior: plugin
+        handler: observation_reconcile
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+          - name: attribute
+            type: string
+            required: true
+          - name: case-id
+            type: uuid
+            required: false
+          - name: auto-create-discrepancies
+            type: boolean
+            required: false
+            default: true
+        returns:
+          type: record_set
+
+      verify-allegations:
+        description: "Batch verify pending allegations against observations"
+        behavior: plugin
+        handler: observation_verify_allegations
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: entity-id
+            type: uuid
+            required: true
+          - name: case-id
+            type: uuid
+            required: false
+        returns:
+          type: record_set
 
   # ===========================================================================
   # DOMAIN: discrepancy (Observation Discrepancies)
