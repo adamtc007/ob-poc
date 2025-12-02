@@ -472,7 +472,7 @@ dsl_cli execute -f program.dsl --format json | jq '.bindings'
 |--------|---------|
 | cbu | Client Business Unit lifecycle (ensure, assign-role, etc.) |
 | entity | Dynamic verbs from entity_types (create-proper-person, create-limited-company) |
-| document | Document catalog, request, extract |
+| document | Document catalog, request, extract, extract-to-observations |
 | screening | Legacy PEP, sanctions checks (use case-screening instead) |
 | kyc | Legacy KYC verbs (use kyc-case domain instead) |
 | ubo | Ownership chains, control relationships, UBO registry |
@@ -631,6 +631,8 @@ The observation model implements evidence-based KYC verification. Instead of sto
 | `observation.list-for-entity` | List all observations for entity |
 | `observation.list-for-attribute` | List observations of specific attribute |
 | `observation.get-current` | Get current best observation |
+| `observation.reconcile` | Compare observations and auto-create discrepancies |
+| `observation.verify-allegations` | Batch verify pending allegations with observations |
 
 ### Discrepancy Verbs
 

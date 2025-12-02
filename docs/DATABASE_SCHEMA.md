@@ -1,7 +1,7 @@
 # Database Schema Reference
 
 **Database**: `data_designer` on PostgreSQL 17  
-**Schemas**: `ob-poc` (51 tables), `custody` (17 tables), `kyc` (11 tables)  
+**Schemas**: `ob-poc` (55 tables), `custody` (17 tables), `kyc` (11 tables)  
 **Updated**: 2025-12-02
 
 ## Overview
@@ -296,6 +296,59 @@ Non-ownership control links between entities.
 | evidence_doc_id | uuid | | | FK to document_catalog |
 | created_at | timestamptz | | now() | |
 | updated_at | timestamptz | | now() | |
+
+
+## Observation Model (KYC Evidence)
+
+The observation model captures the reality of KYC: multiple sources may provide different observations about the same attribute. Allegations from clients are verified against documentary evidence.
+
+### client_allegations
+
+What the client claims about their entities.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| allegation_id | uuid | Primary key |
+| cbu_id | uuid | FK to cbus |
+| entity_id | uuid | FK to entities |
+| attribute_id | uuid | FK to attribute_registry |
+| alleged_value | jsonb | The claimed value |
+| allegation_source | varchar(50) | ONBOARDING_FORM, KYC_QUESTIONNAIRE, EMAIL, VERBAL, API, DOCUMENT |
+| verification_status | varchar(30) | PENDING, VERIFIED, CONTRADICTED, PARTIAL, UNVERIFIABLE, WAIVED |
+| verification_result | varchar(30) | EXACT_MATCH, ACCEPTABLE_VARIATION, MATERIAL_DISCREPANCY |
+| verified_by_observation_id | uuid | FK to attribute_observations |
+
+### attribute_observations
+
+Evidence from authoritative sources (documents, screening, third parties).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| observation_id | uuid | Primary key |
+| entity_id | uuid | FK to entities |
+| attribute_id | uuid | FK to attribute_registry |
+| value_text/number/boolean/date/json | varied | Exactly one value column set |
+| source_type | varchar(30) | DOCUMENT, SCREENING, THIRD_PARTY, SYSTEM, DERIVED, MANUAL |
+| source_document_id | uuid | FK to document_catalog (required if source_type=DOCUMENT) |
+| confidence | numeric(3,2) | 0.00-1.00 confidence score |
+| is_authoritative | boolean | Primary source for this attribute |
+| status | varchar(30) | ACTIVE, SUPERSEDED, DISPUTED, WITHDRAWN, REJECTED |
+
+### observation_discrepancies
+
+Conflicts between observations requiring resolution.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| discrepancy_id | uuid | Primary key |
+| entity_id | uuid | FK to entities |
+| attribute_id | uuid | FK to attribute_registry |
+| observation_1_id | uuid | FK to attribute_observations |
+| observation_2_id | uuid | FK to attribute_observations |
+| discrepancy_type | varchar(30) | VALUE_MISMATCH, SPELLING_VARIATION, CONTRADICTORY |
+| severity | varchar(20) | INFO, LOW, MEDIUM, HIGH, CRITICAL |
+| resolution_status | varchar(30) | OPEN, INVESTIGATING, RESOLVED, ESCALATED |
+| accepted_observation_id | uuid | FK to observation chosen as correct |
 
 ## Products & Services
 
