@@ -109,6 +109,7 @@ pub fn load_rules(path: &Path) -> Result<Vec<Rule>> {
 }
 
 /// Load rules from a string (for testing)
+#[cfg(test)]
 pub fn load_rules_from_str(yaml: &str) -> Result<Vec<Rule>> {
     let config: RulesConfig = serde_yaml::from_str(yaml)?;
     Ok(config

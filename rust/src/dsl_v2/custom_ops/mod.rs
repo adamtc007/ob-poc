@@ -2253,7 +2253,7 @@ impl CustomOperation for ObservationReconcileOp {
         let attribute_id: Option<Uuid> = sqlx::query_scalar(
             r#"SELECT uuid FROM "ob-poc".attribute_registry WHERE id = $1 OR name = $1"#,
         )
-        .bind(&attr_name)
+        .bind(attr_name)
         .fetch_optional(pool)
         .await?;
 
@@ -2313,27 +2313,25 @@ impl CustomOperation for ObservationReconcileOp {
 
         for other in observations.iter().skip(1) {
             // Compare values (simplified - just text comparison for now)
-            if first.1 != other.1 {
-                if auto_create {
-                    // Create discrepancy record
-                    let discrepancy_id = Uuid::new_v4();
-                    sqlx::query!(
-                        r#"INSERT INTO "ob-poc".observation_discrepancies
-                           (discrepancy_id, entity_id, attribute_id, observation_1_id, observation_2_id,
-                            discrepancy_type, severity, description, case_id, resolution_status)
-                           VALUES ($1, $2, $3, $4, $5, 'VALUE_MISMATCH', 'MEDIUM',
-                                   'Different values observed for same attribute', $6, 'OPEN')"#,
-                        discrepancy_id,
-                        entity_id,
-                        attribute_id,
-                        first.0,
-                        other.0,
-                        case_id
-                    )
-                    .execute(pool)
-                    .await?;
-                    discrepancies_created += 1;
-                }
+            if first.1 != other.1 && auto_create {
+                // Create discrepancy record
+                let discrepancy_id = Uuid::new_v4();
+                sqlx::query!(
+                    r#"INSERT INTO "ob-poc".observation_discrepancies
+                       (discrepancy_id, entity_id, attribute_id, observation_1_id, observation_2_id,
+                        discrepancy_type, severity, description, case_id, resolution_status)
+                       VALUES ($1, $2, $3, $4, $5, 'VALUE_MISMATCH', 'MEDIUM',
+                               'Different values observed for same attribute', $6, 'OPEN')"#,
+                    discrepancy_id,
+                    entity_id,
+                    attribute_id,
+                    first.0,
+                    other.0,
+                    case_id
+                )
+                .execute(pool)
+                .await?;
+                discrepancies_created += 1;
             }
         }
 

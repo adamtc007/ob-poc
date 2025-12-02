@@ -28,7 +28,7 @@ pub struct CompositeSourceExecutor {
 impl CompositeSourceExecutor {
     pub fn new(pool: PgPool) -> Self {
         Self {
-            document_source: Box::new(DocumentSource::new(pool.clone())),
+            document_source: Box::new(DocumentSource),
             database_source: Box::new(DatabaseSource::new(pool)),
         }
     }
@@ -58,16 +58,8 @@ impl CompositeSourceExecutor {
     }
 }
 
-// Document source implementation
-struct DocumentSource {
-    pool: PgPool,
-}
-
-impl DocumentSource {
-    fn new(pool: PgPool) -> Self {
-        Self { pool }
-    }
-}
+// Document source implementation (placeholder - will query document_catalog when implemented)
+struct DocumentSource;
 
 #[async_trait]
 impl SourceExecutor for DocumentSource {
