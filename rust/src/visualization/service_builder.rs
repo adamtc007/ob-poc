@@ -2,10 +2,13 @@
 //!
 //! Builds hierarchical tree visualization for Service Delivery view.
 //! Structure: CBU → Product → Service → Resource (Instance)
+//!
+//! NOTE: All database access goes through VisualizationRepository.
+//! This builder only handles tree assembly logic.
 
 use super::types::*;
+use crate::database::{CbuSummaryView, ServiceDeliveryView, VisualizationRepository};
 use anyhow::Result;
-use sqlx::PgPool;
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -16,39 +19,40 @@ type ServiceMap = HashMap<Uuid, (String, Vec<TreeNode>)>;
 type ProductMap = HashMap<Uuid, (String, ServiceMap)>;
 
 pub struct ServiceTreeBuilder {
-    pool: PgPool,
-}
-
-#[derive(Debug, sqlx::FromRow)]
-struct CbuRecord {
-    name: String,
-    jurisdiction: Option<String>,
-    client_type: Option<String>,
-}
-
-#[derive(Debug, sqlx::FromRow)]
-struct DeliveryRecord {
-    #[allow(dead_code)]
-    delivery_id: Uuid,
-    product_id: Uuid,
-    product_name: String,
-    service_id: Uuid,
-    service_name: String,
-    instance_id: Option<Uuid>,
-    instance_name: Option<String>,
-    resource_type_name: Option<String>,
-    delivery_status: Option<String>,
+    repo: VisualizationRepository,
 }
 
 impl ServiceTreeBuilder {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+    pub fn new(repo: VisualizationRepository) -> Self {
+        Self { repo }
     }
 
     pub async fn build(&self, cbu_id: Uuid) -> Result<CbuVisualization> {
-        let cbu = self.load_cbu(cbu_id).await?;
-        let deliveries = self.load_deliveries(cbu_id).await?;
+        let cbu = self
+            .repo
+            .get_cbu(cbu_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("CBU not found: {}", cbu_id))?;
+        let deliveries = self.repo.get_service_deliveries(cbu_id).await?;
 
+        let product_nodes = self.build_product_tree(&deliveries);
+
+        let root = self.build_root_node(cbu_id, &cbu, product_nodes);
+        let stats = VisualizationStats::from_tree(&root, &[]);
+
+        Ok(CbuVisualization {
+            cbu_id,
+            cbu_name: cbu.name,
+            client_type: cbu.client_type,
+            jurisdiction: cbu.jurisdiction,
+            view_mode: ViewMode::ServiceDelivery,
+            root,
+            overlay_edges: vec![],
+            stats,
+        })
+    }
+
+    fn build_product_tree(&self, deliveries: &[ServiceDeliveryView]) -> Vec<TreeNode> {
         // Group by product -> service -> resources
         let mut products: ProductMap = HashMap::new();
 
@@ -67,13 +71,16 @@ impl ServiceTreeBuilder {
                 let resource_node = TreeNode {
                     id: instance_id,
                     node_type: TreeNodeType::Resource,
-                    label: d.instance_name.unwrap_or_else(|| "Instance".to_string()),
-                    sublabel: d.resource_type_name,
+                    label: d
+                        .instance_name
+                        .clone()
+                        .unwrap_or_else(|| "Instance".to_string()),
+                    sublabel: d.resource_type_name.clone(),
                     jurisdiction: None,
                     children: vec![],
                     metadata: {
                         let mut m = HashMap::new();
-                        if let Some(status) = d.delivery_status {
+                        if let Some(ref status) = d.delivery_status {
                             m.insert("status".to_string(), serde_json::json!(status));
                         }
                         m
@@ -83,7 +90,7 @@ impl ServiceTreeBuilder {
             }
         }
 
-        // Build tree
+        // Build tree nodes
         let mut product_nodes: Vec<TreeNode> = products
             .into_iter()
             .map(|(product_id, (product_name, services))| {
@@ -113,68 +120,23 @@ impl ServiceTreeBuilder {
             .collect();
 
         product_nodes.sort_by(|a, b| a.label.cmp(&b.label));
+        product_nodes
+    }
 
-        let root = TreeNode {
+    fn build_root_node(
+        &self,
+        cbu_id: Uuid,
+        cbu: &CbuSummaryView,
+        children: Vec<TreeNode>,
+    ) -> TreeNode {
+        TreeNode {
             id: cbu_id,
             node_type: TreeNodeType::Cbu,
             label: cbu.name.clone(),
             sublabel: cbu.client_type.clone(),
             jurisdiction: cbu.jurisdiction.clone(),
-            children: product_nodes,
+            children,
             metadata: HashMap::new(),
-        };
-
-        let stats = VisualizationStats::from_tree(&root, &[]);
-
-        Ok(CbuVisualization {
-            cbu_id,
-            cbu_name: cbu.name,
-            client_type: cbu.client_type,
-            jurisdiction: cbu.jurisdiction,
-            view_mode: ViewMode::ServiceDelivery,
-            root,
-            overlay_edges: vec![],
-            stats,
-        })
-    }
-
-    async fn load_cbu(&self, cbu_id: Uuid) -> Result<CbuRecord> {
-        let row = sqlx::query_as!(
-            CbuRecord,
-            r#"SELECT name, jurisdiction, client_type
-               FROM "ob-poc".cbus
-               WHERE cbu_id = $1"#,
-            cbu_id
-        )
-        .fetch_one(&self.pool)
-        .await?;
-        Ok(row)
-    }
-
-    async fn load_deliveries(&self, cbu_id: Uuid) -> Result<Vec<DeliveryRecord>> {
-        let rows = sqlx::query_as!(
-            DeliveryRecord,
-            r#"SELECT
-                sdm.delivery_id,
-                sdm.product_id,
-                p.name as "product_name!",
-                sdm.service_id,
-                s.name as "service_name!",
-                sdm.instance_id,
-                cri.instance_name as "instance_name?",
-                srt.name as "resource_type_name?",
-                sdm.delivery_status as "delivery_status?"
-               FROM "ob-poc".service_delivery_map sdm
-               JOIN "ob-poc".products p ON p.product_id = sdm.product_id
-               JOIN "ob-poc".services s ON s.service_id = sdm.service_id
-               LEFT JOIN "ob-poc".cbu_resource_instances cri ON cri.instance_id = sdm.instance_id
-               LEFT JOIN "ob-poc".service_resource_types srt ON srt.resource_id = cri.resource_type_id
-               WHERE sdm.cbu_id = $1
-               ORDER BY p.name, s.name"#,
-            cbu_id
-        )
-        .fetch_all(&self.pool)
-        .await?;
-        Ok(rows)
+        }
     }
 }

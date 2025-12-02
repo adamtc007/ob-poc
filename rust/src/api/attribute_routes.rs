@@ -1,6 +1,9 @@
 //! REST API routes for attribute dictionary operations
+//!
+//! All database access goes through VisualizationRepository or DictionaryServiceImpl.
 
 use crate::data_dictionary::{AttributeId, DictionaryService};
+use crate::database::VisualizationRepository;
 use crate::services::DictionaryServiceImpl;
 use axum::{
     extract::{Path, State},
@@ -165,22 +168,9 @@ async fn get_cbu_attributes(
     State(pool): State<PgPool>,
     Path(entity_id): Path<Uuid>,
 ) -> Result<Json<AttributeListResponse>, StatusCode> {
-    let values = sqlx::query!(
-        r#"
-        SELECT
-            av.attribute_id,
-            av.value_text,
-            ar.display_name as attribute_name
-        FROM "ob-poc".attribute_values_typed av
-        JOIN "ob-poc".attribute_registry ar ON ar.id = av.attribute_id
-        WHERE av.entity_id = $1
-        ORDER BY ar.display_name
-        "#,
-        entity_id
-    )
-    .fetch_all(&pool)
-    .await
-    .map_err(|e| {
+    let repo = VisualizationRepository::new(pool);
+
+    let values = repo.get_entity_attributes(entity_id).await.map_err(|e| {
         eprintln!("Failed to fetch attributes: {}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
@@ -211,22 +201,9 @@ async fn get_document_attributes(
     State(pool): State<PgPool>,
     Path(doc_id): Path<Uuid>,
 ) -> Result<Json<Vec<AttributeValue>>, StatusCode> {
-    let values = sqlx::query!(
-        r#"
-        SELECT
-            dm.attribute_id,
-            dm.value,
-            d.name as attribute_name
-        FROM "ob-poc".document_metadata dm
-        JOIN "ob-poc".dictionary d ON d.attribute_id = dm.attribute_id
-        WHERE dm.doc_id = $1
-        ORDER BY d.name
-        "#,
-        doc_id
-    )
-    .fetch_all(&pool)
-    .await
-    .map_err(|e| {
+    let repo = VisualizationRepository::new(pool);
+
+    let values = repo.get_document_attributes(doc_id).await.map_err(|e| {
         eprintln!("Failed to fetch document attributes: {}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;

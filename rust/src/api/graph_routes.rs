@@ -1,6 +1,7 @@
 //! Graph API routes for CBU visualization
 //!
 //! Provides endpoints to fetch graph data for the egui WASM client.
+//! All database access goes through VisualizationRepository.
 
 use axum::{
     extract::{Path, Query, State},
@@ -12,6 +13,7 @@ use serde::Deserialize;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::database::VisualizationRepository;
 use crate::graph::{CbuGraph, CbuGraphBuilder, CbuSummary};
 use crate::visualization::{CbuVisualization, KycTreeBuilder, ServiceTreeBuilder, ViewMode};
 
@@ -55,18 +57,26 @@ pub async fn get_cbu_graph(
 pub async fn list_cbus(
     State(pool): State<PgPool>,
 ) -> Result<Json<Vec<CbuSummary>>, (StatusCode, String)> {
-    let cbus = sqlx::query_as!(
-        CbuSummary,
-        r#"SELECT cbu_id, name, jurisdiction, client_type,
-                  created_at, updated_at
-           FROM "ob-poc".cbus
-           ORDER BY name"#
-    )
-    .fetch_all(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let repo = VisualizationRepository::new(pool);
+    let cbus = repo
+        .list_cbus()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    Ok(Json(cbus))
+    // Convert to CbuSummary (same fields, different struct for API contract)
+    let summaries: Vec<CbuSummary> = cbus
+        .into_iter()
+        .map(|c| CbuSummary {
+            cbu_id: c.cbu_id,
+            name: c.name,
+            jurisdiction: c.jurisdiction,
+            client_type: c.client_type,
+            created_at: c.created_at,
+            updated_at: c.updated_at,
+        })
+        .collect();
+
+    Ok(Json(summaries))
 }
 
 /// GET /api/cbu/{cbu_id} - Get a single CBU summary
@@ -74,19 +84,21 @@ pub async fn get_cbu(
     State(pool): State<PgPool>,
     Path(cbu_id): Path<Uuid>,
 ) -> Result<Json<CbuSummary>, (StatusCode, String)> {
-    let cbu = sqlx::query_as!(
-        CbuSummary,
-        r#"SELECT cbu_id, name, jurisdiction, client_type,
-                  created_at, updated_at
-           FROM "ob-poc".cbus
-           WHERE cbu_id = $1"#,
-        cbu_id
-    )
-    .fetch_one(&pool)
-    .await
-    .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))?;
+    let repo = VisualizationRepository::new(pool);
+    let cbu = repo
+        .get_cbu(cbu_id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or_else(|| (StatusCode::NOT_FOUND, format!("CBU not found: {}", cbu_id)))?;
 
-    Ok(Json(cbu))
+    Ok(Json(CbuSummary {
+        cbu_id: cbu.cbu_id,
+        name: cbu.name,
+        jurisdiction: cbu.jurisdiction,
+        client_type: cbu.client_type,
+        created_at: cbu.created_at,
+        updated_at: cbu.updated_at,
+    }))
 }
 
 /// Query parameters for tree endpoint
@@ -108,12 +120,14 @@ pub async fn get_cbu_tree(
         _ => ViewMode::KycUbo, // Default to KYC/UBO view
     };
 
+    let repo = VisualizationRepository::new(pool);
+
     let viz = match view_mode {
-        ViewMode::KycUbo => KycTreeBuilder::new(pool)
+        ViewMode::KycUbo => KycTreeBuilder::new(repo)
             .build(cbu_id)
             .await
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
-        ViewMode::ServiceDelivery => ServiceTreeBuilder::new(pool)
+        ViewMode::ServiceDelivery => ServiceTreeBuilder::new(repo)
             .build(cbu_id)
             .await
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,

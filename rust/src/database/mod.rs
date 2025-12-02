@@ -30,6 +30,7 @@ pub mod risk_service;
 pub mod screening_service;
 pub mod service_resource_service;
 pub mod service_service;
+pub mod visualization_repository;
 
 // Legacy modules not yet integrated - kept for reference but not compiled
 // pub mod attribute_repository;
@@ -64,6 +65,11 @@ pub use service_resource_service::{
     NewServiceResourceFields, ServiceResourceRow, ServiceResourceService,
 };
 pub use service_service::{NewServiceFields, ServiceRow, ServiceService};
+pub use visualization_repository::{
+    CbuSummaryView, CbuView, ControlRelationshipView, DocumentAttributeView, EntityAttributeView,
+    EntityView, HoldingView, OfficerView, ServiceDeliveryView, ShareClassView,
+    VisualizationRepository,
+};
 
 // KYC Investigation services
 pub use decision_service::{
