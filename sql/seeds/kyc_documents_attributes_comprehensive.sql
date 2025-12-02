@@ -1,7 +1,7 @@
 -- ============================================================================
 -- COMPREHENSIVE KYC DOCUMENT TYPES AND ATTRIBUTE REGISTRY - EXPANDED
 -- ============================================================================
--- 
+--
 -- This file provides the complete KYC document and attribute taxonomy:
 -- - 120+ document types across all KYC domains
 -- - 120+ attributes with semantic IDs
@@ -29,19 +29,19 @@ VALUES
 -- =============================================================================
 ('d0010000-0000-0000-0000-000000000001'::uuid, 'PASSPORT', 'Passport', 'IDENTITY', 'personal',
  'Government-issued international travel document. Primary identity document with MRZ.',
- '{"entity_types": ["PROPER_PERSON_NATURAL"], "is_primary_id": true, "accepted_globally": true, 
+ '{"entity_types": ["PROPER_PERSON_NATURAL"], "is_primary_id": true, "accepted_globally": true,
    "validity": {"must_be_valid": true, "min_validity_months": 3, "reject_if_expired": true}}'::jsonb),
 
 ('d0010000-0000-0000-0000-000000000002'::uuid, 'NATIONAL_ID', 'National Identity Card', 'IDENTITY', 'personal',
  'Government-issued national identity card. Primary ID in EU/EEA.',
- '{"entity_types": ["PROPER_PERSON_NATURAL"], "is_primary_id": true, 
+ '{"entity_types": ["PROPER_PERSON_NATURAL"], "is_primary_id": true,
    "validity": {"must_be_valid": true, "reject_if_expired": true},
    "accepted_regions": ["EU", "EEA", "CH"]}'::jsonb),
 
 ('d0010000-0000-0000-0000-000000000003'::uuid, 'DRIVERS_LICENSE', 'Driver''s License', 'IDENTITY', 'personal',
  'Government-issued driving permit. Secondary ID, proves address in some jurisdictions.',
  '{"entity_types": ["PROPER_PERSON_NATURAL"], "is_secondary_id": true,
-   "validity": {"must_be_valid": true}, 
+   "validity": {"must_be_valid": true},
    "proves_address_in": ["US", "UK", "AU", "CA"]}'::jsonb),
 
 ('d0010000-0000-0000-0000-000000000004'::uuid, 'BIRTH_CERTIFICATE', 'Birth Certificate', 'IDENTITY', 'personal',
@@ -828,9 +828,9 @@ ON CONFLICT (type_code) DO UPDATE SET
 COMMIT;
 
 -- Verification query
-SELECT category, COUNT(*) as doc_count 
-FROM "ob-poc".document_types 
-GROUP BY category 
+SELECT category, COUNT(*) as doc_count
+FROM "ob-poc".document_types
+GROUP BY category
 ORDER BY doc_count DESC;
 
 
@@ -1519,9 +1519,9 @@ ON CONFLICT (id) DO UPDATE SET
 COMMIT;
 
 -- Verification
-SELECT category, COUNT(*) as attr_count 
-FROM "ob-poc".attribute_registry 
-GROUP BY category 
+SELECT category, COUNT(*) as attr_count
+FROM "ob-poc".attribute_registry
+GROUP BY category
 ORDER BY attr_count DESC;
 
 
@@ -1555,35 +1555,45 @@ CREATE TABLE IF NOT EXISTS "ob-poc".document_attribute_links (
 -- Clear existing links
 DELETE FROM "ob-poc".document_attribute_links;
 
-INSERT INTO "ob-poc".document_attribute_links 
+-- Helper function to look up document_type_id by code
+CREATE OR REPLACE FUNCTION pg_temp.doc_id(code TEXT) RETURNS UUID AS $$
+  SELECT type_id FROM "ob-poc".document_types WHERE type_code = code
+$$ LANGUAGE SQL;
+
+-- Helper function to look up attribute_id by id (semantic id like 'attr.identity.full_name')
+CREATE OR REPLACE FUNCTION pg_temp.attr_id(attr_code TEXT) RETURNS UUID AS $$
+  SELECT uuid FROM "ob-poc".attribute_registry WHERE id = attr_code
+$$ LANGUAGE SQL;
+
+INSERT INTO "ob-poc".document_attribute_links
 (document_type_id, attribute_id, direction, extraction_method, extraction_confidence_default, is_authoritative, proof_strength)
 VALUES
 
 -- =============================================================================
 -- PASSPORT - SOURCE (Extraction)
 -- =============================================================================
-('d0010000-0000-0000-0000-000000000001', 'a0010000-0000-0000-0000-000000000001', 'SOURCE', 'MRZ', 0.95, TRUE, 'PRIMARY'),   -- full_name
-('d0010000-0000-0000-0000-000000000001', 'a0010000-0000-0000-0000-000000000002', 'SOURCE', 'MRZ', 0.95, TRUE, 'PRIMARY'),   -- given_name
-('d0010000-0000-0000-0000-000000000001', 'a0010000-0000-0000-0000-000000000003', 'SOURCE', 'MRZ', 0.95, TRUE, 'PRIMARY'),   -- family_name
-('d0010000-0000-0000-0000-000000000001', 'a0010000-0000-0000-0000-000000000005', 'SOURCE', 'MRZ', 0.99, TRUE, 'PRIMARY'),   -- date_of_birth
-('d0010000-0000-0000-0000-000000000001', 'a0010000-0000-0000-0000-000000000006', 'SOURCE', 'OCR', 0.85, TRUE, 'PRIMARY'),   -- place_of_birth
-('d0010000-0000-0000-0000-000000000001', 'a0010000-0000-0000-0000-000000000008', 'SOURCE', 'MRZ', 0.99, TRUE, 'PRIMARY'),   -- gender
-('d0010000-0000-0000-0000-000000000001', 'a0010000-0000-0000-0000-000000000009', 'SOURCE', 'MRZ', 0.99, TRUE, 'PRIMARY'),   -- nationality
-('d0010000-0000-0000-0000-000000000001', 'a0010000-0000-0000-0000-000000000011', 'SOURCE', 'IMAGE', 0.99, TRUE, 'PRIMARY'), -- photo
-('d0010000-0000-0000-0000-000000000001', 'a0010000-0000-0000-0000-000000000012', 'SOURCE', 'IMAGE', 0.90, TRUE, 'PRIMARY'), -- signature
-('d0010000-0000-0000-0000-000000000001', 'a0020000-0000-0000-0000-000000000001', 'SOURCE', 'MRZ', 0.99, TRUE, 'PRIMARY'),   -- passport_number
-('d0010000-0000-0000-0000-000000000001', 'a0020000-0000-0000-0000-000000000004', 'SOURCE', 'OCR', 0.90, TRUE, NULL),        -- issue_date
-('d0010000-0000-0000-0000-000000000001', 'a0020000-0000-0000-0000-000000000005', 'SOURCE', 'MRZ', 0.99, TRUE, NULL),        -- expiry_date
-('d0010000-0000-0000-0000-000000000001', 'a0020000-0000-0000-0000-000000000006', 'SOURCE', 'OCR', 0.85, FALSE, NULL),       -- issuing_authority
-('d0010000-0000-0000-0000-000000000001', 'a0020000-0000-0000-0000-000000000007', 'SOURCE', 'MRZ', 0.99, TRUE, NULL),        -- issuing_country
-('d0010000-0000-0000-0000-000000000001', 'a0020000-0000-0000-0000-000000000008', 'SOURCE', 'MRZ', 0.99, TRUE, NULL),        -- mrz_line_1
-('d0010000-0000-0000-0000-000000000001', 'a0020000-0000-0000-0000-000000000009', 'SOURCE', 'MRZ', 0.99, TRUE, NULL),        -- mrz_line_2
+(pg_temp.doc_id('PASSPORT'), pg_temp.attr_id('attr.identity.full_name'), 'SOURCE', 'MRZ', 0.95, TRUE, 'PRIMARY'),
+(pg_temp.doc_id('PASSPORT'), pg_temp.attr_id('attr.identity.given_name'), 'SOURCE', 'MRZ', 0.95, TRUE, 'PRIMARY'),
+(pg_temp.doc_id('PASSPORT'), pg_temp.attr_id('attr.identity.family_name'), 'SOURCE', 'MRZ', 0.95, TRUE, 'PRIMARY'),
+(pg_temp.doc_id('PASSPORT'), pg_temp.attr_id('attr.identity.date_of_birth'), 'SOURCE', 'MRZ', 0.99, TRUE, 'PRIMARY'),
+(pg_temp.doc_id('PASSPORT'), pg_temp.attr_id('attr.identity.place_of_birth'), 'SOURCE', 'OCR', 0.85, TRUE, 'PRIMARY'),
+(pg_temp.doc_id('PASSPORT'), pg_temp.attr_id('attr.identity.gender'), 'SOURCE', 'MRZ', 0.99, TRUE, 'PRIMARY'),
+(pg_temp.doc_id('PASSPORT'), pg_temp.attr_id('attr.identity.nationality'), 'SOURCE', 'MRZ', 0.99, TRUE, 'PRIMARY'),
+(pg_temp.doc_id('PASSPORT'), pg_temp.attr_id('attr.identity.photo'), 'SOURCE', 'IMAGE', 0.99, TRUE, 'PRIMARY'),
+(pg_temp.doc_id('PASSPORT'), pg_temp.attr_id('attr.identity.signature'), 'SOURCE', 'IMAGE', 0.90, TRUE, 'PRIMARY'),
+(pg_temp.doc_id('PASSPORT'), pg_temp.attr_id('attr.document.passport_number'), 'SOURCE', 'MRZ', 0.99, TRUE, 'PRIMARY'),
+(pg_temp.doc_id('PASSPORT'), pg_temp.attr_id('attr.document.issue_date'), 'SOURCE', 'OCR', 0.90, TRUE, NULL),
+(pg_temp.doc_id('PASSPORT'), pg_temp.attr_id('attr.document.expiry_date'), 'SOURCE', 'MRZ', 0.99, TRUE, NULL),
+(pg_temp.doc_id('PASSPORT'), pg_temp.attr_id('attr.document.issuing_authority'), 'SOURCE', 'OCR', 0.85, FALSE, NULL),
+(pg_temp.doc_id('PASSPORT'), pg_temp.attr_id('attr.document.issuing_country'), 'SOURCE', 'MRZ', 0.99, TRUE, NULL),
+(pg_temp.doc_id('PASSPORT'), pg_temp.attr_id('attr.document.mrz_line_1'), 'SOURCE', 'MRZ', 0.99, TRUE, NULL),
+(pg_temp.doc_id('PASSPORT'), pg_temp.attr_id('attr.document.mrz_line_2'), 'SOURCE', 'MRZ', 0.99, TRUE, NULL),
 
 -- PASSPORT - SINK (What it proves)
-('d0010000-0000-0000-0000-000000000001', 'a0010000-0000-0000-0000-000000000001', 'SINK', NULL, NULL, TRUE, 'PRIMARY'),      -- proves full_name
-('d0010000-0000-0000-0000-000000000001', 'a0010000-0000-0000-0000-000000000005', 'SINK', NULL, NULL, TRUE, 'PRIMARY'),      -- proves dob
-('d0010000-0000-0000-0000-000000000001', 'a0010000-0000-0000-0000-000000000009', 'SINK', NULL, NULL, TRUE, 'PRIMARY'),      -- proves nationality
-('d0010000-0000-0000-0000-000000000001', 'a0010000-0000-0000-0000-000000000011', 'SINK', NULL, NULL, TRUE, 'PRIMARY'),      -- proves photo/likeness
+(pg_temp.doc_id('PASSPORT'), pg_temp.attr_id('attr.identity.full_name'), 'SINK', NULL, NULL, TRUE, 'PRIMARY'),
+(pg_temp.doc_id('PASSPORT'), pg_temp.attr_id('attr.identity.date_of_birth'), 'SINK', NULL, NULL, TRUE, 'PRIMARY'),
+(pg_temp.doc_id('PASSPORT'), pg_temp.attr_id('attr.identity.nationality'), 'SINK', NULL, NULL, TRUE, 'PRIMARY'),
+(pg_temp.doc_id('PASSPORT'), pg_temp.attr_id('attr.identity.photo'), 'SINK', NULL, NULL, TRUE, 'PRIMARY')
 
 -- =============================================================================
 -- NATIONAL ID
@@ -1899,19 +1909,19 @@ COMMIT;
 -- ============================================================================
 
 -- Document counts by category
-SELECT category, COUNT(*) as doc_count 
-FROM "ob-poc".document_types 
-GROUP BY category 
+SELECT category, COUNT(*) as doc_count
+FROM "ob-poc".document_types
+GROUP BY category
 ORDER BY doc_count DESC;
 
 -- Attribute counts by category
-SELECT category, COUNT(*) as attr_count 
-FROM "ob-poc".attribute_registry 
-GROUP BY category 
+SELECT category, COUNT(*) as attr_count
+FROM "ob-poc".attribute_registry
+GROUP BY category
 ORDER BY attr_count DESC;
 
 -- Links summary
-SELECT 
+SELECT
     direction,
     COUNT(*) as link_count,
     COUNT(*) FILTER (WHERE is_authoritative) as authoritative_count
@@ -1919,7 +1929,7 @@ FROM "ob-poc".document_attribute_links
 GROUP BY direction;
 
 -- Top document types by extraction coverage
-SELECT 
+SELECT
     dt.type_code,
     dt.display_name,
     COUNT(*) FILTER (WHERE dal.direction = 'SOURCE') as extracts,
@@ -1933,14 +1943,14 @@ ORDER BY extracts DESC
 LIMIT 20;
 
 -- What documents can prove identity attributes?
-SELECT 
+SELECT
     ar.id as attribute,
     ar.display_name,
     array_agg(dt.type_code ORDER BY dal.proof_strength) as proof_documents
 FROM "ob-poc".document_attribute_links dal
 JOIN "ob-poc".document_types dt ON dal.document_type_id = dt.type_id
 JOIN "ob-poc".attribute_registry ar ON dal.attribute_id = ar.uuid
-WHERE ar.category = 'identity' 
+WHERE ar.category = 'identity'
   AND dal.direction IN ('SINK', 'BOTH')
 GROUP BY ar.id, ar.display_name
 ORDER BY ar.id;
