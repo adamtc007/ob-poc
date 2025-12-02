@@ -1,8 +1,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::type_complexity)]
+#![allow(dead_code)]
+#![allow(clippy::collapsible_if)]
 
 mod agent_panel;
 mod api;
 mod app;
+mod graph;
 mod graph_view;
 
 use app::ObPocApp;

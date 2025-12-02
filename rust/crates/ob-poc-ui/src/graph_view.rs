@@ -1,5 +1,7 @@
 //! Hierarchical tree visualization view with pan/zoom
 
+#![allow(dead_code)]
+
 use egui::{Color32, Pos2, Rect, Sense, Stroke, Vec2};
 use serde::Deserialize;
 use std::collections::HashMap;

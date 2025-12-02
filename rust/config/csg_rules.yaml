@@ -106,6 +106,22 @@ warnings:
       less_than: 25
     message: "UBO threshold {value}% is below standard 25%. Verify regulatory requirements."
 
+  - id: CSG-W006
+    name: cbu_missing_category
+    description: "CBU created without category"
+    when:
+      verb: cbu.create
+      missing_arg: category
+    message: "CBU created without cbu_category. Consider setting category for proper classification."
+
+  - id: CSG-W007
+    name: cbu_missing_jurisdiction
+    description: "CBU without jurisdiction"
+    when:
+      verb: cbu.create
+      missing_arg: jurisdiction
+    message: "CBU created without jurisdiction. Jurisdiction is required for compliance."
+
 # =============================================================================
 # JURISDICTION RULES
 # =============================================================================
@@ -173,6 +189,50 @@ jurisdiction_rules:
     when:
       jurisdiction: KY
     message: "Cayman entity - enhanced AML/KYC requirements apply."
+
+# =============================================================================
+# CBU PRECONDITION RULES
+# =============================================================================
+preconditions:
+  - id: CSG-P001
+    name: share_class_requires_fund_mandate
+    description: "Share class creation requires FUND_MANDATE CBU category"
+    when:
+      verb: share-class.create
+    requires:
+      cbu_category: FUND_MANDATE
+      via_arg: cbu-id
+    error: "Cannot create share class for non-fund CBU. CBU must have category FUND_MANDATE."
+
+  - id: CSG-P002
+    name: share_class_requires_fund_entity
+    description: "Share class creation requires fund/principal entity assigned"
+    when:
+      verb: share-class.create
+    requires:
+      cbu_has_role_any: [FUND_VEHICLE, PRINCIPAL]
+      via_arg: cbu-id
+    error: "Cannot create share class without FUND_VEHICLE or PRINCIPAL entity assigned to CBU."
+
+  - id: CSG-P003
+    name: custody_requires_principal
+    description: "Custody setup requires principal entity"
+    when:
+      verb_pattern: "cbu-custody.*"
+    requires:
+      cbu_has_role_any: [PRINCIPAL, FUND_VEHICLE]
+      via_arg: cbu-id
+    error: "Cannot configure custody without PRINCIPAL or FUND_VEHICLE entity assigned to CBU."
+
+  - id: CSG-P004
+    name: kyc_case_requires_jurisdiction
+    description: "KYC case creation requires CBU jurisdiction"
+    when:
+      verb: kyc-case.create
+    requires:
+      cbu_has_jurisdiction: true
+      via_arg: cbu-id
+    error: "Cannot create KYC case for CBU without jurisdiction set."
 
 # =============================================================================
 # COMPOSITE RULES (Multi-condition Checks)

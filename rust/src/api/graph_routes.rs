@@ -18,15 +18,16 @@ use crate::graph::{CbuGraph, CbuGraphBuilder, CbuSummary};
 use crate::visualization::{CbuVisualization, KycTreeBuilder, ServiceTreeBuilder, ViewMode};
 
 /// Query parameters for graph endpoint
+/// All layers are enabled by default for complete CBU visualization
 #[derive(Deserialize)]
 pub struct GraphQueryParams {
     #[serde(default = "default_true")]
     pub custody: bool,
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub kyc: bool,
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub ubo: bool,
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub services: bool,
 }
 

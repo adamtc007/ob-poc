@@ -1,5 +1,7 @@
 //! API client for backend communication
 
+#![allow(dead_code)]
+
 use serde::de::DeserializeOwned;
 
 #[derive(Clone)]

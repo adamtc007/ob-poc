@@ -65,7 +65,12 @@ impl CbuGraphBuilder {
             .await?
             .ok_or_else(|| anyhow::anyhow!("CBU not found: {}", self.cbu_id))?;
 
-        let mut graph = CbuGraph::new(self.cbu_id, cbu_record.name.clone());
+        let mut graph = CbuGraph::with_metadata(
+            self.cbu_id,
+            cbu_record.name.clone(),
+            cbu_record.cbu_category.clone(),
+            cbu_record.jurisdiction.clone(),
+        );
 
         // Add CBU root node
         graph.add_node(GraphNode {
@@ -80,9 +85,14 @@ impl CbuGraphBuilder {
             )),
             status: NodeStatus::Active,
             parent_id: None,
+            roles: Vec::new(),
+            primary_role: None,
+            jurisdiction: cbu_record.jurisdiction.clone(),
+            role_priority: None,
             data: serde_json::json!({
                 "jurisdiction": cbu_record.jurisdiction,
-                "client_type": cbu_record.client_type
+                "client_type": cbu_record.client_type,
+                "cbu_category": cbu_record.cbu_category
             }),
         });
 
@@ -117,6 +127,7 @@ impl CbuGraphBuilder {
     }
 
     /// Load entities linked to the CBU via cbu_entity_roles
+    /// Now uses aggregated role data from v_cbu_entity_with_roles view
     async fn load_entities(
         &self,
         graph: &mut CbuGraph,
@@ -127,7 +138,7 @@ impl CbuGraphBuilder {
         for ent in entities {
             let entity_id = ent.entity_id.to_string();
 
-            // Only add entity node if not already present (an entity can have multiple roles)
+            // Each entity appears once with all roles aggregated
             if !graph.has_node(&entity_id) {
                 graph.add_node(GraphNode {
                     id: entity_id.clone(),
@@ -137,19 +148,27 @@ impl CbuGraphBuilder {
                     sublabel: Some(ent.entity_type),
                     status: NodeStatus::Active,
                     parent_id: None,
+                    roles: ent.roles.clone(),
+                    primary_role: ent.primary_role.clone(),
+                    jurisdiction: ent.jurisdiction.clone(),
+                    role_priority: ent.role_priority,
                     data: serde_json::json!({
-                        "entity_id": ent.entity_id
+                        "entity_id": ent.entity_id,
+                        "roles": ent.roles,
+                        "primary_role": ent.primary_role,
+                        "jurisdiction": ent.jurisdiction,
+                        "role_priority": ent.role_priority
                     }),
                 });
             }
 
-            // Add edge for each role
+            // Add edge with primary role as label
             graph.add_edge(GraphEdge {
-                id: ent.cbu_entity_role_id.to_string(),
+                id: format!("{}->{}", self.cbu_id, entity_id),
                 source: self.cbu_id.to_string(),
                 target: entity_id,
                 edge_type: EdgeType::HasRole,
-                label: Some(ent.role_name),
+                label: ent.primary_role,
             });
         }
 
@@ -186,10 +205,10 @@ impl CbuGraphBuilder {
                         label: mic.clone(),
                         sublabel: Some(market_name),
                         status: NodeStatus::Active,
-                        parent_id: None,
                         data: serde_json::json!({
                             "market_id": market_id
                         }),
+                        ..Default::default()
                     });
 
                     // Edge: CBU → Market
@@ -239,6 +258,7 @@ impl CbuGraphBuilder {
                     "currencies": u.currencies,
                     "settlement_types": u.settlement_types
                 }),
+                ..Default::default()
             });
 
             // Edge: Market → Universe (if grouped) or CBU → Universe (if no market)
@@ -281,10 +301,10 @@ impl CbuGraphBuilder {
                         label: mic.clone(),
                         sublabel: None,
                         status: NodeStatus::Active,
-                        parent_id: None,
                         data: serde_json::json!({
                             "market_id": market_id
                         }),
+                        ..Default::default()
                     });
 
                     // Edge: CBU → Market
@@ -329,6 +349,7 @@ impl CbuGraphBuilder {
                     "cash_account_bic": ssi.cash_account_bic,
                     "market_id": ssi.market_id
                 }),
+                ..Default::default()
             });
 
             // Edge: Market → SSI (if grouped) or CBU → SSI
@@ -371,10 +392,10 @@ impl CbuGraphBuilder {
                         label: mic.clone(),
                         sublabel: None,
                         status: NodeStatus::Active,
-                        parent_id: None,
                         data: serde_json::json!({
                             "market_id": market_id
                         }),
+                        ..Default::default()
                     });
 
                     // Edge: CBU → Market
@@ -413,6 +434,7 @@ impl CbuGraphBuilder {
                     "mic": rule.mic,
                     "currency": rule.currency
                 }),
+                ..Default::default()
             });
 
             // Edge: Rule → SSI (routes to)
@@ -448,13 +470,13 @@ impl CbuGraphBuilder {
                 } else {
                     NodeStatus::Suspended
                 },
-                parent_id: None,
                 data: serde_json::json!({
                     "counterparty_entity_id": isda.counterparty_entity_id,
                     "counterparty_name": isda.counterparty_name,
                     "governing_law": isda.governing_law,
                     "agreement_date": isda.agreement_date
                 }),
+                ..Default::default()
             });
 
             // Edge: CBU → ISDA
@@ -483,10 +505,10 @@ impl CbuGraphBuilder {
                     } else {
                         NodeStatus::Suspended
                     },
-                    parent_id: None,
                     data: serde_json::json!({
                         "csa_type": csa.csa_type
                     }),
+                    ..Default::default()
                 });
 
                 // Edge: ISDA → CSA
@@ -527,12 +549,12 @@ impl CbuGraphBuilder {
                     Some("EXPIRED") => NodeStatus::Expired,
                     _ => NodeStatus::Draft,
                 },
-                parent_id: None,
                 data: serde_json::json!({
                     "kyc_status": ks.kyc_status,
                     "risk_rating": ks.risk_rating,
                     "next_review_date": ks.next_review_date
                 }),
+                ..Default::default()
             });
 
             // Edge: Entity → KYC Status
@@ -563,11 +585,11 @@ impl CbuGraphBuilder {
                     Some("REJECTED") => NodeStatus::Expired,
                     _ => NodeStatus::Draft,
                 },
-                parent_id: None,
                 data: serde_json::json!({
                     "document_type": dr.document_type,
                     "status": dr.status
                 }),
+                ..Default::default()
             });
 
             // Edge: Entity → Document Requirement (if entity specified)
@@ -603,12 +625,12 @@ impl CbuGraphBuilder {
                     },
                     _ => NodeStatus::Draft,
                 },
-                parent_id: None,
                 data: serde_json::json!({
                     "screening_type": scr.screening_type,
                     "result": scr.result,
                     "resolution": scr.resolution
                 }),
+                ..Default::default()
             });
 
             // Edge: Entity → Screening
@@ -656,12 +678,12 @@ impl CbuGraphBuilder {
                         Some("PENDING") => NodeStatus::Pending,
                         _ => NodeStatus::Draft,
                     },
-                    parent_id: None,
                     data: serde_json::json!({
                         "ownership_percentage": ubo.ownership_percentage,
                         "control_type": ubo.control_type,
                         "verification_status": ubo.verification_status
                     }),
+                    ..Default::default()
                 });
             }
 
@@ -697,8 +719,8 @@ impl CbuGraphBuilder {
                         .unwrap_or_else(|| "Unknown".to_string()),
                     sublabel: Some(own.ownership_type.clone()),
                     status: NodeStatus::Active,
-                    parent_id: None,
                     data: serde_json::json!({}),
+                    ..Default::default()
                 });
             }
 
@@ -732,8 +754,8 @@ impl CbuGraphBuilder {
                         .unwrap_or_else(|| "Unknown".to_string()),
                     sublabel: Some(ctrl.control_type.clone()),
                     status: NodeStatus::Active,
-                    parent_id: None,
                     data: serde_json::json!({}),
+                    ..Default::default()
                 });
             }
 
@@ -773,10 +795,10 @@ impl CbuGraphBuilder {
                     "SUSPENDED" => NodeStatus::Suspended,
                     _ => NodeStatus::Draft,
                 },
-                parent_id: None,
                 data: serde_json::json!({
                     "instance_name": inst.instance_name
                 }),
+                ..Default::default()
             });
 
             graph.add_edge(GraphEdge {

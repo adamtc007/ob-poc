@@ -12,6 +12,9 @@ use uuid::Uuid;
 pub struct CbuGraph {
     pub cbu_id: Uuid,
     pub label: String,
+    /// CBU category for template selection (FUND_MANDATE, CORPORATE_GROUP, etc.)
+    pub cbu_category: Option<String>,
+    pub jurisdiction: Option<String>,
     pub nodes: Vec<GraphNode>,
     pub edges: Vec<GraphEdge>,
     pub layers: Vec<LayerInfo>,
@@ -19,7 +22,7 @@ pub struct CbuGraph {
 }
 
 /// A node in the graph representing an entity, document, or resource
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct GraphNode {
     pub id: String,
     pub node_type: NodeType,
@@ -31,12 +34,25 @@ pub struct GraphNode {
     /// Parent node ID for hierarchical grouping (e.g., market groups custody items)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_id: Option<String>,
+    /// All roles for this entity (for Entity nodes)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub roles: Vec<String>,
+    /// Primary role determined by priority (for Entity nodes)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub primary_role: Option<String>,
+    /// Jurisdiction code (for Entity nodes)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub jurisdiction: Option<String>,
+    /// Role priority score for layout ordering
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role_priority: Option<i32>,
 }
 
 /// Types of nodes in the graph
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum NodeType {
+    #[default]
     // Core
     Cbu,
 
@@ -65,9 +81,10 @@ pub enum NodeType {
 }
 
 /// Layer categories for organizing nodes
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum LayerType {
+    #[default]
     Core,
     Custody,
     Kyc,
@@ -76,9 +93,10 @@ pub enum LayerType {
 }
 
 /// Status of a node
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum NodeStatus {
+    #[default]
     Active,
     Pending,
     Suspended,
@@ -148,6 +166,27 @@ impl CbuGraph {
         Self {
             cbu_id,
             label,
+            cbu_category: None,
+            jurisdiction: None,
+            nodes: Vec::new(),
+            edges: Vec::new(),
+            layers: Vec::new(),
+            stats: GraphStats::default(),
+        }
+    }
+
+    /// Create a new graph with category and jurisdiction
+    pub fn with_metadata(
+        cbu_id: Uuid,
+        label: String,
+        cbu_category: Option<String>,
+        jurisdiction: Option<String>,
+    ) -> Self {
+        Self {
+            cbu_id,
+            label,
+            cbu_category,
+            jurisdiction,
             nodes: Vec::new(),
             edges: Vec::new(),
             layers: Vec::new(),

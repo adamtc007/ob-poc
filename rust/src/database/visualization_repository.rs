@@ -177,6 +177,7 @@ pub struct CbuBasicView {
     pub name: String,
     pub client_type: Option<String>,
     pub jurisdiction: Option<String>,
+    pub cbu_category: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -197,6 +198,10 @@ pub struct GraphEntityView {
     pub entity_name: String,
     pub entity_type: String,
     pub role_name: String,
+    pub jurisdiction: Option<String>,
+    pub roles: Vec<String>,
+    pub primary_role: Option<String>,
+    pub role_priority: Option<i32>,
 }
 
 #[derive(Debug, Clone)]
@@ -707,7 +712,7 @@ impl VisualizationRepository {
     /// Get basic CBU info
     pub async fn get_cbu_basic(&self, cbu_id: Uuid) -> Result<Option<CbuBasicView>> {
         let row = sqlx::query!(
-            r#"SELECT cbu_id, name, jurisdiction, client_type
+            r#"SELECT cbu_id, name, jurisdiction, client_type, cbu_category
                FROM "ob-poc".cbus WHERE cbu_id = $1"#,
             cbu_id
         )
@@ -719,6 +724,7 @@ impl VisualizationRepository {
             name: r.name,
             client_type: r.client_type,
             jurisdiction: r.jurisdiction,
+            cbu_category: r.cbu_category,
         }))
     }
 
@@ -729,7 +735,7 @@ impl VisualizationRepository {
         limit: i64,
     ) -> Result<Vec<CbuBasicView>> {
         let rows = sqlx::query!(
-            r#"SELECT cbu_id, name, client_type, jurisdiction
+            r#"SELECT cbu_id, name, client_type, jurisdiction, cbu_category
                FROM "ob-poc".cbus
                WHERE ($1::text IS NULL OR name ILIKE '%' || $1 || '%')
                ORDER BY name
@@ -747,6 +753,7 @@ impl VisualizationRepository {
                 name: r.name,
                 client_type: r.client_type,
                 jurisdiction: r.jurisdiction,
+                cbu_category: r.cbu_category,
             })
             .collect())
     }
@@ -993,19 +1000,20 @@ impl VisualizationRepository {
     // =========================================================================
 
     /// Get entities linked to a CBU via cbu_entity_roles (for graph)
+    /// Uses v_cbu_entity_with_roles view for aggregated role data
     pub async fn get_graph_entities(&self, cbu_id: Uuid) -> Result<Vec<GraphEntityView>> {
+        // Use the view that aggregates roles and computes primary role
         let rows = sqlx::query!(
             r#"SELECT
-                cer.cbu_entity_role_id,
-                cer.entity_id,
-                e.name as entity_name,
-                et.name as entity_type,
-                r.name as role_name
-               FROM "ob-poc".cbu_entity_roles cer
-               JOIN "ob-poc".entities e ON e.entity_id = cer.entity_id
-               JOIN "ob-poc".entity_types et ON et.entity_type_id = e.entity_type_id
-               JOIN "ob-poc".roles r ON r.role_id = cer.role_id
-               WHERE cer.cbu_id = $1"#,
+                entity_id as "entity_id!",
+                entity_name as "entity_name!",
+                entity_type as "entity_type!",
+                jurisdiction,
+                roles,
+                primary_role,
+                max_role_priority as role_priority
+               FROM "ob-poc".v_cbu_entity_with_roles
+               WHERE cbu_id = $1"#,
             cbu_id
         )
         .fetch_all(&self.pool)
@@ -1014,11 +1022,17 @@ impl VisualizationRepository {
         Ok(rows
             .into_iter()
             .map(|r| GraphEntityView {
-                cbu_entity_role_id: r.cbu_entity_role_id,
+                // Generate a synthetic role ID since we're grouping by entity
+                cbu_entity_role_id: r.entity_id,
                 entity_id: r.entity_id,
                 entity_name: r.entity_name,
                 entity_type: r.entity_type,
-                role_name: r.role_name,
+                // Use primary_role as the main role_name
+                role_name: r.primary_role.clone().unwrap_or_default(),
+                jurisdiction: r.jurisdiction,
+                roles: r.roles.unwrap_or_default(),
+                primary_role: r.primary_role,
+                role_priority: r.role_priority,
             })
             .collect())
     }

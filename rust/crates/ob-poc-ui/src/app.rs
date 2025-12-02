@@ -1,26 +1,32 @@
 //! CBU Visualization Application
 
 use crate::api::ApiClient;
+use crate::graph::CbuGraphWidget;
 use crate::graph_view::{CbuTreeVisualization, GraphView, ViewMode};
 use eframe::egui;
 use serde::Deserialize;
+use std::sync::{Arc, Mutex};
 
 /// Main application
 pub struct ObPocApp {
     api: ApiClient,
     graph_view: GraphView,
+    graph_widget: CbuGraphWidget,
+    use_new_graph: bool,
     selected_cbu: Option<uuid::Uuid>,
     cbu_list: Vec<CbuSummary>,
     loading: bool,
     error: Option<String>,
     view_mode: ViewMode,
 
-    #[cfg(target_arch = "wasm32")]
-    pending_cbu_list:
-        Option<std::sync::Arc<std::sync::Mutex<Option<Result<Vec<CbuSummary>, String>>>>>,
-    #[cfg(target_arch = "wasm32")]
-    pending_tree:
-        Option<std::sync::Arc<std::sync::Mutex<Option<Result<CbuTreeVisualization, String>>>>>,
+    // Async result holders (work for both native and WASM)
+    pending_cbu_list: Option<Arc<Mutex<Option<Result<Vec<CbuSummary>, String>>>>>,
+    pending_tree: Option<Arc<Mutex<Option<Result<CbuTreeVisualization, String>>>>>,
+    pending_graph: Option<Arc<Mutex<Option<Result<crate::graph::CbuGraphData, String>>>>>,
+
+    // Tokio runtime for native async
+    #[cfg(not(target_arch = "wasm32"))]
+    runtime: Arc<tokio::runtime::Runtime>,
 }
 
 #[derive(Clone, Deserialize)]
@@ -42,18 +48,29 @@ impl ObPocApp {
         #[cfg(not(target_arch = "wasm32"))]
         let base_url = "http://localhost:3000".to_string();
 
+        #[cfg(not(target_arch = "wasm32"))]
+        let runtime = Arc::new(
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .expect("Failed to create tokio runtime"),
+        );
+
         let mut app = Self {
             api: ApiClient::new(&base_url),
             graph_view: GraphView::new(),
+            graph_widget: CbuGraphWidget::new(),
+            use_new_graph: true,
             selected_cbu: None,
             cbu_list: Vec::new(),
             loading: false,
             error: None,
             view_mode: ViewMode::KycUbo,
-            #[cfg(target_arch = "wasm32")]
             pending_cbu_list: None,
-            #[cfg(target_arch = "wasm32")]
             pending_tree: None,
+            pending_graph: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            runtime,
         };
 
         app.load_cbu_list();
@@ -64,84 +81,129 @@ impl ObPocApp {
         self.loading = true;
         self.error = None;
 
+        let api = self.api.clone();
+        let result = Arc::new(Mutex::new(None));
+        let result_clone = result.clone();
+
         #[cfg(target_arch = "wasm32")]
         {
-            let api = self.api.clone();
-            let result = std::sync::Arc::new(std::sync::Mutex::new(None));
-            let result_clone = result.clone();
-
             wasm_bindgen_futures::spawn_local(async move {
                 let res: Result<Vec<CbuSummary>, String> = api.get("/api/cbu").await;
                 *result_clone.lock().unwrap() = Some(res);
             });
-
-            self.pending_cbu_list = Some(result);
         }
 
         #[cfg(not(target_arch = "wasm32"))]
         {
-            self.loading = false;
+            self.runtime.spawn(async move {
+                let res: Result<Vec<CbuSummary>, String> = api.get("/api/cbu").await;
+                *result_clone.lock().unwrap() = Some(res);
+            });
         }
+
+        self.pending_cbu_list = Some(result);
     }
 
     fn load_cbu_view(&mut self, cbu_id: uuid::Uuid) {
         self.loading = true;
         self.error = None;
 
-        #[cfg(target_arch = "wasm32")]
-        {
-            let api = self.api.clone();
+        let api = self.api.clone();
+
+        if self.use_new_graph {
+            // Load graph data for new widget
+            let result = Arc::new(Mutex::new(None));
+            let result_clone = result.clone();
+            let path = format!("/api/cbu/{}/graph", cbu_id);
+
+            #[cfg(target_arch = "wasm32")]
+            {
+                wasm_bindgen_futures::spawn_local(async move {
+                    let res: Result<crate::graph::CbuGraphData, String> = api.get(&path).await;
+                    *result_clone.lock().unwrap() = Some(res);
+                });
+            }
+
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                self.runtime.spawn(async move {
+                    let res: Result<crate::graph::CbuGraphData, String> = api.get(&path).await;
+                    *result_clone.lock().unwrap() = Some(res);
+                });
+            }
+
+            self.pending_graph = Some(result);
+        } else {
+            // Load tree data for old widget
+            let result = Arc::new(Mutex::new(None));
+            let result_clone = result.clone();
             let view = match self.view_mode {
                 ViewMode::KycUbo => "kyc_ubo",
                 ViewMode::ServiceDelivery => "service_delivery",
             };
-
-            let result = std::sync::Arc::new(std::sync::Mutex::new(None));
-            let result_clone = result.clone();
             let path = format!("/api/cbu/{}/tree?view={}", cbu_id, view);
 
-            wasm_bindgen_futures::spawn_local(async move {
-                let res: Result<CbuTreeVisualization, String> = api.get(&path).await;
-                *result_clone.lock().unwrap() = Some(res);
-            });
+            #[cfg(target_arch = "wasm32")]
+            {
+                wasm_bindgen_futures::spawn_local(async move {
+                    let res: Result<CbuTreeVisualization, String> = api.get(&path).await;
+                    *result_clone.lock().unwrap() = Some(res);
+                });
+            }
+
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                self.runtime.spawn(async move {
+                    let res: Result<CbuTreeVisualization, String> = api.get(&path).await;
+                    *result_clone.lock().unwrap() = Some(res);
+                });
+            }
 
             self.pending_tree = Some(result);
-        }
-
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            self.loading = false;
         }
     }
 
     fn check_pending_requests(&mut self) {
-        #[cfg(target_arch = "wasm32")]
-        {
-            if let Some(result) = self
-                .pending_cbu_list
-                .as_ref()
-                .and_then(|p| p.try_lock().ok().and_then(|mut g| g.take()))
-            {
-                match result {
-                    Ok(cbus) => self.cbu_list = cbus,
-                    Err(e) => self.error = Some(format!("Failed to load CBUs: {}", e)),
-                }
-                self.loading = false;
-                self.pending_cbu_list = None;
+        // Check CBU list - extract result first, then clear pending
+        let cbu_result = self
+            .pending_cbu_list
+            .as_ref()
+            .and_then(|pending| pending.try_lock().ok().and_then(|mut guard| guard.take()));
+        if let Some(result) = cbu_result {
+            match result {
+                Ok(cbus) => self.cbu_list = cbus,
+                Err(e) => self.error = Some(format!("Failed to load CBUs: {}", e)),
             }
+            self.loading = false;
+            self.pending_cbu_list = None;
+        }
 
-            if let Some(result) = self
-                .pending_tree
-                .as_ref()
-                .and_then(|p| p.try_lock().ok().and_then(|mut g| g.take()))
-            {
-                match result {
-                    Ok(tree) => self.graph_view.set_tree(tree),
-                    Err(e) => self.error = Some(format!("Failed to load visualization: {}", e)),
-                }
-                self.loading = false;
-                self.pending_tree = None;
+        // Check tree - extract result first, then clear pending
+        let tree_result = self
+            .pending_tree
+            .as_ref()
+            .and_then(|pending| pending.try_lock().ok().and_then(|mut guard| guard.take()));
+        if let Some(result) = tree_result {
+            match result {
+                Ok(tree) => self.graph_view.set_tree(tree),
+                Err(e) => self.error = Some(format!("Failed to load visualization: {}", e)),
             }
+            self.loading = false;
+            self.pending_tree = None;
+        }
+
+        // Check graph - extract result first, then clear pending
+        let graph_result = self
+            .pending_graph
+            .as_ref()
+            .and_then(|pending| pending.try_lock().ok().and_then(|mut guard| guard.take()));
+        if let Some(result) = graph_result {
+            match result {
+                Ok(graph_data) => self.graph_widget.set_data(graph_data),
+                Err(e) => self.error = Some(format!("Failed to load graph: {}", e)),
+            }
+            self.loading = false;
+            self.pending_graph = None;
         }
     }
 }
@@ -157,6 +219,7 @@ impl eframe::App for ObPocApp {
         let mut clicked_cbu_id: Option<uuid::Uuid> = None;
         let mut refresh_clicked = false;
         let mut view_changed = false;
+        let mut graph_mode_changed = false;
         let mut new_view_mode = self.view_mode;
 
         // Top panel - CBU selector and view toggle
@@ -213,6 +276,24 @@ impl eframe::App for ObPocApp {
                     view_changed = true;
                 }
 
+                ui.separator();
+
+                // Toggle between old tree view and new graph widget
+                ui.label("Layout:");
+                if ui
+                    .selectable_label(self.use_new_graph, "Template")
+                    .clicked()
+                    && !self.use_new_graph
+                {
+                    self.use_new_graph = true;
+                    graph_mode_changed = true;
+                }
+                if ui.selectable_label(!self.use_new_graph, "Tree").clicked() && self.use_new_graph
+                {
+                    self.use_new_graph = false;
+                    graph_mode_changed = true;
+                }
+
                 if self.loading {
                     ui.spinner();
                 }
@@ -232,6 +313,12 @@ impl eframe::App for ObPocApp {
                 self.load_cbu_view(cbu_id);
             }
         }
+        if graph_mode_changed {
+            // Reload with the new mode
+            if let Some(cbu_id) = self.selected_cbu {
+                self.load_cbu_view(cbu_id);
+            }
+        }
 
         // Central panel - Graph view (full width)
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -241,6 +328,8 @@ impl eframe::App for ObPocApp {
                 });
             } else if let Some(ref err) = self.error {
                 ui.colored_label(egui::Color32::RED, err);
+            } else if self.use_new_graph {
+                self.graph_widget.ui(ui);
             } else {
                 self.graph_view.ui(ui);
             }

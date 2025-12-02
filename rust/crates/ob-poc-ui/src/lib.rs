@@ -1,10 +1,16 @@
 //! OB-POC UI - CBU Visualization
 
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::type_complexity)]
+#![allow(clippy::should_implement_trait)]
+
 pub mod api;
 pub mod app;
+pub mod graph;
 pub mod graph_view;
 
 pub use app::ObPocApp;
+pub use graph::CbuGraphWidget;
 
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen::prelude::wasm_bindgen(start)]
