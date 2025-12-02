@@ -2,7 +2,7 @@
 -- DOCUMENT VALIDITY RULES
 -- Defines expiry, renewal, and age requirements for KYC documents
 -- ============================================================================
--- 
+--
 -- Rule Types:
 --   MAX_AGE_DAYS/MONTHS  - Document must not be older than X from issue date
 --   CHECK_EXPIRY         - Document has explicit expiry date to validate
@@ -42,9 +42,12 @@ CREATE TABLE IF NOT EXISTS "ob-poc".document_validity_rules (
     is_hard_requirement BOOLEAN DEFAULT TRUE,
     regulatory_source VARCHAR(200),
     notes TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    CONSTRAINT unique_doc_validity_rule UNIQUE (document_type_id, rule_type, COALESCE(applies_to_jurisdictions::text, 'ALL'))
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Index for lookups by document type
+CREATE INDEX IF NOT EXISTS idx_doc_validity_by_type
+ON "ob-poc".document_validity_rules (document_type_id);
 
 -- Clear existing rules
 DELETE FROM "ob-poc".document_validity_rules;
@@ -339,13 +342,13 @@ COMMIT;
 -- ============================================================================
 
 -- Count rules by type
-SELECT rule_type, COUNT(*) as count 
-FROM "ob-poc".document_validity_rules 
-GROUP BY rule_type 
+SELECT rule_type, COUNT(*) as count
+FROM "ob-poc".document_validity_rules
+GROUP BY rule_type
 ORDER BY count DESC;
 
 -- Rules with jurisdiction restrictions
-SELECT 
+SELECT
     dt.type_code,
     dvr.rule_type,
     dvr.rule_value,
@@ -359,7 +362,7 @@ WHERE dvr.applies_to_jurisdictions IS NOT NULL
 ORDER BY dt.type_code;
 
 -- Documents with multiple rules
-SELECT 
+SELECT
     dt.type_code,
     COUNT(*) as rule_count,
     array_agg(dvr.rule_type) as rules
