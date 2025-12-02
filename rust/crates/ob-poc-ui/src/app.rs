@@ -1,6 +1,5 @@
-//! Main application state and UI
+//! CBU Visualization Application
 
-use crate::agent_panel::AgentPanel;
 use crate::api::ApiClient;
 use crate::graph_view::{CbuTreeVisualization, GraphView, ViewMode};
 use eframe::egui;
@@ -10,14 +9,12 @@ use serde::Deserialize;
 pub struct ObPocApp {
     api: ApiClient,
     graph_view: GraphView,
-    agent_panel: AgentPanel,
     selected_cbu: Option<uuid::Uuid>,
     cbu_list: Vec<CbuSummary>,
     loading: bool,
     error: Option<String>,
     view_mode: ViewMode,
 
-    // Async state
     #[cfg(target_arch = "wasm32")]
     pending_cbu_list:
         Option<std::sync::Arc<std::sync::Mutex<Option<Result<Vec<CbuSummary>, String>>>>>,
@@ -31,15 +28,12 @@ pub struct CbuSummary {
     pub cbu_id: uuid::Uuid,
     pub name: String,
     pub jurisdiction: Option<String>,
-    pub client_type: Option<String>,
 }
 
 impl ObPocApp {
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
-        // Determine base URL based on environment
         #[cfg(target_arch = "wasm32")]
         let base_url = {
-            // In WASM, use the current origin
             web_sys::window()
                 .and_then(|w| w.location().origin().ok())
                 .unwrap_or_else(|| "http://localhost:3000".to_string())
@@ -51,7 +45,6 @@ impl ObPocApp {
         let mut app = Self {
             api: ApiClient::new(&base_url),
             graph_view: GraphView::new(),
-            agent_panel: AgentPanel::new(),
             selected_cbu: None,
             cbu_list: Vec::new(),
             loading: false,
@@ -63,9 +56,7 @@ impl ObPocApp {
             pending_tree: None,
         };
 
-        // Load initial CBU list
         app.load_cbu_list();
-
         app
     }
 
@@ -89,8 +80,6 @@ impl ObPocApp {
 
         #[cfg(not(target_arch = "wasm32"))]
         {
-            // For native, we'd need to handle async differently
-            // For now, just mark loading complete
             self.loading = false;
         }
     }
@@ -102,34 +91,21 @@ impl ObPocApp {
         #[cfg(target_arch = "wasm32")]
         {
             let api = self.api.clone();
-            let view_mode = self.view_mode;
+            let view = match self.view_mode {
+                ViewMode::KycUbo => "kyc_ubo",
+                ViewMode::ServiceDelivery => "service_delivery",
+            };
 
-            match view_mode {
-                ViewMode::KycUbo => {
-                    let result = std::sync::Arc::new(std::sync::Mutex::new(None));
-                    let result_clone = result.clone();
+            let result = std::sync::Arc::new(std::sync::Mutex::new(None));
+            let result_clone = result.clone();
+            let path = format!("/api/cbu/{}/tree?view={}", cbu_id, view);
 
-                    wasm_bindgen_futures::spawn_local(async move {
-                        let path = format!("/api/cbu/{}/tree?view=kyc_ubo", cbu_id);
-                        let res: Result<CbuTreeVisualization, String> = api.get(&path).await;
-                        *result_clone.lock().unwrap() = Some(res);
-                    });
+            wasm_bindgen_futures::spawn_local(async move {
+                let res: Result<CbuTreeVisualization, String> = api.get(&path).await;
+                *result_clone.lock().unwrap() = Some(res);
+            });
 
-                    self.pending_tree = Some(result);
-                }
-                ViewMode::ServiceDelivery => {
-                    let result = std::sync::Arc::new(std::sync::Mutex::new(None));
-                    let result_clone = result.clone();
-
-                    wasm_bindgen_futures::spawn_local(async move {
-                        let path = format!("/api/cbu/{}/tree?view=service_delivery", cbu_id);
-                        let res: Result<CbuTreeVisualization, String> = api.get(&path).await;
-                        *result_clone.lock().unwrap() = Some(res);
-                    });
-
-                    self.pending_tree = Some(result);
-                }
-            }
+            self.pending_tree = Some(result);
         }
 
         #[cfg(not(target_arch = "wasm32"))]
@@ -141,37 +117,27 @@ impl ObPocApp {
     fn check_pending_requests(&mut self) {
         #[cfg(target_arch = "wasm32")]
         {
-            // Check pending CBU list
-            let cbu_result = self
+            if let Some(result) = self
                 .pending_cbu_list
                 .as_ref()
-                .and_then(|pending| pending.try_lock().ok().and_then(|mut guard| guard.take()));
-            if let Some(result) = cbu_result {
+                .and_then(|p| p.try_lock().ok().and_then(|mut g| g.take()))
+            {
                 match result {
-                    Ok(cbus) => {
-                        self.cbu_list = cbus;
-                    }
-                    Err(e) => {
-                        self.error = Some(format!("Failed to load CBUs: {}", e));
-                    }
+                    Ok(cbus) => self.cbu_list = cbus,
+                    Err(e) => self.error = Some(format!("Failed to load CBUs: {}", e)),
                 }
                 self.loading = false;
                 self.pending_cbu_list = None;
             }
 
-            // Check pending tree visualization
-            let tree_result = self
+            if let Some(result) = self
                 .pending_tree
                 .as_ref()
-                .and_then(|pending| pending.try_lock().ok().and_then(|mut guard| guard.take()));
-            if let Some(result) = tree_result {
+                .and_then(|p| p.try_lock().ok().and_then(|mut g| g.take()))
+            {
                 match result {
-                    Ok(tree) => {
-                        self.graph_view.set_tree(tree);
-                    }
-                    Err(e) => {
-                        self.error = Some(format!("Failed to load visualization: {}", e));
-                    }
+                    Ok(tree) => self.graph_view.set_tree(tree),
+                    Err(e) => self.error = Some(format!("Failed to load visualization: {}", e)),
                 }
                 self.loading = false;
                 self.pending_tree = None;
@@ -182,15 +148,12 @@ impl ObPocApp {
 
 impl eframe::App for ObPocApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Check for completed async requests
         self.check_pending_requests();
 
-        // Request repaint while loading
         if self.loading {
             ctx.request_repaint();
         }
 
-        // Track which CBU was clicked (to handle after borrow ends)
         let mut clicked_cbu_id: Option<uuid::Uuid> = None;
         let mut refresh_clicked = false;
         let mut view_changed = false;
@@ -231,7 +194,6 @@ impl eframe::App for ObPocApp {
 
                 ui.separator();
 
-                // View mode toggle buttons
                 ui.label("View:");
                 if ui
                     .selectable_label(self.view_mode == ViewMode::KycUbo, "KYC / UBO")
@@ -257,7 +219,6 @@ impl eframe::App for ObPocApp {
             });
         });
 
-        // Handle deferred actions after UI borrows are released
         if let Some(cbu_id) = clicked_cbu_id {
             self.selected_cbu = Some(cbu_id);
             self.load_cbu_view(cbu_id);
@@ -272,14 +233,7 @@ impl eframe::App for ObPocApp {
             }
         }
 
-        // Left panel - Agent prompt
-        egui::SidePanel::left("agent_panel")
-            .default_width(350.0)
-            .show(ctx, |ui| {
-                self.agent_panel.ui(ui);
-            });
-
-        // Central panel - Graph view
+        // Central panel - Graph view (full width)
         egui::CentralPanel::default().show(ctx, |ui| {
             if self.loading {
                 ui.centered_and_justified(|ui| {

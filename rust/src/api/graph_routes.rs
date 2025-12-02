@@ -13,7 +13,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::graph::{CbuGraph, CbuGraphBuilder, CbuSummary};
-use crate::visualization::{CbuVisualization, KycTreeBuilder, ViewMode};
+use crate::visualization::{CbuVisualization, KycTreeBuilder, ServiceTreeBuilder, ViewMode};
 
 /// Query parameters for graph endpoint
 #[derive(Deserialize)]
@@ -108,23 +108,17 @@ pub async fn get_cbu_tree(
         _ => ViewMode::KycUbo, // Default to KYC/UBO view
     };
 
-    match view_mode {
-        ViewMode::KycUbo => {
-            let builder = KycTreeBuilder::new(pool);
-            let viz = builder
-                .build(cbu_id)
-                .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-            Ok(Json(viz))
-        }
-        ViewMode::ServiceDelivery => {
-            // TODO: Implement ServiceDeliveryBuilder
-            Err((
-                StatusCode::NOT_IMPLEMENTED,
-                "Service Delivery view not yet implemented".to_string(),
-            ))
-        }
-    }
+    let viz = match view_mode {
+        ViewMode::KycUbo => KycTreeBuilder::new(pool)
+            .build(cbu_id)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
+        ViewMode::ServiceDelivery => ServiceTreeBuilder::new(pool)
+            .build(cbu_id)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
+    };
+    Ok(Json(viz))
 }
 
 /// Create the graph router
