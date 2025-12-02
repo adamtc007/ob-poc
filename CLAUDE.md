@@ -125,6 +125,13 @@ ob-poc/
 │   │   │   ├── execution_plan.rs   # AST → ExecutionPlan compiler
 │   │   │   └── custom_ops/         # Plugin handlers for non-CRUD ops
 │   │   ├── database/               # Repository pattern services
+│   │   │   └── visualization_repository.rs  # Centralized visualization queries
+│   │   ├── visualization/          # Server-side visualization builders
+│   │   │   ├── kyc_builder.rs      # KYC/UBO tree builder
+│   │   │   └── service_builder.rs  # Service delivery tree builder
+│   │   ├── graph/                  # Graph visualization
+│   │   │   ├── builder.rs          # CbuGraphBuilder (multi-layer graph)
+│   │   │   └── types.rs            # GraphNode, GraphEdge, CbuGraph
 │   │   ├── domains/                # Domain-specific logic
 │   │   ├── mcp/                    # MCP server for Claude Desktop
 │   │   ├── planner/                # DSL builder utilities
@@ -145,6 +152,60 @@ ob-poc/
 ├── schema_export.sql               # Full DDL for database rebuild
 └── CLAUDE.md                       # This file
 ```
+
+## Visualization Architecture
+
+The UI follows a **server-side rendering / dumb UI** pattern. All data assembly happens on the server; the UI receives JSON and renders it.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         UI (Dumb Client)                         │
+│  Receives JSON, renders trees/graphs, no business logic         │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Visualization Builders                        │
+│  KycTreeBuilder, ServiceTreeBuilder, CbuGraphBuilder            │
+│  Assemble view models from repository data                      │
+│  rust/src/visualization/, rust/src/graph/                       │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                  VisualizationRepository                         │
+│  SINGLE point of DB access for all visualization queries        │
+│  Enables Oracle migration - SQL isolated to one file            │
+│  rust/src/database/visualization_repository.rs                  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      PostgreSQL / Oracle                         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Design Principles
+
+1. **Centralized DB Access**: All visualization queries go through `VisualizationRepository`. No direct `sqlx::query!` calls in builders or API routes.
+
+2. **View Models**: Repository returns typed view structs (e.g., `CbuView`, `EntityView`, `GraphEntityView`). Builders transform these into UI-ready structures.
+
+3. **Database Portability**: Isolating SQL to one file enables future Oracle migration without touching visualization logic.
+
+### Query Categories in VisualizationRepository
+
+| Category | Methods | Used By |
+|----------|---------|--------|
+| CBU | `list_cbus`, `get_cbu`, `get_cbu_for_tree` | Tree builders, dropdowns |
+| Entity | `get_entity`, `get_entities_by_role`, `get_officers` | KYC tree |
+| Graph Core | `get_graph_entities` | Graph builder |
+| Graph Custody | `get_universes`, `get_ssis`, `get_booking_rules`, `get_isdas`, `get_csas` | Graph builder |
+| Graph KYC | `get_kyc_statuses`, `get_document_requests`, `get_graph_screenings` | Graph builder |
+| Graph UBO | `get_ubos`, `get_ownerships`, `get_graph_controls` | Graph builder |
+| Graph Services | `get_resource_instances` | Graph builder |
+| MCP | `get_cbu_basic`, `get_cbu_entities`, `get_entity_types`, etc. | MCP handlers |
+
 
 ## Commands
 
