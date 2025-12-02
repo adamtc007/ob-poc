@@ -1055,20 +1055,21 @@ The `share-class`, `holding`, and `movement` domains implement a Clearstream-sty
   :trade-date "2024-02-01" :reference "RED-2024-001")
 ```
 
+
 ## Database
 
 **Database**: `data_designer` on PostgreSQL 17
 
-Four schemas:
-- **ob-poc**: KYC/AML domain (105 tables)
-- **custody**: Settlement & custody (18 tables)
-- **kyc**: Investor registry (3 tables: share_classes, holdings, movements)
-- **public**: Runtime API endpoints
+Three schemas:
+- **ob-poc**: Core KYC/AML domain (55 tables) - CBUs, entities, documents, observations, allegations
+- **custody**: Settlement & custody (17 tables) - universe, SSIs, booking rules, ISDAs
+- **kyc**: Case management & investor registry (11 tables) - cases, workstreams, screenings, share classes, holdings
 
 See `docs/DATABASE_SCHEMA.md` for complete schema. Rebuild with:
 ```bash
 psql -d data_designer -f schema_export.sql
 ```
+
 
 ## MCP Server Tools
 
