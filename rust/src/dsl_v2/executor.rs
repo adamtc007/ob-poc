@@ -55,7 +55,7 @@ pub enum ExecutionResult {
 }
 
 /// Execution context holding state during DSL execution
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ExecutionContext {
     /// Symbol table for @reference resolution
     pub symbols: HashMap<String, Uuid>,
@@ -63,11 +63,35 @@ pub struct ExecutionContext {
     pub audit_user: Option<String>,
     /// Transaction ID for grouping operations
     pub transaction_id: Option<Uuid>,
+    /// Execution ID for idempotency tracking (auto-generated if not set)
+    pub execution_id: Uuid,
+    /// Whether idempotency checking is enabled
+    pub idempotency_enabled: bool,
+}
+
+impl Default for ExecutionContext {
+    fn default() -> Self {
+        Self {
+            symbols: HashMap::new(),
+            audit_user: None,
+            transaction_id: None,
+            execution_id: Uuid::new_v4(),
+            idempotency_enabled: true,
+        }
+    }
 }
 
 impl ExecutionContext {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Create context with a specific execution ID (for resumable executions)
+    pub fn with_execution_id(execution_id: Uuid) -> Self {
+        Self {
+            execution_id,
+            ..Self::default()
+        }
     }
 
     /// Bind a symbol to a UUID value
@@ -85,6 +109,12 @@ impl ExecutionContext {
         self.audit_user = Some(user.to_string());
         self
     }
+
+    /// Disable idempotency checking (for testing or forced re-execution)
+    pub fn without_idempotency(mut self) -> Self {
+        self.idempotency_enabled = false;
+        self
+    }
 }
 
 /// The main DSL executor
@@ -95,6 +125,8 @@ pub struct DslExecutor {
     custom_ops: CustomOperationRegistry,
     #[cfg(feature = "database")]
     generic_executor: GenericCrudExecutor,
+    #[cfg(feature = "database")]
+    idempotency: super::idempotency::IdempotencyManager,
 }
 
 impl DslExecutor {
@@ -103,6 +135,7 @@ impl DslExecutor {
     pub fn new(pool: PgPool) -> Self {
         Self {
             generic_executor: GenericCrudExecutor::new(pool.clone()),
+            idempotency: super::idempotency::IdempotencyManager::new(pool.clone()),
             pool,
             custom_ops: CustomOperationRegistry::new(),
         }
@@ -232,6 +265,11 @@ impl DslExecutor {
     /// This is the preferred method for executing DSL with nested/composite operations.
     /// The plan has already been dependency-sorted by the compiler.
     ///
+    /// Idempotency: Each statement is checked against the idempotency table.
+    /// If already executed (same execution_id + statement_index + verb + args),
+    /// the cached result is returned. Otherwise, the statement is executed
+    /// and the result is recorded for future runs.
+    ///
     /// # Example
     /// ```ignore
     /// let program = parse_program(dsl_source)?;
@@ -245,7 +283,7 @@ impl DslExecutor {
     ) -> Result<Vec<ExecutionResult>> {
         let mut results: Vec<ExecutionResult> = Vec::with_capacity(plan.steps.len());
 
-        for step in &plan.steps {
+        for (step_index, step) in plan.steps.iter().enumerate() {
             // Clone the verb call so we can inject values
             let mut vc = step.verb_call.clone();
 
@@ -262,8 +300,46 @@ impl DslExecutor {
                 }
             }
 
+            // Build args for idempotency check
+            let verb_name = format!("{}.{}", vc.domain, vc.verb);
+            let json_args = Self::verbcall_args_to_json(&vc.arguments, ctx)?;
+
+            // Check idempotency cache if enabled
+            if ctx.idempotency_enabled {
+                if let Some(cached) = self
+                    .idempotency
+                    .check(ctx.execution_id, step_index, &verb_name, &json_args)
+                    .await?
+                {
+                    let result = cached.to_execution_result();
+
+                    // Restore symbol binding from cached result
+                    if let Some(ref binding_name) = step.bind_as {
+                        if let ExecutionResult::Uuid(id) = &result {
+                            ctx.bind(binding_name, *id);
+                        }
+                    }
+
+                    results.push(result);
+                    continue;
+                }
+            }
+
             // Execute the verb call
             let result = self.execute_verb(&vc, ctx).await?;
+
+            // Record in idempotency table if enabled
+            if ctx.idempotency_enabled {
+                self.idempotency
+                    .record(
+                        ctx.execution_id,
+                        step_index,
+                        &verb_name,
+                        &json_args,
+                        &result,
+                    )
+                    .await?;
+            }
 
             // Handle explicit :as binding (in addition to verb's default capture)
             if let Some(ref binding_name) = step.bind_as {

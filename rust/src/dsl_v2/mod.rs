@@ -50,6 +50,8 @@ pub mod execution_plan;
 pub mod executor;
 #[cfg(feature = "database")]
 pub mod generic_executor;
+#[cfg(feature = "database")]
+pub mod idempotency;
 pub mod parser;
 #[cfg(feature = "database")]
 pub mod ref_resolver;
@@ -70,6 +72,8 @@ pub use execution_plan::{compile, CompileError, ExecutionPlan, ExecutionStep, In
 pub use executor::{DslExecutor, ExecutionContext, ExecutionResult, ReturnType};
 #[cfg(feature = "database")]
 pub use generic_executor::{GenericCrudExecutor, GenericExecutionResult};
+#[cfg(feature = "database")]
+pub use idempotency::{compute_idempotency_key, IdempotencyManager};
 pub use parser::{parse_program, parse_single_verb};
 pub use runtime_registry::{runtime_registry, RuntimeVerbRegistry};
 pub use semantic_context::SemanticContextStore;
