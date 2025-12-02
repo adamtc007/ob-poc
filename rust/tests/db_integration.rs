@@ -179,6 +179,7 @@ mod db_tests {
     }
 
     #[derive(Debug)]
+    #[allow(dead_code)]
     struct CbuRow {
         cbu_id: Uuid,
         name: String,

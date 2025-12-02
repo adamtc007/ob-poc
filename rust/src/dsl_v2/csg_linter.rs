@@ -654,16 +654,13 @@ impl Default for CsgLinter {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     // Helper functions for testing that don't require database connection
     fn test_types_compatible(expected: &str, actual: &str) -> bool {
         if expected == actual {
             return true;
         }
         // Wildcard: "LIMITED_COMPANY_*" matches "LIMITED_COMPANY_PRIVATE"
-        if expected.ends_with('*') {
-            let prefix = &expected[..expected.len() - 1];
+        if let Some(prefix) = expected.strip_suffix('*') {
             return actual.starts_with(prefix);
         }
         // Hierarchy: "PROPER_PERSON" matches "PROPER_PERSON_NATURAL"
@@ -681,18 +678,18 @@ mod tests {
         let a: Vec<char> = a.chars().collect();
         let b: Vec<char> = b.chars().collect();
         let mut dp = vec![vec![0; b.len() + 1]; a.len() + 1];
-        for i in 0..=a.len() {
-            dp[i][0] = i;
+        for (i, row) in dp.iter_mut().enumerate() {
+            row[0] = i;
         }
-        for j in 0..=b.len() {
-            dp[0][j] = j;
+        for (j, val) in dp[0].iter_mut().enumerate() {
+            *val = j;
         }
-        for i in 1..=a.len() {
-            for j in 1..=b.len() {
-                let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };
-                dp[i][j] = (dp[i - 1][j] + 1)
-                    .min(dp[i][j - 1] + 1)
-                    .min(dp[i - 1][j - 1] + cost);
+        for (i, a_char) in a.iter().enumerate() {
+            for (j, b_char) in b.iter().enumerate() {
+                let cost = if a_char == b_char { 0 } else { 1 };
+                dp[i + 1][j + 1] = (dp[i][j + 1] + 1)
+                    .min(dp[i + 1][j] + 1)
+                    .min(dp[i][j] + cost);
             }
         }
         dp[a.len()][b.len()]

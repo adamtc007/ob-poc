@@ -14,7 +14,6 @@
 //! ```
 
 use std::env;
-use tokio;
 use tracing::{error, info, warn};
 
 #[tokio::main]

@@ -201,41 +201,6 @@ pub fn get_all_supported_verbs() -> Vec<String> {
     all_verbs
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_domain_registry() {
-        let registry = DomainRegistry::new();
-        let domains = registry.get_all_domains();
-
-        // Should have core domains
-        assert!(domains.contains(&"kyc".to_string()));
-        assert!(domains.contains(&"onboarding".to_string()));
-        assert!(domains.contains(&"ubo".to_string()));
-        assert!(domains.contains(&"isda".to_string()));
-    }
-
-    #[test]
-    fn test_verb_domain_extraction() {
-        assert_eq!(extract_domain_from_verb("kyc.collect"), Some("kyc"));
-        assert_eq!(extract_domain_from_verb("ubo.analyze"), Some("ubo"));
-        assert_eq!(
-            extract_domain_from_verb("isda.establish_master"),
-            Some("isda")
-        );
-        assert_eq!(extract_domain_from_verb("invalid"), Some("invalid"));
-    }
-
-    #[test]
-    fn test_verb_belongs_to_domain() {
-        assert!(verb_belongs_to_domain("kyc.collect", "kyc"));
-        assert!(verb_belongs_to_domain("ubo.calculate", "ubo"));
-        assert!(!verb_belongs_to_domain("kyc.collect", "ubo"));
-    }
-}
-
 /// Stub domain handler for testing and compilation
 pub struct StubDomainHandler {
     domain: String,
@@ -309,5 +274,40 @@ impl DomainHandler for StubDomainHandler {
 
     fn get_templates(&self) -> HashMap<String, String> {
         HashMap::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_domain_registry() {
+        let registry = DomainRegistry::new();
+        let domains = registry.get_all_domains();
+
+        // Should have core domains
+        assert!(domains.contains(&"kyc".to_string()));
+        assert!(domains.contains(&"onboarding".to_string()));
+        assert!(domains.contains(&"ubo".to_string()));
+        assert!(domains.contains(&"isda".to_string()));
+    }
+
+    #[test]
+    fn test_verb_domain_extraction() {
+        assert_eq!(extract_domain_from_verb("kyc.collect"), Some("kyc"));
+        assert_eq!(extract_domain_from_verb("ubo.analyze"), Some("ubo"));
+        assert_eq!(
+            extract_domain_from_verb("isda.establish_master"),
+            Some("isda")
+        );
+        assert_eq!(extract_domain_from_verb("invalid"), Some("invalid"));
+    }
+
+    #[test]
+    fn test_verb_belongs_to_domain() {
+        assert!(verb_belongs_to_domain("kyc.collect", "kyc"));
+        assert!(verb_belongs_to_domain("ubo.calculate", "ubo"));
+        assert!(!verb_belongs_to_domain("kyc.collect", "ubo"));
     }
 }

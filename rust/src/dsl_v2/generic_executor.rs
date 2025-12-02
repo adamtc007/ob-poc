@@ -1505,8 +1505,6 @@ impl GenericCrudExecutor {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn test_infer_pk_column() {
         // Create a dummy executor to test the method
