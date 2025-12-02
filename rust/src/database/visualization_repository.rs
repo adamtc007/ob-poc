@@ -333,6 +333,69 @@ pub struct ResourceInstanceView {
 }
 
 // =============================================================================
+// KYC CASE VIEW MODELS
+// =============================================================================
+
+#[derive(Debug, Clone)]
+pub struct CaseView {
+    pub case_id: Uuid,
+    pub cbu_id: Uuid,
+    pub status: String,
+    pub escalation_level: String,
+    pub risk_rating: Option<String>,
+    pub case_type: Option<String>,
+    pub sla_deadline: Option<chrono::DateTime<chrono::Utc>>,
+    pub opened_at: chrono::DateTime<chrono::Utc>,
+    pub closed_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct WorkstreamView {
+    pub workstream_id: Uuid,
+    pub case_id: Uuid,
+    pub entity_id: Uuid,
+    pub entity_name: String,
+    pub entity_type: String,
+    pub jurisdiction: Option<String>,
+    pub status: String,
+    pub risk_rating: Option<String>,
+    pub is_ubo: bool,
+    pub ownership_percentage: Option<f64>,
+    pub requires_enhanced_dd: bool,
+    pub discovery_reason: Option<String>,
+    pub discovery_depth: i32,
+    pub discovery_source_workstream_id: Option<Uuid>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RedFlagView {
+    pub red_flag_id: Uuid,
+    pub case_id: Uuid,
+    pub workstream_id: Option<Uuid>,
+    pub flag_type: String,
+    pub severity: String,
+    pub status: String,
+    pub description: String,
+    pub source: Option<String>,
+    pub raised_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct DocStatsView {
+    pub pending: i64,
+    pub received: i64,
+    pub verified: i64,
+    pub rejected: i64,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ScreeningStatsView {
+    pub clear: i64,
+    pub pending_review: i64,
+    pub confirmed_hits: i64,
+}
+
+// =============================================================================
 // REPOSITORY
 // =============================================================================
 
@@ -561,32 +624,6 @@ impl VisualizationRepository {
     }
 
     // =========================================================================
-    // CONTROL RELATIONSHIP QUERIES
-    // =========================================================================
-
-    /// Get control relationships for entities in a CBU
-    pub async fn get_control_relationships(
-        &self,
-        cbu_id: Uuid,
-    ) -> Result<Vec<ControlRelationshipView>> {
-        let controls = sqlx::query_as!(
-            ControlRelationshipView,
-            r#"SELECT cr.controller_entity_id, cr.controlled_entity_id, cr.control_type
-               FROM "ob-poc".control_relationships cr
-               WHERE cr.is_active = true
-               AND (cr.controller_entity_id IN (
-                   SELECT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1
-               ) OR cr.controlled_entity_id IN (
-                   SELECT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1
-               ))"#,
-            cbu_id
-        )
-        .fetch_all(&self.pool)
-        .await?;
-        Ok(controls)
-    }
-
-    // =========================================================================
     // ATTRIBUTE QUERIES (for display)
     // =========================================================================
 
@@ -614,37 +651,6 @@ impl VisualizationRepository {
                 attribute_id: r.attribute_id,
                 attribute_name: r.attribute_name,
                 value_text: r.value_text,
-            })
-            .collect())
-    }
-
-    /// Get attributes extracted from a document
-    pub async fn get_document_attributes(
-        &self,
-        doc_id: Uuid,
-    ) -> Result<Vec<DocumentAttributeView>> {
-        let rows = sqlx::query!(
-            r#"
-            SELECT
-                dm.attribute_id,
-                dm.value,
-                d.name as attribute_name
-            FROM "ob-poc".document_metadata dm
-            JOIN "ob-poc".dictionary d ON d.attribute_id = dm.attribute_id
-            WHERE dm.doc_id = $1
-            ORDER BY d.name
-            "#,
-            doc_id
-        )
-        .fetch_all(&self.pool)
-        .await?;
-
-        Ok(rows
-            .into_iter()
-            .map(|r| DocumentAttributeView {
-                attribute_id: r.attribute_id,
-                attribute_name: r.attribute_name,
-                value: r.value,
             })
             .collect())
     }
@@ -810,14 +816,14 @@ impl VisualizationRepository {
             .collect())
     }
 
-    /// Get screenings for entities in a CBU
+    /// Get screenings for entities in a CBU (via workstreams in cases)
     pub async fn get_cbu_screenings(&self, cbu_id: Uuid) -> Result<Vec<CbuScreeningView>> {
         let rows = sqlx::query!(
-            r#"SELECT s.screening_id, s.entity_id, s.screening_type, s.status, s.result
-               FROM "ob-poc".screenings s
-               WHERE s.entity_id IN (
-                   SELECT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1
-               )"#,
+            r#"SELECT s.screening_id, w.entity_id, s.screening_type, s.status, s.result_summary as result
+               FROM kyc.screenings s
+               JOIN kyc.entity_workstreams w ON w.workstream_id = s.workstream_id
+               JOIN kyc.cases c ON c.case_id = w.case_id
+               WHERE c.cbu_id = $1"#,
             cbu_id
         )
         .fetch_all(&self.pool)
@@ -829,7 +835,7 @@ impl VisualizationRepository {
                 screening_id: r.screening_id,
                 entity_id: r.entity_id,
                 screening_type: r.screening_type,
-                status: r.status,
+                status: Some(r.status),
                 result: r.result,
             })
             .collect())
@@ -900,34 +906,20 @@ impl VisualizationRepository {
             .collect())
     }
 
-    /// Get documents linked to an entity
-    pub async fn get_entity_documents(&self, entity_id: Uuid) -> Result<Vec<CbuDocumentView>> {
-        let rows = sqlx::query!(
-            r#"SELECT del.doc_id, dc.document_type_code, dc.status
-               FROM "ob-poc".document_entity_links del
-               JOIN "ob-poc".document_catalog dc ON del.doc_id = dc.doc_id
-               WHERE del.entity_id = $1"#,
-            entity_id
-        )
-        .fetch_all(&self.pool)
-        .await
-        .unwrap_or_default();
-
-        Ok(rows
-            .into_iter()
-            .map(|r| CbuDocumentView {
-                doc_id: r.doc_id,
-                document_type_code: r.document_type_code,
-                status: r.status,
-            })
-            .collect())
+    /// Get documents linked to an entity (placeholder - document_entity_links removed)
+    pub async fn get_entity_documents(&self, _entity_id: Uuid) -> Result<Vec<CbuDocumentView>> {
+        // document_entity_links table was removed in schema cleanup
+        // Documents are now linked via workstream doc_requests in kyc schema
+        Ok(Vec::new())
     }
 
-    /// Get screenings for an entity
+    /// Get screenings for an entity (via workstreams)
     pub async fn get_entity_screenings(&self, entity_id: Uuid) -> Result<Vec<EntityScreeningView>> {
         let rows = sqlx::query!(
-            r#"SELECT screening_id, screening_type, status, result
-               FROM "ob-poc".screenings WHERE entity_id = $1"#,
+            r#"SELECT s.screening_id, s.screening_type, s.status, s.result_summary as result
+               FROM kyc.screenings s
+               JOIN kyc.entity_workstreams w ON w.workstream_id = s.workstream_id
+               WHERE w.entity_id = $1"#,
             entity_id
         )
         .fetch_all(&self.pool)
@@ -938,7 +930,7 @@ impl VisualizationRepository {
             .map(|r| EntityScreeningView {
                 screening_id: r.screening_id,
                 screening_type: r.screening_type,
-                status: r.status,
+                status: Some(r.status),
                 result: r.result,
             })
             .collect())
@@ -1192,19 +1184,20 @@ impl VisualizationRepository {
     // GRAPH QUERIES - KYC LAYER
     // =========================================================================
 
-    /// Get KYC statuses for entities in a CBU
+    /// Get KYC statuses for entities in a CBU (via workstreams)
     pub async fn get_kyc_statuses(&self, cbu_id: Uuid) -> Result<Vec<KycStatusView>> {
         let rows = sqlx::query!(
             r#"SELECT
-                ks.status_id,
-                ks.entity_id,
-                ks.kyc_status,
-                ks.risk_rating,
-                ks.next_review_date,
+                w.workstream_id as status_id,
+                w.entity_id,
+                w.status as kyc_status,
+                w.risk_rating,
+                NULL::date as next_review_date,
                 e.name as "entity_name?"
-               FROM "ob-poc".entity_kyc_status ks
-               JOIN "ob-poc".entities e ON e.entity_id = ks.entity_id
-               WHERE ks.cbu_id = $1"#,
+               FROM kyc.entity_workstreams w
+               JOIN kyc.cases c ON c.case_id = w.case_id
+               JOIN "ob-poc".entities e ON e.entity_id = w.entity_id
+               WHERE c.cbu_id = $1"#,
             cbu_id
         )
         .fetch_all(&self.pool)
@@ -1215,7 +1208,7 @@ impl VisualizationRepository {
             .map(|r| KycStatusView {
                 status_id: r.status_id,
                 entity_id: r.entity_id,
-                kyc_status: r.kyc_status,
+                kyc_status: Some(r.kyc_status),
                 risk_rating: r.risk_rating,
                 next_review_date: r.next_review_date,
                 entity_name: r.entity_name,
@@ -1223,19 +1216,20 @@ impl VisualizationRepository {
             .collect())
     }
 
-    /// Get document requests for a CBU (via investigations)
+    /// Get document requests for a CBU (via workstreams)
     pub async fn get_document_requests(&self, cbu_id: Uuid) -> Result<Vec<DocumentRequestView>> {
         let rows = sqlx::query!(
             r#"SELECT
                 dr.request_id,
-                dr.document_type,
+                dr.doc_type as document_type,
                 dr.status,
-                dr.requested_from_entity_id,
+                w.entity_id as requested_from_entity_id,
                 e.name as "entity_name?"
-               FROM "ob-poc".document_requests dr
-               JOIN "ob-poc".kyc_investigations ki ON ki.investigation_id = dr.investigation_id
-               LEFT JOIN "ob-poc".entities e ON e.entity_id = dr.requested_from_entity_id
-               WHERE ki.cbu_id = $1"#,
+               FROM kyc.doc_requests dr
+               JOIN kyc.entity_workstreams w ON w.workstream_id = dr.workstream_id
+               JOIN kyc.cases c ON c.case_id = w.case_id
+               LEFT JOIN "ob-poc".entities e ON e.entity_id = w.entity_id
+               WHERE c.cbu_id = $1"#,
             cbu_id
         )
         .fetch_all(&self.pool)
@@ -1246,27 +1240,28 @@ impl VisualizationRepository {
             .map(|r| DocumentRequestView {
                 request_id: r.request_id,
                 document_type: r.document_type,
-                status: r.status,
-                requested_from_entity_id: r.requested_from_entity_id,
+                status: Some(r.status),
+                requested_from_entity_id: Some(r.requested_from_entity_id),
                 entity_name: r.entity_name,
             })
             .collect())
     }
 
-    /// Get screenings for entities in a CBU (for graph)
+    /// Get screenings for entities in a CBU (for graph, via workstreams)
     pub async fn get_graph_screenings(&self, cbu_id: Uuid) -> Result<Vec<ScreeningView>> {
         let rows = sqlx::query!(
             r#"SELECT
                 s.screening_id,
-                s.entity_id,
+                w.entity_id,
                 s.screening_type,
-                s.result,
-                s.resolution,
+                s.result_summary as result,
+                NULL::varchar as resolution,
                 e.name as "entity_name?"
-               FROM "ob-poc".screenings s
-               JOIN "ob-poc".cbu_entity_roles cer ON cer.entity_id = s.entity_id
-               JOIN "ob-poc".entities e ON e.entity_id = s.entity_id
-               WHERE cer.cbu_id = $1"#,
+               FROM kyc.screenings s
+               JOIN kyc.entity_workstreams w ON w.workstream_id = s.workstream_id
+               JOIN kyc.cases c ON c.case_id = w.case_id
+               JOIN "ob-poc".entities e ON e.entity_id = w.entity_id
+               WHERE c.cbu_id = $1"#,
             cbu_id
         )
         .fetch_all(&self.pool)
@@ -1366,46 +1361,11 @@ impl VisualizationRepository {
             .collect())
     }
 
-    /// Get control relationships for a CBU (for graph)
-    pub async fn get_graph_controls(&self, cbu_id: Uuid) -> Result<Vec<ControlView>> {
-        let rows = sqlx::query!(
-            r#"SELECT
-                c.control_id,
-                c.controller_entity_id,
-                c.controlled_entity_id,
-                c.control_type,
-                c.description,
-                c.is_active,
-                controller.name as "controller_name?",
-                controlled.name as "controlled_name?"
-               FROM "ob-poc".control_relationships c
-               LEFT JOIN "ob-poc".entities controller ON controller.entity_id = c.controller_entity_id
-               LEFT JOIN "ob-poc".entities controlled ON controlled.entity_id = c.controlled_entity_id
-               WHERE c.is_active = true
-                 AND (c.controlled_entity_id IN (
-                       SELECT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1
-                     )
-                  OR c.controller_entity_id IN (
-                       SELECT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1
-                     ))"#,
-            cbu_id
-        )
-        .fetch_all(&self.pool)
-        .await?;
-
-        Ok(rows
-            .into_iter()
-            .map(|r| ControlView {
-                control_id: r.control_id,
-                controller_entity_id: r.controller_entity_id,
-                controlled_entity_id: r.controlled_entity_id,
-                control_type: r.control_type,
-                description: r.description,
-                is_active: r.is_active,
-                controller_name: r.controller_name,
-                controlled_name: r.controlled_name,
-            })
-            .collect())
+    /// Get control relationships for a CBU (placeholder - control_relationships removed)
+    pub async fn get_graph_controls(&self, _cbu_id: Uuid) -> Result<Vec<ControlView>> {
+        // control_relationships table was removed in schema cleanup
+        // Control relationships are now tracked via ubo domain (ubo.add-control verb)
+        Ok(Vec::new())
     }
 
     // =========================================================================
@@ -1433,6 +1393,207 @@ impl VisualizationRepository {
                 instance_name: r.instance_name,
                 type_name: r.type_name,
                 category: r.category,
+            })
+            .collect())
+    }
+
+    // =========================================================================
+    // KYC CASE QUERIES
+    // =========================================================================
+
+    /// Get a KYC case by ID
+    pub async fn get_case(&self, case_id: Uuid) -> Result<CaseView> {
+        let row = sqlx::query!(
+            r#"SELECT
+                case_id, cbu_id, status, escalation_level, risk_rating,
+                case_type, sla_deadline, opened_at, closed_at
+               FROM kyc.cases
+               WHERE case_id = $1"#,
+            case_id
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(CaseView {
+            case_id: row.case_id,
+            cbu_id: row.cbu_id,
+            status: row.status,
+            escalation_level: row.escalation_level,
+            risk_rating: row.risk_rating,
+            case_type: row.case_type,
+            sla_deadline: row.sla_deadline,
+            opened_at: row.opened_at,
+            closed_at: row.closed_at,
+        })
+    }
+
+    /// Get all workstreams for a case
+    pub async fn get_case_workstreams(&self, case_id: Uuid) -> Result<Vec<WorkstreamView>> {
+        let rows = sqlx::query!(
+            r#"SELECT
+                w.workstream_id,
+                w.case_id,
+                w.entity_id,
+                e.name as entity_name,
+                et.type_code as entity_type,
+                COALESCE(lc.jurisdiction, p.jurisdiction, t.jurisdiction) as jurisdiction,
+                w.status,
+                w.risk_rating,
+                w.is_ubo,
+                w.ownership_percentage,
+                w.requires_enhanced_dd,
+                w.discovery_reason,
+                w.discovery_depth,
+                w.discovery_source_workstream_id
+               FROM kyc.entity_workstreams w
+               JOIN "ob-poc".entities e ON e.entity_id = w.entity_id
+               JOIN "ob-poc".entity_types et ON et.entity_type_id = e.entity_type_id
+               LEFT JOIN "ob-poc".entity_limited_companies lc ON lc.entity_id = e.entity_id
+               LEFT JOIN "ob-poc".entity_partnerships p ON p.entity_id = e.entity_id
+               LEFT JOIN "ob-poc".entity_trusts t ON t.entity_id = e.entity_id
+               WHERE w.case_id = $1
+               ORDER BY w.discovery_depth, w.created_at"#,
+            case_id
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| WorkstreamView {
+                workstream_id: r.workstream_id,
+                case_id: r.case_id,
+                entity_id: r.entity_id,
+                entity_name: r.entity_name,
+                entity_type: r.entity_type.unwrap_or_default(),
+                jurisdiction: r.jurisdiction,
+                status: r.status,
+                risk_rating: r.risk_rating,
+                is_ubo: r.is_ubo.unwrap_or(false),
+                ownership_percentage: r
+                    .ownership_percentage
+                    .map(|d| d.to_string().parse().unwrap_or(0.0)),
+                requires_enhanced_dd: r.requires_enhanced_dd.unwrap_or(false),
+                discovery_reason: r.discovery_reason,
+                discovery_depth: r.discovery_depth.unwrap_or(1),
+                discovery_source_workstream_id: r.discovery_source_workstream_id,
+            })
+            .collect())
+    }
+
+    /// Get all red flags for a case
+    pub async fn get_case_red_flags(&self, case_id: Uuid) -> Result<Vec<RedFlagView>> {
+        let rows = sqlx::query!(
+            r#"SELECT
+                red_flag_id, case_id, workstream_id, flag_type, severity,
+                status, description, source, raised_at
+               FROM kyc.red_flags
+               WHERE case_id = $1
+               ORDER BY raised_at DESC"#,
+            case_id
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| RedFlagView {
+                red_flag_id: r.red_flag_id,
+                case_id: r.case_id,
+                workstream_id: r.workstream_id,
+                flag_type: r.flag_type,
+                severity: r.severity,
+                status: r.status,
+                description: r.description,
+                source: r.source,
+                raised_at: r.raised_at,
+            })
+            .collect())
+    }
+
+    /// Get document stats for a workstream
+    pub async fn get_workstream_doc_stats(&self, workstream_id: Uuid) -> Result<DocStatsView> {
+        let row = sqlx::query!(
+            r#"SELECT
+                COUNT(*) FILTER (WHERE status IN ('REQUIRED', 'REQUESTED')) as "pending!",
+                COUNT(*) FILTER (WHERE status IN ('RECEIVED', 'UNDER_REVIEW')) as "received!",
+                COUNT(*) FILTER (WHERE status = 'VERIFIED') as "verified!",
+                COUNT(*) FILTER (WHERE status = 'REJECTED') as "rejected!"
+               FROM kyc.doc_requests
+               WHERE workstream_id = $1"#,
+            workstream_id
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(DocStatsView {
+            pending: row.pending,
+            received: row.received,
+            verified: row.verified,
+            rejected: row.rejected,
+        })
+    }
+
+    /// Get screening stats for a workstream
+    pub async fn get_workstream_screening_stats(
+        &self,
+        workstream_id: Uuid,
+    ) -> Result<ScreeningStatsView> {
+        let row = sqlx::query!(
+            r#"SELECT
+                COUNT(*) FILTER (WHERE status = 'CLEAR') as "clear!",
+                COUNT(*) FILTER (WHERE status = 'HIT_PENDING_REVIEW') as "pending_review!",
+                COUNT(*) FILTER (WHERE status = 'HIT_CONFIRMED') as "confirmed_hits!"
+               FROM kyc.screenings
+               WHERE workstream_id = $1"#,
+            workstream_id
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(ScreeningStatsView {
+            clear: row.clear,
+            pending_review: row.pending_review,
+            confirmed_hits: row.confirmed_hits,
+        })
+    }
+
+    /// List cases for a CBU
+    pub async fn list_cases_for_cbu(
+        &self,
+        cbu_id: Uuid,
+    ) -> Result<Vec<crate::visualization::case_builder::CaseSummary>> {
+        let rows = sqlx::query!(
+            r#"SELECT
+                c.case_id,
+                c.cbu_id,
+                c.status,
+                c.escalation_level,
+                c.risk_rating,
+                c.case_type,
+                c.opened_at,
+                (SELECT COUNT(*) FROM kyc.entity_workstreams w WHERE w.case_id = c.case_id) as "workstream_count!",
+                (SELECT COUNT(*) FROM kyc.red_flags r WHERE r.case_id = c.case_id AND r.status IN ('OPEN', 'BLOCKING')) as "open_red_flags!"
+               FROM kyc.cases c
+               WHERE c.cbu_id = $1
+               ORDER BY c.opened_at DESC"#,
+            cbu_id
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| crate::visualization::case_builder::CaseSummary {
+                case_id: r.case_id,
+                cbu_id: r.cbu_id,
+                status: r.status,
+                escalation_level: r.escalation_level,
+                risk_rating: r.risk_rating,
+                case_type: r.case_type,
+                opened_at: r.opened_at.to_rfc3339(),
+                workstream_count: r.workstream_count,
+                open_red_flags: r.open_red_flags,
             })
             .collect())
     }

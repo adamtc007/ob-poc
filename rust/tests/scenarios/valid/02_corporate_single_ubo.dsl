@@ -1,3 +1,4 @@
+;; Corporate with Single UBO - KYC Case Model
 
 (cbu.create
     :name "Acme Ltd Corporate"
@@ -42,5 +43,30 @@
     :entity-id @ubo
     :document-type "PASSPORT")
 
-(screening.pep :entity-id @ubo)
-(screening.sanctions :entity-id @company)
+;; Create KYC case and workstreams
+(kyc-case.create
+    :cbu-id @cbu
+    :case-type "NEW_CLIENT"
+    :as @case)
+
+(entity-workstream.create
+    :case-id @case
+    :entity-id @company
+    :as @ws-company)
+
+(entity-workstream.create
+    :case-id @case
+    :entity-id @ubo
+    :discovery-reason "BENEFICIAL_OWNER"
+    :ownership-percentage 100
+    :is-ubo true
+    :as @ws-ubo)
+
+;; Run screenings via workstreams
+(case-screening.run
+    :workstream-id @ws-ubo
+    :screening-type "PEP")
+
+(case-screening.run
+    :workstream-id @ws-company
+    :screening-type "SANCTIONS")

@@ -525,8 +525,13 @@ impl CsgLinter {
             "create-limited-company" => "LIMITED_COMPANY_PRIVATE".to_string(),
             "create-proper-person" | "create-natural-person" => "PROPER_PERSON_NATURAL".to_string(),
             "create-beneficial-owner" => "PROPER_PERSON_BENEFICIAL_OWNER".to_string(),
-            "create-partnership" => "PARTNERSHIP_GENERAL".to_string(),
-            "create-trust" => "TRUST_DISCRETIONARY".to_string(),
+            "create-partnership" | "create-partnership-general" => {
+                "PARTNERSHIP_GENERAL".to_string()
+            }
+            "create-partnership-limited" => "PARTNERSHIP_LIMITED".to_string(),
+            "create-trust" | "create-trust-discretionary" => "TRUST_DISCRETIONARY".to_string(),
+            "create-trust-fixed-interest" => "TRUST_FIXED_INTEREST".to_string(),
+            "create-trust-unit" => "TRUST_UNIT".to_string(),
             "create" => "ENTITY".to_string(),
             _ => "UNKNOWN".to_string(),
         }
@@ -698,8 +703,13 @@ mod tests {
             "create-limited-company" => "LIMITED_COMPANY_PRIVATE".to_string(),
             "create-proper-person" | "create-natural-person" => "PROPER_PERSON_NATURAL".to_string(),
             "create-beneficial-owner" => "PROPER_PERSON_BENEFICIAL_OWNER".to_string(),
-            "create-partnership" => "PARTNERSHIP_GENERAL".to_string(),
-            "create-trust" => "TRUST_DISCRETIONARY".to_string(),
+            "create-partnership" | "create-partnership-general" => {
+                "PARTNERSHIP_GENERAL".to_string()
+            }
+            "create-partnership-limited" => "PARTNERSHIP_LIMITED".to_string(),
+            "create-trust" | "create-trust-discretionary" => "TRUST_DISCRETIONARY".to_string(),
+            "create-trust-fixed-interest" => "TRUST_FIXED_INTEREST".to_string(),
+            "create-trust-unit" => "TRUST_UNIT".to_string(),
             "create" => "ENTITY".to_string(),
             _ => "UNKNOWN".to_string(),
         }

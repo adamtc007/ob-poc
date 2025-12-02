@@ -198,28 +198,13 @@ async fn get_cbu_attributes(
 /// GET /api/attributes/document/:doc_id
 /// Get all attributes extracted from a document
 async fn get_document_attributes(
-    State(pool): State<PgPool>,
-    Path(doc_id): Path<Uuid>,
+    State(_pool): State<PgPool>,
+    Path(_doc_id): Path<Uuid>,
 ) -> Result<Json<Vec<AttributeValue>>, StatusCode> {
-    let repo = VisualizationRepository::new(pool);
-
-    let values = repo.get_document_attributes(doc_id).await.map_err(|e| {
-        eprintln!("Failed to fetch document attributes: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
-
-    let attributes: Vec<AttributeValue> = values
-        .into_iter()
-        .map(|v| AttributeValue {
-            attribute_id: v.attribute_id.to_string(),
-            attribute_name: v.attribute_name,
-            value: serde_json::to_string(&v.value).unwrap_or_default(),
-            confidence: 1.0,
-            source_doc_id: Some(doc_id.to_string()),
-        })
-        .collect();
-
-    Ok(Json(attributes))
+    // document_metadata table was removed in schema cleanup
+    // Document extraction results are now stored in document_catalog.extracted_data
+    // This endpoint returns empty until reimplemented with new schema
+    Ok(Json(Vec::new()))
 }
 
 /// GET /api/attributes/health

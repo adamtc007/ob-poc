@@ -453,9 +453,12 @@ dsl_cli execute -f program.dsl --format json | jq '.bindings'
 ;; Document operations
 (document.catalog :cbu-id @fund :doc-type "PASSPORT" :title "John Smith Passport")
 
-;; Screening
-(screening.pep :entity-id @john)
-(screening.sanctions :entity-id @company)
+;; KYC Case with workstreams and screenings
+(kyc-case.create :cbu-id @fund :case-type "NEW_CLIENT" :as @case)
+(entity-workstream.create :case-id @case :entity-id @john :as @ws-john)
+(entity-workstream.create :case-id @case :entity-id @company :as @ws-company)
+(case-screening.run :workstream-id @ws-john :screening-type "PEP")
+(case-screening.run :workstream-id @ws-company :screening-type "SANCTIONS")
 
 ;; Service resource instance lifecycle
 (service-resource.provision :cbu-id @fund :resource-type "CUSTODY_ACCOUNT" :instance-url "https://..." :as @account)
@@ -470,8 +473,8 @@ dsl_cli execute -f program.dsl --format json | jq '.bindings'
 | cbu | Client Business Unit lifecycle (ensure, assign-role, etc.) |
 | entity | Dynamic verbs from entity_types (create-proper-person, create-limited-company) |
 | document | Document catalog, request, extract |
-| screening | PEP, sanctions, adverse-media checks |
-| kyc | KYC status, document requirements, screenings |
+| screening | Legacy PEP, sanctions checks (use case-screening instead) |
+| kyc | Legacy KYC verbs (use kyc-case domain instead) |
 | ubo | Ownership chains, control relationships, UBO registry |
 | service-resource | Service resource type CRUD + instance provision, set-attr, activate, suspend, decommission |
 | delivery | Service delivery record, complete, fail |
@@ -479,6 +482,88 @@ dsl_cli execute -f program.dsl --format json | jq '.bindings'
 | share-class | Fund share class master data (ISIN, NAV, fees, liquidity) |
 | holding | Investor positions in share classes |
 | movement | Subscription, redemption, transfer transactions |
+| kyc-case | KYC case lifecycle (create, status, escalate, close) |
+| entity-workstream | Per-entity workstream within KYC case |
+| red-flag | Risk indicators and issues (raise, mitigate, waive) |
+| doc-request | Document collection and verification |
+| case-screening | Screenings within KYC workstreams |
+| case-event | Audit trail for case activities |
+
+## KYC Case Management DSL
+
+The KYC case management system provides a complete workflow for client onboarding and periodic review, with automatic rule-based risk detection.
+
+### Case State Machine
+
+```
+INTAKE → DISCOVERY → ASSESSMENT → REVIEW → APPROVED/REJECTED
+                                    ↓
+                                 BLOCKED (if hard stops)
+```
+
+### Entity Workstream States
+
+```
+PENDING → COLLECT → VERIFY → SCREEN → ASSESS → COMPLETE
+                                 ↓
+                          ENHANCED_DD (if PEP/high-risk)
+                                 ↓
+                              BLOCKED (if sanctions match)
+```
+
+### KYC Case Verbs
+
+| Verb | Description |
+|------|-------------|
+| `kyc-case.create` | Create new KYC case for a CBU |
+| `kyc-case.update-status` | Update case status |
+| `kyc-case.escalate` | Escalate to higher authority |
+| `kyc-case.assign` | Assign analyst/reviewer |
+| `kyc-case.set-risk-rating` | Set case risk rating |
+| `kyc-case.close` | Close case (approved/rejected/withdrawn) |
+
+### Entity Workstream Verbs
+
+| Verb | Description |
+|------|-------------|
+| `entity-workstream.create` | Create workstream for entity |
+| `entity-workstream.update-status` | Update workstream status |
+| `entity-workstream.block` | Block with reason |
+| `entity-workstream.complete` | Mark as complete |
+| `entity-workstream.set-enhanced-dd` | Flag for enhanced due diligence |
+| `entity-workstream.set-ubo` | Mark entity as UBO |
+
+### Red Flag Verbs
+
+| Verb | Description |
+|------|-------------|
+| `red-flag.raise` | Raise new red flag |
+| `red-flag.mitigate` | Mark as mitigated |
+| `red-flag.waive` | Waive with justification |
+| `red-flag.dismiss` | Dismiss as false positive |
+| `red-flag.set-blocking` | Set as blocking the case |
+
+### Rules Engine
+
+The KYC system includes a YAML-driven rules engine that automatically triggers actions based on events.
+
+**Configuration**: `rust/config/rules.yaml`
+
+**Supported Events**: `workstream.created`, `screening.completed`, `doc-request.received`, `red-flag.raised`, `case.created`, `scheduled`
+
+**Action Types**: `raise-red-flag`, `block-workstream`, `escalate-case`, `set-enhanced-dd`, `require-document`, `log-event`
+
+### KYC Schema (kyc.* tables)
+
+| Table | Purpose |
+|-------|---------|
+| cases | Main KYC case for a CBU |
+| entity_workstreams | Per-entity work items within case |
+| red_flags | Risk indicators and issues |
+| doc_requests | Document requirements per workstream |
+| screenings | Sanctions/PEP/adverse media checks |
+| case_events | Audit trail of all activities |
+| rule_executions | Audit log of rule engine runs |
 
 ## Custody & Settlement DSL
 
@@ -623,21 +708,9 @@ The `cbu-custody` domain implements a three-layer model for settlement instructi
 
 ## KYC & UBO DSL
 
-The `kyc` and `ubo` domains manage entity-level KYC status, document requirements, screenings, ownership chains, and UBO determinations.
+The KYC case management and UBO domains manage entity-level investigations, screenings, ownership chains, and UBO determinations.
 
-### KYC Verbs
-
-| Verb | Description |
-|------|-------------|
-| `kyc.require-document` | Add document requirement for KYC |
-| `kyc.fulfill-requirement` | Mark document requirement as fulfilled |
-| `kyc.list-requirements` | List requirements for investigation |
-| `kyc.set-status` | Set KYC status for entity within CBU |
-| `kyc.get-status` | Get KYC status for entity |
-| `kyc.list-by-cbu` | List all entity KYC statuses for CBU |
-| `kyc.record-screening` | Record screening result |
-| `kyc.resolve-screening` | Resolve a screening hit |
-| `kyc.list-screenings` | List screenings for entity |
+> **Note**: Screenings are now managed via the KYC Case model. Use `kyc-case.create` → `entity-workstream.create` → `case-screening.run` instead of the legacy `screening.*` verbs.
 
 ### UBO Verbs
 
@@ -648,28 +721,40 @@ The `kyc` and `ubo` domains manage entity-level KYC status, document requirement
 | `ubo.end-ownership` | End ownership relationship |
 | `ubo.list-owners` | List owners of entity |
 | `ubo.list-owned` | List entities owned by entity |
-| `ubo.add-control` | Add control relationship (non-ownership) |
-| `ubo.end-control` | End control relationship |
-| `ubo.list-controllers` | List controllers of entity |
 | `ubo.register-ubo` | Register UBO determination |
 | `ubo.verify-ubo` | Mark UBO as verified |
 | `ubo.list-ubos` | List UBOs for CBU |
 | `ubo.list-by-subject` | List UBOs for subject entity |
 
-### Example: KYC Flow
+### Example: Full KYC Case Flow
 
 ```clojure
-;; Set initial KYC status
-(kyc.set-status :entity-id @investor :cbu-id @fund :status "IN_PROGRESS")
+;; Create CBU and entities
+(cbu.create :name "Acme Corp" :jurisdiction "GB" :client-type "corporate" :as @cbu)
+(entity.create-limited-company :cbu-id @cbu :name "Acme Ltd" :as @company)
+(entity.create-proper-person :cbu-id @cbu :first-name "John" :last-name "Smith" :as @ubo)
+(cbu.assign-role :cbu-id @cbu :entity-id @ubo :role "BENEFICIAL_OWNER" :ownership-percentage 100)
 
-;; Record screening
-(kyc.record-screening :entity-id @investor :screening-type "SANCTIONS" :result "CLEAR" :as @screening)
+;; Create KYC case
+(kyc-case.create :cbu-id @cbu :case-type "NEW_CLIENT" :as @case)
 
-;; Resolve if there was a match
-(kyc.resolve-screening :screening-id @screening :resolution "FALSE_POSITIVE" :rationale "Name similarity only" :resolved-by "analyst@example.com")
+;; Create workstreams for entities requiring KYC
+(entity-workstream.create :case-id @case :entity-id @company :as @ws-company)
+(entity-workstream.create :case-id @case :entity-id @ubo :discovery-reason "BENEFICIAL_OWNER" :is-ubo true :as @ws-ubo)
 
-;; Set final status
-(kyc.set-status :entity-id @investor :cbu-id @fund :status "APPROVED" :risk-rating "LOW")
+;; Run screenings
+(case-screening.run :workstream-id @ws-ubo :screening-type "PEP" :as @pep)
+(case-screening.run :workstream-id @ws-ubo :screening-type "SANCTIONS" :as @sanctions)
+(case-screening.run :workstream-id @ws-company :screening-type "SANCTIONS")
+
+;; Complete screenings with results
+(case-screening.complete :screening-id @pep :status "CLEAR" :result-summary "No matches")
+(case-screening.complete :screening-id @sanctions :status "CLEAR" :result-summary "No matches")
+
+;; Complete workstreams and case
+(entity-workstream.update-status :workstream-id @ws-ubo :status "COMPLETE")
+(entity-workstream.update-status :workstream-id @ws-company :status "COMPLETE")
+(kyc-case.update-status :case-id @case :status "APPROVED")
 ```
 
 ### Example: UBO Chain
@@ -679,16 +764,12 @@ The `kyc` and `ubo` domains manage entity-level KYC status, document requirement
 (ubo.add-ownership :owner-entity-id @person :owned-entity-id @holdco :percentage 100 :ownership-type "DIRECT" :as @own1)
 (ubo.add-ownership :owner-entity-id @holdco :owned-entity-id @fund-entity :percentage 60 :ownership-type "DIRECT" :as @own2)
 
-;; Add control relationship (trustee, not ownership)
-(ubo.add-control :controller-entity-id @trustee :controlled-entity-id @trust :control-type "TRUSTEE")
-
 ;; Register UBO determination
 (ubo.register-ubo :cbu-id @fund :subject-entity-id @fund-entity :ubo-person-id @person :relationship-type "OWNER" :qualifying-reason "OWNERSHIP_25PCT" :ownership-percentage 60 :workflow-type "ONBOARDING")
 
 ;; Verify UBO
 (ubo.verify-ubo :ubo-id @ubo1 :verification-status "VERIFIED" :risk-rating "LOW")
 ```
-
 ## Investor Registry DSL
 
 The `share-class`, `holding`, and `movement` domains implement a Clearstream-style investor registry for fund share classes.

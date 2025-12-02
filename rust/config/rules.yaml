@@ -1,0 +1,639 @@
+# =============================================================================
+# KYC RISK RULES - DSL DEFINITION
+# =============================================================================
+#
+# Rules are evaluated automatically when events occur.
+# Each rule has:
+#   - name: unique identifier
+#   - description: human readable
+#   - priority: lower = higher priority (1 = first)
+#   - trigger: which event activates this rule
+#   - condition: when to fire (supports all/any/not logic)
+#   - actions: what to do when condition matches
+#
+# Condition Operators:
+#   equals, not_equals, in, not_in, contains, starts_with,
+#   gt, gte, lt, lte, is_null, is_not_null, matches (regex)
+#
+# Logic:
+#   all: [conditions] - AND
+#   any: [conditions] - OR
+#   not: {condition}  - NOT
+#
+# Variables:
+#   ${entity.jurisdiction} - field from context
+#   ${now} - current timestamp
+#   ${now + 3 days} - future timestamp
+# =============================================================================
+
+rules:
+
+  # ===========================================================================
+  # JURISDICTION RULES
+  # ===========================================================================
+
+  - name: high-risk-jurisdiction-cayman
+    description: "Flag entities in Cayman Islands"
+    priority: 10
+    trigger:
+      event: workstream.created
+    condition:
+      field: entity.jurisdiction
+      in: [KY]
+    actions:
+      - type: raise-red-flag
+        params:
+          flag-type: HIGH_RISK_JURISDICTION
+          severity: ESCALATE
+          description: "Entity registered in Cayman Islands (${entity.jurisdiction})"
+          source: RULE_ENGINE
+          source-reference: high-risk-jurisdiction-cayman
+      - type: require-document
+        params:
+          doc-type: SOURCE_OF_FUNDS
+          priority: HIGH
+
+  - name: high-risk-jurisdiction-bvi
+    description: "Flag entities in BVI"
+    priority: 10
+    trigger:
+      event: workstream.created
+    condition:
+      field: entity.jurisdiction
+      in: [VG, BVI]
+    actions:
+      - type: raise-red-flag
+        params:
+          flag-type: HIGH_RISK_JURISDICTION
+          severity: ESCALATE
+          description: "Entity registered in British Virgin Islands"
+          source: RULE_ENGINE
+          source-reference: high-risk-jurisdiction-bvi
+      - type: require-document
+        params:
+          doc-type: SOURCE_OF_FUNDS
+          priority: HIGH
+
+  - name: tax-haven-jurisdiction
+    description: "Flag entities in tax haven jurisdictions"
+    priority: 20
+    trigger:
+      event: workstream.created
+    condition:
+      field: entity.jurisdiction
+      in: [PA, JE, GG, IM, MH, BM, AN, TC, VU]
+    actions:
+      - type: raise-red-flag
+        params:
+          flag-type: TAX_HAVEN
+          severity: SOFT
+          description: "Entity in tax haven jurisdiction: ${entity.jurisdiction}"
+          source: RULE_ENGINE
+          source-reference: tax-haven-jurisdiction
+
+  # ===========================================================================
+  # SCREENING RULES
+  # ===========================================================================
+
+  - name: sanctions-hard-stop
+    description: "Sanctions match is immediate hard stop"
+    priority: 1
+    trigger:
+      event: screening.completed
+    condition:
+      all:
+        - field: screening.type
+          equals: SANCTIONS
+        - field: screening.status
+          in: [HIT_PENDING_REVIEW, HIT_CONFIRMED]
+    actions:
+      - type: raise-red-flag
+        params:
+          flag-type: SANCTIONS_MATCH
+          severity: HARD_STOP
+          description: "Sanctions screening match detected"
+          source: SCREENING
+          source-reference: "${screening.id}"
+      - type: block-workstream
+        params:
+          reason: "Sanctions match - cannot proceed without clearance"
+      - type: update-case-status
+        params:
+          status: BLOCKED
+      - type: escalate-case
+        params:
+          level: EXECUTIVE
+
+  - name: pep-enhanced-dd
+    description: "PEP requires enhanced due diligence"
+    priority: 5
+    trigger:
+      event: screening.completed
+    condition:
+      all:
+        - field: screening.type
+          equals: PEP
+        - field: screening.status
+          in: [HIT_PENDING_REVIEW, HIT_CONFIRMED]
+    actions:
+      - type: raise-red-flag
+        params:
+          flag-type: PEP_IDENTIFIED
+          severity: ESCALATE
+          description: "Politically Exposed Person identified"
+          source: SCREENING
+          source-reference: "${screening.id}"
+      - type: set-enhanced-dd
+      - type: require-document
+        params:
+          doc-type: SOURCE_OF_WEALTH
+          priority: URGENT
+      - type: require-document
+        params:
+          doc-type: SOURCE_OF_FUNDS
+          priority: URGENT
+      - type: escalate-case
+        params:
+          level: SENIOR_COMPLIANCE
+
+  - name: adverse-media-escalate
+    description: "Adverse media hits require review"
+    priority: 15
+    trigger:
+      event: screening.completed
+    condition:
+      all:
+        - field: screening.type
+          equals: ADVERSE_MEDIA
+        - field: screening.status
+          equals: HIT_PENDING_REVIEW
+    actions:
+      - type: raise-red-flag
+        params:
+          flag-type: ADVERSE_MEDIA
+          severity: ESCALATE
+          description: "Adverse media coverage detected (${screening.match_count} matches)"
+          source: SCREENING
+          source-reference: "${screening.id}"
+      - type: escalate-case
+        params:
+          level: SENIOR_COMPLIANCE
+
+  # ===========================================================================
+  # ENTITY TYPE RULES
+  # ===========================================================================
+
+  - name: discretionary-trust
+    description: "Discretionary trusts are opaque structures"
+    priority: 20
+    trigger:
+      event: workstream.created
+    condition:
+      all:
+        - field: entity.type
+          equals: trust
+        - field: entity.trust_type
+          equals: DISCRETIONARY
+    actions:
+      - type: raise-red-flag
+        params:
+          flag-type: OPAQUE_STRUCTURE
+          severity: ESCALATE
+          description: "Discretionary trust with no fixed beneficiaries"
+          source: RULE_ENGINE
+          source-reference: discretionary-trust
+      - type: set-enhanced-dd
+      - type: require-document
+        params:
+          doc-type: TRUST_DEED
+          priority: HIGH
+      - type: require-document
+        params:
+          doc-type: LETTER_OF_WISHES
+          priority: HIGH
+      - type: require-document
+        params:
+          doc-type: DEED_OF_APPOINTMENT
+          priority: NORMAL
+
+  - name: nominee-detection
+    description: "Nominee arrangements require principal disclosure"
+    priority: 5
+    trigger:
+      event: workstream.created
+    condition:
+      any:
+        - field: entity.name
+          contains: nominee
+        - field: entity.name
+          contains: Nominee
+        - field: entity.name
+          contains: NOMINEE
+        - field: entity.name
+          contains: Designated
+        - field: entity.name
+          contains: DESIGNATED
+    actions:
+      - type: raise-red-flag
+        params:
+          flag-type: NOMINEE_UNDISCLOSED
+          severity: HARD_STOP
+          description: "Nominee arrangement detected - principal disclosure required"
+          source: RULE_ENGINE
+          source-reference: nominee-detection
+      - type: block-workstream
+        params:
+          reason: "Nominee principal must be disclosed before proceeding"
+
+  - name: shell-company-indicators
+    description: "Detect potential shell company characteristics"
+    priority: 25
+    trigger:
+      event: workstream.created
+    condition:
+      all:
+        - field: entity.type
+          equals: limited_company
+        - any:
+            - field: entity.name
+              contains: Holdings
+            - field: entity.name
+              contains: Investments
+            - field: entity.name
+              contains: International
+        - field: entity.jurisdiction
+          in: [KY, VG, BVI, PA, BM]
+    actions:
+      - type: raise-red-flag
+        params:
+          flag-type: SHELL_COMPANY
+          severity: SOFT
+          description: "Potential shell company indicators detected"
+          source: RULE_ENGINE
+          source-reference: shell-company-indicators
+      - type: require-document
+        params:
+          doc-type: FINANCIAL_STATEMENTS
+          priority: HIGH
+      - type: require-document
+        params:
+          doc-type: SOURCE_OF_WEALTH
+          priority: HIGH
+
+  # ===========================================================================
+  # OWNERSHIP RULES
+  # ===========================================================================
+
+  - name: ubo-threshold-25
+    description: "25%+ ownership qualifies as UBO"
+    priority: 50
+    trigger:
+      event: holding.created
+    condition:
+      field: holding.ownership_percentage
+      gte: 25
+    actions:
+      - type: set-ubo
+      - type: require-document
+        params:
+          doc-type: PASSPORT
+          priority: HIGH
+      - type: require-document
+        params:
+          doc-type: PROOF_OF_ADDRESS
+          priority: HIGH
+
+  - name: controlling-ownership
+    description: "Majority ownership requires extra scrutiny"
+    priority: 45
+    trigger:
+      event: holding.created
+    condition:
+      field: holding.ownership_percentage
+      gt: 50
+    actions:
+      - type: set-ubo
+      - type: require-document
+        params:
+          doc-type: SOURCE_OF_WEALTH
+          priority: HIGH
+
+  - name: complex-ownership-structure
+    description: "Flag structures with 4+ layers"
+    priority: 30
+    trigger:
+      event: workstream.created
+    condition:
+      field: workstream.discovery_depth
+      gte: 4
+    actions:
+      - type: raise-red-flag
+        params:
+          flag-type: COMPLEX_STRUCTURE
+          severity: ESCALATE
+          description: "Complex ownership structure with ${workstream.discovery_depth} layers"
+          source: RULE_ENGINE
+          source-reference: complex-ownership-structure
+      - type: set-enhanced-dd
+      - type: escalate-case
+        params:
+          level: SENIOR_COMPLIANCE
+
+  # ===========================================================================
+  # COMPOUND / COMBINATION RULES
+  # ===========================================================================
+
+  - name: high-risk-combination
+    description: "Multiple risk factors trigger very high risk rating"
+    priority: 15
+    trigger:
+      event: red-flag.raised
+    condition:
+      all:
+        - field: case.open_red_flags_count
+          gte: 3
+        - any:
+            - field: case.has_pep
+              equals: true
+            - field: case.has_adverse_media
+              equals: true
+    actions:
+      - type: set-case-risk
+        params:
+          rating: VERY_HIGH
+      - type: escalate-case
+        params:
+          level: EXECUTIVE
+      - type: log-event
+        params:
+          event-type: HIGH_RISK_COMBINATION
+          comment: "Multiple risk factors detected - case marked VERY_HIGH risk"
+
+  - name: pep-plus-jurisdiction
+    description: "PEP in high risk jurisdiction is executive escalation"
+    priority: 12
+    trigger:
+      event: red-flag.raised
+    condition:
+      all:
+        - field: case.has_pep
+          equals: true
+        - field: entity.jurisdiction
+          in: [KY, VG, BVI, PA, RU, CN, IR]
+    actions:
+      - type: set-case-risk
+        params:
+          rating: VERY_HIGH
+      - type: escalate-case
+        params:
+          level: EXECUTIVE
+      - type: log-event
+        params:
+          event-type: PEP_HIGH_RISK_JURISDICTION
+          comment: "PEP identified in high-risk jurisdiction - executive review required"
+
+  # ===========================================================================
+  # TEMPORAL / SLA RULES (scheduled, not event-driven)
+  # ===========================================================================
+
+  - name: document-overdue
+    description: "Flag overdue document requests"
+    priority: 100
+    trigger:
+      event: scheduled
+      schedule: daily
+    condition:
+      all:
+        - field: doc_request.status
+          in: [REQUIRED, REQUESTED]
+        - field: doc_request.due_date
+          lt: "${now}"
+    actions:
+      - type: raise-red-flag
+        params:
+          flag-type: DOCUMENT_OVERDUE
+          severity: SOFT
+          description: "Document ${doc_request.doc_type} overdue since ${doc_request.due_date}"
+          source: RULE_ENGINE
+          source-reference: document-overdue
+      - type: log-event
+        params:
+          event-type: DOCUMENT_OVERDUE
+          comment: "Document request past due date"
+
+  - name: case-sla-warning
+    description: "Warn when case approaching SLA deadline"
+    priority: 100
+    trigger:
+      event: scheduled
+      schedule: daily
+    condition:
+      all:
+        - field: case.status
+          not_in: [APPROVED, REJECTED, WITHDRAWN, EXPIRED]
+        - field: case.sla_deadline
+          lt: "${now + 3 days}"
+        - field: case.sla_deadline
+          gte: "${now}"
+    actions:
+      - type: escalate-case
+        params:
+          level: TEAM_LEAD
+      - type: log-event
+        params:
+          event-type: SLA_WARNING
+          comment: "Case approaching SLA deadline - ${case.sla_deadline}"
+
+  - name: case-sla-breach
+    description: "Handle SLA breach"
+    priority: 99
+    trigger:
+      event: scheduled
+      schedule: daily
+    condition:
+      all:
+        - field: case.status
+          not_in: [APPROVED, REJECTED, WITHDRAWN, EXPIRED]
+        - field: case.sla_deadline
+          lt: "${now}"
+    actions:
+      - type: raise-red-flag
+        params:
+          flag-type: SLA_BREACH
+          severity: ESCALATE
+          description: "Case SLA breached - deadline was ${case.sla_deadline}"
+          source: RULE_ENGINE
+          source-reference: case-sla-breach
+      - type: escalate-case
+        params:
+          level: SENIOR_COMPLIANCE
+      - type: log-event
+        params:
+          event-type: SLA_BREACH
+          comment: "Case has exceeded SLA deadline"
+
+  # ===========================================================================
+  # WORKFLOW AUTOMATION RULES
+  # ===========================================================================
+
+  - name: auto-advance-to-verify
+    description: "Auto-advance workstream when all docs received"
+    priority: 200
+    trigger:
+      event: doc-request.received
+    condition:
+      all:
+        - field: workstream.status
+          equals: COLLECT
+        - field: workstream.pending_docs
+          equals: 0
+    actions:
+      - type: update-workstream-status
+        params:
+          status: VERIFY
+      - type: log-event
+        params:
+          event-type: WORKSTREAM_AUTO_ADVANCED
+          comment: "All documents received - advanced to VERIFY"
+
+  - name: auto-advance-to-screen
+    description: "Auto-advance workstream when all docs verified"
+    priority: 200
+    trigger:
+      event: doc-request.verified
+    condition:
+      all:
+        - field: workstream.status
+          equals: VERIFY
+        - field: workstream.pending_docs
+          equals: 0
+    actions:
+      - type: update-workstream-status
+        params:
+          status: SCREEN
+      - type: auto-run-screenings
+      - type: log-event
+        params:
+          event-type: WORKSTREAM_AUTO_ADVANCED
+          comment: "All documents verified - advanced to SCREEN, screenings initiated"
+
+  # ===========================================================================
+  # STANDARD DOCUMENT REQUIREMENTS BY ENTITY TYPE
+  # ===========================================================================
+
+  - name: person-standard-docs
+    description: "Standard document requirements for natural persons"
+    priority: 100
+    trigger:
+      event: workstream.created
+    condition:
+      field: entity.type
+      equals: proper_person
+    actions:
+      - type: require-document
+        params:
+          doc-type: PASSPORT
+          priority: NORMAL
+      - type: require-document
+        params:
+          doc-type: PROOF_OF_ADDRESS
+          priority: NORMAL
+
+  - name: company-standard-docs
+    description: "Standard document requirements for companies"
+    priority: 100
+    trigger:
+      event: workstream.created
+    condition:
+      field: entity.type
+      equals: limited_company
+    actions:
+      - type: require-document
+        params:
+          doc-type: CERT_OF_INCORPORATION
+          priority: NORMAL
+      - type: require-document
+        params:
+          doc-type: MEMORANDUM_ARTICLES
+          priority: NORMAL
+      - type: require-document
+        params:
+          doc-type: REGISTER_OF_DIRECTORS
+          priority: NORMAL
+      - type: require-document
+        params:
+          doc-type: REGISTER_OF_SHAREHOLDERS
+          priority: NORMAL
+
+  - name: trust-standard-docs
+    description: "Standard document requirements for trusts"
+    priority: 100
+    trigger:
+      event: workstream.created
+    condition:
+      field: entity.type
+      equals: trust
+    actions:
+      - type: require-document
+        params:
+          doc-type: TRUST_DEED
+          priority: NORMAL
+      - type: require-document
+        params:
+          doc-type: DEED_OF_APPOINTMENT
+          priority: NORMAL
+
+  # ===========================================================================
+  # HIGH RISK COUNTRY LIST (FATF, EU)
+  # ===========================================================================
+
+  - name: fatf-high-risk
+    description: "FATF high-risk third countries"
+    priority: 8
+    trigger:
+      event: workstream.created
+    condition:
+      field: entity.jurisdiction
+      in: [KP, IR, MM]
+    actions:
+      - type: raise-red-flag
+        params:
+          flag-type: HIGH_RISK_JURISDICTION
+          severity: HARD_STOP
+          description: "Entity in FATF high-risk jurisdiction (${entity.jurisdiction}) - onboarding prohibited"
+          source: RULE_ENGINE
+          source-reference: fatf-high-risk
+      - type: block-workstream
+        params:
+          reason: "FATF high-risk jurisdiction - cannot proceed"
+      - type: update-case-status
+        params:
+          status: BLOCKED
+      - type: escalate-case
+        params:
+          level: EXECUTIVE
+
+  - name: fatf-increased-monitoring
+    description: "FATF increased monitoring jurisdictions"
+    priority: 15
+    trigger:
+      event: workstream.created
+    condition:
+      field: entity.jurisdiction
+      in: [SY, YE, HT, PH, VN, TZ, ZA, NG, ML, CM, BF, CD, SS]
+    actions:
+      - type: raise-red-flag
+        params:
+          flag-type: HIGH_RISK_JURISDICTION
+          severity: ESCALATE
+          description: "Entity in FATF increased monitoring jurisdiction (${entity.jurisdiction})"
+          source: RULE_ENGINE
+          source-reference: fatf-increased-monitoring
+      - type: set-enhanced-dd
+      - type: require-document
+        params:
+          doc-type: SOURCE_OF_FUNDS
+          priority: URGENT
+      - type: escalate-case
+        params:
+          level: SENIOR_COMPLIANCE

@@ -1,3 +1,4 @@
+;; Multi-Level Ownership Structure with KYC Case Model
 
 (cbu.create
     :name "Multi-Level Structure"
@@ -66,8 +67,43 @@
 (document.catalog :cbu-id @cbu :entity-id @ubo :document-type "PASSPORT")
 (document.catalog :cbu-id @cbu :entity-id @ubo :document-type "PROOF_OF_ADDRESS")
 
-(screening.sanctions :entity-id @opco)
-(screening.sanctions :entity-id @holdco)
-(screening.sanctions :entity-id @topco)
-(screening.pep :entity-id @ubo)
-(screening.sanctions :entity-id @ubo)
+;; Create KYC case and workstreams for multi-level structure
+(kyc-case.create
+    :cbu-id @cbu
+    :case-type "NEW_CLIENT"
+    :as @case)
+
+(entity-workstream.create
+    :case-id @case
+    :entity-id @opco
+    :as @ws-opco)
+
+(entity-workstream.create
+    :case-id @case
+    :entity-id @holdco
+    :discovery-reason "SHAREHOLDER"
+    :discovery-depth 1
+    :as @ws-holdco)
+
+(entity-workstream.create
+    :case-id @case
+    :entity-id @topco
+    :discovery-reason "SHAREHOLDER"
+    :discovery-depth 2
+    :as @ws-topco)
+
+(entity-workstream.create
+    :case-id @case
+    :entity-id @ubo
+    :discovery-reason "BENEFICIAL_OWNER"
+    :discovery-depth 3
+    :ownership-percentage 100
+    :is-ubo true
+    :as @ws-ubo)
+
+;; Run screenings via workstreams
+(case-screening.run :workstream-id @ws-opco :screening-type "SANCTIONS")
+(case-screening.run :workstream-id @ws-holdco :screening-type "SANCTIONS")
+(case-screening.run :workstream-id @ws-topco :screening-type "SANCTIONS")
+(case-screening.run :workstream-id @ws-ubo :screening-type "PEP")
+(case-screening.run :workstream-id @ws-ubo :screening-type "SANCTIONS")

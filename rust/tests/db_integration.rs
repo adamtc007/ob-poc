@@ -38,9 +38,32 @@ mod db_tests {
         async fn cleanup(&self) -> Result<()> {
             let pattern = format!("{}%", self.prefix);
 
-            // Delete in reverse dependency order
+            // Delete kyc schema tables first (new case model)
             sqlx::query(
-                r#"DELETE FROM "ob-poc".investigations WHERE cbu_id IN
+                r#"DELETE FROM kyc.screenings WHERE workstream_id IN
+                   (SELECT w.workstream_id FROM kyc.entity_workstreams w
+                    JOIN kyc.cases c ON c.case_id = w.case_id
+                    JOIN "ob-poc".cbus cbu ON cbu.cbu_id = c.cbu_id
+                    WHERE cbu.name LIKE $1)"#,
+            )
+            .bind(&pattern)
+            .execute(&self.pool)
+            .await
+            .ok();
+
+            sqlx::query(
+                r#"DELETE FROM kyc.entity_workstreams WHERE case_id IN
+                   (SELECT c.case_id FROM kyc.cases c
+                    JOIN "ob-poc".cbus cbu ON cbu.cbu_id = c.cbu_id
+                    WHERE cbu.name LIKE $1)"#,
+            )
+            .bind(&pattern)
+            .execute(&self.pool)
+            .await
+            .ok();
+
+            sqlx::query(
+                r#"DELETE FROM kyc.cases WHERE cbu_id IN
                    (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1)"#,
             )
             .bind(&pattern)
@@ -48,15 +71,7 @@ mod db_tests {
             .await
             .ok();
 
-            sqlx::query(
-                r#"DELETE FROM "ob-poc".screenings WHERE entity_id IN
-                   (SELECT entity_id FROM "ob-poc".entities WHERE name LIKE $1)"#,
-            )
-            .bind(&pattern)
-            .execute(&self.pool)
-            .await
-            .ok();
-
+            // Delete ob-poc tables in reverse dependency order
             sqlx::query(
                 r#"DELETE FROM "ob-poc".document_catalog WHERE cbu_id IN
                    (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1)"#,
@@ -150,13 +165,16 @@ mod db_tests {
         Ok(count.unwrap_or(0))
     }
 
-    // Helper: Count screenings for an entity
+    // Helper: Count screenings for an entity (via kyc.screenings joined to workstreams)
     async fn count_screenings(pool: &PgPool, entity_id: Uuid) -> Result<i64> {
-        let count: Option<i64> =
-            sqlx::query_scalar(r#"SELECT COUNT(*) FROM "ob-poc".screenings WHERE entity_id = $1"#)
-                .bind(entity_id)
-                .fetch_one(pool)
-                .await?;
+        let count: Option<i64> = sqlx::query_scalar(
+            r#"SELECT COUNT(*) FROM kyc.screenings s
+               JOIN kyc.entity_workstreams w ON w.workstream_id = s.workstream_id
+               WHERE w.entity_id = $1"#,
+        )
+        .bind(entity_id)
+        .fetch_one(pool)
+        .await?;
         Ok(count.unwrap_or(0))
     }
 
@@ -434,6 +452,13 @@ mod db_tests {
     async fn test_full_corporate_onboarding() -> Result<()> {
         let db = TestDb::new().await?;
 
+        // Full corporate onboarding with KYC case model:
+        // 1. Create CBU and entities
+        // 2. Assign roles
+        // 3. Catalog documents
+        // 4. Create KYC case
+        // 5. Create entity workstreams for UBOs
+        // 6. Run screenings via case-screening.run
         let dsl = format!(
             r#"
             (cbu.create :name "{}" :client-type "corporate" :jurisdiction "GB" :as @cbu)
@@ -445,10 +470,13 @@ mod db_tests {
             (document.catalog :cbu-id @cbu :doc-type "CERTIFICATE_OF_INCORPORATION" :title "Company Certificate")
             (document.catalog :cbu-id @cbu :doc-type "PASSPORT" :title "Alice Passport")
             (document.catalog :cbu-id @cbu :doc-type "PASSPORT" :title "Bob Passport")
-            (screening.pep :entity-id @ubo1)
-            (screening.pep :entity-id @ubo2)
-            (screening.sanctions :entity-id @ubo1)
-            (screening.sanctions :entity-id @ubo2)
+            (kyc-case.create :cbu-id @cbu :case-type "NEW_CLIENT" :as @case)
+            (entity-workstream.create :case-id @case :entity-id @ubo1 :as @ws1)
+            (entity-workstream.create :case-id @case :entity-id @ubo2 :as @ws2)
+            (case-screening.run :workstream-id @ws1 :screening-type "PEP")
+            (case-screening.run :workstream-id @ws1 :screening-type "SANCTIONS")
+            (case-screening.run :workstream-id @ws2 :screening-type "PEP")
+            (case-screening.run :workstream-id @ws2 :screening-type "SANCTIONS")
         "#,
             db.name("FullCBU"),
             db.name("FullCompany")

@@ -1,3 +1,7 @@
+;; Full KYC Workflow using the new Case Model
+;;
+;; Flow: CBU → Entities → Roles → Documents → KYC Case → Workstreams → Screenings
+
 (cbu.create
     :name "Full KYC Workflow Test"
     :client-type "corporate"
@@ -26,6 +30,7 @@
     :target-entity-id @company
     :ownership-percentage 100)
 
+;; Document cataloging
 (document.catalog
     :cbu-id @cbu
     :entity-id @company
@@ -56,31 +61,79 @@
     :document-type "PROOF_OF_ADDRESS"
     :as @poa)
 
-(screening.pep
+;; Create KYC case for the onboarding
+(kyc-case.create
+    :cbu-id @cbu
+    :case-type "NEW_CLIENT"
+    :as @case)
+
+;; Create workstreams for entities requiring KYC
+(entity-workstream.create
+    :case-id @case
+    :entity-id @company
+    :as @ws-company)
+
+(entity-workstream.create
+    :case-id @case
     :entity-id @ubo
+    :discovery-reason "BENEFICIAL_OWNER"
+    :ownership-percentage 100
+    :is-ubo true
+    :as @ws-ubo)
+
+;; Run screenings via workstreams
+(case-screening.run
+    :workstream-id @ws-ubo
+    :screening-type "PEP"
     :as @pep)
 
-(screening.sanctions
-    :entity-id @ubo
-    :as @ubosanctions)
+(case-screening.run
+    :workstream-id @ws-ubo
+    :screening-type "SANCTIONS"
+    :as @ubo-sanctions)
 
-(screening.sanctions
-    :entity-id @company
-    :as @companysanctions)
+(case-screening.run
+    :workstream-id @ws-company
+    :screening-type "SANCTIONS"
+    :as @company-sanctions)
 
-(screening.adverse-media
-    :entity-id @ubo
+(case-screening.run
+    :workstream-id @ws-ubo
+    :screening-type "ADVERSE_MEDIA"
     :as @adverse)
 
-(kyc.initiate
-    :cbu-id @cbu
-    :investigation-type "ONBOARDING"
-    :risk-rating "MEDIUM"
-    :as @investigation)
+;; Complete screenings with clear results
+(case-screening.complete
+    :screening-id @pep
+    :status "CLEAR"
+    :result-summary "No PEP matches found")
 
-(kyc.decide
-    :investigation-id @investigation
-    :decision "APPROVE"
-    :rationale "All checks passed - standard corporate client"
-    :decided-by "compliance_officer"
-    :as @decision)
+(case-screening.complete
+    :screening-id @ubo-sanctions
+    :status "CLEAR"
+    :result-summary "No sanctions matches found")
+
+(case-screening.complete
+    :screening-id @company-sanctions
+    :status "CLEAR"
+    :result-summary "No sanctions matches found")
+
+(case-screening.complete
+    :screening-id @adverse
+    :status "CLEAR"
+    :result-summary "No adverse media found")
+
+;; Update workstream statuses
+(entity-workstream.update-status
+    :workstream-id @ws-ubo
+    :status "COMPLETE")
+
+(entity-workstream.update-status
+    :workstream-id @ws-company
+    :status "COMPLETE")
+
+;; Complete the case
+(kyc-case.update-status
+    :case-id @case
+    :status "APPROVED"
+    :notes "All checks passed - standard corporate client")

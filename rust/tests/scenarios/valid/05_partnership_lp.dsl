@@ -1,3 +1,5 @@
+;; Limited Partnership with KYC Case Model
+
 (cbu.create
     :name "Investment Partnership"
     :client-type "fund"
@@ -68,8 +70,48 @@
 (document.catalog :cbu-id @cbu :entity-id @lp1 :document-type "CERTIFICATE_OF_INCORPORATION")
 (document.catalog :cbu-id @cbu :entity-id @lp2 :document-type "CERTIFICATE_OF_INCORPORATION")
 
-(screening.pep :entity-id @gpubo)
-(screening.sanctions :entity-id @partnership)
-(screening.sanctions :entity-id @gp)
-(screening.sanctions :entity-id @lp1)
-(screening.sanctions :entity-id @lp2)
+;; Create KYC case and workstreams
+(kyc-case.create
+    :cbu-id @cbu
+    :case-type "NEW_CLIENT"
+    :as @case)
+
+(entity-workstream.create
+    :case-id @case
+    :entity-id @partnership
+    :as @ws-partnership)
+
+(entity-workstream.create
+    :case-id @case
+    :entity-id @gp
+    :discovery-reason "GENERAL_PARTNER"
+    :as @ws-gp)
+
+(entity-workstream.create
+    :case-id @case
+    :entity-id @gpubo
+    :discovery-reason "BENEFICIAL_OWNER"
+    :ownership-percentage 100
+    :is-ubo true
+    :as @ws-gpubo)
+
+(entity-workstream.create
+    :case-id @case
+    :entity-id @lp1
+    :discovery-reason "LIMITED_PARTNER"
+    :ownership-percentage 60
+    :as @ws-lp1)
+
+(entity-workstream.create
+    :case-id @case
+    :entity-id @lp2
+    :discovery-reason "LIMITED_PARTNER"
+    :ownership-percentage 40
+    :as @ws-lp2)
+
+;; Run screenings via workstreams
+(case-screening.run :workstream-id @ws-gpubo :screening-type "PEP")
+(case-screening.run :workstream-id @ws-partnership :screening-type "SANCTIONS")
+(case-screening.run :workstream-id @ws-gp :screening-type "SANCTIONS")
+(case-screening.run :workstream-id @ws-lp1 :screening-type "SANCTIONS")
+(case-screening.run :workstream-id @ws-lp2 :screening-type "SANCTIONS")

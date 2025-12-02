@@ -1,8 +1,8 @@
 # Database Schema Reference
 
 **Database**: `data_designer` on PostgreSQL 17  
-**Schemas**: `ob-poc` (105 tables), `custody` (18 tables), `kyc` (3 tables)  
-**Updated**: 2025-12-01
+**Schemas**: `ob-poc` (51 tables), `custody` (17 tables), `kyc` (11 tables)  
+**Updated**: 2025-12-02
 
 ## Overview
 
@@ -550,7 +550,216 @@ ISO 4217 currency codes.
 
 ## KYC Schema (`kyc`)
 
-The kyc schema implements a Clearstream-style investor registry for fund share classes.
+The kyc schema implements both KYC case management and a Clearstream-style investor registry.
+
+### KYC Case Management
+
+#### cases
+
+Central table for KYC investigation cases.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| case_id | uuid | NOT NULL | gen_random_uuid() | Primary key |
+| cbu_id | uuid | NOT NULL | | FK to cbus |
+| status | varchar(30) | NOT NULL | 'INTAKE' | INTAKE, DISCOVERY, ASSESSMENT, REVIEW, APPROVED, REJECTED, BLOCKED, WITHDRAWN, EXPIRED |
+| escalation_level | varchar(30) | NOT NULL | 'STANDARD' | STANDARD, SENIOR_COMPLIANCE, EXECUTIVE, BOARD |
+| risk_rating | varchar(20) | | | LOW, MEDIUM, HIGH, VERY_HIGH, PROHIBITED |
+| assigned_analyst_id | uuid | | | Assigned analyst |
+| assigned_reviewer_id | uuid | | | Assigned reviewer |
+| opened_at | timestamptz | NOT NULL | now() | Case opened timestamp |
+| closed_at | timestamptz | | | Case closed timestamp |
+| sla_deadline | timestamptz | | | SLA deadline |
+| last_activity_at | timestamptz | | now() | Last activity timestamp |
+| case_type | varchar(30) | | 'NEW_CLIENT' | NEW_CLIENT, PERIODIC_REVIEW, EVENT_DRIVEN, REMEDIATION |
+| notes | text | | | Case notes |
+
+**Indexes**: case_id (PK), cbu_id, status, assigned_analyst_id
+
+#### entity_workstreams
+
+Per-entity work items within a case.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| workstream_id | uuid | NOT NULL | gen_random_uuid() | Primary key |
+| case_id | uuid | NOT NULL | | FK to cases |
+| entity_id | uuid | NOT NULL | | FK to entities |
+| status | varchar(30) | NOT NULL | 'PENDING' | PENDING, COLLECT, VERIFY, SCREEN, ASSESS, COMPLETE, BLOCKED, ENHANCED_DD |
+| discovery_source_workstream_id | uuid | | | FK to self - parent workstream that discovered this entity |
+| discovery_reason | varchar(100) | | | Why entity was discovered |
+| risk_rating | varchar(20) | | | Entity risk rating |
+| risk_factors | jsonb | | '[]' | Array of risk factors |
+| created_at | timestamptz | NOT NULL | now() | |
+| started_at | timestamptz | | | Work started |
+| completed_at | timestamptz | | | Work completed |
+| blocked_at | timestamptz | | | When blocked |
+| blocked_reason | text | | | Why blocked |
+| requires_enhanced_dd | boolean | | false | Enhanced due diligence required |
+| is_ubo | boolean | | false | Is this entity a UBO |
+| ownership_percentage | numeric(5,2) | | | Ownership percentage if applicable |
+| discovery_depth | integer | | 1 | Depth in ownership chain |
+
+**Unique constraint**: (case_id, entity_id)
+**Indexes**: case_id, entity_id, status, discovery_source_workstream_id
+
+#### red_flags
+
+Risk indicators raised during KYC.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| red_flag_id | uuid | NOT NULL | gen_random_uuid() | Primary key |
+| case_id | uuid | NOT NULL | | FK to cases |
+| workstream_id | uuid | | | FK to entity_workstreams (optional) |
+| flag_type | varchar(50) | NOT NULL | | Type of red flag |
+| severity | varchar(20) | NOT NULL | | SOFT, ESCALATE, HARD_STOP |
+| status | varchar(20) | NOT NULL | 'OPEN' | OPEN, UNDER_REVIEW, MITIGATED, WAIVED, BLOCKING, CLOSED |
+| description | text | NOT NULL | | Description of the flag |
+| source | varchar(50) | | | Source system/rule |
+| source_reference | text | | | Reference ID in source |
+| raised_at | timestamptz | NOT NULL | now() | When raised |
+| raised_by | uuid | | | Who raised it |
+| reviewed_at | timestamptz | | | When reviewed |
+| reviewed_by | uuid | | | Who reviewed |
+| resolved_at | timestamptz | | | When resolved |
+| resolved_by | uuid | | | Who resolved |
+| resolution_type | varchar(30) | | | How resolved |
+| resolution_notes | text | | | Resolution details |
+| waiver_approved_by | uuid | | | Who approved waiver |
+| waiver_justification | text | | | Waiver justification |
+
+**Indexes**: case_id, workstream_id, flag_type, severity, status
+
+#### doc_requests
+
+Document collection requests per workstream.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| request_id | uuid | NOT NULL | gen_random_uuid() | Primary key |
+| workstream_id | uuid | NOT NULL | | FK to entity_workstreams |
+| doc_type | varchar(50) | NOT NULL | | Document type code |
+| status | varchar(20) | NOT NULL | 'REQUIRED' | REQUIRED, REQUESTED, RECEIVED, UNDER_REVIEW, VERIFIED, REJECTED, WAIVED, EXPIRED |
+| required_at | timestamptz | NOT NULL | now() | When requirement created |
+| requested_at | timestamptz | | | When requested from client |
+| due_date | date | | | Due date for document |
+| received_at | timestamptz | | | When received |
+| reviewed_at | timestamptz | | | When reviewed |
+| verified_at | timestamptz | | | When verified |
+| document_id | uuid | | | FK to document_catalog |
+| reviewer_id | uuid | | | Who reviewed |
+| rejection_reason | text | | | Why rejected |
+| verification_notes | text | | | Verification notes |
+| is_mandatory | boolean | | true | Is document mandatory |
+| priority | varchar(10) | | 'NORMAL' | Document priority |
+
+**Indexes**: workstream_id, doc_type, status, due_date
+
+#### screenings
+
+Screening requests and results per workstream.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| screening_id | uuid | NOT NULL | gen_random_uuid() | Primary key |
+| workstream_id | uuid | NOT NULL | | FK to entity_workstreams |
+| screening_type | varchar(30) | NOT NULL | | SANCTIONS, PEP, ADVERSE_MEDIA, CREDIT, CRIMINAL, REGULATORY, CONSOLIDATED |
+| provider | varchar(50) | | | Screening provider |
+| status | varchar(20) | NOT NULL | 'PENDING' | PENDING, RUNNING, CLEAR, HIT_PENDING_REVIEW, HIT_CONFIRMED, HIT_DISMISSED, ERROR, EXPIRED |
+| requested_at | timestamptz | NOT NULL | now() | When requested |
+| completed_at | timestamptz | | | When completed |
+| expires_at | timestamptz | | | When expires |
+| result_summary | varchar(100) | | | Brief result |
+| result_data | jsonb | | | Full result data |
+| match_count | integer | | 0 | Number of matches |
+| reviewed_by | uuid | | | Who reviewed |
+| reviewed_at | timestamptz | | | When reviewed |
+| review_notes | text | | | Review notes |
+| red_flag_id | uuid | | | FK to red_flags if hit raised flag |
+
+**Indexes**: workstream_id, screening_type, status
+
+#### case_events
+
+Audit trail for case activities.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| event_id | uuid | NOT NULL | gen_random_uuid() | Primary key |
+| case_id | uuid | NOT NULL | | FK to cases |
+| workstream_id | uuid | | | FK to entity_workstreams (optional) |
+| event_type | varchar(50) | NOT NULL | | Event type |
+| event_data | jsonb | | '{}' | Event payload |
+| actor_id | uuid | | | Who performed action |
+| actor_type | varchar(20) | | 'USER' | USER, SYSTEM, RULE |
+| occurred_at | timestamptz | NOT NULL | now() | When occurred |
+| comment | text | | | Optional comment |
+
+**Indexes**: case_id, workstream_id, event_type, occurred_at DESC
+
+#### rule_executions
+
+Audit log for rules engine executions.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| execution_id | uuid | NOT NULL | gen_random_uuid() | Primary key |
+| case_id | uuid | NOT NULL | | FK to cases |
+| workstream_id | uuid | | | FK to entity_workstreams (optional) |
+| rule_name | varchar(100) | NOT NULL | | Rule that was evaluated |
+| trigger_event | varchar(50) | NOT NULL | | Event that triggered rule |
+| condition_matched | boolean | NOT NULL | | Whether conditions matched |
+| actions_executed | jsonb | | '[]' | Actions that were executed |
+| context_snapshot | jsonb | | '{}' | Context at time of execution |
+| executed_at | timestamptz | NOT NULL | now() | When executed |
+
+#### approval_requests
+
+Escalation and approval workflow.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| approval_id | uuid | NOT NULL | gen_random_uuid() | Primary key |
+| case_id | uuid | NOT NULL | | FK to cases |
+| workstream_id | uuid | | | FK to entity_workstreams (optional) |
+| request_type | varchar(50) | NOT NULL | | Type of approval needed |
+| requested_by | varchar(255) | | | Who requested |
+| requested_at | timestamptz | NOT NULL | now() | When requested |
+| approver | varchar(255) | | | Who approved/rejected |
+| decision | varchar(20) | | | APPROVED, REJECTED, PENDING |
+| decision_at | timestamptz | | | When decided |
+| comments | text | | | Decision comments |
+
+### KYC Case Views
+
+#### v_case_summary
+
+Aggregated case view with counts.
+
+```sql
+SELECT c.*, 
+       COUNT(DISTINCT w.workstream_id) as workstream_count,
+       COUNT(DISTINCT r.red_flag_id) FILTER (WHERE r.status = 'OPEN') as open_flags,
+       MIN(c.sla_deadline) as next_deadline
+FROM kyc.cases c
+LEFT JOIN kyc.entity_workstreams w ON c.case_id = w.case_id
+LEFT JOIN kyc.red_flags r ON c.case_id = r.case_id
+GROUP BY c.case_id
+```
+
+#### v_workstream_detail
+
+Workstream view with entity details.
+
+```sql
+SELECT w.*, e.name as entity_name, et.name as entity_type
+FROM kyc.entity_workstreams w
+JOIN entities e ON w.entity_id = e.entity_id
+JOIN entity_types et ON e.entity_type_id = et.entity_type_id
+```
+
+### Investor Registry
 
 ### share_classes
 
@@ -629,23 +838,24 @@ Subscription, redemption, and transfer transactions.
 - movement_type IN ('subscription', 'redemption', 'transfer_in', 'transfer_out', 'dividend', 'adjustment')
 - status IN ('pending', 'confirmed', 'settled', 'cancelled', 'failed')
 
+
 ## Table Count by Category
 
 | Category | Tables | Examples |
 |----------|--------|----------|
 | Core | 5 | cbus, entities, entity_types, roles, cbu_entity_roles |
 | Entity Extensions | 4 | entity_proper_persons, entity_limited_companies, entity_partnerships, entity_trusts |
-| Documents | 6 | document_catalog, document_types, document_requests, document_verifications |
-| Screening/KYC | 8 | screenings, kyc_investigations, kyc_decisions, risk_assessments, entity_kyc_status, control_relationships |
+| Documents | 3 | document_catalog, document_types, document_attribute_mappings |
 | Products/Services | 8 | products, services, service_delivery_map, cbu_resource_instances |
-| Reference Data | 4 | master_jurisdictions, currencies, roles |
-| DSL/Execution | 8 | dsl_instances, dsl_execution_log, verb_registry |
-| Monitoring | 6 | monitoring_setup, monitoring_events, monitoring_cases |
-| Other | 56 | Various support tables |
-| **ob-poc Total** | **105** | |
-| **Custody** | **18** | cbu_instrument_universe, cbu_ssi, ssi_booking_rules, instrument_classes, markets, security_types, currencies |
-| **KYC (Investor Registry)** | **3** | share_classes, holdings, movements |
-| **Grand Total** | **126** | |
+| Reference Data | 4 | master_jurisdictions, currencies, roles, dictionary |
+| DSL/Execution | 6 | dsl_instances, dsl_instance_versions, dsl_execution_log, dsl_domains, dsl_examples |
+| Onboarding | 4 | onboarding_requests, onboarding_products, service_option_definitions, service_option_choices |
+| Attributes | 4 | attribute_registry, attribute_values_typed, attribute_dictionary, resource_attribute_requirements |
+| Other | 13 | Various support tables |
+| **ob-poc Total** | **51** | |
+| **Custody** | **17** | cbu_instrument_universe, cbu_ssi, ssi_booking_rules, isda_agreements, csa_agreements |
+| **KYC** | **11** | cases, entity_workstreams, red_flags, doc_requests, screenings, share_classes, holdings, movements |
+| **Grand Total** | **79** | |
 
 ## Rebuilding the Schema
 

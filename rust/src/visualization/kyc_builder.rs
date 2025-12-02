@@ -11,8 +11,7 @@
 
 use super::types::*;
 use crate::database::{
-    CbuView, ControlRelationshipView, EntityView, HoldingView, OfficerView, ShareClassView,
-    VisualizationRepository,
+    CbuView, EntityView, HoldingView, OfficerView, ShareClassView, VisualizationRepository,
 };
 use anyhow::Result;
 use uuid::Uuid;
@@ -157,7 +156,7 @@ impl KycTreeBuilder {
         cbu_id: Uuid,
         cbu: &CbuView,
     ) -> Result<(TreeNode, Vec<TreeEdge>)> {
-        let mut overlay_edges = Vec::new();
+        let overlay_edges = Vec::new();
 
         // Load trustee
         let trustee = self.repo.get_entity_by_role(cbu_id, "TRUSTEE").await?;
@@ -194,9 +193,8 @@ impl KycTreeBuilder {
             node
         });
 
-        // Load control relationships for overlay
-        let controls = self.repo.get_control_relationships(cbu_id).await?;
-        self.add_control_edges(&controls, &mut overlay_edges);
+        // Control relationships removed in schema cleanup
+        // Control edges would be added via UBO domain if needed
 
         // Build tree: Trustee → Trust
         let root = if let Some(t) = trustee {
@@ -355,18 +353,6 @@ impl KycTreeBuilder {
                 to: holding.share_class_id,
                 edge_type: TreeEdgeType::Owns,
                 label: Some(format!("{} units", holding.units)),
-                weight: None,
-            });
-        }
-    }
-
-    fn add_control_edges(&self, controls: &[ControlRelationshipView], edges: &mut Vec<TreeEdge>) {
-        for ctrl in controls {
-            edges.push(TreeEdge {
-                from: ctrl.controller_entity_id,
-                to: ctrl.controlled_entity_id,
-                edge_type: TreeEdgeType::Controls,
-                label: Some(ctrl.control_type.clone()),
                 weight: None,
             });
         }

@@ -1,3 +1,4 @@
+;; Corporate with Multiple UBOs - KYC Case Model
 
 (cbu.create
     :name "Multi-Owner Corp"
@@ -61,7 +62,43 @@
 (document.catalog :cbu-id @cbu :entity-id @ubo2 :document-type "PASSPORT")
 (document.catalog :cbu-id @cbu :entity-id @ubo3 :document-type "PASSPORT")
 
-(screening.pep :entity-id @ubo1)
-(screening.pep :entity-id @ubo2)
-(screening.pep :entity-id @ubo3)
-(screening.sanctions :entity-id @company)
+;; Create KYC case and workstreams
+(kyc-case.create
+    :cbu-id @cbu
+    :case-type "NEW_CLIENT"
+    :as @case)
+
+(entity-workstream.create
+    :case-id @case
+    :entity-id @company
+    :as @ws-company)
+
+(entity-workstream.create
+    :case-id @case
+    :entity-id @ubo1
+    :discovery-reason "BENEFICIAL_OWNER"
+    :ownership-percentage 45
+    :is-ubo true
+    :as @ws-ubo1)
+
+(entity-workstream.create
+    :case-id @case
+    :entity-id @ubo2
+    :discovery-reason "BENEFICIAL_OWNER"
+    :ownership-percentage 35
+    :is-ubo true
+    :as @ws-ubo2)
+
+(entity-workstream.create
+    :case-id @case
+    :entity-id @ubo3
+    :discovery-reason "BENEFICIAL_OWNER"
+    :ownership-percentage 20
+    :is-ubo false
+    :as @ws-ubo3)
+
+;; Run screenings via workstreams
+(case-screening.run :workstream-id @ws-ubo1 :screening-type "PEP")
+(case-screening.run :workstream-id @ws-ubo2 :screening-type "PEP")
+(case-screening.run :workstream-id @ws-ubo3 :screening-type "PEP")
+(case-screening.run :workstream-id @ws-company :screening-type "SANCTIONS")

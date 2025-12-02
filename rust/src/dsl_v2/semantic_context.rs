@@ -117,35 +117,14 @@ impl SemanticContextStore {
     #[cfg(feature = "database")]
     pub async fn get_cached_similarities(
         &self,
-        source_type: &str,
-        source_code: &str,
-        target_type: &str,
-        min_similarity: f64,
+        _source_type: &str,
+        _source_code: &str,
+        _target_type: &str,
+        _min_similarity: f64,
     ) -> Result<Vec<(String, f64)>, String> {
-        let results = sqlx::query!(
-            r#"
-            SELECT target_code, cosine_similarity
-            FROM "ob-poc".csg_semantic_similarity_cache
-            WHERE source_type = $1
-              AND source_code = $2
-              AND target_type = $3
-              AND cosine_similarity >= $4
-              AND expires_at > NOW()
-            ORDER BY cosine_similarity DESC
-            "#,
-            source_type,
-            source_code,
-            target_type,
-            min_similarity
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| format!("Failed to fetch similarities: {}", e))?;
-
-        Ok(results
-            .into_iter()
-            .map(|r| (r.target_code, r.cosine_similarity))
-            .collect())
+        // csg_semantic_similarity_cache table was removed in schema cleanup
+        // Semantic similarity is now computed on-demand using embeddings
+        Ok(vec![])
     }
 
     #[cfg(not(feature = "database"))]

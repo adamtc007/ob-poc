@@ -1,3 +1,5 @@
+;; Simple Individual Onboarding with KYC Case
+
 (cbu.create
     :name "John Smith Individual"
     :client-type "individual"
@@ -24,10 +26,24 @@
     :document-type "PROOF_OF_ADDRESS"
     :as @poa)
 
-(screening.pep
+;; Create KYC case and workstream
+(kyc-case.create
+    :cbu-id @cbu
+    :case-type "NEW_CLIENT"
+    :as @case)
+
+(entity-workstream.create
+    :case-id @case
     :entity-id @person
+    :as @ws)
+
+;; Run screenings via workstream
+(case-screening.run
+    :workstream-id @ws
+    :screening-type "PEP"
     :as @pepscreen)
 
-(screening.sanctions
-    :entity-id @person
+(case-screening.run
+    :workstream-id @ws
+    :screening-type "SANCTIONS"
     :as @sanctionsscreen)

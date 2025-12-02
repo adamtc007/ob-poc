@@ -70,6 +70,9 @@ pub mod graph;
 #[cfg(feature = "database")]
 pub mod visualization;
 
+// KYC case management and rules engine
+pub mod kyc;
+
 // Database integration re-exports (when database feature is enabled)
 #[cfg(feature = "database")]
 pub use database::DictionaryDatabaseService;

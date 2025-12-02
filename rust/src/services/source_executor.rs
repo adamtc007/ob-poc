@@ -73,30 +73,14 @@ impl DocumentSource {
 impl SourceExecutor for DocumentSource {
     async fn fetch_value(
         &self,
-        attribute_id: &AttributeId,
+        _attribute_id: &AttributeId,
         _definition: &DbAttributeDefinition,
         _entity_id: Uuid,
     ) -> Result<Option<Value>, String> {
-        // Fetch from document_metadata for most recent extraction
-        // Schema: doc_id, attribute_id (uuid), value (jsonb)
-        // Note: document_metadata links to documents, not directly to entities
-        // This would need a join through document_entity_links for entity-specific queries
-
-        let result = sqlx::query!(
-            r#"
-            SELECT dm.value
-            FROM "ob-poc".document_metadata dm
-            WHERE dm.attribute_id = $1
-            ORDER BY dm.created_at DESC
-            LIMIT 1
-            "#,
-            attribute_id.as_uuid()
-        )
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| format!("Database error: {}", e))?;
-
-        Ok(result.map(|row| row.value))
+        // document_metadata table was removed in schema cleanup
+        // Document extraction results are now stored in document_catalog.extracted_data jsonb field
+        // This is a placeholder - full implementation would query document_catalog
+        Ok(None)
     }
 }
 

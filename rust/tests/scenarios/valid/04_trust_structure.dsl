@@ -1,3 +1,5 @@
+;; Trust Structure with KYC Case Model
+
 (cbu.create
     :name "Family Trust Structure"
     :client-type "trust"
@@ -67,7 +69,37 @@
 (document.catalog :cbu-id @cbu :entity-id @beneficiary2 :document-type "PASSPORT")
 (document.catalog :cbu-id @cbu :entity-id @trustee :document-type "CERTIFICATE_OF_INCORPORATION")
 
-(screening.pep :entity-id @settlor)
-(screening.pep :entity-id @beneficiary1)
-(screening.pep :entity-id @beneficiary2)
-(screening.sanctions :entity-id @trust)
+;; Create KYC case and workstreams
+(kyc-case.create
+    :cbu-id @cbu
+    :case-type "NEW_CLIENT"
+    :as @case)
+
+(entity-workstream.create
+    :case-id @case
+    :entity-id @trust
+    :as @ws-trust)
+
+(entity-workstream.create
+    :case-id @case
+    :entity-id @settlor
+    :discovery-reason "SETTLOR"
+    :as @ws-settlor)
+
+(entity-workstream.create
+    :case-id @case
+    :entity-id @beneficiary1
+    :discovery-reason "BENEFICIARY"
+    :as @ws-ben1)
+
+(entity-workstream.create
+    :case-id @case
+    :entity-id @beneficiary2
+    :discovery-reason "BENEFICIARY"
+    :as @ws-ben2)
+
+;; Run screenings via workstreams
+(case-screening.run :workstream-id @ws-settlor :screening-type "PEP")
+(case-screening.run :workstream-id @ws-ben1 :screening-type "PEP")
+(case-screening.run :workstream-id @ws-ben2 :screening-type "PEP")
+(case-screening.run :workstream-id @ws-trust :screening-type "SANCTIONS")

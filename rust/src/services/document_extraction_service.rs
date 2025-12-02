@@ -230,28 +230,13 @@ impl DocumentExtractionService {
 
     async fn store_document_metadata(
         &self,
-        doc_id: Uuid,
-        attribute_id: Uuid,
-        value: &Value,
+        _doc_id: Uuid,
+        _attribute_id: Uuid,
+        _value: &Value,
     ) -> Result<(), String> {
-        // Use UPSERT since (doc_id, attribute_id) is the composite PK
-        sqlx::query!(
-            r#"
-            INSERT INTO "ob-poc".document_metadata (doc_id, attribute_id, value, extraction_confidence, extracted_at)
-            VALUES ($1, $2, $3, 0.85, CURRENT_TIMESTAMP)
-            ON CONFLICT (doc_id, attribute_id)
-            DO UPDATE SET value = EXCLUDED.value,
-                          extraction_confidence = EXCLUDED.extraction_confidence,
-                          extracted_at = EXCLUDED.extracted_at
-            "#,
-            doc_id,
-            attribute_id,
-            value
-        )
-        .execute(&self.pool)
-        .await
-        .map_err(|e| format!("Failed to store document metadata: {}", e))?;
-
+        // document_metadata table was removed in schema cleanup
+        // Document extraction results should be stored in document_catalog.extracted_data jsonb field
+        // This is a placeholder - full implementation would update document_catalog
         Ok(())
     }
 
