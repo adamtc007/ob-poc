@@ -66,8 +66,10 @@ pub use service_resource_service::{
 };
 pub use service_service::{NewServiceFields, ServiceRow, ServiceService};
 pub use visualization_repository::{
-    CbuSummaryView, CbuView, ControlRelationshipView, DocumentAttributeView, EntityAttributeView,
-    EntityView, HoldingView, OfficerView, ServiceDeliveryView, ShareClassView,
+    CbuBasicView, CbuDocumentView, CbuEntityView, CbuRoleView, CbuScreeningView, CbuSummaryView,
+    CbuView, ControlRelationshipView, DocumentAttributeView, DocumentTypeView, EntityAttributeView,
+    EntityBasicView, EntityCbuView, EntityRoleView, EntityScreeningView, EntityTypeView,
+    EntityView, HoldingView, OfficerView, RoleView, ServiceDeliveryView, ShareClassView,
     VisualizationRepository,
 };
 

@@ -41,12 +41,13 @@ pub async fn get_cbu_graph(
     Path(cbu_id): Path<Uuid>,
     Query(params): Query<GraphQueryParams>,
 ) -> Result<Json<CbuGraph>, (StatusCode, String)> {
+    let repo = VisualizationRepository::new(pool);
     let graph = CbuGraphBuilder::new(cbu_id)
         .with_custody(params.custody)
         .with_kyc(params.kyc)
         .with_ubo(params.ubo)
         .with_services(params.services)
-        .build(&pool)
+        .build(&repo)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 

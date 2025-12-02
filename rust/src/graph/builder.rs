@@ -2,10 +2,13 @@
 //!
 //! This builder queries the database for CBU data across multiple layers
 //! (custody, KYC, UBO, services) and constructs a graph representation.
+//!
+//! All database queries are delegated to VisualizationRepository.
 
 use anyhow::Result;
-use sqlx::PgPool;
 use uuid::Uuid;
+
+use crate::database::VisualizationRepository;
 
 use super::types::*;
 
@@ -54,16 +57,13 @@ impl CbuGraphBuilder {
         self
     }
 
-    /// Build the graph from database
-    pub async fn build(self, pool: &PgPool) -> Result<CbuGraph> {
+    /// Build the graph from database via VisualizationRepository
+    pub async fn build(self, repo: &VisualizationRepository) -> Result<CbuGraph> {
         // Load CBU base record
-        let cbu_record = sqlx::query!(
-            r#"SELECT cbu_id, name, jurisdiction, client_type
-               FROM "ob-poc".cbus WHERE cbu_id = $1"#,
-            self.cbu_id
-        )
-        .fetch_one(pool)
-        .await?;
+        let cbu_record = repo
+            .get_cbu_basic(self.cbu_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("CBU not found: {}", self.cbu_id))?;
 
         let mut graph = CbuGraph::new(self.cbu_id, cbu_record.name.clone());
 
@@ -87,26 +87,26 @@ impl CbuGraphBuilder {
         });
 
         // Always load linked entities (Core layer)
-        self.load_entities(&mut graph, pool).await?;
+        self.load_entities(&mut graph, repo).await?;
 
         // Load custody layer
         if self.include_custody {
-            self.load_custody_layer(&mut graph, pool).await?;
+            self.load_custody_layer(&mut graph, repo).await?;
         }
 
-        // Load KYC layer (stub - tables don't exist yet)
+        // Load KYC layer
         if self.include_kyc {
-            self.load_kyc_layer(&mut graph, pool).await?;
+            self.load_kyc_layer(&mut graph, repo).await?;
         }
 
-        // Load UBO layer (stub - tables don't exist yet)
+        // Load UBO layer
         if self.include_ubo {
-            self.load_ubo_layer(&mut graph, pool).await?;
+            self.load_ubo_layer(&mut graph, repo).await?;
         }
 
         // Load Services layer
         if self.include_services {
-            self.load_services_layer(&mut graph, pool).await?;
+            self.load_services_layer(&mut graph, repo).await?;
         }
 
         // Compute final stats
@@ -117,23 +117,12 @@ impl CbuGraphBuilder {
     }
 
     /// Load entities linked to the CBU via cbu_entity_roles
-    async fn load_entities(&self, graph: &mut CbuGraph, pool: &PgPool) -> Result<()> {
-        let entities = sqlx::query!(
-            r#"SELECT
-                cer.cbu_entity_role_id,
-                cer.entity_id,
-                e.name as entity_name,
-                et.name as entity_type,
-                r.name as role_name
-               FROM "ob-poc".cbu_entity_roles cer
-               JOIN "ob-poc".entities e ON e.entity_id = cer.entity_id
-               JOIN "ob-poc".entity_types et ON et.entity_type_id = e.entity_type_id
-               JOIN "ob-poc".roles r ON r.role_id = cer.role_id
-               WHERE cer.cbu_id = $1"#,
-            self.cbu_id
-        )
-        .fetch_all(pool)
-        .await?;
+    async fn load_entities(
+        &self,
+        graph: &mut CbuGraph,
+        repo: &VisualizationRepository,
+    ) -> Result<()> {
+        let entities = repo.get_graph_entities(self.cbu_id).await?;
 
         for ent in entities {
             let entity_id = ent.entity_id.to_string();
@@ -167,38 +156,25 @@ impl CbuGraphBuilder {
         Ok(())
     }
 
-    async fn load_custody_layer(&self, graph: &mut CbuGraph, pool: &PgPool) -> Result<()> {
+    async fn load_custody_layer(
+        &self,
+        graph: &mut CbuGraph,
+        repo: &VisualizationRepository,
+    ) -> Result<()> {
         // Track which markets we've created nodes for
         let mut market_nodes: std::collections::HashMap<Uuid, String> =
             std::collections::HashMap::new();
 
-        // Load universe entries with joined names
-        let universes = sqlx::query!(
-            r#"SELECT
-                u.universe_id,
-                u.instrument_class_id,
-                u.market_id,
-                u.currencies,
-                u.settlement_types,
-                u.is_active,
-                ic.name as "class_name?",
-                m.name as "market_name?",
-                m.mic as "mic?"
-               FROM custody.cbu_instrument_universe u
-               LEFT JOIN custody.instrument_classes ic ON ic.class_id = u.instrument_class_id
-               LEFT JOIN custody.markets m ON m.market_id = u.market_id
-               WHERE u.cbu_id = $1"#,
-            self.cbu_id
-        )
-        .fetch_all(pool)
-        .await?;
+        // Load universe entries
+        let universes = repo.get_universes(self.cbu_id).await?;
 
         for u in universes {
             let universe_id = u.universe_id.to_string();
 
             // Create market grouping node if not already created
             let market_node_id = if let Some(market_id) = u.market_id {
-                if let std::collections::hash_map::Entry::Vacant(e) = market_nodes.entry(market_id) {
+                if let std::collections::hash_map::Entry::Vacant(e) = market_nodes.entry(market_id)
+                {
                     let market_node_id = format!("market-{}", market_id);
                     let mic = u.mic.clone().unwrap_or_else(|| "N/A".to_string());
                     let market_name = u.market_name.clone().unwrap_or_else(|| mic.clone());
@@ -285,26 +261,16 @@ impl CbuGraphBuilder {
             }
         }
 
-        // Load SSIs with market info for grouping
-        let ssis = sqlx::query!(
-            r#"SELECT s.ssi_id, s.ssi_name, s.ssi_type, s.status, s.cash_currency,
-                      s.safekeeping_account, s.safekeeping_bic, s.cash_account, s.cash_account_bic,
-                      s.market_id,
-                      m.mic as "mic?"
-               FROM custody.cbu_ssi s
-               LEFT JOIN custody.markets m ON m.market_id = s.market_id
-               WHERE s.cbu_id = $1"#,
-            self.cbu_id
-        )
-        .fetch_all(pool)
-        .await?;
+        // Load SSIs
+        let ssis = repo.get_ssis(self.cbu_id).await?;
 
         for ssi in ssis {
             let ssi_id = ssi.ssi_id.to_string();
 
             // Create market node if needed and get parent_id
             let market_node_id = if let Some(market_id) = ssi.market_id {
-                if let std::collections::hash_map::Entry::Vacant(e) = market_nodes.entry(market_id) {
+                if let std::collections::hash_map::Entry::Vacant(e) = market_nodes.entry(market_id)
+                {
                     let market_node_id = format!("market-{}", market_id);
                     let mic = ssi.mic.clone().unwrap_or_else(|| "N/A".to_string());
 
@@ -386,27 +352,15 @@ impl CbuGraphBuilder {
         }
 
         // Load booking rules
-        let rules = sqlx::query!(
-            r#"SELECT r.rule_id, r.rule_name, r.priority, r.ssi_id,
-                      r.instrument_class_id, r.market_id, r.currency, r.is_active,
-                      ic.name as "class_name?",
-                      m.mic as "mic?"
-               FROM custody.ssi_booking_rules r
-               LEFT JOIN custody.instrument_classes ic ON ic.class_id = r.instrument_class_id
-               LEFT JOIN custody.markets m ON m.market_id = r.market_id
-               WHERE r.cbu_id = $1
-               ORDER BY r.priority"#,
-            self.cbu_id
-        )
-        .fetch_all(pool)
-        .await?;
+        let rules = repo.get_booking_rules(self.cbu_id).await?;
 
         for rule in rules {
             let rule_id = rule.rule_id.to_string();
 
             // Create market node if needed and get parent_id
             let market_node_id = if let Some(market_id) = rule.market_id {
-                if let std::collections::hash_map::Entry::Vacant(e) = market_nodes.entry(market_id) {
+                if let std::collections::hash_map::Entry::Vacant(e) = market_nodes.entry(market_id)
+                {
                     let market_node_id = format!("market-{}", market_id);
                     let mic = rule.mic.clone().unwrap_or_else(|| "N/A".to_string());
 
@@ -472,17 +426,7 @@ impl CbuGraphBuilder {
         }
 
         // Load ISDA agreements
-        let isdas = sqlx::query!(
-            r#"SELECT i.isda_id, i.counterparty_entity_id, i.governing_law,
-                      i.agreement_date, i.is_active,
-                      e.name as "counterparty_name?"
-               FROM custody.isda_agreements i
-               LEFT JOIN "ob-poc".entities e ON e.entity_id = i.counterparty_entity_id
-               WHERE i.cbu_id = $1"#,
-            self.cbu_id
-        )
-        .fetch_all(pool)
-        .await?;
+        let isdas = repo.get_isdas(self.cbu_id).await?;
 
         for isda in isdas {
             let isda_id = isda.isda_id.to_string();
@@ -523,14 +467,7 @@ impl CbuGraphBuilder {
             });
 
             // Load CSAs for this ISDA
-            let csas = sqlx::query!(
-                r#"SELECT csa_id, csa_type, is_active
-                   FROM custody.csa_agreements
-                   WHERE isda_id = $1"#,
-                isda.isda_id
-            )
-            .fetch_all(pool)
-            .await?;
+            let csas = repo.get_csas(isda.isda_id).await?;
 
             for csa in csas {
                 let csa_id = csa.csa_id.to_string();
@@ -566,23 +503,13 @@ impl CbuGraphBuilder {
         Ok(())
     }
 
-    async fn load_kyc_layer(&self, graph: &mut CbuGraph, pool: &PgPool) -> Result<()> {
+    async fn load_kyc_layer(
+        &self,
+        graph: &mut CbuGraph,
+        repo: &VisualizationRepository,
+    ) -> Result<()> {
         // Load entity KYC statuses for this CBU
-        let statuses = sqlx::query!(
-            r#"SELECT
-                ks.status_id,
-                ks.entity_id,
-                ks.kyc_status,
-                ks.risk_rating,
-                ks.next_review_date,
-                e.name as "entity_name?"
-               FROM "ob-poc".entity_kyc_status ks
-               JOIN "ob-poc".entities e ON e.entity_id = ks.entity_id
-               WHERE ks.cbu_id = $1"#,
-            self.cbu_id
-        )
-        .fetch_all(pool)
-        .await?;
+        let statuses = repo.get_kyc_statuses(self.cbu_id).await?;
 
         for ks in statuses {
             let status_id = format!("kyc-status-{}", ks.status_id);
@@ -619,21 +546,7 @@ impl CbuGraphBuilder {
         }
 
         // Load document requirements from investigations linked to this CBU
-        let doc_reqs = sqlx::query!(
-            r#"SELECT
-                dr.request_id,
-                dr.document_type,
-                dr.status,
-                dr.requested_from_entity_id,
-                e.name as "entity_name?"
-               FROM "ob-poc".document_requests dr
-               JOIN "ob-poc".kyc_investigations ki ON ki.investigation_id = dr.investigation_id
-               LEFT JOIN "ob-poc".entities e ON e.entity_id = dr.requested_from_entity_id
-               WHERE ki.cbu_id = $1"#,
-            self.cbu_id
-        )
-        .fetch_all(pool)
-        .await?;
+        let doc_reqs = repo.get_document_requests(self.cbu_id).await?;
 
         for dr in doc_reqs {
             let doc_req_id = format!("doc-req-{}", dr.request_id);
@@ -670,22 +583,7 @@ impl CbuGraphBuilder {
         }
 
         // Load screenings for entities linked to this CBU
-        let screenings = sqlx::query!(
-            r#"SELECT
-                s.screening_id,
-                s.entity_id,
-                s.screening_type,
-                s.result,
-                s.resolution,
-                e.name as "entity_name?"
-               FROM "ob-poc".screenings s
-               JOIN "ob-poc".cbu_entity_roles cer ON cer.entity_id = s.entity_id
-               JOIN "ob-poc".entities e ON e.entity_id = s.entity_id
-               WHERE cer.cbu_id = $1"#,
-            self.cbu_id
-        )
-        .fetch_all(pool)
-        .await?;
+        let screenings = repo.get_graph_screenings(self.cbu_id).await?;
 
         for scr in screenings {
             let screening_id = format!("screening-{}", scr.screening_id);
@@ -726,27 +624,13 @@ impl CbuGraphBuilder {
         Ok(())
     }
 
-    async fn load_ubo_layer(&self, graph: &mut CbuGraph, pool: &PgPool) -> Result<()> {
+    async fn load_ubo_layer(
+        &self,
+        graph: &mut CbuGraph,
+        repo: &VisualizationRepository,
+    ) -> Result<()> {
         // Load UBO registry entries for this CBU
-        let ubos = sqlx::query!(
-            r#"SELECT
-                u.ubo_id,
-                u.subject_entity_id,
-                u.ubo_proper_person_id,
-                u.relationship_type,
-                u.ownership_percentage,
-                u.control_type,
-                u.verification_status,
-                se.name as "subject_name?",
-                pe.name as "ubo_name?"
-               FROM "ob-poc".ubo_registry u
-               LEFT JOIN "ob-poc".entities se ON se.entity_id = u.subject_entity_id
-               LEFT JOIN "ob-poc".entities pe ON pe.entity_id = u.ubo_proper_person_id
-               WHERE u.cbu_id = $1"#,
-            self.cbu_id
-        )
-        .fetch_all(pool)
-        .await?;
+        let ubos = repo.get_ubos(self.cbu_id).await?;
 
         for ubo in &ubos {
             // Add UBO person node if not already present
@@ -795,28 +679,7 @@ impl CbuGraphBuilder {
         }
 
         // Also load direct ownership relationships for chain visualization
-        let ownerships = sqlx::query!(
-            r#"SELECT
-                o.ownership_id,
-                o.owner_entity_id,
-                o.owned_entity_id,
-                o.ownership_type,
-                o.ownership_percent,
-                owner.name as "owner_name?",
-                owned.name as "owned_name?"
-               FROM "ob-poc".ownership_relationships o
-               LEFT JOIN "ob-poc".entities owner ON owner.entity_id = o.owner_entity_id
-               LEFT JOIN "ob-poc".entities owned ON owned.entity_id = o.owned_entity_id
-               WHERE o.owned_entity_id IN (
-                   SELECT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1
-               )
-               OR o.owner_entity_id IN (
-                   SELECT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1
-               )"#,
-            self.cbu_id
-        )
-        .fetch_all(pool)
-        .await?;
+        let ownerships = repo.get_ownerships(self.cbu_id).await?;
 
         for own in &ownerships {
             let owner_id = own.owner_entity_id.to_string();
@@ -851,30 +714,7 @@ impl CbuGraphBuilder {
         }
 
         // Load control relationships (non-ownership control like board, trustee, etc.)
-        let controls = sqlx::query!(
-            r#"SELECT
-                c.control_id,
-                c.controller_entity_id,
-                c.controlled_entity_id,
-                c.control_type,
-                c.description,
-                c.is_active,
-                controller.name as "controller_name?",
-                controlled.name as "controlled_name?"
-               FROM "ob-poc".control_relationships c
-               LEFT JOIN "ob-poc".entities controller ON controller.entity_id = c.controller_entity_id
-               LEFT JOIN "ob-poc".entities controlled ON controlled.entity_id = c.controlled_entity_id
-               WHERE c.is_active = true
-                 AND (c.controlled_entity_id IN (
-                       SELECT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1
-                     )
-                  OR c.controller_entity_id IN (
-                       SELECT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1
-                     ))"#,
-            self.cbu_id
-        )
-        .fetch_all(pool)
-        .await?;
+        let controls = repo.get_graph_controls(self.cbu_id).await?;
 
         for ctrl in &controls {
             let controller_id = ctrl.controller_entity_id.to_string();
@@ -910,49 +750,42 @@ impl CbuGraphBuilder {
         Ok(())
     }
 
-    async fn load_services_layer(&self, graph: &mut CbuGraph, pool: &PgPool) -> Result<()> {
-        // Load service resource instances from cbu_resource_instances
-        let instances = sqlx::query!(
-            r#"SELECT ri.instance_id, ri.status, ri.instance_name,
-                      rt.name as type_name, rt.resource_type as category
-               FROM "ob-poc".cbu_resource_instances ri
-               JOIN "ob-poc".service_resource_types rt ON rt.resource_id = ri.resource_type_id
-               WHERE ri.cbu_id = $1"#,
-            self.cbu_id
-        )
-        .fetch_all(pool)
-        .await;
+    async fn load_services_layer(
+        &self,
+        graph: &mut CbuGraph,
+        repo: &VisualizationRepository,
+    ) -> Result<()> {
+        // Load service resource instances
+        let instances = repo.get_resource_instances(self.cbu_id).await?;
 
-        if let Ok(instances) = instances {
-            for inst in instances {
-                let inst_id = inst.instance_id.to_string();
+        for inst in instances {
+            let inst_id = inst.instance_id.to_string();
 
-                graph.add_node(GraphNode {
-                    id: inst_id.clone(),
-                    node_type: NodeType::Resource,
-                    layer: LayerType::Services,
-                    label: inst.type_name,
-                    sublabel: inst.category,
-                    status: match inst.status.as_str() {
-                        "ACTIVE" => NodeStatus::Active,
-                        "PENDING" => NodeStatus::Pending,
-                        "SUSPENDED" => NodeStatus::Suspended,
-                        _ => NodeStatus::Draft,
-                    },
-                    parent_id: None,
-                    data: serde_json::json!({
-                        "instance_name": inst.instance_name
-                    }),
-                });
+            graph.add_node(GraphNode {
+                id: inst_id.clone(),
+                node_type: NodeType::Resource,
+                layer: LayerType::Services,
+                label: inst.type_name,
+                sublabel: inst.category,
+                status: match inst.status.as_str() {
+                    "ACTIVE" => NodeStatus::Active,
+                    "PENDING" => NodeStatus::Pending,
+                    "SUSPENDED" => NodeStatus::Suspended,
+                    _ => NodeStatus::Draft,
+                },
+                parent_id: None,
+                data: serde_json::json!({
+                    "instance_name": inst.instance_name
+                }),
+            });
 
-                graph.add_edge(GraphEdge {
-                    id: format!("cbu->{}", inst_id),
-                    source: self.cbu_id.to_string(),
-                    target: inst_id,
-                    edge_type: EdgeType::Delivers,
-                    label: None,
-                });
-            }
+            graph.add_edge(GraphEdge {
+                id: format!("cbu->{}", inst_id),
+                source: self.cbu_id.to_string(),
+                target: inst_id,
+                edge_type: EdgeType::Delivers,
+                label: None,
+            });
         }
 
         Ok(())
