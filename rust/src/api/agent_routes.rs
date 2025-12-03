@@ -313,35 +313,156 @@ async fn delete_session(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// POST /api/session/:id/chat - Process chat message
-/// For now, this just stores the message. LLM integration can be re-added later.
+/// POST /api/session/:id/chat - Process chat message and generate DSL via Claude
 async fn chat_session(
     State(state): State<AgentState>,
     Path(session_id): Path<Uuid>,
     Json(req): Json<ChatRequest>,
 ) -> Result<Json<ChatResponse>, StatusCode> {
+    // Store the user message first
+    {
+        let mut sessions = state.sessions.write().await;
+        let session = sessions.get_mut(&session_id).ok_or(StatusCode::NOT_FOUND)?;
+        session.add_user_message(req.message.clone());
+    }
+
+    // Call Claude API to generate DSL
+    let api_key = match std::env::var("ANTHROPIC_API_KEY") {
+        Ok(key) => key,
+        Err(_) => {
+            let mut sessions = state.sessions.write().await;
+            let session = sessions.get_mut(&session_id).ok_or(StatusCode::NOT_FOUND)?;
+            session.add_agent_message(
+                "Error: ANTHROPIC_API_KEY not configured".to_string(),
+                None,
+                None,
+            );
+            return Ok(Json(ChatResponse {
+                message: "Error: ANTHROPIC_API_KEY not configured".to_string(),
+                intents: vec![],
+                assembled_dsl: None,
+                validation_results: vec![],
+                session_state: session.state.clone(),
+                can_execute: false,
+            }));
+        }
+    };
+
+    // Build vocabulary prompt and system prompt
+    let vocab = build_vocab_prompt(None);
+    let system_prompt = build_chat_system_prompt(&vocab);
+
+    // Call Claude API
+    let client = reqwest::Client::new();
+    let response = client
+        .post("https://api.anthropic.com/v1/messages")
+        .header("x-api-key", &api_key)
+        .header("anthropic-version", "2023-06-01")
+        .header("content-type", "application/json")
+        .json(&serde_json::json!({
+            "model": "claude-sonnet-4-20250514",
+            "max_tokens": 2048,
+            "system": system_prompt,
+            "messages": [
+                {"role": "user", "content": req.message}
+            ]
+        }))
+        .send()
+        .await;
+
+    let (dsl_result, error_msg) = match response {
+        Ok(resp) => {
+            if resp.status().is_success() {
+                match resp.json::<serde_json::Value>().await {
+                    Ok(json) => {
+                        let content = json["content"][0]["text"]
+                            .as_str()
+                            .unwrap_or("")
+                            .trim()
+                            .to_string();
+
+                        if content.starts_with("ERROR:") {
+                            (None, Some(content))
+                        } else {
+                            // Validate the generated DSL
+                            match parse_program(&content) {
+                                Ok(_) => (Some(content), None),
+                                Err(e) => (Some(content), Some(format!("Syntax error: {}", e))),
+                            }
+                        }
+                    }
+                    Err(e) => (None, Some(format!("Failed to parse API response: {}", e))),
+                }
+            } else {
+                let status = resp.status();
+                let body = resp.text().await.unwrap_or_default();
+                (None, Some(format!("API error {}: {}", status, body)))
+            }
+        }
+        Err(e) => (None, Some(format!("Request failed: {}", e))),
+    };
+
+    // Update session with results
     let mut sessions = state.sessions.write().await;
     let session = sessions.get_mut(&session_id).ok_or(StatusCode::NOT_FOUND)?;
 
-    // Store the user message
-    session.add_user_message(req.message.clone());
-
-    // For now, respond with a placeholder - LLM integration can be added later
-    session.add_agent_message(
-        "DSL chat processing is being upgraded. Please use the execute endpoint directly with DSL."
-            .to_string(),
-        None,
-        None,
-    );
+    let (response_msg, can_execute, assembled) = match (&dsl_result, &error_msg) {
+        (Some(dsl), None) => {
+            // Success - store DSL in session
+            session.assembled_dsl = vec![dsl.clone()];
+            session.state = SessionState::ReadyToExecute;
+            session.add_agent_message(
+                "DSL generated successfully. Ready to execute.".to_string(),
+                None,
+                Some(dsl.clone()),
+            );
+            (
+                "DSL generated successfully. Ready to execute.".to_string(),
+                true,
+                Some(crate::api::intent::AssembledDsl {
+                    statements: vec![dsl.clone()],
+                    combined: dsl.clone(),
+                    intent_count: 1,
+                }),
+            )
+        }
+        (Some(dsl), Some(err)) => {
+            // DSL generated but has validation errors
+            session.assembled_dsl = vec![dsl.clone()];
+            session.state = SessionState::PendingValidation;
+            session.add_agent_message(
+                format!("DSL generated with warnings: {}", err),
+                None,
+                Some(dsl.clone()),
+            );
+            (
+                format!("DSL generated with warnings: {}", err),
+                false,
+                Some(crate::api::intent::AssembledDsl {
+                    statements: vec![dsl.clone()],
+                    combined: dsl.clone(),
+                    intent_count: 1,
+                }),
+            )
+        }
+        (None, Some(err)) => {
+            // Generation failed
+            session.add_agent_message(format!("Error: {}", err), None, None);
+            (format!("Error: {}", err), false, None)
+        }
+        (None, None) => {
+            session.add_agent_message("Unknown error occurred".to_string(), None, None);
+            ("Unknown error occurred".to_string(), false, None)
+        }
+    };
 
     Ok(Json(ChatResponse {
-        message: "Chat received. Direct DSL execution is available via /execute endpoint."
-            .to_string(),
+        message: response_msg,
         intents: vec![],
-        assembled_dsl: None,
+        assembled_dsl: assembled,
         validation_results: vec![],
         session_state: session.state.clone(),
-        can_execute: false,
+        can_execute,
     }))
 }
 
@@ -962,6 +1083,48 @@ fn build_vocab_prompt(domain: Option<&str>) -> String {
     }
 
     lines.join("\n")
+}
+
+/// Build system prompt for chat-based DSL generation
+fn build_chat_system_prompt(vocab: &str) -> String {
+    format!(
+        r#"You are a DSL generator for a KYC/AML onboarding system.
+Generate valid DSL S-expressions from natural language instructions.
+
+AVAILABLE VERBS:
+{}
+
+DSL SYNTAX:
+- Format: (domain.verb :key "value" :key2 value2)
+- Strings must be quoted: "text"
+- Numbers are unquoted: 42, 25.5
+- References start with @: @symbol_name (use underscores, not hyphens)
+- Use :as @name to capture results
+
+EXAMPLES:
+
+;; Create a CBU (Client Business Unit)
+(cbu.ensure :name "Acme Corp" :jurisdiction "GB" :client-type "corporate" :as @cbu)
+
+;; Create a person entity
+(entity.create-proper-person :first-name "John" :last-name "Smith" :date-of-birth "1980-01-15" :as @john)
+
+;; Create a company entity  
+(entity.create-limited-company :name "Holdings Ltd" :jurisdiction "GB" :as @company)
+
+;; Assign a role to an entity within a CBU
+(cbu.assign-role :cbu-id @cbu :entity-id @john :role "DIRECTOR")
+
+;; Create a fund with multiple entities
+(cbu.ensure :name "Growth Fund" :jurisdiction "LU" :client-type "fund" :as @fund)
+(entity.create-proper-person :first-name "Jane" :last-name "Doe" :as @jane)
+(entity.create-limited-company :name "Fund Manager SA" :jurisdiction "LU" :as @manager)
+(cbu.assign-role :cbu-id @fund :entity-id @jane :role "BENEFICIAL_OWNER")
+(cbu.assign-role :cbu-id @fund :entity-id @manager :role "INVESTMENT_MANAGER")
+
+Respond with ONLY the DSL code, no explanation or markdown. If you cannot generate valid DSL, respond with: ERROR: <reason>"#,
+        vocab
+    )
 }
 
 /// POST /api/agent/validate - Validate DSL syntax

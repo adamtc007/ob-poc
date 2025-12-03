@@ -2,11 +2,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"embed"
 	"encoding/json"
 	"flag"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 
@@ -21,14 +23,16 @@ var templates embed.FS
 var static embed.FS
 
 var (
-	rustURL string
-	client  *rustclient.Client
-	tmpl    *template.Template
+	rustURL  string
+	agentURL string
+	client   *rustclient.Client
+	tmpl     *template.Template
 )
 
 func main() {
 	addr := flag.String("addr", ":8181", "Listen address")
-	flag.StringVar(&rustURL, "rust-url", "", "Rust API URL (optional, default http://localhost:3001)")
+	flag.StringVar(&rustURL, "rust-url", "", "Rust DSL API URL (default http://localhost:3001)")
+	flag.StringVar(&agentURL, "agent-url", "http://localhost:3000", "Rust Agent API URL")
 	flag.Parse()
 
 	if rustURL != "" {
@@ -46,13 +50,16 @@ func main() {
 	http.HandleFunc("/api/run", handleRunSuite)
 	http.HandleFunc("/api/validate", handleValidate)
 	http.HandleFunc("/api/config", handleConfig)
+	// Agent proxy endpoints
+	http.HandleFunc("/api/agent/session", handleAgentSession)
+	http.HandleFunc("/api/agent/chat", handleAgentChat)
+	http.HandleFunc("/api/agent/generate", handleAgentGenerate)
+	http.HandleFunc("/api/agent/execute", handleAgentExecute)
 	http.Handle("/static/", http.FileServer(http.FS(static)))
 
-	if rustURL != "" {
-		log.Printf("Starting server on %s (Rust API: %s)", *addr, rustURL)
-	} else {
-		log.Printf("Starting server on %s (standalone mode - no Rust API)", *addr)
-	}
+	log.Printf("Starting server on %s", *addr)
+	log.Printf("  DSL API: %s", rustURL)
+	log.Printf("  Agent API: %s", agentURL)
 	log.Fatal(http.ListenAndServe(*addr, nil))
 }
 
@@ -66,11 +73,19 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 		verbs, _ = client.ListVerbs(ctx)
 	}
 
+	// Check agent health for connected status
+	agentHealthy := false
+	if resp, err := http.Get(agentURL + "/api/agent/health"); err == nil {
+		resp.Body.Close()
+		agentHealthy = resp.StatusCode == 200
+	}
+
 	data := map[string]any{
 		"Health":    health,
 		"Verbs":     verbs,
 		"RustURL":   rustURL,
-		"Connected": client != nil && health != nil,
+		"AgentURL":  agentURL,
+		"Connected": agentHealthy,
 	}
 	if err := tmpl.ExecuteTemplate(w, "index.html", data); err != nil {
 		http.Error(w, err.Error(), 500)
@@ -80,22 +95,24 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 func handleConfig(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		var req struct {
-			RustURL string `json:"rust_url"`
+			RustURL  string `json:"rust_url"`
+			AgentURL string `json:"agent_url"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			jsonError(w, err.Error(), 400)
 			return
 		}
-		rustURL = req.RustURL
-		if rustURL != "" {
+		if req.RustURL != "" {
+			rustURL = req.RustURL
 			client = rustclient.NewClient(rustURL)
-		} else {
-			client = nil
 		}
-		jsonResponse(w, map[string]string{"status": "ok", "rust_url": rustURL})
+		if req.AgentURL != "" {
+			agentURL = req.AgentURL
+		}
+		jsonResponse(w, map[string]string{"status": "ok", "rust_url": rustURL, "agent_url": agentURL})
 		return
 	}
-	jsonResponse(w, map[string]any{"rust_url": rustURL, "connected": client != nil})
+	jsonResponse(w, map[string]any{"rust_url": rustURL, "agent_url": agentURL, "connected": client != nil})
 }
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -169,6 +186,54 @@ func handleRunSuite(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, result)
 }
 
+// Agent proxy: create session
+func handleAgentSession(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "POST required", 405)
+		return
+	}
+
+	resp, err := http.Post(agentURL+"/api/session", "application/json", bytes.NewReader([]byte("{}")))
+	if err != nil {
+		jsonError(w, "Agent connection failed: "+err.Error(), 503)
+		return
+	}
+	defer resp.Body.Close()
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(resp.StatusCode)
+	io.Copy(w, resp.Body)
+}
+
+// Agent proxy: chat
+func handleAgentChat(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "POST required", 405)
+		return
+	}
+
+	var req struct {
+		SessionID string `json:"session_id"`
+		Message   string `json:"message"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, err.Error(), 400)
+		return
+	}
+
+	body, _ := json.Marshal(map[string]string{"message": req.Message})
+	resp, err := http.Post(agentURL+"/api/session/"+req.SessionID+"/chat", "application/json", bytes.NewReader(body))
+	if err != nil {
+		jsonError(w, "Agent connection failed: "+err.Error(), 503)
+		return
+	}
+	defer resp.Body.Close()
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(resp.StatusCode)
+	io.Copy(w, resp.Body)
+}
+
 func jsonResponse(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(v)
@@ -178,4 +243,62 @@ func jsonError(w http.ResponseWriter, msg string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+
+// Agent proxy: generate DSL from natural language
+func handleAgentGenerate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "POST required", 405)
+		return
+	}
+
+	var req struct {
+		Instruction string `json:"instruction"`
+		Domain      string `json:"domain,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, err.Error(), 400)
+		return
+	}
+
+	body, _ := json.Marshal(req)
+	resp, err := http.Post(agentURL+"/api/agent/generate", "application/json", bytes.NewReader(body))
+	if err != nil {
+		jsonError(w, "Agent connection failed: "+err.Error(), 503)
+		return
+	}
+	defer resp.Body.Close()
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(resp.StatusCode)
+	io.Copy(w, resp.Body)
+}
+
+// Agent proxy: execute DSL
+func handleAgentExecute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "POST required", 405)
+		return
+	}
+
+	var req struct {
+		SessionID string `json:"session_id"`
+		DSL       string `json:"dsl"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, err.Error(), 400)
+		return
+	}
+
+	body, _ := json.Marshal(map[string]string{"dsl": req.DSL})
+	resp, err := http.Post(agentURL+"/api/session/"+req.SessionID+"/execute", "application/json", bytes.NewReader(body))
+	if err != nil {
+		jsonError(w, "Agent connection failed: "+err.Error(), 503)
+		return
+	}
+	defer resp.Body.Close()
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(resp.StatusCode)
+	io.Copy(w, resp.Body)
 }

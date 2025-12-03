@@ -79,8 +79,8 @@ func main() {
 			status = "FAIL"
 		}
 		fmt.Printf("[%s] %s (%v)\n", status, r.Case, r.Duration)
-		if r.Error != nil {
-			fmt.Printf("       Error: %v\n", r.Error)
+		if r.Error != "" {
+			fmt.Printf("       Error: %s\n", r.Error)
 		}
 	}
 

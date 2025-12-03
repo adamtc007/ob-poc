@@ -39,24 +39,24 @@ type Expectation struct {
 
 // Result captures test execution results.
 type Result struct {
-	Suite      string
-	Case       string
-	Passed     bool
-	Duration   time.Duration
-	Error      error
-	Response   *rustclient.ExecuteResponse
-	Skipped    bool
-	SkipReason string
+	Suite      string                       `json:"suite,omitempty"`
+	Case       string                       `json:"case"`
+	Passed     bool                         `json:"passed"`
+	Duration   time.Duration                `json:"duration"`
+	Error      string                       `json:"error,omitempty"`
+	Response   *rustclient.ExecuteResponse  `json:"response,omitempty"`
+	Skipped    bool                         `json:"skipped,omitempty"`
+	SkipReason string                       `json:"skip_reason,omitempty"`
 }
 
 // SuiteResult aggregates results for a suite.
 type SuiteResult struct {
-	Name       string
-	Passed     int
-	Failed     int
-	Skipped    int
-	Duration   time.Duration
-	Results    []Result
+	Name       string        `json:"name"`
+	Passed     int           `json:"passed"`
+	Failed     int           `json:"failed"`
+	Skipped    int           `json:"skipped"`
+	Duration   time.Duration                `json:"duration"`
+	Results    []Result      `json:"results"`
 	CreatedIDs []uuid.UUID // Track created CBU IDs for cleanup
 }
 
@@ -144,7 +144,7 @@ func (r *Runner) runCase(ctx context.Context, tc Case) Result {
 	result.Response = resp
 
 	if err != nil {
-		result.Error = err
+		result.Error = err.Error()
 		result.Passed = false
 		return result
 	}
@@ -156,7 +156,7 @@ func (r *Runner) runCase(ctx context.Context, tc Case) Result {
 
 	// Check expectations
 	if resp.Success != tc.Expect.Success {
-		result.Error = fmt.Errorf("expected success=%v, got %v", tc.Expect.Success, resp.Success)
+		result.Error = fmt.Sprintf("expected success=%v, got %v", tc.Expect.Success, resp.Success)
 		result.Passed = false
 		return result
 	}
@@ -170,7 +170,7 @@ func (r *Runner) runCase(ctx context.Context, tc Case) Result {
 			}
 		}
 		if !found {
-			result.Error = fmt.Errorf("expected error containing %q", *tc.Expect.ErrorContains)
+			result.Error = fmt.Sprintf("expected error containing %q", *tc.Expect.ErrorContains)
 			result.Passed = false
 			return result
 		}
@@ -184,7 +184,7 @@ func (r *Runner) runCase(ctx context.Context, tc Case) Result {
 			}
 		}
 		if count != *tc.Expect.EntityCount {
-			result.Error = fmt.Errorf("expected %d entities, got %d", *tc.Expect.EntityCount, count)
+			result.Error = fmt.Sprintf("expected %d entities, got %d", *tc.Expect.EntityCount, count)
 			result.Passed = false
 			return result
 		}
@@ -192,7 +192,7 @@ func (r *Runner) runCase(ctx context.Context, tc Case) Result {
 
 	if tc.Expect.Validate != nil {
 		if err := tc.Expect.Validate(resp); err != nil {
-			result.Error = err
+			result.Error = err.Error()
 			result.Passed = false
 			return result
 		}
