@@ -41,6 +41,10 @@ domains:
             type: uuid
             required: false
             maps_to: commercial_client_entity_id
+          - name: product-id
+            type: uuid
+            required: false
+            maps_to: product_id
         returns:
           type: uuid
           name: cbu_id
@@ -94,6 +98,10 @@ domains:
             type: uuid
             required: false
             maps_to: commercial_client_entity_id
+          - name: product-id
+            type: uuid
+            required: false
+            maps_to: product_id
         returns:
           type: affected
 
@@ -174,6 +182,10 @@ domains:
             type: uuid
             required: false
             maps_to: commercial_client_entity_id
+          - name: product-id
+            type: uuid
+            required: false
+            maps_to: product_id
         returns:
           type: uuid
           name: cbu_id

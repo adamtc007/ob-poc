@@ -1092,6 +1092,7 @@ The central entity representing a client relationship.
 | semantic_context | jsonb | | '{}' | AI/semantic context |
 | embedding | vector | | | pgvector embedding |
 | commercial_client_entity_id | uuid | YES | | FK to entities - head office that contracted with bank |
+| product_id | uuid | YES | | FK to products - primary product for this CBU |
 | created_at | timestamptz | | now() | |
 | updated_at | timestamptz | | now() | |
 
@@ -1409,6 +1410,20 @@ Conflicts between observations requiring resolution.
 | accepted_observation_id | uuid | FK to observation chosen as correct |
 
 ## Products & Services
+
+### Reference Data Summary (as of 2025-12-03)
+
+| Entity | Count |
+|--------|-------|
+| Products | 7 |
+| Services | 30 |
+| Service Resource Types | 22 |
+| Product-Service Mappings | 32 |
+
+**Products**: Alternatives, Collateral Management, Custody, Fund Accounting, Markets FX, Middle Office, Transfer Agency
+
+**Service Resource Types**: ALTS_GENEVA, ALTS_PRADO, APAC_CLEAR, CA_PLATFORM, COLLATERAL_GLOBAL1, CUSTODY_ACCT, CUSTODY_GSP, CUSTODY_IMMS, CUSTODY_SMARTSTREAM, CUSTODY_SWIFT, DTCC_SETTLE, EUROCLEAR, FA_EAGLE, FA_INVESTONE, IBOR_SYSTEM, INVESTOR_LEDGER, NAV_ENGINE, PNL_ENGINE, REPORTING_HUB, RUFUS_TA, SETTLE_ACCT, SWIFT_CONN
+
 
 ### products
 
