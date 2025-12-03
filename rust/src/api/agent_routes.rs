@@ -279,11 +279,14 @@ async fn create_session(
         sessions.insert(session_id, session);
     }
 
-    // Persist to database (non-blocking, log errors but don't fail)
+    // Persist to database asynchronously (simple insert, ~1-5ms)
     let session_repo = state.session_repo.clone();
     tokio::spawn(async move {
-        if let Err(e) = session_repo.create_session(None, None).await {
-            tracing::warn!("Failed to persist session to DB: {}", e);
+        if let Err(e) = session_repo
+            .create_session_with_id(session_id, None, None)
+            .await
+        {
+            tracing::error!("Failed to persist session {}: {}", session_id, e);
         }
     });
 
@@ -667,9 +670,14 @@ async fn execute_session_dsl(
                 let mut entity_id: Option<Uuid> = None;
                 if let DslV2Result::Uuid(uuid) = exec_result {
                     entity_id = Some(*uuid);
-                    // Update context
-                    context.last_cbu_id = Some(*uuid);
-                    context.cbu_ids.push(*uuid);
+
+                    // Only set last_cbu_id if this was a cbu.* verb
+                    if let Some(step) = plan.steps.get(idx) {
+                        if step.verb_call.domain == "cbu" {
+                            context.last_cbu_id = Some(*uuid);
+                            context.cbu_ids.push(*uuid);
+                        }
+                    }
                 }
 
                 results.push(ExecutionResult {
@@ -786,48 +794,53 @@ async fn execute_session_dsl(
         let primary_domain = crate::database::detect_domain(&dsl_clone);
         let execution_ms = start_time.elapsed().as_millis() as i32;
 
-        // Persist snapshot asynchronously (don't block response)
+        // Persist snapshot asynchronously (simple insert, ~1-5ms)
         tokio::spawn(async move {
-            // Save snapshot
+            // Insert snapshot
             if let Err(e) = session_repo
                 .save_snapshot(
                     session_id,
                     &dsl_clone,
                     &bindings_clone,
-                    &[], // entities_created - could be populated from results
+                    &[],
                     &domains,
                     Some(execution_ms),
                 )
                 .await
             {
-                tracing::warn!("Failed to save DSL snapshot: {}", e);
+                tracing::error!("Failed to save snapshot for session {}: {}", session_id, e);
             }
 
-            // Update session bindings and domain context
+            // Update session bindings
             if let Err(e) = session_repo
                 .update_bindings(
                     session_id,
                     &bindings_clone,
                     cbu_id,
-                    None, // kyc_case_id
+                    None,
                     primary_domain.as_deref(),
                 )
                 .await
             {
-                tracing::warn!("Failed to update session bindings: {}", e);
+                tracing::error!(
+                    "Failed to update bindings for session {}: {}",
+                    session_id,
+                    e
+                );
             }
         });
     } else {
-        // Log error to session
+        // Log error to session asynchronously
         let session_repo = state.session_repo.clone();
         let error_msg = errors.join("; ");
+        let dsl_clone = dsl.clone();
         tokio::spawn(async move {
             let _ = session_repo.record_error(session_id, &error_msg).await;
             let _ = session_repo
                 .log_event(
                     session_id,
                     crate::database::SessionEventType::ExecuteFailed,
-                    Some(&dsl),
+                    Some(&dsl_clone),
                     Some(&error_msg),
                     None,
                 )

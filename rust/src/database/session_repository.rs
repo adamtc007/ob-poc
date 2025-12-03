@@ -154,13 +154,13 @@ impl SessionRepository {
     // Session CRUD
     // ------------------------------------------------------------------------
 
-    /// Create a new session
-    pub async fn create_session(
+    /// Create a new session with a specific ID
+    pub async fn create_session_with_id(
         &self,
+        session_id: Uuid,
         client_type: Option<&str>,
         jurisdiction: Option<&str>,
     ) -> Result<PersistedSession, sqlx::Error> {
-        let session_id = Uuid::new_v4();
         let now = Utc::now();
         let expires_at = now + chrono::Duration::hours(24);
 
