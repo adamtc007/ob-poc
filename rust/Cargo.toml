@@ -101,6 +101,11 @@ name = "run_e2e_tests"
 path = "src/bin/run_e2e_tests.rs"
 required-features = ["database"]
 
+[[bin]]
+name = "dsl_api"
+path = "src/bin/dsl_api.rs"
+required-features = ["server"]
+
 # Features for conditional compilation
 [features]
 default = []

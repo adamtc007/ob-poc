@@ -2,10 +2,12 @@
 package rustclient
 
 import (
-	"time"
-
 	"github.com/google/uuid"
 )
+
+// =============================================================================
+// Graph Types (for visualization)
+// =============================================================================
 
 // CbuGraph is the graph projection of a CBU for visualization.
 type CbuGraph struct {
@@ -121,14 +123,4 @@ type GraphStats struct {
 	TotalEdges   int            `json:"total_edges"`
 	NodesByLayer map[string]int `json:"nodes_by_layer"`
 	NodesByType  map[string]int `json:"nodes_by_type"`
-}
-
-// CbuSummary for list views.
-type CbuSummary struct {
-	CbuID        uuid.UUID  `json:"cbu_id"`
-	Name         string     `json:"name"`
-	Jurisdiction *string    `json:"jurisdiction,omitempty"`
-	ClientType   *string    `json:"client_type,omitempty"`
-	CreatedAt    *time.Time `json:"created_at,omitempty"`
-	UpdatedAt    *time.Time `json:"updated_at,omitempty"`
 }

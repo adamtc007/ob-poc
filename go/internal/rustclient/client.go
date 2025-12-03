@@ -37,29 +37,16 @@ func (c *Client) WithTimeout(d time.Duration) *Client {
 // Health checks API health.
 func (c *Client) Health(ctx context.Context) (*HealthResponse, error) {
 	var resp HealthResponse
-	if err := c.get(ctx, "/api/agent/health", &resp); err != nil {
+	if err := c.get(ctx, "/health", &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-// ListDomains returns available DSL domains.
-func (c *Client) ListDomains(ctx context.Context) (*DomainsResponse, error) {
-	var resp DomainsResponse
-	if err := c.get(ctx, "/api/agent/domains", &resp); err != nil {
-		return nil, err
-	}
-	return &resp, nil
-}
-
-// GetVocabulary returns verb vocabulary, optionally filtered by domain.
-func (c *Client) GetVocabulary(ctx context.Context, domain *string) (*VocabResponse, error) {
-	path := "/api/agent/vocabulary"
-	if domain != nil {
-		path += "?domain=" + *domain
-	}
-	var resp VocabResponse
-	if err := c.get(ctx, path, &resp); err != nil {
+// ListVerbs returns all available verbs.
+func (c *Client) ListVerbs(ctx context.Context) (*VerbsResponse, error) {
+	var resp VerbsResponse
+	if err := c.get(ctx, "/verbs", &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -69,38 +56,17 @@ func (c *Client) GetVocabulary(ctx context.Context, domain *string) (*VocabRespo
 func (c *Client) ValidateDSL(ctx context.Context, dsl string) (*ValidationResult, error) {
 	req := ValidateDSLRequest{DSL: dsl}
 	var resp ValidationResult
-	if err := c.post(ctx, "/api/agent/validate", req, &resp); err != nil {
+	if err := c.post(ctx, "/validate", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-// GenerateDSL generates DSL from natural language.
-func (c *Client) GenerateDSL(ctx context.Context, instruction string, domain *string) (*GenerateDSLResponse, error) {
-	req := GenerateDSLRequest{Instruction: instruction, Domain: domain}
-	var resp GenerateDSLResponse
-	if err := c.post(ctx, "/api/agent/generate", req, &resp); err != nil {
-		return nil, err
-	}
-	return &resp, nil
-}
-
-// CreateSession creates a new session.
-func (c *Client) CreateSession(ctx context.Context, domainHint *string) (*CreateSessionResponse, error) {
-	req := CreateSessionRequest{DomainHint: domainHint}
-	var resp CreateSessionResponse
-	if err := c.post(ctx, "/api/session", req, &resp); err != nil {
-		return nil, err
-	}
-	return &resp, nil
-}
-
-// ExecuteDSL executes DSL in a session.
-func (c *Client) ExecuteDSL(ctx context.Context, sessionID uuid.UUID, dsl string) (*ExecuteResponse, error) {
+// ExecuteDSL executes DSL and returns results with bindings.
+func (c *Client) ExecuteDSL(ctx context.Context, dsl string) (*ExecuteResponse, error) {
 	req := ExecuteDSLRequest{DSL: dsl}
 	var resp ExecuteResponse
-	path := fmt.Sprintf("/api/session/%s/execute", sessionID)
-	if err := c.post(ctx, path, req, &resp); err != nil {
+	if err := c.post(ctx, "/execute", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -109,17 +75,37 @@ func (c *Client) ExecuteDSL(ctx context.Context, sessionID uuid.UUID, dsl string
 // ListCBUs returns all CBUs.
 func (c *Client) ListCBUs(ctx context.Context) ([]CbuSummary, error) {
 	var resp []CbuSummary
-	if err := c.get(ctx, "/api/cbus", &resp); err != nil {
+	if err := c.get(ctx, "/query/cbus", &resp); err != nil {
 		return nil, err
 	}
 	return resp, nil
 }
 
-// GetCBUGraph returns graph data for a CBU.
-func (c *Client) GetCBUGraph(ctx context.Context, cbuID uuid.UUID) (*CbuGraph, error) {
-	var resp CbuGraph
-	path := fmt.Sprintf("/api/cbus/%s/graph", cbuID)
+// GetCBU returns a CBU with full details (entities, roles).
+func (c *Client) GetCBU(ctx context.Context, cbuID uuid.UUID) (*CbuDetail, error) {
+	var resp CbuDetail
+	path := fmt.Sprintf("/query/cbus/%s", cbuID)
 	if err := c.get(ctx, path, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// GetKYCCase returns a KYC case with workstreams and flags.
+func (c *Client) GetKYCCase(ctx context.Context, caseID uuid.UUID) (*KycCaseDetail, error) {
+	var resp KycCaseDetail
+	path := fmt.Sprintf("/query/kyc/cases/%s", caseID)
+	if err := c.get(ctx, path, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// CleanupCBU deletes a CBU and all related data.
+func (c *Client) CleanupCBU(ctx context.Context, cbuID uuid.UUID) (*CleanupResponse, error) {
+	var resp CleanupResponse
+	path := fmt.Sprintf("/cleanup/cbu/%s", cbuID)
+	if err := c.delete(ctx, path, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -143,6 +129,14 @@ func (c *Client) post(ctx context.Context, path string, body, result any) error 
 		return fmt.Errorf("creating request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	return c.do(req, result)
+}
+
+func (c *Client) delete(ctx context.Context, path string, result any) error {
+	req, err := http.NewRequestWithContext(ctx, "DELETE", c.baseURL+path, nil)
+	if err != nil {
+		return fmt.Errorf("creating request: %w", err)
+	}
 	return c.do(req, result)
 }
 

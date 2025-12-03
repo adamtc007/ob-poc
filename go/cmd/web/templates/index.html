@@ -9,17 +9,20 @@
         .card { background: white; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .status { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.875rem; }
         .status.ok { background: #d4edda; color: #155724; }
+        .status.warn { background: #fff3cd; color: #856404; }
         .status.error { background: #f8d7da; color: #721c24; }
         textarea { width: 100%; height: 200px; font-family: monospace; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; }
+        input[type="text"] { padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; width: 300px; }
         button { background: #007bff; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; }
         button:hover { background: #0056b3; }
+        button.secondary { background: #6c757d; }
+        button.secondary:hover { background: #545b62; }
         .results { margin-top: 1rem; }
         .result { padding: 0.5rem; border-left: 3px solid #ddd; margin-bottom: 0.5rem; background: #fafafa; }
         .result.pass { border-color: #28a745; }
         .result.fail { border-color: #dc3545; }
-        .result.skip { border-color: #ffc107; }
-        pre { background: #f4f4f4; padding: 1rem; overflow-x: auto; border-radius: 4px; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .config-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem; }
         @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
     </style>
 </head>
@@ -28,17 +31,26 @@
         <h1>DSL Test Harness</h1>
         
         <div class="card">
-            <h2>API Status</h2>
-            {{if .Health}}
-            <p>
-                <span class="status ok">{{.Health.Status}}</span>
-                Version: {{.Health.Version}} | 
-                Verbs: {{.Health.VerbCount}} |
-                Domains: {{.Health.DomainCount}}
-            </p>
-            {{else}}
-            <p><span class="status error">API Unreachable</span> ({{.RustURL}})</p>
-            {{end}}
+            <h2>Rust API Connection</h2>
+            <div class="config-row">
+                <input type="text" id="rust-url" placeholder="http://localhost:3001" value="{{.RustURL}}">
+                <button onclick="connectRust()">Connect</button>
+                <button class="secondary" onclick="disconnectRust()">Disconnect</button>
+            </div>
+            <div id="api-status">
+                {{if .Connected}}
+                <p>
+                    <span class="status ok">Connected</span>
+                    {{if .Health}}
+                    Version: {{.Health.Version}} | Verbs: {{.Health.VerbCount}}
+                    {{end}}
+                </p>
+                {{else if .RustURL}}
+                <p><span class="status error">Disconnected</span> Cannot reach {{.RustURL}}</p>
+                {{else}}
+                <p><span class="status warn">Standalone Mode</span> Enter Rust API URL to connect (default: http://localhost:3001)</p>
+                {{end}}
+            </div>
         </div>
 
         <div class="grid">
@@ -50,29 +62,51 @@
             </div>
 
             <div class="card">
-                <h2>Run Test Case</h2>
+                <h2>Execute DSL</h2>
                 <textarea id="test-dsl" placeholder="(cbu.ensure :name &quot;Test Fund&quot; :jurisdiction &quot;LU&quot; :client-type &quot;fund&quot; :as @fund)"></textarea>
-                <button onclick="runTest()">Run Test</button>
+                <button onclick="runTest()">Execute</button>
                 <div id="test-result" class="results"></div>
             </div>
         </div>
 
-        {{if .Domains}}
+        {{if .Verbs}}
         <div class="card">
-            <h2>Available Domains ({{.Domains.TotalVerbs}} verbs)</h2>
-            <div class="grid">
-            {{range .Domains.Domains}}
-                <div>
-                    <strong>{{.Name}}</strong> ({{.VerbCount}} verbs)<br>
-                    <small>{{.Description}}</small>
-                </div>
-            {{end}}
-            </div>
+            <h2>Available Verbs ({{.Verbs.Total}} total)</h2>
+            <p><small>Use /verbs endpoint for full list</small></p>
         </div>
         {{end}}
     </div>
 
     <script>
+        async function connectRust() {
+            const url = document.getElementById('rust-url').value || 'http://localhost:3001';
+            try {
+                const resp = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({rust_url: url})
+                });
+                if (resp.ok) {
+                    location.reload();
+                }
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        async function disconnectRust() {
+            try {
+                await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({rust_url: ''})
+                });
+                location.reload();
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
         async function validateDSL() {
             const dsl = document.getElementById('validate-dsl').value;
             const result = document.getElementById('validate-result');
@@ -83,7 +117,9 @@
                     body: JSON.stringify({dsl})
                 });
                 const data = await resp.json();
-                if (data.valid) {
+                if (data.error) {
+                    result.innerHTML = '<div class="result fail">' + data.error + '</div>';
+                } else if (data.valid) {
                     result.innerHTML = '<div class="result pass">Valid DSL</div>';
                 } else {
                     result.innerHTML = '<div class="result fail">Invalid: ' + 
@@ -106,13 +142,19 @@
                     })
                 });
                 const data = await resp.json();
+                if (data.error) {
+                    result.innerHTML = '<div class="result fail">' + data.error + '</div>';
+                    return;
+                }
                 let html = '<p>Duration: ' + data.Duration + '</p>';
-                data.Results.forEach(r => {
-                    const cls = r.Passed ? 'pass' : 'fail';
-                    html += '<div class="result ' + cls + '">' + r.Case;
-                    if (r.Error) html += '<br><small>' + r.Error + '</small>';
-                    html += '</div>';
-                });
+                if (data.Results) {
+                    data.Results.forEach(r => {
+                        const cls = r.Passed ? 'pass' : 'fail';
+                        html += '<div class="result ' + cls + '">' + r.Case;
+                        if (r.Error) html += '<br><small>' + r.Error + '</small>';
+                        html += '</div>';
+                    });
+                }
                 result.innerHTML = html;
             } catch (e) {
                 result.innerHTML = '<div class="result fail">Error: ' + e.message + '</div>';

@@ -6,85 +6,17 @@ import (
 	"github.com/google/uuid"
 )
 
-// SessionState represents session lifecycle.
-type SessionState string
-
-const (
-	SessionStateNew               SessionState = "new"
-	SessionStatePendingValidation SessionState = "pending_validation"
-	SessionStateReadyToExecute    SessionState = "ready_to_execute"
-	SessionStateExecuting         SessionState = "executing"
-	SessionStateExecuted          SessionState = "executed"
-	SessionStateClosed            SessionState = "closed"
-)
-
-// ValidationResult from DSL validation.
-type ValidationResult struct {
-	Valid    bool              `json:"valid"`
-	Errors   []ValidationError `json:"errors"`
-	Warnings []string          `json:"warnings"`
+// HealthResponse from /health
+type HealthResponse struct {
+	Status    string `json:"status"`
+	Version   string `json:"version"`
+	VerbCount int    `json:"verb_count"`
 }
 
-// ValidationError details.
-type ValidationError struct {
-	Line       *int    `json:"line,omitempty"`
-	Column     *int    `json:"column,omitempty"`
-	Message    string  `json:"message"`
-	Suggestion *string `json:"suggestion,omitempty"`
-}
-
-// ExecutionResult from DSL execution.
-type ExecutionResult struct {
-	StatementIndex int        `json:"statement_index"`
-	DSL            string     `json:"dsl"`
-	Success        bool       `json:"success"`
-	Message        string     `json:"message"`
-	EntityID       *uuid.UUID `json:"entity_id,omitempty"`
-	EntityType     *string    `json:"entity_type,omitempty"`
-}
-
-// ExecuteResponse from /api/session/:id/execute
-type ExecuteResponse struct {
-	Success  bool              `json:"success"`
-	Results  []ExecutionResult `json:"results"`
-	Errors   []string          `json:"errors"`
-	NewState SessionState      `json:"new_state"`
-}
-
-// ValidateDSLRequest for /api/agent/validate
-type ValidateDSLRequest struct {
-	DSL string `json:"dsl"`
-}
-
-// GenerateDSLRequest for /api/agent/generate
-type GenerateDSLRequest struct {
-	Instruction string  `json:"instruction"`
-	Domain      *string `json:"domain,omitempty"`
-}
-
-// GenerateDSLResponse from /api/agent/generate
-type GenerateDSLResponse struct {
-	DSL         *string `json:"dsl,omitempty"`
-	Explanation *string `json:"explanation,omitempty"`
-	Error       *string `json:"error,omitempty"`
-}
-
-// DomainsResponse from /api/agent/domains
-type DomainsResponse struct {
-	Domains    []DomainInfo `json:"domains"`
-	TotalVerbs int          `json:"total_verbs"`
-}
-
-// DomainInfo describes a DSL domain.
-type DomainInfo struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	VerbCount   int    `json:"verb_count"`
-}
-
-// VocabResponse from /api/agent/vocabulary
-type VocabResponse struct {
+// VerbsResponse from /verbs
+type VerbsResponse struct {
 	Verbs []VerbInfo `json:"verbs"`
+	Total int        `json:"total"`
 }
 
 // VerbInfo describes a DSL verb.
@@ -97,37 +29,104 @@ type VerbInfo struct {
 	OptionalArgs []string `json:"optional_args"`
 }
 
-// HealthResponse from /api/agent/health
-type HealthResponse struct {
-	Status      string `json:"status"`
-	Version     string `json:"version"`
-	VerbCount   int    `json:"verb_count"`
-	DomainCount int    `json:"domain_count"`
+// ValidateDSLRequest for /validate
+type ValidateDSLRequest struct {
+	DSL string `json:"dsl"`
 }
 
-// CreateSessionRequest for POST /api/session
-type CreateSessionRequest struct {
-	DomainHint *string `json:"domain_hint,omitempty"`
+// ValidationResult from /validate
+type ValidationResult struct {
+	Valid  bool              `json:"valid"`
+	Errors []ValidationError `json:"errors"`
 }
 
-// CreateSessionResponse from POST /api/session
-type CreateSessionResponse struct {
-	SessionID uuid.UUID    `json:"session_id"`
-	CreatedAt time.Time    `json:"created_at"`
-	State     SessionState `json:"state"`
+// ValidationError details.
+type ValidationError struct {
+	Message string `json:"message"`
 }
 
-// SessionContext maintained across session.
-type SessionContext struct {
-	LastCbuID    *uuid.UUID           `json:"last_cbu_id,omitempty"`
-	LastEntityID *uuid.UUID           `json:"last_entity_id,omitempty"`
-	CbuIDs       []uuid.UUID          `json:"cbu_ids"`
-	EntityIDs    []uuid.UUID          `json:"entity_ids"`
-	DomainHint   *string              `json:"domain_hint,omitempty"`
-	NamedRefs    map[string]uuid.UUID `json:"named_refs"`
-}
-
-// ExecuteDSLRequest for POST /api/session/:id/execute
+// ExecuteDSLRequest for /execute
 type ExecuteDSLRequest struct {
 	DSL string `json:"dsl"`
+}
+
+// ExecuteResponse from /execute
+type ExecuteResponse struct {
+	Success  bool                 `json:"success"`
+	Results  []ExecuteResultItem  `json:"results"`
+	Bindings map[string]uuid.UUID `json:"bindings"`
+	Errors   []string             `json:"errors"`
+}
+
+// ExecuteResultItem for each statement.
+type ExecuteResultItem struct {
+	StatementIndex int        `json:"statement_index"`
+	Success        bool       `json:"success"`
+	Message        string     `json:"message"`
+	EntityID       *uuid.UUID `json:"entity_id,omitempty"`
+}
+
+// CbuSummary for list views.
+type CbuSummary struct {
+	CbuID        uuid.UUID `json:"cbu_id"`
+	Name         string    `json:"name"`
+	Jurisdiction *string   `json:"jurisdiction,omitempty"`
+	ClientType   *string   `json:"client_type,omitempty"`
+}
+
+// CbuDetail with full entity information.
+type CbuDetail struct {
+	CbuID        uuid.UUID    `json:"cbu_id"`
+	Name         string       `json:"name"`
+	Jurisdiction *string      `json:"jurisdiction,omitempty"`
+	ClientType   *string      `json:"client_type,omitempty"`
+	Description  *string      `json:"description,omitempty"`
+	CreatedAt    *time.Time   `json:"created_at,omitempty"`
+	UpdatedAt    *time.Time   `json:"updated_at,omitempty"`
+	Entities     []EntityRole `json:"entities"`
+}
+
+// EntityRole links entity to CBU with role.
+type EntityRole struct {
+	EntityID   uuid.UUID `json:"entity_id"`
+	Name       string    `json:"name"`
+	EntityType string    `json:"entity_type"`
+	Role       string    `json:"role"`
+}
+
+// KycCaseDetail with workstreams and flags.
+type KycCaseDetail struct {
+	CaseID      uuid.UUID          `json:"case_id"`
+	CbuID       uuid.UUID          `json:"cbu_id"`
+	Status      string             `json:"status"`
+	CaseType    *string            `json:"case_type,omitempty"`
+	RiskRating  *string            `json:"risk_rating,omitempty"`
+	OpenedAt    *time.Time         `json:"opened_at,omitempty"`
+	ClosedAt    *time.Time         `json:"closed_at,omitempty"`
+	Workstreams []WorkstreamDetail `json:"workstreams"`
+	RedFlags    []RedFlagDetail    `json:"red_flags"`
+}
+
+// WorkstreamDetail for entity workstream.
+type WorkstreamDetail struct {
+	WorkstreamID uuid.UUID  `json:"workstream_id"`
+	EntityID     uuid.UUID  `json:"entity_id"`
+	Status       string     `json:"status"`
+	IsUbo        *bool      `json:"is_ubo,omitempty"`
+	RiskRating   *string    `json:"risk_rating,omitempty"`
+}
+
+// RedFlagDetail for KYC red flag.
+type RedFlagDetail struct {
+	RedFlagID   uuid.UUID `json:"red_flag_id"`
+	FlagType    string    `json:"flag_type"`
+	Severity    string    `json:"severity"`
+	Status      string    `json:"status"`
+	Description string    `json:"description"`
+}
+
+// CleanupResponse from /cleanup/cbu/:id
+type CleanupResponse struct {
+	Deleted bool      `json:"deleted"`
+	CbuID   uuid.UUID `json:"cbu_id"`
 }

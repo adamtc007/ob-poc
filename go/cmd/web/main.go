@@ -6,7 +6,6 @@ import (
 	"embed"
 	"encoding/json"
 	"flag"
-	
 	"html/template"
 	"log"
 	"net/http"
@@ -29,10 +28,12 @@ var (
 
 func main() {
 	addr := flag.String("addr", ":8181", "Listen address")
-	flag.StringVar(&rustURL, "rust-url", "http://localhost:3000", "Rust API URL")
+	flag.StringVar(&rustURL, "rust-url", "", "Rust API URL (optional, default http://localhost:3001)")
 	flag.Parse()
 
-	client = rustclient.NewClient(rustURL)
+	if rustURL != "" {
+		client = rustclient.NewClient(rustURL)
+	}
 
 	var err error
 	tmpl, err = template.ParseFS(templates, "templates/*.html")
@@ -44,28 +45,64 @@ func main() {
 	http.HandleFunc("/health", handleHealth)
 	http.HandleFunc("/api/run", handleRunSuite)
 	http.HandleFunc("/api/validate", handleValidate)
+	http.HandleFunc("/api/config", handleConfig)
 	http.Handle("/static/", http.FileServer(http.FS(static)))
 
-	log.Printf("Starting server on %s (Rust API: %s)", *addr, rustURL)
+	if rustURL != "" {
+		log.Printf("Starting server on %s (Rust API: %s)", *addr, rustURL)
+	} else {
+		log.Printf("Starting server on %s (standalone mode - no Rust API)", *addr)
+	}
 	log.Fatal(http.ListenAndServe(*addr, nil))
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	health, _ := client.Health(ctx)
-	domains, _ := client.ListDomains(ctx)
+	var health *rustclient.HealthResponse
+	var verbs *rustclient.VerbsResponse
+
+	if client != nil {
+		ctx := r.Context()
+		health, _ = client.Health(ctx)
+		verbs, _ = client.ListVerbs(ctx)
+	}
 
 	data := map[string]any{
-		"Health":  health,
-		"Domains": domains,
-		"RustURL": rustURL,
+		"Health":    health,
+		"Verbs":     verbs,
+		"RustURL":   rustURL,
+		"Connected": client != nil && health != nil,
 	}
 	if err := tmpl.ExecuteTemplate(w, "index.html", data); err != nil {
 		http.Error(w, err.Error(), 500)
 	}
 }
 
+func handleConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		var req struct {
+			RustURL string `json:"rust_url"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			jsonError(w, err.Error(), 400)
+			return
+		}
+		rustURL = req.RustURL
+		if rustURL != "" {
+			client = rustclient.NewClient(rustURL)
+		} else {
+			client = nil
+		}
+		jsonResponse(w, map[string]string{"status": "ok", "rust_url": rustURL})
+		return
+	}
+	jsonResponse(w, map[string]any{"rust_url": rustURL, "connected": client != nil})
+}
+
 func handleHealth(w http.ResponseWriter, r *http.Request) {
+	if client == nil {
+		jsonError(w, "Rust API not configured", 503)
+		return
+	}
 	ctx := r.Context()
 	health, err := client.Health(ctx)
 	if err != nil {
@@ -78,6 +115,10 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 func handleValidate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "POST required", 405)
+		return
+	}
+	if client == nil {
+		jsonError(w, "Rust API not configured", 503)
 		return
 	}
 	var req struct {
@@ -99,6 +140,10 @@ func handleValidate(w http.ResponseWriter, r *http.Request) {
 func handleRunSuite(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "POST required", 405)
+		return
+	}
+	if rustURL == "" {
+		jsonError(w, "Rust API not configured", 503)
 		return
 	}
 

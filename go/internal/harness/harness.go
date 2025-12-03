@@ -39,31 +39,32 @@ type Expectation struct {
 
 // Result captures test execution results.
 type Result struct {
-	Suite     string
-	Case      string
-	Passed    bool
-	Duration  time.Duration
-	Error     error
-	Response  *rustclient.ExecuteResponse
-	Skipped   bool
+	Suite      string
+	Case       string
+	Passed     bool
+	Duration   time.Duration
+	Error      error
+	Response   *rustclient.ExecuteResponse
+	Skipped    bool
 	SkipReason string
 }
 
 // SuiteResult aggregates results for a suite.
 type SuiteResult struct {
-	Name     string
-	Passed   int
-	Failed   int
-	Skipped  int
-	Duration time.Duration
-	Results  []Result
+	Name       string
+	Passed     int
+	Failed     int
+	Skipped    int
+	Duration   time.Duration
+	Results    []Result
+	CreatedIDs []uuid.UUID // Track created CBU IDs for cleanup
 }
 
 // Runner executes test suites.
 type Runner struct {
-	client    *rustclient.Client
-	sessionID uuid.UUID
-	verbose   bool
+	client     *rustclient.Client
+	verbose    bool
+	createdIDs []uuid.UUID
 }
 
 // NewRunner creates a new test runner.
@@ -83,13 +84,7 @@ func (r *Runner) WithVerbose(v bool) *Runner {
 func (r *Runner) Run(ctx context.Context, suite Suite) (*SuiteResult, error) {
 	start := time.Now()
 	result := &SuiteResult{Name: suite.Name}
-
-	// Create session
-	sess, err := r.client.CreateSession(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("creating session: %w", err)
-	}
-	r.sessionID = sess.SessionID
+	r.createdIDs = nil
 
 	// Run setup if defined
 	if suite.Setup != nil {
@@ -114,13 +109,23 @@ func (r *Runner) Run(ctx context.Context, suite Suite) (*SuiteResult, error) {
 	// Run teardown if defined
 	if suite.Teardown != nil {
 		if err := suite.Teardown(ctx, r.client); err != nil {
-			// Log but don't fail
 			fmt.Printf("teardown warning: %v\n", err)
 		}
 	}
 
 	result.Duration = time.Since(start)
+	result.CreatedIDs = r.createdIDs
 	return result, nil
+}
+
+// Cleanup removes all CBUs created during tests.
+func (r *Runner) Cleanup(ctx context.Context, ids []uuid.UUID) error {
+	for _, id := range ids {
+		if _, err := r.client.CleanupCBU(ctx, id); err != nil {
+			return fmt.Errorf("cleanup CBU %s: %w", id, err)
+		}
+	}
+	return nil
 }
 
 func (r *Runner) runCase(ctx context.Context, tc Case) Result {
@@ -134,7 +139,7 @@ func (r *Runner) runCase(ctx context.Context, tc Case) Result {
 	}
 
 	// Execute DSL
-	resp, err := r.client.ExecuteDSL(ctx, r.sessionID, tc.DSL)
+	resp, err := r.client.ExecuteDSL(ctx, tc.DSL)
 	result.Duration = time.Since(start)
 	result.Response = resp
 
@@ -142,6 +147,11 @@ func (r *Runner) runCase(ctx context.Context, tc Case) Result {
 		result.Error = err
 		result.Passed = false
 		return result
+	}
+
+	// Track created IDs for cleanup
+	for _, id := range resp.Bindings {
+		r.createdIDs = append(r.createdIDs, id)
 	}
 
 	// Check expectations
@@ -193,11 +203,6 @@ func (r *Runner) runCase(ctx context.Context, tc Case) Result {
 }
 
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
-		(len(s) > 0 && len(substr) > 0 && searchString(s, substr)))
-}
-
-func searchString(s, substr string) bool {
 	for i := 0; i <= len(s)-len(substr); i++ {
 		if s[i:i+len(substr)] == substr {
 			return true
