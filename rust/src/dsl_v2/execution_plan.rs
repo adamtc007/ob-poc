@@ -63,7 +63,11 @@ pub struct Injection {
 #[derive(Debug, Clone)]
 pub enum CompileError {
     /// Verb not found in registry
-    UnknownVerb { domain: String, verb: String },
+    UnknownVerb {
+        domain: String,
+        verb: String,
+        suggestions: Vec<String>,
+    },
 
     /// Circular dependency detected
     CircularDependency { steps: Vec<usize> },
@@ -78,8 +82,17 @@ pub enum CompileError {
 impl std::fmt::Display for CompileError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CompileError::UnknownVerb { domain, verb } => {
-                write!(f, "Unknown verb: {}.{}", domain, verb)
+            CompileError::UnknownVerb {
+                domain,
+                verb,
+                suggestions,
+            } => {
+                write!(f, "Unknown verb: {}.{}", domain, verb)?;
+                if !suggestions.is_empty() {
+                    write!(f, "\n  Did you mean: {}?", suggestions[0])?;
+                    write!(f, "\n  Available verbs: {}", suggestions.join(", "))?;
+                }
+                Ok(())
             }
             CompileError::CircularDependency { steps } => {
                 write!(f, "Circular dependency between steps: {:?}", steps)
@@ -151,6 +164,52 @@ fn infer_parent_fk(parent_domain: &str, child_domain: &str) -> Option<&'static s
 // Compiler
 // ============================================================================
 
+/// Minimum similarity threshold for verb suggestions
+const VERB_SIMILARITY_THRESHOLD: f64 = 0.5;
+
+/// Get verb suggestions for an unknown verb using Jaro-Winkler similarity
+fn get_verb_suggestions(domain: &str, verb: &str) -> Vec<String> {
+    let reg = registry();
+
+    // First, check if the domain exists and get verbs from that domain
+    let domain_verbs: Vec<String> = reg
+        .verbs_for_domain(domain)
+        .into_iter()
+        .map(|v| format!("{}.{}", v.domain, v.verb))
+        .collect();
+
+    // If domain exists, suggest verbs from that domain
+    if !domain_verbs.is_empty() {
+        // Sort by Jaro-Winkler similarity (higher is better)
+        let mut scored: Vec<(String, f64)> = domain_verbs
+            .into_iter()
+            .map(|full_verb| {
+                let v = full_verb.split('.').nth(1).unwrap_or("");
+                let score = strsim::jaro_winkler(verb, v);
+                (full_verb, score)
+            })
+            .filter(|(_, score)| *score >= VERB_SIMILARITY_THRESHOLD)
+            .collect();
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        return scored.into_iter().take(5).map(|(v, _)| v).collect();
+    }
+
+    // Domain doesn't exist - suggest similar verbs from all domains
+    let full_verb = format!("{}.{}", domain, verb);
+
+    let mut scored: Vec<(String, f64)> = reg
+        .all_verbs()
+        .map(|v| {
+            let full = format!("{}.{}", v.domain, v.verb);
+            let score = strsim::jaro_winkler(&full_verb, &full);
+            (full, score)
+        })
+        .filter(|(_, score)| *score >= VERB_SIMILARITY_THRESHOLD)
+        .collect();
+    scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    scored.into_iter().take(5).map(|(v, _)| v).collect()
+}
+
 /// Compile an AST into an execution plan
 pub fn compile(program: &Program) -> Result<ExecutionPlan, CompileError> {
     let mut compiler = Compiler::new();
@@ -185,13 +244,15 @@ impl Compiler {
         parent: Option<ParentInfo>,
     ) -> Result<usize, CompileError> {
         // Look up verb in unified registry (includes both CRUD and custom ops)
-        let verb_def =
-            registry()
-                .get(&vc.domain, &vc.verb)
-                .ok_or_else(|| CompileError::UnknownVerb {
-                    domain: vc.domain.clone(),
-                    verb: vc.verb.clone(),
-                })?;
+        let verb_def = registry().get(&vc.domain, &vc.verb).ok_or_else(|| {
+            // Get suggestions for the unknown verb
+            let suggestions = get_verb_suggestions(&vc.domain, &vc.verb);
+            CompileError::UnknownVerb {
+                domain: vc.domain.clone(),
+                verb: vc.verb.clone(),
+                suggestions,
+            }
+        })?;
 
         // Build injections from parent
         let mut injections = Vec::new();

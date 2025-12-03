@@ -504,6 +504,7 @@ async fn execute_session_dsl(
             results: Vec::new(),
             errors: vec!["No DSL to execute".to_string()],
             new_state: current_state,
+            bindings: None,
         }));
     }
 
@@ -533,6 +534,10 @@ async fn execute_session_dsl(
     }
     if let Some(id) = context.last_entity_id {
         exec_ctx.bind("last_entity", id);
+    }
+    // Pre-bind all named references from previous executions
+    for (name, id) in &context.named_refs {
+        exec_ctx.bind(name, *id);
     }
 
     // =========================================================================
@@ -579,6 +584,7 @@ async fn execute_session_dsl(
                 results: Vec::new(),
                 errors: vec![parse_error],
                 new_state: current_state,
+                bindings: None,
             }));
         }
     };
@@ -627,6 +633,7 @@ async fn execute_session_dsl(
                 results: Vec::new(),
                 errors: vec![compile_error],
                 new_state: current_state,
+                bindings: None,
             }));
         }
     };
@@ -661,6 +668,15 @@ async fn execute_session_dsl(
                     entity_id,
                     entity_type: None,
                 });
+            }
+
+            // =========================================================================
+            // PERSIST SYMBOLS TO SESSION CONTEXT
+            // =========================================================================
+            // Copy all symbols from execution context back to session's named_refs
+            // This allows @cbu, @entity, etc. to be referenced in subsequent messages
+            for (name, id) in &exec_ctx.symbols {
+                context.named_refs.insert(name.clone(), *id);
             }
 
             // =========================================================================
@@ -743,6 +759,9 @@ async fn execute_session_dsl(
         }
     }
 
+    // Collect bindings to return to the client BEFORE moving context
+    let bindings_map: std::collections::HashMap<String, uuid::Uuid> = context.named_refs.clone();
+
     // Update session
     let new_state = {
         let mut sessions = state.sessions.write().await;
@@ -771,6 +790,11 @@ async fn execute_session_dsl(
         results,
         errors,
         new_state,
+        bindings: if bindings_map.is_empty() {
+            None
+        } else {
+            Some(bindings_map)
+        },
     }))
 }
 
@@ -1109,7 +1133,7 @@ EXAMPLES:
 ;; Create a person entity
 (entity.create-proper-person :first-name "John" :last-name "Smith" :date-of-birth "1980-01-15" :as @john)
 
-;; Create a company entity  
+;; Create a company entity
 (entity.create-limited-company :name "Holdings Ltd" :jurisdiction "GB" :as @company)
 
 ;; Assign a role to an entity within a CBU
@@ -1121,6 +1145,13 @@ EXAMPLES:
 (entity.create-limited-company :name "Fund Manager SA" :jurisdiction "LU" :as @manager)
 (cbu.assign-role :cbu-id @fund :entity-id @jane :role "BENEFICIAL_OWNER")
 (cbu.assign-role :cbu-id @fund :entity-id @manager :role "INVESTMENT_MANAGER")
+
+;; Record service delivery (product and service names MUST be quoted strings)
+(delivery.record :cbu-id @cbu :product "CUSTODY" :service "ASSET_SAFEKEEPING")
+(delivery.record :cbu-id @cbu :product "FUND_ADMIN" :service "NAV_CALCULATION")
+
+IMPORTANT: All string values with spaces or special characters MUST be quoted.
+Product codes are typically uppercase with underscores: "CUSTODY", "FUND_ADMIN", "PRIME_BROKERAGE"
 
 Respond with ONLY the DSL code, no explanation or markdown. If you cannot generate valid DSL, respond with: ERROR: <reason>"#,
         vocab

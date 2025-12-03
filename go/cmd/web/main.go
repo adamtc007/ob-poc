@@ -5,12 +5,12 @@ import (
 	"bytes"
 	"context"
 	"embed"
-	"encoding/json"
 	"flag"
 	"html/template"
-	"io"
 	"log"
 	"net/http"
+
+	"encoding/json"
 
 	"github.com/adamtc007/ob-poc/go/internal/harness"
 	"github.com/adamtc007/ob-poc/go/internal/rustclient"
@@ -31,8 +31,8 @@ var (
 
 func main() {
 	addr := flag.String("addr", ":8181", "Listen address")
-	flag.StringVar(&rustURL, "rust-url", "", "Rust DSL API URL (default http://localhost:3001)")
-	flag.StringVar(&agentURL, "agent-url", "http://localhost:3000", "Rust Agent API URL")
+	flag.StringVar(&rustURL, "rust-url", "http://127.0.0.1:3001", "Rust DSL API URL")
+	flag.StringVar(&agentURL, "agent-url", "http://127.0.0.1:3000", "Rust Agent API URL")
 	flag.Parse()
 
 	if rustURL != "" {
@@ -55,6 +55,14 @@ func main() {
 	http.HandleFunc("/api/agent/chat", handleAgentChat)
 	http.HandleFunc("/api/agent/generate", handleAgentGenerate)
 	http.HandleFunc("/api/agent/execute", handleAgentExecute)
+	// KYC case query endpoint (proxies to dsl_api)
+	http.HandleFunc("/api/kyc/case/", handleKycCase)
+	// Direct DSL execution (no session needed)
+	http.HandleFunc("/api/dsl/execute", handleDirectExecute)
+	http.HandleFunc("/api/dsl/analyze-errors", handleAnalyzeErrors)
+	http.HandleFunc("/api/dsl/validate-with-fixes", handleValidateWithFixes)
+	// Entity search endpoint
+	http.HandleFunc("/api/entities/search", handleEntitySearch)
 	http.Handle("/static/", http.FileServer(http.FS(static)))
 
 	log.Printf("Starting server on %s", *addr)
@@ -131,7 +139,7 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 
 func handleValidate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		http.Error(w, "POST required", 405)
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
 		return
 	}
 	if client == nil {
@@ -156,7 +164,7 @@ func handleValidate(w http.ResponseWriter, r *http.Request) {
 
 func handleRunSuite(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		http.Error(w, "POST required", 405)
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
 		return
 	}
 	if rustURL == "" {
@@ -189,7 +197,7 @@ func handleRunSuite(w http.ResponseWriter, r *http.Request) {
 // Agent proxy: create session
 func handleAgentSession(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		http.Error(w, "POST required", 405)
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -200,15 +208,18 @@ func handleAgentSession(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, resp.Body)
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		jsonError(w, "Invalid JSON from Agent: "+err.Error(), 502)
+		return
+	}
+	jsonResponse(w, result)
 }
 
 // Agent proxy: chat
 func handleAgentChat(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		http.Error(w, "POST required", 405)
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -229,26 +240,29 @@ func handleAgentChat(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, resp.Body)
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		jsonError(w, "Invalid JSON from Agent: "+err.Error(), 502)
+		return
+	}
+	jsonResponse(w, result)
 }
 
 func jsonResponse(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(v)
+	_ = json.NewEncoder(w).Encode(v)
 }
 
 func jsonError(w http.ResponseWriter, msg string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
 
 // Agent proxy: generate DSL from natural language
 func handleAgentGenerate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		http.Error(w, "POST required", 405)
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -269,15 +283,18 @@ func handleAgentGenerate(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, resp.Body)
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		jsonError(w, "Invalid JSON from Agent: "+err.Error(), 502)
+		return
+	}
+	jsonResponse(w, result)
 }
 
 // Agent proxy: execute DSL
 func handleAgentExecute(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		http.Error(w, "POST required", 405)
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -298,7 +315,172 @@ func handleAgentExecute(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, resp.Body)
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		jsonError(w, "Invalid JSON from Agent: "+err.Error(), 502)
+		return
+	}
+	jsonResponse(w, result)
+}
+
+// Direct DSL execution via dsl_api (simpler, no session required)
+func handleDirectExecute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		DSL string `json:"dsl"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, err.Error(), 400)
+		return
+	}
+
+	body, _ := json.Marshal(req)
+	resp, err := http.Post(rustURL+"/execute", "application/json", bytes.NewReader(body))
+	if err != nil {
+		jsonError(w, "DSL API connection failed: "+err.Error(), 503)
+		return
+	}
+	defer resp.Body.Close()
+
+	// Decode and re-encode to ensure valid JSON
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		jsonError(w, "Invalid JSON from DSL API: "+err.Error(), 502)
+		return
+	}
+	jsonResponse(w, result)
+}
+
+// KYC case query: proxy to dsl_api
+func handleKycCase(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "GET required", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract case ID from path: /api/kyc/case/{id}
+	caseID := r.URL.Path[len("/api/kyc/case/"):]
+	if caseID == "" {
+		jsonError(w, "Case ID required", 400)
+		return
+	}
+
+	// Proxy to dsl_api
+	resp, err := http.Get(rustURL + "/query/kyc/cases/" + caseID)
+	if err != nil {
+		jsonError(w, "DSL API connection failed: "+err.Error(), 503)
+		return
+	}
+	defer resp.Body.Close()
+
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		jsonError(w, "Invalid JSON from DSL API: "+err.Error(), 502)
+		return
+	}
+	jsonResponse(w, result)
+}
+
+// Analyze DSL errors: proxy to dsl_api
+func handleAnalyzeErrors(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		DSL    string   `json:"dsl"`
+		Errors []string `json:"errors"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, err.Error(), 400)
+		return
+	}
+
+	body, _ := json.Marshal(req)
+	resp, err := http.Post(rustURL+"/analyze-errors", "application/json", bytes.NewReader(body))
+	if err != nil {
+		jsonError(w, "DSL API connection failed: "+err.Error(), 503)
+		return
+	}
+	defer resp.Body.Close()
+
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		jsonError(w, "Invalid JSON from DSL API: "+err.Error(), 502)
+		return
+	}
+	jsonResponse(w, result)
+}
+
+// Validate DSL with auto-corrections: proxy to dsl_api
+// This proactively fixes lookup values before execution
+func handleValidateWithFixes(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		DSL string `json:"dsl"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, err.Error(), 400)
+		return
+	}
+
+	body, _ := json.Marshal(req)
+	resp, err := http.Post(rustURL+"/validate-with-fixes", "application/json", bytes.NewReader(body))
+	if err != nil {
+		jsonError(w, "DSL API connection failed: "+err.Error(), 503)
+		return
+	}
+	defer resp.Body.Close()
+
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		jsonError(w, "Invalid JSON from DSL API: "+err.Error(), 502)
+		return
+	}
+	jsonResponse(w, result)
+}
+
+
+// Entity search: proxy to dsl_api for fuzzy entity lookup
+// Used to find existing entities before creating new ones (prevents duplicates)
+func handleEntitySearch(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Query        string `json:"query"`
+		Limit        int    `json:"limit,omitempty"`
+		Jurisdiction string `json:"jurisdiction,omitempty"`
+		EntityType   string `json:"entity_type,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, err.Error(), 400)
+		return
+	}
+
+	body, _ := json.Marshal(req)
+	resp, err := http.Post(rustURL+"/query/entities/search", "application/json", bytes.NewReader(body))
+	if err != nil {
+		jsonError(w, "DSL API connection failed: "+err.Error(), 503)
+		return
+	}
+	defer resp.Body.Close()
+
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		jsonError(w, "Invalid JSON from DSL API: "+err.Error(), 502)
+		return
+	}
+	jsonResponse(w, result)
 }

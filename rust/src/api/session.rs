@@ -35,7 +35,6 @@ pub enum SessionState {
     Closed,
 }
 
-
 // ============================================================================
 // Session Types
 // ============================================================================
@@ -390,6 +389,9 @@ pub struct ExecuteResponse {
     pub errors: Vec<String>,
     /// New session state after execution
     pub new_state: SessionState,
+    /// All bindings created during execution (name -> UUID)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bindings: Option<std::collections::HashMap<String, uuid::Uuid>>,
 }
 
 // ============================================================================

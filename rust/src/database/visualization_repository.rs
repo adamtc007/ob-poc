@@ -1363,14 +1363,16 @@ impl VisualizationRepository {
 
         Ok(rows
             .into_iter()
-            .map(|r| OwnershipView {
-                ownership_id: r.ownership_id,
-                owner_entity_id: r.owner_entity_id,
-                owned_entity_id: r.owned_entity_id,
-                ownership_type: r.ownership_type,
-                ownership_percent: r.ownership_percent,
-                owner_name: r.owner_name,
-                owned_name: r.owned_name,
+            .filter_map(|r| {
+                Some(OwnershipView {
+                    ownership_id: r.ownership_id?,
+                    owner_entity_id: r.owner_entity_id?,
+                    owned_entity_id: r.owned_entity_id?,
+                    ownership_type: r.ownership_type?,
+                    ownership_percent: r.ownership_percent?,
+                    owner_name: r.owner_name,
+                    owned_name: r.owned_name,
+                })
             })
             .collect())
     }

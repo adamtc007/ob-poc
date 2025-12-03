@@ -93,10 +93,7 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(ResourceDecommissionOp));
         registry.register(Arc::new(ResourceValidateAttrsOp));
 
-        // Service delivery operations
-        registry.register(Arc::new(DeliveryRecordOp));
-        registry.register(Arc::new(DeliveryCompleteOp));
-        registry.register(Arc::new(DeliveryFailOp));
+        // Service delivery operations - now CRUD-based in delivery.yaml
 
         // Custody operations
         registry.register(Arc::new(SubcustodianLookupOp));

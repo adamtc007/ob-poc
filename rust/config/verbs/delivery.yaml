@@ -3,60 +3,134 @@ domains:
     description: Service delivery tracking operations
     verbs:
       record:
-        description: Record a service delivery for a CBU
-        behavior: plugin
+        description: Record a service delivery for a CBU (upsert by cbu+product+service)
+        behavior: crud
+        crud:
+          operation: upsert
+          table: service_delivery_map
+          schema: ob-poc
+          returning: delivery_id
+          conflict_keys:
+            - cbu_id
+            - product_id
+            - service_id
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-        - name: product
-          type: string
-          required: true
-        - name: service
-          type: string
-          required: true
-        - name: instance-id
-          type: uuid
-          required: false
-        - name: config
-          type: json
-          required: false
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+          - name: product
+            type: lookup
+            required: true
+            maps_to: product_id
+            lookup:
+              schema: ob-poc
+              table: products
+              code_column: product_code
+              id_column: product_id
+          - name: service
+            type: lookup
+            required: true
+            maps_to: service_id
+            lookup:
+              schema: ob-poc
+              table: services
+              code_column: service_code
+              id_column: service_id
+          - name: instance-id
+            type: uuid
+            required: false
+            maps_to: instance_id
+          - name: config
+            type: json
+            required: false
+            maps_to: service_config
         returns:
           type: uuid
           capture: true
+
       complete:
         description: Mark a service delivery as complete
-        behavior: plugin
+        behavior: crud
+        crud:
+          operation: update
+          table: service_delivery_map
+          schema: ob-poc
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-        - name: product
-          type: string
-          required: true
-        - name: service
-          type: string
-          required: true
-        - name: instance-id
-          type: uuid
-          required: false
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            is_filter: true
+          - name: product
+            type: lookup
+            required: true
+            maps_to: product_id
+            is_filter: true
+            lookup:
+              schema: ob-poc
+              table: products
+              code_column: product_code
+              id_column: product_id
+          - name: service
+            type: lookup
+            required: true
+            maps_to: service_id
+            is_filter: true
+            lookup:
+              schema: ob-poc
+              table: services
+              code_column: service_code
+              id_column: service_id
+          - name: instance-id
+            type: uuid
+            required: false
+            maps_to: instance_id
+        set:
+          delivery_status: "DELIVERED"
+          delivered_at: "now()"
         returns:
           type: affected
+
       fail:
         description: Mark a service delivery as failed
-        behavior: plugin
+        behavior: crud
+        crud:
+          operation: update
+          table: service_delivery_map
+          schema: ob-poc
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-        - name: product
-          type: string
-          required: true
-        - name: service
-          type: string
-          required: true
-        - name: reason
-          type: string
-          required: true
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            is_filter: true
+          - name: product
+            type: lookup
+            required: true
+            maps_to: product_id
+            is_filter: true
+            lookup:
+              schema: ob-poc
+              table: products
+              code_column: product_code
+              id_column: product_id
+          - name: service
+            type: lookup
+            required: true
+            maps_to: service_id
+            is_filter: true
+            lookup:
+              schema: ob-poc
+              table: services
+              code_column: service_code
+              id_column: service_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: failure_reason
+        set:
+          delivery_status: "FAILED"
+          failed_at: "now()"
         returns:
           type: affected

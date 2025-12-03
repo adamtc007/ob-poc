@@ -194,6 +194,7 @@ domains:
             type: lookup
             required: true
             lookup:
+              schema: ob-poc
               table: roles
               code_column: name
               id_column: role_id
@@ -222,6 +223,7 @@ domains:
             type: lookup
             required: true
             lookup:
+              schema: ob-poc
               table: roles
               code_column: name
               id_column: role_id

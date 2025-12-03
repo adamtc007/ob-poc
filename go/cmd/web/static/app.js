@@ -1,238 +1,803 @@
-"use strict";
+// Enterprise Onboarding Agent - Chat-based interface with context tracking
+// Maintains CBU/Case context across conversation for incremental building
+
 document.addEventListener("DOMContentLoaded", () => {
-    // State
-    let currentDsl = "";
+    // ==================== STATE ====================
     let sessionId = null;
-    // DOM elements
+
+    let context = {
+        cbu: null,
+        case: null,
+        entities: new Map(),
+        bindings: new Map()
+    };
+
+    let pendingDsl = null;
+    let pendingCorrections = null;
+    let pendingEntitySelection = null;
+    
+    // Accumulated DSL tracking
+    let accumulatedDsl = [];  // Array of { dsl: string, timestamp: Date, description: string }
+
+    // ==================== DOM ELEMENTS ====================
     const chatMessages = document.getElementById("chat-messages");
     const chatInput = document.getElementById("chat-input");
     const sendBtn = document.getElementById("send-btn");
     const newSessionBtn = document.getElementById("new-session-btn");
+    const contextBar = document.getElementById("context-bar");
+    const contextCbu = document.getElementById("context-cbu");
+    const contextCbuName = document.getElementById("context-cbu-name");
+    const contextCbuId = document.getElementById("context-cbu-id");
+    const contextCase = document.getElementById("context-case");
+    const contextCaseType = document.getElementById("context-case-type");
+    const contextCaseId = document.getElementById("context-case-id");
+    const contextClearBtn = document.getElementById("context-clear-btn");
+    
+    // DSL Panel elements
+    const dslPanel = document.getElementById("dsl-panel");
+    const dslPanelToggle = document.getElementById("dsl-panel-toggle");
+    const dslCount = document.getElementById("dsl-count");
+    const dslEmpty = document.getElementById("dsl-empty");
     const dslCode = document.getElementById("dsl-code");
-    const dslStatus = document.getElementById("dsl-status");
-    const executeBtn = document.getElementById("execute-btn");
-    const copyBtn = document.getElementById("copy-btn");
-    const validateBtn = document.getElementById("validate-btn");
-    const resultsDiv = document.getElementById("results");
-    const settingsBtn = document.getElementById("settings-btn");
-    const settingsModal = document.getElementById("settings-modal");
-    const settingsSave = document.getElementById("settings-save");
-    const settingsCancel = document.getElementById("settings-cancel");
-    const rustUrlInput = document.getElementById("rust-url");
-    const agentUrlInput = document.getElementById("agent-url");
-    // Utils
+    const copyDslBtn = document.getElementById("copy-dsl-btn");
+    const clearDslBtn = document.getElementById("clear-dsl-btn");
+
+    // ==================== BINDING NORMALIZATION ====================
+    const bindingAliases = {
+        'cbu': ['cbu_id', 'cbu-id', 'client', 'client_id', 'client-id'],
+        'case': ['case_id', 'case-id', 'kyc_case', 'kyc-case', 'kyc_case_id'],
+        'entity': ['entity_id', 'entity-id'],
+        'company': ['company_id', 'company-id', 'corp', 'corp_id'],
+        'person': ['person_id', 'person-id', 'ubo', 'ubo_id'],
+    };
+
+    const reverseAliases = {
+        'cbu_id': 'cbu',
+        'cbu-id': 'cbu',
+        'client': 'cbu',
+        'client_id': 'cbu',
+        'case_id': 'case',
+        'case-id': 'case',
+        'kyc_case': 'case',
+        'kyc_case_id': 'case',
+        'entity_id': 'entity',
+        'company_id': 'company',
+        'person_id': 'person',
+    };
+
+    function normalizeDslBindings(dsl) {
+        let normalized = dsl;
+        for (const [canonical, aliases] of Object.entries(bindingAliases)) {
+            if (context.bindings.has(canonical)) {
+                for (const alias of aliases) {
+                    const regex = new RegExp(`@${alias}\\b`, 'g');
+                    normalized = normalized.replace(regex, `@${canonical}`);
+                }
+            }
+        }
+        return normalized;
+    }
+
+    // ==================== DSL PANEL ====================
+    function updateDslPanel() {
+        const count = accumulatedDsl.length;
+        dslCount.textContent = count;
+        
+        if (count === 0) {
+            dslEmpty.style.display = "block";
+            dslCode.style.display = "none";
+            copyDslBtn.disabled = true;
+            clearDslBtn.disabled = true;
+        } else {
+            dslEmpty.style.display = "none";
+            dslCode.style.display = "block";
+            copyDslBtn.disabled = false;
+            clearDslBtn.disabled = false;
+            
+            // Render accumulated DSL with statements
+            let html = "";
+            for (const item of accumulatedDsl) {
+                const time = item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                html += `<div class="dsl-statement">`;
+                if (item.description) {
+                    html += `<div class="dsl-statement-meta">${escapeHtml(item.description)} - ${time}</div>`;
+                } else {
+                    html += `<div class="dsl-statement-meta">${time}</div>`;
+                }
+                html += escapeHtml(item.dsl);
+                html += `</div>`;
+            }
+            dslCode.innerHTML = html;
+            
+            // Scroll to bottom
+            const content = document.getElementById("dsl-panel-content");
+            content.scrollTop = content.scrollHeight;
+        }
+    }
+    
+    function addToAccumulatedDsl(dsl, description) {
+        // Parse DSL into individual statements
+        const statements = dsl.split('\n').filter(line => line.trim().startsWith('('));
+        
+        if (statements.length > 0) {
+            accumulatedDsl.push({
+                dsl: statements.join('\n'),
+                timestamp: new Date(),
+                description: description || null
+            });
+            updateDslPanel();
+        }
+    }
+    
+    function getFullAccumulatedDsl() {
+        return accumulatedDsl.map(item => item.dsl).join('\n\n');
+    }
+    
+    function clearAccumulatedDsl() {
+        accumulatedDsl = [];
+        updateDslPanel();
+    }
+
+    // ==================== ENTITY SEARCH ====================
+    function detectEntityNames(message) {
+        const names = [];
+        const addPattern = /(?:add|assign|make|appoint)\s+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\s+(?:as|to be)/gi;
+        let match;
+        while ((match = addPattern.exec(message)) !== null) {
+            names.push(match[1]);
+        }
+        const rolePattern = /([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\s+as\s+(?:director|ubo|beneficial owner|shareholder|officer|manager)/gi;
+        while ((match = rolePattern.exec(message)) !== null) {
+            if (!names.includes(match[1])) names.push(match[1]);
+        }
+        const namedPattern = /(?:person|individual|company|entity)\s+(?:named|called)\s+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)/gi;
+        while ((match = namedPattern.exec(message)) !== null) {
+            if (!names.includes(match[1])) names.push(match[1]);
+        }
+        return names;
+    }
+
+    async function searchEntities(query, jurisdiction) {
+        try {
+            const body = { query, limit: 5 };
+            if (jurisdiction) body.jurisdiction = jurisdiction;
+            const resp = await fetch("/api/entities/search", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body)
+            });
+            if (!resp.ok) return { results: [], create_option: `Create new entity "${query}"` };
+            return await resp.json();
+        } catch (e) {
+            console.error("Entity search failed:", e);
+            return { results: [], create_option: `Create new entity "${query}"` };
+        }
+    }
+
+    // ==================== CONTEXT MANAGEMENT ====================
+    function updateContextBar() {
+        const hasCbu = !!context.cbu;
+        const hasCase = !!context.case;
+
+        if (hasCbu || hasCase) {
+            contextBar.classList.add("active");
+        } else {
+            contextBar.classList.remove("active");
+        }
+
+        if (hasCbu) {
+            contextCbu.style.display = "flex";
+            contextCbuName.textContent = context.cbu.name;
+            if (context.cbu.jurisdiction) {
+                contextCbuName.textContent += ` (${context.cbu.jurisdiction})`;
+            }
+            contextCbuId.textContent = context.cbu.id.substring(0, 8) + "...";
+        } else {
+            contextCbu.style.display = "none";
+        }
+
+        if (hasCase) {
+            contextCase.style.display = "flex";
+            contextCaseType.textContent = context.case.type + (context.case.status ? ` - ${context.case.status}` : "");
+            contextCaseId.textContent = context.case.id.substring(0, 8) + "...";
+        } else {
+            contextCase.style.display = "none";
+        }
+    }
+
+    function clearContext() {
+        context = { cbu: null, case: null, entities: new Map(), bindings: new Map() };
+        updateContextBar();
+    }
+
+    function extractEntitiesFromDsl(dsl) {
+        const entities = [];
+        const entityPattern = /\(entity\.create-(\w+)[^)]*:(?:name|first-name)\s+"([^"]+)"[^)]*(?::as\s+@(\w+))?/g;
+        let match;
+        while ((match = entityPattern.exec(dsl)) !== null) {
+            entities.push({ type: match[1].replace(/-/g, ' '), name: match[2], binding: match[3] });
+        }
+        return entities;
+    }
+    
+    function extractDescriptionFromDsl(dsl) {
+        // Try to extract a meaningful description from the DSL
+        const cbuMatch = dsl.match(/\(cbu\.ensure[^)]*:name\s+"([^"]+)"/);
+        if (cbuMatch) return `Create CBU: ${cbuMatch[1]}`;
+        
+        const entityMatch = dsl.match(/\(entity\.create-(\w+)[^)]*:(?:name|first-name)\s+"([^"]+)"/);
+        if (entityMatch) return `Create ${entityMatch[1].replace(/-/g, ' ')}: ${entityMatch[2]}`;
+        
+        const roleMatch = dsl.match(/\(cbu\.assign-role[^)]*:role\s+"([^"]+)"/);
+        if (roleMatch) return `Assign role: ${roleMatch[1]}`;
+        
+        const caseMatch = dsl.match(/\(kyc-case\.create/);
+        if (caseMatch) return "Create KYC case";
+        
+        return null;
+    }
+
+    async function updateContextFromBindings(bindings) {
+        for (const [key, value] of Object.entries(bindings)) {
+            context.bindings.set(key, value);
+            if (reverseAliases[key]) {
+                context.bindings.set(reverseAliases[key], value);
+            }
+        }
+
+        const cbuId = bindings.cbu || bindings.cbu_id;
+        if (cbuId && !context.cbu) {
+            try {
+                const resp = await fetch(`/api/dsl/query/cbu/${cbuId}`);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    context.cbu = {
+                        id: cbuId,
+                        name: data.name || "Unknown",
+                        jurisdiction: data.jurisdiction,
+                        clientType: data.client_type
+                    };
+                }
+            } catch (e) {
+                context.cbu = { id: cbuId, name: "CBU " + cbuId.substring(0, 8) };
+            }
+        }
+
+        const caseId = bindings.case || bindings.case_id;
+        if (caseId && !context.case) {
+            context.case = { id: caseId, type: "KYC Case", status: "INTAKE" };
+        }
+
+        updateContextBar();
+    }
+
+    // ==================== UI HELPERS ====================
     function escapeHtml(text) {
         const div = document.createElement("div");
         div.textContent = text;
         return div.innerHTML;
     }
-    function addMessage(role, content, dsl) {
+
+    function clearEmptyState() {
         const empty = chatMessages.querySelector(".empty-state");
-        if (empty)
-            empty.remove();
+        if (empty) empty.remove();
+    }
+
+    function addUserMessage(text) {
+        clearEmptyState();
         const msg = document.createElement("div");
-        msg.className = `msg msg-${role}`;
-        let html = `<div class="msg-bubble">${escapeHtml(content)}</div>`;
-        if (dsl) {
-            html += `<div class="msg-dsl">${escapeHtml(dsl)}</div>`;
+        msg.className = "msg msg-user";
+        msg.innerHTML = `<div class="msg-bubble">${escapeHtml(text)}</div>`;
+        chatMessages.appendChild(msg);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function addAssistantMessage(options) {
+        clearEmptyState();
+        const msg = document.createElement("div");
+        msg.className = "msg msg-assistant";
+
+        let html = `<div class="msg-bubble">${escapeHtml(options.text)}`;
+
+        if (options.dsl) {
+            html += `<div class="msg-dsl">${escapeHtml(options.dsl)}</div>`;
         }
+
+        if (options.status) {
+            html += `<div class="msg-status ${options.status.type}">${escapeHtml(options.status.text)}</div>`;
+        }
+
+        if (options.suggestions && options.suggestions.length > 0) {
+            html += `<div class="suggestion-list">`;
+            options.suggestions.forEach((s, i) => {
+                const pct = Math.round(s.confidence * 100);
+                html += `<div class="suggestion-item" data-index="${i}">
+                    <span class="num">${i + 1}</span>
+                    <span>"${escapeHtml(s.current)}" -> "${escapeHtml(s.suggested)}"</span>
+                    <span class="confidence">${pct}%</span>
+                </div>`;
+            });
+            html += `</div>`;
+        }
+
+        if (options.entityChoices && options.entityChoices.results.length > 0) {
+            html += `<div class="suggestion-list entity-choices">`;
+            options.entityChoices.results.forEach((e, i) => {
+                const pct = Math.round(e.similarity * 100);
+                const typeDisplay = (e.entity_type_code || e.entity_type).replace(/_/g, ' ').toLowerCase();
+                const jurisdictionDisplay = e.jurisdiction ? ` (${e.jurisdiction})` : '';
+                html += `<div class="suggestion-item entity-choice" data-entity-idx="${i}">
+                    <span class="num">${i + 1}</span>
+                    <span class="entity-info">
+                        <strong>${escapeHtml(e.name)}</strong>${jurisdictionDisplay}
+                        <span class="entity-type">${typeDisplay}</span>
+                    </span>
+                    <span class="confidence">${pct}%</span>
+                </div>`;
+            });
+            html += `<div class="suggestion-item entity-choice create-new" data-entity-idx="create">
+                <span class="num">+</span>
+                <span>${escapeHtml(options.entityChoices.createOption)}</span>
+            </div>`;
+            html += `</div>`;
+        }
+
+        if (options.createdEntities && options.createdEntities.length > 0) {
+            html += `<div class="created-entities">`;
+            for (const e of options.createdEntities) {
+                html += `<div class="created-entity">
+                    <span class="type">${escapeHtml(e.type)}</span>
+                    <span class="name">${escapeHtml(e.name)}</span>
+                    ${e.binding ? `<span class="binding">@${escapeHtml(e.binding)}</span>` : ''}
+                </div>`;
+            }
+            html += `</div>`;
+        }
+
+        html += `</div>`;
+
+        if (options.actions && options.actions.length > 0) {
+            html += `<div class="msg-actions">`;
+            options.actions.forEach((a, i) => {
+                html += `<button class="${a.class || ''}" data-action="${i}">${escapeHtml(a.label)}</button>`;
+            });
+            html += `</div>`;
+        }
+
+        msg.innerHTML = html;
+        chatMessages.appendChild(msg);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        if (options.actions) {
+            msg.querySelectorAll("[data-action]").forEach((btn, i) => {
+                btn.addEventListener("click", () => options.actions[i].onClick());
+            });
+        }
+
+        if (options.suggestions) {
+            msg.querySelectorAll(".suggestion-item:not(.entity-choice)").forEach((item) => {
+                item.addEventListener("click", () => {
+                    const idx = parseInt(item.getAttribute("data-index") || "0");
+                    handleSuggestionSelect(idx + 1);
+                });
+            });
+        }
+
+        if (options.entityChoices) {
+            msg.querySelectorAll(".entity-choice").forEach((item) => {
+                item.addEventListener("click", () => {
+                    const idxAttr = item.getAttribute("data-entity-idx");
+                    if (idxAttr === "create") {
+                        options.entityChoices.onSelect("create");
+                    } else {
+                        const idx = parseInt(idxAttr || "0");
+                        options.entityChoices.onSelect(options.entityChoices.results[idx]);
+                    }
+                });
+            });
+        }
+
+        return msg;
+    }
+
+    function addExecutionResult(success, message, bindings) {
+        clearEmptyState();
+        const msg = document.createElement("div");
+        msg.className = "msg msg-assistant";
+
+        let html = `<div class="msg-bubble">`;
+        html += `<div class="execution-result ${success ? 'success' : 'error'}">`;
+        html += success ? 'OK ' : 'X ';
+        html += escapeHtml(message);
+
+        if (success && bindings && Object.keys(bindings).length > 0) {
+            html += `<div class="created-entities" style="margin-top: 0.5rem;">`;
+            for (const [binding, id] of Object.entries(bindings)) {
+                const entity = context.entities.get(binding);
+                const displayName = entity ? entity.name : id.substring(0, 8) + "...";
+                html += `<div class="created-entity">
+                    <span class="binding">@${escapeHtml(binding)}</span>
+                    <span class="name">${escapeHtml(displayName)}</span>
+                </div>`;
+            }
+            html += `</div>`;
+        }
+
+        html += `</div></div>`;
         msg.innerHTML = html;
         chatMessages.appendChild(msg);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
-    function setDsl(dsl) {
-        currentDsl = dsl;
-        dslCode.textContent = dsl || "; DSL will appear here after generation";
-        executeBtn.disabled = !dsl;
-        if (dsl) {
-            dslStatus.textContent = "Ready to execute";
-        }
-    }
-    function showResult(success, message, bindings) {
-        resultsDiv.style.display = "block";
-        let html = `<div class="result-box ${success ? "success" : "error"}">
-            <div class="result-header">${success ? "[OK]" : "[X]"} ${escapeHtml(message)}</div>`;
-        if (bindings && Object.keys(bindings).length > 0) {
-            html += `<div class="bindings">`;
-            for (const [k, v] of Object.entries(bindings)) {
-                html += `<span class="binding">@${k} -> ${v.substring(0, 8)}...</span>`;
-            }
-            html += `</div>`;
-        }
-        html += `</div>`;
-        resultsDiv.innerHTML = html;
-    }
-    // API calls - using Go proxy endpoints
-    async function sendMessage() {
-        const text = chatInput.value.trim();
-        if (!text)
+
+    // ==================== CONVERSATION FLOW ====================
+    function handleSuggestionSelect(num) {
+        if (!pendingCorrections || num < 1 || num > pendingCorrections.length) {
+            addAssistantMessage({ text: `Please select a number between 1 and ${pendingCorrections?.length || 0}.` });
             return;
-        chatInput.value = "";
-        addMessage("user", text);
-        sendBtn.disabled = true;
-        sendBtn.innerHTML = `<span class="spinner"></span>Generating...`;
+        }
+
+        const correction = pendingCorrections[num - 1];
+
+        if (pendingDsl) {
+            if (correction.type === "lookup") {
+                pendingDsl = pendingDsl.replace(`"${correction.current}"`, `"${correction.suggested}"`);
+            } else {
+                pendingDsl = pendingDsl.replace(`(${correction.current}`, `(${correction.suggested}`);
+            }
+        }
+
+        addUserMessage(String(num));
+        validateAndPrompt(pendingDsl);
+    }
+
+    async function handleEntitySelection(choice) {
+        if (!pendingEntitySelection) return;
+
+        const { originalMessage } = pendingEntitySelection;
+        pendingEntitySelection = null;
+
+        if (choice === "create") {
+            addUserMessage("Create new");
+            await generateDslForMessage(originalMessage);
+        } else {
+            addUserMessage(`Use existing: ${choice.name}`);
+            const bindingName = choice.name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+            context.bindings.set(bindingName, choice.entity_id);
+            context.entities.set(bindingName, {
+                id: choice.entity_id,
+                name: choice.name,
+                type: choice.entity_type,
+                binding: bindingName
+            });
+            const modifiedMessage = `${originalMessage}\n\n[Use existing entity: "${choice.name}" (ID: ${choice.entity_id}, binding: @${bindingName})]`;
+            await generateDslForMessage(modifiedMessage);
+        }
+    }
+
+    async function handleConfirmExecute(confirmed) {
+        if (!confirmed) {
+            pendingDsl = null;
+            pendingCorrections = null;
+            addAssistantMessage({ text: "Okay, cancelled. What would you like to do?" });
+            return;
+        }
+
+        if (!pendingDsl) {
+            addAssistantMessage({ text: "Nothing to execute. Describe what you want to onboard." });
+            return;
+        }
+
+        await executeDsl(pendingDsl);
+        pendingDsl = null;
+        pendingCorrections = null;
+    }
+
+    async function validateAndPrompt(dsl) {
+        const normalizedDsl = normalizeDslBindings(dsl);
+        const extractedEntities = extractEntitiesFromDsl(normalizedDsl);
+
         try {
-            // Create session if needed (via Go proxy)
+            const resp = await fetch("/api/dsl/validate-with-fixes", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ dsl: normalizedDsl })
+            });
+
+            if (!resp.ok) throw new Error("Validation failed");
+
+            const data = await resp.json();
+
+            if (data.status === "valid") {
+                pendingDsl = normalizedDsl;
+                pendingCorrections = null;
+                addAssistantMessage({
+                    text: "I've prepared this for you:",
+                    dsl: normalizedDsl,
+                    status: { type: "valid", text: "Ready to run" },
+                    createdEntities: extractedEntities,
+                    actions: [
+                        { label: "Yes, run it", class: "success", onClick: () => handleConfirmExecute(true) },
+                        { label: "No", class: "secondary", onClick: () => handleConfirmExecute(false) }
+                    ]
+                });
+            } else if (data.status === "auto_fixed") {
+                pendingDsl = data.corrected_dsl;
+                pendingCorrections = null;
+                addAssistantMessage({
+                    text: `I auto-corrected: ${data.message}`,
+                    dsl: data.corrected_dsl,
+                    status: { type: "valid", text: "Auto-corrected, ready to run" },
+                    createdEntities: extractEntitiesFromDsl(data.corrected_dsl),
+                    actions: [
+                        { label: "Yes, run it", class: "success", onClick: () => handleConfirmExecute(true) },
+                        { label: "No", class: "secondary", onClick: () => handleConfirmExecute(false) }
+                    ]
+                });
+            } else if (data.status === "needs_confirmation") {
+                pendingDsl = normalizedDsl;
+                pendingCorrections = [];
+
+                for (const lc of data.lookup_corrections) {
+                    if (lc.action === "needs_confirmation") {
+                        pendingCorrections.push({
+                            type: "lookup", line: lc.line, current: lc.current_value,
+                            suggested: lc.suggested_value, confidence: lc.confidence,
+                            action: lc.action, available: lc.available_values, arg_name: lc.arg_name
+                        });
+                    }
+                }
+                for (const vc of data.verb_corrections) {
+                    if (vc.action === "needs_confirmation") {
+                        pendingCorrections.push({
+                            type: "verb", line: vc.line, current: vc.current_verb,
+                            suggested: vc.suggested_verb, confidence: vc.confidence,
+                            action: vc.action, available: vc.available_verbs
+                        });
+                    }
+                }
+
+                addAssistantMessage({
+                    text: data.message || "I found some issues. Please confirm:",
+                    dsl: normalizedDsl,
+                    status: { type: "warning", text: "Needs your input" },
+                    suggestions: pendingCorrections
+                });
+            } else {
+                pendingDsl = null;
+                pendingCorrections = null;
+                addAssistantMessage({
+                    text: data.message || "I couldn't generate valid DSL.",
+                    dsl: normalizedDsl,
+                    status: { type: "error", text: data.compile_error || data.parse_error || "Invalid" }
+                });
+            }
+        } catch (e) {
+            pendingDsl = normalizedDsl;
+            addAssistantMessage({
+                text: "Here's what I've prepared:",
+                dsl: normalizedDsl,
+                createdEntities: extractedEntities,
+                actions: [
+                    { label: "Yes, run it", class: "success", onClick: () => handleConfirmExecute(true) },
+                    { label: "No", class: "secondary", onClick: () => handleConfirmExecute(false) }
+                ]
+            });
+        }
+    }
+
+    async function executeDsl(dsl) {
+        addAssistantMessage({ text: "Executing..." });
+
+        try {
+            const resp = await fetch("/api/agent/execute", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ session_id: sessionId, dsl })
+            });
+
+            const data = await resp.json();
+
+            if (data.success) {
+                // Add to accumulated DSL on successful execution
+                const description = extractDescriptionFromDsl(dsl);
+                addToAccumulatedDsl(dsl, description);
+                
+                if (data.bindings) {
+                    await updateContextFromBindings(data.bindings);
+                }
+                addExecutionResult(true, "Executed successfully!", data.bindings);
+            } else {
+                const errorMsg = data.errors?.join("; ") || data.error || "Execution failed";
+                addExecutionResult(false, errorMsg);
+            }
+        } catch (e) {
+            addExecutionResult(false, `Error: ${e.message}`);
+        }
+    }
+
+    function getContextForAgent() {
+        const parts = [];
+
+        if (context.cbu) {
+            parts.push(`Current CBU: "${context.cbu.name}" (ID: ${context.cbu.id}) - use @cbu to reference it`);
+        }
+        if (context.case) {
+            parts.push(`Current KYC Case: ${context.case.type} - use @case to reference it`);
+        }
+        if (context.bindings.size > 0) {
+            const bindings = Array.from(context.bindings.entries())
+                .map(([k, v]) => `@${k}=${v.substring(0,8)}`)
+                .join(", ");
+            parts.push(`Available bindings: ${bindings}`);
+        }
+
+        return parts.length > 0 ? parts.join("\n") : "";
+    }
+
+    async function generateDslForMessage(message) {
+        try {
             if (!sessionId) {
                 const sessResp = await fetch("/api/agent/session", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" }
                 });
                 const sessData = await sessResp.json();
-                if (sessData.error) {
-                    addMessage("assistant", "Error: " + sessData.error);
-                    return;
-                }
-                sessionId = sessData.session_id;
+                if (sessData.session_id) sessionId = sessData.session_id;
             }
-            // Send chat message (via Go proxy)
+
+            const contextStr = getContextForAgent();
+            const messageWithContext = contextStr
+                ? `[Context]\n${contextStr}\n\n[Request]\n${message}`
+                : message;
+
             const resp = await fetch("/api/agent/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ session_id: sessionId, message: text })
+                body: JSON.stringify({ session_id: sessionId, message: messageWithContext })
             });
+
             const data = await resp.json();
-            console.log("Chat response:", data);
+
             if (data.error) {
-                addMessage("assistant", "Error: " + data.error);
-            }
-            else {
+                addAssistantMessage({ text: `Error: ${data.error}` });
+            } else {
                 const dsl = data.assembled_dsl?.combined || data.dsl;
-                console.log("DSL extracted:", dsl);
-                addMessage("assistant", data.message || "DSL generated", dsl);
                 if (dsl) {
-                    console.log("Calling setDsl with:", dsl);
-                    setDsl(dsl);
-                }
-                else {
-                    console.log("No DSL found in response");
+                    await validateAndPrompt(dsl);
+                } else {
+                    addAssistantMessage({ text: data.message || "I couldn't generate DSL for that." });
                 }
             }
+        } catch (e) {
+            addAssistantMessage({ text: `Connection error: ${e.message}` });
         }
-        catch (e) {
-            addMessage("assistant", "Failed to connect: " + e.message);
+    }
+
+    async function sendMessage() {
+        const text = chatInput.value.trim();
+        if (!text) return;
+
+        chatInput.value = "";
+
+        const lower = text.toLowerCase();
+        if (lower === "yes" || lower === "y" || lower === "run" || lower === "execute") {
+            addUserMessage(text);
+            handleConfirmExecute(true);
+            return;
         }
-        finally {
+        if (lower === "no" || lower === "n" || lower === "cancel") {
+            addUserMessage(text);
+            handleConfirmExecute(false);
+            return;
+        }
+
+        const num = parseInt(text);
+        if (!isNaN(num) && pendingCorrections && num >= 1 && num <= pendingCorrections.length) {
+            handleSuggestionSelect(num);
+            return;
+        }
+
+        if (!isNaN(num) && pendingEntitySelection) {
+            if (num >= 1 && num <= pendingEntitySelection.results.length) {
+                handleEntitySelection(pendingEntitySelection.results[num - 1]);
+                return;
+            } else if (num === pendingEntitySelection.results.length + 1) {
+                handleEntitySelection("create");
+                return;
+            }
+        }
+
+        if ((lower === "create" || lower === "new") && pendingEntitySelection) {
+            handleEntitySelection("create");
+            return;
+        }
+
+        addUserMessage(text);
+
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = `<span class="spinner"></span>`;
+
+        try {
+            const entityNames = detectEntityNames(text);
+
+            if (entityNames.length > 0) {
+                const searchName = entityNames[0];
+                const jurisdiction = context.cbu?.jurisdiction;
+                const searchResult = await searchEntities(searchName, jurisdiction);
+                const goodMatches = searchResult.results.filter(r => r.similarity >= 0.7);
+
+                if (goodMatches.length > 0) {
+                    pendingEntitySelection = {
+                        originalMessage: text,
+                        searchQuery: searchName,
+                        results: goodMatches,
+                        createOption: searchResult.create_option
+                    };
+
+                    addAssistantMessage({
+                        text: `I found existing entities matching "${searchName}". Would you like to use one of these, or create a new one?`,
+                        entityChoices: {
+                            results: goodMatches,
+                            createOption: searchResult.create_option,
+                            onSelect: handleEntitySelection
+                        }
+                    });
+                    return;
+                }
+            }
+
+            await generateDslForMessage(text);
+
+        } catch (e) {
+            addAssistantMessage({ text: `Connection error: ${e.message}` });
+        } finally {
             sendBtn.disabled = false;
             sendBtn.textContent = "Send";
         }
     }
-    async function executeDsl() {
-        if (!currentDsl || !sessionId)
-            return;
-        executeBtn.disabled = true;
-        executeBtn.innerHTML = `<span class="spinner"></span>Executing...`;
-        dslStatus.textContent = "Executing...";
-        try {
-            const resp = await fetch("/api/agent/execute", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    session_id: sessionId,
-                    dsl: currentDsl
-                })
-            });
-            const data = await resp.json();
-            console.log("Execute response:", data);
-            if (data.error) {
-                showResult(false, data.error);
-                dslStatus.textContent = "Execution failed";
-            }
-            else if (data.success) {
-                const bindings = {};
-                data.results?.forEach((r) => {
-                    if (r.entity_id) {
-                        bindings[r.entity_type || "entity"] = r.entity_id;
-                    }
-                });
-                showResult(true, "Execution successful", bindings);
-                dslStatus.textContent = "Executed successfully";
-            }
-            else {
-                const errors = data.errors?.join(", ") || "Execution failed";
-                showResult(false, errors);
-                dslStatus.textContent = "Execution failed";
-            }
-        }
-        catch (e) {
-            showResult(false, e.message);
-            dslStatus.textContent = "Execution failed";
-        }
-        finally {
-            executeBtn.disabled = false;
-            executeBtn.textContent = "Execute";
-        }
-    }
-    async function validateDsl() {
-        if (!currentDsl)
-            return;
-        validateBtn.disabled = true;
-        validateBtn.textContent = "Validating...";
-        try {
-            const resp = await fetch("/api/validate", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ dsl: currentDsl })
-            });
-            const data = await resp.json();
-            if (data.valid) {
-                showResult(true, "DSL is valid");
-            }
-            else {
-                const errors = (data.errors || []).map((e) => e.message).join(", ");
-                showResult(false, errors || "Invalid DSL");
-            }
-        }
-        catch (e) {
-            showResult(false, e.message);
-        }
-        finally {
-            validateBtn.disabled = false;
-            validateBtn.textContent = "Validate";
-        }
-    }
+
     function newSession() {
         sessionId = null;
+        clearContext();
+        clearAccumulatedDsl();
+        pendingDsl = null;
+        pendingCorrections = null;
+        pendingEntitySelection = null;
         chatMessages.innerHTML = `<div class="empty-state">
-            <p><strong>Describe what you want to create</strong></p>
-            <p>e.g., "Create a fund in Luxembourg with John Smith as director"</p>
+            <p><strong>Enterprise Onboarding Agent</strong></p>
+            <p>Describe what you want to onboard in natural language.</p>
+            <p style="font-size: 0.85rem;">e.g., "Create a fund in Luxembourg called Apex Capital"</p>
         </div>`;
-        setDsl("");
-        resultsDiv.style.display = "none";
-        resultsDiv.innerHTML = "";
     }
-    function copyDsl() {
-        if (currentDsl) {
-            navigator.clipboard.writeText(currentDsl);
-            copyBtn.textContent = "Copied!";
-            setTimeout(() => { copyBtn.textContent = "Copy"; }, 1500);
-        }
-    }
-    // Settings
-    function openSettings() { settingsModal.style.display = "block"; }
-    function closeSettings() { settingsModal.style.display = "none"; }
-    async function saveSettings() {
-        const rustUrl = rustUrlInput.value;
-        const agentUrl = agentUrlInput.value;
-        await fetch("/api/config", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ rust_url: rustUrl, agent_url: agentUrl })
-        });
-        closeSettings();
-        location.reload();
-    }
+
     // Event listeners
     sendBtn.addEventListener("click", sendMessage);
-    chatInput.addEventListener("keypress", (e) => { if (e.key === "Enter")
-        sendMessage(); });
+    chatInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") sendMessage();
+    });
     newSessionBtn.addEventListener("click", newSession);
-    executeBtn.addEventListener("click", executeDsl);
-    validateBtn.addEventListener("click", validateDsl);
-    copyBtn.addEventListener("click", copyDsl);
-    settingsBtn.addEventListener("click", openSettings);
-    settingsCancel.addEventListener("click", closeSettings);
-    settingsSave.addEventListener("click", saveSettings);
-    settingsModal.addEventListener("click", (e) => { if (e.target === settingsModal)
-        closeSettings(); });
+    contextClearBtn.addEventListener("click", clearContext);
+    
+    // DSL Panel event listeners
+    dslPanelToggle.addEventListener("click", () => {
+        dslPanel.classList.toggle("collapsed");
+    });
+    
+    copyDslBtn.addEventListener("click", () => {
+        const fullDsl = getFullAccumulatedDsl();
+        navigator.clipboard.writeText(fullDsl).then(() => {
+            const originalText = copyDslBtn.textContent;
+            copyDslBtn.textContent = "Copied!";
+            setTimeout(() => { copyDslBtn.textContent = originalText; }, 1500);
+        });
+    });
+    
+    clearDslBtn.addEventListener("click", () => {
+        if (confirm("Clear all accumulated DSL?")) {
+            clearAccumulatedDsl();
+        }
+    });
+    
+    // Initialize DSL panel
+    updateDslPanel();
 });

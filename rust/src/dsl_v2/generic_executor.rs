@@ -776,23 +776,12 @@ impl GenericCrudExecutor {
             .get(&role_arg.name)
             .ok_or_else(|| anyhow!("Missing role argument"))?;
 
-        let lookup = role_arg.lookup.as_ref().unwrap();
         let role_code = role_value
             .as_str()
             .ok_or_else(|| anyhow!("Role must be a string"))?;
 
-        // Look up role_id
-        let lookup_sql = format!(
-            r#"SELECT "{}" FROM "{}"."{}" WHERE "{}" = $1"#,
-            lookup.id_column, crud.schema, lookup.table, lookup.code_column
-        );
-
-        let role_row = sqlx::query(&lookup_sql)
-            .bind(role_code)
-            .fetch_one(&self.pool)
-            .await?;
-
-        let role_id: Uuid = role_row.try_get(&lookup.id_column as &str)?;
+        // Look up role_id using resolve_lookup for better error messages
+        let role_id = self.resolve_lookup(role_arg, role_code).await?;
 
         // Build insert
         let pk_col = self.infer_pk_column(junction);
@@ -1374,6 +1363,7 @@ impl GenericCrudExecutor {
 
     /// Resolve a lookup argument by querying the lookup table
     /// Returns the UUID (id_column) for the given code (code_column)
+    /// If not found, provides "did you mean?" suggestions based on similar values
     async fn resolve_lookup(&self, arg: &RuntimeArg, code_value: &str) -> Result<Uuid> {
         let lookup = arg
             .lookup
@@ -1392,20 +1382,96 @@ impl GenericCrudExecutor {
         let row = sqlx::query(&sql)
             .bind(code_value)
             .fetch_optional(&self.pool)
-            .await?
-            .ok_or_else(|| {
-                anyhow!(
-                    "Lookup failed: no {} with {} = '{}' in {}.{}",
+            .await?;
+
+        match row {
+            Some(r) => {
+                let uuid: Uuid = r.try_get(&*lookup.id_column)?;
+                Ok(uuid)
+            }
+            None => {
+                // Lookup failed - fetch similar values for "did you mean?" suggestions
+                let suggestions = self
+                    .get_lookup_suggestions(schema, &lookup.table, &lookup.code_column, code_value)
+                    .await
+                    .unwrap_or_default();
+
+                let suggestion_text = if suggestions.is_empty() {
+                    String::new()
+                } else {
+                    format!(
+                        "\n  Did you mean: {}?\n  Available values: {}",
+                        suggestions.first().unwrap(),
+                        suggestions.join(", ")
+                    )
+                };
+
+                Err(anyhow!(
+                    "Lookup failed: no {} with {} = '{}' in {}.{}{}",
                     lookup.table,
                     lookup.code_column,
                     code_value,
                     schema,
-                    lookup.table
-                )
-            })?;
+                    lookup.table,
+                    suggestion_text
+                ))
+            }
+        }
+    }
 
-        let uuid: Uuid = row.try_get(&*lookup.id_column)?;
-        Ok(uuid)
+    /// Get suggestions for failed lookup - returns similar values from the table
+    async fn get_lookup_suggestions(
+        &self,
+        schema: &str,
+        table: &str,
+        code_column: &str,
+        attempted_value: &str,
+    ) -> Result<Vec<String>> {
+        // Use PostgreSQL's similarity function (pg_trgm) if available, otherwise ILIKE
+        // First try to get all values and rank by Levenshtein distance
+        let sql = format!(
+            r#"SELECT "{}" FROM "{}"."{}"
+               WHERE "{}" IS NOT NULL
+               ORDER BY levenshtein(LOWER("{}"), LOWER($1)) ASC
+               LIMIT 5"#,
+            code_column, schema, table, code_column, code_column
+        );
+
+        let rows = sqlx::query(&sql)
+            .bind(attempted_value)
+            .fetch_all(&self.pool)
+            .await;
+
+        match rows {
+            Ok(rows) => {
+                let suggestions: Vec<String> = rows
+                    .iter()
+                    .filter_map(|r| r.try_get::<String, _>(code_column).ok())
+                    .collect();
+                Ok(suggestions)
+            }
+            Err(_) => {
+                // Levenshtein not available, fall back to simple ILIKE prefix match
+                let fallback_sql = format!(
+                    r#"SELECT "{}" FROM "{}"."{}"
+                       WHERE LOWER("{}") LIKE LOWER($1)
+                       LIMIT 10"#,
+                    code_column, schema, table, code_column
+                );
+
+                let prefix = format!("{}%", &attempted_value.chars().take(2).collect::<String>());
+                let rows = sqlx::query(&fallback_sql)
+                    .bind(&prefix)
+                    .fetch_all(&self.pool)
+                    .await?;
+
+                let suggestions: Vec<String> = rows
+                    .iter()
+                    .filter_map(|r| r.try_get::<String, _>(code_column).ok())
+                    .collect();
+                Ok(suggestions)
+            }
+        }
     }
 
     /// Bind a SqlValue to a query

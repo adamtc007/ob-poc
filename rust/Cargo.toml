@@ -55,6 +55,9 @@ tempfile = "3.0"
 regex = "1.12.2"
 rand = "0.8"
 
+# Fuzzy matching for smart suggestions (Jaro-Winkler, Levenshtein, etc.)
+strsim = "0.11"
+
 # For attribute API endpoints
 base64 = "0.22"
 sha2 = "0.10"

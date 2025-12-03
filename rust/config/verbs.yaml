@@ -701,52 +701,11 @@ domains:
   # ===========================================================================
   # DOMAIN: product
   # ===========================================================================
+  # Products are reference data - read-only via DSL, managed separately
   product:
-    description: "Product catalog operations"
+    description: "Product catalog operations (read-only - products are reference data)"
 
     verbs:
-      create:
-        description: "Create a new product in the catalog"
-        behavior: crud
-        crud:
-          operation: insert
-          table: products
-          schema: ob-poc
-          returning: product_id
-        args:
-          - name: name
-            type: string
-            required: true
-            maps_to: name
-          - name: product-code
-            type: string
-            required: true
-            maps_to: product_code
-          - name: description
-            type: string
-            required: false
-            maps_to: description
-          - name: product-category
-            type: string
-            required: false
-            maps_to: product_category
-          - name: regulatory-framework
-            type: string
-            required: false
-            maps_to: regulatory_framework
-          - name: min-asset-requirement
-            type: decimal
-            required: false
-            maps_to: min_asset_requirement
-          - name: metadata
-            type: json
-            required: false
-            maps_to: metadata
-        returns:
-          type: uuid
-          name: product_id
-          capture: true
-
       read:
         description: "Read a product by ID or code"
         behavior: crud
@@ -765,54 +724,6 @@ domains:
             maps_to: product_code
         returns:
           type: record
-
-      update:
-        description: "Update a product"
-        behavior: crud
-        crud:
-          operation: update
-          table: products
-          schema: ob-poc
-          key: product_id
-        args:
-          - name: product-id
-            type: uuid
-            required: true
-            maps_to: product_id
-          - name: name
-            type: string
-            required: false
-            maps_to: name
-          - name: description
-            type: string
-            required: false
-            maps_to: description
-          - name: is-active
-            type: boolean
-            required: false
-            maps_to: is_active
-          - name: product-category
-            type: string
-            required: false
-            maps_to: product_category
-        returns:
-          type: affected
-
-      delete:
-        description: "Delete a product"
-        behavior: crud
-        crud:
-          operation: delete
-          table: products
-          schema: ob-poc
-          key: product_id
-        args:
-          - name: product-id
-            type: uuid
-            required: true
-            maps_to: product_id
-        returns:
-          type: affected
 
       list:
         description: "List products with optional filters"
@@ -841,83 +752,14 @@ domains:
         returns:
           type: record_set
 
-      ensure:
-        description: "Create or update a product by product-code"
-        behavior: crud
-        crud:
-          operation: upsert
-          table: products
-          schema: ob-poc
-          conflict_keys: [product_code]
-          returning: product_id
-        args:
-          - name: name
-            type: string
-            required: true
-            maps_to: name
-          - name: product-code
-            type: string
-            required: true
-            maps_to: product_code
-          - name: description
-            type: string
-            required: false
-            maps_to: description
-          - name: product-category
-            type: string
-            required: false
-            maps_to: product_category
-          - name: regulatory-framework
-            type: string
-            required: false
-            maps_to: regulatory_framework
-        returns:
-          type: uuid
-          name: product_id
-          capture: true
-
   # ===========================================================================
   # DOMAIN: service
   # ===========================================================================
+  # Services are reference data - read-only via DSL, managed separately
   service:
-    description: "Service catalog operations"
+    description: "Service catalog operations (read-only - services are reference data)"
 
     verbs:
-      create:
-        description: "Create a new service in the catalog"
-        behavior: crud
-        crud:
-          operation: insert
-          table: services
-          schema: ob-poc
-          returning: service_id
-        args:
-          - name: name
-            type: string
-            required: true
-            maps_to: name
-          - name: service-code
-            type: string
-            required: true
-            maps_to: service_code
-          - name: description
-            type: string
-            required: false
-            maps_to: description
-          - name: service-type
-            type: string
-            required: false
-            maps_to: service_type
-          - name: is-active
-            type: boolean
-            required: false
-            maps_to: is_active
-            default: true
-        returns:
-          type: uuid
-          name: service_id
-          capture: true
-
       read:
         description: "Read a service by ID or code"
         behavior: crud
@@ -936,54 +778,6 @@ domains:
             maps_to: service_code
         returns:
           type: record
-
-      update:
-        description: "Update a service"
-        behavior: crud
-        crud:
-          operation: update
-          table: services
-          schema: ob-poc
-          key: service_id
-        args:
-          - name: service-id
-            type: uuid
-            required: true
-            maps_to: service_id
-          - name: name
-            type: string
-            required: false
-            maps_to: name
-          - name: description
-            type: string
-            required: false
-            maps_to: description
-          - name: is-active
-            type: boolean
-            required: false
-            maps_to: is_active
-          - name: service-type
-            type: string
-            required: false
-            maps_to: service_type
-        returns:
-          type: affected
-
-      delete:
-        description: "Delete a service"
-        behavior: crud
-        crud:
-          operation: delete
-          table: services
-          schema: ob-poc
-          key: service_id
-        args:
-          - name: service-id
-            type: uuid
-            required: true
-            maps_to: service_id
-        returns:
-          type: affected
 
       list:
         description: "List services with optional filters"
@@ -1012,89 +806,6 @@ domains:
         returns:
           type: record_set
 
-      ensure:
-        description: "Create or update a service by service-code"
-        behavior: crud
-        crud:
-          operation: upsert
-          table: services
-          schema: ob-poc
-          conflict_keys: [service_code]
-          returning: service_id
-        args:
-          - name: name
-            type: string
-            required: true
-            maps_to: name
-          - name: service-code
-            type: string
-            required: true
-            maps_to: service_code
-          - name: description
-            type: string
-            required: false
-            maps_to: description
-          - name: service-type
-            type: string
-            required: false
-            maps_to: service_type
-        returns:
-          type: uuid
-          name: service_id
-          capture: true
-
-      link-product:
-        description: "Link a service to a product"
-        behavior: crud
-        crud:
-          operation: link
-          junction: product_services
-          schema: ob-poc
-          from_col: service_id
-          to_col: product_id
-        args:
-          - name: service-id
-            type: uuid
-            required: true
-            maps_to: service_id
-          - name: product-id
-            type: uuid
-            required: true
-            maps_to: product_id
-          - name: is-mandatory
-            type: boolean
-            required: false
-            maps_to: is_mandatory
-          - name: is-default
-            type: boolean
-            required: false
-            maps_to: is_default
-          - name: display-order
-            type: integer
-            required: false
-            maps_to: display_order
-        returns:
-          type: void
-
-      unlink-product:
-        description: "Unlink a service from a product"
-        behavior: crud
-        crud:
-          operation: unlink
-          junction: product_services
-          schema: ob-poc
-          from_col: service_id
-          to_col: product_id
-        args:
-          - name: service-id
-            type: uuid
-            required: true
-          - name: product-id
-            type: uuid
-            required: true
-        returns:
-          type: affected
-
       list-by-product:
         description: "List services for a product"
         behavior: crud
@@ -1118,56 +829,13 @@ domains:
   # ===========================================================================
   # DOMAIN: service-resource
   # ===========================================================================
+  # Service resource TYPES are reference data - read-only via DSL
+  # Instance operations (provision, activate, etc.) create CBU-specific instances
   service-resource:
-    description: "Service resource type and instance operations"
+    description: "Service resource type (read-only) and instance operations"
 
     verbs:
-      create:
-        description: "Create a new service resource type"
-        behavior: crud
-        crud:
-          operation: insert
-          table: service_resource_types
-          schema: ob-poc
-          returning: resource_id
-        args:
-          - name: name
-            type: string
-            required: true
-            maps_to: name
-          - name: resource-code
-            type: string
-            required: true
-            maps_to: resource_code
-          - name: owner
-            type: string
-            required: true
-            maps_to: owner
-          - name: description
-            type: string
-            required: false
-            maps_to: description
-          - name: resource-type
-            type: string
-            required: false
-            maps_to: resource_type
-          - name: vendor
-            type: string
-            required: false
-            maps_to: vendor
-          - name: api-endpoint
-            type: string
-            required: false
-            maps_to: api_endpoint
-          - name: capabilities
-            type: json
-            required: false
-            maps_to: capabilities
-        returns:
-          type: uuid
-          name: resource_id
-          capture: true
-
+      # === Type Operations (read-only - reference data) ===
       read:
         description: "Read a service resource type by ID or code"
         behavior: crud
@@ -1186,58 +854,6 @@ domains:
             maps_to: resource_code
         returns:
           type: record
-
-      update:
-        description: "Update a service resource type"
-        behavior: crud
-        crud:
-          operation: update
-          table: service_resource_types
-          schema: ob-poc
-          key: resource_id
-        args:
-          - name: resource-id
-            type: uuid
-            required: true
-            maps_to: resource_id
-          - name: name
-            type: string
-            required: false
-            maps_to: name
-          - name: description
-            type: string
-            required: false
-            maps_to: description
-          - name: is-active
-            type: boolean
-            required: false
-            maps_to: is_active
-          - name: api-endpoint
-            type: string
-            required: false
-            maps_to: api_endpoint
-          - name: capabilities
-            type: json
-            required: false
-            maps_to: capabilities
-        returns:
-          type: affected
-
-      delete:
-        description: "Delete a service resource type"
-        behavior: crud
-        crud:
-          operation: delete
-          table: service_resource_types
-          schema: ob-poc
-          key: resource_id
-        args:
-          - name: resource-id
-            type: uuid
-            required: true
-            maps_to: resource_id
-        returns:
-          type: affected
 
       list:
         description: "List service resource types with optional filters"
@@ -1270,89 +886,7 @@ domains:
         returns:
           type: record_set
 
-      ensure:
-        description: "Create or update a service resource type by resource-code"
-        behavior: crud
-        crud:
-          operation: upsert
-          table: service_resource_types
-          schema: ob-poc
-          conflict_keys: [resource_code]
-          returning: resource_id
-        args:
-          - name: name
-            type: string
-            required: true
-            maps_to: name
-          - name: resource-code
-            type: string
-            required: true
-            maps_to: resource_code
-          - name: owner
-            type: string
-            required: true
-            maps_to: owner
-          - name: description
-            type: string
-            required: false
-            maps_to: description
-          - name: resource-type
-            type: string
-            required: false
-            maps_to: resource_type
-          - name: vendor
-            type: string
-            required: false
-            maps_to: vendor
-        returns:
-          type: uuid
-          name: resource_id
-          capture: true
-
-      link-service:
-        description: "Link a service resource type to a service"
-        behavior: crud
-        crud:
-          operation: link
-          junction: service_resources
-          schema: ob-poc
-          from_col: resource_id
-          to_col: service_id
-        args:
-          - name: resource-id
-            type: uuid
-            required: true
-            maps_to: resource_id
-          - name: service-id
-            type: uuid
-            required: true
-            maps_to: service_id
-          - name: is-primary
-            type: boolean
-            required: false
-            maps_to: is_primary
-        returns:
-          type: void
-
-      unlink-service:
-        description: "Unlink a service resource type from a service"
-        behavior: crud
-        crud:
-          operation: unlink
-          junction: service_resources
-          schema: ob-poc
-          from_col: resource_id
-          to_col: service_id
-        args:
-          - name: resource-id
-            type: uuid
-            required: true
-          - name: service-id
-            type: uuid
-            required: true
-        returns:
-          type: affected
-
+      # === Taxonomy lookups (read-only - taxonomy managed separately) ===
       list-by-service:
         description: "List service resource types for a service"
         behavior: crud
@@ -1370,110 +904,7 @@ domains:
         returns:
           type: record_set
 
-      # Attribute dictionary linkage
-      add-attribute:
-        description: "Add an attribute requirement to a service resource type"
-        behavior: crud
-        crud:
-          operation: insert
-          table: resource_attribute_requirements
-          schema: ob-poc
-          returning: requirement_id
-        args:
-          - name: resource-id
-            type: uuid
-            required: true
-            maps_to: resource_id
-          - name: attribute-id
-            type: uuid
-            required: true
-            maps_to: attribute_id
-          - name: resource-field-name
-            type: string
-            required: false
-            maps_to: resource_field_name
-          - name: is-mandatory
-            type: boolean
-            required: false
-            maps_to: is_mandatory
-            default: true
-          - name: transformation-rule
-            type: json
-            required: false
-            maps_to: transformation_rule
-          - name: validation-override
-            type: json
-            required: false
-            maps_to: validation_override
-          - name: default-value
-            type: string
-            required: false
-            maps_to: default_value
-          - name: display-order
-            type: integer
-            required: false
-            maps_to: display_order
-        returns:
-          type: uuid
-          name: requirement_id
-          capture: false
-
-      remove-attribute:
-        description: "Remove an attribute requirement from a service resource type"
-        behavior: crud
-        crud:
-          operation: delete
-          table: resource_attribute_requirements
-          schema: ob-poc
-          key: requirement_id
-        args:
-          - name: requirement-id
-            type: uuid
-            required: true
-            maps_to: requirement_id
-        returns:
-          type: affected
-
-      update-attribute:
-        description: "Update an attribute requirement configuration"
-        behavior: crud
-        crud:
-          operation: update
-          table: resource_attribute_requirements
-          schema: ob-poc
-          key: requirement_id
-        args:
-          - name: requirement-id
-            type: uuid
-            required: true
-            maps_to: requirement_id
-          - name: resource-field-name
-            type: string
-            required: false
-            maps_to: resource_field_name
-          - name: is-mandatory
-            type: boolean
-            required: false
-            maps_to: is_mandatory
-          - name: transformation-rule
-            type: json
-            required: false
-            maps_to: transformation_rule
-          - name: validation-override
-            type: json
-            required: false
-            maps_to: validation_override
-          - name: default-value
-            type: string
-            required: false
-            maps_to: default_value
-          - name: display-order
-            type: integer
-            required: false
-            maps_to: display_order
-        returns:
-          type: affected
-
+      # Attribute lookups (read-only - attribute requirements managed separately)
       list-attributes:
         description: "List attribute requirements for a service resource type"
         behavior: crud
@@ -1491,53 +922,6 @@ domains:
             required: false
         returns:
           type: record_set
-
-      ensure-attribute:
-        description: "Ensure an attribute requirement exists (upsert)"
-        behavior: crud
-        crud:
-          operation: upsert
-          table: resource_attribute_requirements
-          schema: ob-poc
-          conflict_keys: [resource_id, attribute_id]
-          returning: requirement_id
-        args:
-          - name: resource-id
-            type: uuid
-            required: true
-            maps_to: resource_id
-          - name: attribute-id
-            type: uuid
-            required: true
-            maps_to: attribute_id
-          - name: resource-field-name
-            type: string
-            required: false
-            maps_to: resource_field_name
-          - name: is-mandatory
-            type: boolean
-            required: false
-            maps_to: is_mandatory
-          - name: transformation-rule
-            type: json
-            required: false
-            maps_to: transformation_rule
-          - name: validation-override
-            type: json
-            required: false
-            maps_to: validation_override
-          - name: default-value
-            type: string
-            required: false
-            maps_to: default_value
-          - name: display-order
-            type: integer
-            required: false
-            maps_to: display_order
-        returns:
-          type: uuid
-          name: requirement_id
-          capture: false
 
       # === Instance Operations (provisioning and lifecycle) ===
       provision:
