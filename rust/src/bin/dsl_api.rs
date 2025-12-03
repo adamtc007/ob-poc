@@ -120,7 +120,7 @@ async fn list_verbs() -> Json<VerbsResponse> {
     let mut verbs = Vec::new();
 
     for domain in reg.domains() {
-        for verb in reg.verbs_for_domain(&domain) {
+        for verb in reg.verbs_for_domain(domain) {
             verbs.push(VerbResponse {
                 domain: verb.domain.to_string(),
                 name: verb.verb.to_string(),
