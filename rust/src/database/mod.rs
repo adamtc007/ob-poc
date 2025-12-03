@@ -31,6 +31,7 @@ pub mod risk_service;
 pub mod screening_service;
 pub mod service_resource_service;
 pub mod service_service;
+pub mod session_repository;
 pub mod visualization_repository;
 
 // Legacy modules not yet integrated - kept for reference but not compiled
@@ -98,6 +99,10 @@ pub use risk_service::{
 pub use screening_service::{
     NewAdverseMediaScreeningFields, NewPepScreeningFields, NewSanctionsScreeningFields,
     ScreeningResolutionFields, ScreeningResultFields, ScreeningRow, ScreeningService,
+};
+pub use session_repository::{
+    detect_domain, extract_domains, DslSnapshot, EntityCreated, PersistedSession, SessionEventType,
+    SessionRepository, SessionStatus,
 };
 
 /// Database configuration

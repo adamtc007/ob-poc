@@ -207,6 +207,7 @@ pub struct AgentState {
     pub dsl_v2_executor: Arc<DslExecutor>,
     pub sessions: SessionStore,
     pub generation_log: Arc<GenerationLogRepository>,
+    pub session_repo: Arc<crate::database::SessionRepository>,
 }
 
 impl AgentState {
@@ -214,11 +215,13 @@ impl AgentState {
         let dsl_v2_executor = Arc::new(DslExecutor::new(pool.clone()));
         let sessions = create_session_store();
         let generation_log = Arc::new(GenerationLogRepository::new(pool.clone()));
+        let session_repo = Arc::new(crate::database::SessionRepository::new(pool.clone()));
         Self {
             pool,
             dsl_v2_executor,
             sessions,
             generation_log,
+            session_repo,
         }
     }
 }
@@ -270,10 +273,19 @@ async fn create_session(
     let session_id = session.id;
     let created_at = session.created_at;
 
+    // Store in memory
     {
         let mut sessions = state.sessions.write().await;
         sessions.insert(session_id, session);
     }
+
+    // Persist to database (non-blocking, log errors but don't fail)
+    let session_repo = state.session_repo.clone();
+    tokio::spawn(async move {
+        if let Err(e) = session_repo.create_session(None, None).await {
+            tracing::warn!("Failed to persist session to DB: {}", e);
+        }
+    });
 
     Ok(Json(CreateSessionResponse {
         session_id,
@@ -761,6 +773,67 @@ async fn execute_session_dsl(
 
     // Collect bindings to return to the client BEFORE moving context
     let bindings_map: std::collections::HashMap<String, uuid::Uuid> = context.named_refs.clone();
+
+    // =========================================================================
+    // PERSIST TO DATABASE (on success only)
+    // =========================================================================
+    if all_success {
+        let session_repo = state.session_repo.clone();
+        let dsl_clone = dsl.clone();
+        let bindings_clone = bindings_map.clone();
+        let cbu_id = context.last_cbu_id;
+        let domains = crate::database::extract_domains(&dsl_clone);
+        let primary_domain = crate::database::detect_domain(&dsl_clone);
+        let execution_ms = start_time.elapsed().as_millis() as i32;
+
+        // Persist snapshot asynchronously (don't block response)
+        tokio::spawn(async move {
+            // Save snapshot
+            if let Err(e) = session_repo
+                .save_snapshot(
+                    session_id,
+                    &dsl_clone,
+                    &bindings_clone,
+                    &[], // entities_created - could be populated from results
+                    &domains,
+                    Some(execution_ms),
+                )
+                .await
+            {
+                tracing::warn!("Failed to save DSL snapshot: {}", e);
+            }
+
+            // Update session bindings and domain context
+            if let Err(e) = session_repo
+                .update_bindings(
+                    session_id,
+                    &bindings_clone,
+                    cbu_id,
+                    None, // kyc_case_id
+                    primary_domain.as_deref(),
+                )
+                .await
+            {
+                tracing::warn!("Failed to update session bindings: {}", e);
+            }
+        });
+    } else {
+        // Log error to session
+        let session_repo = state.session_repo.clone();
+        let error_msg = errors.join("; ");
+        tokio::spawn(async move {
+            let _ = session_repo.record_error(session_id, &error_msg).await;
+            let _ = session_repo
+                .log_event(
+                    session_id,
+                    crate::database::SessionEventType::ExecuteFailed,
+                    Some(&dsl),
+                    Some(&error_msg),
+                    None,
+                )
+                .await;
+        });
+    }
 
     // Update session
     let new_state = {
