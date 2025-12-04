@@ -1,13 +1,14 @@
 -- Migration: 011_ubo_enhancements.sql
 -- Description: UBO chain analysis enhancements - discovery, versioning, snapshots
 -- Based on: KYC_DSL_LIFECYCLE_TODO.md Phase 4 + docs_KYC_UBO_DSL_SPEC.md Section 8
+-- FIXED: entity_ownership -> ownership_relationships, is_active -> effective_to IS NULL, ownership_percentage -> ownership_percent
 
 -- =============================================================================
 -- PART 1: Extend ubo_registry with case/workstream linking and lifecycle fields
 -- =============================================================================
 
 -- Add columns to existing ubo_registry table
-ALTER TABLE "ob-poc".ubo_registry 
+ALTER TABLE "ob-poc".ubo_registry
     ADD COLUMN IF NOT EXISTS case_id UUID REFERENCES kyc.cases(case_id),
     ADD COLUMN IF NOT EXISTS workstream_id UUID REFERENCES kyc.entity_workstreams(workstream_id),
     ADD COLUMN IF NOT EXISTS discovery_method VARCHAR(30) DEFAULT 'MANUAL',
@@ -17,10 +18,10 @@ ALTER TABLE "ob-poc".ubo_registry
     ADD COLUMN IF NOT EXISTS closed_reason VARCHAR(100);
 
 -- Add check constraint for discovery_method
-ALTER TABLE "ob-poc".ubo_registry 
+ALTER TABLE "ob-poc".ubo_registry
     DROP CONSTRAINT IF EXISTS chk_ubo_discovery_method;
-ALTER TABLE "ob-poc".ubo_registry 
-    ADD CONSTRAINT chk_ubo_discovery_method 
+ALTER TABLE "ob-poc".ubo_registry
+    ADD CONSTRAINT chk_ubo_discovery_method
     CHECK (discovery_method IN ('MANUAL', 'INFERRED', 'DOCUMENT', 'REGISTRY', 'SCREENING'));
 
 -- Index for case-based UBO queries
@@ -87,6 +88,7 @@ CREATE INDEX IF NOT EXISTS idx_ubo_comparisons_current ON "ob-poc".ubo_snapshot_
 
 -- =============================================================================
 -- PART 4: Ownership chain computation function
+-- FIXED: Uses ownership_relationships table with ownership_percent column
 -- =============================================================================
 
 CREATE OR REPLACE FUNCTION "ob-poc".compute_ownership_chains(
@@ -107,46 +109,46 @@ RETURNS TABLE (
 ) AS $$
 WITH RECURSIVE ownership_chain AS (
     -- Base case: direct ownership from persons
-    SELECT 
+    SELECT
         ROW_NUMBER() OVER () as chain_id,
         o.owner_entity_id as current_entity,
         o.owned_entity_id as target_entity,
         ARRAY[o.owner_entity_id] as path,
         ARRAY[COALESCE(e.name, 'Unknown')] as names,
-        ARRAY[o.ownership_percentage] as percentages,
-        o.ownership_percentage as effective_pct,
+        ARRAY[o.ownership_percent] as percentages,
+        o.ownership_percent as effective_pct,
         1 as depth,
         et.type_code = 'proper_person' as owner_is_person
-    FROM "ob-poc".entity_ownership o
+    FROM "ob-poc".ownership_relationships o
     JOIN "ob-poc".entities e ON o.owner_entity_id = e.entity_id
     JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
     JOIN "ob-poc".cbu_entity_roles cer ON o.owned_entity_id = cer.entity_id
     WHERE cer.cbu_id = p_cbu_id
-      AND o.is_active = true
+      AND o.effective_to IS NULL  -- Active ownership (no end date)
       AND (p_target_entity_id IS NULL OR o.owned_entity_id = p_target_entity_id)
-    
+
     UNION ALL
-    
+
     -- Recursive case: follow ownership chain upward
-    SELECT 
+    SELECT
         oc.chain_id,
         o.owner_entity_id,
         oc.target_entity,
         oc.path || o.owner_entity_id,
         oc.names || COALESCE(e.name, 'Unknown'),
-        oc.percentages || o.ownership_percentage,
-        oc.effective_pct * o.ownership_percentage / 100,
+        oc.percentages || o.ownership_percent,
+        oc.effective_pct * o.ownership_percent / 100,
         oc.depth + 1,
         et.type_code = 'proper_person'
     FROM ownership_chain oc
-    JOIN "ob-poc".entity_ownership o ON o.owned_entity_id = oc.current_entity
+    JOIN "ob-poc".ownership_relationships o ON o.owned_entity_id = oc.current_entity
     JOIN "ob-poc".entities e ON o.owner_entity_id = e.entity_id
     JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
-    WHERE o.is_active = true
+    WHERE o.effective_to IS NULL  -- Active ownership
       AND oc.depth < p_max_depth
       AND NOT o.owner_entity_id = ANY(oc.path) -- Prevent cycles
 )
-SELECT 
+SELECT
     chain_id::INTEGER,
     current_entity as ubo_person_id,
     names[array_length(names, 1)] as ubo_name,
@@ -163,6 +165,7 @@ $$ LANGUAGE SQL STABLE;
 
 -- =============================================================================
 -- PART 5: UBO completeness check function
+-- FIXED: Uses ownership_relationships table
 -- =============================================================================
 
 CREATE OR REPLACE FUNCTION "ob-poc".check_ubo_completeness(
@@ -187,26 +190,26 @@ BEGIN
     SELECT COALESCE(SUM(DISTINCT effective_ownership), 0)
     INTO v_total_ownership
     FROM "ob-poc".compute_ownership_chains(p_cbu_id);
-    
+
     -- Count UBOs above threshold
     SELECT COUNT(DISTINCT ubo_person_id)
     INTO v_ubos_count
     FROM "ob-poc".compute_ownership_chains(p_cbu_id)
     WHERE effective_ownership >= p_threshold;
-    
+
     -- Check for incomplete chains (entities with no further ownership but not persons)
     SELECT COUNT(*)
     INTO v_incomplete_chains
-    FROM "ob-poc".entity_ownership o
+    FROM "ob-poc".ownership_relationships o
     JOIN "ob-poc".cbu_entity_roles cer ON o.owned_entity_id = cer.entity_id
-    LEFT JOIN "ob-poc".entity_ownership parent ON o.owner_entity_id = parent.owned_entity_id
+    LEFT JOIN "ob-poc".ownership_relationships parent ON o.owner_entity_id = parent.owned_entity_id AND parent.effective_to IS NULL
     JOIN "ob-poc".entities e ON o.owner_entity_id = e.entity_id
     JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
     WHERE cer.cbu_id = p_cbu_id
-      AND o.is_active = true
+      AND o.effective_to IS NULL  -- Active ownership
       AND parent.ownership_id IS NULL
       AND et.type_code != 'proper_person';
-    
+
     -- Build issues array
     IF v_total_ownership < 100 THEN
         v_issues := v_issues || jsonb_build_object(
@@ -215,7 +218,7 @@ BEGIN
             'gap', 100 - v_total_ownership
         );
     END IF;
-    
+
     IF v_incomplete_chains > 0 THEN
         v_issues := v_issues || jsonb_build_object(
             'type', 'INCOMPLETE_CHAIN',
@@ -223,7 +226,7 @@ BEGIN
             'count', v_incomplete_chains
         );
     END IF;
-    
+
     RETURN QUERY SELECT
         (v_total_ownership >= 100 AND v_incomplete_chains = 0),
         v_total_ownership,
@@ -257,7 +260,7 @@ BEGIN
     SELECT COALESCE(jsonb_agg(jsonb_build_object(
         'ubo_id', ur.ubo_id,
         'subject_entity_id', ur.subject_entity_id,
-        'ubo_person_id', ur.ubo_person_id,
+        'ubo_person_id', ur.ubo_proper_person_id,
         'relationship_type', ur.relationship_type,
         'qualifying_reason', ur.qualifying_reason,
         'ownership_percentage', ur.ownership_percentage,
@@ -269,7 +272,7 @@ BEGIN
     WHERE ur.cbu_id = p_cbu_id
       AND ur.superseded_at IS NULL
       AND ur.closed_at IS NULL;
-    
+
     -- Get ownership chains
     SELECT COALESCE(jsonb_agg(jsonb_build_object(
         'ubo_person_id', chain.ubo_person_id,
@@ -282,7 +285,7 @@ BEGIN
     )), '[]'::JSONB)
     INTO v_chains
     FROM "ob-poc".compute_ownership_chains(p_cbu_id) chain;
-    
+
     -- Get control relationships
     SELECT COALESCE(jsonb_agg(jsonb_build_object(
         'control_id', cr.control_id,
@@ -296,11 +299,11 @@ BEGIN
     JOIN "ob-poc".cbu_entity_roles cer ON cr.controlled_entity_id = cer.entity_id
     WHERE cer.cbu_id = p_cbu_id
       AND cr.is_active = true;
-    
+
     -- Check completeness
     SELECT * INTO v_completeness
     FROM "ob-poc".check_ubo_completeness(p_cbu_id);
-    
+
     -- Insert snapshot
     INSERT INTO "ob-poc".ubo_snapshots (
         cbu_id, case_id, snapshot_type, snapshot_reason,
@@ -312,12 +315,12 @@ BEGIN
         v_ubos, v_chains, v_controls,
         v_completeness.total_identified_ownership,
         NOT v_completeness.is_complete,
-        CASE WHEN NOT v_completeness.is_complete 
-             THEN v_completeness.issues::TEXT 
+        CASE WHEN NOT v_completeness.is_complete
+             THEN v_completeness.issues::TEXT
              ELSE NULL END,
         p_captured_by
     ) RETURNING snapshot_id INTO v_snapshot_id;
-    
+
     RETURN v_snapshot_id;
 END;
 $$ LANGUAGE plpgsql;

@@ -266,6 +266,243 @@ domains:
         returns:
           type: record_set
 
+      # -------------------------------------------------------------------------
+      # CBU Evidence Lifecycle Verbs (Phase 2)
+      # -------------------------------------------------------------------------
+
+      set-status:
+        description: "Update CBU status with transition validation"
+        behavior: crud
+        crud:
+          operation: update
+          table: cbus
+          schema: ob-poc
+          key: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+          - name: status
+            type: string
+            required: true
+            maps_to: status
+            valid_values:
+              [
+                DISCOVERED,
+                VALIDATION_PENDING,
+                VALIDATED,
+                UPDATE_PENDING_PROOF,
+                VALIDATION_FAILED,
+              ]
+        returns:
+          type: affected
+
+      attach-evidence:
+        description: "Attach evidence document or attestation to a CBU"
+        behavior: crud
+        crud:
+          operation: insert
+          table: cbu_evidence
+          schema: ob-poc
+          returning: evidence_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+          - name: evidence-type
+            type: string
+            required: true
+            maps_to: evidence_type
+            valid_values:
+              [
+                DOCUMENT,
+                ATTESTATION,
+                SCREENING,
+                REGISTRY_CHECK,
+                MANUAL_VERIFICATION,
+              ]
+          - name: document-id
+            type: uuid
+            required: false
+            maps_to: document_id
+          - name: attestation-ref
+            type: string
+            required: false
+            maps_to: attestation_ref
+          - name: evidence-category
+            type: string
+            required: false
+            maps_to: evidence_category
+            valid_values: [IDENTITY, OWNERSHIP, REGULATORY, FINANCIAL]
+          - name: description
+            type: string
+            required: false
+            maps_to: description
+          - name: attached-by
+            type: string
+            required: false
+            maps_to: attached_by
+        returns:
+          type: uuid
+          name: evidence_id
+          capture: true
+
+      verify-evidence:
+        description: "Verify or reject attached evidence"
+        behavior: crud
+        crud:
+          operation: update
+          table: cbu_evidence
+          schema: ob-poc
+          key: evidence_id
+          set_values:
+            verified_at: now()
+        args:
+          - name: evidence-id
+            type: uuid
+            required: true
+            maps_to: evidence_id
+          - name: verification-status
+            type: string
+            required: true
+            maps_to: verification_status
+            valid_values: [VERIFIED, REJECTED, EXPIRED]
+          - name: verified-by
+            type: string
+            required: false
+            maps_to: verified_by
+          - name: verification-notes
+            type: string
+            required: false
+            maps_to: verification_notes
+        returns:
+          type: affected
+
+      list-evidence:
+        description: "List evidence attached to a CBU"
+        behavior: crud
+        crud:
+          operation: select
+          table: cbu_evidence
+          schema: ob-poc
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+          - name: verification-status
+            type: string
+            required: false
+            maps_to: verification_status
+            valid_values: [PENDING, VERIFIED, REJECTED, EXPIRED]
+          - name: evidence-category
+            type: string
+            required: false
+            maps_to: evidence_category
+        returns:
+          type: record_set
+
+      log-change:
+        description: "Log a change to the CBU audit trail"
+        behavior: crud
+        crud:
+          operation: insert
+          table: cbu_change_log
+          schema: ob-poc
+          returning: log_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+          - name: change-type
+            type: string
+            required: true
+            maps_to: change_type
+            valid_values:
+              [
+                STATUS_CHANGE,
+                FIELD_UPDATE,
+                EVIDENCE_ADDED,
+                EVIDENCE_VERIFIED,
+                ROLE_CHANGE,
+                UBO_CHANGE,
+                PRODUCT_CHANGE,
+              ]
+          - name: field-name
+            type: string
+            required: false
+            maps_to: field_name
+          - name: old-value
+            type: json
+            required: false
+            maps_to: old_value
+          - name: new-value
+            type: json
+            required: false
+            maps_to: new_value
+          - name: evidence-ids
+            type: uuid_array
+            required: false
+            maps_to: evidence_ids
+          - name: changed-by
+            type: string
+            required: false
+            maps_to: changed_by
+          - name: reason
+            type: string
+            required: false
+            maps_to: reason
+          - name: case-id
+            type: uuid
+            required: false
+            maps_to: case_id
+        returns:
+          type: uuid
+          name: log_id
+          capture: false
+
+      list-changes:
+        description: "List change log entries for a CBU"
+        behavior: crud
+        crud:
+          operation: select
+          table: cbu_change_log
+          schema: ob-poc
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+          - name: change-type
+            type: string
+            required: false
+            maps_to: change_type
+          - name: limit
+            type: integer
+            required: false
+            default: 100
+          - name: offset
+            type: integer
+            required: false
+            default: 0
+        returns:
+          type: record_set
+
+      check-evidence-completeness:
+        description: "Check if CBU has all required evidence categories verified"
+        behavior: plugin
+        plugin:
+          handler: check_cbu_evidence_completeness
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+        returns:
+          type: record
+
   # ===========================================================================
   # DOMAIN: entity
   # ===========================================================================
@@ -2275,7 +2512,8 @@ domains:
             type: string
             required: true
             maps_to: verification_status
-            valid_values: [PENDING, VERIFIED, FAILED, DISPUTED]
+            valid_values:
+              [SUSPECTED, PENDING, PROVEN, VERIFIED, FAILED, DISPUTED, REMOVED]
           - name: risk-rating
             type: string
             required: false
@@ -2444,6 +2682,8 @@ domains:
           table: ubo_registry
           schema: ob-poc
           key: ubo_id
+          set_values:
+            closed_at: now()
         args:
           - name: ubo-id
             type: uuid
@@ -2516,6 +2756,256 @@ domains:
             required: true
         returns:
           type: record_set
+
+      # -------------------------------------------------------------------------
+      # UBO Discovery & Proof Lifecycle Verbs (Phase 3)
+      # -------------------------------------------------------------------------
+
+      assert:
+        description: "Assert a suspected UBO (creates SUSPECTED record pending proof)"
+        behavior: crud
+        crud:
+          operation: insert
+          table: ubo_registry
+          schema: ob-poc
+          returning: ubo_id
+          set_values:
+            verification_status: SUSPECTED
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+          - name: subject-entity-id
+            type: uuid
+            required: true
+            maps_to: subject_entity_id
+          - name: ubo-person-id
+            type: uuid
+            required: true
+            maps_to: ubo_proper_person_id
+          - name: relationship-type
+            type: string
+            required: true
+            maps_to: relationship_type
+          - name: qualifying-reason
+            type: string
+            required: true
+            maps_to: qualifying_reason
+            valid_values: [OWNERSHIP_25PCT, CONTROL, SENIOR_MANAGEMENT, OTHER]
+          - name: ownership-percentage
+            type: decimal
+            required: false
+            maps_to: ownership_percentage
+          - name: workflow-type
+            type: string
+            required: true
+            maps_to: workflow_type
+          - name: case-id
+            type: uuid
+            required: false
+            maps_to: case_id
+          - name: workstream-id
+            type: uuid
+            required: false
+            maps_to: workstream_id
+          - name: discovery-method
+            type: string
+            required: false
+            maps_to: discovery_method
+            valid_values: [MANUAL, INFERRED, DOCUMENT, REGISTRY, SCREENING]
+        returns:
+          type: uuid
+          name: ubo_id
+          capture: true
+
+      prove:
+        description: "Prove a UBO determination with evidence (transitions to PROVEN)"
+        behavior: crud
+        crud:
+          operation: update
+          table: ubo_registry
+          schema: ob-poc
+          key: ubo_id
+          set_values:
+            verification_status: PROVEN
+            proof_date: now()
+        args:
+          - name: ubo-id
+            type: uuid
+            required: true
+            maps_to: ubo_id
+          - name: proof-method
+            type: string
+            required: true
+            maps_to: proof_method
+            valid_values:
+              [
+                DOCUMENT,
+                REGISTRY_LOOKUP,
+                SCREENING_MATCH,
+                MANUAL_VERIFICATION,
+                OWNERSHIP_CHAIN,
+                CLIENT_ATTESTATION,
+              ]
+          - name: evidence-doc-ids
+            type: uuid_array
+            required: false
+            maps_to: evidence_doc_ids
+          - name: proof-notes
+            type: string
+            required: false
+            maps_to: proof_notes
+        returns:
+          type: affected
+
+      remove:
+        description: "Remove a UBO (no longer qualifies as UBO)"
+        behavior: crud
+        crud:
+          operation: update
+          table: ubo_registry
+          schema: ob-poc
+          key: ubo_id
+          set_values:
+            verification_status: REMOVED
+            closed_at: now()
+        args:
+          - name: ubo-id
+            type: uuid
+            required: true
+            maps_to: ubo_id
+          - name: removal-reason
+            type: string
+            required: true
+            maps_to: removal_reason
+          - name: replacement-ubo-id
+            type: uuid
+            required: false
+            maps_to: replacement_ubo_id
+        returns:
+          type: affected
+
+      attach-evidence:
+        description: "Attach evidence document to a UBO record"
+        behavior: crud
+        crud:
+          operation: insert
+          table: ubo_evidence
+          schema: ob-poc
+          returning: ubo_evidence_id
+        args:
+          - name: ubo-id
+            type: uuid
+            required: true
+            maps_to: ubo_id
+          - name: evidence-type
+            type: string
+            required: true
+            maps_to: evidence_type
+            valid_values:
+              [
+                DOCUMENT,
+                ATTESTATION,
+                SCREENING,
+                REGISTRY_LOOKUP,
+                OWNERSHIP_RECORD,
+              ]
+          - name: evidence-role
+            type: string
+            required: true
+            maps_to: evidence_role
+            valid_values:
+              [
+                IDENTITY_PROOF,
+                OWNERSHIP_PROOF,
+                CONTROL_PROOF,
+                ADDRESS_PROOF,
+                SOURCE_OF_WEALTH,
+                CHAIN_LINK,
+              ]
+          - name: document-id
+            type: uuid
+            required: false
+            maps_to: document_id
+          - name: attestation-ref
+            type: string
+            required: false
+            maps_to: attestation_ref
+          - name: description
+            type: string
+            required: false
+            maps_to: description
+          - name: attached-by
+            type: string
+            required: false
+            maps_to: attached_by
+        returns:
+          type: uuid
+          name: ubo_evidence_id
+          capture: true
+
+      verify-evidence:
+        description: "Verify or reject evidence attached to a UBO"
+        behavior: crud
+        crud:
+          operation: update
+          table: ubo_evidence
+          schema: ob-poc
+          key: ubo_evidence_id
+          set_values:
+            verified_at: now()
+        args:
+          - name: evidence-id
+            type: uuid
+            required: true
+            maps_to: ubo_evidence_id
+          - name: verification-status
+            type: string
+            required: true
+            maps_to: verification_status
+            valid_values: [VERIFIED, REJECTED, EXPIRED]
+          - name: verified-by
+            type: string
+            required: false
+            maps_to: verified_by
+          - name: verification-notes
+            type: string
+            required: false
+            maps_to: verification_notes
+        returns:
+          type: affected
+
+      list-evidence:
+        description: "List evidence attached to a UBO"
+        behavior: crud
+        crud:
+          operation: select
+          table: ubo_evidence
+          schema: ob-poc
+        args:
+          - name: ubo-id
+            type: uuid
+            required: true
+            maps_to: ubo_id
+          - name: verification-status
+            type: string
+            required: false
+            maps_to: verification_status
+        returns:
+          type: record_set
+
+      can-prove:
+        description: "Check if UBO has sufficient evidence to be proven"
+        behavior: plugin
+        plugin:
+          handler: can_prove_ubo
+        args:
+          - name: ubo-id
+            type: uuid
+            required: true
+        returns:
+          type: record
 
   # ===========================================================================
   # DOMAIN: share-class (Fund Share Classes and Investor Registry)
@@ -3342,6 +3832,8 @@ domains:
                 BLOCKED,
                 WITHDRAWN,
                 EXPIRED,
+                REFER_TO_REGULATOR,
+                DO_NOT_ONBOARD,
               ]
         returns:
           type: affected
@@ -3435,7 +3927,8 @@ domains:
             type: string
             required: true
             maps_to: status
-            valid_values: [APPROVED, REJECTED, WITHDRAWN, EXPIRED]
+            valid_values:
+              [APPROVED, REJECTED, WITHDRAWN, EXPIRED, DO_NOT_ONBOARD]
           - name: notes
             type: string
             required: false
@@ -3476,6 +3969,41 @@ domains:
             maps_to: status
         returns:
           type: record_set
+
+      # -------------------------------------------------------------------------
+      # Case Decision Verbs (Phase 4)
+      # -------------------------------------------------------------------------
+
+      apply-decision:
+        description: "Apply a decision to the case based on red-flag evaluation"
+        behavior: plugin
+        plugin:
+          handler: apply_case_decision
+        emits_event: case.decision-applied
+        args:
+          - name: case-id
+            type: uuid
+            required: true
+          - name: decision
+            type: string
+            required: true
+            valid_values:
+              [
+                APPROVE,
+                APPROVE_WITH_CONDITIONS,
+                ESCALATE,
+                REFER_TO_REGULATOR,
+                DO_NOT_ONBOARD,
+                REJECT,
+              ]
+          - name: decided-by
+            type: string
+            required: true
+          - name: notes
+            type: string
+            required: false
+        returns:
+          type: boolean
 
   # ===========================================================================
   # DOMAIN: entity-workstream (Per-entity workstream within a KYC case)
@@ -3557,6 +4085,8 @@ domains:
                 COMPLETE,
                 BLOCKED,
                 ENHANCED_DD,
+                REFERRED,
+                PROHIBITED,
               ]
         returns:
           type: affected
@@ -3904,6 +4434,58 @@ domains:
             type: string
             required: false
             maps_to: status
+        returns:
+          type: record_set
+
+      # -------------------------------------------------------------------------
+      # Red-Flag Aggregation Verbs (Phase 4)
+      # -------------------------------------------------------------------------
+
+      aggregate:
+        description: "Compute aggregated red-flag scores for a case"
+        behavior: plugin
+        plugin:
+          handler: compute_case_redflag_score
+        args:
+          - name: case-id
+            type: uuid
+            required: true
+        returns:
+          type: record
+
+      evaluate:
+        description: "Evaluate case and create decision recommendation snapshot"
+        behavior: plugin
+        plugin:
+          handler: evaluate_case_decision
+        args:
+          - name: case-id
+            type: uuid
+            required: true
+          - name: evaluated-by
+            type: string
+            required: false
+        returns:
+          type: uuid
+          name: snapshot_id
+          capture: true
+
+      list-evaluations:
+        description: "List evaluation snapshots for a case"
+        behavior: crud
+        crud:
+          operation: select
+          table: case_evaluation_snapshots
+          schema: ob-poc
+        args:
+          - name: case-id
+            type: uuid
+            required: true
+            maps_to: case_id
+          - name: limit
+            type: integer
+            required: false
+            default: 10
         returns:
           type: record_set
 
@@ -4963,6 +5545,7 @@ domains:
             required: false
             valid_values:
               [
+                DRAFT,
                 REQUIRED,
                 REQUESTED,
                 RECEIVED,
