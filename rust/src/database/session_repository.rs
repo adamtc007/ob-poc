@@ -15,21 +15,16 @@ use uuid::Uuid;
 // ============================================================================
 
 /// Session status enum matching DB constraint
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "VARCHAR", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
 pub enum SessionStatus {
+    #[default]
     Active,
     Completed,
     Aborted,
     Expired,
     Error,
-}
-
-impl Default for SessionStatus {
-    fn default() -> Self {
-        Self::Active
-    }
 }
 
 /// Primary domain detected from DSL execution

@@ -23,7 +23,8 @@
 (document.catalog
     :cbu-id @cbu
     :entity-id @person
-    :document-type "PROOF_OF_ADDRESS"
+    :document-type "UTILITY_BILL"
+    :title "Gas Bill - March 2024"
     :as @poa)
 
 ;; Create KYC case and workstream

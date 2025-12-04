@@ -1329,6 +1329,9 @@ impl GenericCrudExecutor {
 
     /// Execute query returning single row
     async fn execute_with_bindings(&self, sql: &str, values: &[SqlValue]) -> Result<PgRow> {
+        tracing::trace!(sql = %sql, bind_count = values.len(), "executing SQL (single row)");
+        tracing::trace!(bindings = ?values, "SQL bind values");
+
         let mut query = sqlx::query(sql);
         for val in values {
             query = Self::bind_sql_value(query, val);
@@ -1343,21 +1346,29 @@ impl GenericCrudExecutor {
         sql: &str,
         values: &[SqlValue],
     ) -> Result<Vec<PgRow>> {
+        tracing::trace!(sql = %sql, bind_count = values.len(), "executing SQL (multi row)");
+        tracing::trace!(bindings = ?values, "SQL bind values");
+
         let mut query = sqlx::query(sql);
         for val in values {
             query = Self::bind_sql_value(query, val);
         }
         let rows = query.fetch_all(&self.pool).await?;
+        tracing::trace!(row_count = rows.len(), "SQL returned rows");
         Ok(rows)
     }
 
     /// Execute non-query (INSERT/UPDATE/DELETE without RETURNING)
     async fn execute_non_query(&self, sql: &str, values: &[SqlValue]) -> Result<u64> {
+        tracing::trace!(sql = %sql, bind_count = values.len(), "executing SQL (non-query)");
+        tracing::trace!(bindings = ?values, "SQL bind values");
+
         let mut query = sqlx::query(sql);
         for val in values {
             query = Self::bind_sql_value(query, val);
         }
         let result = query.execute(&self.pool).await?;
+        tracing::trace!(rows_affected = result.rows_affected(), "SQL rows affected");
         Ok(result.rows_affected())
     }
 

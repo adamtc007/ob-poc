@@ -287,6 +287,14 @@ impl DslExecutor {
             // Clone the verb call so we can inject values
             let mut vc = step.verb_call.clone();
 
+            // Trace each verb execution
+            tracing::debug!(
+                step = step_index,
+                verb = %format!("{}.{}", &vc.domain, &vc.verb),
+                bind_as = ?step.bind_as,
+                "executing DSL step"
+            );
+
             // Inject values from previous steps
             for inj in &step.injections {
                 if let Some(ExecutionResult::Uuid(id)) = results.get(inj.from_step) {
@@ -327,6 +335,14 @@ impl DslExecutor {
 
             // Execute the verb call
             let result = self.execute_verb(&vc, ctx).await?;
+
+            // Trace the result
+            tracing::debug!(
+                step = step_index,
+                verb = %format!("{}.{}", &vc.domain, &vc.verb),
+                result = ?result,
+                "DSL step completed"
+            );
 
             // Record in idempotency table if enabled
             if ctx.idempotency_enabled {

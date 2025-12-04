@@ -24,6 +24,7 @@ use colored::Colorize;
 use std::io::{self, Read};
 use std::path::PathBuf;
 use std::process::ExitCode;
+use tracing_subscriber::EnvFilter;
 
 // Import from library
 use ob_poc::dsl_v2::{
@@ -191,6 +192,13 @@ enum Commands {
 // =============================================================================
 
 fn main() -> ExitCode {
+    // Initialize tracing subscriber (controlled by RUST_LOG env var)
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .with_target(true)
+        .with_writer(std::io::stderr)
+        .init();
+
     let cli = Cli::parse();
 
     let result = match cli.command {

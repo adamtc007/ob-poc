@@ -2729,10 +2729,8 @@ mod tests {
         assert!(registry.has("service-resource", "activate"));
         assert!(registry.has("service-resource", "suspend"));
         assert!(registry.has("service-resource", "decommission"));
-        // Delivery operations
-        assert!(registry.has("delivery", "record"));
-        assert!(registry.has("delivery", "complete"));
-        assert!(registry.has("delivery", "fail"));
+        assert!(registry.has("service-resource", "validate-attrs"));
+        // Delivery operations are now CRUD-based (delivery.yaml)
         // Custody operations
         assert!(registry.has("subcustodian", "lookup"));
         assert!(registry.has("cbu-custody", "lookup-ssi"));
@@ -2744,6 +2742,9 @@ mod tests {
     fn test_registry_list() {
         let registry = CustomOperationRegistry::new();
         let ops = registry.list();
-        assert_eq!(ops.len(), 25); // 6 original + 1 adverse-media + 6 resource + 3 delivery + 4 custody + 2 observation + 3 new observation/doc
+        // 7 original (entity-create, doc-catalog, doc-extract, ubo-calculate, 3 screening)
+        // + 6 resource + 4 custody + 4 observation + 1 doc-extract-observations
+        // + 3 threshold + 3 rfi + 7 ubo-analysis = 35
+        assert_eq!(ops.len(), 35);
     }
 }
