@@ -777,11 +777,118 @@ impl CbuGraphBuilder {
         graph: &mut CbuGraph,
         repo: &VisualizationRepository,
     ) -> Result<()> {
-        // Load service resource instances
+        // Load service delivery records (products → services → resources)
+        let deliveries = repo.get_service_deliveries(self.cbu_id).await?;
+
+        // Track which products and services we've already added
+        let mut products_added: std::collections::HashSet<Uuid> = std::collections::HashSet::new();
+        let mut services_added: std::collections::HashSet<Uuid> = std::collections::HashSet::new();
+
+        for delivery in &deliveries {
+            // Add product node if not already added
+            let product_id = format!("product-{}", delivery.product_id);
+            if products_added.insert(delivery.product_id) {
+                graph.add_node(GraphNode {
+                    id: product_id.clone(),
+                    node_type: NodeType::Product,
+                    layer: LayerType::Services,
+                    label: delivery.product_name.clone(),
+                    sublabel: None,
+                    status: NodeStatus::Active,
+                    data: serde_json::json!({
+                        "product_id": delivery.product_id
+                    }),
+                    ..Default::default()
+                });
+
+                // Edge: CBU → Product
+                graph.add_edge(GraphEdge {
+                    id: format!("cbu->{}", product_id),
+                    source: self.cbu_id.to_string(),
+                    target: product_id.clone(),
+                    edge_type: EdgeType::Delivers,
+                    label: None,
+                });
+            }
+
+            // Add service node if not already added
+            let service_id = format!("service-{}", delivery.service_id);
+            if services_added.insert(delivery.service_id) {
+                graph.add_node(GraphNode {
+                    id: service_id.clone(),
+                    node_type: NodeType::Service,
+                    layer: LayerType::Services,
+                    label: delivery.service_name.clone(),
+                    sublabel: delivery.delivery_status.clone(),
+                    status: match delivery.delivery_status.as_deref() {
+                        Some("DELIVERED") => NodeStatus::Active,
+                        Some("IN_PROGRESS") => NodeStatus::Pending,
+                        Some("FAILED") => NodeStatus::Expired,
+                        _ => NodeStatus::Pending,
+                    },
+                    data: serde_json::json!({
+                        "service_id": delivery.service_id,
+                        "delivery_status": delivery.delivery_status
+                    }),
+                    ..Default::default()
+                });
+
+                // Edge: Product → Service
+                let product_id = format!("product-{}", delivery.product_id);
+                graph.add_edge(GraphEdge {
+                    id: format!("{}->{}", product_id, service_id),
+                    source: product_id,
+                    target: service_id.clone(),
+                    edge_type: EdgeType::Delivers,
+                    label: None,
+                });
+            }
+
+            // Add resource instance if present
+            if let Some(instance_id) = delivery.instance_id {
+                let inst_id = format!("resource-{}", instance_id);
+
+                if !graph.has_node(&inst_id) {
+                    graph.add_node(GraphNode {
+                        id: inst_id.clone(),
+                        node_type: NodeType::Resource,
+                        layer: LayerType::Services,
+                        label: delivery
+                            .resource_type_name
+                            .clone()
+                            .unwrap_or_else(|| "Resource".to_string()),
+                        sublabel: delivery.instance_name.clone(),
+                        status: NodeStatus::Active,
+                        data: serde_json::json!({
+                            "instance_id": instance_id,
+                            "instance_name": delivery.instance_name
+                        }),
+                        ..Default::default()
+                    });
+
+                    // Edge: Service → Resource
+                    let service_id = format!("service-{}", delivery.service_id);
+                    graph.add_edge(GraphEdge {
+                        id: format!("{}->{}", service_id, inst_id),
+                        source: service_id,
+                        target: inst_id,
+                        edge_type: EdgeType::Delivers,
+                        label: None,
+                    });
+                }
+            }
+        }
+
+        // Also load any resource instances that aren't linked via service_delivery_map
         let instances = repo.get_resource_instances(self.cbu_id).await?;
 
         for inst in instances {
-            let inst_id = inst.instance_id.to_string();
+            let inst_id = format!("resource-{}", inst.instance_id);
+
+            // Skip if already added via service delivery
+            if graph.has_node(&inst_id) {
+                continue;
+            }
 
             graph.add_node(GraphNode {
                 id: inst_id.clone(),

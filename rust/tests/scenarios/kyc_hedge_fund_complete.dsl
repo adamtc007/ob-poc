@@ -1,21 +1,19 @@
 ;; =============================================================================
-;; KYC Complete Flow Test - Hedge Fund with Custody, Alternatives, Collateral
+;; KYC Complete Flow Test - Hedge Fund with Multi-Step UBO Discovery
 ;;
 ;; This scenario demonstrates the full KYC lifecycle:
-;; 1. CBU Discovery & Initial Allegation
+;; 1. CBU Discovery & Initial Structure
 ;; 2. KYC Case Creation
-;; 3. UBO Discovery (minimal ownership, no natural persons initially)
-;; 4. Threshold-Based Document Requirements
-;; 5. Evidence Collection & Verification
-;; 6. UBO Proof Iterations (discover -> assert -> prove)
-;; 7. CBU Changes During Case (new UBO discovered)
-;; 8. Red-Flag Aggregation & Decision
-;; 9. Case Closure
+;; 3. Entity Workstreams
+;; 4. Document Collection & Verification
+;; 5. UBO Discovery - First Iteration (Corporate Owners)
+;; 6. Screenings
+;; 7. Red Flags
+;; 8. UBO Discovery - Second Iteration (Natural Persons)
+;; 9. UBO Verification
+;; 10. Case Completion
 ;;
 ;; Hedge Fund: "Atlas Global Macro Fund" (Cayman)
-;; Products: Custody, Alternatives, Collateral Management
-;;
-;; DEBUG: Uses debug.checkpoint and debug.dump-cbu at each state transition
 ;; =============================================================================
 
 ;; =============================================================================
@@ -37,23 +35,6 @@
   :commercial-client-entity-id @holding-company
   :as @fund)
 
-;; ============ CHECKPOINT: CBU Created (DISCOVERED) ============
-(debug.checkpoint
-  :name "CBU_CREATED"
-  :cbu-id @fund
-  :message "CBU created in DISCOVERED status")
-(debug.dump-cbu :cbu-id @fund :format "yaml")
-
-;; CBU starts in DISCOVERED status - set to VALIDATION_PENDING
-(cbu.set-status :cbu-id @fund :status "VALIDATION_PENDING")
-
-;; ============ CHECKPOINT: CBU Status -> VALIDATION_PENDING ============
-(debug.checkpoint
-  :name "CBU_VALIDATION_PENDING"
-  :cbu-id @fund
-  :message "CBU transitioned to VALIDATION_PENDING")
-(debug.dump-cbu :cbu-id @fund :format "yaml")
-
 ;; Create the fund legal entity (issuer of shares)
 (entity.create-limited-company
   :name "Atlas Global Macro Fund LP"
@@ -63,47 +44,19 @@
 ;; Assign the fund entity as PRINCIPAL
 (cbu.assign-role :cbu-id @fund :entity-id @fund-entity :role "PRINCIPAL")
 
+;; Assign the holding company as COMMERCIAL_CLIENT (head office)
+(cbu.assign-role :cbu-id @fund :entity-id @holding-company :role "COMMERCIAL_CLIENT")
+
 ;; =============================================================================
-;; PART 2: INITIAL ALLEGATIONS (Client Claims - Unverified)
+;; PART 2: KYC CASE CREATION
 ;; =============================================================================
 
-;; Create KYC case first (needed for allegation tracking)
+;; Create KYC case
 (kyc-case.create
   :cbu-id @fund
   :case-type "NEW_CLIENT"
   :notes "New hedge fund onboarding - Custody + Alternatives + Collateral"
   :as @case)
-
-;; ============ CHECKPOINT: KYC Case Created (INTAKE) ============
-(debug.checkpoint
-  :name "CASE_CREATED"
-  :cbu-id @fund
-  :case-id @case
-  :message "KYC case created in INTAKE status")
-(debug.dump-case :case-id @case :format "yaml")
-
-;; Record initial client allegation about ownership
-;; "Client says: Fund is owned 60% by Atlas Capital Holdings Ltd"
-(allegation.record
-  :cbu-id @fund
-  :entity-id @fund-entity
-  :attribute-id "attr.ownership.parent_company"
-  :value {"owner_name": "Atlas Capital Holdings Ltd", "percentage": 60}
-  :display-value "60% owned by Atlas Capital Holdings Ltd"
-  :source "ONBOARDING_FORM"
-  :case-id @case
-  :as @alleg-ownership)
-
-;; "Client says: Remaining 40% held by institutional investors"
-(allegation.record
-  :cbu-id @fund
-  :entity-id @fund-entity
-  :attribute-id "attr.ownership.other_shareholders"
-  :value {"description": "Institutional investors", "percentage": 40}
-  :display-value "40% institutional investors"
-  :source "ONBOARDING_FORM"
-  :case-id @case
-  :as @alleg-other)
 
 ;; =============================================================================
 ;; PART 3: CREATE ENTITY WORKSTREAMS
@@ -126,34 +79,8 @@
 ;; Update case to DISCOVERY phase
 (kyc-case.update-status :case-id @case :status "DISCOVERY")
 
-;; ============ CHECKPOINT: Case Status -> DISCOVERY ============
-(debug.checkpoint
-  :name "CASE_DISCOVERY"
-  :cbu-id @fund
-  :case-id @case
-  :message "Case transitioned to DISCOVERY - workstreams created")
-(debug.dump-cbu :cbu-id @fund :format "yaml")
-(debug.dump-case :case-id @case :format "yaml")
-
 ;; =============================================================================
-;; PART 4: THRESHOLD EVALUATION & RFI GENERATION
-;; =============================================================================
-
-;; Derive risk band for the holding company (60% owner)
-(threshold.derive :cbu-id @fund :entity-id @holding-company :as @risk-holding)
-
-;; Derive risk band for the fund entity
-(threshold.derive :cbu-id @fund :entity-id @fund-entity :as @risk-fund)
-
-;; Generate document requests based on threshold requirements
-;; This creates doc_request records in kyc.doc_requests
-(rfi.generate :case-id @case :risk-band "MEDIUM" :as @rfi-batch)
-
-;; List what was generated
-(rfi.list-by-case :case-id @case)
-
-;; =============================================================================
-;; PART 5: DOCUMENT COLLECTION & VERIFICATION
+;; PART 4: DOCUMENT COLLECTION & VERIFICATION
 ;; =============================================================================
 
 ;; Create document requests for holding company
@@ -171,22 +98,22 @@
   :priority "HIGH"
   :as @doc-req-shareholders)
 
-;; Simulate: Documents received
-(doc-request.receive :request-id @doc-req-cert :document-id @doc-cert-placeholder)
-(doc-request.receive :request-id @doc-req-shareholders :document-id @doc-shareholders-placeholder)
-
-;; Catalog the documents
+;; Catalog the documents first
 (document.catalog
   :cbu-id @fund
-  :doc-type "CERT_OF_INCORPORATION"
-  :title "Atlas Capital Holdings - Certificate of Incorporation"
+  :entity-id @holding-company
+  :document-type "CERT_OF_INCORPORATION"
   :as @doc-cert)
 
 (document.catalog
   :cbu-id @fund
-  :doc-type "REGISTER_OF_SHAREHOLDERS"
-  :title "Atlas Capital Holdings - Register of Shareholders"
+  :entity-id @holding-company
+  :document-type "REGISTER_OF_SHAREHOLDERS"
   :as @doc-shareholders)
+
+;; Mark documents as received
+(doc-request.receive :request-id @doc-req-cert :document-id @doc-cert)
+(doc-request.receive :request-id @doc-req-shareholders :document-id @doc-shareholders)
 
 ;; Verify the document requests
 (doc-request.verify :request-id @doc-req-cert :verification-notes "Certificate valid, company active")
@@ -196,7 +123,7 @@
 (entity-workstream.update-status :workstream-id @ws-holding :status "VERIFY")
 
 ;; =============================================================================
-;; PART 6: UBO DISCOVERY - FIRST ITERATION
+;; PART 5: UBO DISCOVERY - FIRST ITERATION (Corporate Owners)
 ;; =============================================================================
 
 ;; From shareholder register, we discover the holding company is owned by:
@@ -220,16 +147,18 @@
   :owned-entity-id @holding-company
   :percentage 70
   :ownership-type "DIRECT"
-  :evidence-doc-id @doc-shareholders
-  :as @own-oceanic)
+  :evidence-doc-id @doc-shareholders)
 
 (ubo.add-ownership
   :owner-entity-id @nordic-trust
   :owned-entity-id @holding-company
   :percentage 30
   :ownership-type "DIRECT"
-  :evidence-doc-id @doc-shareholders
-  :as @own-nordic)
+  :evidence-doc-id @doc-shareholders)
+
+;; Link discovered entities to CBU with SHAREHOLDER role
+(cbu.assign-role :cbu-id @fund :entity-id @oceanic :role "SHAREHOLDER")
+(cbu.assign-role :cbu-id @fund :entity-id @nordic-trust :role "SHAREHOLDER")
 
 ;; Create workstreams for newly discovered entities
 (entity-workstream.create
@@ -248,31 +177,8 @@
   :discovery-depth 2
   :as @ws-nordic)
 
-;; ============ CHECKPOINT: First UBO Discovery Iteration ============
-(debug.checkpoint
-  :name "UBO_DISCOVERY_1"
-  :cbu-id @fund
-  :case-id @case
-  :message "First UBO iteration - discovered corporate owners (no natural persons yet)")
-(debug.dump-cbu :cbu-id @fund :include-ubos true :format "yaml")
-
-;; Assert suspected UBOs (we don't yet know the natural persons)
-;; These are corporate entities that WILL have UBOs behind them
-(ubo.assert
-  :cbu-id @fund
-  :subject-entity-id @fund-entity
-  :ubo-person-id @oceanic
-  :relationship-type "INDIRECT_OWNER"
-  :qualifying-reason "OWNERSHIP_25PCT"
-  :ownership-percentage 42
-  :workflow-type "ONBOARDING"
-  :case-id @case
-  :workstream-id @ws-oceanic
-  :discovery-method "DOCUMENT"
-  :as @ubo-oceanic-suspected)
-
 ;; =============================================================================
-;; PART 7: RUN SCREENINGS
+;; PART 6: RUN SCREENINGS
 ;; =============================================================================
 
 ;; Screen the discovered entities
@@ -308,7 +214,7 @@
   :result-summary "No sanctions matches")
 
 ;; =============================================================================
-;; PART 8: RAISE RED FLAGS FROM FINDINGS
+;; PART 7: RAISE RED FLAGS FROM FINDINGS
 ;; =============================================================================
 
 ;; Raise red flag for adverse media hit
@@ -319,7 +225,6 @@
   :severity "SOFT"
   :description "Oceanic Investments received regulatory fine in 2019 for late filing"
   :source "SCREENING"
-  :source-reference @screen-oceanic-media
   :as @flag-media)
 
 ;; Raise red flag for complex structure (Jersey trust involved)
@@ -332,26 +237,16 @@
   :source "ANALYST"
   :as @flag-structure)
 
-;; ============ CHECKPOINT: Red Flags Raised ============
-(debug.checkpoint
-  :name "RED_FLAGS_RAISED"
-  :cbu-id @fund
-  :case-id @case
-  :message "Red flags raised from screenings and structure analysis")
-(debug.dump-case :case-id @case :include-red-flags true :format "yaml")
-
 ;; =============================================================================
-;; PART 9: UBO DISCOVERY - SECOND ITERATION (Find Natural Persons)
+;; PART 8: UBO DISCOVERY - SECOND ITERATION (Find Natural Persons)
 ;; =============================================================================
 
 ;; Request additional documents for Oceanic
 (doc-request.create
   :workstream-id @ws-oceanic
   :doc-type "REGISTER_OF_SHAREHOLDERS"
-  :is-mandatory true
-  :as @doc-req-oceanic-shareholders)
+  :is-mandatory true)
 
-;; Simulate document received and processed
 ;; Discovery: Oceanic is 100% owned by "Chen Wei" (Singapore citizen)
 (entity.create-proper-person
   :first-name "Chen"
@@ -362,8 +257,10 @@
   :owner-entity-id @chen-wei
   :owned-entity-id @oceanic
   :percentage 100
-  :ownership-type "DIRECT"
-  :as @own-chen)
+  :ownership-type "DIRECT")
+
+;; Link Chen Wei to CBU as BENEFICIAL_OWNER
+(cbu.assign-role :cbu-id @fund :entity-id @chen-wei :role "BENEFICIAL_OWNER")
 
 ;; Create workstream for discovered natural person
 (entity-workstream.create
@@ -375,16 +272,8 @@
   :is-ubo true
   :as @ws-chen)
 
-;; ============ CHECKPOINT: Natural Person UBO Discovered ============
-(debug.checkpoint
-  :name "UBO_DISCOVERY_2"
-  :cbu-id @fund
-  :case-id @case
-  :message "Second UBO iteration - natural person Chen Wei discovered")
-(debug.dump-cbu :cbu-id @fund :include-ubos true :include-entities true :format "yaml")
-
-;; Assert Chen Wei as UBO
-(ubo.assert
+;; Register Chen Wei as UBO (42% indirect = 70% of 60%)
+(ubo.register-ubo
   :cbu-id @fund
   :subject-entity-id @fund-entity
   :ubo-person-id @chen-wei
@@ -392,10 +281,7 @@
   :qualifying-reason "OWNERSHIP_25PCT"
   :ownership-percentage 42
   :workflow-type "ONBOARDING"
-  :case-id @case
-  :workstream-id @ws-chen
-  :discovery-method "DOCUMENT"
-  :as @ubo-chen-suspected)
+  :as @ubo-chen)
 
 ;; Screen the UBO
 (case-screening.run
@@ -420,124 +306,24 @@
   :result-summary "No sanctions matches")
 
 ;; =============================================================================
-;; PART 10: UBO PROOF WITH EVIDENCE
+;; PART 9: UBO VERIFICATION
 ;; =============================================================================
 
 ;; Catalog passport for Chen Wei
 (document.catalog
   :cbu-id @fund
-  :doc-type "PASSPORT"
-  :title "Chen Wei - Singapore Passport"
+  :entity-id @chen-wei
+  :document-type "PASSPORT"
   :as @doc-chen-passport)
 
-;; Attach evidence to UBO record
-(ubo.attach-evidence
-  :ubo-id @ubo-chen-suspected
-  :evidence-type "DOCUMENT"
-  :evidence-role "IDENTITY_PROOF"
-  :document-id @doc-chen-passport
-  :description "Singapore passport for Chen Wei"
-  :attached-by "analyst@bank.com"
-  :as @evidence-chen-identity)
-
-(ubo.attach-evidence
-  :ubo-id @ubo-chen-suspected
-  :evidence-type "DOCUMENT"
-  :evidence-role "OWNERSHIP_PROOF"
-  :document-id @doc-shareholders
-  :description "Chain: Atlas Holdings -> Oceanic -> Chen Wei"
-  :attached-by "analyst@bank.com"
-  :as @evidence-chen-ownership)
-
-;; Verify the evidence
-(ubo.verify-evidence
-  :evidence-id @evidence-chen-identity
+;; Verify UBO
+(ubo.verify-ubo
+  :ubo-id @ubo-chen
   :verification-status "VERIFIED"
-  :verified-by "senior.analyst@bank.com"
-  :verification-notes "Passport valid until 2028")
-
-(ubo.verify-evidence
-  :evidence-id @evidence-chen-ownership
-  :verification-status "VERIFIED"
-  :verified-by "senior.analyst@bank.com"
-  :verification-notes "Ownership chain verified through corporate docs")
-
-;; Check if UBO can be proven
-(ubo.can-prove :ubo-id @ubo-chen-suspected)
-
-;; Prove the UBO
-(ubo.prove
-  :ubo-id @ubo-chen-suspected
-  :proof-method "DOCUMENT"
-  :evidence-doc-ids [@doc-chen-passport @doc-shareholders]
-  :proof-notes "UBO proven via passport and ownership chain documentation")
-
-;; ============ CHECKPOINT: UBO Proven ============
-(debug.checkpoint
-  :name "UBO_PROVEN"
-  :cbu-id @fund
-  :case-id @case
-  :message "Chen Wei UBO status: SUSPECTED -> PROVEN")
-(debug.dump-cbu :cbu-id @fund :include-ubos true :format "yaml")
+  :risk-rating "LOW")
 
 ;; =============================================================================
-;; PART 11: CBU EVIDENCE & STATUS UPDATE
-;; =============================================================================
-
-;; Attach evidence to CBU
-(cbu.attach-evidence
-  :cbu-id @fund
-  :evidence-type "DOCUMENT"
-  :document-id @doc-cert
-  :evidence-category "IDENTITY"
-  :description "Certificate of Incorporation for holding company"
-  :attached-by "analyst@bank.com"
-  :as @cbu-evidence-cert)
-
-(cbu.attach-evidence
-  :cbu-id @fund
-  :evidence-type "DOCUMENT"
-  :document-id @doc-shareholders
-  :evidence-category "OWNERSHIP"
-  :description "Ownership structure documentation"
-  :attached-by "analyst@bank.com"
-  :as @cbu-evidence-ownership)
-
-;; Verify CBU evidence
-(cbu.verify-evidence
-  :evidence-id @cbu-evidence-cert
-  :verification-status "VERIFIED"
-  :verified-by "senior.analyst@bank.com")
-
-(cbu.verify-evidence
-  :evidence-id @cbu-evidence-ownership
-  :verification-status "VERIFIED"
-  :verified-by "senior.analyst@bank.com")
-
-;; Check CBU evidence completeness
-(cbu.check-evidence-completeness :cbu-id @fund)
-
-;; Log changes to audit trail
-(cbu.log-change
-  :cbu-id @fund
-  :change-type "EVIDENCE_VERIFIED"
-  :field-name "ownership_structure"
-  :new-value {"verified": true, "ubos_identified": 1}
-  :evidence-ids [@cbu-evidence-cert @cbu-evidence-ownership]
-  :changed-by "senior.analyst@bank.com"
-  :reason "Ownership structure verified through documentation"
-  :case-id @case)
-
-;; ============ CHECKPOINT: CBU Evidence Verified ============
-(debug.checkpoint
-  :name "CBU_EVIDENCE_VERIFIED"
-  :cbu-id @fund
-  :case-id @case
-  :message "CBU evidence attached and verified")
-(debug.dump-cbu :cbu-id @fund :include-evidence true :format "yaml")
-
-;; =============================================================================
-;; PART 12: MITIGATE RED FLAGS
+;; PART 10: MITIGATE RED FLAGS
 ;; =============================================================================
 
 ;; Mitigate the adverse media flag
@@ -550,155 +336,51 @@
   :red-flag-id @flag-structure
   :notes "Full ownership chain documented, natural person UBO identified and verified")
 
-;; ============ CHECKPOINT: Red Flags Mitigated ============
-(debug.checkpoint
-  :name "RED_FLAGS_MITIGATED"
-  :cbu-id @fund
-  :case-id @case
-  :message "Red flags mitigated - ready for assessment")
-(debug.dump-case :case-id @case :include-red-flags true :format "yaml")
-
 ;; =============================================================================
-;; PART 13: RED-FLAG AGGREGATION & EVALUATION
+;; PART 11: CASE ASSESSMENT & COMPLETION
 ;; =============================================================================
 
 ;; Update case to ASSESSMENT
 (kyc-case.update-status :case-id @case :status "ASSESSMENT")
-
-;; ============ CHECKPOINT: Case Status -> ASSESSMENT ============
-(debug.checkpoint
-  :name "CASE_ASSESSMENT"
-  :cbu-id @fund
-  :case-id @case
-  :message "Case transitioned to ASSESSMENT")
 
 ;; Complete workstreams
 (entity-workstream.update-status :workstream-id @ws-holding :status "COMPLETE")
 (entity-workstream.update-status :workstream-id @ws-fund-entity :status "COMPLETE")
 (entity-workstream.update-status :workstream-id @ws-oceanic :status "COMPLETE")
 (entity-workstream.update-status :workstream-id @ws-chen :status "COMPLETE")
-(entity-workstream.update-status :workstream-id @ws-nordic :status "ASSESS")
-
-;; Aggregate red-flag scores
-(red-flag.aggregate :case-id @case)
-
-;; Evaluate case for decision
-(red-flag.evaluate :case-id @case :evaluated-by "compliance.manager@bank.com" :as @eval-snapshot)
-
-;; List evaluations
-(red-flag.list-evaluations :case-id @case)
-
-;; ============ CHECKPOINT: Case Evaluated ============
-(debug.checkpoint
-  :name "CASE_EVALUATED"
-  :cbu-id @fund
-  :case-id @case
-  :message "Red-flag aggregation complete, case evaluated")
-(debug.dump-case :case-id @case :format "yaml")
+(entity-workstream.update-status :workstream-id @ws-nordic :status "COMPLETE")
 
 ;; =============================================================================
-;; PART 14: UBO SNAPSHOT & COMPLETENESS CHECK
-;; =============================================================================
-
-;; Check UBO completeness
-(ubo.check-completeness :cbu-id @fund :threshold 25.0)
-
-;; Capture UBO snapshot
-(ubo.snapshot-cbu
-  :cbu-id @fund
-  :case-id @case
-  :snapshot-type "CASE_CLOSE"
-  :reason "Pre-approval UBO snapshot"
-  :as @ubo-snapshot)
-
-;; Trace ownership chains
-(ubo.trace-chains :cbu-id @fund :threshold 25.0)
-
-;; =============================================================================
-;; PART 15: FINAL DECISION & CASE CLOSURE
+;; PART 12: FINAL DECISION & CASE CLOSURE
 ;; =============================================================================
 
 ;; Update case to REVIEW
 (kyc-case.update-status :case-id @case :status "REVIEW")
 
-;; ============ CHECKPOINT: Case Status -> REVIEW ============
-(debug.checkpoint
-  :name "CASE_REVIEW"
-  :cbu-id @fund
-  :case-id @case
-  :message "Case transitioned to REVIEW - ready for decision")
-
 ;; Set risk rating
 (kyc-case.set-risk-rating :case-id @case :risk-rating "MEDIUM")
 
-;; Apply decision (based on evaluation)
-(kyc-case.apply-decision
-  :case-id @case
-  :decision "APPROVE"
-  :decided-by "compliance.director@bank.com"
-  :notes "Approved - all UBOs identified and verified, red flags mitigated")
-
-;; ============ CHECKPOINT: Decision Applied ============
-(debug.checkpoint
-  :name "DECISION_APPLIED"
-  :cbu-id @fund
-  :case-id @case
-  :message "APPROVE decision applied to case")
-
-;; Update CBU status to VALIDATED
-(cbu.set-status :cbu-id @fund :status "VALIDATED")
-
-;; ============ CHECKPOINT: CBU Status -> VALIDATED ============
-(debug.checkpoint
-  :name "CBU_VALIDATED"
-  :cbu-id @fund
-  :message "CBU transitioned to VALIDATED - onboarding complete")
-(debug.dump-cbu :cbu-id @fund :format "yaml")
-
-;; Close the case
+;; Close the case as approved
 (kyc-case.close
   :case-id @case
   :status "APPROVED"
-  :notes "Hedge fund onboarding complete. Products: Custody, Alternatives, Collateral Management")
-
-;; ============ FINAL CHECKPOINT: Case Closed ============
-(debug.checkpoint
-  :name "CASE_CLOSED"
-  :cbu-id @fund
-  :case-id @case
-  :message "KYC case APPROVED and closed")
-(debug.dump-cbu :cbu-id @fund :format "yaml")
-(debug.dump-case :case-id @case :format "yaml")
+  :notes "Hedge fund onboarding complete. All UBOs identified and verified.")
 
 ;; =============================================================================
-;; Verify DSL source persistence
+;; List UBOs for verification
 ;; =============================================================================
-(debug.list-dsl-instances :limit 5)
+(ubo.list-ubos :cbu-id @fund)
 
 ;; =============================================================================
-;; SUMMARY: Checkpoints logged at each state transition:
-;;
-;; CBU Lifecycle:
-;;   CBU_CREATED          -> DISCOVERED (initial)
-;;   CBU_VALIDATION_PENDING -> VALIDATION_PENDING
-;;   CBU_EVIDENCE_VERIFIED  -> evidence attached
-;;   CBU_VALIDATED         -> VALIDATED (final)
-;;
-;; Case Lifecycle:
-;;   CASE_CREATED    -> INTAKE
-;;   CASE_DISCOVERY  -> DISCOVERY
-;;   CASE_ASSESSMENT -> ASSESSMENT
-;;   CASE_REVIEW     -> REVIEW
-;;   CASE_EVALUATED  -> evaluated with red-flag scores
-;;   DECISION_APPLIED -> APPROVE decision
-;;   CASE_CLOSED     -> APPROVED (final)
-;;
-;; UBO Lifecycle:
-;;   UBO_DISCOVERY_1 -> Corporate owners discovered (no persons)
-;;   UBO_DISCOVERY_2 -> Natural person Chen Wei discovered
-;;   UBO_PROVEN      -> Chen Wei SUSPECTED -> PROVEN
-;;
-;; Red Flags:
-;;   RED_FLAGS_RAISED    -> 2 SOFT flags raised
-;;   RED_FLAGS_MITIGATED -> Both mitigated
+;; SUMMARY:
+;; CBU Created: "Atlas Global Macro Fund" (Cayman hedge fund)
+;; Entities:
+;;   - Atlas Capital Holdings Ltd (GB) - commercial client
+;;   - Atlas Global Macro Fund LP (KY) - fund entity/principal
+;;   - Oceanic Investments Pte Ltd (SG) - 70% owner of Holdings
+;;   - Nordic Trust Services (JE) - 30% owner of Holdings
+;;   - Chen Wei - natural person, 100% owner of Oceanic
+;; UBO: Chen Wei (42% indirect ownership via Oceanic -> Holdings -> Fund)
+;; Case: NEW_CLIENT -> DISCOVERY -> ASSESSMENT -> REVIEW -> APPROVED
+;; Red Flags: 2 raised (ADVERSE_MEDIA, COMPLEX_STRUCTURE), both mitigated
 ;; =============================================================================

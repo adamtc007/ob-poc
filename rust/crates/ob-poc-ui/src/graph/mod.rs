@@ -48,6 +48,9 @@ pub use layout::LayoutEngine;
 pub use render::GraphRenderer;
 pub use types::*;
 
+// Re-export ViewMode from graph_view (single source of truth)
+pub use crate::graph_view::ViewMode;
+
 use egui::{Color32, Rect, Sense, Vec2};
 
 // =============================================================================
@@ -60,7 +63,9 @@ pub struct CbuGraphWidget {
     camera: Camera2D,
     /// Input state (hover, selection)
     input_state: InputState,
-    /// Computed layout graph
+    /// Raw graph data from server (100% CBU structure)
+    raw_data: Option<CbuGraphData>,
+    /// Computed layout graph (filtered subset based on view mode)
     layout_graph: Option<LayoutGraph>,
     /// Renderer
     renderer: GraphRenderer,
@@ -81,6 +86,7 @@ impl CbuGraphWidget {
         Self {
             camera: Camera2D::new(),
             input_state: InputState::new(),
+            raw_data: None,
             layout_graph: None,
             renderer: GraphRenderer::new(),
             view_mode: ViewMode::KycUbo,
@@ -88,31 +94,103 @@ impl CbuGraphWidget {
         }
     }
 
-    /// Set graph data from server response
+    /// Set graph data from server response (stores full data, filters for current view)
     pub fn set_data(&mut self, data: CbuGraphData) {
-        // Determine category and create layout engine
-        let category = data
-            .cbu_category
-            .as_ref()
-            .map(|s| CbuCategory::from_str(s))
-            .unwrap_or_default();
-
-        let engine = LayoutEngine::new(category);
-        self.layout_graph = Some(engine.compute_layout(&data));
+        self.raw_data = Some(data);
+        self.recompute_layout();
         self.needs_initial_fit = true;
         self.input_state.clear_focus();
     }
 
     /// Clear the graph
     pub fn clear(&mut self) {
+        self.raw_data = None;
         self.layout_graph = None;
         self.input_state.clear_focus();
     }
 
-    /// Set view mode (KYC/UBO or Onboarding)
+    /// Set view mode and re-filter/re-layout
     pub fn set_view_mode(&mut self, mode: ViewMode) {
-        self.view_mode = mode;
-        // TODO: Re-layout or filter nodes based on view mode
+        if self.view_mode != mode {
+            self.view_mode = mode;
+            #[cfg(target_arch = "wasm32")]
+            web_sys::console::log_1(&format!("View mode changed to: {:?}", mode).into());
+            self.recompute_layout();
+            self.needs_initial_fit = true;
+        }
+    }
+
+    /// Filter raw data by view mode and recompute layout
+    fn recompute_layout(&mut self) {
+        let Some(ref raw) = self.raw_data else {
+            self.layout_graph = None;
+            return;
+        };
+
+        // Filter nodes/edges based on view mode
+        let filtered = self.filter_by_view_mode(raw);
+
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(
+            &format!(
+                "Recompute layout: raw={} nodes, filtered={} nodes, view={:?}",
+                raw.nodes.len(),
+                filtered.nodes.len(),
+                self.view_mode
+            )
+            .into(),
+        );
+
+        // Determine category and create layout engine
+        let category = filtered
+            .cbu_category
+            .as_ref()
+            .map(|s| CbuCategory::from_str(s))
+            .unwrap_or_default();
+
+        let engine = LayoutEngine::new(category);
+        self.layout_graph = Some(engine.compute_layout(&filtered));
+    }
+
+    /// Filter graph data based on current view mode
+    /// - KycUbo: Core + Kyc + Ubo layers
+    /// - ServiceDelivery: Core + Services (products, services, resources)
+    fn filter_by_view_mode(&self, data: &CbuGraphData) -> CbuGraphData {
+        let allowed_layers: &[&str] = match self.view_mode {
+            ViewMode::KycUbo => &["core", "kyc", "ubo"],
+            ViewMode::ServiceDelivery => &["core", "services"],
+        };
+
+        // Filter nodes by layer
+        let filtered_nodes: Vec<GraphNodeData> = data
+            .nodes
+            .iter()
+            .filter(|n| allowed_layers.contains(&n.layer.as_str()))
+            .cloned()
+            .collect();
+
+        // Collect IDs of filtered nodes for edge filtering
+        let node_ids: std::collections::HashSet<&str> =
+            filtered_nodes.iter().map(|n| n.id.as_str()).collect();
+
+        // Filter edges - both source and target must be in filtered nodes
+        let filtered_edges: Vec<GraphEdgeData> = data
+            .edges
+            .iter()
+            .filter(|e| {
+                node_ids.contains(e.source.as_str()) && node_ids.contains(e.target.as_str())
+            })
+            .cloned()
+            .collect();
+
+        CbuGraphData {
+            cbu_id: data.cbu_id,
+            label: data.label.clone(),
+            cbu_category: data.cbu_category.clone(),
+            jurisdiction: data.jurisdiction.clone(),
+            nodes: filtered_nodes,
+            edges: filtered_edges,
+        }
     }
 
     /// Get current view mode

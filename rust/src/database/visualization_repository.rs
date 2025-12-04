@@ -38,6 +38,16 @@ pub struct OfficerView {
     pub roles: Vec<String>,
 }
 
+/// Entity with role information for CBU tree building
+#[derive(Debug, Clone)]
+pub struct EntityWithRoleView {
+    pub entity_id: Uuid,
+    pub name: String,
+    pub entity_type: String,
+    pub jurisdiction: Option<String>,
+    pub role_name: String,
+}
+
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct ShareClassView {
     pub id: Uuid,
@@ -548,6 +558,41 @@ impl VisualizationRepository {
                 name: r.name,
                 jurisdiction: r.jurisdiction,
                 entity_type: r.entity_type,
+            })
+            .collect())
+    }
+
+    /// Get ALL entities linked to a CBU via any role
+    /// Returns each entity with their role (entity may appear multiple times if multiple roles)
+    pub async fn get_all_linked_entities(&self, cbu_id: Uuid) -> Result<Vec<EntityWithRoleView>> {
+        let rows = sqlx::query!(
+            r#"SELECT e.entity_id, e.name,
+                      et.type_code as "entity_type!",
+                      COALESCE(lc.jurisdiction, p.jurisdiction, t.jurisdiction, pp.nationality) as jurisdiction,
+                      r.name as "role_name!"
+               FROM "ob-poc".cbu_entity_roles cer
+               JOIN "ob-poc".entities e ON e.entity_id = cer.entity_id
+               JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
+               JOIN "ob-poc".roles r ON cer.role_id = r.role_id
+               LEFT JOIN "ob-poc".entity_limited_companies lc ON e.entity_id = lc.entity_id
+               LEFT JOIN "ob-poc".entity_partnerships p ON e.entity_id = p.entity_id
+               LEFT JOIN "ob-poc".entity_trusts t ON e.entity_id = t.entity_id
+               LEFT JOIN "ob-poc".entity_proper_persons pp ON e.entity_id = pp.entity_id
+               WHERE cer.cbu_id = $1
+               ORDER BY r.name, e.name"#,
+            cbu_id
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| EntityWithRoleView {
+                entity_id: r.entity_id,
+                name: r.name,
+                entity_type: r.entity_type,
+                jurisdiction: r.jurisdiction,
+                role_name: r.role_name,
             })
             .collect())
     }

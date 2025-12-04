@@ -77,7 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Serve index.html at root - redirect to WASM app
         .route("/", get(serve_index))
         // Serve static files for WASM app
-        .nest_service("/pkg", ServeDir::new("crates/ob-poc-ui/pkg"))
+        .nest_service("/pkg", ServeDir::new("static/pkg"))
         // API routes
         .merge(create_graph_router(pool.clone()))
         .merge(create_agent_router(pool.clone()))
@@ -195,7 +195,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     <div class="loading" id="loading">Loading WASM app...</div>
     <canvas id="ob_poc_canvas"></canvas>
     <script type="module">
-        import init from './pkg/ob_poc_ui.js';
+        // Cache bust: v2
+        import init from './pkg/ob_poc_ui.js?v=2';
 
         init().then(() => {
             document.getElementById('loading').style.display = 'none';

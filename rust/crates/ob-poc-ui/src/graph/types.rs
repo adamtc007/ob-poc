@@ -390,15 +390,7 @@ impl LayoutGraph {
 }
 
 // =============================================================================
-// VIEW MODE
+// VIEW MODE - re-exported from graph_view
 // =============================================================================
 
-/// Which overlay to show on the graph
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum ViewMode {
-    #[default]
-    /// KYC/UBO view - shows ownership, control, beneficial owners
-    KycUbo,
-    /// Onboarding view - shows service delivery, resources
-    Onboarding,
-}
+// ViewMode is defined in graph_view.rs and re-exported through mod.rs

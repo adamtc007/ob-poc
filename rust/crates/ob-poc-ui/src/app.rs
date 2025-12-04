@@ -60,7 +60,7 @@ impl ObPocApp {
             api: ApiClient::new(&base_url),
             graph_view: GraphView::new(),
             graph_widget: CbuGraphWidget::new(),
-            use_new_graph: true,
+            use_new_graph: false, // Use Tree layout (Template is incomplete)
             selected_cbu: None,
             cbu_list: Vec::new(),
             loading: false,
@@ -111,10 +111,11 @@ impl ObPocApp {
         let api = self.api.clone();
 
         if self.use_new_graph {
-            // Load graph data for new widget
+            // Load FULL graph data - widget filters by view mode
             let result = Arc::new(Mutex::new(None));
             let result_clone = result.clone();
             let path = format!("/api/cbu/{}/graph", cbu_id);
+            self.graph_widget.set_view_mode(self.view_mode);
 
             #[cfg(target_arch = "wasm32")]
             {
@@ -219,7 +220,6 @@ impl eframe::App for ObPocApp {
         let mut clicked_cbu_id: Option<uuid::Uuid> = None;
         let mut refresh_clicked = false;
         let mut view_changed = false;
-        let mut graph_mode_changed = false;
         let mut new_view_mode = self.view_mode;
 
         // Top panel - CBU selector and view toggle
@@ -276,24 +276,6 @@ impl eframe::App for ObPocApp {
                     view_changed = true;
                 }
 
-                ui.separator();
-
-                // Toggle between old tree view and new graph widget
-                ui.label("Layout:");
-                if ui
-                    .selectable_label(self.use_new_graph, "Template")
-                    .clicked()
-                    && !self.use_new_graph
-                {
-                    self.use_new_graph = true;
-                    graph_mode_changed = true;
-                }
-                if ui.selectable_label(!self.use_new_graph, "Tree").clicked() && self.use_new_graph
-                {
-                    self.use_new_graph = false;
-                    graph_mode_changed = true;
-                }
-
                 if self.loading {
                     ui.spinner();
                 }
@@ -308,18 +290,23 @@ impl eframe::App for ObPocApp {
             self.load_cbu_list();
         }
         if view_changed {
+            #[cfg(target_arch = "wasm32")]
+            web_sys::console::log_1(
+                &format!(
+                    "View changed: old={:?}, new={:?}, use_new_graph={}",
+                    self.view_mode, new_view_mode, self.use_new_graph
+                )
+                .into(),
+            );
             self.view_mode = new_view_mode;
-            if let Some(cbu_id) = self.selected_cbu {
+            if self.use_new_graph {
+                // New graph widget: just update view mode (re-filters cached data)
+                self.graph_widget.set_view_mode(new_view_mode);
+            } else if let Some(cbu_id) = self.selected_cbu {
+                // Old tree view: needs to reload from API
                 self.load_cbu_view(cbu_id);
             }
         }
-        if graph_mode_changed {
-            // Reload with the new mode
-            if let Some(cbu_id) = self.selected_cbu {
-                self.load_cbu_view(cbu_id);
-            }
-        }
-
         // Central panel - Graph view (full width)
         egui::CentralPanel::default().show(ctx, |ui| {
             if self.loading {

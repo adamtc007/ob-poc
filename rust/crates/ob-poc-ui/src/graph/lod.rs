@@ -12,11 +12,12 @@ use super::types::{EntityType, LayoutNode, PrimaryRole};
 // =============================================================================
 
 /// Level of detail for node rendering
+/// Thresholds adjusted: Micro < 8px < Icon < 20px < Compact < 40px < Standard < 80px < Expanded
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DetailLevel {
     /// < 8px: colored dot only
     Micro,
-    /// 8-20px: shape + status color
+    /// 8-20px: shape + status color (no text)
     Icon,
     /// 20-40px: shape + truncated name
     Compact,
@@ -30,17 +31,21 @@ pub enum DetailLevel {
 
 impl DetailLevel {
     /// Determine LOD from screen-space radius
+    /// Based on zoom percentage of base node size (~100px):
+    /// - Icon only: < 20% (< 20px)
+    /// - Labels (Compact): 20-70% (20-70px)
+    /// - Full text (Standard+): 70%+ (70px+)
     pub fn from_screen_size(screen_width: f32, is_focused: bool) -> Self {
         if is_focused {
             return DetailLevel::Focused;
         }
 
         match screen_width {
-            w if w < 16.0 => DetailLevel::Micro,
-            w if w < 40.0 => DetailLevel::Icon,
-            w if w < 80.0 => DetailLevel::Compact,
-            w if w < 160.0 => DetailLevel::Standard,
-            _ => DetailLevel::Expanded,
+            w if w < 10.0 => DetailLevel::Micro,     // tiny dot
+            w if w < 20.0 => DetailLevel::Icon,      // icon only, no text (< 20%)
+            w if w < 70.0 => DetailLevel::Compact,   // labels/truncated name (20-70%)
+            w if w < 120.0 => DetailLevel::Standard, // full text (70%+)
+            _ => DetailLevel::Expanded,              // all details
         }
     }
 }

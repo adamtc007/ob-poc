@@ -406,9 +406,16 @@ impl GenericCrudExecutor {
         if let Some(set_values) = &crud.set_values {
             for (col, value) in set_values {
                 if let Some(s) = value.as_str() {
-                    sets.push(format!("\"{}\" = ${}", col, idx));
-                    bind_values.push(SqlValue::String(s.to_string()));
-                    idx += 1;
+                    // Check if this is a SQL expression (e.g., now(), CURRENT_TIMESTAMP)
+                    let s_lower = s.to_lowercase();
+                    if s_lower == "now()" || s_lower == "current_timestamp" {
+                        sets.push(format!("\"{}\" = NOW()", col));
+                        // No bind value needed for SQL expression
+                    } else {
+                        sets.push(format!("\"{}\" = ${}", col, idx));
+                        bind_values.push(SqlValue::String(s.to_string()));
+                        idx += 1;
+                    }
                 } else if let Some(b) = value.as_bool() {
                     sets.push(format!("\"{}\" = ${}", col, idx));
                     bind_values.push(SqlValue::Boolean(b));
@@ -425,8 +432,8 @@ impl GenericCrudExecutor {
             bail!("No columns to update for {}.{}", verb.domain, verb.verb);
         }
 
-        // Add updated_at if not explicitly set
-        sets.push("\"updated_at\" = NOW()".to_string());
+        // Note: We no longer auto-add updated_at since not all tables have it.
+        // Tables that need updated_at should use triggers or explicit set_values in YAML.
 
         let sql = format!(
             r#"UPDATE "{}"."{}" SET {} WHERE "{}" = ${}"#,

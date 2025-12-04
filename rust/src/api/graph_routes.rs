@@ -17,37 +17,22 @@ use crate::database::VisualizationRepository;
 use crate::graph::{CbuGraph, CbuGraphBuilder, CbuSummary};
 use crate::visualization::{CbuVisualization, KycTreeBuilder, ServiceTreeBuilder, ViewMode};
 
-/// Query parameters for graph endpoint
-/// All layers are enabled by default for complete CBU visualization
-#[derive(Deserialize)]
-pub struct GraphQueryParams {
-    #[serde(default = "default_true")]
-    pub custody: bool,
-    #[serde(default = "default_true")]
-    pub kyc: bool,
-    #[serde(default = "default_true")]
-    pub ubo: bool,
-    #[serde(default = "default_true")]
-    pub services: bool,
-}
-
-fn default_true() -> bool {
-    true
-}
-
 /// GET /api/cbu/{cbu_id}/graph
-/// Returns the graph data for a specific CBU
+/// Returns the COMPLETE graph data for a specific CBU
+/// Always loads ALL layers (Core, Custody, KYC, UBO, Services)
+/// UI is responsible for filtering by view mode
 pub async fn get_cbu_graph(
     State(pool): State<PgPool>,
     Path(cbu_id): Path<Uuid>,
-    Query(params): Query<GraphQueryParams>,
 ) -> Result<Json<CbuGraph>, (StatusCode, String)> {
     let repo = VisualizationRepository::new(pool);
+
+    // Always load ALL layers - UI handles view mode filtering
     let graph = CbuGraphBuilder::new(cbu_id)
-        .with_custody(params.custody)
-        .with_kyc(params.kyc)
-        .with_ubo(params.ubo)
-        .with_services(params.services)
+        .with_custody(true)
+        .with_kyc(true)
+        .with_ubo(true)
+        .with_services(true)
         .build(&repo)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
