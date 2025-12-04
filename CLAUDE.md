@@ -224,7 +224,7 @@ ANTHROPIC_API_KEY="sk-..." \
 # Open http://localhost:3000
 
 # Test
-cargo test --features database --lib                  # Unit tests (~118)
+cargo test --features database --lib                  # Unit tests (~143)
 cargo test --features database --test db_integration  # DB tests
 ./tests/scenarios/run_tests.sh                        # DSL scenarios
 ./tests/mcp_test.sh                                   # MCP protocol tests
@@ -234,6 +234,27 @@ cargo clippy --features server
 cargo clippy --features database
 cargo clippy --features mcp
 ```
+
+## Tracing / Debug Logging
+
+The DSL executor supports structured logging via the `tracing` crate. Logging is **off by default**.
+
+```bash
+# Debug level - shows step execution, verb routing, SQL queries
+RUST_LOG=ob_poc::dsl_v2=debug ./target/debug/dsl_cli execute -f file.dsl
+
+# Trace level - includes SQL bind values and row counts
+RUST_LOG=ob_poc::dsl_v2=trace ./target/debug/dsl_cli execute -f file.dsl
+
+# Save trace output to file
+RUST_LOG=ob_poc::dsl_v2=debug ./target/debug/dsl_cli execute -f file.dsl 2> trace.log
+```
+
+| Level | Output |
+|-------|--------|
+| `info` | Config loading, high-level events |
+| `debug` | Step execution, verb routing, generated SQL |
+| `trace` | SQL bind values, row counts (very verbose) |
 
 ## DSL CLI (dsl_cli)
 
@@ -994,6 +1015,22 @@ The `threshold` domain provides risk-based document requirements that determine 
 | threshold_requirements | Per-risk-band attribute requirements |
 | requirement_acceptable_docs | Document types that satisfy requirements |
 | screening_requirements | Screening requirements per risk band |
+
+### Requirement → Acceptable Documents Mapping
+
+Each threshold requirement maps to document types that can satisfy it:
+
+| Attribute | Acceptable Documents (by priority) |
+|-----------|-----------------------------------|
+| `identity` | PASSPORT, NATIONAL_ID, DRIVERS_LICENSE |
+| `address` | UTILITY_BILL, BANK_STATEMENT |
+| `date_of_birth` | PASSPORT, NATIONAL_ID, DRIVERS_LICENSE, BIRTH_CERTIFICATE |
+| `nationality` | PASSPORT, NATIONAL_ID, BIRTH_CERTIFICATE |
+| `ownership_percentage` | REGISTER_OF_SHAREHOLDERS, SHARE_CERTIFICATE, OWNERSHIP_CHART, PSC_REGISTER, UBO_DECLARATION |
+| `source_of_funds` | SOURCE_OF_FUNDS, BANK_STATEMENT, PROOF_OF_PAYMENT, INVESTMENT_PORTFOLIO |
+| `source_of_wealth` | SOURCE_OF_WEALTH, NET_WORTH_STATEMENT, TAX_RETURN, AUDITED_ACCOUNTS |
+| `tax_residence` | TAX_RESIDENCY_CERT, TAX_RETURN, W9, W8_BEN, CRS_SELF_CERT, FATCA_SELF_CERT |
+
 
 ### Threshold Verbs
 
