@@ -211,6 +211,38 @@ The UI follows a **single pipeline** pattern. Server returns flat graph data; UI
 
 ## Commands
 
+### Layout Persistence
+
+Users can customize node positions (drag) and sizes (shift+drag) in the graph visualization. These layout overrides are persisted per CBU and view mode.
+
+**Database Table**: `"ob-poc".cbu_layout_overrides`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| cbu_id | UUID | CBU identifier |
+| user_id | UUID | User identifier (default: nil UUID for shared) |
+| view_mode | TEXT | "KYC_UBO" or "SERVICE_DELIVERY" |
+| positions | JSONB | Array of `{node_id, dx, dy}` offsets from template |
+| sizes | JSONB | Array of `{node_id, w, h}` size overrides |
+
+**API Endpoints**:
+- `GET /api/cbu/:id/layout?view_mode=KYC_UBO` - Fetch saved layout
+- `POST /api/cbu/:id/layout?view_mode=KYC_UBO` - Save layout overrides
+
+**UI Behavior**:
+- Drag node: Moves node, stores offset from template base position
+- Shift+drag node: Resizes node container
+- Debounced save: Changes saved after 1 second of inactivity
+- Race condition handling: UI waits for both graph AND layout to load before rendering
+
+**Key Implementation Files**:
+- `rust/src/database/visualization_repository.rs` - Layout CRUD operations
+- `rust/src/api/graph_routes.rs` - Layout API endpoints  
+- `rust/crates/ob-poc-ui/src/app.rs` - Fetch/save logic with debounce
+- `rust/crates/ob-poc-ui/src/graph/types.rs` - LayoutOverride, NodeOffset, NodeSizeOverride
+- `rust/crates/ob-poc-ui/src/graph/input.rs` - Drag/resize handling
+
+
 ```bash
 cd rust/
 

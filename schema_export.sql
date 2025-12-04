@@ -10620,6 +10620,9 @@ ALTER TABLE ONLY public.rules
 
 
 -- Layout overrides for egui visualizer
+-- Stores user customizations to node positions and sizes in the CBU graph visualization.
+-- positions: Array of {node_id, dx, dy} offsets from template base positions
+-- sizes: Array of {node_id, w, h} size overrides for node containers
 CREATE TABLE IF NOT EXISTS "ob-poc".cbu_layout_overrides (
     cbu_id UUID NOT NULL,
     user_id UUID NOT NULL,
@@ -10629,4 +10632,6 @@ CREATE TABLE IF NOT EXISTS "ob-poc".cbu_layout_overrides (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (cbu_id, user_id, view_mode)
 );
+
+COMMENT ON TABLE "ob-poc".cbu_layout_overrides IS 'Persists user layout customizations (drag/resize) for CBU graph visualization per view mode';
 
