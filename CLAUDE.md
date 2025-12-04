@@ -141,9 +141,6 @@ ob-poc/
 │   └── tests/
 │       ├── db_integration.rs       # Database integration tests
 │       └── scenarios/              # DSL test scenarios (8 valid, 5 error)
-├── sql/
-│   ├── seeds/                      # Seed data SQL files
-│   └── tests/                      # SQL test fixtures
 ├── docs/
 │   └── DSL_TEST_SCENARIOS.md       # Test scenario documentation
 ├── schema_export.sql               # Full DDL for database rebuild
@@ -2110,8 +2107,6 @@ Subscription, redemption, and transfer transactions.
 # Full schema rebuild
 psql -d data_designer -f schema_export.sql
 
-# Seed data only
-psql -d data_designer -f sql/seeds/all_seeds.sql
 ```
 
 ## MCP Server Tools
