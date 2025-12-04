@@ -14,6 +14,8 @@
 ;;
 ;; Hedge Fund: "Atlas Global Macro Fund" (Cayman)
 ;; Products: Custody, Alternatives, Collateral Management
+;;
+;; DEBUG: Uses debug.checkpoint and debug.dump-cbu at each state transition
 ;; =============================================================================
 
 ;; =============================================================================
@@ -35,8 +37,22 @@
   :commercial-client-entity-id @holding-company
   :as @fund)
 
+;; ============ CHECKPOINT: CBU Created (DISCOVERED) ============
+(debug.checkpoint
+  :name "CBU_CREATED"
+  :cbu-id @fund
+  :message "CBU created in DISCOVERED status")
+(debug.dump-cbu :cbu-id @fund :format "yaml")
+
 ;; CBU starts in DISCOVERED status - set to VALIDATION_PENDING
 (cbu.set-status :cbu-id @fund :status "VALIDATION_PENDING")
+
+;; ============ CHECKPOINT: CBU Status -> VALIDATION_PENDING ============
+(debug.checkpoint
+  :name "CBU_VALIDATION_PENDING"
+  :cbu-id @fund
+  :message "CBU transitioned to VALIDATION_PENDING")
+(debug.dump-cbu :cbu-id @fund :format "yaml")
 
 ;; Create the fund legal entity (issuer of shares)
 (entity.create-limited-company
@@ -57,6 +73,14 @@
   :case-type "NEW_CLIENT"
   :notes "New hedge fund onboarding - Custody + Alternatives + Collateral"
   :as @case)
+
+;; ============ CHECKPOINT: KYC Case Created (INTAKE) ============
+(debug.checkpoint
+  :name "CASE_CREATED"
+  :cbu-id @fund
+  :case-id @case
+  :message "KYC case created in INTAKE status")
+(debug.dump-case :case-id @case :format "yaml")
 
 ;; Record initial client allegation about ownership
 ;; "Client says: Fund is owned 60% by Atlas Capital Holdings Ltd"
@@ -101,6 +125,15 @@
 
 ;; Update case to DISCOVERY phase
 (kyc-case.update-status :case-id @case :status "DISCOVERY")
+
+;; ============ CHECKPOINT: Case Status -> DISCOVERY ============
+(debug.checkpoint
+  :name "CASE_DISCOVERY"
+  :cbu-id @fund
+  :case-id @case
+  :message "Case transitioned to DISCOVERY - workstreams created")
+(debug.dump-cbu :cbu-id @fund :format "yaml")
+(debug.dump-case :case-id @case :format "yaml")
 
 ;; =============================================================================
 ;; PART 4: THRESHOLD EVALUATION & RFI GENERATION
@@ -215,6 +248,14 @@
   :discovery-depth 2
   :as @ws-nordic)
 
+;; ============ CHECKPOINT: First UBO Discovery Iteration ============
+(debug.checkpoint
+  :name "UBO_DISCOVERY_1"
+  :cbu-id @fund
+  :case-id @case
+  :message "First UBO iteration - discovered corporate owners (no natural persons yet)")
+(debug.dump-cbu :cbu-id @fund :include-ubos true :format "yaml")
+
 ;; Assert suspected UBOs (we don't yet know the natural persons)
 ;; These are corporate entities that WILL have UBOs behind them
 (ubo.assert
@@ -291,6 +332,14 @@
   :source "ANALYST"
   :as @flag-structure)
 
+;; ============ CHECKPOINT: Red Flags Raised ============
+(debug.checkpoint
+  :name "RED_FLAGS_RAISED"
+  :cbu-id @fund
+  :case-id @case
+  :message "Red flags raised from screenings and structure analysis")
+(debug.dump-case :case-id @case :include-red-flags true :format "yaml")
+
 ;; =============================================================================
 ;; PART 9: UBO DISCOVERY - SECOND ITERATION (Find Natural Persons)
 ;; =============================================================================
@@ -325,6 +374,14 @@
   :discovery-depth 3
   :is-ubo true
   :as @ws-chen)
+
+;; ============ CHECKPOINT: Natural Person UBO Discovered ============
+(debug.checkpoint
+  :name "UBO_DISCOVERY_2"
+  :cbu-id @fund
+  :case-id @case
+  :message "Second UBO iteration - natural person Chen Wei discovered")
+(debug.dump-cbu :cbu-id @fund :include-ubos true :include-entities true :format "yaml")
 
 ;; Assert Chen Wei as UBO
 (ubo.assert
@@ -415,6 +472,14 @@
   :evidence-doc-ids [@doc-chen-passport @doc-shareholders]
   :proof-notes "UBO proven via passport and ownership chain documentation")
 
+;; ============ CHECKPOINT: UBO Proven ============
+(debug.checkpoint
+  :name "UBO_PROVEN"
+  :cbu-id @fund
+  :case-id @case
+  :message "Chen Wei UBO status: SUSPECTED -> PROVEN")
+(debug.dump-cbu :cbu-id @fund :include-ubos true :format "yaml")
+
 ;; =============================================================================
 ;; PART 11: CBU EVIDENCE & STATUS UPDATE
 ;; =============================================================================
@@ -463,6 +528,14 @@
   :reason "Ownership structure verified through documentation"
   :case-id @case)
 
+;; ============ CHECKPOINT: CBU Evidence Verified ============
+(debug.checkpoint
+  :name "CBU_EVIDENCE_VERIFIED"
+  :cbu-id @fund
+  :case-id @case
+  :message "CBU evidence attached and verified")
+(debug.dump-cbu :cbu-id @fund :include-evidence true :format "yaml")
+
 ;; =============================================================================
 ;; PART 12: MITIGATE RED FLAGS
 ;; =============================================================================
@@ -477,12 +550,27 @@
   :red-flag-id @flag-structure
   :notes "Full ownership chain documented, natural person UBO identified and verified")
 
+;; ============ CHECKPOINT: Red Flags Mitigated ============
+(debug.checkpoint
+  :name "RED_FLAGS_MITIGATED"
+  :cbu-id @fund
+  :case-id @case
+  :message "Red flags mitigated - ready for assessment")
+(debug.dump-case :case-id @case :include-red-flags true :format "yaml")
+
 ;; =============================================================================
 ;; PART 13: RED-FLAG AGGREGATION & EVALUATION
 ;; =============================================================================
 
 ;; Update case to ASSESSMENT
 (kyc-case.update-status :case-id @case :status "ASSESSMENT")
+
+;; ============ CHECKPOINT: Case Status -> ASSESSMENT ============
+(debug.checkpoint
+  :name "CASE_ASSESSMENT"
+  :cbu-id @fund
+  :case-id @case
+  :message "Case transitioned to ASSESSMENT")
 
 ;; Complete workstreams
 (entity-workstream.update-status :workstream-id @ws-holding :status "COMPLETE")
@@ -499,6 +587,14 @@
 
 ;; List evaluations
 (red-flag.list-evaluations :case-id @case)
+
+;; ============ CHECKPOINT: Case Evaluated ============
+(debug.checkpoint
+  :name "CASE_EVALUATED"
+  :cbu-id @fund
+  :case-id @case
+  :message "Red-flag aggregation complete, case evaluated")
+(debug.dump-case :case-id @case :format "yaml")
 
 ;; =============================================================================
 ;; PART 14: UBO SNAPSHOT & COMPLETENESS CHECK
@@ -525,6 +621,13 @@
 ;; Update case to REVIEW
 (kyc-case.update-status :case-id @case :status "REVIEW")
 
+;; ============ CHECKPOINT: Case Status -> REVIEW ============
+(debug.checkpoint
+  :name "CASE_REVIEW"
+  :cbu-id @fund
+  :case-id @case
+  :message "Case transitioned to REVIEW - ready for decision")
+
 ;; Set risk rating
 (kyc-case.set-risk-rating :case-id @case :risk-rating "MEDIUM")
 
@@ -535,8 +638,22 @@
   :decided-by "compliance.director@bank.com"
   :notes "Approved - all UBOs identified and verified, red flags mitigated")
 
+;; ============ CHECKPOINT: Decision Applied ============
+(debug.checkpoint
+  :name "DECISION_APPLIED"
+  :cbu-id @fund
+  :case-id @case
+  :message "APPROVE decision applied to case")
+
 ;; Update CBU status to VALIDATED
 (cbu.set-status :cbu-id @fund :status "VALIDATED")
+
+;; ============ CHECKPOINT: CBU Status -> VALIDATED ============
+(debug.checkpoint
+  :name "CBU_VALIDATED"
+  :cbu-id @fund
+  :message "CBU transitioned to VALIDATED - onboarding complete")
+(debug.dump-cbu :cbu-id @fund :format "yaml")
 
 ;; Close the case
 (kyc-case.close
@@ -544,16 +661,44 @@
   :status "APPROVED"
   :notes "Hedge fund onboarding complete. Products: Custody, Alternatives, Collateral Management")
 
+;; ============ FINAL CHECKPOINT: Case Closed ============
+(debug.checkpoint
+  :name "CASE_CLOSED"
+  :cbu-id @fund
+  :case-id @case
+  :message "KYC case APPROVED and closed")
+(debug.dump-cbu :cbu-id @fund :format "yaml")
+(debug.dump-case :case-id @case :format "yaml")
+
 ;; =============================================================================
-;; SUMMARY: Test demonstrates:
-;; - CBU lifecycle: DISCOVERED -> VALIDATION_PENDING -> VALIDATED
-;; - Case lifecycle: INTAKE -> DISCOVERY -> ASSESSMENT -> REVIEW -> APPROVED
-;; - UBO lifecycle: SUSPECTED -> PROVEN (with evidence)
-;; - Workstream lifecycle: PENDING -> VERIFY -> ASSESS -> COMPLETE
-;; - Red-flag lifecycle: OPEN -> MITIGATED
-;; - Threshold-based RFI generation
-;; - Multi-iteration UBO discovery
-;; - Evidence attachment and verification
-;; - Red-flag aggregation and evaluation
-;; - Decision application with validation
+;; Verify DSL source persistence
+;; =============================================================================
+(debug.list-dsl-instances :limit 5)
+
+;; =============================================================================
+;; SUMMARY: Checkpoints logged at each state transition:
+;;
+;; CBU Lifecycle:
+;;   CBU_CREATED          -> DISCOVERED (initial)
+;;   CBU_VALIDATION_PENDING -> VALIDATION_PENDING
+;;   CBU_EVIDENCE_VERIFIED  -> evidence attached
+;;   CBU_VALIDATED         -> VALIDATED (final)
+;;
+;; Case Lifecycle:
+;;   CASE_CREATED    -> INTAKE
+;;   CASE_DISCOVERY  -> DISCOVERY
+;;   CASE_ASSESSMENT -> ASSESSMENT
+;;   CASE_REVIEW     -> REVIEW
+;;   CASE_EVALUATED  -> evaluated with red-flag scores
+;;   DECISION_APPLIED -> APPROVE decision
+;;   CASE_CLOSED     -> APPROVED (final)
+;;
+;; UBO Lifecycle:
+;;   UBO_DISCOVERY_1 -> Corporate owners discovered (no persons)
+;;   UBO_DISCOVERY_2 -> Natural person Chen Wei discovered
+;;   UBO_PROVEN      -> Chen Wei SUSPECTED -> PROVEN
+;;
+;; Red Flags:
+;;   RED_FLAGS_RAISED    -> 2 SOFT flags raised
+;;   RED_FLAGS_MITIGATED -> Both mitigated
 ;; =============================================================================

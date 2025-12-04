@@ -5557,3 +5557,143 @@ domains:
               ]
         returns:
           type: record_set
+
+  # ===========================================================================
+  # DOMAIN: debug (Inspection and debugging utilities)
+  # ===========================================================================
+  debug:
+    description: "Inspection and debugging utilities for development and testing"
+
+    verbs:
+      dump-cbu:
+        description: "Dump complete CBU state as YAML for inspection"
+        behavior: plugin
+        plugin:
+          handler: debug_dump_cbu
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: include-entities
+            type: boolean
+            required: false
+            default: true
+          - name: include-roles
+            type: boolean
+            required: false
+            default: true
+          - name: include-evidence
+            type: boolean
+            required: false
+            default: true
+          - name: include-ubos
+            type: boolean
+            required: false
+            default: true
+          - name: format
+            type: string
+            required: false
+            default: "yaml"
+            valid_values: [yaml, json]
+        returns:
+          type: string
+          capture: true
+
+      dump-case:
+        description: "Dump complete KYC case state as YAML for inspection"
+        behavior: plugin
+        plugin:
+          handler: debug_dump_case
+        args:
+          - name: case-id
+            type: uuid
+            required: true
+          - name: include-workstreams
+            type: boolean
+            required: false
+            default: true
+          - name: include-red-flags
+            type: boolean
+            required: false
+            default: true
+          - name: include-screenings
+            type: boolean
+            required: false
+            default: true
+          - name: include-doc-requests
+            type: boolean
+            required: false
+            default: true
+          - name: format
+            type: string
+            required: false
+            default: "yaml"
+            valid_values: [yaml, json]
+        returns:
+          type: string
+          capture: true
+
+      checkpoint:
+        description: "Log a named checkpoint with CBU/case state for test review"
+        behavior: plugin
+        plugin:
+          handler: debug_checkpoint
+        args:
+          - name: name
+            type: string
+            required: true
+          - name: cbu-id
+            type: uuid
+            required: false
+          - name: case-id
+            type: uuid
+            required: false
+          - name: message
+            type: string
+            required: false
+        returns:
+          type: uuid
+          name: checkpoint_id
+          capture: true
+
+      list-dsl-instances:
+        description: "List DSL instances persisted in the database"
+        behavior: crud
+        crud:
+          operation: select
+          table: dsl_instances
+          schema: ob-poc
+        args:
+          - name: business-reference
+            type: string
+            required: false
+            maps_to: business_reference
+          - name: domain
+            type: string
+            required: false
+            maps_to: domain
+          - name: limit
+            type: integer
+            required: false
+            default: 20
+        returns:
+          type: record_set
+
+      get-dsl-source:
+        description: "Get DSL source code for an instance"
+        behavior: crud
+        crud:
+          operation: select
+          table: dsl_instance_versions
+          schema: ob-poc
+        args:
+          - name: instance-id
+            type: uuid
+            required: true
+            maps_to: instance_id
+          - name: version
+            type: integer
+            required: false
+            maps_to: version_number
+        returns:
+          type: record
