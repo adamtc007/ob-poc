@@ -86,6 +86,36 @@ pub struct ServiceDeliveryView {
     pub delivery_status: Option<String>,
 }
 
+/// Product view for graph building (via cbus.product_id)
+#[derive(Debug, Clone)]
+pub struct ProductView {
+    pub product_id: Uuid,
+    pub name: String,
+    pub product_code: Option<String>,
+    pub product_category: Option<String>,
+    pub is_active: Option<bool>,
+}
+
+/// Service view for graph building (via product_services)
+#[derive(Debug, Clone)]
+pub struct ServiceView {
+    pub service_id: Uuid,
+    pub name: String,
+    pub service_code: Option<String>,
+    pub service_category: Option<String>,
+    pub is_mandatory: Option<bool>,
+}
+
+/// Service resource type view for graph building (via service_resource_capabilities)
+#[derive(Debug, Clone)]
+pub struct ServiceResourceTypeView {
+    pub resource_id: Uuid,
+    pub name: String,
+    pub resource_type: Option<String>,
+    pub resource_code: Option<String>,
+    pub is_active: Option<bool>,
+}
+
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct CbuSummaryView {
     pub cbu_id: Uuid,
@@ -1454,6 +1484,80 @@ impl VisualizationRepository {
                 instance_name: r.instance_name,
                 type_name: r.type_name,
                 category: r.category,
+            })
+            .collect())
+    }
+
+    /// Get product for a CBU via cbus.product_id
+    pub async fn get_cbu_product(&self, cbu_id: Uuid) -> Result<Option<ProductView>> {
+        let row = sqlx::query!(
+            r#"SELECT p.product_id, p.name, p.product_code, p.product_category, p.is_active
+               FROM "ob-poc".products p
+               JOIN "ob-poc".cbus c ON c.product_id = p.product_id
+               WHERE c.cbu_id = $1"#,
+            cbu_id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(|r| ProductView {
+            product_id: r.product_id,
+            name: r.name,
+            product_code: r.product_code,
+            product_category: r.product_category,
+            is_active: r.is_active,
+        }))
+    }
+
+    /// Get services for a product via product_services
+    pub async fn get_product_services(&self, product_id: Uuid) -> Result<Vec<ServiceView>> {
+        let rows = sqlx::query!(
+            r#"SELECT s.service_id, s.name, s.service_code, s.service_category, ps.is_mandatory
+               FROM "ob-poc".services s
+               JOIN "ob-poc".product_services ps ON ps.service_id = s.service_id
+               WHERE ps.product_id = $1
+               ORDER BY ps.display_order, s.name"#,
+            product_id
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| ServiceView {
+                service_id: r.service_id,
+                name: r.name,
+                service_code: r.service_code,
+                service_category: r.service_category,
+                is_mandatory: r.is_mandatory,
+            })
+            .collect())
+    }
+
+    /// Get service resource types for a service via service_resource_capabilities
+    pub async fn get_service_resource_types(
+        &self,
+        service_id: Uuid,
+    ) -> Result<Vec<ServiceResourceTypeView>> {
+        let rows = sqlx::query!(
+            r#"SELECT rt.resource_id, rt.name, rt.resource_type, rt.resource_code, src.is_active
+               FROM "ob-poc".service_resource_types rt
+               JOIN "ob-poc".service_resource_capabilities src ON src.resource_id = rt.resource_id
+               WHERE src.service_id = $1
+               ORDER BY src.priority, rt.name"#,
+            service_id
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| ServiceResourceTypeView {
+                resource_id: r.resource_id,
+                name: r.name,
+                resource_type: r.resource_type,
+                resource_code: r.resource_code,
+                is_active: r.is_active,
             })
             .collect())
     }
