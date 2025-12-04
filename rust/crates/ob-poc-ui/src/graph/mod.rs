@@ -117,6 +117,56 @@ impl CbuGraphWidget {
     }
 
     /// Set view mode and re-filter/re-layout
+    /// Apply saved layout overrides (positions/sizes)
+    /// Check if graph is loaded
+    pub fn has_graph(&self) -> bool {
+        self.layout_graph.is_some()
+    }
+
+    /// Peek at pending layout override without consuming it (for debounce check)
+    pub fn peek_pending_layout_override(&self) -> bool {
+        self.input_state.layout_dirty
+    }
+
+    pub fn apply_layout_override(&mut self, overrides: LayoutOverride) -> usize {
+        if let Some(ref mut graph) = self.layout_graph {
+            graph.apply_overrides(&overrides)
+        } else {
+            0
+        }
+    }
+
+    /// Consume and return pending layout override changes for persistence
+    pub fn take_pending_layout_override(&mut self) -> Option<LayoutOverride> {
+        if !self.input_state.layout_dirty {
+            return None;
+        }
+        let graph = self.layout_graph.as_ref()?;
+        let mut positions = Vec::new();
+        let mut sizes = Vec::new();
+        for node in graph.nodes.values() {
+            if node.offset.length_sq() > 0.01 {
+                positions.push(NodeOffset {
+                    node_id: node.id.clone(),
+                    dx: node.offset.x,
+                    dy: node.offset.y,
+                });
+            }
+            if let Some(sz) = node.size_override {
+                sizes.push(NodeSizeOverride {
+                    node_id: node.id.clone(),
+                    w: sz.x,
+                    h: sz.y,
+                });
+            }
+        }
+        self.input_state.layout_dirty = false;
+        if positions.is_empty() && sizes.is_empty() {
+            return None;
+        }
+        Some(LayoutOverride { positions, sizes })
+    }
+
     pub fn set_view_mode(&mut self, mode: ViewMode) {
         if self.view_mode != mode {
             self.view_mode = mode;
@@ -260,7 +310,7 @@ impl CbuGraphWidget {
 
     /// Main UI function
     pub fn ui(&mut self, ui: &mut egui::Ui) {
-        let Some(ref graph) = self.layout_graph else {
+        let Some(graph) = self.layout_graph.as_mut() else {
             self.render_empty_state(ui);
             return;
         };
@@ -281,13 +331,12 @@ impl CbuGraphWidget {
         let dt = ui.input(|i| i.stable_dt);
         self.camera.update(dt);
 
-        // Handle input - need to clone graph for borrow checker
-        let graph_clone = graph.clone();
+        // Handle input
         let needs_repaint = InputHandler::handle_input(
             &response,
             &mut self.camera,
             &mut self.input_state,
-            &graph_clone,
+            graph,
             screen_rect,
         );
 
@@ -305,6 +354,8 @@ impl CbuGraphWidget {
         );
 
         // Render UI chrome (stats, controls)
+        // Drop mutable borrow, reborrow immutably for rendering
+        let graph = self.layout_graph.as_ref().unwrap();
         self.render_chrome(&painter, graph, screen_rect);
 
         // Render focus card if a node is focused

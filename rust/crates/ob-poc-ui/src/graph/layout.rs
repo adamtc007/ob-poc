@@ -328,6 +328,8 @@ impl LayoutEngine {
             let position = Pos2::new(x, slot.position.y);
 
             let layout_node = LayoutNode {
+                base_position: position,
+                offset: Vec2::ZERO,
                 id: node.id.clone(),
                 entity_type: EntityType::from_str(&node.node_type),
                 primary_role: node
@@ -340,6 +342,8 @@ impl LayoutEngine {
                 sublabel: node.sublabel.clone(),
                 jurisdiction: node.jurisdiction.clone(),
                 position,
+                base_size: node_size,
+                size_override: None,
                 size: node_size,
                 in_focus: true,
                 is_cbu_root: node.node_type == "cbu",
@@ -369,6 +373,8 @@ impl LayoutEngine {
             let position = Pos2::new(x, y);
 
             let layout_node = LayoutNode {
+                base_position: position,
+                offset: Vec2::ZERO,
                 id: node.id.clone(),
                 entity_type: EntityType::from_str(&node.node_type),
                 primary_role: node
@@ -381,6 +387,8 @@ impl LayoutEngine {
                 sublabel: node.sublabel.clone(),
                 jurisdiction: node.jurisdiction.clone(),
                 position,
+                base_size: node_size,
+                size_override: None,
                 size: node_size,
                 in_focus: true,
                 is_cbu_root: false,
@@ -447,6 +455,8 @@ impl LayoutEngine {
                 let position = Pos2::new(x, TIER_PRODUCT);
 
                 let layout_node = LayoutNode {
+                    base_position: position,
+                    offset: Vec2::ZERO,
                     id: product.id.clone(),
                     entity_type: EntityType::Product,
                     primary_role: PrimaryRole::Unknown,
@@ -455,6 +465,8 @@ impl LayoutEngine {
                     sublabel: product.sublabel.clone(),
                     jurisdiction: None,
                     position,
+                    base_size: node_size,
+                    size_override: None,
                     size: node_size,
                     in_focus: true,
                     is_cbu_root: false,
@@ -486,7 +498,11 @@ impl LayoutEngine {
                             label: service.label.clone(),
                             sublabel: service.sublabel.clone(),
                             jurisdiction: None,
+                            base_position: svc_position,
+                            offset: Vec2::ZERO,
                             position: svc_position,
+                            base_size: node_size,
+                            size_override: None,
                             size: node_size,
                             in_focus: true,
                             is_cbu_root: false,
@@ -518,7 +534,11 @@ impl LayoutEngine {
                                     label: resource.label.clone(),
                                     sublabel: resource.sublabel.clone(),
                                     jurisdiction: None,
+                                    base_position: res_position,
+                                    offset: Vec2::ZERO,
                                     position: res_position,
+                                    base_size: node_size,
+                                    size_override: None,
                                     size: node_size,
                                     in_focus: true,
                                     is_cbu_root: false,
@@ -558,6 +578,8 @@ impl LayoutEngine {
                 let position = Pos2::new(x, TIER_SERVICE);
 
                 let layout_node = LayoutNode {
+                    base_position: position,
+                    offset: Vec2::ZERO,
                     id: service.id.clone(),
                     entity_type: EntityType::Service,
                     primary_role: PrimaryRole::Unknown,
@@ -566,6 +588,8 @@ impl LayoutEngine {
                     sublabel: service.sublabel.clone(),
                     jurisdiction: None,
                     position,
+                    base_size: node_size,
+                    size_override: None,
                     size: node_size,
                     in_focus: true,
                     is_cbu_root: false,
@@ -601,6 +625,8 @@ impl LayoutEngine {
                 let position = Pos2::new(x, TIER_RESOURCE);
 
                 let layout_node = LayoutNode {
+                    base_position: position,
+                    offset: Vec2::ZERO,
                     id: resource.id.clone(),
                     entity_type: EntityType::Resource,
                     primary_role: PrimaryRole::Unknown,
@@ -609,6 +635,8 @@ impl LayoutEngine {
                     sublabel: resource.sublabel.clone(),
                     jurisdiction: None,
                     position,
+                    base_size: node_size,
+                    size_override: None,
                     size: node_size,
                     in_focus: true,
                     is_cbu_root: false,

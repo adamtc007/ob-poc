@@ -288,3 +288,32 @@ pub struct CbuSummary {
     pub created_at: Option<chrono::DateTime<chrono::Utc>>,
     pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
 }
+
+// =============================================================================
+// LAYOUT OVERRIDES (positions/sizes saved by UI)
+// =============================================================================
+
+/// Per-node position offset from template layout
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct NodeOffset {
+    pub node_id: String,
+    pub dx: f32,
+    pub dy: f32,
+}
+
+/// Per-node size override
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct NodeSizeOverride {
+    pub node_id: String,
+    pub w: f32,
+    pub h: f32,
+}
+
+/// Saved layout overrides for a CBU/view
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+pub struct LayoutOverride {
+    #[serde(default)]
+    pub positions: Vec<NodeOffset>,
+    #[serde(default)]
+    pub sizes: Vec<NodeSizeOverride>,
+}

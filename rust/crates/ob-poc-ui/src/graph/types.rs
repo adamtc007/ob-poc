@@ -210,9 +210,17 @@ pub struct LayoutNode {
     pub sublabel: Option<String>,
     pub jurisdiction: Option<String>,
 
-    /// Computed position in graph coordinates
+    /// Base position from template layout
+    pub base_position: Pos2,
+    /// User offset from base position
+    pub offset: Vec2,
+    /// Computed position in graph coordinates (base_position + offset)
     pub position: Pos2,
-    /// Size of the node
+    /// Base size from template
+    pub base_size: Vec2,
+    /// User size override
+    pub size_override: Option<Vec2>,
+    /// Current size (size_override or base_size)
     pub size: Vec2,
     /// Is this node in the current focus set?
     pub in_focus: bool,
@@ -405,3 +413,55 @@ impl LayoutGraph {
 // =============================================================================
 
 // ViewMode is defined in graph_view.rs and re-exported through mod.rs
+
+// =============================================================================
+// LAYOUT OVERRIDES
+// =============================================================================
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct NodeOffset {
+    pub node_id: String,
+    pub dx: f32,
+    pub dy: f32,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct NodeSizeOverride {
+    pub node_id: String,
+    pub w: f32,
+    pub h: f32,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, Default)]
+pub struct LayoutOverride {
+    #[serde(default)]
+    pub positions: Vec<NodeOffset>,
+    #[serde(default)]
+    pub sizes: Vec<NodeSizeOverride>,
+}
+
+impl LayoutGraph {
+    /// Apply position/size overrides (offsets relative to template positions)
+    pub fn apply_overrides(&mut self, overrides: &LayoutOverride) -> usize {
+        let mut applied = 0;
+        for off in &overrides.positions {
+            if let Some(node) = self.nodes.get_mut(&off.node_id) {
+                node.offset = Vec2::new(off.dx, off.dy);
+                node.position = node.base_position + node.offset;
+                applied += 1;
+            }
+        }
+        for sz in &overrides.sizes {
+            if let Some(node) = self.nodes.get_mut(&sz.node_id) {
+                let new_size = Vec2::new(sz.w, sz.h);
+                node.size_override = Some(new_size);
+                node.size = new_size;
+                applied += 1;
+            }
+        }
+        if applied > 0 {
+            self.recompute_bounds();
+        }
+        applied
+    }
+}

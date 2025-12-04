@@ -77,7 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Serve index.html at root - redirect to WASM app
         .route("/", get(serve_index))
         // Serve static files for WASM app
-        .nest_service("/pkg", ServeDir::new("static/pkg"))
+        .nest_service("/pkg", ServeDir::new("crates/ob-poc-ui/pkg"))
         // API routes
         .merge(create_graph_router(pool.clone()))
         .merge(create_agent_router(pool.clone()))

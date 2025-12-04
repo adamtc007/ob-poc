@@ -6,8 +6,11 @@
 //! This enables database portability (e.g., Postgres → Oracle migration).
 
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use sqlx::types::Json;
 use sqlx::PgPool;
 use uuid::Uuid;
+use crate::graph::{NodeOffset, NodeSizeOverride};
 
 // =============================================================================
 // VIEW MODELS (read-only structs for visualization)
@@ -438,6 +441,17 @@ pub struct ScreeningStatsView {
     pub clear: i64,
     pub pending_review: i64,
     pub confirmed_hits: i64,
+}
+
+// =============================================================================
+// LAYOUT OVERRIDE VIEW MODEL
+// =============================================================================
+
+/// Layout overrides for CBU graph visualization (positions and sizes)
+#[derive(Debug, Clone)]
+pub struct LayoutOverrideView {
+    pub positions: Vec<NodeOffset>,
+    pub sizes: Vec<NodeSizeOverride>,
 }
 
 // =============================================================================
@@ -1731,4 +1745,61 @@ impl VisualizationRepository {
             confirmed_hits: row.confirmed_hits,
         })
     }
+    // =====================================================================
+    // LAYOUT OVERRIDE PERSISTENCE
+    // =====================================================================
+
+    /// Fetch saved layout overrides for a CBU/user/view_mode combo.
+    pub async fn get_layout_override(
+        &self,
+        cbu_id: Uuid,
+        user_id: Uuid,
+        view_mode: &str,
+    ) -> Result<Option<LayoutOverrideView>> {
+        let row = sqlx::query!(
+            r#"SELECT positions as "positions: Json<Vec<NodeOffset>>",
+                      sizes as "sizes: Json<Vec<NodeSizeOverride>>"
+               FROM "ob-poc".cbu_layout_overrides
+               WHERE cbu_id = $1 AND user_id = $2 AND view_mode = $3"#,
+            cbu_id,
+            user_id,
+            view_mode,
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(|r| LayoutOverrideView {
+            positions: r.positions.0,
+            sizes: r.sizes.0,
+        }))
+    }
+
+    /// Upsert layout overrides for a CBU/user/view_mode combo.
+    pub async fn upsert_layout_override(
+        &self,
+        cbu_id: Uuid,
+        user_id: Uuid,
+        view_mode: &str,
+        overrides: LayoutOverrideView,
+    ) -> Result<()> {
+        sqlx::query!(
+            r#"INSERT INTO "ob-poc".cbu_layout_overrides
+                    (cbu_id, user_id, view_mode, positions, sizes, updated_at)
+               VALUES ($1, $2, $3, $4, $5, NOW())
+               ON CONFLICT (cbu_id, user_id, view_mode)
+               DO UPDATE SET positions = EXCLUDED.positions,
+                             sizes = EXCLUDED.sizes,
+                             updated_at = NOW()"#,
+            cbu_id,
+            user_id,
+            view_mode,
+            serde_json::to_value(&overrides.positions).unwrap_or_default(),
+            serde_json::to_value(&overrides.sizes).unwrap_or_default(),
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+
 }

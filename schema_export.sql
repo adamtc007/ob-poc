@@ -10618,3 +10618,15 @@ ALTER TABLE ONLY public.rules
 
 \unrestrict B2XyN99cke6WN6KofWcvIeIcPj29PHpIsJMoepAJeN3XVheeY0nr5JxeC4SiG0Z
 
+
+-- Layout overrides for egui visualizer
+CREATE TABLE IF NOT EXISTS "ob-poc".cbu_layout_overrides (
+    cbu_id UUID NOT NULL,
+    user_id UUID NOT NULL,
+    view_mode TEXT NOT NULL,
+    positions JSONB NOT NULL DEFAULT '[]'::jsonb,
+    sizes JSONB NOT NULL DEFAULT '[]'::jsonb,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (cbu_id, user_id, view_mode)
+);
+

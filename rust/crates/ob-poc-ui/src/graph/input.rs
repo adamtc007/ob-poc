@@ -17,6 +17,15 @@ pub struct InputState {
     pub hovered_node: Option<String>,
     /// Currently selected/focused node ID
     pub focused_node: Option<String>,
+    /// Currently dragged node ID (if any)
+    pub dragging_node: Option<String>,
+    pub drag_start_offset: Option<egui::Vec2>,
+    pub drag_start_world: Option<Pos2>,
+    /// Currently resizing node ID (if any)
+    pub resizing_node: Option<String>,
+    pub resize_start_size: Option<egui::Vec2>,
+    /// Layout dirty flag (set when position/size changes)
+    pub layout_dirty: bool,
     /// Is the user currently dragging to pan?
     pub is_panning: bool,
     /// Last pointer position for drag tracking
@@ -63,10 +72,19 @@ impl InputHandler {
         response: &Response,
         camera: &mut Camera2D,
         state: &mut InputState,
-        graph: &LayoutGraph,
+        graph: &mut LayoutGraph,
         screen_rect: Rect,
     ) -> bool {
         let mut needs_repaint = false;
+        
+        // Debug: log shift state and drag state
+        #[cfg(target_arch = "wasm32")]
+        {
+            let shift = response.ctx.input(|i| i.modifiers.shift);
+            if response.drag_started() {
+                web_sys::console::log_1(&format!("Drag started! Shift held: {}", shift).into());
+            }
+        }
 
         // Get pointer position
         let pointer_pos = response.hover_pos();
@@ -79,15 +97,23 @@ impl InputHandler {
             }
         }
 
-        // Handle click for node selection
-        if response.clicked() {
+        // Handle drag start on node - we'll determine move vs resize by Shift during drag
+        if response.drag_started() {
             if let Some(pos) = pointer_pos {
                 if let Some(node_id) = Self::hit_test_node(pos, graph, camera, screen_rect) {
                     state.toggle_focus(&node_id);
+                    let world = camera.screen_to_world(pos, screen_rect);
+                    // Always set up for potential drag - shift check happens during drag
+                    state.dragging_node = Some(node_id.clone());
+                    state.drag_start_world = Some(world);
+                    state.drag_start_offset = graph.get_node(&node_id).map(|n| n.offset);
+                    state.resize_start_size = graph.get_node(&node_id).map(|n| n.size);
                     needs_repaint = true;
                 } else {
                     // Clicked on empty space - clear focus
                     state.clear_focus();
+                    state.dragging_node = None;
+                    state.resizing_node = None;
                     needs_repaint = true;
                 }
             }
@@ -116,16 +142,81 @@ impl InputHandler {
             }
         }
 
-        // Handle drag for panning
+                // Handle drag for moving/resizing nodes or panning
         if response.dragged() {
             let delta = response.drag_delta();
             if delta.length() > 0.0 {
-                camera.pan(delta);
-                state.is_panning = true;
-                needs_repaint = true;
+                let is_shift = response.ctx.input(|i| i.modifiers.shift);
+                if let Some(ref node_id) = state.dragging_node {
+                    if is_shift {
+                        // Shift held = resize mode
+                        if let Some(node) = graph.get_node_mut(node_id) {
+                            if let Some(current_size) = state.resize_start_size {
+                                let delta_world = delta / camera.zoom;
+                                let mut new_size = current_size + delta_world;
+                                let min_size = egui::vec2(80.0, 50.0);
+                                new_size.x = new_size.x.max(min_size.x);
+                                new_size.y = new_size.y.max(min_size.y);
+                                node.size_override = Some(new_size);
+                                node.size = new_size;
+                                state.resize_start_size = Some(new_size);
+                                graph.recompute_bounds();
+                                state.layout_dirty = true;
+                                needs_repaint = true;
+                            }
+                        }
+                    } else {
+                        // No shift = move mode
+                        if let Some(node) = graph.get_node_mut(node_id) {
+                            if let (Some(start_world), Some(start_off), Some(pos)) = (
+                                state.drag_start_world,
+                                state.drag_start_offset,
+                                pointer_pos,
+                            ) {
+                                let world_delta = camera.screen_to_world(pos, screen_rect) - start_world;
+                                node.offset = start_off + world_delta;
+                                node.position = node.base_position + node.offset;
+                                graph.recompute_bounds();
+                                state.layout_dirty = true;
+                                needs_repaint = true;
+                            }
+                        }
+                    }
+                } else if let Some(ref node_id) = state.resizing_node {
+                    if let Some(node) = graph.get_node_mut(node_id) {
+                        if let Some(current_size) = state.resize_start_size {
+                            let delta_world = delta / camera.zoom;
+                            let mut new_size = current_size + delta_world;
+                            let min_size = egui::vec2(80.0, 50.0);
+                            new_size.x = new_size.x.max(min_size.x);
+                            new_size.y = new_size.y.max(min_size.y);
+                            node.size_override = Some(new_size);
+                            node.size = new_size;
+                            // Update start_size so next frame accumulates from current
+                            state.resize_start_size = Some(new_size);
+                            graph.recompute_bounds();
+                            state.layout_dirty = true;
+                            needs_repaint = true;
+                        }
+                    }
+                } else {
+                    camera.pan(delta);
+                    state.is_panning = true;
+                    needs_repaint = true;
+                }
             }
         } else {
             state.is_panning = false;
+        }
+
+// Clear drag/resize on mouse up
+        let primary_down = response.ctx.input(|i| i.pointer.primary_down());
+        if !primary_down {
+            state.dragging_node = None;
+            state.resizing_node = None;
+            state.drag_start_offset = None;
+            state.drag_start_world = None;
+            state.resize_start_size = None;
         }
 
         // Handle scroll for zooming

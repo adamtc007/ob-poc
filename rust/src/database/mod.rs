@@ -76,7 +76,7 @@ pub use visualization_repository::{
     CbuView, ControlRelationshipView, DocumentAttributeView, DocumentTypeView, EntityAttributeView,
     EntityBasicView, EntityCbuView, EntityRoleView, EntityScreeningView, EntityTypeView,
     EntityView, EntityWithRoleView, HoldingView, OfficerView, RoleView, ServiceDeliveryView,
-    ShareClassView, VisualizationRepository,
+    ShareClassView, LayoutOverrideView, VisualizationRepository,
 };
 
 // KYC Investigation services
