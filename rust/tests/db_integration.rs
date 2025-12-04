@@ -449,6 +449,237 @@ mod db_tests {
     // FULL SCENARIO TESTS
     // =========================================================================
 
+    // =========================================================================
+    // CBU PRODUCT ASSIGNMENT TESTS (Critical Lifecycle)
+    // =========================================================================
+
+    /// Helper: Count service delivery entries for a CBU
+    async fn count_service_deliveries(pool: &PgPool, cbu_id: Uuid) -> Result<i64> {
+        let count: Option<i64> = sqlx::query_scalar(
+            r#"SELECT COUNT(*) FROM "ob-poc".service_delivery_map WHERE cbu_id = $1"#,
+        )
+        .bind(cbu_id)
+        .fetch_one(pool)
+        .await?;
+        Ok(count.unwrap_or(0))
+    }
+
+    /// Helper: Get CBU product_id
+    async fn get_cbu_product_id(pool: &PgPool, cbu_id: Uuid) -> Result<Option<Uuid>> {
+        let product_id: Option<Uuid> =
+            sqlx::query_scalar(r#"SELECT product_id FROM "ob-poc".cbus WHERE cbu_id = $1"#)
+                .bind(cbu_id)
+                .fetch_one(pool)
+                .await?;
+        Ok(product_id)
+    }
+
+    /// Helper: Get service count for a product
+    async fn get_product_service_count(pool: &PgPool, product_name: &str) -> Result<i64> {
+        let count: Option<i64> = sqlx::query_scalar(
+            r#"SELECT COUNT(*) FROM "ob-poc".product_services ps
+               JOIN "ob-poc".products p ON ps.product_id = p.product_id
+               WHERE p.name = $1"#,
+        )
+        .bind(product_name)
+        .fetch_one(pool)
+        .await?;
+        Ok(count.unwrap_or(0))
+    }
+
+    #[tokio::test]
+    async fn test_cbu_add_product_creates_delivery_entries() -> Result<()> {
+        let db = TestDb::new().await?;
+
+        // Create a CBU
+        let dsl = format!(
+            r#"(cbu.create :name "{}" :client-type "corporate" :jurisdiction "GB" :as @cbu)"#,
+            db.name("ProductTestCBU")
+        );
+        let ctx = db.execute_dsl(&dsl).await?;
+        let cbu_id = ctx.resolve("cbu").unwrap();
+
+        // Verify CBU has no product and no deliveries initially
+        assert!(
+            get_cbu_product_id(&db.pool, cbu_id).await?.is_none(),
+            "CBU should have no product initially"
+        );
+        assert_eq!(
+            count_service_deliveries(&db.pool, cbu_id).await?,
+            0,
+            "CBU should have no service deliveries initially"
+        );
+
+        // Add product (Custody has 11 services)
+        let add_product_dsl = format!(
+            r#"(cbu.add-product :cbu-id "{}" :product "Custody")"#,
+            cbu_id
+        );
+        db.execute_dsl(&add_product_dsl).await?;
+
+        // Verify product was linked
+        let product_id = get_cbu_product_id(&db.pool, cbu_id).await?;
+        assert!(product_id.is_some(), "CBU should have product_id set");
+
+        // Verify service delivery entries created (should match product's service count)
+        let expected_services = get_product_service_count(&db.pool, "Custody").await?;
+        let actual_deliveries = count_service_deliveries(&db.pool, cbu_id).await?;
+        assert_eq!(
+            actual_deliveries, expected_services,
+            "Should create one delivery entry per service"
+        );
+        assert!(
+            actual_deliveries >= 10,
+            "Custody product should have at least 10 services"
+        );
+
+        // Cleanup
+        sqlx::query(r#"DELETE FROM "ob-poc".service_delivery_map WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .execute(&db.pool)
+            .await?;
+        db.cleanup().await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cbu_add_product_idempotent() -> Result<()> {
+        let db = TestDb::new().await?;
+
+        // Create CBU and add product
+        let dsl = format!(
+            r#"(cbu.create :name "{}" :client-type "fund" :jurisdiction "LU" :as @cbu)"#,
+            db.name("IdempotentCBU")
+        );
+        let ctx = db.execute_dsl(&dsl).await?;
+        let cbu_id = ctx.resolve("cbu").unwrap();
+
+        // Add product first time
+        let add_product_dsl = format!(
+            r#"(cbu.add-product :cbu-id "{}" :product "Custody")"#,
+            cbu_id
+        );
+        db.execute_dsl(&add_product_dsl).await?;
+
+        let first_count = count_service_deliveries(&db.pool, cbu_id).await?;
+
+        // Add same product again (should be idempotent)
+        db.execute_dsl(&add_product_dsl).await?;
+
+        let second_count = count_service_deliveries(&db.pool, cbu_id).await?;
+
+        assert_eq!(
+            first_count, second_count,
+            "Re-running add-product should not duplicate entries"
+        );
+
+        // Cleanup
+        sqlx::query(r#"DELETE FROM "ob-poc".service_delivery_map WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .execute(&db.pool)
+            .await?;
+        db.cleanup().await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cbu_add_product_invalid_product() -> Result<()> {
+        let db = TestDb::new().await?;
+
+        let dsl = format!(
+            r#"(cbu.create :name "{}" :as @cbu)"#,
+            db.name("InvalidProductCBU")
+        );
+        let ctx = db.execute_dsl(&dsl).await?;
+        let cbu_id = ctx.resolve("cbu").unwrap();
+
+        // Try to add non-existent product
+        let bad_dsl = format!(
+            r#"(cbu.add-product :cbu-id "{}" :product "NonExistentProduct")"#,
+            cbu_id
+        );
+        let result = db.execute_dsl(&bad_dsl).await;
+
+        assert!(result.is_err(), "Should fail for unknown product");
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("not found") || err.contains("Unknown"),
+            "Error should mention product not found: {}",
+            err
+        );
+
+        db.cleanup().await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cbu_add_product_invalid_cbu() -> Result<()> {
+        let db = TestDb::new().await?;
+
+        // Try to add product to non-existent CBU
+        let fake_cbu_id = Uuid::new_v4();
+        let dsl = format!(
+            r#"(cbu.add-product :cbu-id "{}" :product "Custody")"#,
+            fake_cbu_id
+        );
+        let result = db.execute_dsl(&dsl).await;
+
+        assert!(result.is_err(), "Should fail for unknown CBU");
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("not found") || err.contains("CBU"),
+            "Error should mention CBU not found: {}",
+            err
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cbu_add_product_all_deliveries_pending() -> Result<()> {
+        let db = TestDb::new().await?;
+
+        let dsl = format!(
+            r#"(cbu.create :name "{}" :as @cbu)"#,
+            db.name("PendingStatusCBU")
+        );
+        let ctx = db.execute_dsl(&dsl).await?;
+        let cbu_id = ctx.resolve("cbu").unwrap();
+
+        let add_dsl = format!(
+            r#"(cbu.add-product :cbu-id "{}" :product "Custody")"#,
+            cbu_id
+        );
+        db.execute_dsl(&add_dsl).await?;
+
+        // Verify all entries have PENDING status
+        let non_pending: Option<i64> = sqlx::query_scalar(
+            r#"SELECT COUNT(*) FROM "ob-poc".service_delivery_map
+               WHERE cbu_id = $1 AND delivery_status != 'PENDING'"#,
+        )
+        .bind(cbu_id)
+        .fetch_one(&db.pool)
+        .await?;
+
+        assert_eq!(
+            non_pending.unwrap_or(0),
+            0,
+            "All delivery entries should have PENDING status"
+        );
+
+        // Cleanup
+        sqlx::query(r#"DELETE FROM "ob-poc".service_delivery_map WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .execute(&db.pool)
+            .await?;
+        db.cleanup().await?;
+        Ok(())
+    }
+
+    // =========================================================================
+    // FULL SCENARIO TESTS
+    // =========================================================================
+
     #[tokio::test]
     async fn test_full_corporate_onboarding() -> Result<()> {
         let db = TestDb::new().await?;

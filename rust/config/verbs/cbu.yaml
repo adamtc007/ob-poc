@@ -283,3 +283,18 @@ domains:
         returns:
           type: record_set
           description: List of violations (empty if valid)
+
+      add-product:
+        description: Add a product to a CBU (creates service_delivery_map entries for all services)
+        behavior: plugin
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: product
+            type: string
+            required: true
+            description: Product name (looked up in products table)
+        returns:
+          type: affected
+          description: Number of service delivery entries created

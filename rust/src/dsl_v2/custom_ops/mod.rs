@@ -102,7 +102,13 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(ResourceDecommissionOp));
         registry.register(Arc::new(ResourceValidateAttrsOp));
 
-        // Service delivery operations - now CRUD-based in delivery.yaml
+        // CBU product assignment
+        registry.register(Arc::new(CbuAddProductOp));
+
+        // Service delivery operations
+        registry.register(Arc::new(DeliveryRecordOp));
+        registry.register(Arc::new(DeliveryCompleteOp));
+        registry.register(Arc::new(DeliveryFailOp));
 
         // Custody operations
         registry.register(Arc::new(SubcustodianLookupOp));
@@ -1630,6 +1636,198 @@ impl CustomOperation for ResourceValidateAttrsOp {
             "missing": [],
             "message": "Validation skipped (no database)"
         })))
+    }
+}
+
+// ============================================================================
+// CBU Product Assignment
+// ============================================================================
+
+/// Add a product to a CBU by creating service_delivery_map entries for all services
+///
+/// This is a CRITICAL onboarding operation that:
+/// 1. Validates CBU exists
+/// 2. Looks up product by name and validates it exists
+/// 3. Validates product has services defined
+/// 4. Sets cbus.product_id (in transaction)
+/// 5. Creates service_delivery_map entries for ALL services under that product
+///
+/// Idempotency: Safe to re-run - uses ON CONFLICT DO NOTHING for delivery entries
+/// Transaction: All operations wrapped in a transaction for atomicity
+pub struct CbuAddProductOp;
+
+#[async_trait]
+impl CustomOperation for CbuAddProductOp {
+    fn domain(&self) -> &'static str {
+        "cbu"
+    }
+    fn verb(&self) -> &'static str {
+        "add-product"
+    }
+    fn rationale(&self) -> &'static str {
+        "Critical onboarding op: links CBU to product and creates service delivery entries"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use uuid::Uuid;
+
+        // =====================================================================
+        // Step 1: Extract and validate arguments
+        // =====================================================================
+        let cbu_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("cbu-id"))
+            .and_then(|a| {
+                if let Some(name) = a.value.as_reference() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("cbu.add-product: Missing required argument :cbu-id"))?;
+
+        let product_name = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("product"))
+            .and_then(|a| a.value.as_string())
+            .ok_or_else(|| {
+                anyhow::anyhow!("cbu.add-product: Missing required argument :product")
+            })?;
+
+        // =====================================================================
+        // Step 2: Validate CBU exists
+        // =====================================================================
+        let cbu_row = sqlx::query!(
+            r#"SELECT cbu_id, name, product_id FROM "ob-poc".cbus WHERE cbu_id = $1"#,
+            cbu_id
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        let cbu = cbu_row
+            .ok_or_else(|| anyhow::anyhow!("cbu.add-product: CBU not found with id {}", cbu_id))?;
+
+        // Check if CBU already has this product (idempotency info)
+        let had_existing_product = cbu.product_id.is_some();
+
+        // =====================================================================
+        // Step 3: Validate product exists and get its ID
+        // =====================================================================
+        let product_row = sqlx::query!(
+            r#"SELECT product_id, name FROM "ob-poc".products WHERE name = $1"#,
+            product_name
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        let product = product_row.ok_or_else(|| {
+            anyhow::anyhow!(
+                "cbu.add-product: Product '{}' not found. Available products can be listed with product.list",
+                product_name
+            )
+        })?;
+
+        let product_id = product.product_id;
+
+        // =====================================================================
+        // Step 4: Get all services for this product
+        // =====================================================================
+        let services = sqlx::query!(
+            r#"SELECT ps.service_id, s.name as service_name
+               FROM "ob-poc".product_services ps
+               JOIN "ob-poc".services s ON ps.service_id = s.service_id
+               WHERE ps.product_id = $1
+               ORDER BY s.name"#,
+            product_id
+        )
+        .fetch_all(pool)
+        .await?;
+
+        if services.is_empty() {
+            return Err(anyhow::anyhow!(
+                "cbu.add-product: Product '{}' has no services defined in product_services. \
+                 Cannot add product without services.",
+                product_name
+            ));
+        }
+
+        // =====================================================================
+        // Step 5: Execute in transaction
+        // =====================================================================
+        let mut tx = pool.begin().await?;
+
+        // 5a: Update cbus.product_id
+        sqlx::query!(
+            r#"UPDATE "ob-poc".cbus
+               SET product_id = $1, updated_at = NOW()
+               WHERE cbu_id = $2"#,
+            product_id,
+            cbu_id
+        )
+        .execute(&mut *tx)
+        .await?;
+
+        // 5b: Create service_delivery_map entries for each service
+        let mut created_count: i64 = 0;
+        let mut skipped_count: i64 = 0;
+
+        for svc in &services {
+            let delivery_id = Uuid::new_v4();
+            let result = sqlx::query(
+                r#"INSERT INTO "ob-poc".service_delivery_map
+                   (delivery_id, cbu_id, product_id, service_id, delivery_status)
+                   VALUES ($1, $2, $3, $4, 'PENDING')
+                   ON CONFLICT (cbu_id, product_id, service_id) DO NOTHING"#,
+            )
+            .bind(delivery_id)
+            .bind(cbu_id)
+            .bind(product_id)
+            .bind(svc.service_id)
+            .execute(&mut *tx)
+            .await?;
+
+            if result.rows_affected() > 0 {
+                created_count += 1;
+            } else {
+                skipped_count += 1;
+            }
+        }
+
+        // Commit transaction
+        tx.commit().await?;
+
+        // =====================================================================
+        // Step 6: Log result for debugging
+        // =====================================================================
+        tracing::info!(
+            cbu_id = %cbu_id,
+            cbu_name = %cbu.name,
+            product = %product_name,
+            services_total = services.len(),
+            entries_created = created_count,
+            entries_skipped = skipped_count,
+            had_existing_product = had_existing_product,
+            "cbu.add-product completed"
+        );
+
+        Ok(ExecutionResult::Affected(created_count as u64))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Affected(0))
     }
 }
 

@@ -503,6 +503,24 @@ domains:
         returns:
           type: record
 
+      # -------------------------------------------------------------------------
+      # CBU Product Assignment
+      # -------------------------------------------------------------------------
+      add-product:
+        description: "Add a product to a CBU (creates service_delivery_map entries for all services)"
+        behavior: plugin
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: product
+            type: string
+            required: true
+            description: "Product name (looked up in products table)"
+        returns:
+          type: affected
+          description: "Number of service delivery entries created"
+
   # ===========================================================================
   # DOMAIN: entity
   # ===========================================================================
@@ -882,12 +900,37 @@ domains:
   # ===========================================================================
   # DOMAIN: delivery
   # ===========================================================================
+  # Two-level model:
+  # 1. assign-product: Links CBU to product AND creates service_delivery_map entries
+  #    for all services in that product (via product_services join)
+  # 2. record/complete/fail: Per-service status tracking in service_delivery_map
   delivery:
-    description: "Service delivery tracking operations"
+    description: "CBU product assignment and service delivery tracking"
 
     verbs:
+      # Primary verb: assign a product to a CBU
+      # This is a PLUGIN because it does 3 things:
+      # 1. Sets cbus.product_id
+      # 2. Queries product_services to get all services for the product
+      # 3. Creates service_delivery_map entries for each (cbu, product, service)
+      assign-product:
+        description: "Assign a product to a CBU and create delivery entries for all its services"
+        behavior: plugin
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: product
+            type: string
+            required: true
+            description: "Product name (looked up in products table)"
+        returns:
+          type: affected
+          description: "Number of service delivery entries created"
+
+      # Per-service delivery tracking (for granular status updates)
       record:
-        description: "Record a service delivery for a CBU"
+        description: "Record a single service delivery entry (use assign-product for bulk)"
         behavior: plugin
         args:
           - name: cbu-id
