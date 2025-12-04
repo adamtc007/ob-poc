@@ -1039,9 +1039,87 @@ pub async fn rfi_receive(
 
 ---
 
-## Phase 4: UBO Chain Analysis
+## Phase 4: UBO Chain Analysis & Lifecycle
 
-### 4.1 Database Function
+### 4.0 UBO Grammar Enhancements
+
+The existing UBO verbs treat ownership as assertions. We need discovery-oriented verbs that:
+1. Distinguish **discovery** (found during KYC) from **assertion** (known upfront)
+2. Link UBO determinations to the KYC case that discovered them
+3. Support explicit lifecycle (supersede, close, snapshot)
+
+**New Verb Categories:**
+
+| Category | Verbs | Purpose |
+|----------|-------|---------|
+| Discovery | `ubo.discover-owner`, `ubo.infer-chain` | Found vs asserted ownership |
+| Traceability | Update `ubo.register-ubo` | Link to case/workstream |
+| Lifecycle | `ubo.supersede-ubo`, `ubo.close-ubo` | Explicit status transitions |
+| Snapshots | `ubo.snapshot-cbu`, `ubo.compare-snapshot` | Point-in-time views |
+
+### 4.1 Database Schema Updates
+
+**File**: `sql/migrations/022_ubo_enhancements.sql`
+
+```sql
+-- Add case/workstream traceability to ubo_registry
+ALTER TABLE "ob-poc".ubo_registry 
+    ADD COLUMN IF NOT EXISTS case_id UUID REFERENCES kyc.cases(case_id),
+    ADD COLUMN IF NOT EXISTS workstream_id UUID REFERENCES kyc.entity_workstreams(workstream_id),
+    ADD COLUMN IF NOT EXISTS discovery_method VARCHAR(30) DEFAULT 'ASSERTED',
+    ADD COLUMN IF NOT EXISTS superseded_by UUID REFERENCES "ob-poc".ubo_registry(ubo_id),
+    ADD COLUMN IF NOT EXISTS superseded_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS closed_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS closed_reason TEXT;
+
+-- Valid discovery methods
+COMMENT ON COLUMN "ob-poc".ubo_registry.discovery_method IS 
+    'ASSERTED=known upfront, DISCOVERED=found during KYC, INFERRED=computed from chain';
+
+-- UBO snapshots for point-in-time comparison
+CREATE TABLE "ob-poc".ubo_snapshots (
+    snapshot_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    cbu_id UUID NOT NULL REFERENCES "ob-poc".cbus(cbu_id),
+    case_id UUID REFERENCES kyc.cases(case_id),
+    snapshot_type VARCHAR(30) NOT NULL DEFAULT 'PERIODIC',
+    snapshot_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    total_chains INTEGER,
+    terminated_chains INTEGER,
+    identified_ownership_pct NUMERIC(5,2),
+    ubo_count INTEGER,
+    snapshot_data JSONB NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    created_by VARCHAR(100),
+    notes TEXT,
+    CONSTRAINT valid_snapshot_type CHECK (snapshot_type IN ('INITIAL', 'PERIODIC', 'EVENT_DRIVEN', 'MANUAL'))
+);
+
+-- Snapshot comparison results
+CREATE TABLE "ob-poc".ubo_snapshot_comparisons (
+    comparison_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    cbu_id UUID NOT NULL REFERENCES "ob-poc".cbus(cbu_id),
+    baseline_snapshot_id UUID NOT NULL REFERENCES "ob-poc".ubo_snapshots(snapshot_id),
+    current_snapshot_id UUID NOT NULL REFERENCES "ob-poc".ubo_snapshots(snapshot_id),
+    comparison_date TIMESTAMPTZ DEFAULT now(),
+    changes_detected BOOLEAN NOT NULL DEFAULT false,
+    added_ubos JSONB DEFAULT '[]',
+    removed_ubos JSONB DEFAULT '[]',
+    changed_percentages JSONB DEFAULT '[]',
+    new_chains JSONB DEFAULT '[]',
+    terminated_chains JSONB DEFAULT '[]',
+    requires_review BOOLEAN DEFAULT false,
+    reviewed_at TIMESTAMPTZ,
+    reviewed_by VARCHAR(100)
+);
+
+-- Indexes
+CREATE INDEX idx_ubo_registry_case ON "ob-poc".ubo_registry(case_id);
+CREATE INDEX idx_ubo_registry_workstream ON "ob-poc".ubo_registry(workstream_id);
+CREATE INDEX idx_ubo_snapshots_cbu ON "ob-poc".ubo_snapshots(cbu_id);
+CREATE INDEX idx_ubo_snapshots_date ON "ob-poc".ubo_snapshots(snapshot_date);
+```
+
+### 4.2 Ownership Chain Function
 
 **File**: `sql/migrations/022_ubo_chain_function.sql`
 
@@ -1152,11 +1230,88 @@ FROM terminal_entities
 GROUP BY cbu_id;
 ```
 
-### 4.2 UBO Plugin Verbs
+### 4.3 UBO Plugin Verbs
 
 **File**: Update `rust/config/verbs/ubo.yaml` to add:
 
 ```yaml
+      # ======================
+      # DISCOVERY VERBS
+      # ======================
+      
+      discover-owner:
+        description: Record ownership discovered during KYC (vs asserted upfront)
+        behavior: plugin
+        plugin:
+          handler: ubo_discover_owner
+        args:
+        - name: case-id
+          type: uuid
+          required: true
+          description: KYC case that discovered this ownership
+        - name: workstream-id
+          type: uuid
+          required: false
+          description: Entity workstream that discovered this
+        - name: owner-entity-id
+          type: uuid
+          required: true
+        - name: owned-entity-id
+          type: uuid
+          required: true
+        - name: percentage
+          type: decimal
+          required: true
+        - name: ownership-type
+          type: string
+          required: true
+          valid_values: [DIRECT, INDIRECT, BENEFICIAL]
+        - name: evidence-doc-id
+          type: uuid
+          required: false
+        - name: notes
+          type: string
+          required: false
+        returns:
+          type: uuid
+          name: ownership_id
+          capture: true
+
+      infer-chain:
+        description: Run DB logic to compute ownership chain and generate ownership links
+        behavior: plugin
+        plugin:
+          handler: ubo_infer_chain
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+        - name: case-id
+          type: uuid
+          required: false
+          description: Link inferred ownerships to this case
+        - name: threshold
+          type: decimal
+          required: false
+          default: 25.0
+        - name: max-depth
+          type: integer
+          required: false
+          default: 10
+        returns:
+          type: json
+          capture: true
+          description: |
+            {
+              inferred_ownerships: [{owner_entity_id, owned_entity_id, percentage, chain_depth}],
+              identified_ubos: [{entity_id, aggregate_pct}],
+              unterminated_chains: [{last_entity_id, chain_depth, aggregate_pct}]
+            }
+
+      # ======================
+      # CHAIN ANALYSIS VERBS
+      # ======================
+
       trace-chains:
         description: Compute all ownership chains for CBU
         behavior: plugin
@@ -1222,6 +1377,216 @@ GROUP BY cbu_id;
         returns:
           type: uuid
           name: entity_id
+          capture: true
+
+      # ======================
+      # LIFECYCLE VERBS
+      # ======================
+
+      supersede-ubo:
+        description: Supersede existing UBO determination with new one
+        behavior: plugin
+        plugin:
+          handler: ubo_supersede
+        args:
+        - name: ubo-id
+          type: uuid
+          required: true
+          description: UBO determination being superseded
+        - name: new-ubo-id
+          type: uuid
+          required: true
+          description: New UBO determination replacing it
+        - name: reason
+          type: string
+          required: true
+        - name: case-id
+          type: uuid
+          required: false
+          description: Case that triggered the supersession
+        returns:
+          type: affected
+
+      close-ubo:
+        description: Close UBO determination (entity no longer qualifies)
+        behavior: crud
+        crud:
+          operation: update
+          table: ubo_registry
+          schema: ob-poc
+          key: ubo_id
+        args:
+        - name: ubo-id
+          type: uuid
+          required: true
+          maps_to: ubo_id
+        - name: reason
+          type: string
+          required: true
+          maps_to: closed_reason
+        returns:
+          type: affected
+          set_values:
+            closed_at: now()
+
+      # ======================
+      # SNAPSHOT VERBS
+      # ======================
+
+      snapshot-cbu:
+        description: Create point-in-time snapshot of UBO structure
+        behavior: plugin
+        plugin:
+          handler: ubo_snapshot_cbu
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+        - name: case-id
+          type: uuid
+          required: false
+          description: Associated KYC case (if event-driven)
+        - name: snapshot-type
+          type: string
+          required: false
+          default: MANUAL
+          valid_values: [INITIAL, PERIODIC, EVENT_DRIVEN, MANUAL]
+        - name: notes
+          type: string
+          required: false
+        returns:
+          type: uuid
+          name: snapshot_id
+          capture: true
+
+      compare-snapshot:
+        description: Compare current UBO structure against baseline snapshot
+        behavior: plugin
+        plugin:
+          handler: ubo_compare_snapshot
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+        - name: baseline-snapshot-id
+          type: uuid
+          required: true
+        - name: create-current-snapshot
+          type: boolean
+          required: false
+          default: true
+          description: If true, creates new snapshot for comparison
+        returns:
+          type: json
+          capture: true
+          description: |
+            {
+              changes_detected: boolean,
+              added_ubos: [{entity_id, name, aggregate_pct}],
+              removed_ubos: [{entity_id, name, previous_pct}],
+              changed_percentages: [{entity_id, name, old_pct, new_pct}],
+              new_chains: integer,
+              terminated_chains: integer,
+              requires_review: boolean,
+              current_snapshot_id: uuid
+            }
+
+      list-snapshots:
+        description: List UBO snapshots for a CBU
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: ubo_snapshots
+          schema: ob-poc
+          fk_col: cbu_id
+          order_by: snapshot_date DESC
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+        returns:
+          type: record_set
+```
+
+### 4.4 Update ubo.register-ubo for Traceability
+
+**File**: Update existing verb in `rust/config/verbs/ubo.yaml`:
+
+```yaml
+      register-ubo:
+        description: Register a UBO determination for a CBU
+        behavior: crud
+        crud:
+          operation: upsert
+          table: ubo_registry
+          schema: ob-poc
+          conflict_keys:
+          - subject_entity_id
+          - ubo_proper_person_id
+          - relationship_type
+          returning: ubo_id
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+          maps_to: cbu_id
+        - name: subject-entity-id
+          type: uuid
+          required: true
+          maps_to: subject_entity_id
+        - name: ubo-person-id
+          type: uuid
+          required: true
+          maps_to: ubo_proper_person_id
+        - name: relationship-type
+          type: string
+          required: true
+          maps_to: relationship_type
+        - name: qualifying-reason
+          type: string
+          required: true
+          maps_to: qualifying_reason
+          valid_values:
+          - OWNERSHIP_25PCT
+          - CONTROL
+          - SENIOR_MANAGEMENT
+          - OTHER
+        - name: ownership-percentage
+          type: decimal
+          required: false
+          maps_to: ownership_percentage
+        - name: control-type
+          type: string
+          required: false
+          maps_to: control_type
+        - name: workflow-type
+          type: string
+          required: true
+          maps_to: workflow_type
+        - name: regulatory-framework
+          type: string
+          required: false
+          maps_to: regulatory_framework
+        # NEW: Traceability fields
+        - name: case-id
+          type: uuid
+          required: false
+          maps_to: case_id
+          description: KYC case that determined this UBO
+        - name: workstream-id
+          type: uuid
+          required: false
+          maps_to: workstream_id
+          description: Entity workstream within the case
+        - name: discovery-method
+          type: string
+          required: false
+          default: ASSERTED
+          maps_to: discovery_method
+          valid_values: [ASSERTED, DISCOVERED, INFERRED]
+        returns:
+          type: uuid
+          name: ubo_id
           capture: true
 ```
 
@@ -1582,25 +1947,30 @@ cleanup:
 6. Phase 3 - RFI verbs (CRUD)
 7. Phase 3 - rfi.generate plugin
 
-### Week 3: UBO Analysis
-8. Phase 4 - compute_ownership_chains SQL function
-9. Phase 4 - ubo.trace-chains plugin
-10. Phase 4 - ubo.check-completeness plugin
+### Week 3: UBO Analysis + Discovery
+8. Phase 4.1 - UBO schema enhancements (case_id, workstream_id, discovery_method, snapshots)
+9. Phase 4.2 - compute_ownership_chains SQL function
+10. Phase 4.3 - Discovery verbs: ubo.discover-owner, ubo.infer-chain
+11. Phase 4.3 - Analysis verbs: ubo.trace-chains, ubo.check-completeness
+12. Phase 4.3 - Lifecycle verbs: ubo.supersede-ubo, ubo.close-ubo
+13. Phase 4.3 - Snapshot verbs: ubo.snapshot-cbu, ubo.compare-snapshot
+14. Phase 4.4 - Update ubo.register-ubo with traceability args
 
 ### Week 4: Automation + Integration
-11. Phase 5 - Event system schema
-12. Phase 5 - Event/automation verbs
-13. Phase 5 - kyc-case.reevaluate plugin
+15. Phase 5 - Event system schema
+16. Phase 5 - Event/automation verbs
+17. Phase 5 - kyc-case.reevaluate plugin
 
 ### Week 5: Go Harness
-14. Phase 6 - Go project setup
-15. Phase 6 - DSL client (HTTP to Rust server)
-16. Phase 6 - Web UI + scenario runner
+18. Phase 6 - Go project setup
+19. Phase 6 - DSL client (HTTP to Rust server)
+20. Phase 6 - Web UI + scenario runner
 
 ### Week 6: Testing
-17. End-to-end: Initial KYC scenario
-18. End-to-end: Complex UBO discovery
-19. End-to-end: RFI loop with document upload
+21. End-to-end: Initial KYC scenario
+22. End-to-end: Complex UBO discovery with snapshots
+23. End-to-end: RFI loop with document upload
+24. End-to-end: Periodic review with snapshot comparison
 
 ---
 
@@ -1609,6 +1979,7 @@ cleanup:
 ### SQL Migrations
 - [ ] `sql/migrations/020_threshold_matrix.sql`
 - [ ] `sql/migrations/021_rfi_system.sql`
+- [ ] `sql/migrations/022_ubo_enhancements.sql` (case_id, workstream_id, discovery_method, snapshots)
 - [ ] `sql/migrations/022_ubo_chain_function.sql`
 - [ ] `sql/migrations/023_event_system.sql`
 
@@ -1619,13 +1990,32 @@ cleanup:
 - [ ] `rust/config/verbs/kyc/threshold.yaml`
 - [ ] `rust/config/verbs/kyc/rfi.yaml`
 - [ ] `rust/config/verbs/kyc/automation.yaml`
-- [ ] Update `rust/config/verbs/ubo.yaml` (add trace-chains, check-completeness)
+- [ ] Update `rust/config/verbs/ubo.yaml`:
+  - [ ] Add `discover-owner` (discovery during KYC)
+  - [ ] Add `infer-chain` (compute and suggest ownerships)
+  - [ ] Add `trace-chains` (chain analysis)
+  - [ ] Add `check-completeness` (completeness check)
+  - [ ] Add `insert-placeholder` (placeholder entities)
+  - [ ] Add `supersede-ubo` (lifecycle - supersession)
+  - [ ] Add `close-ubo` (lifecycle - closure)
+  - [ ] Add `snapshot-cbu` (point-in-time snapshot)
+  - [ ] Add `compare-snapshot` (delta detection)
+  - [ ] Add `list-snapshots` (snapshot listing)
+  - [ ] Update `register-ubo` (add case-id, workstream-id, discovery-method)
 - [ ] Update `rust/config/verbs/kyc/kyc-case.yaml` (add reevaluate)
 
 ### Rust Plugins
 - [ ] `rust/src/dsl_v2/custom_ops/threshold.rs`
 - [ ] `rust/src/dsl_v2/custom_ops/rfi.rs`
-- [ ] `rust/src/dsl_v2/custom_ops/ubo_analysis.rs`
+- [ ] `rust/src/dsl_v2/custom_ops/ubo_analysis.rs`:
+  - [ ] `ubo_discover_owner`
+  - [ ] `ubo_infer_chain`
+  - [ ] `ubo_trace_chains`
+  - [ ] `ubo_check_completeness`
+  - [ ] `ubo_insert_placeholder`
+  - [ ] `ubo_supersede`
+  - [ ] `ubo_snapshot_cbu`
+  - [ ] `ubo_compare_snapshot`
 - [ ] `rust/src/dsl_v2/custom_ops/kyc_reevaluate.rs`
 - [ ] Update `rust/src/dsl_v2/custom_ops/mod.rs`
 
@@ -1644,6 +2034,12 @@ cleanup:
 - [ ] rfi.request-document validates document type codes
 - [ ] UBO chains compute correctly with recursive CTE
 - [ ] Circular ownership detected (max depth 10)
+- [ ] `ubo.discover-owner` creates ownership with DISCOVERED method
+- [ ] `ubo.infer-chain` generates ownership suggestions
+- [ ] `ubo.register-ubo` stores case_id and workstream_id
+- [ ] `ubo.supersede-ubo` links old to new UBO
+- [ ] `ubo.snapshot-cbu` creates point-in-time record
+- [ ] `ubo.compare-snapshot` detects added/removed/changed UBOs
 - [ ] Event emission works
 - [ ] Action queue workflow (SEMI_AUTO)
 - [ ] kyc-case.reevaluate runs full cycle

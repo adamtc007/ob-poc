@@ -490,6 +490,16 @@ dsl_cli execute -f program.dsl --format json | jq '.bindings'
 | allegation | Client allegations - unverified claims that start KYC |
 | observation | Attribute observations from various sources |
 | discrepancy | Conflicts between attribute observations |
+| threshold | Risk-based document requirements (derive, evaluate, check-entity) |
+| rfi | Request for Information batch operations (generate, check-completion, list-by-case) |
+| product | Product catalog CRUD (create, update, list) |
+| service | Service catalog CRUD (create, update, list) |
+| instrument-class | CFI-based instrument classification reference data |
+| security-type | SMPG/ALERT security type taxonomy |
+| market | ISO 10383 MIC market reference data |
+| subcustodian | Subcustodian network relationships |
+| isda | ISDA master agreements and product coverage |
+| entity-settlement | Entity BIC/LEI settlement identity |
 
 ## KYC Case Management DSL
 
@@ -917,6 +927,13 @@ The KYC case management and UBO domains manage entity-level investigations, scre
 | `ubo.verify-ubo` | Mark UBO as verified |
 | `ubo.list-ubos` | List UBOs for CBU |
 | `ubo.list-by-subject` | List UBOs for subject entity |
+| `ubo.discover-owner` | Discover potential UBOs from documents, registry, or screening |
+| `ubo.trace-chains` | Trace all ownership chains to natural persons |
+| `ubo.infer-chain` | Trace ownership chain upward from starting entity |
+| `ubo.check-completeness` | Validate UBO determination completeness |
+| `ubo.supersede-ubo` | Supersede UBO record with newer determination |
+| `ubo.snapshot-cbu` | Capture point-in-time UBO state snapshot |
+| `ubo.compare-snapshot` | Compare two UBO snapshots for changes |
 
 ### Example: Full KYC Case Flow
 
@@ -963,6 +980,67 @@ The KYC case management and UBO domains manage entity-level investigations, scre
 (ubo.verify-ubo :ubo-id @ubo1 :verification-status "VERIFIED" :risk-rating "LOW")
 ```
 ## Investor Registry DSL
+
+## Threshold Decision Matrix
+
+The `threshold` domain provides risk-based document requirements that determine what documentation is needed based on entity roles and risk bands.
+
+### Threshold Tables
+
+| Table | Purpose |
+|-------|---------|
+| threshold_factors | Risk factors and their weights |
+| risk_bands | Risk band definitions (LOW, MEDIUM, HIGH, VERY_HIGH) |
+| threshold_requirements | Per-risk-band attribute requirements |
+| requirement_acceptable_docs | Document types that satisfy requirements |
+| screening_requirements | Screening requirements per risk band |
+
+### Threshold Verbs
+
+| Verb | Description |
+|------|-------------|
+| `threshold.derive` | Compute risk band from entity factors |
+| `threshold.evaluate` | Evaluate requirements for entity based on risk band |
+| `threshold.check-entity` | Check if entity meets all threshold requirements |
+
+### Example: Threshold-Based Requirements
+
+```clojure
+;; Derive risk band for entity
+(threshold.derive :cbu-id @fund :entity-id @ubo :as @risk-result)
+
+;; Evaluate what requirements apply
+(threshold.evaluate :cbu-id @fund :entity-id @ubo :risk-band "HIGH")
+
+;; Check if entity meets all requirements
+(threshold.check-entity :cbu-id @fund :entity-id @ubo)
+```
+
+## RFI (Request for Information) System
+
+The `rfi` domain manages batch document requests based on threshold requirements. It extends the existing `kyc.doc_requests` table rather than creating separate tables.
+
+### RFI Verbs
+
+| Verb | Description |
+|------|-------------|
+| `rfi.generate` | Generate doc_requests from threshold requirements for a case |
+| `rfi.check-completion` | Check document completion status for a case |
+| `rfi.list-by-case` | List all doc_requests for a case |
+
+### Example: RFI Generation
+
+```clojure
+;; Generate document requests based on threshold requirements
+(rfi.generate :case-id @case :risk-band "HIGH" :as @batch-id)
+
+;; Check completion status
+(rfi.check-completion :case-id @case)
+
+;; List all requests for the case
+(rfi.list-by-case :case-id @case)
+```
+
 
 The `share-class`, `holding`, and `movement` domains implement a Clearstream-style investor registry for fund share classes.
 
@@ -2145,6 +2223,392 @@ dsl_cli custody -i "..." --format json
 **Retry Loop**: Validation failures feed back to Claude with error messages for self-correction (max 3 attempts).
 
 ## Environment Variables
+## Complete DSL Verb Reference
+
+This section provides a complete reference of all DSL verbs organized by domain.
+
+### allegation
+
+Client allegations - unverified claims that start the KYC process
+
+| Verb | Description |
+|------|-------------|
+| `allegation.contradict` | Mark allegation as contradicted by evidence |
+| `allegation.list-by-entity` | List allegations for an entity |
+| `allegation.list-pending` | List pending allegations for a CBU |
+| `allegation.mark-partial` | Mark allegation as partially verified |
+| `allegation.record` | Record a client allegation about an entity attribute |
+| `allegation.verify` | Mark allegation as verified by an observation |
+
+### case-event
+
+Audit trail for KYC case activities
+
+| Verb | Description |
+|------|-------------|
+| `case-event.list-by-case` | List events for a case |
+| `case-event.log` | Log a case event |
+
+### case-screening
+
+Sanctions, PEP, and adverse media screening for KYC workstreams
+
+| Verb | Description |
+|------|-------------|
+| `case-screening.complete` | Record screening completion |
+| `case-screening.list-by-workstream` | List screenings for a workstream |
+| `case-screening.review-hit` | Review a screening hit |
+| `case-screening.run` | Initiate a screening |
+
+### cbu
+
+Client Business Unit operations
+
+| Verb | Description |
+|------|-------------|
+| `cbu.assign-role` | Assign a role to an entity within a CBU |
+| `cbu.create` | Create a new Client Business Unit |
+| `cbu.delete` | Delete a CBU |
+| `cbu.ensure` | Create or update a CBU by natural key |
+| `cbu.list` | List CBUs with optional filters |
+| `cbu.parties` | List all parties (entities with their roles) for a CBU |
+| `cbu.read` | Read a CBU by ID |
+| `cbu.remove-role` | Remove a specific role from an entity within a CBU |
+| `cbu.update` | Update a CBU |
+
+### cbu-custody
+
+CBU custody operations: Universe, SSIs, and Booking Rules
+
+| Verb | Description |
+|------|-------------|
+| `cbu-custody.activate-ssi` | Activate an SSI |
+| `cbu-custody.add-booking-rule` | Add ALERT-style booking rule for SSI routing |
+| `cbu-custody.add-universe` | Declare what a CBU trades (instrument class + market + currencies) |
+| `cbu-custody.create-ssi` | Create a Standing Settlement Instruction (pure account data) |
+| `cbu-custody.deactivate-rule` | Deactivate a booking rule |
+| `cbu-custody.derive-required-coverage` | Compare universe to booking rules, find gaps |
+| `cbu-custody.list-booking-rules` | List booking rules for a CBU |
+| `cbu-custody.list-ssis` | List SSIs for a CBU |
+| `cbu-custody.list-universe` | List CBU's traded universe |
+| `cbu-custody.lookup-ssi` | Find SSI for given trade characteristics (simulate ALERT lookup) |
+| `cbu-custody.suspend-ssi` | Suspend an SSI |
+| `cbu-custody.update-rule-priority` | Update booking rule priority |
+| `cbu-custody.validate-booking-coverage` | Validate that all universe entries have matching booking rules |
+
+### delivery
+
+Service delivery tracking operations
+
+| Verb | Description |
+|------|-------------|
+| `delivery.complete` | Mark a service delivery as complete |
+| `delivery.fail` | Mark a service delivery as failed |
+| `delivery.record` | Record a service delivery for a CBU |
+
+### discrepancy
+
+Observation discrepancies - conflicts between attribute observations
+
+| Verb | Description |
+|------|-------------|
+| `discrepancy.escalate` | Escalate a discrepancy |
+| `discrepancy.list-open` | List open discrepancies |
+| `discrepancy.record` | Record a discrepancy between observations |
+| `discrepancy.resolve` | Resolve a discrepancy |
+
+### doc-request
+
+Document collection and verification for KYC workstreams
+
+| Verb | Description |
+|------|-------------|
+| `doc-request.create` | Create a document request |
+| `doc-request.list-by-workstream` | List document requests for a workstream |
+| `doc-request.mark-requested` | Mark document as formally requested |
+| `doc-request.receive` | Record document received |
+| `doc-request.reject` | Reject document |
+| `doc-request.verify` | Verify document as valid |
+| `doc-request.waive` | Waive document requirement |
+
+### document
+
+Document catalog and extraction operations
+
+| Verb | Description |
+|------|-------------|
+| `document.catalog` | Catalog a document for an entity within a CBU |
+| `document.extract` | Extract attributes from a cataloged document |
+| `document.extract-to-observations` | Extract document data and create observations |
+
+### entity
+
+Entity management operations
+
+| Verb | Description |
+|------|-------------|
+| `entity.create-limited-company` | Create a limited company entity |
+| `entity.create-partnership-limited` | Create a limited partnership entity |
+| `entity.create-proper-person` | Create a natural person entity |
+| `entity.create-trust-discretionary` | Create a discretionary trust entity |
+| `entity.delete` | Delete an entity (cascades to type extension) |
+| `entity.list` | List entities with optional filters |
+| `entity.read` | Read an entity by ID |
+| `entity.update` | Update an entity's base fields |
+
+### entity-settlement
+
+Entity settlement identity and SSIs (counterparty data from ALERT)
+
+| Verb | Description |
+|------|-------------|
+| `entity-settlement.add-ssi` | Add counterparty SSI (from ALERT or manual) |
+| `entity-settlement.set-identity` | Set primary settlement identity for an entity |
+
+### entity-workstream
+
+Per-entity workstream within a KYC case
+
+| Verb | Description |
+|------|-------------|
+| `entity-workstream.block` | Block workstream with reason |
+| `entity-workstream.complete` | Mark workstream as complete |
+| `entity-workstream.create` | Create a new entity workstream |
+| `entity-workstream.list-by-case` | List workstreams for a case |
+| `entity-workstream.read` | Read workstream details |
+| `entity-workstream.set-enhanced-dd` | Flag workstream for enhanced due diligence |
+| `entity-workstream.set-ubo` | Mark workstream entity as UBO |
+| `entity-workstream.update-status` | Update workstream status |
+
+### holding
+
+Investor position management in share classes
+
+| Verb | Description |
+|------|-------------|
+| `holding.close` | Close a holding (mark as inactive) |
+| `holding.create` | Create a new investor holding in a share class |
+| `holding.ensure` | Ensure investor holding exists (upsert) |
+| `holding.list-by-investor` | List holdings for an investor across all share classes |
+| `holding.list-by-share-class` | List holdings for a share class |
+| `holding.read` | Read a holding by ID |
+| `holding.update-units` | Update holding units (for position adjustments) |
+
+### instrument-class
+
+Instrument class with industry taxonomy mappings
+
+| Verb | Description |
+|------|-------------|
+| `instrument-class.ensure` | Create or update instrument class with CFI/SMPG/ISDA mappings |
+| `instrument-class.list` | List instrument classes with filters |
+| `instrument-class.read` | Read instrument class by code |
+
+### isda
+
+ISDA and CSA agreement management for OTC derivatives
+
+| Verb | Description |
+|------|-------------|
+| `isda.add-coverage` | Add instrument class coverage to ISDA |
+| `isda.add-csa` | Add CSA (Credit Support Annex) to ISDA |
+| `isda.create` | Create ISDA agreement with counterparty |
+| `isda.list` | List ISDA agreements for CBU |
+
+### kyc-case
+
+KYC case lifecycle management
+
+| Verb | Description |
+|------|-------------|
+| `kyc-case.assign` | Assign case to analyst and/or reviewer |
+| `kyc-case.close` | Close the case |
+| `kyc-case.create` | Create a new KYC case for a CBU |
+| `kyc-case.escalate` | Escalate case to higher authority |
+| `kyc-case.list-by-cbu` | List cases for a CBU |
+| `kyc-case.read` | Read case details |
+| `kyc-case.set-risk-rating` | Set case risk rating |
+| `kyc-case.update-status` | Update case status |
+
+### market
+
+Market/Exchange reference data
+
+| Verb | Description |
+|------|-------------|
+| `market.ensure` | Create or update market reference |
+| `market.list` | List markets |
+| `market.read` | Read market by MIC |
+
+### movement
+
+Fund subscription, redemption, and transfer transactions
+
+| Verb | Description |
+|------|-------------|
+| `movement.cancel` | Cancel a pending movement |
+| `movement.confirm` | Confirm a pending movement |
+| `movement.list-by-holding` | List movements for a holding |
+| `movement.read` | Read a movement by ID |
+| `movement.redeem` | Record a redemption (investor selling units) |
+| `movement.settle` | Mark a movement as settled |
+| `movement.subscribe` | Record a subscription (investor buying units) |
+| `movement.transfer-in` | Record an incoming transfer of units |
+| `movement.transfer-out` | Record an outgoing transfer of units |
+
+### observation
+
+Attribute observations from various sources
+
+| Verb | Description |
+|------|-------------|
+| `observation.get-current` | Get current best observation for an attribute |
+| `observation.list-for-attribute` | List observations of a specific attribute for an entity |
+| `observation.list-for-entity` | List all observations for an entity |
+| `observation.reconcile` | Compare observations for an attribute and auto-create discrepancies |
+| `observation.record` | Record an attribute observation |
+| `observation.record-from-document` | Record observation extracted from a document |
+| `observation.supersede` | Supersede an observation with a newer one |
+| `observation.verify-allegations` | Batch verify pending allegations against observations |
+
+### product
+
+Product catalog operations (read-only - products are reference data)
+
+| Verb | Description |
+|------|-------------|
+| `product.list` | List products with optional filters |
+| `product.read` | Read a product by ID or code |
+
+### red-flag
+
+Risk indicators and issues requiring attention
+
+| Verb | Description |
+|------|-------------|
+| `red-flag.dismiss` | Dismiss red flag as false positive |
+| `red-flag.list-by-case` | List red flags for a case |
+| `red-flag.list-by-workstream` | List red flags for a workstream |
+| `red-flag.mitigate` | Mark red flag as mitigated |
+| `red-flag.raise` | Raise a new red flag |
+| `red-flag.set-blocking` | Set red flag as blocking the case |
+| `red-flag.waive` | Waive red flag with justification |
+
+### rfi
+
+Request for Information - batch document request operations using kyc.doc_requests
+
+| Verb | Description |
+|------|-------------|
+| `rfi.check-completion` | Check document completion status for a case |
+| `rfi.generate` | Generate doc_requests from threshold requirements for a case |
+| `rfi.list-by-case` | List all doc_requests for a case |
+
+### screening
+
+Entity screening operations (PEP, sanctions, adverse media)
+
+| Verb | Description |
+|------|-------------|
+| `screening.adverse-media` | Run adverse media screening |
+| `screening.pep` | Run PEP (Politically Exposed Persons) screening |
+| `screening.sanctions` | Run sanctions list screening |
+
+### security-type
+
+SMPG/ALERT security type codes
+
+| Verb | Description |
+|------|-------------|
+| `security-type.ensure` | Create or update ALERT security type |
+| `security-type.list` | List security types for an instrument class |
+
+### service
+
+Service catalog operations (read-only - services are reference data)
+
+| Verb | Description |
+|------|-------------|
+| `service.list` | List services with optional filters |
+| `service.list-by-product` | List services for a product |
+| `service.read` | Read a service by ID or code |
+
+### service-resource
+
+Service resource type (read-only) and instance operations
+
+| Verb | Description |
+|------|-------------|
+| `service-resource.activate` | Activate a service resource instance |
+| `service-resource.decommission` | Decommission a service resource instance |
+| `service-resource.list` | List service resource types with optional filters |
+| `service-resource.list-attributes` | List attribute requirements for a service resource type |
+| `service-resource.list-by-service` | List service resource types for a service |
+| `service-resource.provision` | Provision a service resource instance for a CBU |
+| `service-resource.read` | Read a service resource type by ID or code |
+| `service-resource.set-attr` | Set an attribute value on a service resource instance |
+| `service-resource.suspend` | Suspend a service resource instance |
+| `service-resource.validate-attrs` | Validate that all required attributes are set for a resource instance |
+
+### share-class
+
+Fund share class management and investor registry (Clearstream-style)
+
+| Verb | Description |
+|------|-------------|
+| `share-class.close` | Close a share class to new subscriptions |
+| `share-class.create` | Create a new share class for a fund CBU |
+| `share-class.ensure` | Create or update share class by ISIN |
+| `share-class.list` | List share classes for a fund |
+| `share-class.read` | Read a share class by ID |
+| `share-class.update-nav` | Update NAV for a share class |
+
+### subcustodian
+
+Bank's sub-custodian network (Omgeo Institution Network)
+
+| Verb | Description |
+|------|-------------|
+| `subcustodian.ensure` | Create or update sub-custodian entry for market/currency |
+| `subcustodian.list-by-market` | List sub-custodian entries for a market |
+| `subcustodian.lookup` | Find sub-custodian for market/currency |
+
+### threshold
+
+KYC threshold computation and evaluation
+
+| Verb | Description |
+|------|-------------|
+| `threshold.check-entity` | Check single entity against requirements |
+| `threshold.derive` | Compute KYC requirements based on CBU risk factors |
+| `threshold.evaluate` | Check if CBU meets threshold requirements |
+
+### ubo
+
+UBO ownership and control chain management
+
+| Verb | Description |
+|------|-------------|
+| `ubo.add-ownership` | Add ownership relationship between entities |
+| `ubo.calculate` | Calculate ultimate beneficial ownership chain |
+| `ubo.check-completeness` | Check if UBO determination is complete for a CBU |
+| `ubo.close-ubo` | Close a UBO record (no longer a UBO) |
+| `ubo.compare-snapshot` | Compare two UBO snapshots to detect changes |
+| `ubo.discover-owner` | Discover potential UBOs from document extraction or registry lookup |
+| `ubo.end-ownership` | End an ownership relationship |
+| `ubo.infer-chain` | Infer ownership chain from known relationships |
+| `ubo.list-by-subject` | List UBOs for a subject entity |
+| `ubo.list-owned` | List entities owned by an entity (what does this entity own) |
+| `ubo.list-owners` | List owners of an entity (who owns this entity) |
+| `ubo.list-snapshots` | List UBO snapshots for a CBU |
+| `ubo.list-ubos` | List UBOs for a CBU |
+| `ubo.register-ubo` | Register a UBO determination for a CBU |
+| `ubo.snapshot-cbu` | Capture a point-in-time snapshot of UBO state for a CBU |
+| `ubo.supersede-ubo` | Supersede a UBO record with a newer determination |
+| `ubo.trace-chains` | Trace all ownership chains to natural persons for a CBU |
+| `ubo.update-ownership` | Update ownership percentage or end date |
+| `ubo.verify-ubo` | Mark a UBO as verified |
+
 
 ```bash
 DATABASE_URL="postgresql:///data_designer"

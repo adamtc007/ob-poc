@@ -19,6 +19,9 @@
 //! 4. Ensure operations are testable in isolation
 
 mod custody;
+mod rfi;
+mod threshold;
+mod ubo_analysis;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -30,6 +33,12 @@ use super::executor::{ExecutionContext, ExecutionResult};
 
 pub use custody::{
     DeriveRequiredCoverageOp, LookupSsiForTradeOp, SubcustodianLookupOp, ValidateBookingCoverageOp,
+};
+pub use rfi::{RfiCheckCompletionOp, RfiGenerateOp, RfiListByCaseOp};
+pub use threshold::{ThresholdCheckEntityOp, ThresholdDeriveOp, ThresholdEvaluateOp};
+pub use ubo_analysis::{
+    UboCheckCompletenessOp, UboCompareSnapshotOp, UboDiscoverOwnerOp, UboInferChainOp,
+    UboSnapshotCbuOp, UboSupersedeOp, UboTraceChainsOp,
 };
 
 #[cfg(feature = "database")]
@@ -109,6 +118,25 @@ impl CustomOperationRegistry {
 
         // Document extraction to observations
         registry.register(Arc::new(DocumentExtractObservationsOp));
+
+        // Threshold operations (Phase 2)
+        registry.register(Arc::new(ThresholdDeriveOp));
+        registry.register(Arc::new(ThresholdEvaluateOp));
+        registry.register(Arc::new(ThresholdCheckEntityOp));
+
+        // RFI operations (Phase 3) - works with existing kyc.doc_requests
+        registry.register(Arc::new(RfiGenerateOp));
+        registry.register(Arc::new(RfiCheckCompletionOp));
+        registry.register(Arc::new(RfiListByCaseOp));
+
+        // UBO Analysis operations (Phase 4)
+        registry.register(Arc::new(UboDiscoverOwnerOp));
+        registry.register(Arc::new(UboInferChainOp));
+        registry.register(Arc::new(UboTraceChainsOp));
+        registry.register(Arc::new(UboCheckCompletenessOp));
+        registry.register(Arc::new(UboSupersedeOp));
+        registry.register(Arc::new(UboSnapshotCbuOp));
+        registry.register(Arc::new(UboCompareSnapshotOp));
 
         registry
     }

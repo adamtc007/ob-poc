@@ -2240,6 +2240,19 @@ domains:
             type: string
             required: false
             maps_to: regulatory_framework
+          - name: case-id
+            type: uuid
+            required: false
+            maps_to: case_id
+          - name: workstream-id
+            type: uuid
+            required: false
+            maps_to: workstream_id
+          - name: discovery-method
+            type: string
+            required: false
+            maps_to: discovery_method
+            valid_values: [MANUAL, INFERRED, DOCUMENT, REGISTRY, SCREENING]
         returns:
           type: uuid
           name: ubo_id
@@ -2320,6 +2333,187 @@ domains:
             type: decimal
             required: false
             default: 25.0
+        returns:
+          type: record_set
+
+      # UBO Discovery and Chain Analysis (Phase 4 enhancements)
+      discover-owner:
+        description: "Discover potential UBOs from document extraction or registry lookup"
+        behavior: plugin
+        plugin:
+          handler: ubo_discover_owner
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: entity-id
+            type: uuid
+            required: true
+          - name: source-type
+            type: string
+            required: true
+            valid_values: [DOCUMENT, REGISTRY, SCREENING]
+          - name: source-ref
+            type: string
+            required: false
+        returns:
+          type: json
+          capture: true
+
+      infer-chain:
+        description: "Infer ownership chain from known relationships"
+        behavior: plugin
+        plugin:
+          handler: ubo_infer_chain
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: start-entity-id
+            type: uuid
+            required: true
+          - name: max-depth
+            type: integer
+            required: false
+            default: 10
+        returns:
+          type: json
+          capture: true
+
+      trace-chains:
+        description: "Trace all ownership chains to natural persons for a CBU"
+        behavior: plugin
+        plugin:
+          handler: ubo_trace_chains
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: target-entity-id
+            type: uuid
+            required: false
+          - name: threshold
+            type: decimal
+            required: false
+            default: 25.0
+        returns:
+          type: json
+          capture: true
+
+      check-completeness:
+        description: "Check if UBO determination is complete for a CBU"
+        behavior: plugin
+        plugin:
+          handler: ubo_check_completeness
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: threshold
+            type: decimal
+            required: false
+            default: 25.0
+        returns:
+          type: json
+          capture: true
+
+      # UBO Lifecycle Management
+      supersede-ubo:
+        description: "Supersede a UBO record with a newer determination"
+        behavior: plugin
+        plugin:
+          handler: ubo_supersede
+        args:
+          - name: old-ubo-id
+            type: uuid
+            required: true
+          - name: new-ubo-id
+            type: uuid
+            required: true
+          - name: reason
+            type: string
+            required: false
+        returns:
+          type: affected
+
+      close-ubo:
+        description: "Close a UBO record (no longer a UBO)"
+        behavior: crud
+        crud:
+          operation: update
+          table: ubo_registry
+          schema: ob-poc
+          key: ubo_id
+        args:
+          - name: ubo-id
+            type: uuid
+            required: true
+            maps_to: ubo_id
+          - name: closed-reason
+            type: string
+            required: true
+            maps_to: closed_reason
+        returns:
+          type: affected
+
+      # UBO Snapshots
+      snapshot-cbu:
+        description: "Capture a point-in-time snapshot of UBO state for a CBU"
+        behavior: plugin
+        plugin:
+          handler: ubo_snapshot_cbu
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: case-id
+            type: uuid
+            required: false
+          - name: snapshot-type
+            type: string
+            required: false
+            default: MANUAL
+            valid_values:
+              [MANUAL, PERIODIC, EVENT_DRIVEN, CASE_OPEN, CASE_CLOSE]
+          - name: reason
+            type: string
+            required: false
+        returns:
+          type: uuid
+          name: snapshot_id
+          capture: true
+
+      compare-snapshot:
+        description: "Compare two UBO snapshots to detect changes"
+        behavior: plugin
+        plugin:
+          handler: ubo_compare_snapshot
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: baseline-snapshot-id
+            type: uuid
+            required: true
+          - name: current-snapshot-id
+            type: uuid
+            required: true
+        returns:
+          type: json
+          capture: true
+
+      list-snapshots:
+        description: "List UBO snapshots for a CBU"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: ubo_snapshots
+          schema: ob-poc
+          fk_col: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
         returns:
           type: record_set
 
@@ -4651,5 +4845,132 @@ domains:
             type: string
             required: false
             maps_to: severity
+        returns:
+          type: record_set
+
+  # ===========================================================================
+  # DOMAIN: threshold (KYC Threshold Computation)
+  # ===========================================================================
+  threshold:
+    description: "KYC threshold computation and evaluation"
+
+    verbs:
+      derive:
+        description: "Compute KYC requirements based on CBU risk factors"
+        behavior: plugin
+        plugin:
+          handler: threshold_derive
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+        returns:
+          type: json
+          capture: true
+          description: |
+            Returns risk_score, risk_band, factors[], entity_requirements[], screening_requirements
+
+      evaluate:
+        description: "Check if CBU meets threshold requirements"
+        behavior: plugin
+        plugin:
+          handler: threshold_evaluate
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: requirements
+            type: json
+            required: false
+            description: "Pre-computed requirements (if not provided, derives them)"
+        returns:
+          type: json
+          capture: true
+          description: |
+            Returns overall_status (COMPLETE|INCOMPLETE|BLOCKED), entities[], gaps[], blocking[]
+
+      check-entity:
+        description: "Check single entity against requirements"
+        behavior: plugin
+        plugin:
+          handler: threshold_check_entity
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+          - name: role
+            type: string
+            required: true
+          - name: risk-band
+            type: string
+            required: true
+        returns:
+          type: json
+          capture: true
+
+  # ===========================================================================
+  # DOMAIN: rfi (Request for Information)
+  # ===========================================================================
+  rfi:
+    description: "Request for Information - batch document request operations using kyc.doc_requests"
+
+    verbs:
+      # NOTE: RFI operations work with the existing kyc.doc_requests table,
+      # not separate RFI tables. "RFI" is a batch concept that generates
+      # multiple doc_requests based on threshold requirements.
+
+      generate:
+        description: "Generate doc_requests from threshold requirements for a case"
+        behavior: plugin
+        plugin:
+          handler: rfi_generate
+        args:
+          - name: case-id
+            type: uuid
+            required: true
+          - name: batch-reference
+            type: string
+            required: false
+            description: "Optional batch reference (auto-generated if not provided)"
+        returns:
+          type: json
+          capture: true
+
+      check-completion:
+        description: "Check document completion status for a case"
+        behavior: plugin
+        plugin:
+          handler: rfi_check_completion
+        args:
+          - name: case-id
+            type: uuid
+            required: true
+        returns:
+          type: json
+          capture: true
+
+      list-by-case:
+        description: "List all doc_requests for a case"
+        behavior: plugin
+        plugin:
+          handler: rfi_list_by_case
+        args:
+          - name: case-id
+            type: uuid
+            required: true
+          - name: status
+            type: string
+            required: false
+            valid_values:
+              [
+                REQUIRED,
+                REQUESTED,
+                RECEIVED,
+                UNDER_REVIEW,
+                VERIFIED,
+                REJECTED,
+                WAIVED,
+                EXPIRED,
+              ]
         returns:
           type: record_set
