@@ -7,7 +7,6 @@
 pub mod api;
 pub mod app;
 pub mod graph;
-pub mod graph_view;
 
 pub use app::ObPocApp;
 pub use graph::CbuGraphWidget;

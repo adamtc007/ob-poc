@@ -740,6 +740,7 @@ impl VisualizationRepository {
     // =========================================================================
 
     /// Get service delivery records for a CBU
+    /// Joins cbu_resource_instances via (cbu_id, product_id, service_id) to find resources
     pub async fn get_service_deliveries(&self, cbu_id: Uuid) -> Result<Vec<ServiceDeliveryView>> {
         let rows = sqlx::query!(
             r#"SELECT
@@ -748,17 +749,20 @@ impl VisualizationRepository {
                 p.name as "product_name!",
                 sdm.service_id,
                 s.name as "service_name!",
-                sdm.instance_id,
+                cri.instance_id as "instance_id?",
                 cri.instance_name as "instance_name?",
                 srt.name as "resource_type_name?",
                 sdm.delivery_status as "delivery_status?"
                FROM "ob-poc".service_delivery_map sdm
                JOIN "ob-poc".products p ON p.product_id = sdm.product_id
                JOIN "ob-poc".services s ON s.service_id = sdm.service_id
-               LEFT JOIN "ob-poc".cbu_resource_instances cri ON cri.instance_id = sdm.instance_id
+               LEFT JOIN "ob-poc".cbu_resource_instances cri
+                   ON cri.cbu_id = sdm.cbu_id
+                   AND cri.product_id = sdm.product_id
+                   AND cri.service_id = sdm.service_id
                LEFT JOIN "ob-poc".service_resource_types srt ON srt.resource_id = cri.resource_type_id
                WHERE sdm.cbu_id = $1
-               ORDER BY p.name, s.name"#,
+               ORDER BY p.name, s.name, srt.name"#,
             cbu_id
         )
         .fetch_all(&self.pool)
@@ -1488,25 +1492,30 @@ impl VisualizationRepository {
             .collect())
     }
 
-    /// Get product for a CBU via cbus.product_id
-    pub async fn get_cbu_product(&self, cbu_id: Uuid) -> Result<Option<ProductView>> {
-        let row = sqlx::query!(
-            r#"SELECT p.product_id, p.name, p.product_code, p.product_category, p.is_active
+    /// Get products for a CBU via service_delivery_map (source of truth)
+    /// A CBU can have 0..n products
+    pub async fn get_cbu_products(&self, cbu_id: Uuid) -> Result<Vec<ProductView>> {
+        let rows = sqlx::query!(
+            r#"SELECT DISTINCT p.product_id, p.name, p.product_code, p.product_category, p.is_active
                FROM "ob-poc".products p
-               JOIN "ob-poc".cbus c ON c.product_id = p.product_id
-               WHERE c.cbu_id = $1"#,
+               JOIN "ob-poc".service_delivery_map sdm ON sdm.product_id = p.product_id
+               WHERE sdm.cbu_id = $1
+               ORDER BY p.name"#,
             cbu_id
         )
-        .fetch_optional(&self.pool)
+        .fetch_all(&self.pool)
         .await?;
 
-        Ok(row.map(|r| ProductView {
-            product_id: r.product_id,
-            name: r.name,
-            product_code: r.product_code,
-            product_category: r.product_category,
-            is_active: r.is_active,
-        }))
+        Ok(rows
+            .into_iter()
+            .map(|r| ProductView {
+                product_id: r.product_id,
+                name: r.name,
+                product_code: r.product_code,
+                product_category: r.product_category,
+                is_active: r.is_active,
+            })
+            .collect())
     }
 
     /// Get services for a product via product_services
@@ -1721,45 +1730,5 @@ impl VisualizationRepository {
             pending_review: row.pending_review,
             confirmed_hits: row.confirmed_hits,
         })
-    }
-
-    /// List cases for a CBU
-    pub async fn list_cases_for_cbu(
-        &self,
-        cbu_id: Uuid,
-    ) -> Result<Vec<crate::visualization::case_builder::CaseSummary>> {
-        let rows = sqlx::query!(
-            r#"SELECT
-                c.case_id,
-                c.cbu_id,
-                c.status,
-                c.escalation_level,
-                c.risk_rating,
-                c.case_type,
-                c.opened_at,
-                (SELECT COUNT(*) FROM kyc.entity_workstreams w WHERE w.case_id = c.case_id) as "workstream_count!",
-                (SELECT COUNT(*) FROM kyc.red_flags r WHERE r.case_id = c.case_id AND r.status IN ('OPEN', 'BLOCKING')) as "open_red_flags!"
-               FROM kyc.cases c
-               WHERE c.cbu_id = $1
-               ORDER BY c.opened_at DESC"#,
-            cbu_id
-        )
-        .fetch_all(&self.pool)
-        .await?;
-
-        Ok(rows
-            .into_iter()
-            .map(|r| crate::visualization::case_builder::CaseSummary {
-                case_id: r.case_id,
-                cbu_id: r.cbu_id,
-                status: r.status,
-                escalation_level: r.escalation_level,
-                risk_rating: r.risk_rating,
-                case_type: r.case_type,
-                opened_at: r.opened_at.to_rfc3339(),
-                workstream_count: r.workstream_count,
-                open_red_flags: r.open_red_flags,
-            })
-            .collect())
     }
 }

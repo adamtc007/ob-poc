@@ -48,8 +48,15 @@ pub use layout::LayoutEngine;
 pub use render::GraphRenderer;
 pub use types::*;
 
-// Re-export ViewMode from graph_view (single source of truth)
-pub use crate::graph_view::ViewMode;
+/// View mode for the graph visualization
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ViewMode {
+    /// KYC/UBO view - shows core entities, KYC status, and ownership chains
+    #[default]
+    KycUbo,
+    /// Service Delivery view - shows products, services, and resource instances
+    ServiceDelivery,
+}
 
 use egui::{Color32, Rect, Sense, Vec2};
 
@@ -153,21 +160,45 @@ impl CbuGraphWidget {
     }
 
     /// Filter graph data based on current view mode
-    /// - KycUbo: Core + Kyc + Ubo layers
-    /// - ServiceDelivery: Core + Services (products, services, resources)
+    /// - KycUbo: Core (CBU + entities) + Kyc + Ubo layers (full ownership/KYC picture)
+    /// - ServiceDelivery: Core (CBU + entities) + Services (excludes UBO layer)
     fn filter_by_view_mode(&self, data: &CbuGraphData) -> CbuGraphData {
-        let allowed_layers: &[&str] = match self.view_mode {
-            ViewMode::KycUbo => &["core", "kyc", "ubo"],
-            ViewMode::ServiceDelivery => &["core", "services"],
+        // Filter nodes based on view mode
+        // - KycUbo: CBU + entities (core) + KYC status + UBO ownership chain
+        // - ServiceDelivery: CBU + business entities (core) + products/services/resources
+        //   Excludes: UBO layer (ownership links), KYC layer (verification status)
+        let filtered_nodes: Vec<GraphNodeData> = match self.view_mode {
+            ViewMode::KycUbo => {
+                // Include core, kyc, ubo layers - full KYC/ownership picture
+                data.nodes
+                    .iter()
+                    .filter(|n| matches!(n.layer.as_str(), "core" | "kyc" | "ubo"))
+                    .cloned()
+                    .collect()
+            }
+            ViewMode::ServiceDelivery => {
+                // Include: core layer (CBU + business entities) + services layer
+                // Exclude: ubo layer (ownership links) and kyc layer (verification status)
+                data.nodes
+                    .iter()
+                    .filter(|n| matches!(n.layer.as_str(), "core" | "services"))
+                    .cloned()
+                    .collect()
+            }
         };
 
-        // Filter nodes by layer
-        let filtered_nodes: Vec<GraphNodeData> = data
-            .nodes
-            .iter()
-            .filter(|n| allowed_layers.contains(&n.layer.as_str()))
-            .cloned()
-            .collect();
+        #[cfg(target_arch = "wasm32")]
+        {
+            web_sys::console::log_1(
+                &format!(
+                    "filter_by_view_mode: view={:?}, raw={} nodes, filtered={} nodes",
+                    self.view_mode,
+                    data.nodes.len(),
+                    filtered_nodes.len()
+                )
+                .into(),
+            );
+        }
 
         // Collect IDs of filtered nodes for edge filtering
         let node_ids: std::collections::HashSet<&str> =

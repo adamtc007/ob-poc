@@ -105,10 +105,8 @@ impl CustomOperationRegistry {
         // CBU product assignment
         registry.register(Arc::new(CbuAddProductOp));
 
-        // Service delivery operations
-        registry.register(Arc::new(DeliveryRecordOp));
-        registry.register(Arc::new(DeliveryCompleteOp));
-        registry.register(Arc::new(DeliveryFailOp));
+        // NOTE: delivery.record, delivery.complete, delivery.fail are now CRUD verbs
+        // defined in config/verbs/delivery.yaml - no plugin needed
 
         // Custody operations
         registry.register(Arc::new(SubcustodianLookupOp));
@@ -1643,16 +1641,21 @@ impl CustomOperation for ResourceValidateAttrsOp {
 // CBU Product Assignment
 // ============================================================================
 
-/// Add a product to a CBU by creating service_delivery_map entries for all services
+/// Add a product to a CBU by creating service_delivery_map and cbu_resource_instances entries
 ///
 /// This is a CRITICAL onboarding operation that:
 /// 1. Validates CBU exists
 /// 2. Looks up product by name and validates it exists
 /// 3. Validates product has services defined
-/// 4. Sets cbus.product_id (in transaction)
-/// 5. Creates service_delivery_map entries for ALL services under that product
+/// 4. Creates service_delivery_map entries for ALL services under that product
+/// 5. Creates cbu_resource_instances for ALL resource types under each service
+///    (via service_resource_capabilities join) - one per (CBU, resource_type)
 ///
-/// Idempotency: Safe to re-run - uses ON CONFLICT DO NOTHING for delivery entries
+/// NOTE: A CBU can have MULTIPLE products. This verb adds one product at a time.
+/// The service_delivery_map is the source of truth for CBU->Product relationships.
+/// cbus.product_id is NOT used (legacy field).
+///
+/// Idempotency: Safe to re-run - uses ON CONFLICT DO NOTHING for all entries
 /// Transaction: All operations wrapped in a transaction for atomicity
 pub struct CbuAddProductOp;
 
@@ -1715,8 +1718,7 @@ impl CustomOperation for CbuAddProductOp {
         let cbu = cbu_row
             .ok_or_else(|| anyhow::anyhow!("cbu.add-product: CBU not found with id {}", cbu_id))?;
 
-        // Check if CBU already has this product (idempotency info)
-        let had_existing_product = cbu.product_id.is_some();
+        // Note: We don't touch cbus.product_id - service_delivery_map is source of truth
 
         // =====================================================================
         // Step 3: Validate product exists and get its ID
@@ -1764,20 +1766,9 @@ impl CustomOperation for CbuAddProductOp {
         // =====================================================================
         let mut tx = pool.begin().await?;
 
-        // 5a: Update cbus.product_id
-        sqlx::query!(
-            r#"UPDATE "ob-poc".cbus
-               SET product_id = $1, updated_at = NOW()
-               WHERE cbu_id = $2"#,
-            product_id,
-            cbu_id
-        )
-        .execute(&mut *tx)
-        .await?;
-
-        // 5b: Create service_delivery_map entries for each service
-        let mut created_count: i64 = 0;
-        let mut skipped_count: i64 = 0;
+        // 5a: Create service_delivery_map entries for each service
+        let mut delivery_created: i64 = 0;
+        let mut delivery_skipped: i64 = 0;
 
         for svc in &services {
             let delivery_id = Uuid::new_v4();
@@ -1795,9 +1786,68 @@ impl CustomOperation for CbuAddProductOp {
             .await?;
 
             if result.rows_affected() > 0 {
-                created_count += 1;
+                delivery_created += 1;
             } else {
-                skipped_count += 1;
+                delivery_skipped += 1;
+            }
+        }
+
+        // =====================================================================
+        // Step 5b: Create cbu_resource_instances for each service's resource types
+        // =====================================================================
+        let mut resource_created: i64 = 0;
+        let mut resource_skipped: i64 = 0;
+
+        // Get all (service, resource_type) pairs for this product
+        // Each service-resource combination gets its own instance
+        // e.g., SWIFT Connection under Trade Settlement is separate from SWIFT Connection under Income Collection
+        let service_resources = sqlx::query!(
+            r#"SELECT src.service_id, src.resource_id, srt.resource_code, srt.name as resource_name
+               FROM "ob-poc".service_resource_capabilities src
+               JOIN "ob-poc".service_resource_types srt ON src.resource_id = srt.resource_id
+               WHERE src.service_id IN (
+                   SELECT service_id FROM "ob-poc".product_services WHERE product_id = $1
+               )
+               AND src.is_active = true
+               ORDER BY src.service_id, srt.name"#,
+            product_id
+        )
+        .fetch_all(&mut *tx)
+        .await?;
+
+        for sr in &service_resources {
+            let instance_id = Uuid::new_v4();
+            // Generate a unique instance URL using CBU name, resource code, and partial UUID
+            let instance_url = format!(
+                "urn:ob-poc:{}:{}:{}",
+                cbu.name.to_lowercase().replace(' ', "-"),
+                sr.resource_code.as_deref().unwrap_or("unknown"),
+                &instance_id.to_string()[..8]
+            );
+
+            // Unique key is (cbu_id, product_id, service_id, resource_type_id)
+            // One resource instance per service per resource type
+            let result = sqlx::query(
+                r#"INSERT INTO "ob-poc".cbu_resource_instances
+                   (instance_id, cbu_id, product_id, service_id, resource_type_id,
+                    instance_url, instance_name, status)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING')
+                   ON CONFLICT (cbu_id, product_id, service_id, resource_type_id) DO NOTHING"#,
+            )
+            .bind(instance_id)
+            .bind(cbu_id)
+            .bind(product_id)
+            .bind(sr.service_id)
+            .bind(sr.resource_id)
+            .bind(&instance_url)
+            .bind(&sr.resource_name)
+            .execute(&mut *tx)
+            .await?;
+
+            if result.rows_affected() > 0 {
+                resource_created += 1;
+            } else {
+                resource_skipped += 1;
             }
         }
 
@@ -1812,13 +1862,17 @@ impl CustomOperation for CbuAddProductOp {
             cbu_name = %cbu.name,
             product = %product_name,
             services_total = services.len(),
-            entries_created = created_count,
-            entries_skipped = skipped_count,
-            had_existing_product = had_existing_product,
+            delivery_entries_created = delivery_created,
+            delivery_entries_skipped = delivery_skipped,
+            resource_instances_created = resource_created,
+            resource_instances_skipped = resource_skipped,
             "cbu.add-product completed"
         );
 
-        Ok(ExecutionResult::Affected(created_count as u64))
+        // Return total entries created (deliveries + resources)
+        Ok(ExecutionResult::Affected(
+            (delivery_created + resource_created) as u64,
+        ))
     }
 
     #[cfg(not(feature = "database"))]
@@ -1828,331 +1882,6 @@ impl CustomOperation for CbuAddProductOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(0))
-    }
-}
-
-// ============================================================================
-// Service Delivery Operations
-// ============================================================================
-
-/// Record a service delivery for a CBU
-pub struct DeliveryRecordOp;
-
-#[async_trait]
-impl CustomOperation for DeliveryRecordOp {
-    fn domain(&self) -> &'static str {
-        "delivery"
-    }
-    fn verb(&self) -> &'static str {
-        "record"
-    }
-    fn rationale(&self) -> &'static str {
-        "Requires product/service code lookup and upsert logic"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        use uuid::Uuid;
-
-        // Get CBU ID
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key.matches("cbu-id"))
-            .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
-
-        // Get product code and look up ID
-        let product_code = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key.matches("product"))
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing product argument"))?;
-
-        let product_id: Option<Uuid> = sqlx::query_scalar(
-            r#"SELECT product_id FROM "ob-poc".products WHERE product_code = $1"#,
-        )
-        .bind(product_code)
-        .fetch_optional(pool)
-        .await?;
-
-        let product_id =
-            product_id.ok_or_else(|| anyhow::anyhow!("Unknown product: {}", product_code))?;
-
-        // Get service code and look up ID
-        let service_code = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key.matches("service"))
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing service argument"))?;
-
-        let service_id: Option<Uuid> = sqlx::query_scalar(
-            r#"SELECT service_id FROM "ob-poc".services WHERE service_code = $1"#,
-        )
-        .bind(service_code)
-        .fetch_optional(pool)
-        .await?;
-
-        let service_id =
-            service_id.ok_or_else(|| anyhow::anyhow!("Unknown service: {}", service_code))?;
-
-        // Get optional instance-id
-        let instance_id: Option<Uuid> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key.matches("instance-id"))
-            .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            });
-
-        // Create delivery record
-        let delivery_id = Uuid::new_v4();
-
-        sqlx::query(
-            r#"INSERT INTO "ob-poc".service_delivery_map
-               (delivery_id, cbu_id, product_id, service_id, instance_id, delivery_status)
-               VALUES ($1, $2, $3, $4, $5, 'PENDING')
-               ON CONFLICT (cbu_id, product_id, service_id) DO UPDATE SET
-                   instance_id = EXCLUDED.instance_id,
-                   updated_at = NOW()"#,
-        )
-        .bind(delivery_id)
-        .bind(cbu_id)
-        .bind(product_id)
-        .bind(service_id)
-        .bind(instance_id)
-        .execute(pool)
-        .await?;
-
-        ctx.bind("delivery", delivery_id);
-
-        Ok(ExecutionResult::Uuid(delivery_id))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
-    }
-}
-
-/// Mark service delivery as complete
-pub struct DeliveryCompleteOp;
-
-#[async_trait]
-impl CustomOperation for DeliveryCompleteOp {
-    fn domain(&self) -> &'static str {
-        "delivery"
-    }
-    fn verb(&self) -> &'static str {
-        "complete"
-    }
-    fn rationale(&self) -> &'static str {
-        "Updates delivery status with timestamp"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        use uuid::Uuid;
-
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key.matches("cbu-id"))
-            .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
-
-        let product_code = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key.matches("product"))
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing product argument"))?;
-
-        let service_code = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key.matches("service"))
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing service argument"))?;
-
-        // Look up product and service IDs
-        let product_id: Option<Uuid> = sqlx::query_scalar(
-            r#"SELECT product_id FROM "ob-poc".products WHERE product_code = $1"#,
-        )
-        .bind(product_code)
-        .fetch_optional(pool)
-        .await?;
-
-        let product_id =
-            product_id.ok_or_else(|| anyhow::anyhow!("Unknown product: {}", product_code))?;
-
-        let service_id: Option<Uuid> = sqlx::query_scalar(
-            r#"SELECT service_id FROM "ob-poc".services WHERE service_code = $1"#,
-        )
-        .bind(service_code)
-        .fetch_optional(pool)
-        .await?;
-
-        let service_id =
-            service_id.ok_or_else(|| anyhow::anyhow!("Unknown service: {}", service_code))?;
-
-        sqlx::query(
-            r#"UPDATE "ob-poc".service_delivery_map
-               SET delivery_status = 'DELIVERED', delivered_at = NOW(), updated_at = NOW()
-               WHERE cbu_id = $1 AND product_id = $2 AND service_id = $3"#,
-        )
-        .bind(cbu_id)
-        .bind(product_id)
-        .bind(service_id)
-        .execute(pool)
-        .await?;
-
-        Ok(ExecutionResult::Void)
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
-    }
-}
-
-/// Mark service delivery as failed
-pub struct DeliveryFailOp;
-
-#[async_trait]
-impl CustomOperation for DeliveryFailOp {
-    fn domain(&self) -> &'static str {
-        "delivery"
-    }
-    fn verb(&self) -> &'static str {
-        "fail"
-    }
-    fn rationale(&self) -> &'static str {
-        "Updates delivery status with failure reason"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        use uuid::Uuid;
-
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key.matches("cbu-id"))
-            .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
-
-        let product_code = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key.matches("product"))
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing product argument"))?;
-
-        let service_code = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key.matches("service"))
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing service argument"))?;
-
-        let reason = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key.matches("reason"))
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing reason argument"))?;
-
-        // Look up product and service IDs
-        let product_id: Option<Uuid> = sqlx::query_scalar(
-            r#"SELECT product_id FROM "ob-poc".products WHERE product_code = $1"#,
-        )
-        .bind(product_code)
-        .fetch_optional(pool)
-        .await?;
-
-        let product_id =
-            product_id.ok_or_else(|| anyhow::anyhow!("Unknown product: {}", product_code))?;
-
-        let service_id: Option<Uuid> = sqlx::query_scalar(
-            r#"SELECT service_id FROM "ob-poc".services WHERE service_code = $1"#,
-        )
-        .bind(service_code)
-        .fetch_optional(pool)
-        .await?;
-
-        let service_id =
-            service_id.ok_or_else(|| anyhow::anyhow!("Unknown service: {}", service_code))?;
-
-        sqlx::query(
-            r#"UPDATE "ob-poc".service_delivery_map
-               SET delivery_status = 'FAILED', failed_at = NOW(), failure_reason = $4, updated_at = NOW()
-               WHERE cbu_id = $1 AND product_id = $2 AND service_id = $3"#,
-        )
-        .bind(cbu_id)
-        .bind(product_id)
-        .bind(service_id)
-        .bind(reason)
-        .execute(pool)
-        .await?;
-
-        Ok(ExecutionResult::Void)
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
     }
 }
 

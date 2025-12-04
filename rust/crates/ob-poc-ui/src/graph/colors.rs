@@ -102,6 +102,9 @@ pub fn entity_type_fill(entity_type: EntityType) -> Color32 {
         EntityType::Partnership => Color32::from_rgb(129, 199, 132),  // Light green
         EntityType::Trust => Color32::from_rgb(206, 147, 216),        // Light purple
         EntityType::Fund => Color32::from_rgb(178, 223, 219),         // Teal
+        EntityType::Product => Color32::from_rgb(168, 85, 247),       // Purple (service layer)
+        EntityType::Service => Color32::from_rgb(96, 165, 250),       // Blue (service layer)
+        EntityType::Resource => Color32::from_rgb(74, 222, 128),      // Green (service layer)
         EntityType::Unknown => Color32::from_rgb(176, 190, 197),      // Gray
     }
 }
@@ -114,6 +117,9 @@ pub fn entity_type_border(entity_type: EntityType) -> Color32 {
         EntityType::Partnership => Color32::from_rgb(56, 142, 60),   // Green
         EntityType::Trust => Color32::from_rgb(142, 36, 170),        // Purple
         EntityType::Fund => Color32::from_rgb(0, 137, 123),          // Teal dark
+        EntityType::Product => Color32::from_rgb(88, 28, 135),       // Purple dark (service layer)
+        EntityType::Service => Color32::from_rgb(30, 58, 138),       // Blue dark (service layer)
+        EntityType::Resource => Color32::from_rgb(20, 83, 45),       // Green dark (service layer)
         EntityType::Unknown => Color32::from_rgb(96, 125, 139),      // Gray dark
     }
 }

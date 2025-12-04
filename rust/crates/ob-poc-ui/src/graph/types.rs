@@ -117,11 +117,16 @@ impl PrimaryRole {
 pub enum EntityType {
     #[default]
     Unknown,
+    // Entity types
     ProperPerson,
     LimitedCompany,
     Partnership,
     Trust,
     Fund,
+    // Service layer types
+    Product,
+    Service,
+    Resource,
 }
 
 impl EntityType {
@@ -137,6 +142,12 @@ impl EntityType {
             Self::Trust
         } else if lower.contains("fund") {
             Self::Fund
+        } else if lower == "product" {
+            Self::Product
+        } else if lower == "service" {
+            Self::Service
+        } else if lower == "resource" {
+            Self::Resource
         } else {
             Self::Unknown
         }

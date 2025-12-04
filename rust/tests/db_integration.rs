@@ -517,9 +517,9 @@ mod db_tests {
         );
         db.execute_dsl(&add_product_dsl).await?;
 
-        // Verify product was linked
-        let product_id = get_cbu_product_id(&db.pool, cbu_id).await?;
-        assert!(product_id.is_some(), "CBU should have product_id set");
+        // Note: cbus.product_id is NOT set by cbu.add-product
+        // service_delivery_map is the source of truth for CBU->Product relationships
+        // A CBU can have multiple products, tracked via service_delivery_map
 
         // Verify service delivery entries created (should match product's service count)
         let expected_services = get_product_service_count(&db.pool, "Custody").await?;

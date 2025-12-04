@@ -2,20 +2,21 @@
 //!
 //! Provides endpoints to fetch graph data for the egui WASM client.
 //! All database access goes through VisualizationRepository.
+//!
+//! Single endpoint: /api/cbu/:id/graph returns flat graph (nodes + edges).
+//! UI owns layout/visualization logic.
 
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Path, State},
     http::StatusCode,
     routing::get,
     Json, Router,
 };
-use serde::Deserialize;
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::database::VisualizationRepository;
 use crate::graph::{CbuGraph, CbuGraphBuilder, CbuSummary};
-use crate::visualization::{CbuVisualization, KycTreeBuilder, ServiceTreeBuilder, ViewMode};
 
 /// GET /api/cbu/{cbu_id}/graph
 /// Returns the COMPLETE graph data for a specific CBU
@@ -88,46 +89,11 @@ pub async fn get_cbu(
     }))
 }
 
-/// Query parameters for tree endpoint
-#[derive(Deserialize)]
-pub struct TreeQueryParams {
-    #[serde(default)]
-    pub view: Option<String>,
-}
-
-/// GET /api/cbu/{cbu_id}/tree
-/// Returns hierarchical tree visualization data for a specific CBU
-pub async fn get_cbu_tree(
-    State(pool): State<PgPool>,
-    Path(cbu_id): Path<Uuid>,
-    Query(params): Query<TreeQueryParams>,
-) -> Result<Json<CbuVisualization>, (StatusCode, String)> {
-    let view_mode = match params.view.as_deref() {
-        Some("service_delivery") => ViewMode::ServiceDelivery,
-        _ => ViewMode::KycUbo, // Default to KYC/UBO view
-    };
-
-    let repo = VisualizationRepository::new(pool);
-
-    let viz = match view_mode {
-        ViewMode::KycUbo => KycTreeBuilder::new(repo)
-            .build(cbu_id)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
-        ViewMode::ServiceDelivery => ServiceTreeBuilder::new(repo)
-            .build(cbu_id)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
-    };
-    Ok(Json(viz))
-}
-
 /// Create the graph router
 pub fn create_graph_router(pool: PgPool) -> Router {
     Router::new()
         .route("/api/cbu", get(list_cbus))
         .route("/api/cbu/:cbu_id", get(get_cbu))
         .route("/api/cbu/:cbu_id/graph", get(get_cbu_graph))
-        .route("/api/cbu/:cbu_id/tree", get(get_cbu_tree))
         .with_state(pool)
 }

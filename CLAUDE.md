@@ -126,10 +126,8 @@ ob-poc/
 │   │   │   └── custom_ops/         # Plugin handlers for non-CRUD ops
 │   │   ├── database/               # Repository pattern services
 │   │   │   └── visualization_repository.rs  # Centralized visualization queries
-│   │   ├── visualization/          # Server-side visualization builders
-│   │   │   ├── kyc_builder.rs      # KYC/UBO tree builder
-│   │   │   └── service_builder.rs  # Service delivery tree builder
-│   │   ├── graph/                  # Graph visualization
+│   │   ├── graph/                  # Graph visualization (single pipeline)
+│   │   ├── graph/                  # Graph visualization (single pipeline)
 │   │   │   ├── builder.rs          # CbuGraphBuilder (multi-layer graph)
 │   │   │   └── types.rs            # GraphNode, GraphEdge, CbuGraph
 │   │   ├── domains/                # Domain-specific logic
@@ -154,27 +152,33 @@ ob-poc/
 
 ## Visualization Architecture
 
-The UI follows a **server-side rendering / dumb UI** pattern. All data assembly happens on the server; the UI receives JSON and renders it.
+The UI follows a **single pipeline** pattern. Server returns flat graph data; UI owns filtering and layout.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         UI (Dumb Client)                         │
-│  Receives JSON, renders trees/graphs, no business logic         │
+│                    WASM UI (egui)                                │
+│  CbuGraphWidget: filters by ViewMode, owns layout logic         │
+│  rust/crates/ob-poc-ui/src/graph/                               │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Visualization Builders                        │
-│  KycTreeBuilder, ServiceTreeBuilder, CbuGraphBuilder            │
-│  Assemble view models from repository data                      │
-│  rust/src/visualization/, rust/src/graph/                       │
+│              /api/cbu/:id/graph endpoint                         │
+│  Returns COMPLETE graph (all layers)                            │
+│  rust/src/api/graph_routes.rs                                   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    CbuGraphBuilder                               │
+│  Loads all layers: Core, Custody, KYC, UBO, Services            │
+│  rust/src/graph/builder.rs                                      │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                  VisualizationRepository                         │
 │  SINGLE point of DB access for all visualization queries        │
-│  Enables Oracle migration - SQL isolated to one file            │
 │  rust/src/database/visualization_repository.rs                  │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -184,27 +188,29 @@ The UI follows a **server-side rendering / dumb UI** pattern. All data assembly 
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+### View Modes (UI-side filtering)
+
+| Mode | Layers Shown | Description |
+|------|--------------|-------------|
+| KYC/UBO | core, kyc, ubo | Entities, KYC status, ownership chains |
+| Service Delivery | core, services | Entities + Products → Services → Resources |
+
 ### Key Design Principles
 
-1. **Centralized DB Access**: All visualization queries go through `VisualizationRepository`. No direct `sqlx::query!` calls in builders or API routes.
+1. **Single Pipeline**: One endpoint (`/api/cbu/:id/graph`), one builder, UI filters by view mode.
 
-2. **View Models**: Repository returns typed view structs (e.g., `CbuView`, `EntityView`, `GraphEntityView`). Builders transform these into UI-ready structures.
+2. **UI Owns Layout**: Server returns flat graph (nodes + edges). UI's `LayoutEngine` positions nodes based on roles and node types.
 
-3. **Database Portability**: Isolating SQL to one file enables future Oracle migration without touching visualization logic.
+3. **Centralized DB Access**: All queries go through `VisualizationRepository`.
 
-### Query Categories in VisualizationRepository
+### Graph Layers
 
-| Category | Methods | Used By |
-|----------|---------|--------|
-| CBU | `list_cbus`, `get_cbu`, `get_cbu_for_tree` | Tree builders, dropdowns |
-| Entity | `get_entity`, `get_entities_by_role`, `get_officers` | KYC tree |
-| Graph Core | `get_graph_entities` | Graph builder |
-| Graph Custody | `get_universes`, `get_ssis`, `get_booking_rules`, `get_isdas`, `get_csas` | Graph builder |
-| Graph KYC | `get_kyc_statuses`, `get_document_requests`, `get_graph_screenings` | Graph builder |
-| Graph UBO | `get_ubos`, `get_ownerships`, `get_graph_controls` | Graph builder |
-| Graph Services | `get_resource_instances` | Graph builder |
-| MCP | `get_cbu_basic`, `get_cbu_entities`, `get_entity_types`, etc. | MCP handlers |
-
+| Layer | Node Types | Description |
+|-------|------------|-------------|
+| core | cbu, entity | CBU and business entities with roles |
+| kyc | verification, document | KYC status, document requests |
+| ubo | entity (UBO-specific) | Ownership chains, control relationships |
+| services | product, service, resource | Products → Services → Resource instances |
 
 ## Commands
 

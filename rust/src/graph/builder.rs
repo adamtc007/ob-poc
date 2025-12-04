@@ -777,8 +777,11 @@ impl CbuGraphBuilder {
         graph: &mut CbuGraph,
         repo: &VisualizationRepository,
     ) -> Result<()> {
-        // Load product via cbus.product_id (the correct path)
-        if let Some(product) = repo.get_cbu_product(self.cbu_id).await? {
+        // Load products via service_delivery_map (source of truth)
+        // A CBU can have 0..n products
+        let products = repo.get_cbu_products(self.cbu_id).await?;
+
+        for product in &products {
             let product_node_id = format!("product-{}", product.product_id);
 
             // Add product node
@@ -815,21 +818,23 @@ impl CbuGraphBuilder {
             for service in &services {
                 let service_node_id = format!("service-{}", service.service_id);
 
-                // Add service node
-                graph.add_node(GraphNode {
-                    id: service_node_id.clone(),
-                    node_type: NodeType::Service,
-                    layer: LayerType::Services,
-                    label: service.name.clone(),
-                    sublabel: service.service_category.clone(),
-                    status: NodeStatus::Active,
-                    data: serde_json::json!({
-                        "service_id": service.service_id,
-                        "service_code": service.service_code,
-                        "is_mandatory": service.is_mandatory
-                    }),
-                    ..Default::default()
-                });
+                // Add service node (if not already added - could be shared across products)
+                if !graph.has_node(&service_node_id) {
+                    graph.add_node(GraphNode {
+                        id: service_node_id.clone(),
+                        node_type: NodeType::Service,
+                        layer: LayerType::Services,
+                        label: service.name.clone(),
+                        sublabel: service.service_category.clone(),
+                        status: NodeStatus::Active,
+                        data: serde_json::json!({
+                            "service_id": service.service_id,
+                            "service_code": service.service_code,
+                            "is_mandatory": service.is_mandatory
+                        }),
+                        ..Default::default()
+                    });
+                }
 
                 // Edge: Product → Service
                 graph.add_edge(GraphEdge {

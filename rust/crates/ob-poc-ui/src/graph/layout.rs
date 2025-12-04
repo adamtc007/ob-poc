@@ -237,6 +237,11 @@ impl LayoutEngine {
         let mut slot_assignments: HashMap<&str, Vec<&GraphNodeData>> = HashMap::new();
         let mut unassigned: Vec<&GraphNodeData> = Vec::new();
 
+        // Collect service layer nodes separately
+        let mut products: Vec<&GraphNodeData> = Vec::new();
+        let mut services: Vec<&GraphNodeData> = Vec::new();
+        let mut resources: Vec<&GraphNodeData> = Vec::new();
+
         for node in &data.nodes {
             if node.node_type == "cbu" {
                 slot_assignments.entry("cbu").or_default().push(node);
@@ -257,8 +262,14 @@ impl LayoutEngine {
                 if !assigned {
                     unassigned.push(node);
                 }
+            } else if node.node_type == "product" {
+                products.push(node);
+            } else if node.node_type == "service" {
+                services.push(node);
+            } else if node.node_type == "resource" {
+                resources.push(node);
             }
-            // Skip non-entity nodes for now (custody, services, etc.)
+            // Skip other node types (kyc, ubo verification nodes, etc.)
         }
 
         // Position nodes in each slot
@@ -271,6 +282,12 @@ impl LayoutEngine {
         // Position unassigned nodes at the bottom
         if !unassigned.is_empty() {
             self.position_unassigned(&mut graph, &unassigned);
+        }
+
+        // Position service layer nodes (below CBU)
+        // Products at -150, Services at -300, Resources at -450 (negative Y = below)
+        if !products.is_empty() || !services.is_empty() || !resources.is_empty() {
+            self.position_service_nodes(&mut graph, &products, &services, &resources, &data.edges);
         }
 
         // Create edges
@@ -371,6 +388,239 @@ impl LayoutEngine {
             };
 
             graph.nodes.insert(node.id.clone(), layout_node);
+        }
+    }
+
+    /// Position service layer nodes in a hierarchy below CBU
+    /// Layout: CBU (0) -> Products (-150) -> Services (-300) -> Resources (-450)
+    fn position_service_nodes(
+        &self,
+        graph: &mut LayoutGraph,
+        products: &[&GraphNodeData],
+        services: &[&GraphNodeData],
+        resources: &[&GraphNodeData],
+        edges: &[GraphEdgeData],
+    ) {
+        use egui::Color32;
+
+        let node_size = Vec2::new(NODE_WIDTH, NODE_HEIGHT);
+
+        // Tier positions (negative Y = below CBU in screen coords)
+        const TIER_PRODUCT: f32 = -150.0;
+        const TIER_SERVICE: f32 = -300.0;
+        const TIER_RESOURCE: f32 = -450.0;
+
+        // Build parent->children maps from edges
+        let mut product_services: HashMap<String, Vec<&GraphNodeData>> = HashMap::new();
+        let mut service_resources: HashMap<String, Vec<&GraphNodeData>> = HashMap::new();
+
+        // Map service IDs to their parent product
+        for edge in edges {
+            if edge.edge_type == "has_service" || edge.edge_type == "product_service" {
+                // source = product, target = service
+                if let Some(service) = services.iter().find(|s| s.id == edge.target) {
+                    product_services
+                        .entry(edge.source.clone())
+                        .or_default()
+                        .push(*service);
+                }
+            } else if edge.edge_type == "has_resource" || edge.edge_type == "service_resource" {
+                // source = service, target = resource
+                if let Some(resource) = resources.iter().find(|r| r.id == edge.target) {
+                    service_resources
+                        .entry(edge.source.clone())
+                        .or_default()
+                        .push(*resource);
+                }
+            }
+        }
+
+        // Position products horizontally centered
+        let product_count = products.len();
+        if product_count > 0 {
+            let total_width =
+                product_count as f32 * NODE_WIDTH + (product_count - 1) as f32 * H_SPACING;
+            let start_x = -total_width / 2.0 + NODE_WIDTH / 2.0;
+
+            for (i, product) in products.iter().enumerate() {
+                let x = start_x + i as f32 * (NODE_WIDTH + H_SPACING);
+                let position = Pos2::new(x, TIER_PRODUCT);
+
+                let layout_node = LayoutNode {
+                    id: product.id.clone(),
+                    entity_type: EntityType::Product,
+                    primary_role: PrimaryRole::Unknown,
+                    all_roles: vec![],
+                    label: product.label.clone(),
+                    sublabel: product.sublabel.clone(),
+                    jurisdiction: None,
+                    position,
+                    size: node_size,
+                    in_focus: true,
+                    is_cbu_root: false,
+                    style: NodeStyle {
+                        fill_color: Color32::from_rgb(88, 28, 135), // purple
+                        border_color: Color32::from_rgb(168, 85, 247),
+                        text_color: Color32::WHITE,
+                        border_width: 2.0,
+                    },
+                };
+                graph.nodes.insert(product.id.clone(), layout_node);
+
+                // Position services under this product
+                if let Some(prod_services) = product_services.get(&product.id) {
+                    let svc_count = prod_services.len();
+                    let svc_total_width =
+                        svc_count as f32 * NODE_WIDTH + (svc_count - 1) as f32 * (H_SPACING / 2.0);
+                    let svc_start_x = x - svc_total_width / 2.0 + NODE_WIDTH / 2.0;
+
+                    for (j, service) in prod_services.iter().enumerate() {
+                        let svc_x = svc_start_x + j as f32 * (NODE_WIDTH + H_SPACING / 2.0);
+                        let svc_position = Pos2::new(svc_x, TIER_SERVICE);
+
+                        let svc_node = LayoutNode {
+                            id: service.id.clone(),
+                            entity_type: EntityType::Service,
+                            primary_role: PrimaryRole::Unknown,
+                            all_roles: vec![],
+                            label: service.label.clone(),
+                            sublabel: service.sublabel.clone(),
+                            jurisdiction: None,
+                            position: svc_position,
+                            size: node_size,
+                            in_focus: true,
+                            is_cbu_root: false,
+                            style: NodeStyle {
+                                fill_color: Color32::from_rgb(30, 58, 138), // blue
+                                border_color: Color32::from_rgb(96, 165, 250),
+                                text_color: Color32::WHITE,
+                                border_width: 2.0,
+                            },
+                        };
+                        graph.nodes.insert(service.id.clone(), svc_node);
+
+                        // Position resources under this service
+                        if let Some(svc_resources) = service_resources.get(&service.id) {
+                            let res_count = svc_resources.len();
+                            let res_total_width = res_count as f32 * NODE_WIDTH
+                                + (res_count - 1) as f32 * (H_SPACING / 3.0);
+                            let res_start_x = svc_x - res_total_width / 2.0 + NODE_WIDTH / 2.0;
+
+                            for (k, resource) in svc_resources.iter().enumerate() {
+                                let res_x = res_start_x + k as f32 * (NODE_WIDTH + H_SPACING / 3.0);
+                                let res_position = Pos2::new(res_x, TIER_RESOURCE);
+
+                                let res_node = LayoutNode {
+                                    id: resource.id.clone(),
+                                    entity_type: EntityType::Resource,
+                                    primary_role: PrimaryRole::Unknown,
+                                    all_roles: vec![],
+                                    label: resource.label.clone(),
+                                    sublabel: resource.sublabel.clone(),
+                                    jurisdiction: None,
+                                    position: res_position,
+                                    size: node_size,
+                                    in_focus: true,
+                                    is_cbu_root: false,
+                                    style: NodeStyle {
+                                        fill_color: Color32::from_rgb(20, 83, 45), // green
+                                        border_color: Color32::from_rgb(74, 222, 128),
+                                        text_color: Color32::WHITE,
+                                        border_width: 2.0,
+                                    },
+                                };
+                                graph.nodes.insert(resource.id.clone(), res_node);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Position orphan services (no parent product) - shouldn't happen but handle it
+        let positioned_services: std::collections::HashSet<&str> = product_services
+            .values()
+            .flatten()
+            .map(|s| s.id.as_str())
+            .collect();
+        let orphan_services: Vec<_> = services
+            .iter()
+            .filter(|s| !positioned_services.contains(s.id.as_str()))
+            .collect();
+
+        if !orphan_services.is_empty() {
+            let count = orphan_services.len();
+            let total_width = count as f32 * NODE_WIDTH + (count - 1) as f32 * H_SPACING;
+            let start_x = -total_width / 2.0 + NODE_WIDTH / 2.0;
+
+            for (i, service) in orphan_services.iter().enumerate() {
+                let x = start_x + i as f32 * (NODE_WIDTH + H_SPACING);
+                let position = Pos2::new(x, TIER_SERVICE);
+
+                let layout_node = LayoutNode {
+                    id: service.id.clone(),
+                    entity_type: EntityType::Service,
+                    primary_role: PrimaryRole::Unknown,
+                    all_roles: vec![],
+                    label: service.label.clone(),
+                    sublabel: service.sublabel.clone(),
+                    jurisdiction: None,
+                    position,
+                    size: node_size,
+                    in_focus: true,
+                    is_cbu_root: false,
+                    style: NodeStyle {
+                        fill_color: Color32::from_rgb(30, 58, 138),
+                        border_color: Color32::from_rgb(96, 165, 250),
+                        text_color: Color32::WHITE,
+                        border_width: 2.0,
+                    },
+                };
+                graph.nodes.insert(service.id.clone(), layout_node);
+            }
+        }
+
+        // Position orphan resources (no parent service)
+        let positioned_resources: std::collections::HashSet<&str> = service_resources
+            .values()
+            .flatten()
+            .map(|r| r.id.as_str())
+            .collect();
+        let orphan_resources: Vec<_> = resources
+            .iter()
+            .filter(|r| !positioned_resources.contains(r.id.as_str()))
+            .collect();
+
+        if !orphan_resources.is_empty() {
+            let count = orphan_resources.len();
+            let total_width = count as f32 * NODE_WIDTH + (count - 1) as f32 * H_SPACING;
+            let start_x = -total_width / 2.0 + NODE_WIDTH / 2.0;
+
+            for (i, resource) in orphan_resources.iter().enumerate() {
+                let x = start_x + i as f32 * (NODE_WIDTH + H_SPACING);
+                let position = Pos2::new(x, TIER_RESOURCE);
+
+                let layout_node = LayoutNode {
+                    id: resource.id.clone(),
+                    entity_type: EntityType::Resource,
+                    primary_role: PrimaryRole::Unknown,
+                    all_roles: vec![],
+                    label: resource.label.clone(),
+                    sublabel: resource.sublabel.clone(),
+                    jurisdiction: None,
+                    position,
+                    size: node_size,
+                    in_focus: true,
+                    is_cbu_root: false,
+                    style: NodeStyle {
+                        fill_color: Color32::from_rgb(20, 83, 45),
+                        border_color: Color32::from_rgb(74, 222, 128),
+                        text_color: Color32::WHITE,
+                        border_width: 2.0,
+                    },
+                };
+                graph.nodes.insert(resource.id.clone(), layout_node);
+            }
         }
     }
 }

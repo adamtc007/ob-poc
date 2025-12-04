@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict vSihfV9Y84Pu6oM6pENqW9wESK3In5m3406xScrtpQttSkoSK2fOuBvJ50QQ7ak
+\restrict B2XyN99cke6WN6KofWcvIeIcPj29PHpIsJMoepAJeN3XVheeY0nr5JxeC4SiG0Z
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -315,6 +315,74 @@ COMMENT ON FUNCTION kyc.generate_doc_requests_from_threshold(p_case_id uuid, p_b
 
 
 --
+-- Name: is_valid_case_transition(character varying, character varying); Type: FUNCTION; Schema: kyc; Owner: -
+--
+
+CREATE FUNCTION kyc.is_valid_case_transition(p_from_status character varying, p_to_status character varying) RETURNS boolean
+    LANGUAGE plpgsql IMMUTABLE
+    AS $$
+BEGIN
+    IF p_from_status = p_to_status THEN RETURN true; END IF;
+    RETURN CASE p_from_status
+        WHEN 'INTAKE' THEN p_to_status IN ('DISCOVERY', 'WITHDRAWN')
+        WHEN 'DISCOVERY' THEN p_to_status IN ('ASSESSMENT', 'BLOCKED', 'WITHDRAWN')
+        WHEN 'ASSESSMENT' THEN p_to_status IN ('REVIEW', 'BLOCKED', 'WITHDRAWN')
+        WHEN 'REVIEW' THEN p_to_status IN ('APPROVED', 'REJECTED', 'BLOCKED', 'REFER_TO_REGULATOR', 'DO_NOT_ONBOARD')
+        WHEN 'BLOCKED' THEN p_to_status IN ('DISCOVERY', 'ASSESSMENT', 'REVIEW', 'WITHDRAWN', 'DO_NOT_ONBOARD')
+        WHEN 'REFER_TO_REGULATOR' THEN p_to_status IN ('REVIEW', 'DO_NOT_ONBOARD', 'APPROVED', 'REJECTED')
+        ELSE false
+    END;
+END;
+$$;
+
+
+--
+-- Name: is_valid_doc_request_transition(character varying, character varying); Type: FUNCTION; Schema: kyc; Owner: -
+--
+
+CREATE FUNCTION kyc.is_valid_doc_request_transition(p_from_status character varying, p_to_status character varying) RETURNS boolean
+    LANGUAGE plpgsql IMMUTABLE
+    AS $$
+BEGIN
+    IF p_from_status = p_to_status THEN RETURN true; END IF;
+    RETURN CASE p_from_status
+        WHEN 'DRAFT' THEN p_to_status IN ('REQUIRED', 'REQUESTED', 'WAIVED')
+        WHEN 'REQUIRED' THEN p_to_status IN ('REQUESTED', 'WAIVED', 'EXPIRED')
+        WHEN 'REQUESTED' THEN p_to_status IN ('RECEIVED', 'WAIVED', 'EXPIRED')
+        WHEN 'RECEIVED' THEN p_to_status IN ('UNDER_REVIEW', 'VERIFIED', 'REJECTED')
+        WHEN 'UNDER_REVIEW' THEN p_to_status IN ('VERIFIED', 'REJECTED')
+        WHEN 'REJECTED' THEN p_to_status IN ('REQUESTED')
+        ELSE false
+    END;
+END;
+$$;
+
+
+--
+-- Name: is_valid_workstream_transition(character varying, character varying); Type: FUNCTION; Schema: kyc; Owner: -
+--
+
+CREATE FUNCTION kyc.is_valid_workstream_transition(p_from_status character varying, p_to_status character varying) RETURNS boolean
+    LANGUAGE plpgsql IMMUTABLE
+    AS $$
+BEGIN
+    IF p_from_status = p_to_status THEN RETURN true; END IF;
+    RETURN CASE p_from_status
+        WHEN 'PENDING' THEN p_to_status IN ('COLLECT', 'BLOCKED')
+        WHEN 'COLLECT' THEN p_to_status IN ('VERIFY', 'BLOCKED')
+        WHEN 'VERIFY' THEN p_to_status IN ('SCREEN', 'BLOCKED', 'ENHANCED_DD')
+        WHEN 'SCREEN' THEN p_to_status IN ('ASSESS', 'BLOCKED', 'ENHANCED_DD', 'REFERRED', 'PROHIBITED')
+        WHEN 'ASSESS' THEN p_to_status IN ('COMPLETE', 'BLOCKED', 'ENHANCED_DD')
+        WHEN 'ENHANCED_DD' THEN p_to_status IN ('ASSESS', 'COMPLETE', 'BLOCKED', 'REFERRED', 'PROHIBITED')
+        WHEN 'BLOCKED' THEN p_to_status IN ('COLLECT', 'VERIFY', 'SCREEN', 'ASSESS', 'PROHIBITED')
+        WHEN 'REFERRED' THEN p_to_status IN ('SCREEN', 'ASSESS', 'COMPLETE', 'PROHIBITED')
+        ELSE false
+    END;
+END;
+$$;
+
+
+--
 -- Name: abort_hung_sessions(); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -337,6 +405,162 @@ BEGIN
     RETURN aborted;
 END;
 $$;
+
+
+--
+-- Name: apply_case_decision(uuid, character varying, character varying, text); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".apply_case_decision(p_case_id uuid, p_decision character varying, p_decided_by character varying, p_notes text DEFAULT NULL::text) RETURNS boolean
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_current_status VARCHAR(30);
+    v_latest_eval RECORD;
+    v_new_status VARCHAR(30);
+BEGIN
+    -- Get current case status
+    SELECT status INTO v_current_status
+    FROM kyc.cases WHERE case_id = p_case_id;
+    
+    -- Get latest evaluation
+    SELECT * INTO v_latest_eval
+    FROM "ob-poc".case_evaluation_snapshots
+    WHERE case_id = p_case_id
+    ORDER BY evaluated_at DESC
+    LIMIT 1;
+    
+    -- Validate decision against recommendation
+    IF v_latest_eval.has_hard_stop AND p_decision NOT IN ('DO_NOT_ONBOARD', 'REJECT', 'REFER_TO_REGULATOR') THEN
+        RAISE EXCEPTION 'Cannot approve case with unresolved hard stops. Recommended: %', v_latest_eval.recommended_action;
+    END IF;
+    
+    -- Map decision to case status
+    v_new_status := CASE p_decision
+        WHEN 'APPROVE' THEN 'APPROVED'
+        WHEN 'APPROVE_WITH_CONDITIONS' THEN 'APPROVED'
+        WHEN 'REJECT' THEN 'REJECTED'
+        WHEN 'DO_NOT_ONBOARD' THEN 'DO_NOT_ONBOARD'
+        WHEN 'REFER_TO_REGULATOR' THEN 'REFER_TO_REGULATOR'
+        WHEN 'ESCALATE' THEN 'REVIEW'  -- Stay in review but escalate
+        ELSE v_current_status
+    END;
+    
+    -- Update evaluation snapshot with decision
+    UPDATE "ob-poc".case_evaluation_snapshots
+    SET decision_made = p_decision,
+        decision_made_at = now(),
+        decision_made_by = p_decided_by,
+        decision_notes = p_notes
+    WHERE snapshot_id = v_latest_eval.snapshot_id;
+    
+    -- Update case status if changed
+    IF v_new_status != v_current_status THEN
+        UPDATE kyc.cases
+        SET status = v_new_status,
+            last_activity_at = now()
+        WHERE case_id = p_case_id;
+        
+        -- If closing, set closed_at
+        IF v_new_status IN ('APPROVED', 'REJECTED', 'DO_NOT_ONBOARD') THEN
+            UPDATE kyc.cases
+            SET closed_at = now()
+            WHERE case_id = p_case_id;
+        END IF;
+    END IF;
+    
+    -- Log case event
+    INSERT INTO kyc.case_events (
+        case_id, event_type, event_data, actor_type, comment
+    ) VALUES (
+        p_case_id, 
+        'DECISION_APPLIED',
+        jsonb_build_object(
+            'decision', p_decision,
+            'previous_status', v_current_status,
+            'new_status', v_new_status,
+            'evaluation_snapshot_id', v_latest_eval.snapshot_id,
+            'total_score', v_latest_eval.total_score,
+            'has_hard_stop', v_latest_eval.has_hard_stop
+        ),
+        'USER',
+        p_notes
+    );
+    
+    RETURN true;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION apply_case_decision(p_case_id uuid, p_decision character varying, p_decided_by character varying, p_notes text); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".apply_case_decision(p_case_id uuid, p_decision character varying, p_decided_by character varying, p_notes text) IS 'Applies decision to case with validation';
+
+
+--
+-- Name: can_prove_ubo(uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".can_prove_ubo(p_ubo_id uuid) RETURNS TABLE(can_prove boolean, has_identity_proof boolean, has_ownership_proof boolean, missing_evidence text[], verified_evidence_count integer, pending_evidence_count integer)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_has_identity BOOLEAN;
+    v_has_ownership BOOLEAN;
+    v_verified_count INTEGER;
+    v_pending_count INTEGER;
+    v_missing TEXT[] := ARRAY[]::TEXT[];
+BEGIN
+    -- Check for identity proof
+    SELECT EXISTS (
+        SELECT 1 FROM "ob-poc".ubo_evidence
+        WHERE ubo_id = p_ubo_id
+          AND evidence_role = 'IDENTITY_PROOF'
+          AND verification_status = 'VERIFIED'
+    ) INTO v_has_identity;
+    
+    -- Check for ownership proof
+    SELECT EXISTS (
+        SELECT 1 FROM "ob-poc".ubo_evidence
+        WHERE ubo_id = p_ubo_id
+          AND evidence_role IN ('OWNERSHIP_PROOF', 'CHAIN_LINK')
+          AND verification_status = 'VERIFIED'
+    ) INTO v_has_ownership;
+    
+    -- Count evidence
+    SELECT 
+        COUNT(*) FILTER (WHERE verification_status = 'VERIFIED'),
+        COUNT(*) FILTER (WHERE verification_status = 'PENDING')
+    INTO v_verified_count, v_pending_count
+    FROM "ob-poc".ubo_evidence
+    WHERE ubo_id = p_ubo_id;
+    
+    -- Build missing list
+    IF NOT v_has_identity THEN
+        v_missing := array_append(v_missing, 'IDENTITY_PROOF');
+    END IF;
+    IF NOT v_has_ownership THEN
+        v_missing := array_append(v_missing, 'OWNERSHIP_PROOF');
+    END IF;
+    
+    RETURN QUERY SELECT 
+        (v_has_identity AND v_has_ownership),
+        v_has_identity,
+        v_has_ownership,
+        v_missing,
+        v_verified_count,
+        v_pending_count;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION can_prove_ubo(p_ubo_id uuid); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".can_prove_ubo(p_ubo_id uuid) IS 'Checks if UBO has sufficient evidence to be proven';
 
 
 --
@@ -428,6 +652,63 @@ $$;
 --
 
 COMMENT ON FUNCTION "ob-poc".capture_ubo_snapshot(p_cbu_id uuid, p_case_id uuid, p_snapshot_type character varying, p_reason character varying, p_captured_by character varying) IS 'Captures current UBO state as a snapshot';
+
+
+--
+-- Name: check_cbu_evidence_completeness(uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".check_cbu_evidence_completeness(p_cbu_id uuid) RETURNS TABLE(is_complete boolean, missing_categories text[], verified_count integer, pending_count integer, rejected_count integer)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_required_categories TEXT[] := ARRAY['IDENTITY', 'OWNERSHIP', 'REGULATORY'];
+    v_verified_categories TEXT[];
+    v_verified_count INTEGER;
+    v_pending_count INTEGER;
+    v_rejected_count INTEGER;
+BEGIN
+    -- Count evidence by status
+    SELECT 
+        COUNT(*) FILTER (WHERE verification_status = 'VERIFIED'),
+        COUNT(*) FILTER (WHERE verification_status = 'PENDING'),
+        COUNT(*) FILTER (WHERE verification_status = 'REJECTED')
+    INTO v_verified_count, v_pending_count, v_rejected_count
+    FROM "ob-poc".cbu_evidence
+    WHERE cbu_id = p_cbu_id;
+    
+    -- Get verified categories
+    SELECT ARRAY_AGG(DISTINCT evidence_category)
+    INTO v_verified_categories
+    FROM "ob-poc".cbu_evidence
+    WHERE cbu_id = p_cbu_id
+      AND verification_status = 'VERIFIED'
+      AND evidence_category IS NOT NULL;
+    
+    -- Handle NULL array
+    IF v_verified_categories IS NULL THEN
+        v_verified_categories := ARRAY[]::TEXT[];
+    END IF;
+    
+    RETURN QUERY SELECT 
+        v_required_categories <@ v_verified_categories,  -- All required present in verified
+        ARRAY(
+            SELECT unnest(v_required_categories)
+            EXCEPT
+            SELECT unnest(v_verified_categories)
+        ),
+        v_verified_count,
+        v_pending_count,
+        v_rejected_count;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION check_cbu_evidence_completeness(p_cbu_id uuid); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".check_cbu_evidence_completeness(p_cbu_id uuid) IS 'Checks if CBU has all required evidence categories verified';
 
 
 --
@@ -609,6 +890,55 @@ $$;
 
 
 --
+-- Name: compute_case_redflag_score(uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".compute_case_redflag_score(p_case_id uuid) RETURNS TABLE(soft_count integer, escalate_count integer, hard_stop_count integer, soft_score integer, escalate_score integer, has_hard_stop boolean, total_score integer, open_flags integer, mitigated_flags integer, waived_flags integer)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_soft_weight INTEGER;
+    v_escalate_weight INTEGER;
+BEGIN
+    -- Get weights from config
+    SELECT weight INTO v_soft_weight FROM "ob-poc".redflag_score_config WHERE severity = 'SOFT';
+    SELECT weight INTO v_escalate_weight FROM "ob-poc".redflag_score_config WHERE severity = 'ESCALATE';
+    
+    -- Default weights if not configured
+    v_soft_weight := COALESCE(v_soft_weight, 1);
+    v_escalate_weight := COALESCE(v_escalate_weight, 2);
+    
+    RETURN QUERY
+    SELECT 
+        COUNT(*) FILTER (WHERE rf.severity = 'SOFT')::INTEGER as soft_count,
+        COUNT(*) FILTER (WHERE rf.severity = 'ESCALATE')::INTEGER as escalate_count,
+        COUNT(*) FILTER (WHERE rf.severity = 'HARD_STOP')::INTEGER as hard_stop_count,
+        (COUNT(*) FILTER (WHERE rf.severity = 'SOFT' AND rf.status = 'OPEN') * v_soft_weight)::INTEGER as soft_score,
+        (COUNT(*) FILTER (WHERE rf.severity = 'ESCALATE' AND rf.status = 'OPEN') * v_escalate_weight)::INTEGER as escalate_score,
+        (COUNT(*) FILTER (WHERE rf.severity = 'HARD_STOP' AND rf.status IN ('OPEN', 'BLOCKING')) > 0) as has_hard_stop,
+        (
+            COUNT(*) FILTER (WHERE rf.severity = 'SOFT' AND rf.status = 'OPEN') * v_soft_weight +
+            COUNT(*) FILTER (WHERE rf.severity = 'ESCALATE' AND rf.status = 'OPEN') * v_escalate_weight +
+            CASE WHEN COUNT(*) FILTER (WHERE rf.severity = 'HARD_STOP' AND rf.status IN ('OPEN', 'BLOCKING')) > 0 
+                 THEN 1000 ELSE 0 END
+        )::INTEGER as total_score,
+        COUNT(*) FILTER (WHERE rf.status = 'OPEN')::INTEGER as open_flags,
+        COUNT(*) FILTER (WHERE rf.status = 'MITIGATED')::INTEGER as mitigated_flags,
+        COUNT(*) FILTER (WHERE rf.status = 'WAIVED')::INTEGER as waived_flags
+    FROM kyc.red_flags rf
+    WHERE rf.case_id = p_case_id;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION compute_case_redflag_score(p_case_id uuid); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".compute_case_redflag_score(p_case_id uuid) IS 'Computes aggregated red-flag scores for a case';
+
+
+--
 -- Name: compute_cbu_risk_score(uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -754,6 +1084,73 @@ $$;
 
 
 --
+-- Name: evaluate_case_decision(uuid, character varying); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".evaluate_case_decision(p_case_id uuid, p_evaluator character varying DEFAULT NULL::character varying) RETURNS uuid
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_scores RECORD;
+    v_threshold RECORD;
+    v_snapshot_id UUID;
+BEGIN
+    -- Get current scores
+    SELECT * INTO v_scores
+    FROM "ob-poc".compute_case_redflag_score(p_case_id);
+    
+    -- Find matching threshold (priority: hard_stop > escalate > score-based)
+    IF v_scores.has_hard_stop THEN
+        SELECT * INTO v_threshold
+        FROM "ob-poc".case_decision_thresholds
+        WHERE has_hard_stop = true AND is_active = true
+        LIMIT 1;
+    ELSIF v_scores.escalate_count > 0 THEN
+        SELECT * INTO v_threshold
+        FROM "ob-poc".case_decision_thresholds
+        WHERE threshold_name = 'escalate_flags' AND is_active = true
+        LIMIT 1;
+    ELSE
+        SELECT * INTO v_threshold
+        FROM "ob-poc".case_decision_thresholds
+        WHERE is_active = true
+          AND has_hard_stop = false
+          AND (min_score IS NULL OR v_scores.total_score >= min_score)
+          AND (max_score IS NULL OR v_scores.total_score <= max_score)
+        ORDER BY COALESCE(min_score, 0) DESC
+        LIMIT 1;
+    END IF;
+    
+    -- Create evaluation snapshot
+    INSERT INTO "ob-poc".case_evaluation_snapshots (
+        case_id,
+        soft_count, escalate_count, hard_stop_count,
+        soft_score, escalate_score, has_hard_stop, total_score,
+        open_flags, mitigated_flags, waived_flags,
+        matched_threshold_id, recommended_action, required_escalation_level,
+        evaluated_by
+    ) VALUES (
+        p_case_id,
+        v_scores.soft_count, v_scores.escalate_count, v_scores.hard_stop_count,
+        v_scores.soft_score, v_scores.escalate_score, v_scores.has_hard_stop, v_scores.total_score,
+        v_scores.open_flags, v_scores.mitigated_flags, v_scores.waived_flags,
+        v_threshold.threshold_id, v_threshold.recommended_action, v_threshold.escalation_level,
+        p_evaluator
+    ) RETURNING snapshot_id INTO v_snapshot_id;
+    
+    RETURN v_snapshot_id;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION evaluate_case_decision(p_case_id uuid, p_evaluator character varying); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".evaluate_case_decision(p_case_id uuid, p_evaluator character varying) IS 'Evaluates case and creates recommendation snapshot';
+
+
+--
 -- Name: get_attribute_value(uuid, text); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -811,6 +1208,116 @@ BEGIN
         UPDATE "ob-poc".parsed_asts
         SET invalidated_at = now()
         WHERE version_id = NEW.version_id;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: is_valid_cbu_transition(character varying, character varying); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".is_valid_cbu_transition(p_from_status character varying, p_to_status character varying) RETURNS boolean
+    LANGUAGE plpgsql IMMUTABLE
+    AS $$
+BEGIN
+    -- Same status is always valid (no-op)
+    IF p_from_status = p_to_status THEN
+        RETURN true;
+    END IF;
+    
+    RETURN CASE p_from_status
+        WHEN 'DISCOVERED' THEN 
+            p_to_status IN ('VALIDATION_PENDING', 'VALIDATION_FAILED')
+        WHEN 'VALIDATION_PENDING' THEN 
+            p_to_status IN ('VALIDATED', 'VALIDATION_FAILED', 'DISCOVERED')
+        WHEN 'VALIDATED' THEN 
+            p_to_status IN ('UPDATE_PENDING_PROOF')  -- Material change triggers re-validation
+        WHEN 'UPDATE_PENDING_PROOF' THEN 
+            p_to_status IN ('VALIDATED', 'VALIDATION_FAILED')
+        WHEN 'VALIDATION_FAILED' THEN 
+            p_to_status IN ('VALIDATION_PENDING', 'DISCOVERED')  -- Retry or start over
+        ELSE 
+            false
+    END;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION is_valid_cbu_transition(p_from_status character varying, p_to_status character varying); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".is_valid_cbu_transition(p_from_status character varying, p_to_status character varying) IS 'Validates CBU status transitions';
+
+
+--
+-- Name: is_valid_ubo_transition(character varying, character varying); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".is_valid_ubo_transition(p_from_status character varying, p_to_status character varying) RETURNS boolean
+    LANGUAGE plpgsql IMMUTABLE
+    AS $$
+BEGIN
+    -- Same status is always valid (no-op)
+    IF p_from_status = p_to_status THEN
+        RETURN true;
+    END IF;
+    
+    -- Handle NULL (new record) - can start as SUSPECTED or PENDING
+    IF p_from_status IS NULL THEN
+        RETURN p_to_status IN ('SUSPECTED', 'PENDING');
+    END IF;
+    
+    RETURN CASE p_from_status
+        WHEN 'SUSPECTED' THEN 
+            p_to_status IN ('PROVEN', 'PENDING', 'FAILED', 'REMOVED')
+        WHEN 'PENDING' THEN 
+            p_to_status IN ('PROVEN', 'VERIFIED', 'FAILED', 'DISPUTED', 'REMOVED')
+        WHEN 'PROVEN' THEN 
+            p_to_status IN ('VERIFIED', 'DISPUTED', 'REMOVED')
+        WHEN 'VERIFIED' THEN 
+            p_to_status IN ('DISPUTED', 'REMOVED')  -- Can be challenged or ownership changes
+        WHEN 'FAILED' THEN 
+            p_to_status IN ('SUSPECTED', 'PENDING')  -- Retry
+        WHEN 'DISPUTED' THEN 
+            p_to_status IN ('PROVEN', 'VERIFIED', 'REMOVED', 'FAILED')  -- Resolution
+        WHEN 'REMOVED' THEN 
+            false  -- Terminal state
+        ELSE 
+            false
+    END;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION is_valid_ubo_transition(p_from_status character varying, p_to_status character varying); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".is_valid_ubo_transition(p_from_status character varying, p_to_status character varying) IS 'Validates UBO verification status transitions';
+
+
+--
+-- Name: log_cbu_status_change(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".log_cbu_status_change() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF OLD.status IS DISTINCT FROM NEW.status THEN
+        INSERT INTO "ob-poc".cbu_change_log (
+            cbu_id, change_type, field_name, old_value, new_value, changed_at
+        ) VALUES (
+            NEW.cbu_id, 
+            'STATUS_CHANGE', 
+            'status',
+            to_jsonb(OLD.status),
+            to_jsonb(NEW.status),
+            now()
+        );
     END IF;
     RETURN NEW;
 END;
@@ -999,6 +1506,46 @@ CREATE FUNCTION "ob-poc".update_timestamp() RETURNS trigger
     AS $$
 BEGIN
     NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: validate_ubo_status_transition(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".validate_ubo_status_transition() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF OLD.verification_status IS DISTINCT FROM NEW.verification_status THEN
+        IF NOT "ob-poc".is_valid_ubo_transition(OLD.verification_status, NEW.verification_status) THEN
+            RAISE EXCEPTION 'Invalid UBO status transition from % to %', 
+                OLD.verification_status, NEW.verification_status;
+        END IF;
+        
+        -- If transitioning to PROVEN, check evidence requirements
+        IF NEW.verification_status = 'PROVEN' THEN
+            DECLARE
+                v_can_prove BOOLEAN;
+            BEGIN
+                SELECT can_prove INTO v_can_prove
+                FROM "ob-poc".can_prove_ubo(NEW.ubo_id);
+                
+                IF NOT v_can_prove THEN
+                    RAISE WARNING 'UBO % marked as PROVEN without complete evidence', NEW.ubo_id;
+                    -- Note: Warning only, not blocking - allows override
+                END IF;
+            END;
+        END IF;
+        
+        -- Set proof_date when transitioning to PROVEN
+        IF NEW.verification_status = 'PROVEN' AND NEW.proof_date IS NULL THEN
+            NEW.proof_date := now();
+        END IF;
+    END IF;
+    
     RETURN NEW;
 END;
 $$;
@@ -1607,7 +2154,7 @@ CREATE TABLE kyc.cases (
     case_type character varying(30) DEFAULT 'NEW_CLIENT'::character varying,
     notes text,
     updated_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT chk_case_status CHECK (((status)::text = ANY ((ARRAY['INTAKE'::character varying, 'DISCOVERY'::character varying, 'ASSESSMENT'::character varying, 'REVIEW'::character varying, 'APPROVED'::character varying, 'REJECTED'::character varying, 'BLOCKED'::character varying, 'WITHDRAWN'::character varying, 'EXPIRED'::character varying])::text[]))),
+    CONSTRAINT chk_case_status CHECK (((status)::text = ANY ((ARRAY['INTAKE'::character varying, 'DISCOVERY'::character varying, 'ASSESSMENT'::character varying, 'REVIEW'::character varying, 'APPROVED'::character varying, 'REJECTED'::character varying, 'BLOCKED'::character varying, 'WITHDRAWN'::character varying, 'EXPIRED'::character varying, 'REFER_TO_REGULATOR'::character varying, 'DO_NOT_ONBOARD'::character varying])::text[]))),
     CONSTRAINT chk_case_type CHECK (((case_type)::text = ANY ((ARRAY['NEW_CLIENT'::character varying, 'PERIODIC_REVIEW'::character varying, 'EVENT_DRIVEN'::character varying, 'REMEDIATION'::character varying])::text[]))),
     CONSTRAINT chk_escalation_level CHECK (((escalation_level)::text = ANY ((ARRAY['STANDARD'::character varying, 'SENIOR_COMPLIANCE'::character varying, 'EXECUTIVE'::character varying, 'BOARD'::character varying])::text[]))),
     CONSTRAINT chk_risk_rating CHECK (((risk_rating IS NULL) OR ((risk_rating)::text = ANY ((ARRAY['LOW'::character varying, 'MEDIUM'::character varying, 'HIGH'::character varying, 'VERY_HIGH'::character varying, 'PROHIBITED'::character varying])::text[]))))
@@ -1664,7 +2211,7 @@ CREATE TABLE kyc.doc_requests (
     batch_id uuid,
     batch_reference character varying(50),
     generation_source character varying(30) DEFAULT 'MANUAL'::character varying,
-    CONSTRAINT chk_doc_status CHECK (((status)::text = ANY ((ARRAY['REQUIRED'::character varying, 'REQUESTED'::character varying, 'RECEIVED'::character varying, 'UNDER_REVIEW'::character varying, 'VERIFIED'::character varying, 'REJECTED'::character varying, 'WAIVED'::character varying, 'EXPIRED'::character varying])::text[])))
+    CONSTRAINT chk_doc_status CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'REQUIRED'::character varying, 'REQUESTED'::character varying, 'RECEIVED'::character varying, 'UNDER_REVIEW'::character varying, 'VERIFIED'::character varying, 'REJECTED'::character varying, 'WAIVED'::character varying, 'EXPIRED'::character varying])::text[])))
 );
 
 
@@ -1719,7 +2266,7 @@ CREATE TABLE kyc.entity_workstreams (
     ownership_percentage numeric(5,2),
     discovery_depth integer DEFAULT 1,
     updated_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT chk_workstream_status CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'COLLECT'::character varying, 'VERIFY'::character varying, 'SCREEN'::character varying, 'ASSESS'::character varying, 'COMPLETE'::character varying, 'BLOCKED'::character varying, 'ENHANCED_DD'::character varying])::text[])))
+    CONSTRAINT chk_workstream_status CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'COLLECT'::character varying, 'VERIFY'::character varying, 'SCREEN'::character varying, 'ASSESS'::character varying, 'COMPLETE'::character varying, 'BLOCKED'::character varying, 'ENHANCED_DD'::character varying, 'REFERRED'::character varying, 'PROHIBITED'::character varying])::text[])))
 );
 
 
@@ -2247,6 +2794,96 @@ ALTER SEQUENCE "ob-poc".attribute_values_typed_id_seq OWNED BY "ob-poc".attribut
 
 
 --
+-- Name: case_decision_thresholds; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".case_decision_thresholds (
+    threshold_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    threshold_name character varying(100) NOT NULL,
+    min_score integer,
+    max_score integer,
+    has_hard_stop boolean DEFAULT false,
+    escalation_level character varying(30),
+    recommended_action character varying(50) NOT NULL,
+    description text,
+    is_active boolean DEFAULT true,
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT chk_recommended_action CHECK (((recommended_action)::text = ANY ((ARRAY['APPROVE'::character varying, 'APPROVE_WITH_CONDITIONS'::character varying, 'ESCALATE'::character varying, 'REFER_TO_REGULATOR'::character varying, 'DO_NOT_ONBOARD'::character varying, 'REJECT'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE case_decision_thresholds; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".case_decision_thresholds IS 'Thresholds mapping scores to recommended actions';
+
+
+--
+-- Name: case_evaluation_snapshots; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".case_evaluation_snapshots (
+    snapshot_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    case_id uuid NOT NULL,
+    soft_count integer DEFAULT 0 NOT NULL,
+    escalate_count integer DEFAULT 0 NOT NULL,
+    hard_stop_count integer DEFAULT 0 NOT NULL,
+    soft_score integer DEFAULT 0 NOT NULL,
+    escalate_score integer DEFAULT 0 NOT NULL,
+    has_hard_stop boolean DEFAULT false NOT NULL,
+    total_score integer DEFAULT 0 NOT NULL,
+    open_flags integer DEFAULT 0 NOT NULL,
+    mitigated_flags integer DEFAULT 0 NOT NULL,
+    waived_flags integer DEFAULT 0 NOT NULL,
+    matched_threshold_id uuid,
+    recommended_action character varying(50),
+    required_escalation_level character varying(30),
+    evaluated_at timestamp with time zone DEFAULT now() NOT NULL,
+    evaluated_by character varying(255),
+    notes text,
+    decision_made character varying(50),
+    decision_made_at timestamp with time zone,
+    decision_made_by character varying(255),
+    decision_notes text
+);
+
+
+--
+-- Name: TABLE case_evaluation_snapshots; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".case_evaluation_snapshots IS 'Audit trail of case evaluations and decisions';
+
+
+--
+-- Name: cbu_change_log; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".cbu_change_log (
+    log_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cbu_id uuid NOT NULL,
+    change_type character varying(50) NOT NULL,
+    field_name character varying(100),
+    old_value jsonb,
+    new_value jsonb,
+    evidence_ids uuid[],
+    changed_at timestamp with time zone DEFAULT now(),
+    changed_by character varying(255),
+    reason text,
+    case_id uuid,
+    CONSTRAINT chk_change_type CHECK (((change_type)::text = ANY ((ARRAY['STATUS_CHANGE'::character varying, 'FIELD_UPDATE'::character varying, 'EVIDENCE_ADDED'::character varying, 'EVIDENCE_VERIFIED'::character varying, 'ROLE_CHANGE'::character varying, 'UBO_CHANGE'::character varying, 'PRODUCT_CHANGE'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE cbu_change_log; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".cbu_change_log IS 'Audit trail of all CBU changes';
+
+
+--
 -- Name: cbu_creation_log; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -2272,6 +2909,37 @@ CREATE TABLE "ob-poc".cbu_entity_roles (
     role_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text)
 );
+
+
+--
+-- Name: cbu_evidence; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".cbu_evidence (
+    evidence_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cbu_id uuid NOT NULL,
+    document_id uuid,
+    attestation_ref character varying(255),
+    evidence_type character varying(50) NOT NULL,
+    evidence_category character varying(50),
+    description text,
+    attached_at timestamp with time zone DEFAULT now(),
+    attached_by character varying(255),
+    verified_at timestamp with time zone,
+    verified_by character varying(255),
+    verification_status character varying(30) DEFAULT 'PENDING'::character varying,
+    verification_notes text,
+    CONSTRAINT chk_evidence_source CHECK (((document_id IS NOT NULL) OR (attestation_ref IS NOT NULL))),
+    CONSTRAINT chk_evidence_type CHECK (((evidence_type)::text = ANY ((ARRAY['DOCUMENT'::character varying, 'ATTESTATION'::character varying, 'SCREENING'::character varying, 'REGISTRY_CHECK'::character varying, 'MANUAL_VERIFICATION'::character varying])::text[]))),
+    CONSTRAINT chk_evidence_verification_status CHECK (((verification_status)::text = ANY ((ARRAY['PENDING'::character varying, 'VERIFIED'::character varying, 'REJECTED'::character varying, 'EXPIRED'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE cbu_evidence; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".cbu_evidence IS 'Evidence/documentation attached to CBUs for validation';
 
 
 --
@@ -2336,8 +3004,10 @@ CREATE TABLE "ob-poc".cbus (
     commercial_client_entity_id uuid,
     cbu_category character varying(50),
     product_id uuid,
+    status character varying(30) DEFAULT 'DISCOVERED'::character varying,
     CONSTRAINT cbus_category_check CHECK (((cbu_category IS NULL) OR ((cbu_category)::text = ANY ((ARRAY['FUND_MANDATE'::character varying, 'CORPORATE_GROUP'::character varying, 'INSTITUTIONAL_ACCOUNT'::character varying, 'RETAIL_CLIENT'::character varying, 'FAMILY_TRUST'::character varying, 'CORRESPONDENT_BANK'::character varying])::text[])))),
-    CONSTRAINT chk_cbu_category CHECK (((cbu_category IS NULL) OR ((cbu_category)::text = ANY ((ARRAY['FUND_MANDATE'::character varying, 'CORPORATE_GROUP'::character varying, 'INSTITUTIONAL_ACCOUNT'::character varying, 'RETAIL_CLIENT'::character varying, 'INTERNAL_TEST'::character varying, 'CORRESPONDENT_BANK'::character varying])::text[]))))
+    CONSTRAINT chk_cbu_category CHECK (((cbu_category IS NULL) OR ((cbu_category)::text = ANY ((ARRAY['FUND_MANDATE'::character varying, 'CORPORATE_GROUP'::character varying, 'INSTITUTIONAL_ACCOUNT'::character varying, 'RETAIL_CLIENT'::character varying, 'INTERNAL_TEST'::character varying, 'CORRESPONDENT_BANK'::character varying])::text[])))),
+    CONSTRAINT chk_cbu_status CHECK (((status)::text = ANY ((ARRAY['DISCOVERED'::character varying, 'VALIDATION_PENDING'::character varying, 'VALIDATED'::character varying, 'UPDATE_PENDING_PROOF'::character varying, 'VALIDATION_FAILED'::character varying])::text[])))
 );
 
 
@@ -3544,6 +4214,29 @@ CREATE TABLE "ob-poc".products (
 
 
 --
+-- Name: redflag_score_config; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".redflag_score_config (
+    config_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    severity character varying(20) NOT NULL,
+    weight integer NOT NULL,
+    is_blocking boolean DEFAULT false,
+    description text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT chk_redflag_severity CHECK (((severity)::text = ANY ((ARRAY['SOFT'::character varying, 'ESCALATE'::character varying, 'HARD_STOP'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE redflag_score_config; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".redflag_score_config IS 'Red-flag severity weights for score calculation';
+
+
+--
 -- Name: requirement_acceptable_docs; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -3925,6 +4618,38 @@ CREATE TABLE "ob-poc".trust_parties (
 
 
 --
+-- Name: ubo_evidence; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".ubo_evidence (
+    ubo_evidence_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    ubo_id uuid NOT NULL,
+    document_id uuid,
+    attestation_ref character varying(255),
+    evidence_type character varying(50) NOT NULL,
+    evidence_role character varying(50) NOT NULL,
+    description text,
+    attached_at timestamp with time zone DEFAULT now(),
+    attached_by character varying(255),
+    verified_at timestamp with time zone,
+    verified_by character varying(255),
+    verification_status character varying(30) DEFAULT 'PENDING'::character varying,
+    verification_notes text,
+    CONSTRAINT chk_ubo_evidence_role CHECK (((evidence_role)::text = ANY ((ARRAY['IDENTITY_PROOF'::character varying, 'OWNERSHIP_PROOF'::character varying, 'CONTROL_PROOF'::character varying, 'ADDRESS_PROOF'::character varying, 'SOURCE_OF_WEALTH'::character varying, 'CHAIN_LINK'::character varying])::text[]))),
+    CONSTRAINT chk_ubo_evidence_source CHECK (((document_id IS NOT NULL) OR (attestation_ref IS NOT NULL))),
+    CONSTRAINT chk_ubo_evidence_type CHECK (((evidence_type)::text = ANY ((ARRAY['DOCUMENT'::character varying, 'ATTESTATION'::character varying, 'SCREENING'::character varying, 'REGISTRY_LOOKUP'::character varying, 'OWNERSHIP_RECORD'::character varying])::text[]))),
+    CONSTRAINT chk_ubo_evidence_verification CHECK (((verification_status)::text = ANY ((ARRAY['PENDING'::character varying, 'VERIFIED'::character varying, 'REJECTED'::character varying, 'EXPIRED'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE ubo_evidence; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".ubo_evidence IS 'Evidence documents and attestations supporting UBO determinations';
+
+
+--
 -- Name: ubo_registry; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -3953,7 +4678,15 @@ CREATE TABLE "ob-poc".ubo_registry (
     superseded_at timestamp with time zone,
     closed_at timestamp with time zone,
     closed_reason character varying(100),
-    CONSTRAINT chk_ubo_discovery_method CHECK (((discovery_method)::text = ANY ((ARRAY['MANUAL'::character varying, 'INFERRED'::character varying, 'DOCUMENT'::character varying, 'REGISTRY'::character varying, 'SCREENING'::character varying])::text[])))
+    evidence_doc_ids uuid[],
+    proof_date timestamp with time zone,
+    proof_method character varying(50),
+    proof_notes text,
+    replacement_ubo_id uuid,
+    removal_reason character varying(100),
+    CONSTRAINT chk_ubo_discovery_method CHECK (((discovery_method)::text = ANY ((ARRAY['MANUAL'::character varying, 'INFERRED'::character varying, 'DOCUMENT'::character varying, 'REGISTRY'::character varying, 'SCREENING'::character varying])::text[]))),
+    CONSTRAINT chk_ubo_proof_method CHECK (((proof_method IS NULL) OR ((proof_method)::text = ANY ((ARRAY['DOCUMENT'::character varying, 'REGISTRY_LOOKUP'::character varying, 'SCREENING_MATCH'::character varying, 'MANUAL_VERIFICATION'::character varying, 'OWNERSHIP_CHAIN'::character varying, 'CLIENT_ATTESTATION'::character varying])::text[])))),
+    CONSTRAINT chk_ubo_verification_status CHECK (((verification_status)::text = ANY ((ARRAY['SUSPECTED'::character varying, 'PENDING'::character varying, 'PROVEN'::character varying, 'VERIFIED'::character varying, 'FAILED'::character varying, 'DISPUTED'::character varying, 'REMOVED'::character varying])::text[])))
 );
 
 
@@ -4073,6 +4806,44 @@ CREATE VIEW "ob-poc".v_attribute_current AS
 --
 
 COMMENT ON VIEW "ob-poc".v_attribute_current IS 'Current best value for each attribute - prioritizes authoritative sources, then confidence, then recency';
+
+
+--
+-- Name: v_case_redflag_summary; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_case_redflag_summary AS
+ SELECT c.case_id,
+    c.cbu_id,
+    c.status AS case_status,
+    c.escalation_level,
+    scores.soft_count,
+    scores.escalate_count,
+    scores.hard_stop_count,
+    scores.total_score,
+    scores.has_hard_stop,
+    scores.open_flags,
+    scores.mitigated_flags,
+    scores.waived_flags,
+    ( SELECT es.recommended_action
+           FROM "ob-poc".case_evaluation_snapshots es
+          WHERE (es.case_id = c.case_id)
+          ORDER BY es.evaluated_at DESC
+         LIMIT 1) AS last_recommendation,
+    ( SELECT es.evaluated_at
+           FROM "ob-poc".case_evaluation_snapshots es
+          WHERE (es.case_id = c.case_id)
+          ORDER BY es.evaluated_at DESC
+         LIMIT 1) AS last_evaluated_at
+   FROM (kyc.cases c
+     CROSS JOIN LATERAL "ob-poc".compute_case_redflag_score(c.case_id) scores(soft_count, escalate_count, hard_stop_count, soft_score, escalate_score, has_hard_stop, total_score, open_flags, mitigated_flags, waived_flags));
+
+
+--
+-- Name: VIEW v_case_redflag_summary; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_case_redflag_summary IS 'Summary view of case red-flag status';
 
 
 --
@@ -4458,6 +5229,30 @@ COMMENT ON VIEW "ob-poc".v_cbu_lifecycle IS 'Derived CBU lifecycle state - compo
 
 
 --
+-- Name: v_cbu_validation_summary; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_cbu_validation_summary AS
+ SELECT c.cbu_id,
+    c.name,
+    c.status AS cbu_status,
+    c.client_type,
+    c.jurisdiction,
+    count(e.evidence_id) AS total_evidence,
+    count(e.evidence_id) FILTER (WHERE ((e.verification_status)::text = 'VERIFIED'::text)) AS verified_evidence,
+    count(e.evidence_id) FILTER (WHERE ((e.verification_status)::text = 'PENDING'::text)) AS pending_evidence,
+    count(e.evidence_id) FILTER (WHERE ((e.verification_status)::text = 'REJECTED'::text)) AS rejected_evidence,
+    array_agg(DISTINCT e.evidence_category) FILTER (WHERE ((e.verification_status)::text = 'VERIFIED'::text)) AS verified_categories,
+    max(e.verified_at) AS last_verification_at,
+    ( SELECT count(*) AS count
+           FROM "ob-poc".cbu_change_log cl
+          WHERE (cl.cbu_id = c.cbu_id)) AS change_count
+   FROM ("ob-poc".cbus c
+     LEFT JOIN "ob-poc".cbu_evidence e ON ((c.cbu_id = e.cbu_id)))
+  GROUP BY c.cbu_id, c.name, c.status, c.client_type, c.jurisdiction;
+
+
+--
 -- Name: v_document_extraction_map; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
@@ -4520,6 +5315,40 @@ CREATE VIEW "ob-poc".v_open_discrepancies AS
             WHEN 'LOW'::text THEN 4
             ELSE 5
         END, od.detected_at;
+
+
+--
+-- Name: v_ubo_evidence_summary; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_ubo_evidence_summary AS
+ SELECT ur.ubo_id,
+    ur.cbu_id,
+    ur.subject_entity_id,
+    ur.ubo_proper_person_id,
+    e.name AS ubo_name,
+    ur.verification_status,
+    ur.proof_date,
+    ur.proof_method,
+    count(ue.ubo_evidence_id) AS total_evidence,
+    count(ue.ubo_evidence_id) FILTER (WHERE ((ue.verification_status)::text = 'VERIFIED'::text)) AS verified_evidence,
+    count(ue.ubo_evidence_id) FILTER (WHERE ((ue.verification_status)::text = 'PENDING'::text)) AS pending_evidence,
+    array_agg(DISTINCT ue.evidence_role) FILTER (WHERE ((ue.verification_status)::text = 'VERIFIED'::text)) AS proven_roles,
+    ( SELECT can_prove_ubo.can_prove
+           FROM "ob-poc".can_prove_ubo(ur.ubo_id) can_prove_ubo(can_prove, has_identity_proof, has_ownership_proof, missing_evidence, verified_evidence_count, pending_evidence_count)
+         LIMIT 1) AS can_be_proven
+   FROM (("ob-poc".ubo_registry ur
+     JOIN "ob-poc".entities e ON ((ur.ubo_proper_person_id = e.entity_id)))
+     LEFT JOIN "ob-poc".ubo_evidence ue ON ((ur.ubo_id = ue.ubo_id)))
+  WHERE ((ur.closed_at IS NULL) AND (ur.superseded_at IS NULL))
+  GROUP BY ur.ubo_id, ur.cbu_id, ur.subject_entity_id, ur.ubo_proper_person_id, e.name, ur.verification_status, ur.proof_date, ur.proof_method;
+
+
+--
+-- Name: VIEW v_ubo_evidence_summary; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_ubo_evidence_summary IS 'Summary view of UBO records with evidence status';
 
 
 --
@@ -5334,6 +6163,38 @@ ALTER TABLE ONLY "ob-poc".attribute_values_typed
 
 
 --
+-- Name: case_decision_thresholds case_decision_thresholds_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".case_decision_thresholds
+    ADD CONSTRAINT case_decision_thresholds_pkey PRIMARY KEY (threshold_id);
+
+
+--
+-- Name: case_decision_thresholds case_decision_thresholds_threshold_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".case_decision_thresholds
+    ADD CONSTRAINT case_decision_thresholds_threshold_name_key UNIQUE (threshold_name);
+
+
+--
+-- Name: case_evaluation_snapshots case_evaluation_snapshots_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".case_evaluation_snapshots
+    ADD CONSTRAINT case_evaluation_snapshots_pkey PRIMARY KEY (snapshot_id);
+
+
+--
+-- Name: cbu_change_log cbu_change_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_change_log
+    ADD CONSTRAINT cbu_change_log_pkey PRIMARY KEY (log_id);
+
+
+--
 -- Name: cbu_creation_log cbu_creation_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -5358,11 +6219,27 @@ ALTER TABLE ONLY "ob-poc".cbu_entity_roles
 
 
 --
+-- Name: cbu_evidence cbu_evidence_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_evidence
+    ADD CONSTRAINT cbu_evidence_pkey PRIMARY KEY (evidence_id);
+
+
+--
 -- Name: cbu_resource_instances cbu_resource_instances_cbu_id_resource_type_id_instance_ide_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_resource_instances
     ADD CONSTRAINT cbu_resource_instances_cbu_id_resource_type_id_instance_ide_key UNIQUE (cbu_id, resource_type_id, instance_identifier);
+
+
+--
+-- Name: cbu_resource_instances cbu_resource_instances_cbu_product_service_resource_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_resource_instances
+    ADD CONSTRAINT cbu_resource_instances_cbu_product_service_resource_key UNIQUE (cbu_id, product_id, service_id, resource_type_id);
 
 
 --
@@ -5830,6 +6707,14 @@ ALTER TABLE ONLY "ob-poc".products
 
 
 --
+-- Name: redflag_score_config redflag_score_config_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".redflag_score_config
+    ADD CONSTRAINT redflag_score_config_pkey PRIMARY KEY (config_id);
+
+
+--
 -- Name: requirement_acceptable_docs requirement_acceptable_docs_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -6086,6 +6971,14 @@ ALTER TABLE ONLY "ob-poc".trust_parties
 
 
 --
+-- Name: ubo_evidence ubo_evidence_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".ubo_evidence
+    ADD CONSTRAINT ubo_evidence_pkey PRIMARY KEY (ubo_evidence_id);
+
+
+--
 -- Name: ubo_registry ubo_registry_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -6131,6 +7024,14 @@ ALTER TABLE ONLY "ob-poc".attribute_registry
 
 ALTER TABLE ONLY "ob-poc".document_attribute_links
     ADD CONSTRAINT unique_doc_attr_direction UNIQUE (document_type_id, attribute_id, direction);
+
+
+--
+-- Name: redflag_score_config uq_redflag_severity; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".redflag_score_config
+    ADD CONSTRAINT uq_redflag_severity UNIQUE (severity);
 
 
 --
@@ -6664,6 +7565,48 @@ CREATE INDEX idx_attribute_values_typed_entity_attribute ON "ob-poc".attribute_v
 
 
 --
+-- Name: idx_case_eval_snapshots_case_id; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_case_eval_snapshots_case_id ON "ob-poc".case_evaluation_snapshots USING btree (case_id);
+
+
+--
+-- Name: idx_case_eval_snapshots_evaluated_at; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_case_eval_snapshots_evaluated_at ON "ob-poc".case_evaluation_snapshots USING btree (evaluated_at DESC);
+
+
+--
+-- Name: idx_cbu_change_log_case_id; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_change_log_case_id ON "ob-poc".cbu_change_log USING btree (case_id);
+
+
+--
+-- Name: idx_cbu_change_log_cbu_id; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_change_log_cbu_id ON "ob-poc".cbu_change_log USING btree (cbu_id);
+
+
+--
+-- Name: idx_cbu_change_log_changed_at; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_change_log_changed_at ON "ob-poc".cbu_change_log USING btree (changed_at DESC);
+
+
+--
+-- Name: idx_cbu_change_log_type; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_change_log_type ON "ob-poc".cbu_change_log USING btree (change_type);
+
+
+--
 -- Name: idx_cbu_creation_log_cbu; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -6689,6 +7632,27 @@ CREATE INDEX idx_cbu_entity_roles_entity ON "ob-poc".cbu_entity_roles USING btre
 --
 
 CREATE INDEX idx_cbu_entity_roles_role ON "ob-poc".cbu_entity_roles USING btree (role_id);
+
+
+--
+-- Name: idx_cbu_evidence_cbu_id; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_evidence_cbu_id ON "ob-poc".cbu_evidence USING btree (cbu_id);
+
+
+--
+-- Name: idx_cbu_evidence_document_id; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_evidence_document_id ON "ob-poc".cbu_evidence USING btree (document_id);
+
+
+--
+-- Name: idx_cbu_evidence_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_evidence_status ON "ob-poc".cbu_evidence USING btree (verification_status);
 
 
 --
@@ -7896,6 +8860,27 @@ CREATE INDEX idx_ubo_comparisons_current ON "ob-poc".ubo_snapshot_comparisons US
 
 
 --
+-- Name: idx_ubo_evidence_document_id; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_ubo_evidence_document_id ON "ob-poc".ubo_evidence USING btree (document_id);
+
+
+--
+-- Name: idx_ubo_evidence_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_ubo_evidence_status ON "ob-poc".ubo_evidence USING btree (verification_status);
+
+
+--
+-- Name: idx_ubo_evidence_ubo_id; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_ubo_evidence_ubo_id ON "ob-poc".ubo_evidence USING btree (ubo_id);
+
+
+--
 -- Name: idx_ubo_registry_case_id; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -8118,6 +9103,13 @@ CREATE OR REPLACE VIEW kyc.v_workstream_detail AS
 
 
 --
+-- Name: cbus trg_cbu_status_change; Type: TRIGGER; Schema: ob-poc; Owner: -
+--
+
+CREATE TRIGGER trg_cbu_status_change AFTER UPDATE ON "ob-poc".cbus FOR EACH ROW EXECUTE FUNCTION "ob-poc".log_cbu_status_change();
+
+
+--
 -- Name: cbu_resource_instances trg_cri_updated; Type: TRIGGER; Schema: ob-poc; Owner: -
 --
 
@@ -8136,6 +9128,13 @@ CREATE TRIGGER trg_sdm_updated BEFORE UPDATE ON "ob-poc".service_delivery_map FO
 --
 
 CREATE TRIGGER trg_sync_commercial_client AFTER INSERT OR UPDATE OF commercial_client_entity_id ON "ob-poc".cbus FOR EACH ROW EXECUTE FUNCTION "ob-poc".sync_commercial_client_role();
+
+
+--
+-- Name: ubo_registry trg_ubo_status_transition; Type: TRIGGER; Schema: ob-poc; Owner: -
+--
+
+CREATE TRIGGER trg_ubo_status_transition BEFORE UPDATE ON "ob-poc".ubo_registry FOR EACH ROW EXECUTE FUNCTION "ob-poc".validate_ubo_status_transition();
 
 
 --
@@ -8686,6 +9685,30 @@ ALTER TABLE ONLY "ob-poc".attribute_values_typed
 
 
 --
+-- Name: case_evaluation_snapshots case_evaluation_snapshots_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".case_evaluation_snapshots
+    ADD CONSTRAINT case_evaluation_snapshots_case_id_fkey FOREIGN KEY (case_id) REFERENCES kyc.cases(case_id) ON DELETE CASCADE;
+
+
+--
+-- Name: case_evaluation_snapshots case_evaluation_snapshots_matched_threshold_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".case_evaluation_snapshots
+    ADD CONSTRAINT case_evaluation_snapshots_matched_threshold_id_fkey FOREIGN KEY (matched_threshold_id) REFERENCES "ob-poc".case_decision_thresholds(threshold_id);
+
+
+--
+-- Name: cbu_change_log cbu_change_log_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_change_log
+    ADD CONSTRAINT cbu_change_log_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
 -- Name: cbu_entity_roles cbu_entity_roles_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -8707,6 +9730,22 @@ ALTER TABLE ONLY "ob-poc".cbu_entity_roles
 
 ALTER TABLE ONLY "ob-poc".cbu_entity_roles
     ADD CONSTRAINT cbu_entity_roles_role_id_fkey FOREIGN KEY (role_id) REFERENCES "ob-poc".roles(role_id) ON DELETE CASCADE;
+
+
+--
+-- Name: cbu_evidence cbu_evidence_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_evidence
+    ADD CONSTRAINT cbu_evidence_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
+-- Name: cbu_evidence cbu_evidence_document_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_evidence
+    ADD CONSTRAINT cbu_evidence_document_id_fkey FOREIGN KEY (document_id) REFERENCES "ob-poc".document_catalog(doc_id);
 
 
 --
@@ -9390,6 +10429,22 @@ ALTER TABLE ONLY "ob-poc".trust_parties
 
 
 --
+-- Name: ubo_evidence ubo_evidence_document_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".ubo_evidence
+    ADD CONSTRAINT ubo_evidence_document_id_fkey FOREIGN KEY (document_id) REFERENCES "ob-poc".document_catalog(doc_id);
+
+
+--
+-- Name: ubo_evidence ubo_evidence_ubo_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".ubo_evidence
+    ADD CONSTRAINT ubo_evidence_ubo_id_fkey FOREIGN KEY (ubo_id) REFERENCES "ob-poc".ubo_registry(ubo_id) ON DELETE CASCADE;
+
+
+--
 -- Name: ubo_registry ubo_registry_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -9403,6 +10458,14 @@ ALTER TABLE ONLY "ob-poc".ubo_registry
 
 ALTER TABLE ONLY "ob-poc".ubo_registry
     ADD CONSTRAINT ubo_registry_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
+-- Name: ubo_registry ubo_registry_replacement_ubo_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".ubo_registry
+    ADD CONSTRAINT ubo_registry_replacement_ubo_id_fkey FOREIGN KEY (replacement_ubo_id) REFERENCES "ob-poc".ubo_registry(ubo_id);
 
 
 --
@@ -9553,5 +10616,5 @@ ALTER TABLE ONLY public.rules
 -- PostgreSQL database dump complete
 --
 
-\unrestrict vSihfV9Y84Pu6oM6pENqW9wESK3In5m3406xScrtpQttSkoSK2fOuBvJ50QQ7ak
+\unrestrict B2XyN99cke6WN6KofWcvIeIcPj29PHpIsJMoepAJeN3XVheeY0nr5JxeC4SiG0Z
 

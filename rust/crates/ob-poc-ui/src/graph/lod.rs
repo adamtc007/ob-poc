@@ -12,18 +12,18 @@ use super::types::{EntityType, LayoutNode, PrimaryRole};
 // =============================================================================
 
 /// Level of detail for node rendering
-/// Thresholds adjusted: Micro < 8px < Icon < 20px < Compact < 40px < Standard < 80px < Expanded
+/// Thresholds: Micro < 8px < Icon < 30px < Compact < 80px < Standard < 120px < Expanded
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DetailLevel {
     /// < 8px: colored dot only
     Micro,
-    /// 8-20px: shape + status color (no text)
+    /// 8-30px: shape + status color (no text)
     Icon,
-    /// 20-40px: shape + truncated name
+    /// 30-80px: shape + truncated name (label)
     Compact,
-    /// 40-80px: shape + full name + badge
+    /// 80-120px: shape + full name + badge (full text)
     Standard,
-    /// 80px+: all details inline
+    /// 120px+: all details inline
     Expanded,
     /// clicked node: full card (rendered separately)
     Focused,
@@ -32,19 +32,19 @@ pub enum DetailLevel {
 impl DetailLevel {
     /// Determine LOD from screen-space radius
     /// Based on zoom percentage of base node size (~100px):
-    /// - Icon only: < 20% (< 20px)
-    /// - Labels (Compact): 20-70% (20-70px)
-    /// - Full text (Standard+): 70%+ (70px+)
+    /// - Icon only: < 30% (< 30px)
+    /// - Labels (Compact): 30-80% (30-80px)
+    /// - Full text (Standard+): 80%+ (80px+)
     pub fn from_screen_size(screen_width: f32, is_focused: bool) -> Self {
         if is_focused {
             return DetailLevel::Focused;
         }
 
         match screen_width {
-            w if w < 10.0 => DetailLevel::Micro,     // tiny dot
-            w if w < 20.0 => DetailLevel::Icon,      // icon only, no text (< 20%)
-            w if w < 70.0 => DetailLevel::Compact,   // labels/truncated name (20-70%)
-            w if w < 120.0 => DetailLevel::Standard, // full text (70%+)
+            w if w < 8.0 => DetailLevel::Micro,      // tiny dot
+            w if w < 30.0 => DetailLevel::Icon,      // icon only, no text (< 30%)
+            w if w < 80.0 => DetailLevel::Compact,   // labels/truncated name (30-80%)
+            w if w < 120.0 => DetailLevel::Standard, // full text (80%+)
             _ => DetailLevel::Expanded,              // all details
         }
     }
