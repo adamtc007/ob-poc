@@ -484,12 +484,34 @@ dsl_cli execute -f program.dsl --format json | jq '.bindings'
 | `GET /` | Agent session UI |
 | `GET /verbs` | Verb reference page |
 | `POST /api/agent/generate` | Generate DSL from natural language |
+| `POST /api/agent/generate-with-tools` | Generate DSL with Claude tool_use (looks up real IDs) |
 | `POST /api/agent/validate` | Validate DSL syntax/semantics |
 | `POST /api/session` | Create new session |
 | `POST /api/session/:id/chat` | Send chat message |
 | `POST /api/session/:id/execute` | Execute DSL |
 | `GET /api/templates` | List templates |
 | `GET /api/dsl/list` | List DSL instances |
+
+### Tool-Use Generation Endpoint
+
+The `/api/agent/generate-with-tools` endpoint uses Claude's tool calling feature to look up real database entities before generating DSL. This prevents UUID hallucination.
+
+**Available tools:**
+- `lookup_cbu` - Find CBU by name
+- `lookup_entity` - Find entity by name
+- `lookup_product` - Find product by name  
+- `list_cbus` - List all CBUs
+
+**Example:**
+```bash
+curl -X POST http://localhost:3000/api/agent/generate-with-tools \
+  -H "Content-Type: application/json" \
+  -d '{"instruction": "Add Custody product to Apex Capital"}'
+```
+
+Claude will:
+1. Call `lookup_cbu` with "Apex Capital" to verify it exists
+2. Generate DSL using the confirmed CBU name
 
 ## DSL Syntax
 

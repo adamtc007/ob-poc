@@ -4,10 +4,10 @@
 
 use tower_lsp::lsp_types::*;
 
-use crate::analysis::document::{DocumentState, ExprKind, SymbolDef};
+use crate::analysis::document::{DocumentState, ExprKind, ParsedExpr, SymbolDef};
 use crate::analysis::parse_with_v2;
 
-use ob_poc::dsl_v2::{find_verb, STANDARD_VERBS};
+use ob_poc::dsl_v2::{find_unified_verb, registry};
 
 /// Analyze a document and return state + diagnostics.
 pub fn analyze_document(text: &str) -> (DocumentState, Vec<Diagnostic>) {
@@ -85,19 +85,20 @@ fn validate_expression(
         }
 
         // Check verb exists
-        let verb = match find_verb(parts[0], parts[1]) {
+        let verb = match find_unified_verb(parts[0], parts[1]) {
             Some(v) => v,
             None => {
                 // Suggest similar verbs
-                let suggestions: Vec<String> = STANDARD_VERBS
-                    .iter()
+                let reg = registry();
+                let suggestions: Vec<String> = reg
+                    .all_verbs()
                     .filter(|v| {
                         v.domain == parts[0]
                             || v.verb.contains(parts[1])
-                            || format!("{}.{}", v.domain, v.verb).contains(verb_name)
+                            || v.full_name().contains(verb_name)
                     })
                     .take(3)
-                    .map(|v| format!("{}.{}", v.domain, v.verb))
+                    .map(|v| v.full_name())
                     .collect();
 
                 let message = if suggestions.is_empty() {
@@ -124,10 +125,9 @@ fn validate_expression(
 
         // Check for unknown arguments
         let all_known_args: Vec<&str> = verb
-            .required_args
-            .iter()
-            .chain(verb.optional_args.iter())
-            .copied()
+            .required_arg_names()
+            .into_iter()
+            .chain(verb.optional_arg_names())
             .collect();
 
         for arg in args {
@@ -159,7 +159,7 @@ fn validate_expression(
             .map(|a| a.keyword.trim_start_matches(':'))
             .collect();
 
-        for required_arg in verb.required_args {
+        for required_arg in verb.required_arg_names() {
             if !provided.contains(required_arg) {
                 diagnostics.push(Diagnostic {
                     range: expr.range,
@@ -201,5 +201,3 @@ fn validate_nested_expr(
         _ => {}
     }
 }
-
-use crate::analysis::document::ParsedExpr;

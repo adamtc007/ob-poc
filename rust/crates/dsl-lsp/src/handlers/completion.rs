@@ -4,7 +4,7 @@ use tower_lsp::lsp_types::*;
 
 use crate::analysis::{detect_completion_context, CompletionContext, DocumentState, SymbolTable};
 
-use ob_poc::dsl_v2::{find_verb, STANDARD_VERBS};
+use ob_poc::dsl_v2::{find_unified_verb, registry};
 
 /// Generate completions based on cursor position.
 pub fn get_completions(
@@ -34,17 +34,17 @@ pub fn get_completions(
 /// Complete verb names.
 fn complete_verb_names(prefix: &str) -> Vec<CompletionItem> {
     let prefix_lower = prefix.to_lowercase();
+    let reg = registry();
 
-    STANDARD_VERBS
-        .iter()
+    reg.all_verbs()
         .filter(|verb| {
-            let full_name = format!("{}.{}", verb.domain, verb.verb);
+            let full_name = verb.full_name();
             full_name.to_lowercase().contains(&prefix_lower)
         })
         .map(|verb| {
-            let full_name = format!("{}.{}", verb.domain, verb.verb);
+            let full_name = verb.full_name();
             let required: Vec<_> = verb
-                .required_args
+                .required_arg_names()
                 .iter()
                 .map(|s| format!(":{}", s))
                 .collect();
@@ -58,7 +58,7 @@ fn complete_verb_names(prefix: &str) -> Vec<CompletionItem> {
                 label: full_name.clone(),
                 kind: Some(CompletionItemKind::FUNCTION),
                 detail: Some(detail),
-                documentation: Some(Documentation::String(verb.description.to_string())),
+                documentation: Some(Documentation::String(verb.description.clone())),
                 insert_text: Some(full_name.clone()),
                 insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
                 sort_text: Some(format!("0-{}-{}", verb.domain, verb.verb)),
@@ -76,7 +76,7 @@ fn complete_keywords(verb_name: &str, prefix: &str) -> Vec<CompletionItem> {
         return vec![];
     }
 
-    let verb = match find_verb(parts[0], parts[1]) {
+    let verb = match find_unified_verb(parts[0], parts[1]) {
         Some(v) => v,
         None => return vec![],
     };
@@ -85,7 +85,7 @@ fn complete_keywords(verb_name: &str, prefix: &str) -> Vec<CompletionItem> {
     let mut completions = Vec::new();
 
     // Required args
-    for arg in verb.required_args {
+    for arg in verb.required_arg_names() {
         if arg.to_lowercase().contains(&prefix_lower) {
             completions.push(CompletionItem {
                 label: format!(":{}", arg),
@@ -100,7 +100,7 @@ fn complete_keywords(verb_name: &str, prefix: &str) -> Vec<CompletionItem> {
     }
 
     // Optional args
-    for arg in verb.optional_args {
+    for arg in verb.optional_arg_names() {
         if arg.to_lowercase().contains(&prefix_lower) {
             completions.push(CompletionItem {
                 label: format!(":{}", arg),

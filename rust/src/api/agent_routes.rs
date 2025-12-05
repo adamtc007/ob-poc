@@ -211,6 +211,11 @@ pub fn create_agent_router(pool: PgPool) -> Router {
         .route("/api/agent/health", get(health_check))
         // Onboarding
         .route("/api/agent/onboard", post(generate_onboarding_dsl))
+        // Enhanced generation with tool use
+        .route(
+            "/api/agent/generate-with-tools",
+            post(generate_dsl_with_tools),
+        )
         .with_state(state)
 }
 
@@ -1043,6 +1048,415 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
             error: Some(format!("Request failed: {}", e)),
         }),
     }
+}
+
+/// POST /api/agent/generate-with-tools - Generate DSL using Claude tool_use
+///
+/// This endpoint uses Claude's tool calling feature to look up real database IDs
+/// before generating DSL, preventing UUID hallucination.
+async fn generate_dsl_with_tools(
+    State(state): State<AgentState>,
+    Json(req): Json<GenerateDslRequest>,
+) -> Json<GenerateDslResponse> {
+    let api_key = match std::env::var("ANTHROPIC_API_KEY") {
+        Ok(key) => key,
+        Err(_) => {
+            return Json(GenerateDslResponse {
+                dsl: None,
+                explanation: None,
+                error: Some("ANTHROPIC_API_KEY not configured".to_string()),
+            });
+        }
+    };
+
+    let vocab = build_vocab_prompt(req.domain.as_deref());
+    let system_prompt = build_tool_use_system_prompt(&vocab);
+
+    // Define tools for Claude
+    let tools = serde_json::json!([
+        {
+            "name": "lookup_cbu",
+            "description": "Look up an existing CBU (Client Business Unit) by name. ALWAYS use this before referencing a CBU to get the real ID.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "CBU name to search for (case-insensitive)"
+                    }
+                },
+                "required": ["name"]
+            }
+        },
+        {
+            "name": "lookup_entity",
+            "description": "Look up an existing entity by name. Use this to find persons or companies.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Entity name to search for"
+                    },
+                    "entity_type": {
+                        "type": "string",
+                        "description": "Optional: filter by type (proper_person, limited_company, etc.)"
+                    }
+                },
+                "required": ["name"]
+            }
+        },
+        {
+            "name": "lookup_product",
+            "description": "Look up available products by name.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Product name to search for"
+                    }
+                },
+                "required": ["name"]
+            }
+        },
+        {
+            "name": "list_cbus",
+            "description": "List all CBUs in the system. Use this to see what clients exist.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max results to return (default 10)"
+                    }
+                }
+            }
+        }
+    ]);
+
+    let client = reqwest::Client::new();
+
+    // First call - may include tool use
+    let mut messages = vec![serde_json::json!({"role": "user", "content": req.instruction})];
+
+    let mut tool_results: Vec<String> = Vec::new();
+    let max_iterations = 5;
+
+    for iteration in 0..max_iterations {
+        let response = client
+            .post("https://api.anthropic.com/v1/messages")
+            .header("x-api-key", &api_key)
+            .header("anthropic-version", "2023-06-01")
+            .header("content-type", "application/json")
+            .json(&serde_json::json!({
+                "model": "claude-sonnet-4-20250514",
+                "max_tokens": 2048,
+                "system": system_prompt,
+                "tools": tools,
+                "messages": messages
+            }))
+            .send()
+            .await;
+
+        let resp = match response {
+            Ok(r) => r,
+            Err(e) => {
+                return Json(GenerateDslResponse {
+                    dsl: None,
+                    explanation: None,
+                    error: Some(format!("Request failed: {}", e)),
+                });
+            }
+        };
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Json(GenerateDslResponse {
+                dsl: None,
+                explanation: None,
+                error: Some(format!("API error {}: {}", status, body)),
+            });
+        }
+
+        let json: serde_json::Value = match resp.json().await {
+            Ok(j) => j,
+            Err(e) => {
+                return Json(GenerateDslResponse {
+                    dsl: None,
+                    explanation: None,
+                    error: Some(format!("Failed to parse response: {}", e)),
+                });
+            }
+        };
+
+        let stop_reason = json["stop_reason"].as_str().unwrap_or("");
+
+        // Check if Claude wants to use tools
+        if stop_reason == "tool_use" {
+            let empty_vec = vec![];
+            let content = json["content"].as_array().unwrap_or(&empty_vec);
+            let mut tool_use_results = Vec::new();
+
+            for block in content {
+                if block["type"] == "tool_use" {
+                    let tool_name = block["name"].as_str().unwrap_or("");
+                    let tool_id = block["id"].as_str().unwrap_or("");
+                    let input = &block["input"];
+
+                    // Execute the tool
+                    let result = execute_tool(&state.pool, tool_name, input).await;
+                    tool_results.push(format!("{}: {}", tool_name, result));
+
+                    tool_use_results.push(serde_json::json!({
+                        "type": "tool_result",
+                        "tool_use_id": tool_id,
+                        "content": result
+                    }));
+                }
+            }
+
+            // Add assistant message with tool use
+            messages.push(serde_json::json!({
+                "role": "assistant",
+                "content": content
+            }));
+
+            // Add tool results
+            messages.push(serde_json::json!({
+                "role": "user",
+                "content": tool_use_results
+            }));
+
+            tracing::debug!("Tool use iteration {}: {:?}", iteration, tool_results);
+            continue;
+        }
+
+        // Claude finished - extract the DSL
+        let empty_vec2 = vec![];
+        let content = json["content"].as_array().unwrap_or(&empty_vec2);
+        for block in content {
+            if block["type"] == "text" {
+                let text = block["text"].as_str().unwrap_or("").trim();
+
+                if text.starts_with("ERROR:") {
+                    return Json(GenerateDslResponse {
+                        dsl: None,
+                        explanation: None,
+                        error: Some(text.to_string()),
+                    });
+                }
+
+                // Validate the generated DSL
+                match parse_program(text) {
+                    Ok(_) => {
+                        let explanation = if tool_results.is_empty() {
+                            "DSL generated successfully".to_string()
+                        } else {
+                            format!("DSL generated with lookups: {}", tool_results.join(", "))
+                        };
+                        return Json(GenerateDslResponse {
+                            dsl: Some(text.to_string()),
+                            explanation: Some(explanation),
+                            error: None,
+                        });
+                    }
+                    Err(e) => {
+                        return Json(GenerateDslResponse {
+                            dsl: Some(text.to_string()),
+                            explanation: None,
+                            error: Some(format!("Generated DSL has syntax error: {}", e)),
+                        });
+                    }
+                }
+            }
+        }
+
+        break;
+    }
+
+    Json(GenerateDslResponse {
+        dsl: None,
+        explanation: None,
+        error: Some("Failed to generate DSL after max iterations".to_string()),
+    })
+}
+
+/// Execute a tool call and return the result as a string
+async fn execute_tool(pool: &PgPool, tool_name: &str, input: &serde_json::Value) -> String {
+    match tool_name {
+        "lookup_cbu" => {
+            let name = input["name"].as_str().unwrap_or("");
+            match sqlx::query!(
+                r#"SELECT cbu_id, name, client_type, jurisdiction
+                   FROM "ob-poc".cbus
+                   WHERE LOWER(name) LIKE LOWER('%' || $1 || '%')
+                   LIMIT 5"#,
+                name
+            )
+            .fetch_all(pool)
+            .await
+            {
+                Ok(rows) if !rows.is_empty() => {
+                    let results: Vec<String> = rows
+                        .iter()
+                        .map(|r| {
+                            format!(
+                                "- {} (id: {}, type: {:?}, jurisdiction: {:?})",
+                                r.name, r.cbu_id, r.client_type, r.jurisdiction
+                            )
+                        })
+                        .collect();
+                    format!("Found {} CBU(s):\n{}", rows.len(), results.join("\n"))
+                }
+                Ok(_) => format!("No CBU found matching '{}'", name),
+                Err(e) => format!("Error looking up CBU: {}", e),
+            }
+        }
+        "lookup_entity" => {
+            let name = input["name"].as_str().unwrap_or("");
+            let entity_type = input["entity_type"].as_str();
+            match sqlx::query!(
+                r#"SELECT e.entity_id, e.name, et.type_code
+                   FROM "ob-poc".entities e
+                   JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
+                   WHERE LOWER(e.name) LIKE LOWER('%' || $1 || '%')
+                     AND ($2::text IS NULL OR et.type_code = $2)
+                   LIMIT 5"#,
+                name,
+                entity_type
+            )
+            .fetch_all(pool)
+            .await
+            {
+                Ok(rows) if !rows.is_empty() => {
+                    let results: Vec<String> = rows
+                        .iter()
+                        .map(|r| {
+                            format!(
+                                "- {} (id: {}, type: {:?})",
+                                r.name, r.entity_id, r.type_code
+                            )
+                        })
+                        .collect();
+                    format!("Found {} entity(s):\n{}", rows.len(), results.join("\n"))
+                }
+                Ok(_) => format!("No entity found matching '{}'", name),
+                Err(e) => format!("Error looking up entity: {}", e),
+            }
+        }
+        "lookup_product" => {
+            let name = input["name"].as_str().unwrap_or("");
+            match sqlx::query!(
+                r#"SELECT product_id, name, product_code
+                   FROM "ob-poc".products
+                   WHERE LOWER(name) LIKE LOWER('%' || $1 || '%')
+                   LIMIT 5"#,
+                name
+            )
+            .fetch_all(pool)
+            .await
+            {
+                Ok(rows) if !rows.is_empty() => {
+                    let results: Vec<String> = rows
+                        .iter()
+                        .map(|r| format!("- {} (code: {:?})", r.name, r.product_code))
+                        .collect();
+                    format!("Found {} product(s):\n{}", rows.len(), results.join("\n"))
+                }
+                Ok(_) => format!("No product found matching '{}'", name),
+                Err(e) => format!("Error looking up product: {}", e),
+            }
+        }
+        "list_cbus" => {
+            let limit = input["limit"].as_i64().unwrap_or(10);
+            match sqlx::query!(
+                r#"SELECT cbu_id, name, client_type, jurisdiction
+                   FROM "ob-poc".cbus
+                   ORDER BY name
+                   LIMIT $1"#,
+                limit
+            )
+            .fetch_all(pool)
+            .await
+            {
+                Ok(rows) => {
+                    let results: Vec<String> = rows
+                        .iter()
+                        .map(|r| {
+                            format!(
+                                "- {} (type: {:?}, jurisdiction: {:?})",
+                                r.name, r.client_type, r.jurisdiction
+                            )
+                        })
+                        .collect();
+                    format!("CBUs in system:\n{}", results.join("\n"))
+                }
+                Err(e) => format!("Error listing CBUs: {}", e),
+            }
+        }
+        _ => format!("Unknown tool: {}", tool_name),
+    }
+}
+
+/// Build system prompt for tool-use generation
+fn build_tool_use_system_prompt(vocab: &str) -> String {
+    format!(
+        r#"You are a DSL generator for a KYC/AML onboarding system.
+Generate valid DSL S-expressions from natural language instructions.
+
+## CRITICAL WORKFLOW
+
+1. **ALWAYS look up existing data first** before generating DSL that references existing entities:
+   - Use `lookup_cbu` when user mentions a client/CBU name
+   - Use `lookup_entity` when user mentions a person or company
+   - Use `lookup_product` when adding products
+   - Use `list_cbus` if unsure what clients exist
+
+2. **Use names, not UUIDs** - The DSL system accepts names for CBUs:
+   - `(cbu.add-product :cbu-id "Apex Capital" :product "Custody")` ✓
+   - The name is matched case-insensitively in the database
+
+3. **Create new entities with @references**:
+   - `(cbu.ensure :name "New Fund" :jurisdiction "LU" :as @fund)`
+   - Then reference: `(cbu.add-product :cbu-id @fund :product "Custody")`
+
+## AVAILABLE VERBS
+{}
+
+## DSL SYNTAX
+- Format: (domain.verb :key "value" :key2 value2)
+- Strings must be quoted: "text"
+- Numbers are unquoted: 42, 25.5
+- References start with @: @symbol_name
+- Use :as @name to capture results
+
+## EXAMPLES
+
+Adding product to EXISTING CBU (after lookup confirms it exists):
+```
+(cbu.add-product :cbu-id "Apex Capital" :product "Custody")
+```
+
+Creating NEW CBU and adding product:
+```
+(cbu.ensure :name "Pacific Growth" :jurisdiction "LU" :client-type "fund" :as @fund)
+(cbu.add-product :cbu-id @fund :product "Custody")
+```
+
+## PRODUCTS (use exact names)
+- Custody
+- Fund Accounting
+- Transfer Agency
+- Middle Office
+- Collateral Management
+- Markets FX
+- Alternatives
+
+Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, respond with: ERROR: <reason>"#,
+        vocab
+    )
 }
 
 /// Build vocabulary prompt for a domain

@@ -4,7 +4,7 @@ use tower_lsp::lsp_types::*;
 
 use crate::analysis::DocumentState;
 
-use ob_poc::dsl_v2::find_verb;
+use ob_poc::dsl_v2::find_unified_verb;
 
 /// Get signature help at position.
 pub fn get_signature_help(doc: &DocumentState, position: Position) -> Option<SignatureHelp> {
@@ -22,19 +22,19 @@ pub fn get_signature_help(doc: &DocumentState, position: Position) -> Option<Sig
                     continue;
                 }
 
-                let verb = find_verb(parts[0], parts[1])?;
+                let verb = find_unified_verb(parts[0], parts[1])?;
 
                 // Build signature
                 let mut params = Vec::new();
 
-                for arg in verb.required_args {
+                for arg in verb.required_arg_names() {
                     params.push(ParameterInformation {
                         label: ParameterLabel::Simple(format!(":{}", arg)),
                         documentation: Some(Documentation::String("(required)".to_string())),
                     });
                 }
 
-                for arg in verb.optional_args {
+                for arg in verb.optional_arg_names() {
                     params.push(ParameterInformation {
                         label: ParameterLabel::Simple(format!(":{}", arg)),
                         documentation: Some(Documentation::String("(optional)".to_string())),
@@ -43,7 +43,7 @@ pub fn get_signature_help(doc: &DocumentState, position: Position) -> Option<Sig
 
                 let signature = SignatureInformation {
                     label: format!("({} ...)", verb_name),
-                    documentation: Some(Documentation::String(verb.description.to_string())),
+                    documentation: Some(Documentation::String(verb.description.clone())),
                     parameters: Some(params),
                     active_parameter: None,
                 };

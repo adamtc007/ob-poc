@@ -4,7 +4,7 @@ use tower_lsp::lsp_types::*;
 
 use crate::analysis::DocumentState;
 
-use ob_poc::dsl_v2::{find_verb, VerbDef};
+use ob_poc::dsl_v2::{find_unified_verb, UnifiedVerbDef};
 
 /// Get hover information at position.
 pub fn get_hover(doc: &DocumentState, position: Position) -> Option<Hover> {
@@ -19,7 +19,7 @@ pub fn get_hover(doc: &DocumentState, position: Position) -> Option<Hover> {
             if position_in_range(position, verb_range) {
                 let parts: Vec<&str> = verb_name.split('.').collect();
                 if parts.len() == 2 {
-                    if let Some(verb) = find_verb(parts[0], parts[1]) {
+                    if let Some(verb) = find_unified_verb(parts[0], parts[1]) {
                         return Some(Hover {
                             contents: HoverContents::Markup(MarkupContent {
                                 kind: MarkupKind::Markdown,
@@ -72,25 +72,27 @@ pub fn get_hover(doc: &DocumentState, position: Position) -> Option<Hover> {
     None
 }
 
-fn format_verb_hover(verb: &VerbDef) -> String {
+fn format_verb_hover(verb: &UnifiedVerbDef) -> String {
     let mut parts = Vec::new();
 
     parts.push(format!("**{}.{}**", verb.domain, verb.verb));
     parts.push(String::new());
-    parts.push(verb.description.to_string());
+    parts.push(verb.description.clone());
     parts.push(String::new());
 
-    if !verb.required_args.is_empty() {
+    let required = verb.required_arg_names();
+    if !required.is_empty() {
         parts.push("**Required arguments:**".to_string());
-        for arg in verb.required_args {
+        for arg in required {
             parts.push(format!("- `:{}`", arg));
         }
         parts.push(String::new());
     }
 
-    if !verb.optional_args.is_empty() {
+    let optional = verb.optional_arg_names();
+    if !optional.is_empty() {
         parts.push("**Optional arguments:**".to_string());
-        for arg in verb.optional_args {
+        for arg in optional {
             parts.push(format!("- `:{}`", arg));
         }
     }

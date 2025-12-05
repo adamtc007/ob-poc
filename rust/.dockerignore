@@ -1,0 +1,23 @@
+# Build artifacts
+target/
+debug/
+*.pdb
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# Tests (not needed in production image)
+tests/
+
+# Development files
+.env
+.env.local
