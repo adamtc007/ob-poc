@@ -2146,16 +2146,54 @@ psql -d data_designer -f schema_export.sql
 
 ## MCP Server Tools
 
-For Claude Desktop integration:
+For Claude Desktop integration. The MCP server (`dsl_mcp`) provides tools for DSL generation and execution.
+
+### Core DSL Tools
 
 | Tool | Description |
 |------|-------------|
-| `dsl_validate` | Parse and validate DSL |
-| `dsl_execute` | Execute DSL against database |
-| `cbu_get` | Get CBU with entities, roles, documents |
-| `cbu_list` | List/search CBUs |
-| `verbs_list` | List available DSL verbs |
+| `dsl_validate` | Parse and validate DSL syntax/semantics |
+| `dsl_execute` | Execute DSL against database (with dry_run option) |
+| `dsl_plan` | Show execution plan without running |
+| `dsl_lookup` | **Look up real database IDs** - prevents UUID hallucination |
+| `dsl_complete` | Get completions for verbs, domains, products, roles |
+| `dsl_signature` | Get verb signature with parameters and types |
+
+### Data Access Tools
+
+| Tool | Description |
+|------|-------------|
+| `cbu_get` | Get CBU with entities, roles, documents, screenings |
+| `cbu_list` | List/search CBUs with filtering |
+| `entity_get` | Get entity details with relationships |
+| `verbs_list` | List available DSL verbs (optionally by domain) |
 | `schema_info` | Get entity types, roles, document types |
+
+### Key Tool: `dsl_lookup`
+
+The `dsl_lookup` tool is critical for preventing UUID hallucination. **Always use this tool before generating DSL that references existing entities.**
+
+```json
+// Example: Look up a CBU by name
+{"lookup_type": "cbu", "search": "Apex"}
+
+// Example: Look up entities of a specific type
+{"lookup_type": "entity", "filters": {"entity_type": "proper_person"}}
+
+// Example: Look up products
+{"lookup_type": "product"}
+```
+
+Supported lookup types: `cbu`, `entity`, `document`, `product`, `service`, `kyc_case`
+
+### Key Tool: `dsl_signature`
+
+Get full parameter information for any verb:
+
+```json
+{"verb": "cbu.add-product"}
+// Returns: parameters with types, required flags, descriptions, and example usage
+```
 
 ## Agentic DSL Generation
 

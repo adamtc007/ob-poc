@@ -887,152 +887,73 @@ DSL SYNTAX:
 - References start with @: @symbol_name (use underscores, not hyphens)
 - Use :as @name to capture results
 
-## ONBOARDING DSL GENERATION
+## CRITICAL: EXISTING vs NEW CBUs
 
-You can generate DSL to onboard clients to financial services products. The taxonomy is:
+**EXISTING CBU** - When user references an existing CBU by name (e.g., "onboard Aviva", "add custody to Apex"):
+- Use `cbu.add-product` to add a product to the existing CBU
+- The CBU name is matched case-insensitively in the database
+- DO NOT use `cbu.ensure` - that would create a duplicate!
 
-**Product** → **Service** → **Resource Instance**
+**NEW CBU** - Only when explicitly creating a new client:
+- Use `cbu.ensure` to create the CBU first
+- Then use `cbu.add-product` to add products
 
-### Available Products
+### EXAMPLE: Adding product to EXISTING CBU
+User: "Onboard Aviva to Custody product"
+```
+(cbu.add-product :cbu-id "Aviva" :product "Custody")
+```
 
-| Code | Name | Description |
-|------|------|-------------|
-| `GLOB_CUSTODY` | Global Custody | Asset safekeeping, settlement, corporate actions |
-| `FUND_ACCT` | Fund Accounting | NAV calculation, investor accounting, reporting |
-| `MO_IBOR` | Middle Office IBOR | Position management, trade capture, P&L attribution |
+User: "Add Fund Accounting to Apex Capital"
+```
+(cbu.add-product :cbu-id "Apex Capital" :product "Fund Accounting")
+```
 
-### Product → Service Mappings
+### EXAMPLE: Creating NEW CBU and adding product
+User: "Create a new fund called Pacific Growth in Luxembourg and add Custody"
+```
+(cbu.ensure :name "Pacific Growth" :jurisdiction "LU" :client-type "fund" :as @fund)
+(cbu.add-product :cbu-id @fund :product "Custody")
+```
 
-**Global Custody (GLOB_CUSTODY):**
-- `SAFEKEEPING` - Asset Safekeeping (mandatory) → uses CUSTODY_ACCT
-- `SETTLEMENT` - Trade Settlement (mandatory) → uses SETTLE_ACCT, SWIFT_CONN
-- `CORP_ACTIONS` - Corporate Actions (mandatory)
+## Available Products (use exact names)
 
-**Fund Accounting (FUND_ACCT):**
-- `NAV_CALC` - NAV Calculation (mandatory) → uses NAV_ENGINE
-- `INVESTOR_ACCT` - Investor Accounting (mandatory) → uses INVESTOR_LEDGER
-- `FUND_REPORTING` - Fund Reporting (mandatory)
+| Product Name | Description |
+|--------------|-------------|
+| `Custody` | Asset safekeeping, settlement, corporate actions |
+| `Fund Accounting` | NAV calculation, investor accounting, reporting |
+| `Transfer Agency` | Investor registry, subscriptions, redemptions |
+| `Middle Office` | Position management, trade capture, P&L |
+| `Collateral Management` | Collateral optimization and margin |
+| `Markets FX` | Foreign exchange services |
+| `Alternatives` | Alternative investment administration |
 
-**Middle Office IBOR (MO_IBOR):**
-- `POSITION_MGMT` - Position Management (mandatory) → uses IBOR_SYSTEM
-- `TRADE_CAPTURE` - Trade Capture (mandatory) → uses IBOR_SYSTEM
-- `PNL_ATTRIB` - P&L Attribution (mandatory) → uses PNL_ENGINE
-
-### Resource Types and Required Attributes
-
-**CUSTODY_ACCT** (Custody Account):
-- `resource.account.account_number` (required)
-- `resource.account.account_name` (required)
-- `resource.account.base_currency` (required) - USD, EUR, GBP, etc.
-- `resource.account.account_type` (required) - SEGREGATED or OMNIBUS
-
-**SETTLE_ACCT** (Settlement Account):
-- `resource.account.account_number` (required)
-- `resource.settlement.bic_code` (required)
-- `resource.settlement.settlement_currency` (required)
-
-**SWIFT_CONN** (SWIFT Connection):
-- `resource.settlement.bic_code` (required)
-- `resource.swift.logical_terminal` (required)
-- `resource.swift.message_types` (required) - JSON array like "[\"MT540\", \"MT541\", \"MT950\"]"
-
-**NAV_ENGINE** (NAV Calculation Engine):
-- `resource.fund.fund_code` (required)
-- `resource.fund.valuation_frequency` (required) - DAILY, WEEKLY, or MONTHLY
-- `resource.fund.pricing_source` (required) - Bloomberg, Reuters, ICE
-- `resource.fund.nav_cutoff_time` (required) - e.g., "16:00 CET"
-
-**IBOR_SYSTEM** (IBOR System):
-- `resource.ibor.portfolio_code` (required)
-- `resource.ibor.accounting_basis` (required) - TRADE_DATE or SETTLEMENT_DATE
-- `resource.account.base_currency` (required)
-- `resource.ibor.position_source` (required)
-
-### Onboarding DSL Pattern
-
-Always follow this sequence for onboarding:
-1. Create CBU with `cbu.ensure`
-2. Create Resource Instances with `resource.create`
-3. Set Attributes with `resource.set-attr` for all required attributes
-4. Activate Resources with `resource.activate`
-5. Record Deliveries with `delivery.record`
-6. Complete Deliveries with `delivery.complete`
-
-### Client Types
-- `fund` - Investment fund
+## Client Types
+- `fund` - Investment fund (hedge fund, mutual fund, etc.)
 - `corporate` - Corporate client
 - `individual` - Individual client
+- `trust` - Trust structure
 
-### Common Jurisdictions
+## Common Jurisdictions
 - `US` - United States
-- `UK` - United Kingdom
+- `GB` - United Kingdom
 - `LU` - Luxembourg
 - `IE` - Ireland
+- `KY` - Cayman Islands
+- `JE` - Jersey
 
-### ONBOARDING EXAMPLE: Global Custody
+## Other DSL Examples
 
-User: "Onboard Apex Capital as a US hedge fund for Global Custody with a segregated USD account"
-
-```
-;; Create the client
-(cbu.ensure
-    :name "Apex Capital"
-    :jurisdiction "US"
-    :client-type "fund"
-    :as @apex)
-
-;; Create Custody Account
-(resource.create
-    :cbu-id @apex
-    :resource-type "CUSTODY_ACCT"
-    :instance-url "https://custody.bank.com/accounts/apex-capital-001"
-    :instance-id "APEX-CUSTODY-001"
-    :instance-name "Apex Capital Custody Account"
-    :as @custody)
-
-;; Set required attributes
-(resource.set-attr :instance-id @custody :attr "resource.account.account_number" :value "CUST-APEX-001")
-(resource.set-attr :instance-id @custody :attr "resource.account.account_name" :value "Apex Capital - Main Custody")
-(resource.set-attr :instance-id @custody :attr "resource.account.base_currency" :value "USD")
-(resource.set-attr :instance-id @custody :attr "resource.account.account_type" :value "SEGREGATED")
-
-;; Activate and deliver
-(resource.activate :instance-id @custody)
-(delivery.record :cbu-id @apex :product "GLOB_CUSTODY" :service "SAFEKEEPING" :instance-id @custody)
-(delivery.complete :cbu-id @apex :product "GLOB_CUSTODY" :service "SAFEKEEPING")
-```
-
-### ONBOARDING EXAMPLE: Fund Accounting
-
-User: "Set up Pacific Growth Fund for daily NAV with Bloomberg pricing"
-
-```
-(cbu.ensure :name "Pacific Growth Fund" :jurisdiction "LU" :client-type "fund" :as @pgf)
-
-(resource.create
-    :cbu-id @pgf
-    :resource-type "NAV_ENGINE"
-    :instance-url "https://nav.fundservices.com/funds/pgf-001"
-    :instance-id "PGF-NAV-001"
-    :instance-name "Pacific Growth Fund NAV"
-    :as @nav)
-
-(resource.set-attr :instance-id @nav :attr "resource.fund.fund_code" :value "PGF-LU-001")
-(resource.set-attr :instance-id @nav :attr "resource.fund.valuation_frequency" :value "DAILY")
-(resource.set-attr :instance-id @nav :attr "resource.fund.pricing_source" :value "Bloomberg")
-(resource.set-attr :instance-id @nav :attr "resource.fund.nav_cutoff_time" :value "16:00 CET")
-
-(resource.activate :instance-id @nav)
-(delivery.record :cbu-id @pgf :product "FUND_ACCT" :service "NAV_CALC" :instance-id @nav)
-(delivery.complete :cbu-id @pgf :product "FUND_ACCT" :service "NAV_CALC")
-```
-
-### NON-ONBOARDING EXAMPLES
-
-(cbu.ensure :name "Acme Corp" :jurisdiction "GB" :client-type "corporate" :as @cbu)
+Create entities:
 (entity.create-proper-person :first-name "John" :last-name "Smith" :date-of-birth "1980-01-15" :as @john)
 (entity.create-limited-company :name "Holdings Ltd" :jurisdiction "GB" :as @company)
+
+Assign roles:
 (cbu.assign-role :cbu-id @cbu :entity-id @john :role "DIRECTOR")
+(cbu.assign-role :cbu-id @cbu :entity-id @company :role "PRINCIPAL")
+
+List CBUs:
+(cbu.list)
 
 Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, respond with: ERROR: <reason>"#,
         vocab

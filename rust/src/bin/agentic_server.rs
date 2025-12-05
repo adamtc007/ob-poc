@@ -127,14 +127,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("    GET    http://localhost:3000/api/attributes/health");
     println!("\n  Entity Search:");
     println!("    GET    http://localhost:3000/api/entities/search?q=<query>&types=PERSON,COMPANY");
-    println!("\n  Templates:");
-    println!("    GET    http://localhost:3000/api/templates                - List all templates");
-    println!(
-        "    GET    http://localhost:3000/api/templates/:id            - Get template details"
-    );
-    println!(
-        "    POST   http://localhost:3000/api/templates/:id/render     - Render template to DSL"
-    );
     println!("\n  DSL Viewer:");
     println!("    GET    http://localhost:3000/api/dsl/list                 - List DSL instances");
     println!(

@@ -138,5 +138,70 @@ pub fn get_tools() -> Vec<Tool> {
                 }
             }),
         },
+        Tool {
+            name: "dsl_lookup".into(),
+            description: "Look up real database IDs. ALWAYS use this instead of guessing UUIDs. Returns matching records with their IDs.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "lookup_type": {
+                        "type": "string",
+                        "enum": ["cbu", "entity", "document", "product", "service", "kyc_case"],
+                        "description": "Type of record to look up"
+                    },
+                    "search": {
+                        "type": "string",
+                        "description": "Text search on name/display (case-insensitive)"
+                    },
+                    "filters": {
+                        "type": "object",
+                        "description": "Filter criteria: document_type, entity_type, status, jurisdiction, client_type, cbu_id"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Max results to return"
+                    }
+                },
+                "required": ["lookup_type"]
+            }),
+        },
+        Tool {
+            name: "dsl_complete".into(),
+            description: "Get completions for verbs or attributes. Use before generating DSL to get correct names.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "completion_type": {
+                        "type": "string",
+                        "enum": ["verb", "domain", "product", "role"],
+                        "description": "What to complete"
+                    },
+                    "prefix": {
+                        "type": "string",
+                        "description": "Partial text to match (optional)"
+                    },
+                    "domain": {
+                        "type": "string",
+                        "description": "For verb completion - filter by domain"
+                    }
+                },
+                "required": ["completion_type"]
+            }),
+        },
+        Tool {
+            name: "dsl_signature".into(),
+            description: "Get verb signature - parameters, types, and requirements. Use to understand what arguments a verb needs.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "verb": {
+                        "type": "string",
+                        "description": "Full verb name (e.g., 'cbu.add-product', 'entity.create-proper-person')"
+                    }
+                },
+                "required": ["verb"]
+            }),
+        },
     ]
 }

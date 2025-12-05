@@ -1685,17 +1685,11 @@ impl CustomOperation for CbuAddProductOp {
         // =====================================================================
         // Step 1: Extract and validate arguments
         // =====================================================================
-        let cbu_id: Uuid = verb_call
+        // cbu-id can be: @reference, UUID string, or CBU name string
+        let cbu_id_arg = verb_call
             .arguments
             .iter()
             .find(|a| a.key.matches("cbu-id"))
-            .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
             .ok_or_else(|| anyhow::anyhow!("cbu.add-product: Missing required argument :cbu-id"))?;
 
         let product_name = verb_call
@@ -1708,17 +1702,70 @@ impl CustomOperation for CbuAddProductOp {
             })?;
 
         // =====================================================================
-        // Step 2: Validate CBU exists
+        // Step 2: Resolve CBU - by reference, UUID, or name
         // =====================================================================
-        let cbu_row = sqlx::query!(
-            r#"SELECT cbu_id, name, product_id FROM "ob-poc".cbus WHERE cbu_id = $1"#,
-            cbu_id
-        )
-        .fetch_optional(pool)
-        .await?;
-
-        let cbu = cbu_row
-            .ok_or_else(|| anyhow::anyhow!("cbu.add-product: CBU not found with id {}", cbu_id))?;
+        let (cbu_id, cbu_name): (Uuid, String) =
+            if let Some(ref_name) = cbu_id_arg.value.as_reference() {
+                // It's a @reference - resolve from context
+                let resolved_id = ctx.resolve(ref_name).ok_or_else(|| {
+                    anyhow::anyhow!("cbu.add-product: Unresolved reference @{}", ref_name)
+                })?;
+                let row = sqlx::query!(
+                    r#"SELECT cbu_id, name FROM "ob-poc".cbus WHERE cbu_id = $1"#,
+                    resolved_id
+                )
+                .fetch_optional(pool)
+                .await?
+                .ok_or_else(|| {
+                    anyhow::anyhow!("cbu.add-product: CBU not found with id {}", resolved_id)
+                })?;
+                (row.cbu_id, row.name)
+            } else if let Some(uuid_val) = cbu_id_arg.value.as_uuid() {
+                // It's a UUID
+                let row = sqlx::query!(
+                    r#"SELECT cbu_id, name FROM "ob-poc".cbus WHERE cbu_id = $1"#,
+                    uuid_val
+                )
+                .fetch_optional(pool)
+                .await?
+                .ok_or_else(|| {
+                    anyhow::anyhow!("cbu.add-product: CBU not found with id {}", uuid_val)
+                })?;
+                (row.cbu_id, row.name)
+            } else if let Some(str_val) = cbu_id_arg.value.as_string() {
+                // It's a string - try as UUID first, then as name
+                if let Ok(uuid_val) = Uuid::parse_str(str_val) {
+                    let row = sqlx::query!(
+                        r#"SELECT cbu_id, name FROM "ob-poc".cbus WHERE cbu_id = $1"#,
+                        uuid_val
+                    )
+                    .fetch_optional(pool)
+                    .await?
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("cbu.add-product: CBU not found with id {}", uuid_val)
+                    })?;
+                    (row.cbu_id, row.name)
+                } else {
+                    // Look up by name (case-insensitive)
+                    let row = sqlx::query!(
+                        r#"SELECT cbu_id, name FROM "ob-poc".cbus WHERE LOWER(name) = LOWER($1)"#,
+                        str_val
+                    )
+                    .fetch_optional(pool)
+                    .await?
+                    .ok_or_else(|| {
+                        anyhow::anyhow!(
+                        "cbu.add-product: CBU '{}' not found. Use cbu.list to see available CBUs.",
+                        str_val
+                    )
+                    })?;
+                    (row.cbu_id, row.name)
+                }
+            } else {
+                return Err(anyhow::anyhow!(
+                    "cbu.add-product: :cbu-id must be a @reference, UUID, or CBU name string"
+                ));
+            };
 
         // Note: We don't touch cbus.product_id - service_delivery_map is source of truth
 
@@ -1822,7 +1869,7 @@ impl CustomOperation for CbuAddProductOp {
             // Generate a unique instance URL using CBU name, resource code, and partial UUID
             let instance_url = format!(
                 "urn:ob-poc:{}:{}:{}",
-                cbu.name.to_lowercase().replace(' ', "-"),
+                cbu_name.to_lowercase().replace(' ', "-"),
                 sr.resource_code.as_deref().unwrap_or("unknown"),
                 &instance_id.to_string()[..8]
             );
@@ -1861,7 +1908,7 @@ impl CustomOperation for CbuAddProductOp {
         // =====================================================================
         tracing::info!(
             cbu_id = %cbu_id,
-            cbu_name = %cbu.name,
+            cbu_name = %cbu_name,
             product = %product_name,
             services_total = services.len(),
             delivery_entries_created = delivery_created,

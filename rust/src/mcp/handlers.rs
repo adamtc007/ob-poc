@@ -50,6 +50,9 @@ impl ToolHandlers {
             "entity_get" => self.entity_get(args).await,
             "verbs_list" => self.verbs_list(args),
             "schema_info" => self.schema_info(args).await,
+            "dsl_lookup" => self.dsl_lookup(args).await,
+            "dsl_complete" => self.dsl_complete(args),
+            "dsl_signature" => self.dsl_signature(args),
             _ => Err(anyhow!("Unknown tool: {}", name)),
         }
     }
@@ -554,5 +557,387 @@ impl ToolHandlers {
         }
 
         Ok(result)
+    }
+
+    /// Look up database IDs - the key tool to prevent UUID hallucination
+    async fn dsl_lookup(&self, args: Value) -> Result<Value> {
+        let lookup_type = args["lookup_type"]
+            .as_str()
+            .ok_or_else(|| anyhow!("lookup_type required"))?;
+        let search = args["search"].as_str();
+        let limit = args["limit"].as_i64().unwrap_or(10);
+        let filters = &args["filters"];
+
+        match lookup_type {
+            "cbu" => {
+                let jurisdiction = filters["jurisdiction"].as_str();
+                let client_type = filters["client_type"].as_str();
+
+                let rows = sqlx::query!(
+                    r#"
+                    SELECT cbu_id, name, client_type, jurisdiction, status
+                    FROM "ob-poc".cbus
+                    WHERE ($1::text IS NULL OR LOWER(name) LIKE LOWER('%' || $1 || '%'))
+                      AND ($2::text IS NULL OR jurisdiction = $2)
+                      AND ($3::text IS NULL OR client_type = $3)
+                    ORDER BY name
+                    LIMIT $4
+                    "#,
+                    search,
+                    jurisdiction,
+                    client_type,
+                    limit
+                )
+                .fetch_all(&self.pool)
+                .await?;
+
+                Ok(json!({
+                    "type": "cbu",
+                    "count": rows.len(),
+                    "results": rows.iter().map(|r| json!({
+                        "id": r.cbu_id.to_string(),
+                        "name": r.name,
+                        "client_type": r.client_type,
+                        "jurisdiction": r.jurisdiction,
+                        "status": r.status
+                    })).collect::<Vec<_>>()
+                }))
+            }
+
+            "entity" => {
+                let entity_type = filters["entity_type"].as_str();
+
+                let rows = sqlx::query!(
+                    r#"
+                    SELECT e.entity_id, e.name, et.type_code as entity_type
+                    FROM "ob-poc".entities e
+                    JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
+                    WHERE ($1::text IS NULL OR LOWER(e.name) LIKE LOWER('%' || $1 || '%'))
+                      AND ($2::text IS NULL OR et.type_code = $2)
+                    ORDER BY e.name
+                    LIMIT $3
+                    "#,
+                    search,
+                    entity_type,
+                    limit
+                )
+                .fetch_all(&self.pool)
+                .await?;
+
+                Ok(json!({
+                    "type": "entity",
+                    "count": rows.len(),
+                    "results": rows.iter().map(|r| json!({
+                        "id": r.entity_id.to_string(),
+                        "name": r.name,
+                        "entity_type": r.entity_type
+                    })).collect::<Vec<_>>()
+                }))
+            }
+
+            "document" => {
+                let document_type = filters["document_type"].as_str();
+                let cbu_id = filters["cbu_id"]
+                    .as_str()
+                    .and_then(|s| Uuid::parse_str(s).ok());
+
+                let rows = sqlx::query!(
+                    r#"
+                    SELECT d.doc_id, d.document_name, d.document_type_code, d.status, c.name as cbu_name
+                    FROM "ob-poc".document_catalog d
+                    LEFT JOIN "ob-poc".cbus c ON d.cbu_id = c.cbu_id
+                    WHERE ($1::text IS NULL OR LOWER(d.document_name) LIKE LOWER('%' || $1 || '%'))
+                      AND ($2::text IS NULL OR d.document_type_code = $2)
+                      AND ($3::uuid IS NULL OR d.cbu_id = $3)
+                    ORDER BY d.created_at DESC
+                    LIMIT $4
+                    "#,
+                    search,
+                    document_type,
+                    cbu_id,
+                    limit
+                )
+                .fetch_all(&self.pool)
+                .await?;
+
+                Ok(json!({
+                    "type": "document",
+                    "count": rows.len(),
+                    "results": rows.iter().map(|r| json!({
+                        "id": r.doc_id.to_string(),
+                        "name": r.document_name,
+                        "document_type": r.document_type_code,
+                        "status": r.status,
+                        "cbu_name": r.cbu_name
+                    })).collect::<Vec<_>>()
+                }))
+            }
+
+            "product" => {
+                let rows = sqlx::query!(
+                    r#"
+                    SELECT product_id, name, product_code, description
+                    FROM "ob-poc".products
+                    WHERE ($1::text IS NULL OR LOWER(name) LIKE LOWER('%' || $1 || '%'))
+                    ORDER BY name
+                    LIMIT $2
+                    "#,
+                    search,
+                    limit
+                )
+                .fetch_all(&self.pool)
+                .await?;
+
+                Ok(json!({
+                    "type": "product",
+                    "count": rows.len(),
+                    "results": rows.iter().map(|r| json!({
+                        "id": r.product_id.to_string(),
+                        "name": r.name,
+                        "code": r.product_code,
+                        "description": r.description
+                    })).collect::<Vec<_>>()
+                }))
+            }
+
+            "service" => {
+                let rows = sqlx::query!(
+                    r#"
+                    SELECT service_id, name, service_code, description
+                    FROM "ob-poc".services
+                    WHERE ($1::text IS NULL OR LOWER(name) LIKE LOWER('%' || $1 || '%'))
+                    ORDER BY name
+                    LIMIT $2
+                    "#,
+                    search,
+                    limit
+                )
+                .fetch_all(&self.pool)
+                .await?;
+
+                Ok(json!({
+                    "type": "service",
+                    "count": rows.len(),
+                    "results": rows.iter().map(|r| json!({
+                        "id": r.service_id.to_string(),
+                        "name": r.name,
+                        "code": r.service_code,
+                        "description": r.description
+                    })).collect::<Vec<_>>()
+                }))
+            }
+
+            "kyc_case" => {
+                let cbu_id = filters["cbu_id"]
+                    .as_str()
+                    .and_then(|s| Uuid::parse_str(s).ok());
+                let status = filters["status"].as_str();
+
+                let rows = sqlx::query!(
+                    r#"
+                    SELECT c.case_id, c.status, c.case_type, c.risk_rating, cb.name as cbu_name
+                    FROM kyc.cases c
+                    JOIN "ob-poc".cbus cb ON c.cbu_id = cb.cbu_id
+                    WHERE ($1::uuid IS NULL OR c.cbu_id = $1)
+                      AND ($2::text IS NULL OR c.status = $2)
+                    ORDER BY c.opened_at DESC
+                    LIMIT $3
+                    "#,
+                    cbu_id,
+                    status,
+                    limit
+                )
+                .fetch_all(&self.pool)
+                .await?;
+
+                Ok(json!({
+                    "type": "kyc_case",
+                    "count": rows.len(),
+                    "results": rows.iter().map(|r| json!({
+                        "id": r.case_id.to_string(),
+                        "status": r.status,
+                        "case_type": r.case_type,
+                        "risk_rating": r.risk_rating,
+                        "cbu_name": r.cbu_name
+                    })).collect::<Vec<_>>()
+                }))
+            }
+
+            _ => Err(anyhow!(
+                "Unknown lookup_type: {}. Valid types: cbu, entity, document, product, service, kyc_case",
+                lookup_type
+            )),
+        }
+    }
+
+    /// Get completions for DSL - verbs, domains, products, roles
+    fn dsl_complete(&self, args: Value) -> Result<Value> {
+        let completion_type = args["completion_type"]
+            .as_str()
+            .ok_or_else(|| anyhow!("completion_type required"))?;
+        let prefix = args["prefix"].as_str().unwrap_or("");
+        let domain_filter = args["domain"].as_str();
+
+        match completion_type {
+            "verb" => {
+                let reg = registry();
+                let verbs: Vec<_> = reg
+                    .all_verbs()
+                    .filter(|v| domain_filter.is_none_or(|d| v.domain == d))
+                    .filter(|v| {
+                        prefix.is_empty()
+                            || v.full_name()
+                                .to_lowercase()
+                                .contains(&prefix.to_lowercase())
+                    })
+                    .map(|v| {
+                        json!({
+                            "name": v.full_name(),
+                            "domain": v.domain,
+                            "description": v.description
+                        })
+                    })
+                    .collect();
+
+                Ok(json!({
+                    "type": "verb",
+                    "count": verbs.len(),
+                    "completions": verbs
+                }))
+            }
+
+            "domain" => {
+                let reg = registry();
+                let domains: Vec<_> = reg
+                    .domains()
+                    .iter()
+                    .filter(|d| {
+                        prefix.is_empty() || d.to_lowercase().contains(&prefix.to_lowercase())
+                    })
+                    .map(|d| json!({"name": d}))
+                    .collect();
+
+                Ok(json!({
+                    "type": "domain",
+                    "count": domains.len(),
+                    "completions": domains
+                }))
+            }
+
+            "product" => {
+                // Return hardcoded product names from database
+                let products = vec![
+                    (
+                        "Custody",
+                        "Asset safekeeping, settlement, corporate actions",
+                    ),
+                    ("Fund Accounting", "NAV calculation, investor accounting"),
+                    ("Transfer Agency", "Investor registry, subscriptions"),
+                    ("Middle Office", "Position management, P&L"),
+                    ("Collateral Management", "Collateral optimization"),
+                    ("Markets FX", "Foreign exchange services"),
+                    ("Alternatives", "Alternative investment admin"),
+                ];
+
+                let filtered: Vec<_> = products
+                    .iter()
+                    .filter(|(name, _)| {
+                        prefix.is_empty() || name.to_lowercase().contains(&prefix.to_lowercase())
+                    })
+                    .map(|(name, desc)| json!({"name": name, "description": desc}))
+                    .collect();
+
+                Ok(json!({
+                    "type": "product",
+                    "count": filtered.len(),
+                    "completions": filtered
+                }))
+            }
+
+            "role" => {
+                let roles = vec![
+                    "DIRECTOR",
+                    "SHAREHOLDER",
+                    "BENEFICIAL_OWNER",
+                    "PRINCIPAL",
+                    "SIGNATORY",
+                    "TRUSTEE",
+                    "BENEFICIARY",
+                    "PROTECTOR",
+                    "SETTLOR",
+                    "PARTNER",
+                    "GENERAL_PARTNER",
+                    "LIMITED_PARTNER",
+                ];
+
+                let filtered: Vec<_> = roles
+                    .iter()
+                    .filter(|r| {
+                        prefix.is_empty() || r.to_lowercase().contains(&prefix.to_lowercase())
+                    })
+                    .map(|r| json!({"name": r}))
+                    .collect();
+
+                Ok(json!({
+                    "type": "role",
+                    "count": filtered.len(),
+                    "completions": filtered
+                }))
+            }
+
+            _ => Err(anyhow!(
+                "Unknown completion_type: {}. Valid types: verb, domain, product, role",
+                completion_type
+            )),
+        }
+    }
+
+    /// Get verb signature - parameters and types
+    fn dsl_signature(&self, args: Value) -> Result<Value> {
+        let verb_name = args["verb"]
+            .as_str()
+            .ok_or_else(|| anyhow!("verb required"))?;
+
+        let reg = registry();
+
+        // Parse domain.verb format
+        let parts: Vec<&str> = verb_name.split('.').collect();
+        if parts.len() != 2 {
+            return Err(anyhow!(
+                "Invalid verb format '{}'. Expected 'domain.verb' (e.g., 'cbu.add-product')",
+                verb_name
+            ));
+        }
+
+        let domain = parts[0];
+        let verb = parts[1];
+
+        // Find the verb in registry
+        let verb_info = reg
+            .all_verbs()
+            .find(|v| v.domain == domain && v.verb == verb)
+            .ok_or_else(|| anyhow!("Verb '{}' not found", verb_name))?;
+
+        Ok(json!({
+            "verb": verb_info.full_name(),
+            "domain": verb_info.domain,
+            "description": verb_info.description,
+            "parameters": verb_info.args.iter().map(|a| json!({
+                "name": a.name,
+                "type": a.arg_type,
+                "required": a.required,
+                "description": a.description
+            })).collect::<Vec<_>>(),
+            "behavior": format!("{:?}", verb_info.behavior),
+            "example": format!(
+                "({} {})",
+                verb_info.full_name(),
+                verb_info.args.iter()
+                    .filter(|a| a.required)
+                    .map(|a| format!(":{} <{}>", a.name, a.arg_type))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            )
+        }))
     }
 }
