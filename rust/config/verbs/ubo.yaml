@@ -15,10 +15,20 @@ domains:
           type: uuid
           required: true
           maps_to: owner_entity_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         - name: owned-entity-id
           type: uuid
           required: true
           maps_to: owned_entity_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         - name: percentage
           type: decimal
           required: true
@@ -60,6 +70,11 @@ domains:
           type: uuid
           required: true
           maps_to: ownership_id
+            lookup:
+              table: ownership_relationships
+              schema: ob-poc
+              search_key: ownership_id
+              primary_key: ownership_id
         - name: percentage
           type: decimal
           required: false
@@ -87,6 +102,11 @@ domains:
           type: uuid
           required: true
           maps_to: ownership_id
+            lookup:
+              table: ownership_relationships
+              schema: ob-poc
+              search_key: ownership_id
+              primary_key: ownership_id
         - name: effective-to
           type: date
           required: true
@@ -106,6 +126,11 @@ domains:
           type: uuid
           required: true
           maps_to: owned_entity_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         returns:
           type: record_set
       list-owned:
@@ -121,6 +146,11 @@ domains:
           type: uuid
           required: true
           maps_to: owner_entity_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         returns:
           type: record_set
       register-ubo:
@@ -140,14 +170,29 @@ domains:
           type: uuid
           required: true
           maps_to: cbu_id
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
         - name: subject-entity-id
           type: uuid
           required: true
           maps_to: subject_entity_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         - name: ubo-person-id
           type: uuid
           required: true
           maps_to: ubo_proper_person_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         - name: relationship-type
           type: string
           required: true
@@ -194,6 +239,11 @@ domains:
           type: uuid
           required: true
           maps_to: ubo_id
+            lookup:
+              table: ubo_determinations
+              schema: ob-poc
+              search_key: ubo_id
+              primary_key: ubo_id
         - name: verification-status
           type: string
           required: true

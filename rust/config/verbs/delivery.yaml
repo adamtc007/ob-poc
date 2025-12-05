@@ -19,6 +19,11 @@ domains:
             type: uuid
             required: true
             maps_to: cbu_id
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
           - name: product
             type: lookup
             required: true
@@ -41,6 +46,11 @@ domains:
             type: uuid
             required: false
             maps_to: instance_id
+            lookup:
+              table: cbu_resource_instances
+              schema: ob-poc
+              search_key: instance_name
+              primary_key: instance_id
           - name: config
             type: json
             required: false
@@ -61,6 +71,11 @@ domains:
             type: uuid
             required: true
             maps_to: cbu_id
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
             is_filter: true
           - name: product
             type: lookup
@@ -86,6 +101,11 @@ domains:
             type: uuid
             required: false
             maps_to: instance_id
+            lookup:
+              table: cbu_resource_instances
+              schema: ob-poc
+              search_key: instance_name
+              primary_key: instance_id
         set:
           delivery_status: "DELIVERED"
           delivered_at: "now()"
@@ -104,6 +124,11 @@ domains:
             type: uuid
             required: true
             maps_to: cbu_id
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
             is_filter: true
           - name: product
             type: lookup

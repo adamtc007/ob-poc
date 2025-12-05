@@ -15,6 +15,11 @@ domains:
             type: uuid
             required: false
             maps_to: resource_id
+            lookup:
+              table: service_resource_types
+              schema: ob-poc
+              search_key: name
+              primary_key: resource_type_id
           - name: resource-code
             type: string
             required: false

@@ -15,10 +15,20 @@ domains:
           type: uuid
           required: true
           maps_to: entity_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         - name: attribute-id
           type: uuid
           required: true
           maps_to: attribute_id
+            lookup:
+              table: attribute_registry
+              schema: ob-poc
+              search_key: attribute_code
+              primary_key: attribute_id
         - name: observation-1-id
           type: uuid
           required: true
@@ -51,10 +61,20 @@ domains:
           type: uuid
           required: false
           maps_to: case_id
+            lookup:
+              table: cases
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
         - name: workstream-id
           type: uuid
           required: false
           maps_to: workstream_id
+            lookup:
+              table: entity_workstreams
+              schema: kyc
+              search_key: workstream_id
+              primary_key: workstream_id
         returns:
           type: uuid
           name: discrepancy_id
@@ -75,6 +95,11 @@ domains:
           type: uuid
           required: true
           maps_to: discrepancy_id
+            lookup:
+              table: observation_discrepancies
+              schema: ob-poc
+              search_key: discrepancy_id
+              primary_key: discrepancy_id
         - name: resolution-type
           type: string
           required: true
@@ -108,6 +133,11 @@ domains:
           type: uuid
           required: true
           maps_to: discrepancy_id
+            lookup:
+              table: observation_discrepancies
+              schema: ob-poc
+              search_key: discrepancy_id
+              primary_key: discrepancy_id
         - name: notes
           type: string
           required: false
@@ -126,10 +156,20 @@ domains:
           type: uuid
           required: false
           maps_to: entity_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         - name: case-id
           type: uuid
           required: false
           maps_to: case_id
+            lookup:
+              table: cases
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
         - name: severity
           type: string
           required: false

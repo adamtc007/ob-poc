@@ -16,6 +16,11 @@ domains:
           type: uuid
           required: true
           maps_to: workstream_id
+            lookup:
+              table: entity_workstreams
+              schema: kyc
+              search_key: workstream_id
+              primary_key: workstream_id
         - name: screening-type
           type: string
           required: true
@@ -52,6 +57,11 @@ domains:
           type: uuid
           required: true
           maps_to: screening_id
+            lookup:
+              table: screenings
+              schema: kyc
+              search_key: screening_id
+              primary_key: screening_id
         - name: status
           type: string
           required: true
@@ -86,6 +96,11 @@ domains:
           type: uuid
           required: true
           maps_to: screening_id
+            lookup:
+              table: screenings
+              schema: kyc
+              search_key: screening_id
+              primary_key: screening_id
         - name: status
           type: string
           required: true
@@ -101,6 +116,11 @@ domains:
           type: uuid
           required: false
           maps_to: red_flag_id
+            lookup:
+              table: red_flags
+              schema: kyc
+              search_key: red_flag_id
+              primary_key: red_flag_id
         returns:
           type: affected
       list-by-workstream:

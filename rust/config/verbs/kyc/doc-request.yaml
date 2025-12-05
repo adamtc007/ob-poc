@@ -16,6 +16,11 @@ domains:
           type: uuid
           required: true
           maps_to: workstream_id
+            lookup:
+              table: entity_workstreams
+              schema: kyc
+              search_key: workstream_id
+              primary_key: workstream_id
         - name: doc-type
           type: string
           required: true
@@ -83,6 +88,11 @@ domains:
           type: uuid
           required: true
           maps_to: request_id
+            lookup:
+              table: doc_requests
+              schema: kyc
+              search_key: request_id
+              primary_key: request_id
         returns:
           type: affected
       receive:
@@ -102,10 +112,20 @@ domains:
           type: uuid
           required: true
           maps_to: request_id
+            lookup:
+              table: doc_requests
+              schema: kyc
+              search_key: request_id
+              primary_key: request_id
         - name: document-id
           type: uuid
           required: true
           maps_to: document_id
+            lookup:
+              table: document_catalog
+              schema: ob-poc
+              search_key: document_name
+              primary_key: doc_id
         returns:
           type: affected
       verify:
@@ -125,6 +145,11 @@ domains:
           type: uuid
           required: true
           maps_to: request_id
+            lookup:
+              table: doc_requests
+              schema: kyc
+              search_key: request_id
+              primary_key: request_id
         - name: notes
           type: string
           required: false
@@ -147,6 +172,11 @@ domains:
           type: uuid
           required: true
           maps_to: request_id
+            lookup:
+              table: doc_requests
+              schema: kyc
+              search_key: request_id
+              primary_key: request_id
         - name: reason
           type: string
           required: true
@@ -169,6 +199,11 @@ domains:
           type: uuid
           required: true
           maps_to: request_id
+            lookup:
+              table: doc_requests
+              schema: kyc
+              search_key: request_id
+              primary_key: request_id
         - name: notes
           type: string
           required: true

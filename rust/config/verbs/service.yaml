@@ -14,6 +14,11 @@ domains:
             type: uuid
             required: false
             maps_to: service_id
+            lookup:
+              table: services
+              schema: ob-poc
+              search_key: name
+              primary_key: service_id
           - name: service-code
             type: string
             required: false

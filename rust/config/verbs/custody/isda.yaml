@@ -15,6 +15,11 @@ domains:
           type: uuid
           required: true
           maps_to: cbu_id
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
         - name: counterparty
           type: uuid
           required: true
@@ -51,6 +56,11 @@ domains:
           type: uuid
           required: true
           maps_to: isda_id
+            lookup:
+              table: isda_agreements
+              schema: custody
+              search_key: isda_id
+              primary_key: isda_id
         - name: instrument-class
           type: lookup
           required: true
@@ -85,6 +95,11 @@ domains:
           type: uuid
           required: true
           maps_to: isda_id
+            lookup:
+              table: isda_agreements
+              schema: custody
+              search_key: isda_id
+              primary_key: isda_id
         - name: csa-type
           type: string
           required: true

@@ -16,10 +16,20 @@ domains:
           type: uuid
           required: true
           maps_to: case_id
+            lookup:
+              table: cases
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
         - name: entity-id
           type: uuid
           required: true
           maps_to: entity_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         - name: discovery-source-id
           type: uuid
           required: false
@@ -60,6 +70,11 @@ domains:
           type: uuid
           required: true
           maps_to: workstream_id
+            lookup:
+              table: entity_workstreams
+              schema: kyc
+              search_key: workstream_id
+              primary_key: workstream_id
         - name: status
           type: string
           required: true
@@ -92,6 +107,11 @@ domains:
           type: uuid
           required: true
           maps_to: workstream_id
+            lookup:
+              table: entity_workstreams
+              schema: kyc
+              search_key: workstream_id
+              primary_key: workstream_id
         - name: reason
           type: string
           required: true
@@ -115,6 +135,11 @@ domains:
           type: uuid
           required: true
           maps_to: workstream_id
+            lookup:
+              table: entity_workstreams
+              schema: kyc
+              search_key: workstream_id
+              primary_key: workstream_id
         - name: risk-rating
           type: string
           required: false
@@ -143,6 +168,11 @@ domains:
           type: uuid
           required: true
           maps_to: workstream_id
+            lookup:
+              table: entity_workstreams
+              schema: kyc
+              search_key: workstream_id
+              primary_key: workstream_id
         returns:
           type: affected
       set-ubo:
@@ -161,6 +191,11 @@ domains:
           type: uuid
           required: true
           maps_to: workstream_id
+            lookup:
+              table: entity_workstreams
+              schema: kyc
+              search_key: workstream_id
+              primary_key: workstream_id
         - name: ownership-percentage
           type: decimal
           required: false
@@ -197,5 +232,10 @@ domains:
           type: uuid
           required: true
           maps_to: workstream_id
+            lookup:
+              table: entity_workstreams
+              schema: kyc
+              search_key: workstream_id
+              primary_key: workstream_id
         returns:
           type: record

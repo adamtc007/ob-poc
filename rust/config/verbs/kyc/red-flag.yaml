@@ -16,10 +16,20 @@ domains:
           type: uuid
           required: true
           maps_to: case_id
+            lookup:
+              table: cases
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
         - name: workstream-id
           type: uuid
           required: false
           maps_to: workstream_id
+            lookup:
+              table: entity_workstreams
+              schema: kyc
+              search_key: workstream_id
+              primary_key: workstream_id
         - name: flag-type
           type: string
           required: true
@@ -91,6 +101,11 @@ domains:
           type: uuid
           required: true
           maps_to: red_flag_id
+            lookup:
+              table: red_flags
+              schema: kyc
+              search_key: red_flag_id
+              primary_key: red_flag_id
         - name: notes
           type: string
           required: true
@@ -115,6 +130,11 @@ domains:
           type: uuid
           required: true
           maps_to: red_flag_id
+            lookup:
+              table: red_flags
+              schema: kyc
+              search_key: red_flag_id
+              primary_key: red_flag_id
         - name: justification
           type: string
           required: true
@@ -143,6 +163,11 @@ domains:
           type: uuid
           required: true
           maps_to: red_flag_id
+            lookup:
+              table: red_flags
+              schema: kyc
+              search_key: red_flag_id
+              primary_key: red_flag_id
         - name: notes
           type: string
           required: true
@@ -165,6 +190,11 @@ domains:
           type: uuid
           required: true
           maps_to: red_flag_id
+            lookup:
+              table: red_flags
+              schema: kyc
+              search_key: red_flag_id
+              primary_key: red_flag_id
         returns:
           type: affected
       list-by-case:

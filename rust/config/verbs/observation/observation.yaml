@@ -15,10 +15,20 @@ domains:
           type: uuid
           required: true
           maps_to: entity_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         - name: attribute-id
           type: uuid
           required: true
           maps_to: attribute_id
+            lookup:
+              table: attribute_registry
+              schema: ob-poc
+              search_key: attribute_code
+              primary_key: attribute_id
         - name: value-text
           type: string
           required: false
@@ -106,6 +116,11 @@ domains:
           type: uuid
           required: true
           maps_to: observation_id
+            lookup:
+              table: attribute_observations
+              schema: ob-poc
+              search_key: observation_id
+              primary_key: observation_id
         - name: superseded-by
           type: uuid
           required: true
@@ -142,10 +157,20 @@ domains:
           type: uuid
           required: true
           maps_to: entity_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         - name: attribute-id
           type: uuid
           required: true
           maps_to: attribute_id
+            lookup:
+              table: attribute_registry
+              schema: ob-poc
+              search_key: attribute_code
+              primary_key: attribute_id
         - name: status
           type: string
           required: false

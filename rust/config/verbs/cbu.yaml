@@ -35,6 +35,11 @@ domains:
             type: uuid
             required: false
             maps_to: commercial_client_entity_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         returns:
           type: uuid
           name: cbu_id
@@ -51,6 +56,11 @@ domains:
             type: uuid
             required: true
             maps_to: cbu_id
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
         returns:
           type: record
       update:
@@ -66,6 +76,11 @@ domains:
             type: uuid
             required: true
             maps_to: cbu_id
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
           - name: name
             type: string
             required: false
@@ -86,6 +101,11 @@ domains:
             type: uuid
             required: false
             maps_to: commercial_client_entity_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         returns:
           type: affected
       delete:
@@ -101,6 +121,11 @@ domains:
             type: uuid
             required: true
             maps_to: cbu_id
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
         returns:
           type: affected
       list:
@@ -165,6 +190,11 @@ domains:
             type: uuid
             required: false
             maps_to: commercial_client_entity_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         returns:
           type: uuid
           name: cbu_id
@@ -186,10 +216,20 @@ domains:
             type: uuid
             required: true
             maps_to: cbu_id
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
           - name: entity-id
             type: uuid
             required: true
             maps_to: entity_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
           - name: role
             type: lookup
             required: true
@@ -256,6 +296,11 @@ domains:
             type: uuid
             required: true
             maps_to: cbu_id
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
           - name: category
             type: string
             required: true

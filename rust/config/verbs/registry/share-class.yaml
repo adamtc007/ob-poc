@@ -15,10 +15,20 @@ domains:
           type: uuid
           required: true
           maps_to: cbu_id
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
         - name: entity-id
           type: uuid
           required: false
           maps_to: entity_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         - name: name
           type: string
           required: true
@@ -132,10 +142,20 @@ domains:
           type: uuid
           required: true
           maps_to: cbu_id
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
         - name: entity-id
           type: uuid
           required: false
           maps_to: entity_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         - name: name
           type: string
           required: true
@@ -245,6 +265,11 @@ domains:
           type: uuid
           required: true
           maps_to: id
+            lookup:
+              table: share_classes
+              schema: kyc
+              search_key: name
+              primary_key: id
         - name: nav-per-share
           type: decimal
           required: true
@@ -267,6 +292,11 @@ domains:
           type: uuid
           required: true
           maps_to: id
+            lookup:
+              table: share_classes
+              schema: kyc
+              search_key: name
+              primary_key: id
         returns:
           type: record
       list:
@@ -302,5 +332,10 @@ domains:
           type: uuid
           required: true
           maps_to: id
+            lookup:
+              table: share_classes
+              schema: kyc
+              search_key: name
+              primary_key: id
         returns:
           type: affected

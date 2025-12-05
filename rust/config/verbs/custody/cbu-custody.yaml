@@ -20,6 +20,11 @@ domains:
             type: uuid
             required: true
             maps_to: cbu_id
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
           - name: instrument-class
             type: lookup
             required: true
@@ -93,6 +98,11 @@ domains:
             type: uuid
             required: true
             maps_to: cbu_id
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
           - name: name
             type: string
             required: true
@@ -187,6 +197,11 @@ domains:
             type: uuid
             required: true
             maps_to: ssi_id
+            lookup:
+              table: cbu_ssi
+              schema: custody
+              search_key: ssi_name
+              primary_key: ssi_id
         returns:
           type: affected
       suspend-ssi:
@@ -204,6 +219,11 @@ domains:
             type: uuid
             required: true
             maps_to: ssi_id
+            lookup:
+              table: cbu_ssi
+              schema: custody
+              search_key: ssi_name
+              primary_key: ssi_id
         returns:
           type: affected
       add-booking-rule:
@@ -219,10 +239,20 @@ domains:
             type: uuid
             required: true
             maps_to: cbu_id
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
           - name: ssi-id
             type: uuid
             required: true
             maps_to: ssi_id
+            lookup:
+              table: cbu_ssi
+              schema: custody
+              search_key: ssi_name
+              primary_key: ssi_id
           - name: name
             type: string
             required: true
@@ -318,6 +348,11 @@ domains:
             type: uuid
             required: true
             maps_to: rule_id
+            lookup:
+              table: ssi_booking_rules
+              schema: custody
+              search_key: rule_name
+              primary_key: rule_id
           - name: priority
             type: integer
             required: true
@@ -339,6 +374,11 @@ domains:
             type: uuid
             required: true
             maps_to: rule_id
+            lookup:
+              table: ssi_booking_rules
+              schema: custody
+              search_key: rule_name
+              primary_key: rule_id
         returns:
           type: affected
       derive-required-coverage:
@@ -402,6 +442,11 @@ domains:
             type: uuid
             required: true
             maps_to: ssi_id
+            lookup:
+              table: cbu_ssi
+              schema: custody
+              search_key: ssi_name
+              primary_key: ssi_id
           - name: agent-role
             type: string
             required: true
@@ -451,6 +496,11 @@ domains:
             type: uuid
             required: true
             maps_to: ssi_id
+            lookup:
+              table: cbu_ssi
+              schema: custody
+              search_key: ssi_name
+              primary_key: ssi_id
         returns:
           type: record_set
       setup-ssi:
