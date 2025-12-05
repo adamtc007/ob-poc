@@ -39,6 +39,11 @@ domains:
           type: uuid
           required: false
           maps_to: assigned_analyst_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         - name: notes
           type: string
           required: false
@@ -135,10 +140,20 @@ domains:
           type: uuid
           required: false
           maps_to: assigned_analyst_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         - name: reviewer-id
           type: uuid
           required: false
           maps_to: assigned_reviewer_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         returns:
           type: affected
       set-risk-rating:
@@ -239,6 +254,11 @@ domains:
         - name: cbu-id
           type: uuid
           required: true
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
         - name: status
           type: string
           required: false

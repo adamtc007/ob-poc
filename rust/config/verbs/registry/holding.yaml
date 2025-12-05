@@ -151,6 +151,11 @@ domains:
         - name: share-class-id
           type: uuid
           required: true
+          lookup:
+            table: share_classes
+            schema: kyc
+            search_key: name
+            primary_key: id
         - name: status
           type: string
           required: false
@@ -169,6 +174,11 @@ domains:
         - name: investor-entity-id
           type: uuid
           required: true
+          lookup:
+            table: entities
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         returns:
           type: record_set
       close:

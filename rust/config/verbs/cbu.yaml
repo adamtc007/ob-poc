@@ -256,9 +256,19 @@ domains:
           - name: cbu-id
             type: uuid
             required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
           - name: entity-id
             type: uuid
             required: true
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
           - name: role
             type: lookup
             required: true
@@ -281,6 +291,11 @@ domains:
           - name: cbu-id
             type: uuid
             required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
         returns:
           type: record_set
       set-category:
@@ -325,6 +340,11 @@ domains:
             type: uuid
             required: false
             description: CBU to check (if null, checks all CBUs)
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
         returns:
           type: record_set
           description: List of violations (empty if valid)
@@ -336,6 +356,11 @@ domains:
           - name: cbu-id
             type: uuid
             required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
           - name: product
             type: string
             required: true

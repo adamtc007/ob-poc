@@ -41,6 +41,11 @@ domains:
           type: uuid
           required: false
           maps_to: actor_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         - name: actor-type
           type: string
           required: false
@@ -71,6 +76,11 @@ domains:
         - name: case-id
           type: uuid
           required: true
+          lookup:
+            table: cases
+            schema: kyc
+            search_key: case_id
+            primary_key: case_id
         - name: event-type
           type: string
           required: false

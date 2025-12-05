@@ -290,6 +290,11 @@ domains:
         - name: holding-id
           type: uuid
           required: true
+          lookup:
+            table: holdings
+            schema: kyc
+            search_key: id
+            primary_key: id
         - name: movement-type
           type: string
           required: false

@@ -222,6 +222,11 @@ domains:
         - name: workstream-id
           type: uuid
           required: true
+          lookup:
+            table: entity_workstreams
+            schema: kyc
+            search_key: workstream_id
+            primary_key: workstream_id
         - name: status
           type: string
           required: false

@@ -33,10 +33,20 @@ domains:
           type: uuid
           required: true
           maps_to: observation_1_id
+          lookup:
+            table: attribute_observations
+            schema: ob-poc
+            search_key: observation_id
+            primary_key: observation_id
         - name: observation-2-id
           type: uuid
           required: true
           maps_to: observation_2_id
+          lookup:
+            table: attribute_observations
+            schema: ob-poc
+            search_key: observation_id
+            primary_key: observation_id
         - name: type
           type: string
           required: true
@@ -108,6 +118,11 @@ domains:
           type: uuid
           required: false
           maps_to: accepted_observation_id
+            lookup:
+              table: attribute_observations
+              schema: ob-poc
+              search_key: observation_id
+              primary_key: observation_id
         - name: notes
           type: string
           required: false

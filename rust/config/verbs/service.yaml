@@ -67,6 +67,11 @@ domains:
           - name: product-id
             type: uuid
             required: true
+            lookup:
+              table: products
+              schema: ob-poc
+              search_key: name
+              primary_key: product_id
           - name: is-mandatory
             type: boolean
             required: false

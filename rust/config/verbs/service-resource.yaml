@@ -73,6 +73,11 @@ domains:
           - name: service-id
             type: uuid
             required: true
+            lookup:
+              table: services
+              schema: ob-poc
+              search_key: name
+              primary_key: service_id
         returns:
           type: record_set
 
@@ -89,6 +94,11 @@ domains:
           - name: resource-id
             type: uuid
             required: true
+            lookup:
+              table: service_resource_types
+              schema: ob-poc
+              search_key: name
+              primary_key: resource_type_id
           - name: is-mandatory
             type: boolean
             required: false
@@ -104,6 +114,11 @@ domains:
           - name: cbu-id
             type: uuid
             required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
           - name: resource-type
             type: string
             required: true
@@ -119,9 +134,19 @@ domains:
           - name: product-id
             type: uuid
             required: false
+            lookup:
+              table: products
+              schema: ob-poc
+              search_key: name
+              primary_key: product_id
           - name: service-id
             type: uuid
             required: false
+            lookup:
+              table: services
+              schema: ob-poc
+              search_key: name
+              primary_key: service_id
           - name: config
             type: json
             required: false
@@ -138,6 +163,11 @@ domains:
           - name: instance-id
             type: uuid
             required: true
+            lookup:
+              table: cbu_resource_instances
+              schema: ob-poc
+              search_key: instance_name
+              primary_key: instance_id
           - name: attr
             type: string
             required: true
@@ -167,12 +197,22 @@ domains:
 
       suspend:
         description: Suspend a service resource instance
+            lookup:
+              table: cbu_resource_instances
+              schema: ob-poc
+              search_key: instance_name
+              primary_key: instance_id
         behavior: plugin
         handler: resource_suspend
         args:
           - name: instance-id
             type: uuid
             required: true
+            lookup:
+              table: cbu_resource_instances
+              schema: ob-poc
+              search_key: instance_name
+              primary_key: instance_id
           - name: reason
             type: string
             required: false
@@ -185,6 +225,11 @@ domains:
           - name: instance-id
             type: uuid
             required: true
+            lookup:
+              table: cbu_resource_instances
+              schema: ob-poc
+              search_key: instance_name
+              primary_key: instance_id
           - name: reason
             type: string
             required: false
@@ -197,6 +242,11 @@ domains:
           - name: instance-id
             type: uuid
             required: true
+            lookup:
+              table: cbu_resource_instances
+              schema: ob-poc
+              search_key: instance_name
+              primary_key: instance_id
         returns:
           type: record
           name: validation_result

@@ -9,6 +9,11 @@ domains:
         - name: entity-id
           type: uuid
           required: true
+          lookup:
+            table: entities
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         - name: provider
           type: string
           required: false
@@ -22,6 +27,11 @@ domains:
         - name: entity-id
           type: uuid
           required: true
+          lookup:
+            table: entities
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         - name: lists
           type: string_list
           required: false
@@ -35,6 +45,11 @@ domains:
         - name: entity-id
           type: uuid
           required: true
+          lookup:
+            table: entities
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         - name: lookback-months
           type: integer
           required: false

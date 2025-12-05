@@ -9,9 +9,19 @@ domains:
         - name: cbu-id
           type: uuid
           required: true
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
         - name: entity-id
           type: uuid
           required: true
+          lookup:
+            table: entities
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         - name: document-type
           type: lookup
           required: true
@@ -36,6 +46,11 @@ domains:
         - name: document-id
           type: uuid
           required: true
+          lookup:
+            table: document_catalog
+            schema: ob-poc
+            search_key: document_name
+            primary_key: doc_id
         - name: attributes
           type: string_list
           required: false
@@ -53,9 +68,19 @@ domains:
         - name: document-id
           type: uuid
           required: true
+          lookup:
+            table: document_catalog
+            schema: ob-poc
+            search_key: document_name
+            primary_key: doc_id
         - name: entity-id
           type: uuid
           required: true
+          lookup:
+            table: entities
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         - name: auto-verify-allegations
           type: boolean
           required: false

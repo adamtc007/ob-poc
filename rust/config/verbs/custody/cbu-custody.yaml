@@ -83,6 +83,11 @@ domains:
           - name: cbu-id
             type: uuid
             required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
         returns:
           type: record_set
       create-ssi:
@@ -172,6 +177,11 @@ domains:
           - name: cbu-id
             type: uuid
             required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
           - name: status
             type: string
             required: false
@@ -329,6 +339,11 @@ domains:
           - name: cbu-id
             type: uuid
             required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
           - name: is-active
             type: boolean
             required: false
@@ -389,6 +404,11 @@ domains:
           - name: cbu-id
             type: uuid
             required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
         returns:
           type: record_set
       validate-booking-coverage:
@@ -399,6 +419,11 @@ domains:
           - name: cbu-id
             type: uuid
             required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
         returns:
           type: record
       lookup-ssi:
@@ -409,6 +434,11 @@ domains:
           - name: cbu-id
             type: uuid
             required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
           - name: instrument-class
             type: string
             required: true
@@ -511,9 +541,19 @@ domains:
           - name: cbu-id
             type: uuid
             required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
           - name: document-id
             type: uuid
             required: true
+            lookup:
+              table: document_catalog
+              schema: ob-poc
+              search_key: document_name
+              primary_key: doc_id
           - name: validation-mode
             type: string
             required: false

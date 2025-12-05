@@ -311,6 +311,11 @@ domains:
         - name: cbu-id
           type: uuid
           required: true
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
         - name: status
           type: string
           required: false

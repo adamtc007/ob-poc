@@ -45,6 +45,11 @@ domains:
         - name: cbu-id
           type: uuid
           required: false
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
         - name: company-number
           type: string
           required: false
@@ -79,6 +84,11 @@ domains:
         - name: cbu-id
           type: uuid
           required: false
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
         - name: date-of-birth
           type: date
           required: false
@@ -109,6 +119,11 @@ domains:
         - name: cbu-id
           type: uuid
           required: false
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
         - name: jurisdiction
           type: string
           required: true
@@ -143,6 +158,11 @@ domains:
         - name: cbu-id
           type: uuid
           required: false
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
         - name: jurisdiction
           type: string
           required: false

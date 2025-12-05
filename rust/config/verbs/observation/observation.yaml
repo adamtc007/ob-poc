@@ -57,6 +57,11 @@ domains:
           type: uuid
           required: false
           maps_to: source_document_id
+          lookup:
+            table: document_catalog
+            schema: ob-poc
+            search_key: document_name
+            primary_key: doc_id
         - name: confidence
           type: decimal
           required: false
@@ -81,9 +86,19 @@ domains:
         - name: entity-id
           type: uuid
           required: true
+          lookup:
+            table: entities
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         - name: document-id
           type: uuid
           required: true
+          lookup:
+            table: document_catalog
+            schema: ob-poc
+            search_key: document_name
+            primary_key: doc_id
         - name: attribute
           type: string
           required: true
@@ -139,6 +154,11 @@ domains:
         - name: entity-id
           type: uuid
           required: true
+          lookup:
+            table: entities
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         - name: status
           type: string
           required: false
@@ -185,6 +205,11 @@ domains:
         - name: entity-id
           type: uuid
           required: true
+          lookup:
+            table: entities
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         - name: attribute
           type: string
           required: true
@@ -198,12 +223,22 @@ domains:
         - name: entity-id
           type: uuid
           required: true
+          lookup:
+            table: entities
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         - name: attribute
           type: string
           required: true
         - name: case-id
           type: uuid
           required: false
+          lookup:
+            table: cases
+            schema: kyc
+            search_key: case_id
+            primary_key: case_id
         - name: auto-create-discrepancies
           type: boolean
           required: false
@@ -218,11 +253,26 @@ domains:
         - name: cbu-id
           type: uuid
           required: true
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
         - name: entity-id
           type: uuid
           required: true
+          lookup:
+            table: entities
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         - name: case-id
           type: uuid
           required: false
+          lookup:
+            table: cases
+            schema: kyc
+            search_key: case_id
+            primary_key: case_id
         returns:
           type: record_set
