@@ -1,0 +1,162 @@
+{
+  "$schema": "https://ob-poc.example.com/schemas/ssi-onboarding/v1.json",
+  "document_type": "SSI_ONBOARDING",
+  "version": "1.0.0",
+  "metadata": {
+    "created_at": "2024-12-01T00:00:00Z",
+    "created_by": "custody_ops",
+    "client_reference": "GA-MASTER-2024",
+    "effective_date": "2024-12-01",
+    "status": "ACTIVE"
+  },
+  "settlement_instructions": [
+    {
+      "ssi_name": "US Primary",
+      "ssi_type": "SECURITIES",
+      "market_mic": "XNYS",
+      "safekeeping_account": "GA-SAFE-US-001",
+      "safekeeping_bic": "BABOROCP",
+      "safekeeping_account_name": "Global Alpha US Safekeeping",
+      "cash_account": "GA-CASH-USD-001",
+      "cash_account_bic": "BABOROCP",
+      "cash_currency": "USD",
+      "pset_bic": "DTCYUS33",
+      "effective_date": "2024-12-01",
+      "source": "MANUAL",
+      "agent_overrides": [],
+      "booking_rules": [
+        {
+          "rule_name": "US Equity USD DVP",
+          "priority": 10,
+          "instrument_class": "EQUITY",
+          "currency": "USD",
+          "settlement_type": "DVP"
+        },
+        {
+          "rule_name": "USD Currency Fallback",
+          "priority": 50,
+          "currency": "USD"
+        },
+        {
+          "rule_name": "Ultimate Fallback",
+          "priority": 100
+        }
+      ]
+    },
+    {
+      "ssi_name": "UK GBP Primary",
+      "ssi_type": "SECURITIES",
+      "market_mic": "XLON",
+      "safekeeping_account": "GA-SAFE-UK-001",
+      "safekeeping_bic": "MIDLGB22",
+      "safekeeping_account_name": "Global Alpha UK Safekeeping",
+      "cash_account": "GA-CASH-GBP-001",
+      "cash_account_bic": "MIDLGB22",
+      "cash_currency": "GBP",
+      "pset_bic": "CABOROCP",
+      "effective_date": "2024-12-01",
+      "source": "MANUAL",
+      "agent_overrides": [],
+      "booking_rules": [
+        {
+          "rule_name": "UK Equity GBP DVP",
+          "priority": 10,
+          "instrument_class": "EQUITY",
+          "currency": "GBP",
+          "settlement_type": "DVP"
+        },
+        {
+          "rule_name": "GBP Currency Fallback",
+          "priority": 50,
+          "currency": "GBP"
+        }
+      ]
+    },
+    {
+      "ssi_name": "DE EUR Primary",
+      "ssi_type": "SECURITIES",
+      "market_mic": "XETR",
+      "safekeeping_account": "GA-SAFE-DE-001",
+      "safekeeping_bic": "COBADEFF",
+      "safekeeping_account_name": "Global Alpha DE Safekeeping",
+      "cash_account": "GA-CASH-EUR-001",
+      "cash_account_bic": "COBADEFF",
+      "cash_currency": "EUR",
+      "pset_bic": "DAKVDEFF",
+      "effective_date": "2024-12-01",
+      "source": "MANUAL",
+      "agent_overrides": [],
+      "booking_rules": [
+        {
+          "rule_name": "DE Equity EUR DVP",
+          "priority": 10,
+          "instrument_class": "EQUITY",
+          "currency": "EUR",
+          "settlement_type": "DVP"
+        },
+        {
+          "rule_name": "EUR Currency Fallback",
+          "priority": 50,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "ssi_name": "JP JPY Primary",
+      "ssi_type": "SECURITIES",
+      "market_mic": "XTKS",
+      "safekeeping_account": "GA-SAFE-JP-001",
+      "safekeeping_bic": "MABORJPJ",
+      "safekeeping_account_name": "Global Alpha JP Safekeeping",
+      "cash_account": "GA-CASH-JPY-001",
+      "cash_account_bic": "MABORJPJ",
+      "cash_currency": "JPY",
+      "pset_bic": "JAABORJP",
+      "effective_date": "2024-12-01",
+      "source": "MANUAL",
+      "agent_overrides": [
+        {
+          "agent_role": "INT1",
+          "agent_bic": "SABORJPJ",
+          "agent_account": "INT-JP-001",
+          "agent_name": "Sub-Custodian Japan",
+          "sequence_order": 1,
+          "reason": "Local market requires Japanese sub-custodian"
+        }
+      ],
+      "booking_rules": [
+        {
+          "rule_name": "JP Equity JPY DVP",
+          "priority": 10,
+          "instrument_class": "EQUITY",
+          "currency": "JPY",
+          "settlement_type": "DVP"
+        }
+      ]
+    },
+    {
+      "ssi_name": "HK HKD Primary",
+      "ssi_type": "SECURITIES",
+      "market_mic": "XHKG",
+      "safekeeping_account": "GA-SAFE-HK-001",
+      "safekeeping_bic": "HABORHKH",
+      "safekeeping_account_name": "Global Alpha HK Safekeeping",
+      "cash_account": "GA-CASH-HKD-001",
+      "cash_account_bic": "HABORHKH",
+      "cash_currency": "HKD",
+      "pset_bic": "CCABORHK",
+      "effective_date": "2024-12-01",
+      "source": "MANUAL",
+      "agent_overrides": [],
+      "booking_rules": [
+        {
+          "rule_name": "HK Equity HKD DVP",
+          "priority": 10,
+          "instrument_class": "EQUITY",
+          "currency": "HKD",
+          "settlement_type": "DVP"
+        }
+      ]
+    }
+  ]
+}

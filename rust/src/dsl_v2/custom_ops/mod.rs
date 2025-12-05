@@ -32,7 +32,8 @@ use super::ast::VerbCall;
 use super::executor::{ExecutionContext, ExecutionResult};
 
 pub use custody::{
-    DeriveRequiredCoverageOp, LookupSsiForTradeOp, SubcustodianLookupOp, ValidateBookingCoverageOp,
+    DeriveRequiredCoverageOp, LookupSsiForTradeOp, SetupSsiFromDocumentOp, SubcustodianLookupOp,
+    ValidateBookingCoverageOp,
 };
 pub use rfi::{RfiCheckCompletionOp, RfiGenerateOp, RfiListByCaseOp};
 pub use threshold::{ThresholdCheckEntityOp, ThresholdDeriveOp, ThresholdEvaluateOp};
@@ -113,6 +114,7 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(LookupSsiForTradeOp));
         registry.register(Arc::new(ValidateBookingCoverageOp));
         registry.register(Arc::new(DeriveRequiredCoverageOp));
+        registry.register(Arc::new(SetupSsiFromDocumentOp));
 
         // Observation operations
         registry.register(Arc::new(ObservationFromDocumentOp));

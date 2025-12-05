@@ -8,7 +8,7 @@
 ;; --- Layer 1: Universe ---
 (cbu-custody.add-universe :cbu-id @cbu :instrument-class "EQUITY" :market "XNYS" :currencies ["USD"] :settlement-types ["DVP"])
 (cbu-custody.add-universe :cbu-id @cbu :instrument-class "EQUITY" :market "XLON" :currencies ["GBP" "USD"] :settlement-types ["DVP"])
-(cbu-custody.add-universe :cbu-id @cbu :instrument-class "EQUITY" :market "XFRA" :currencies ["EUR" "USD"] :settlement-types ["DVP"])
+(cbu-custody.add-universe :cbu-id @cbu :instrument-class "EQUITY" :market "XETR" :currencies ["EUR" "USD"] :settlement-types ["DVP"])
 
 ;; --- Layer 2: SSIs ---
 (cbu-custody.create-ssi :cbu-id @cbu :name "US Primary" :type "SECURITIES"
@@ -39,9 +39,9 @@
 (cbu-custody.add-booking-rule :cbu-id @cbu :ssi-id @ssi-us :name "UK Equity USD" :priority 16
   :instrument-class "EQUITY" :market "XLON" :currency "USD" :settlement-type "DVP" :effective-date "2024-12-01")
 (cbu-custody.add-booking-rule :cbu-id @cbu :ssi-id @ssi-de :name "DE Equity EUR" :priority 20
-  :instrument-class "EQUITY" :market "XFRA" :currency "EUR" :settlement-type "DVP" :effective-date "2024-12-01")
+  :instrument-class "EQUITY" :market "XETR" :currency "EUR" :settlement-type "DVP" :effective-date "2024-12-01")
 (cbu-custody.add-booking-rule :cbu-id @cbu :ssi-id @ssi-us :name "DE Equity USD" :priority 21
-  :instrument-class "EQUITY" :market "XFRA" :currency "USD" :settlement-type "DVP" :effective-date "2024-12-01")
+  :instrument-class "EQUITY" :market "XETR" :currency "USD" :settlement-type "DVP" :effective-date "2024-12-01")
 
 ;; Currency fallbacks (medium priority)
 (cbu-custody.add-booking-rule :cbu-id @cbu :ssi-id @ssi-us :name "USD Fallback" :priority 50 :currency "USD" :effective-date "2024-12-01")

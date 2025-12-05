@@ -6,7 +6,6 @@
 //! This enables database portability (e.g., Postgres → Oracle migration).
 
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
 use sqlx::types::Json;
 use sqlx::PgPool;
 use uuid::Uuid;

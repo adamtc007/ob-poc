@@ -867,6 +867,8 @@ The `cbu-custody` domain implements a three-layer model for settlement instructi
 | `cbu-custody.activate-ssi` | CRUD | Set SSI status to ACTIVE |
 | `cbu-custody.suspend-ssi` | CRUD | Set SSI status to SUSPENDED |
 | `cbu-custody.list-ssis` | CRUD | List CBU's SSIs |
+| `cbu-custody.add-agent-override` | CRUD | Add intermediary agent to SSI settlement chain |
+| `cbu-custody.list-agent-overrides` | CRUD | List agent overrides for an SSI |
 | `cbu-custody.add-booking-rule` | CRUD | Add ALERT-style routing rule |
 | `cbu-custody.list-booking-rules` | CRUD | List CBU's booking rules |
 | `cbu-custody.update-rule-priority` | CRUD | Change rule priority |
@@ -874,6 +876,7 @@ The `cbu-custody` domain implements a three-layer model for settlement instructi
 | `cbu-custody.validate-booking-coverage` | Plugin | Validate rules cover universe |
 | `cbu-custody.derive-required-coverage` | Plugin | Calculate required coverage |
 | `cbu-custody.lookup-ssi` | Plugin | Find SSI for trade characteristics |
+| `cbu-custody.setup-ssi` | Plugin | Bulk import SSIs from SSI_ONBOARDING document |
 
 ### Example: Full Custody Setup
 
@@ -2353,15 +2356,18 @@ CBU custody operations: Universe, SSIs, and Booking Rules
 | Verb | Description |
 |------|-------------|
 | `cbu-custody.activate-ssi` | Activate an SSI |
+| `cbu-custody.add-agent-override` | Add intermediary agent to SSI settlement chain |
 | `cbu-custody.add-booking-rule` | Add ALERT-style booking rule for SSI routing |
 | `cbu-custody.add-universe` | Declare what a CBU trades (instrument class + market + currencies) |
 | `cbu-custody.create-ssi` | Create a Standing Settlement Instruction (pure account data) |
 | `cbu-custody.deactivate-rule` | Deactivate a booking rule |
 | `cbu-custody.derive-required-coverage` | Compare universe to booking rules, find gaps |
+| `cbu-custody.list-agent-overrides` | List agent overrides for an SSI |
 | `cbu-custody.list-booking-rules` | List booking rules for a CBU |
 | `cbu-custody.list-ssis` | List SSIs for a CBU |
 | `cbu-custody.list-universe` | List CBU's traded universe |
 | `cbu-custody.lookup-ssi` | Find SSI for given trade characteristics (simulate ALERT lookup) |
+| `cbu-custody.setup-ssi` | Bulk import SSIs from SSI_ONBOARDING document |
 | `cbu-custody.suspend-ssi` | Suspend an SSI |
 | `cbu-custody.update-rule-priority` | Update booking rule priority |
 | `cbu-custody.validate-booking-coverage` | Validate that all universe entries have matching booking rules |

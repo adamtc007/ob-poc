@@ -14,25 +14,36 @@ Each market/currency combination needs Standing Settlement Instructions (SSIs).
 
 | User Says | Market Code | Primary Currency |
 |-----------|-------------|------------------|
-| US, NYSE, NASDAQ, American | XNYS | USD |
+| US, NYSE, American | XNYS | USD |
+| US, NASDAQ | XNAS | USD |
 | UK, London, LSE | XLON | GBP |
-| Germany, Frankfurt, Xetra | XFRA | EUR |
-| France, Paris, Euronext | XPAR | EUR |
+| Germany, Frankfurt, Xetra, Deutsche Boerse | XETR | EUR |
+| France, Paris, Euronext Paris | XPAR | EUR |
+| Netherlands, Amsterdam, Euronext Amsterdam | XAMS | EUR |
 | Japan, Tokyo, TSE | XTKS | JPY |
 | Hong Kong, HKEX | XHKG | HKD |
-| Switzerland, SIX | XSWX | CHF |
+| Switzerland, SIX, Zurich | XSWX | CHF |
+| Australia, ASX, Sydney | XASX | AUD |
+| Singapore, SGX | XSES | SGD |
+| Canada, Toronto, TSX | XTSE | CAD |
 
 ## Instrument Classes
 
 | User Says | Class Code |
 |-----------|------------|
 | equity, equities, stocks, shares | EQUITY |
-| government bonds, treasuries, gilts | GOVT_BOND |
-| corporate bonds | CORP_BOND |
-| ETF, exchange traded funds | ETF |
+| ADR, depositary receipts | EQUITY_ADR |
+| ETF, exchange traded funds | EQUITY_ETF |
+| government bonds, treasuries, gilts, sovereign | GOVT_BOND |
+| corporate bonds, credit | CORP_BOND |
+| fixed income, bonds (general) | FIXED_INCOME |
+| money market, commercial paper, T-bills | MONEY_MARKET |
 | interest rate swap, IRS | OTC_IRS |
 | credit default swap, CDS | OTC_CDS |
-| FX forward, currency forward | OTC_FX |
+| FX derivatives, FX options | OTC_FX |
+| equity derivatives, equity options | OTC_EQD |
+| FX spot | FX_SPOT |
+| FX forward, currency forward | FX_FORWARD |
 
 ## Extraction Rules
 
@@ -97,7 +108,7 @@ Return a JSON object matching this schema:
   "instruments": [{"class": "EQUITY", "specific_types": []}],
   "markets": [
     {"market_code": "XLON", "currencies": ["GBP", "USD"], "settlement_types": ["DVP"]},
-    {"market_code": "XFRA", "currencies": ["EUR", "USD"], "settlement_types": ["DVP"]}
+    {"market_code": "XETR", "currencies": ["EUR", "USD"], "settlement_types": ["DVP"]}
   ],
   "otc_counterparties": [],
   "explicit_requirements": [],

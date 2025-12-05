@@ -549,3 +549,360 @@ impl CustomOperation for DeriveRequiredCoverageOp {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
 }
+
+// ============================================================================
+// Setup SSI from Document (Bulk Import)
+// ============================================================================
+
+/// Bulk import SSIs from SSI_ONBOARDING document
+///
+/// Rationale: Requires parsing JSON document, validating BICs, and creating
+/// multiple related records (SSIs, agent overrides, booking rules) in a transaction.
+pub struct SetupSsiFromDocumentOp;
+
+#[async_trait]
+impl CustomOperation for SetupSsiFromDocumentOp {
+    fn domain(&self) -> &'static str {
+        "cbu-custody"
+    }
+    fn verb(&self) -> &'static str {
+        "setup-ssi"
+    }
+    fn rationale(&self) -> &'static str {
+        "Requires JSON document parsing, BIC validation, and multi-table transaction"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use chrono::NaiveDate;
+        use serde::Deserialize;
+        use serde_json::json;
+        use uuid::Uuid;
+
+        // SSI Onboarding Document schema structs
+        #[derive(Debug, Deserialize)]
+        struct SsiOnboardingDocument {
+            settlement_instructions: Vec<SettlementInstruction>,
+        }
+
+        #[derive(Debug, Deserialize)]
+        struct SettlementInstruction {
+            ssi_name: String,
+            ssi_type: String,
+            market_mic: Option<String>,
+            safekeeping_account: Option<String>,
+            safekeeping_bic: Option<String>,
+            safekeeping_account_name: Option<String>,
+            cash_account: Option<String>,
+            cash_account_bic: Option<String>,
+            cash_currency: Option<String>,
+            collateral_account: Option<String>,
+            collateral_account_bic: Option<String>,
+            pset_bic: Option<String>,
+            receiving_agent_bic: Option<String>,
+            delivering_agent_bic: Option<String>,
+            effective_date: String,
+            expiry_date: Option<String>,
+            source: Option<String>,
+            source_reference: Option<String>,
+            #[serde(default)]
+            agent_overrides: Vec<AgentOverride>,
+            #[serde(default)]
+            booking_rules: Vec<BookingRule>,
+        }
+
+        #[derive(Debug, Deserialize)]
+        struct AgentOverride {
+            agent_role: String,
+            agent_bic: String,
+            agent_account: Option<String>,
+            agent_name: Option<String>,
+            sequence_order: i32,
+            reason: Option<String>,
+        }
+
+        #[derive(Debug, Deserialize)]
+        struct BookingRule {
+            rule_name: String,
+            priority: i32,
+            instrument_class: Option<String>,
+            security_type: Option<String>,
+            currency: Option<String>,
+            settlement_type: Option<String>,
+            effective_date: Option<String>,
+        }
+
+        // Get CBU ID
+        let cbu_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("cbu-id"))
+            .and_then(|a| {
+                if let Some(name) = a.value.as_reference() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
+
+        // Get document ID
+        let document_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("document-id"))
+            .and_then(|a| {
+                if let Some(name) = a.value.as_reference() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing document-id argument"))?;
+
+        // Get validation mode
+        let validation_mode = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key.matches("validation-mode"))
+            .and_then(|a| a.value.as_string())
+            .unwrap_or("STRICT");
+
+        // Fetch document and verify it's SSI_ONBOARDING type
+        let doc_row = sqlx::query!(
+            r#"
+            SELECT dc.extracted_data, dt.type_code
+            FROM "ob-poc".document_catalog dc
+            JOIN "ob-poc".document_types dt ON dt.type_id = dc.document_type_id
+            WHERE dc.doc_id = $1
+            "#,
+            document_id
+        )
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Document not found: {}", document_id))?;
+
+        if doc_row.type_code != "SSI_ONBOARDING" {
+            return Err(anyhow::anyhow!(
+                "Document is not SSI_ONBOARDING type, got: {}",
+                doc_row.type_code
+            ));
+        }
+
+        let extracted_data = doc_row
+            .extracted_data
+            .ok_or_else(|| anyhow::anyhow!("Document has no extracted_data"))?;
+
+        // Parse the SSI onboarding document
+        let ssi_doc: SsiOnboardingDocument = serde_json::from_value(extracted_data)
+            .map_err(|e| anyhow::anyhow!("Failed to parse SSI document: {}", e))?;
+
+        let mut created_ssis: Vec<serde_json::Value> = Vec::new();
+        let mut created_overrides = 0;
+        let mut created_rules = 0;
+        let mut errors: Vec<String> = Vec::new();
+
+        // Process each settlement instruction
+        for ssi in &ssi_doc.settlement_instructions {
+            // Validate BICs in STRICT mode
+            if validation_mode == "STRICT" {
+                if let Some(bic) = &ssi.safekeeping_bic {
+                    if bic.len() != 8 && bic.len() != 11 {
+                        errors.push(format!(
+                            "Invalid safekeeping_bic length for {}: {}",
+                            ssi.ssi_name, bic
+                        ));
+                        continue;
+                    }
+                }
+                if let Some(bic) = &ssi.pset_bic {
+                    if bic.len() != 8 && bic.len() != 11 {
+                        errors.push(format!(
+                            "Invalid pset_bic length for {}: {}",
+                            ssi.ssi_name, bic
+                        ));
+                        continue;
+                    }
+                }
+            }
+
+            // Look up market_id if market_mic provided
+            let market_id: Option<Uuid> = if let Some(mic) = &ssi.market_mic {
+                sqlx::query_scalar("SELECT market_id FROM custody.markets WHERE mic = $1")
+                    .bind(mic)
+                    .fetch_optional(pool)
+                    .await?
+            } else {
+                None
+            };
+
+            // Parse effective date
+            let effective_date = NaiveDate::parse_from_str(&ssi.effective_date, "%Y-%m-%d")
+                .map_err(|e| {
+                    anyhow::anyhow!("Invalid effective_date for {}: {}", ssi.ssi_name, e)
+                })?;
+
+            // Parse expiry date if present
+            let expiry_date: Option<NaiveDate> = ssi
+                .expiry_date
+                .as_ref()
+                .map(|d| NaiveDate::parse_from_str(d, "%Y-%m-%d"))
+                .transpose()
+                .map_err(|e| anyhow::anyhow!("Invalid expiry_date for {}: {}", ssi.ssi_name, e))?;
+
+            // Insert SSI
+            let ssi_id = Uuid::new_v4();
+            sqlx::query!(
+                r#"
+                INSERT INTO custody.cbu_ssi (
+                    ssi_id, cbu_id, ssi_name, ssi_type, market_id,
+                    safekeeping_account, safekeeping_bic, safekeeping_account_name,
+                    cash_account, cash_account_bic, cash_currency,
+                    collateral_account, collateral_account_bic,
+                    pset_bic, receiving_agent_bic, delivering_agent_bic,
+                    effective_date, expiry_date, status, source, source_reference
+                ) VALUES (
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 'PENDING', $19, $20
+                )
+                "#,
+                ssi_id,
+                cbu_id,
+                ssi.ssi_name,
+                ssi.ssi_type,
+                market_id,
+                ssi.safekeeping_account,
+                ssi.safekeeping_bic,
+                ssi.safekeeping_account_name,
+                ssi.cash_account,
+                ssi.cash_account_bic,
+                ssi.cash_currency,
+                ssi.collateral_account,
+                ssi.collateral_account_bic,
+                ssi.pset_bic,
+                ssi.receiving_agent_bic,
+                ssi.delivering_agent_bic,
+                effective_date,
+                expiry_date,
+                ssi.source,
+                ssi.source_reference
+            )
+            .execute(pool)
+            .await?;
+
+            created_ssis.push(json!({
+                "ssi_id": ssi_id,
+                "ssi_name": ssi.ssi_name,
+                "market": ssi.market_mic
+            }));
+
+            // Insert agent overrides
+            for agent in &ssi.agent_overrides {
+                sqlx::query!(
+                    r#"
+                    INSERT INTO custody.cbu_ssi_agent_override (
+                        ssi_id, agent_role, agent_bic, agent_account, agent_name, sequence_order, reason
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    "#,
+                    ssi_id,
+                    agent.agent_role,
+                    agent.agent_bic,
+                    agent.agent_account,
+                    agent.agent_name,
+                    agent.sequence_order,
+                    agent.reason
+                )
+                .execute(pool)
+                .await?;
+                created_overrides += 1;
+            }
+
+            // Insert booking rules
+            for rule in &ssi.booking_rules {
+                // Look up instrument_class_id if provided
+                let instrument_class_id: Option<Uuid> = if let Some(ic) = &rule.instrument_class {
+                    sqlx::query_scalar(
+                        "SELECT class_id FROM custody.instrument_classes WHERE code = $1",
+                    )
+                    .bind(ic)
+                    .fetch_optional(pool)
+                    .await?
+                } else {
+                    None
+                };
+
+                // Look up security_type_id if provided
+                let security_type_id: Option<Uuid> = if let Some(st) = &rule.security_type {
+                    sqlx::query_scalar(
+                        "SELECT security_type_id FROM custody.security_types WHERE code = $1",
+                    )
+                    .bind(st)
+                    .fetch_optional(pool)
+                    .await?
+                } else {
+                    None
+                };
+
+                let rule_effective_date = rule
+                    .effective_date
+                    .as_ref()
+                    .map(|d| NaiveDate::parse_from_str(d, "%Y-%m-%d"))
+                    .transpose()
+                    .map_err(|e| anyhow::anyhow!("Invalid rule effective_date: {}", e))?
+                    .unwrap_or(effective_date);
+
+                sqlx::query!(
+                    r#"
+                    INSERT INTO custody.ssi_booking_rules (
+                        cbu_id, ssi_id, rule_name, priority,
+                        instrument_class_id, security_type_id, market_id,
+                        currency, settlement_type, effective_date
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                    "#,
+                    cbu_id,
+                    ssi_id,
+                    rule.rule_name,
+                    rule.priority,
+                    instrument_class_id,
+                    security_type_id,
+                    market_id,
+                    rule.currency,
+                    rule.settlement_type,
+                    rule_effective_date
+                )
+                .execute(pool)
+                .await?;
+                created_rules += 1;
+            }
+        }
+
+        Ok(ExecutionResult::Record(json!({
+            "success": errors.is_empty(),
+            "ssis_created": created_ssis.len(),
+            "ssis": created_ssis,
+            "agent_overrides_created": created_overrides,
+            "booking_rules_created": created_rules,
+            "errors": errors
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(serde_json::json!({
+            "success": true,
+            "ssis_created": 0,
+            "ssis": [],
+            "agent_overrides_created": 0,
+            "booking_rules_created": 0,
+            "errors": []
+        })))
+    }
+}

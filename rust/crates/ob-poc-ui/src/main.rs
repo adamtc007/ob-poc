@@ -8,7 +8,6 @@ mod agent_panel;
 mod api;
 mod app;
 mod graph;
-mod graph_view;
 
 use app::ObPocApp;
 
