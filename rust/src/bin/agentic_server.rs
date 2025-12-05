@@ -37,7 +37,7 @@ use tower_http::trace::TraceLayer;
 
 use ob_poc::api::{
     create_agent_router, create_attribute_router, create_dsl_viewer_router, create_entity_router,
-    create_graph_router, create_template_router,
+    create_graph_router,
 };
 
 #[tokio::main]
@@ -84,7 +84,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(create_attribute_router(pool.clone()))
         .merge(create_entity_router(pool.clone()))
         .merge(create_dsl_viewer_router(pool))
-        .merge(create_template_router())
         .layer(
             CorsLayer::new()
                 .allow_origin(Any)

@@ -51,10 +51,6 @@ pub mod planner;
 #[cfg(feature = "server")]
 pub mod api;
 
-// Template system for structured DSL generation
-#[cfg(feature = "server")]
-pub mod templates;
-
 // MCP server module (when mcp feature is enabled)
 #[cfg(feature = "mcp")]
 pub mod mcp;

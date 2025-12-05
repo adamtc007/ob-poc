@@ -8,9 +8,10 @@ import (
 
 // HealthResponse from /health
 type HealthResponse struct {
-	Status    string `json:"status"`
-	Version   string `json:"version"`
-	VerbCount int    `json:"verb_count"`
+	Status      string `json:"status"`
+	Version     string `json:"version"`
+	VerbCount   int    `json:"verb_count"`
+	DomainCount int    `json:"domain_count"`
 }
 
 // VerbsResponse from /verbs
@@ -109,11 +110,11 @@ type KycCaseDetail struct {
 
 // WorkstreamDetail for entity workstream.
 type WorkstreamDetail struct {
-	WorkstreamID uuid.UUID  `json:"workstream_id"`
-	EntityID     uuid.UUID  `json:"entity_id"`
-	Status       string     `json:"status"`
-	IsUbo        *bool      `json:"is_ubo,omitempty"`
-	RiskRating   *string    `json:"risk_rating,omitempty"`
+	WorkstreamID uuid.UUID `json:"workstream_id"`
+	EntityID     uuid.UUID `json:"entity_id"`
+	Status       string    `json:"status"`
+	IsUbo        *bool     `json:"is_ubo,omitempty"`
+	RiskRating   *string   `json:"risk_rating,omitempty"`
 }
 
 // RedFlagDetail for KYC red flag.

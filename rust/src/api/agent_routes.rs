@@ -29,7 +29,7 @@ use crate::dsl_v2::{
     compile, parse_program, verb_registry::registry, DslExecutor, ExecutionContext,
     ExecutionResult as DslV2Result,
 };
-use crate::templates::{OnboardingRenderer, OnboardingTemplateRegistry};
+
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
@@ -159,44 +159,6 @@ pub struct OnboardingExecutionResult {
     pub errors: Vec<String>,
 }
 
-/// Request to render a specific onboarding template
-#[derive(Debug, Deserialize)]
-pub struct RenderTemplateRequest {
-    /// Template ID (e.g., "onboarding_global_custody")
-    pub template_id: String,
-    /// Parameters for the template
-    pub parameters: std::collections::HashMap<String, String>,
-    /// Whether to execute the rendered DSL
-    #[serde(default)]
-    pub execute: bool,
-}
-
-/// Response listing available onboarding templates
-#[derive(Debug, Serialize)]
-pub struct OnboardingTemplatesResponse {
-    pub templates: Vec<OnboardingTemplateInfo>,
-}
-
-/// Information about an onboarding template
-#[derive(Debug, Serialize)]
-pub struct OnboardingTemplateInfo {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub product_code: String,
-    pub parameters: Vec<OnboardingParamInfo>,
-}
-
-/// Information about a template parameter
-#[derive(Debug, Serialize)]
-pub struct OnboardingParamInfo {
-    pub name: String,
-    pub display: String,
-    pub required: bool,
-    pub default: Option<String>,
-    pub options: Option<Vec<String>>,
-}
-
 // ============================================================================
 // State
 // ============================================================================
@@ -249,14 +211,6 @@ pub fn create_agent_router(pool: PgPool) -> Router {
         .route("/api/agent/health", get(health_check))
         // Onboarding
         .route("/api/agent/onboard", post(generate_onboarding_dsl))
-        .route(
-            "/api/agent/onboard/templates",
-            get(list_onboarding_templates),
-        )
-        .route(
-            "/api/agent/onboard/render",
-            post(render_onboarding_template),
-        )
         .with_state(state)
 }
 
@@ -1436,111 +1390,9 @@ async fn generate_onboarding_dsl(
     }
 }
 
-/// GET /api/agent/onboard/templates - List available onboarding templates
-async fn list_onboarding_templates() -> Json<OnboardingTemplatesResponse> {
-    let registry = OnboardingTemplateRegistry::new();
-    let templates: Vec<OnboardingTemplateInfo> = registry
-        .list()
-        .iter()
-        .map(|t| OnboardingTemplateInfo {
-            id: t.id.clone(),
-            name: t.name.clone(),
-            description: t.description.clone(),
-            product_code: t.product_code.clone(),
-            parameters: t
-                .parameters
-                .iter()
-                .map(|p| OnboardingParamInfo {
-                    name: p.name.clone(),
-                    display: p.display.clone(),
-                    required: p.required,
-                    default: p.default.clone(),
-                    options: p.options.clone(),
-                })
-                .collect(),
-        })
-        .collect();
-
-    Json(OnboardingTemplatesResponse { templates })
-}
-
-/// POST /api/agent/onboard/render - Render an onboarding template with parameters
-async fn render_onboarding_template(
-    State(state): State<AgentState>,
-    Json(req): Json<RenderTemplateRequest>,
-) -> Json<OnboardingResponse> {
-    let registry = OnboardingTemplateRegistry::new();
-
-    let template = match registry.get(&req.template_id) {
-        Some(t) => t,
-        None => {
-            return Json(OnboardingResponse {
-                dsl: None,
-                explanation: None,
-                validation: None,
-                execution: None,
-                error: Some(format!("Template not found: {}", req.template_id)),
-            });
-        }
-    };
-
-    // Render the template
-    let dsl = match OnboardingRenderer::render(template, &req.parameters) {
-        Ok(rendered) => rendered,
-        Err(e) => {
-            return Json(OnboardingResponse {
-                dsl: None,
-                explanation: None,
-                validation: None,
-                execution: None,
-                error: Some(format!("Failed to render template: {}", e)),
-            });
-        }
-    };
-
-    // Validate
-    let validation = match parse_program(&dsl) {
-        Ok(_) => ValidationResult {
-            valid: true,
-            errors: vec![],
-            warnings: vec![],
-        },
-        Err(e) => ValidationResult {
-            valid: false,
-            errors: vec![ValidationError {
-                line: None,
-                column: None,
-                message: e,
-                suggestion: None,
-            }],
-            warnings: vec![],
-        },
-    };
-
-    // Execute if requested
-    let execution = if req.execute && validation.valid {
-        match execute_onboarding_dsl(&state, &dsl).await {
-            Ok(result) => Some(result),
-            Err(e) => Some(OnboardingExecutionResult {
-                success: false,
-                cbu_id: None,
-                resource_count: 0,
-                delivery_count: 0,
-                errors: vec![e],
-            }),
-        }
-    } else {
-        None
-    };
-
-    Json(OnboardingResponse {
-        dsl: Some(dsl),
-        explanation: Some(format!("Rendered template: {}", template.name)),
-        validation: Some(validation),
-        execution,
-        error: None,
-    })
-}
+// ============================================================================
+// Helpers
+// ============================================================================
 
 /// Helper: Execute onboarding DSL and count results
 async fn execute_onboarding_dsl(
@@ -1564,7 +1416,6 @@ async fn execute_onboarding_dsl(
         .or_else(|| ctx.symbols.get("client"))
         .copied();
 
-    // Count resource instances (symbols starting with custody, settle, swift, nav, ibor, pnl)
     let resource_count = ctx
         .symbols
         .keys()
@@ -1579,7 +1430,6 @@ async fn execute_onboarding_dsl(
         })
         .count();
 
-    // Count deliveries
     let delivery_count = ctx
         .symbols
         .keys()
@@ -1594,10 +1444,6 @@ async fn execute_onboarding_dsl(
         errors: vec![],
     })
 }
-
-// ============================================================================
-// Helpers
-// ============================================================================
 
 fn get_domain_description(domain: &str) -> String {
     match domain {
