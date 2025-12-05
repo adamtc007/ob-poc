@@ -3,29 +3,34 @@
 use tower_lsp::lsp_types::*;
 
 use crate::analysis::{detect_completion_context, CompletionContext, DocumentState, SymbolTable};
+use crate::entity_client::EntityLookupClient;
 
 use ob_poc::dsl_v2::{find_unified_verb, registry};
 
 /// Generate completions based on cursor position.
-pub fn get_completions(
+pub async fn get_completions(
     doc: &DocumentState,
     position: Position,
     symbols: &SymbolTable,
+    entity_client: Option<EntityLookupClient>,
 ) -> Vec<CompletionItem> {
     let context = detect_completion_context(doc, position);
+
+    tracing::debug!(
+        "Completion context: {:?}, entity_client: {}",
+        context,
+        entity_client.is_some()
+    );
 
     match context {
         CompletionContext::VerbName { prefix } => complete_verb_names(&prefix),
         CompletionContext::Keyword { verb_name, prefix } => complete_keywords(&verb_name, &prefix),
         CompletionContext::KeywordValue {
             verb_name: _,
-            keyword: _,
-            prefix: _,
-            in_string: _,
-        } => {
-            // V2 doesn't have rich type info for value completion
-            vec![]
-        }
+            keyword,
+            prefix,
+            in_string,
+        } => complete_keyword_values(&keyword, &prefix, in_string, entity_client).await,
         CompletionContext::SymbolRef { prefix } => complete_symbols(&prefix, symbols),
         CompletionContext::None => vec![],
     }
@@ -130,6 +135,109 @@ fn complete_keywords(verb_name: &str, prefix: &str) -> Vec<CompletionItem> {
     completions
 }
 
+/// Complete keyword values - uses EntityGateway for all lookups.
+async fn complete_keyword_values(
+    keyword: &str,
+    prefix: &str,
+    in_string: bool,
+    entity_client: Option<EntityLookupClient>,
+) -> Vec<CompletionItem> {
+    tracing::debug!(
+        "complete_keyword_values: keyword={}, prefix={}, in_string={}, has_client={}",
+        keyword,
+        prefix,
+        in_string,
+        entity_client.is_some()
+    );
+
+    // Map keyword to EntityGateway nickname
+    let nickname = keyword_to_nickname(keyword);
+
+    if let Some(nickname) = nickname {
+        if let Some(mut client) = entity_client {
+            match client.search(nickname, prefix, 15).await {
+                Ok(results) => {
+                    tracing::debug!("{} lookup returned {} results", nickname, results.len());
+                    if !results.is_empty() {
+                        return results
+                            .into_iter()
+                            .enumerate()
+                            .map(|(i, m)| {
+                                // Always insert the token (UUID for entities, code for enums)
+                                // EntityGateway returns the correct value as token for each type
+                                let insert = if in_string {
+                                    m.id.clone()
+                                } else {
+                                    format!("\"{}\"", m.id)
+                                };
+
+                                let is_uuid = m.id.len() == 36 && m.id.contains('-');
+
+                                CompletionItem {
+                                    label: m.display.clone(),
+                                    kind: Some(if is_uuid {
+                                        CompletionItemKind::REFERENCE
+                                    } else {
+                                        CompletionItemKind::ENUM_MEMBER
+                                    }),
+                                    detail: Some(format!("{:.0}% match", m.score * 100.0)),
+                                    documentation: if is_uuid {
+                                        Some(Documentation::String(format!("ID: {}", m.id)))
+                                    } else {
+                                        Some(Documentation::String(format!("Code: {}", m.id)))
+                                    },
+                                    insert_text: Some(insert),
+                                    insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
+                                    filter_text: Some(m.display.clone()),
+                                    sort_text: Some(format!("{:03}", i)),
+                                    ..Default::default()
+                                }
+                            })
+                            .collect();
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("{} lookup failed: {}", nickname, e);
+                }
+            }
+        }
+    }
+
+    // No results from EntityGateway
+    vec![]
+}
+
+/// Map DSL keyword names to EntityGateway nicknames.
+fn keyword_to_nickname(keyword: &str) -> Option<&'static str> {
+    match keyword {
+        // Entity ID lookups
+        "cbu-id" => Some("cbu"),
+        "entity-id"
+        | "owner-entity-id"
+        | "owned-entity-id"
+        | "ubo-person-id"
+        | "subject-entity-id"
+        | "investor-entity-id"
+        | "commercial-client-entity-id" => Some("entity"),
+
+        // Reference data lookups
+        "role" => Some("role"),
+        "jurisdiction" => Some("jurisdiction"),
+        "currency" | "cash-currency" => Some("currency"),
+        "client-type" => Some("client_type"),
+        "case-type" => Some("case_type"),
+        "screening-type" => Some("screening_type"),
+        "risk-rating" => Some("risk_rating"),
+        "settlement-type" => Some("settlement_type"),
+        "ssi-type" | "type" => Some("ssi_type"),
+        "product-code" | "product" => Some("product"),
+        "instrument-class" => Some("instrument_class"),
+        "market" => Some("market"),
+
+        _ => None,
+    }
+}
+
 /// Complete symbol references.
 fn complete_symbols(prefix: &str, symbols: &SymbolTable) -> Vec<CompletionItem> {
     let prefix_lower = prefix.to_lowercase();
@@ -156,16 +264,27 @@ fn complete_symbols(prefix: &str, symbols: &SymbolTable) -> Vec<CompletionItem> 
 mod tests {
     use super::*;
 
+    // Note: Verb/keyword completion tests require DSL_CONFIG_DIR to be set
+    // pointing to the config directory. These are tested in integration tests.
+
     #[test]
-    fn test_verb_completions() {
-        let completions = complete_verb_names("cbu");
-        assert!(!completions.is_empty());
-        assert!(completions.iter().any(|c| c.label.starts_with("cbu.")));
+    fn test_keyword_to_nickname() {
+        assert_eq!(keyword_to_nickname("cbu-id"), Some("cbu"));
+        assert_eq!(keyword_to_nickname("role"), Some("role"));
+        assert_eq!(keyword_to_nickname("jurisdiction"), Some("jurisdiction"));
+        assert_eq!(keyword_to_nickname("currency"), Some("currency"));
+        assert_eq!(keyword_to_nickname("cash-currency"), Some("currency"));
+        assert_eq!(keyword_to_nickname("client-type"), Some("client_type"));
+        assert_eq!(keyword_to_nickname("unknown-field"), None);
     }
 
     #[test]
-    fn test_keyword_completions() {
-        let completions = complete_keywords("cbu.create", "");
-        assert!(!completions.is_empty());
+    fn test_is_id_keyword() {
+        assert!(is_id_keyword("cbu-id"));
+        assert!(is_id_keyword("entity-id"));
+        assert!(is_id_keyword("owner-entity-id"));
+        assert!(!is_id_keyword("role"));
+        assert!(!is_id_keyword("jurisdiction"));
+        assert!(!is_id_keyword("client-type"));
     }
 }

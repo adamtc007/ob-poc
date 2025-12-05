@@ -281,6 +281,100 @@ Common issues:
 - **"Invalid node type"**: `highlights.scm` or `indents.scm` uses wrong node names for the grammar
 - **Language not recognized**: Check `path_suffixes` in `config.toml`
 
+## EntityGateway (LSP Autocomplete Backend)
+
+The EntityGateway is a gRPC service providing fast fuzzy search for LSP autocomplete. It replaces direct database lookups with an in-memory Tantivy index for sub-millisecond response times.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     Zed Editor                                   │
+│  User types: (cbu.ensure :jurisdiction "Lu                      │
+└─────────────────────────────────────────────────────────────────┘
+                              │ LSP completion request
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   DSL Language Server                            │
+│  rust/crates/dsl-lsp/                                           │
+│  Maps keyword → EntityGateway nickname                          │
+└─────────────────────────────────────────────────────────────────┘
+                              │ gRPC SearchRequest
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   EntityGateway Service                          │
+│  rust/crates/entity-gateway/                                    │
+│  Port: 50051 (default)                                          │
+│  In-memory Tantivy indexes per entity type                      │
+└─────────────────────────────────────────────────────────────────┘
+                              │ Periodic refresh (300s)
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      PostgreSQL                                  │
+│  Reference tables: roles, jurisdictions, currencies, etc.       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Running EntityGateway
+
+```bash
+cd rust/crates/entity-gateway
+DATABASE_URL="postgresql:///data_designer" cargo run --release
+```
+
+The service loads all configured entities from the database on startup and refreshes every 5 minutes.
+
+### Configuration
+
+**Config file**: `rust/crates/entity-gateway/config/entity_index.yaml`
+
+Each entity defines:
+- `nickname`: Lookup key used by LSP (e.g., "role", "jurisdiction")
+- `source_table`: Database table to query
+- `return_key`: Column to return as the token (UUID or code)
+- `search_keys`: Columns to index for search
+- `index_mode`: `trigram` (fuzzy substring) or `exact` (prefix match)
+- `display_template`: How to format results (e.g., `{first_name} {last_name}`)
+
+### Index Modes
+
+| Mode | Use Case | Example |
+|------|----------|---------|
+| `trigram` | Names, descriptions | "gold" → "Goldberg, Sarah" |
+| `exact` | Codes, enums | "dir" → "DIRECTOR" |
+
+### Configured Entities (18 total)
+
+**Trigram mode** (fuzzy name search):
+- `person`, `legal_entity`, `entity`, `cbu`, `fund`, `product`, `service`
+
+**Exact mode** (code/enum lookup):
+- `role`, `jurisdiction`, `currency`, `client_type`, `case_type`
+- `screening_type`, `risk_rating`, `settlement_type`, `ssi_type`
+- `instrument_class`, `market`
+
+### LSP Keyword Mapping
+
+The LSP maps DSL keywords to EntityGateway nicknames:
+
+| DSL Keyword | Nickname |
+|-------------|----------|
+| `:cbu-id` | cbu |
+| `:entity-id`, `:owner-entity-id`, etc. | entity |
+| `:role` | role |
+| `:jurisdiction` | jurisdiction |
+| `:currency`, `:cash-currency` | currency |
+| `:client-type` | client_type |
+| `:instrument-class` | instrument_class |
+| `:market` | market |
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ENTITY_GATEWAY_URL` | `http://[::1]:50051` | gRPC endpoint for LSP |
+| `DATABASE_URL` | (required) | PostgreSQL connection string |
+
 ## Commands
 
 ### Layout Persistence

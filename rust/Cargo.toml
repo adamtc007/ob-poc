@@ -131,4 +131,5 @@ members = [
     ".",
     "crates/dsl-lsp",
     "crates/ob-poc-ui",
+    "crates/entity-gateway",
 ]

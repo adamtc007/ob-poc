@@ -1,0 +1,328 @@
+# Entity Index Configuration
+# Drives index construction and search key resolution
+# IMPORTANT: Uses existing ob-poc database tables - no new tables created
+#
+# index_mode options:
+#   trigram - ngram(3,3) for fuzzy substring search (names, descriptions)
+#   exact   - standard word tokenization for prefix/exact match (codes, enums)
+
+refresh:
+  interval_secs: 300 # 5 minutes
+  startup_mode: async # async | sync
+
+database:
+  connection_string_env: "DATABASE_URL"
+
+entities:
+  # Natural persons - maps to existing entity_proper_persons table
+  person:
+    nickname: "person"
+    source_table: '"ob-poc".entity_proper_persons'
+    return_key: "search_name" # Return full name for DSL (resolved to UUID at execution)
+    display_template: "{first_name} {last_name}"
+    index_mode: trigram # Names need fuzzy substring search
+    search_keys:
+      - name: "name"
+        column: "search_name"
+        default: true
+      - name: "first_name"
+        column: "first_name"
+      - name: "last_name"
+        column: "last_name"
+      - name: "id_document"
+        column: "id_document_number"
+    shard:
+      enabled: true
+      prefix_len: 1
+
+  # Funds - maps to existing cbus table filtered by client_type
+  fund:
+    nickname: "fund"
+    source_table: '"ob-poc".cbus'
+    return_key: "name" # Return name for DSL (resolved to UUID at execution)
+    display_template: "{name}"
+    index_mode: trigram # Fund names need fuzzy search
+    filter: "client_type IN ('FUND', 'fund')"
+    search_keys:
+      - name: "name"
+        column: "name"
+        default: true
+      - name: "jurisdiction"
+        column: "jurisdiction"
+    shard:
+      enabled: true
+      prefix_len: 2
+
+  # CBUs (all types) - maps to existing cbus table
+  cbu:
+    nickname: "cbu"
+    source_table: '"ob-poc".cbus'
+    return_key: "name" # Return name for DSL (resolved to UUID at execution)
+    display_template: "{name}"
+    index_mode: trigram # CBU names need fuzzy search
+    search_keys:
+      - name: "name"
+        column: "name"
+        default: true
+      - name: "jurisdiction"
+        column: "jurisdiction"
+      - name: "client_type"
+        column: "client_type"
+    shard:
+      enabled: true
+      prefix_len: 2
+
+  # Products - maps to existing products table
+  product:
+    nickname: "product"
+    source_table: '"ob-poc".products'
+    return_key: "product_code" # Return the code for DSL insertion
+    display_template: "{name} ({product_code})"
+    index_mode: exact # Codes should use exact match
+    filter: "is_active = true"
+    search_keys:
+      - name: "name"
+        column: "name"
+        default: true
+      - name: "product_code"
+        column: "product_code"
+    shard:
+      enabled: false # Small table, no sharding
+
+  # Legal entities (companies) - maps to existing entity_limited_companies table
+  legal_entity:
+    nickname: "legal_entity"
+    source_table: '"ob-poc".entity_limited_companies'
+    return_key: "company_name" # Return name for DSL (resolved to UUID at execution)
+    display_template: "{company_name}"
+    index_mode: trigram # Company names need fuzzy search
+    search_keys:
+      - name: "name"
+        column: "company_name"
+        default: true
+      - name: "registration_number"
+        column: "registration_number"
+      - name: "jurisdiction"
+        column: "jurisdiction"
+    shard:
+      enabled: true
+      prefix_len: 1
+
+  # Generic entities - maps to base entities table
+  entity:
+    nickname: "entity"
+    source_table: '"ob-poc".entities'
+    return_key: "name" # Return name for DSL (resolved to UUID at execution)
+    display_template: "{name}"
+    index_mode: trigram # Entity names need fuzzy search
+    search_keys:
+      - name: "name"
+        column: "name"
+        default: true
+      - name: "external_id"
+        column: "external_id"
+    shard:
+      enabled: true
+      prefix_len: 1
+
+  # Services - maps to existing services table
+  service:
+    nickname: "service"
+    source_table: '"ob-poc".services'
+    return_key: "service_code" # Return code for DSL
+    display_template: "{name}"
+    index_mode: exact # Service codes use exact match
+    filter: "is_active = true"
+    search_keys:
+      - name: "name"
+        column: "name"
+        default: true
+      - name: "service_code"
+        column: "service_code"
+    shard:
+      enabled: false
+
+  # ============================================
+  # REFERENCE DATA TABLES (small lookup tables)
+  # ============================================
+
+  # Roles - entity roles within a CBU
+  role:
+    nickname: "role"
+    source_table: '"ob-poc".roles'
+    return_key: "name"
+    display_template: "{name}"
+    index_mode: exact # Short code list, prefix match is fine
+    search_keys:
+      - name: "name"
+        column: "name"
+        default: true
+    shard:
+      enabled: false
+
+  # Jurisdictions
+  jurisdiction:
+    nickname: "jurisdiction"
+    source_table: '"ob-poc".master_jurisdictions'
+    return_key: "jurisdiction_code"
+    display_template: "{jurisdiction_name}"
+    index_mode: exact
+    search_keys:
+      - name: "code"
+        column: "jurisdiction_code"
+        default: true
+      - name: "name"
+        column: "jurisdiction_name"
+    shard:
+      enabled: false
+
+  # Currencies
+  currency:
+    nickname: "currency"
+    source_table: '"ob-poc".currencies'
+    return_key: "iso_code"
+    display_template: "{name}"
+    index_mode: exact
+    filter: "is_active = true"
+    search_keys:
+      - name: "code"
+        column: "iso_code"
+        default: true
+      - name: "name"
+        column: "name"
+    shard:
+      enabled: false
+
+  # Client Types
+  client_type:
+    nickname: "client_type"
+    source_table: '"ob-poc".client_types'
+    return_key: "code"
+    display_template: "{name}"
+    index_mode: exact
+    filter: "is_active = true"
+    search_keys:
+      - name: "code"
+        column: "code"
+        default: true
+      - name: "name"
+        column: "name"
+    shard:
+      enabled: false
+
+  # Case Types (KYC)
+  case_type:
+    nickname: "case_type"
+    source_table: '"ob-poc".case_types'
+    return_key: "code"
+    display_template: "{name}"
+    index_mode: exact
+    filter: "is_active = true"
+    search_keys:
+      - name: "code"
+        column: "code"
+        default: true
+      - name: "name"
+        column: "name"
+    shard:
+      enabled: false
+
+  # Screening Types
+  screening_type:
+    nickname: "screening_type"
+    source_table: '"ob-poc".screening_types'
+    return_key: "code"
+    display_template: "{name}"
+    index_mode: exact
+    filter: "is_active = true"
+    search_keys:
+      - name: "code"
+        column: "code"
+        default: true
+      - name: "name"
+        column: "name"
+    shard:
+      enabled: false
+
+  # Risk Ratings
+  risk_rating:
+    nickname: "risk_rating"
+    source_table: '"ob-poc".risk_ratings'
+    return_key: "code"
+    display_template: "{name}"
+    index_mode: exact
+    filter: "is_active = true"
+    search_keys:
+      - name: "code"
+        column: "code"
+        default: true
+      - name: "name"
+        column: "name"
+    shard:
+      enabled: false
+
+  # Settlement Types
+  settlement_type:
+    nickname: "settlement_type"
+    source_table: '"ob-poc".settlement_types'
+    return_key: "code"
+    display_template: "{name}"
+    index_mode: exact
+    filter: "is_active = true"
+    search_keys:
+      - name: "code"
+        column: "code"
+        default: true
+      - name: "name"
+        column: "name"
+    shard:
+      enabled: false
+
+  # SSI Types
+  ssi_type:
+    nickname: "ssi_type"
+    source_table: '"ob-poc".ssi_types'
+    return_key: "code"
+    display_template: "{name}"
+    index_mode: exact
+    filter: "is_active = true"
+    search_keys:
+      - name: "code"
+        column: "code"
+        default: true
+      - name: "name"
+        column: "name"
+    shard:
+      enabled: false
+
+  # Instrument Classes (custody schema)
+  instrument_class:
+    nickname: "instrument_class"
+    source_table: "custody.instrument_classes"
+    return_key: "class_id"
+    display_template: "{name}"
+    index_mode: exact
+    search_keys:
+      - name: "code"
+        column: "code"
+        default: true
+      - name: "name"
+        column: "name"
+    shard:
+      enabled: false
+
+  # Markets (custody schema)
+  market:
+    nickname: "market"
+    source_table: "custody.markets"
+    return_key: "market_id"
+    display_template: "{market_name}"
+    index_mode: exact
+    search_keys:
+      - name: "mic"
+        column: "mic"
+        default: true
+      - name: "name"
+        column: "market_name"
+    shard:
+      enabled: false

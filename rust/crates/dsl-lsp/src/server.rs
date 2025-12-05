@@ -8,6 +8,7 @@ use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer};
 
 use crate::analysis::{DocumentState, SymbolTable};
+use crate::entity_client::{gateway_addr, EntityLookupClient};
 use crate::handlers;
 
 /// DSL Language Server state.
@@ -18,6 +19,8 @@ pub struct DslLanguageServer {
     documents: Arc<RwLock<HashMap<Url, DocumentState>>>,
     /// Session symbol table (shared across documents)
     symbols: Arc<RwLock<SymbolTable>>,
+    /// Entity Gateway client for lookups (replaces direct DB access)
+    entity_client: Arc<RwLock<Option<EntityLookupClient>>>,
 }
 
 impl DslLanguageServer {
@@ -27,6 +30,36 @@ impl DslLanguageServer {
             client,
             documents: Arc::new(RwLock::new(HashMap::new())),
             symbols: Arc::new(RwLock::new(SymbolTable::new())),
+            entity_client: Arc::new(RwLock::new(None)),
+        }
+    }
+
+    /// Initialize EntityGateway connection (called from initialized())
+    async fn init_entity_gateway(&self) {
+        let addr = gateway_addr();
+        tracing::info!("Connecting to EntityGateway at {}", addr);
+
+        match EntityLookupClient::connect(&addr).await {
+            Ok(client) => {
+                tracing::info!("Connected to EntityGateway");
+                *self.entity_client.write().await = Some(client);
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to connect to EntityGateway: {}. Lookups will be unavailable.",
+                    e
+                );
+            }
+        }
+    }
+
+    /// Get the entity client (if connected)
+    pub async fn get_entity_client(&self) -> Option<EntityLookupClient> {
+        // Clone the client for use - we need to reconnect each time since gRPC clients are !Clone
+        let addr = gateway_addr();
+        match EntityLookupClient::connect(&addr).await {
+            Ok(client) => Some(client),
+            Err(_) => None,
         }
     }
 
@@ -45,19 +78,19 @@ impl DslLanguageServer {
     /// Analyze a document and publish diagnostics.
     async fn analyze_document(&self, uri: &Url, text: &str) {
         let (state, diagnostics) = handlers::diagnostics::analyze_document(text);
-        
+
         // Store document state
         {
             let mut docs = self.documents.write().await;
             docs.insert(uri.clone(), state.clone());
         }
-        
+
         // Update symbol table from this document
         {
             let mut symbols = self.symbols.write().await;
             symbols.merge_from_document(uri, &state);
         }
-        
+
         // Publish diagnostics
         self.publish_diagnostics(uri.clone(), diagnostics).await;
     }
@@ -67,14 +100,14 @@ impl DslLanguageServer {
 impl LanguageServer for DslLanguageServer {
     async fn initialize(&self, _: InitializeParams) -> Result<InitializeResult> {
         tracing::info!("Initializing DSL Language Server");
-        
+
         Ok(InitializeResult {
             capabilities: ServerCapabilities {
                 // Incremental sync for efficiency
                 text_document_sync: Some(TextDocumentSyncCapability::Kind(
                     TextDocumentSyncKind::INCREMENTAL,
                 )),
-                
+
                 // Completion support
                 completion_provider: Some(CompletionOptions {
                     resolve_provider: Some(false),
@@ -87,26 +120,26 @@ impl LanguageServer for DslLanguageServer {
                     ]),
                     ..Default::default()
                 }),
-                
+
                 // Hover support
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
-                
+
                 // Go to definition
                 definition_provider: Some(OneOf::Left(true)),
-                
+
                 // Find references
                 references_provider: Some(OneOf::Left(true)),
-                
+
                 // Signature help
                 signature_help_provider: Some(SignatureHelpOptions {
                     trigger_characters: Some(vec!["(".to_string(), " ".to_string()]),
                     retrigger_characters: Some(vec![" ".to_string()]),
                     ..Default::default()
                 }),
-                
+
                 // Document symbols (outline)
                 document_symbol_provider: Some(OneOf::Left(true)),
-                
+
                 ..Default::default()
             },
             server_info: Some(ServerInfo {
@@ -118,6 +151,10 @@ impl LanguageServer for DslLanguageServer {
 
     async fn initialized(&self, _: InitializedParams) {
         tracing::info!("DSL Language Server initialized");
+
+        // Initialize EntityGateway connection
+        self.init_entity_gateway().await;
+
         self.client
             .log_message(MessageType::INFO, "DSL Language Server ready")
             .await;
@@ -136,7 +173,7 @@ impl LanguageServer for DslLanguageServer {
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
         tracing::debug!("Document changed: {}", params.text_document.uri);
-        
+
         // Get full text from incremental changes
         if let Some(doc) = self.get_document(&params.text_document.uri).await {
             let mut text = doc.text.clone();
@@ -151,44 +188,49 @@ impl LanguageServer for DslLanguageServer {
                     text = change.text;
                 }
             }
-            self.analyze_document(&params.text_document.uri, &text).await;
+            self.analyze_document(&params.text_document.uri, &text)
+                .await;
         }
     }
 
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
         tracing::debug!("Document closed: {}", params.text_document.uri);
-        
+
         // Remove document state
         {
             let mut docs = self.documents.write().await;
             docs.remove(&params.text_document.uri);
         }
-        
+
         // Clear diagnostics
-        self.publish_diagnostics(params.text_document.uri, vec![]).await;
+        self.publish_diagnostics(params.text_document.uri, vec![])
+            .await;
     }
 
     async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
         let uri = &params.text_document_position.text_document.uri;
         let position = params.text_document_position.position;
-        
+
         if let Some(doc) = self.get_document(uri).await {
             let symbols = self.symbols.read().await;
-            let completions = handlers::completion::get_completions(&doc, position, &symbols);
+            let entity_client = self.get_entity_client().await;
+            let completions =
+                handlers::completion::get_completions(&doc, position, &symbols, entity_client)
+                    .await;
             return Ok(Some(CompletionResponse::Array(completions)));
         }
-        
+
         Ok(None)
     }
 
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
         let uri = &params.text_document_position_params.text_document.uri;
         let position = params.text_document_position_params.position;
-        
+
         if let Some(doc) = self.get_document(uri).await {
             return Ok(handlers::hover::get_hover(&doc, position));
         }
-        
+
         Ok(None)
     }
 
@@ -198,35 +240,39 @@ impl LanguageServer for DslLanguageServer {
     ) -> Result<Option<GotoDefinitionResponse>> {
         let uri = &params.text_document_position_params.text_document.uri;
         let position = params.text_document_position_params.position;
-        
+
         if let Some(doc) = self.get_document(uri).await {
             let symbols = self.symbols.read().await;
-            return Ok(handlers::goto_definition::get_definition(&doc, position, &symbols));
+            return Ok(handlers::goto_definition::get_definition(
+                &doc, position, &symbols,
+            ));
         }
-        
+
         Ok(None)
     }
 
     async fn references(&self, params: ReferenceParams) -> Result<Option<Vec<Location>>> {
         let uri = &params.text_document_position.text_document.uri;
         let position = params.text_document_position.position;
-        
+
         if let Some(doc) = self.get_document(uri).await {
             let symbols = self.symbols.read().await;
-            return Ok(handlers::goto_definition::get_references(&doc, position, &symbols));
+            return Ok(handlers::goto_definition::get_references(
+                &doc, position, &symbols,
+            ));
         }
-        
+
         Ok(None)
     }
 
     async fn signature_help(&self, params: SignatureHelpParams) -> Result<Option<SignatureHelp>> {
         let uri = &params.text_document_position_params.text_document.uri;
         let position = params.text_document_position_params.position;
-        
+
         if let Some(doc) = self.get_document(uri).await {
             return Ok(handlers::signature::get_signature_help(&doc, position));
         }
-        
+
         Ok(None)
     }
 
@@ -235,12 +281,12 @@ impl LanguageServer for DslLanguageServer {
         params: DocumentSymbolParams,
     ) -> Result<Option<DocumentSymbolResponse>> {
         let uri = &params.text_document.uri;
-        
+
         if let Some(doc) = self.get_document(uri).await {
             let symbols = handlers::symbols::get_document_symbols(&doc);
             return Ok(Some(DocumentSymbolResponse::Flat(symbols)));
         }
-        
+
         Ok(None)
     }
 }

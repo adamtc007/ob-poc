@@ -1,4 +1,22 @@
 {
+  "file_types": {
+    "Clojure": ["dsl", "obdsl"]
+  },
+  "lsp": {
+    "dsl-lsp": {
+      "binary": {
+        "path": "/Users/adamtc007/Developer/ob-poc/rust/target/release/dsl-lsp",
+        "env": {
+          "DSL_CONFIG_DIR": "/Users/adamtc007/Developer/ob-poc/rust/config"
+        }
+      }
+    }
+  },
+  "languages": {
+    "Clojure": {
+      "language_servers": ["dsl-lsp", "!clojure-lsp"]
+    }
+  },
   "assistant": {
     "default_model": {
       "provider": "copilot_chat",

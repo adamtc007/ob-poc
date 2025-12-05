@@ -7,27 +7,41 @@
 //! - Hover documentation for verbs
 //! - Signature help while typing
 
+use std::fs::OpenOptions;
 use tower_lsp::{LspService, Server};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-mod server;
-mod handlers;
 mod analysis;
+mod entity_client;
+mod handlers;
+mod server;
 
 use server::DslLanguageServer;
 
 #[tokio::main]
 async fn main() {
-    // Setup logging to stderr (LSP uses stdout for protocol)
+    // Setup logging to file for debugging (LSP uses stdout for protocol)
+    let log_file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/tmp/dsl-lsp.log")
+        .expect("Failed to open log file");
+
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "dsl_lsp=debug".into()),
+                .unwrap_or_else(|_| "dsl_lsp=debug,ob_poc=debug".into()),
         )
-        .with(tracing_subscriber::fmt::layer().with_writer(std::io::stderr))
+        .with(tracing_subscriber::fmt::layer().with_writer(std::sync::Mutex::new(log_file)))
         .init();
 
     tracing::info!("Starting DSL Language Server");
+    tracing::info!("DSL_CONFIG_DIR: {:?}", std::env::var("DSL_CONFIG_DIR"));
+    tracing::info!(
+        "ENTITY_GATEWAY_URL: {:?}",
+        std::env::var("ENTITY_GATEWAY_URL")
+            .unwrap_or_else(|_| "http://[::1]:50051 (default)".to_string())
+    );
 
     // Create LSP service
     let stdin = tokio::io::stdin();

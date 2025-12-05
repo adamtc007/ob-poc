@@ -1,0 +1,44 @@
+[package]
+name = "entity-gateway"
+version = "0.1.0"
+edition = "2021"
+description = "Read-only Entity Resolution Gateway with Tantivy-based fuzzy search"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# gRPC
+tonic = "0.12"
+prost = "0.13"
+
+# Search engine
+tantivy = "0.22"
+
+# Database
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+
+# Error handling
+thiserror = "1"
+anyhow = "1"
+
+# Async traits
+async-trait = "0.1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# UUID
+uuid = { version = "1.4", features = ["v4", "serde"] }
+
+[build-dependencies]
+tonic-build = "0.12"
+
+[[bin]]
+name = "entity-gateway"
+path = "src/main.rs"

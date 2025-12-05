@@ -1,0 +1,103 @@
+domains:
+  jurisdiction:
+    description: Jurisdiction reference data (US, GB, LU, etc.)
+    verbs:
+      ensure:
+        description: Create or update a jurisdiction
+        behavior: crud
+        crud:
+          operation: upsert
+          table: master_jurisdictions
+          schema: ob-poc
+          conflict_keys:
+            - jurisdiction_code
+          returning: jurisdiction_code
+        args:
+          - name: code
+            type: string
+            required: true
+            maps_to: jurisdiction_code
+          - name: name
+            type: string
+            required: true
+            maps_to: jurisdiction_name
+          - name: country-code
+            type: string
+            required: true
+            maps_to: country_code
+          - name: region
+            type: string
+            required: false
+            maps_to: region
+          - name: regulatory-framework
+            type: string
+            required: false
+            maps_to: regulatory_framework
+          - name: entity-formation-allowed
+            type: boolean
+            required: false
+            maps_to: entity_formation_allowed
+            default: true
+          - name: offshore
+            type: boolean
+            required: false
+            maps_to: offshore_jurisdiction
+            default: false
+          - name: regulatory-authority
+            type: string
+            required: false
+            maps_to: regulatory_authority
+        returns:
+          type: string
+          name: jurisdiction_code
+          capture: true
+
+      read:
+        description: Read a jurisdiction by code
+        behavior: crud
+        crud:
+          operation: select
+          table: master_jurisdictions
+          schema: ob-poc
+        args:
+          - name: code
+            type: string
+            required: true
+            maps_to: jurisdiction_code
+        returns:
+          type: record
+
+      list:
+        description: List all jurisdictions
+        behavior: crud
+        crud:
+          operation: select
+          table: master_jurisdictions
+          schema: ob-poc
+          order_by: jurisdiction_code
+        args:
+          - name: region
+            type: string
+            required: false
+            maps_to: region
+          - name: offshore
+            type: boolean
+            required: false
+            maps_to: offshore_jurisdiction
+        returns:
+          type: record_set
+
+      delete:
+        description: Delete a jurisdiction
+        behavior: crud
+        crud:
+          operation: delete
+          table: master_jurisdictions
+          schema: ob-poc
+        args:
+          - name: code
+            type: string
+            required: true
+            maps_to: jurisdiction_code
+        returns:
+          type: void

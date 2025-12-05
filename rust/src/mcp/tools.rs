@@ -146,16 +146,16 @@ pub fn get_tools() -> Vec<Tool> {
                 "properties": {
                     "lookup_type": {
                         "type": "string",
-                        "enum": ["cbu", "entity", "document", "product", "service", "kyc_case"],
-                        "description": "Type of record to look up"
+                        "enum": ["cbu", "entity", "document", "product", "service", "kyc_case", "attribute"],
+                        "description": "Type of record to look up. Use 'attribute' for attribute IDs (e.g., attr.identity.first_name)"
                     },
                     "search": {
                         "type": "string",
-                        "description": "Text search on name/display (case-insensitive)"
+                        "description": "Text search on name/id/display (case-insensitive)"
                     },
                     "filters": {
                         "type": "object",
-                        "description": "Filter criteria: document_type, entity_type, status, jurisdiction, client_type, cbu_id"
+                        "description": "Filter criteria varies by type. For attribute: category, value_type, domain. For document: document_type, cbu_id. For entity: entity_type. For cbu: jurisdiction, client_type."
                     },
                     "limit": {
                         "type": "integer",

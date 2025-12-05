@@ -29,7 +29,10 @@ pub enum CompletionContext {
 pub fn detect_completion_context(doc: &DocumentState, position: Position) -> CompletionContext {
     let line = match doc.get_line(position.line) {
         Some(l) => l,
-        None => return CompletionContext::None,
+        None => {
+            tracing::debug!("No line at position {}", position.line);
+            return CompletionContext::None;
+        }
     };
 
     let col = position.character as usize;
@@ -38,6 +41,13 @@ pub fn detect_completion_context(doc: &DocumentState, position: Position) -> Com
     } else {
         line
     };
+
+    tracing::debug!(
+        "Context detection: line={}, col={}, prefix='{}'",
+        position.line,
+        col,
+        prefix
+    );
 
     // Check for symbol reference: @
     if let Some(at_pos) = prefix.rfind('@') {
@@ -287,6 +297,87 @@ mod tests {
         match ctx {
             CompletionContext::SymbolRef { prefix } => assert_eq!(prefix, "co"),
             _ => panic!("Expected SymbolRef context"),
+        }
+    }
+
+    #[test]
+    fn test_keyword_value_completion_cbu_id() {
+        // After `:cbu-id ` - should complete CBU ID values
+        let doc = make_doc("(cbu.assign-role :cbu-id ");
+        let ctx = detect_completion_context(
+            &doc,
+            Position {
+                line: 0,
+                character: 25,
+            },
+        );
+        match ctx {
+            CompletionContext::KeywordValue {
+                verb_name,
+                keyword,
+                prefix,
+                ..
+            } => {
+                assert_eq!(verb_name, "cbu.assign-role");
+                assert_eq!(keyword, "cbu-id");
+                assert_eq!(prefix, "");
+            }
+            other => panic!("Expected KeywordValue context, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_keyword_value_completion_with_partial() {
+        // Typing after `:cbu-id "Ap` - should complete with prefix
+        let doc = make_doc("(cbu.assign-role :cbu-id \"Ap");
+        let ctx = detect_completion_context(
+            &doc,
+            Position {
+                line: 0,
+                character: 28,
+            },
+        );
+        match ctx {
+            CompletionContext::KeywordValue {
+                verb_name,
+                keyword,
+                prefix,
+                in_string,
+            } => {
+                assert_eq!(verb_name, "cbu.assign-role");
+                assert_eq!(keyword, "cbu-id");
+                assert_eq!(prefix, "Ap");
+                assert!(in_string);
+            }
+            other => panic!("Expected KeywordValue context, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_multiline_keyword_value() {
+        // Test with comment line before, simulating real file
+        let doc = make_doc(";; Test CBU completion\n(cbu.assign-role :cbu-id \"Ap");
+        let ctx = detect_completion_context(
+            &doc,
+            Position {
+                line: 1,
+                character: 28,
+            },
+        );
+        println!("Context: {:?}", ctx);
+        match ctx {
+            CompletionContext::KeywordValue {
+                verb_name,
+                keyword,
+                prefix,
+                in_string,
+            } => {
+                assert_eq!(verb_name, "cbu.assign-role");
+                assert_eq!(keyword, "cbu-id");
+                assert_eq!(prefix, "Ap");
+                assert!(in_string);
+            }
+            other => panic!("Expected KeywordValue context, got {:?}", other),
         }
     }
 }

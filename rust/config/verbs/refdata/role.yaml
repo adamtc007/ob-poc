@@ -1,0 +1,69 @@
+domains:
+  role:
+    description: Entity role reference data (DIRECTOR, UBO, SHAREHOLDER, etc.)
+    verbs:
+      ensure:
+        description: Create or update a role
+        behavior: crud
+        crud:
+          operation: upsert
+          table: roles
+          schema: ob-poc
+          conflict_keys:
+            - name
+          returning: role_id
+        args:
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+          - name: description
+            type: string
+            required: false
+            maps_to: description
+        returns:
+          type: uuid
+          name: role_id
+          capture: true
+
+      read:
+        description: Read a role by name
+        behavior: crud
+        crud:
+          operation: select
+          table: roles
+          schema: ob-poc
+        args:
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+        returns:
+          type: record
+
+      list:
+        description: List all roles
+        behavior: crud
+        crud:
+          operation: select
+          table: roles
+          schema: ob-poc
+          order_by: name
+        args: []
+        returns:
+          type: record_set
+
+      delete:
+        description: Delete a role
+        behavior: crud
+        crud:
+          operation: delete
+          table: roles
+          schema: ob-poc
+        args:
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+        returns:
+          type: void

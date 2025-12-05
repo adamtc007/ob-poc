@@ -763,8 +763,49 @@ impl ToolHandlers {
                 }))
             }
 
+            "attribute" => {
+                let category = filters["category"].as_str();
+                let value_type = filters["value_type"].as_str();
+                let domain = filters["domain"].as_str();
+
+                let rows = sqlx::query!(
+                    r#"
+                    SELECT id, uuid, display_name, category, value_type, domain, is_required
+                    FROM "ob-poc".attribute_registry
+                    WHERE ($1::text IS NULL OR LOWER(id) LIKE LOWER('%' || $1 || '%')
+                           OR LOWER(display_name) LIKE LOWER('%' || $1 || '%'))
+                      AND ($2::text IS NULL OR category = $2)
+                      AND ($3::text IS NULL OR value_type = $3)
+                      AND ($4::text IS NULL OR domain = $4)
+                    ORDER BY category, id
+                    LIMIT $5
+                    "#,
+                    search,
+                    category,
+                    value_type,
+                    domain,
+                    limit
+                )
+                .fetch_all(&self.pool)
+                .await?;
+
+                Ok(json!({
+                    "type": "attribute",
+                    "count": rows.len(),
+                    "results": rows.iter().map(|r| json!({
+                        "id": r.id,
+                        "uuid": r.uuid.to_string(),
+                        "display_name": r.display_name,
+                        "category": r.category,
+                        "value_type": r.value_type,
+                        "domain": r.domain,
+                        "is_required": r.is_required
+                    })).collect::<Vec<_>>()
+                }))
+            }
+
             _ => Err(anyhow!(
-                "Unknown lookup_type: {}. Valid types: cbu, entity, document, product, service, kyc_case",
+                "Unknown lookup_type: {}. Valid types: cbu, entity, document, product, service, kyc_case, attribute",
                 lookup_type
             )),
         }

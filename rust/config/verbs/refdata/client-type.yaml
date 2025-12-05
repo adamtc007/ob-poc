@@ -1,0 +1,92 @@
+domains:
+  client-type:
+    description: Client type reference data (FUND, CORPORATE, etc.)
+    verbs:
+      ensure:
+        description: Create or update a client type
+        behavior: crud
+        crud:
+          operation: upsert
+          table: client_types
+          schema: ob-poc
+          conflict_keys:
+            - code
+          returning: code
+        args:
+          - name: code
+            type: string
+            required: true
+            maps_to: code
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+          - name: description
+            type: string
+            required: false
+            maps_to: description
+          - name: display-order
+            type: integer
+            required: false
+            maps_to: display_order
+            default: 0
+          - name: is-active
+            type: boolean
+            required: false
+            maps_to: is_active
+            default: true
+        returns:
+          type: string
+          name: code
+          capture: true
+
+      read:
+        description: Read a client type by code
+        behavior: crud
+        crud:
+          operation: select
+          table: client_types
+          schema: ob-poc
+        args:
+          - name: code
+            type: string
+            required: true
+            maps_to: code
+        returns:
+          type: record
+
+      list:
+        description: List all client types
+        behavior: crud
+        crud:
+          operation: select
+          table: client_types
+          schema: ob-poc
+          order_by: display_order
+        args:
+          - name: is-active
+            type: boolean
+            required: false
+            maps_to: is_active
+        returns:
+          type: record_set
+
+      deactivate:
+        description: Deactivate a client type
+        behavior: crud
+        crud:
+          operation: update
+          table: client_types
+          schema: ob-poc
+        args:
+          - name: code
+            type: string
+            required: true
+            maps_to: code
+          - name: is-active
+            type: boolean
+            required: false
+            maps_to: is_active
+            default: false
+        returns:
+          type: void

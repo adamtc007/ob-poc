@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package ob.gateway.v1;
+
+// EntityGateway - Read-only entity resolution service.
+// Single facade for all consumers: LSP, Parser, Linter, Runtime, Batch Agent.
+service EntityGateway {
+  // Search resolves entity references by nickname and input value(s).
+  // Supports single or batch lookups, fuzzy or exact matching.
+  rpc Search(SearchRequest) returns (SearchResponse);
+}
+
+message SearchRequest {
+  // Entity type identifier (e.g., "person", "fund", "product")
+  string nickname = 1;
+
+  // One or more values to resolve
+  repeated string values = 2;
+
+  // Optional: specific search key (defaults to entity's primary search key)
+  optional string search_key = 3;
+
+  // Optional: matching mode (defaults to FUZZY)
+  SearchMode mode = 4;
+
+  // Optional: max results per input value (defaults to 10)
+  optional int32 limit = 5;
+}
+
+enum SearchMode {
+  FUZZY = 0;    // Prefix match, ranked by relevance
+  EXACT = 1;    // Precise match only
+}
+
+message SearchResponse {
+  repeated Match matches = 1;
+}
+
+message Match {
+  string input = 1;     // Echo: which input value this matched
+  string display = 2;   // Human-readable label for UI
+  string token = 3;     // Resolved ID/UUID for DSL insertion
+  float score = 4;      // Relevance score (meaningful in FUZZY mode)
+}

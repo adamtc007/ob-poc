@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict B2XyN99cke6WN6KofWcvIeIcPj29PHpIsJMoepAJeN3XVheeY0nr5JxeC4SiG0Z
+\restrict sKjtb1rYccjHQ9ZW1cOe9jZey7GZCeexvGnosXpaeaMD5xXoZRNV4OKfgE8Qvh9
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -2857,6 +2857,19 @@ COMMENT ON TABLE "ob-poc".case_evaluation_snapshots IS 'Audit trail of case eval
 
 
 --
+-- Name: case_types; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".case_types (
+    code character varying(50) NOT NULL,
+    name character varying(100) NOT NULL,
+    description text,
+    is_active boolean DEFAULT true,
+    display_order integer DEFAULT 0
+);
+
+
+--
 -- Name: cbu_change_log; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -2940,6 +2953,20 @@ CREATE TABLE "ob-poc".cbu_evidence (
 --
 
 COMMENT ON TABLE "ob-poc".cbu_evidence IS 'Evidence/documentation attached to CBUs for validation';
+
+
+--
+-- Name: cbu_layout_overrides; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".cbu_layout_overrides (
+    cbu_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    view_mode text NOT NULL,
+    positions jsonb DEFAULT '[]'::jsonb NOT NULL,
+    sizes jsonb DEFAULT '[]'::jsonb NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
 
 
 --
@@ -3082,6 +3109,19 @@ CREATE TABLE "ob-poc".client_allegations (
 --
 
 COMMENT ON TABLE "ob-poc".client_allegations IS 'Client allegations - the unverified claims that form the starting point of KYC verification.';
+
+
+--
+-- Name: client_types; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".client_types (
+    code character varying(50) NOT NULL,
+    name character varying(100) NOT NULL,
+    description text,
+    is_active boolean DEFAULT true,
+    display_order integer DEFAULT 0
+);
 
 
 --
@@ -4214,6 +4254,20 @@ CREATE TABLE "ob-poc".products (
 
 
 --
+-- Name: red_flag_severities; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".red_flag_severities (
+    code character varying(50) NOT NULL,
+    name character varying(100) NOT NULL,
+    description text,
+    is_blocking boolean DEFAULT false,
+    is_active boolean DEFAULT true,
+    display_order integer DEFAULT 0
+);
+
+
+--
 -- Name: redflag_score_config; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -4315,6 +4369,20 @@ COMMENT ON TABLE "ob-poc".risk_bands IS 'Risk band definitions mapping composite
 
 
 --
+-- Name: risk_ratings; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".risk_ratings (
+    code character varying(50) NOT NULL,
+    name character varying(100) NOT NULL,
+    description text,
+    severity_level integer DEFAULT 0,
+    is_active boolean DEFAULT true,
+    display_order integer DEFAULT 0
+);
+
+
+--
 -- Name: roles; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -4366,6 +4434,19 @@ CREATE TABLE "ob-poc".screening_requirements (
     screening_type character varying(50) NOT NULL,
     is_required boolean DEFAULT true NOT NULL,
     frequency_months integer DEFAULT 12
+);
+
+
+--
+-- Name: screening_types; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".screening_types (
+    code character varying(50) NOT NULL,
+    name character varying(100) NOT NULL,
+    description text,
+    is_active boolean DEFAULT true,
+    display_order integer DEFAULT 0
 );
 
 
@@ -4494,6 +4575,32 @@ CREATE TABLE "ob-poc".services (
     service_category character varying(100),
     sla_definition jsonb,
     is_active boolean DEFAULT true
+);
+
+
+--
+-- Name: settlement_types; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".settlement_types (
+    code character varying(20) NOT NULL,
+    name character varying(100) NOT NULL,
+    description text,
+    is_active boolean DEFAULT true,
+    display_order integer DEFAULT 0
+);
+
+
+--
+-- Name: ssi_types; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".ssi_types (
+    code character varying(50) NOT NULL,
+    name character varying(100) NOT NULL,
+    description text,
+    is_active boolean DEFAULT true,
+    display_order integer DEFAULT 0
 );
 
 
@@ -5352,6 +5459,20 @@ COMMENT ON VIEW "ob-poc".v_ubo_evidence_summary IS 'Summary view of UBO records 
 
 
 --
+-- Name: workstream_statuses; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".workstream_statuses (
+    code character varying(50) NOT NULL,
+    name character varying(100) NOT NULL,
+    description text,
+    is_terminal boolean DEFAULT false,
+    is_active boolean DEFAULT true,
+    display_order integer DEFAULT 0
+);
+
+
+--
 -- Name: attribute_sources; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -6187,6 +6308,14 @@ ALTER TABLE ONLY "ob-poc".case_evaluation_snapshots
 
 
 --
+-- Name: case_types case_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".case_types
+    ADD CONSTRAINT case_types_pkey PRIMARY KEY (code);
+
+
+--
 -- Name: cbu_change_log cbu_change_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -6224,6 +6353,14 @@ ALTER TABLE ONLY "ob-poc".cbu_entity_roles
 
 ALTER TABLE ONLY "ob-poc".cbu_evidence
     ADD CONSTRAINT cbu_evidence_pkey PRIMARY KEY (evidence_id);
+
+
+--
+-- Name: cbu_layout_overrides cbu_layout_overrides_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_layout_overrides
+    ADD CONSTRAINT cbu_layout_overrides_pkey PRIMARY KEY (cbu_id, user_id, view_mode);
 
 
 --
@@ -6280,6 +6417,14 @@ ALTER TABLE ONLY "ob-poc".cbus
 
 ALTER TABLE ONLY "ob-poc".client_allegations
     ADD CONSTRAINT client_allegations_pkey PRIMARY KEY (allegation_id);
+
+
+--
+-- Name: client_types client_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_types
+    ADD CONSTRAINT client_types_pkey PRIMARY KEY (code);
 
 
 --
@@ -6707,6 +6852,14 @@ ALTER TABLE ONLY "ob-poc".products
 
 
 --
+-- Name: red_flag_severities red_flag_severities_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".red_flag_severities
+    ADD CONSTRAINT red_flag_severities_pkey PRIMARY KEY (code);
+
+
+--
 -- Name: redflag_score_config redflag_score_config_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -6763,6 +6916,14 @@ ALTER TABLE ONLY "ob-poc".risk_bands
 
 
 --
+-- Name: risk_ratings risk_ratings_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".risk_ratings
+    ADD CONSTRAINT risk_ratings_pkey PRIMARY KEY (code);
+
+
+--
 -- Name: roles roles_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -6808,6 +6969,14 @@ ALTER TABLE ONLY "ob-poc".screening_lists
 
 ALTER TABLE ONLY "ob-poc".screening_requirements
     ADD CONSTRAINT screening_requirements_pkey PRIMARY KEY (risk_band, screening_type);
+
+
+--
+-- Name: screening_types screening_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".screening_types
+    ADD CONSTRAINT screening_types_pkey PRIMARY KEY (code);
 
 
 --
@@ -6912,6 +7081,22 @@ ALTER TABLE ONLY "ob-poc".services
 
 ALTER TABLE ONLY "ob-poc".services
     ADD CONSTRAINT services_service_code_key UNIQUE (service_code);
+
+
+--
+-- Name: settlement_types settlement_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".settlement_types
+    ADD CONSTRAINT settlement_types_pkey PRIMARY KEY (code);
+
+
+--
+-- Name: ssi_types ssi_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".ssi_types
+    ADD CONSTRAINT ssi_types_pkey PRIMARY KEY (code);
 
 
 --
@@ -7032,6 +7217,14 @@ ALTER TABLE ONLY "ob-poc".document_attribute_links
 
 ALTER TABLE ONLY "ob-poc".redflag_score_config
     ADD CONSTRAINT uq_redflag_severity UNIQUE (severity);
+
+
+--
+-- Name: workstream_statuses workstream_statuses_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".workstream_statuses
+    ADD CONSTRAINT workstream_statuses_pkey PRIMARY KEY (code);
 
 
 --
@@ -10616,22 +10809,5 @@ ALTER TABLE ONLY public.rules
 -- PostgreSQL database dump complete
 --
 
-\unrestrict B2XyN99cke6WN6KofWcvIeIcPj29PHpIsJMoepAJeN3XVheeY0nr5JxeC4SiG0Z
-
-
--- Layout overrides for egui visualizer
--- Stores user customizations to node positions and sizes in the CBU graph visualization.
--- positions: Array of {node_id, dx, dy} offsets from template base positions
--- sizes: Array of {node_id, w, h} size overrides for node containers
-CREATE TABLE IF NOT EXISTS "ob-poc".cbu_layout_overrides (
-    cbu_id UUID NOT NULL,
-    user_id UUID NOT NULL,
-    view_mode TEXT NOT NULL,
-    positions JSONB NOT NULL DEFAULT '[]'::jsonb,
-    sizes JSONB NOT NULL DEFAULT '[]'::jsonb,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (cbu_id, user_id, view_mode)
-);
-
-COMMENT ON TABLE "ob-poc".cbu_layout_overrides IS 'Persists user layout customizations (drag/resize) for CBU graph visualization per view mode';
+\unrestrict sKjtb1rYccjHQ9ZW1cOe9jZey7GZCeexvGnosXpaeaMD5xXoZRNV4OKfgE8Qvh9
 

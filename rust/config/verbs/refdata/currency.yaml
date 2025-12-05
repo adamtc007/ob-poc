@@ -1,0 +1,92 @@
+domains:
+  currency:
+    description: Currency reference data (USD, EUR, GBP, etc.)
+    verbs:
+      ensure:
+        description: Create or update a currency
+        behavior: crud
+        crud:
+          operation: upsert
+          table: currencies
+          schema: ob-poc
+          conflict_keys:
+            - iso_code
+          returning: currency_id
+        args:
+          - name: iso-code
+            type: string
+            required: true
+            maps_to: iso_code
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+          - name: symbol
+            type: string
+            required: false
+            maps_to: symbol
+          - name: decimal-places
+            type: integer
+            required: false
+            maps_to: decimal_places
+            default: 2
+          - name: is-active
+            type: boolean
+            required: false
+            maps_to: is_active
+            default: true
+        returns:
+          type: uuid
+          name: currency_id
+          capture: true
+
+      read:
+        description: Read a currency by ISO code
+        behavior: crud
+        crud:
+          operation: select
+          table: currencies
+          schema: ob-poc
+        args:
+          - name: iso-code
+            type: string
+            required: true
+            maps_to: iso_code
+        returns:
+          type: record
+
+      list:
+        description: List all currencies
+        behavior: crud
+        crud:
+          operation: select
+          table: currencies
+          schema: ob-poc
+          order_by: iso_code
+        args:
+          - name: is-active
+            type: boolean
+            required: false
+            maps_to: is_active
+        returns:
+          type: record_set
+
+      deactivate:
+        description: Deactivate a currency
+        behavior: crud
+        crud:
+          operation: update
+          table: currencies
+          schema: ob-poc
+        args:
+          - name: iso-code
+            type: string
+            required: true
+            maps_to: iso_code
+          - name: is-active
+            type: boolean
+            required: false
+            maps_to: is_active
+            default: false
+        returns:
+          type: void
