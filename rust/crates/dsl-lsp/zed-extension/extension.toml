@@ -1,0 +1,20 @@
+id = "onboarding-dsl"
+name = "Onboarding DSL"
+version = "0.1.0"
+schema_version = 1
+description = "Language support for the Onboarding DSL (S-expression based KYC/AML workflows)"
+repository = "https://github.com/ob-poc/ob-poc"
+authors = ["OB-POC Team"]
+languages = ["languages/dsl"]
+
+[lib]
+kind = "Rust"
+version = "0.1.0"
+
+[language_servers.dsl-lsp]
+name = "DSL Language Server"
+languages = ["DSL"]
+
+[grammars.clojure]
+repository = "https://github.com/sogaiu/tree-sitter-clojure"
+rev = "e43eff80d17cf34852dcd92ca5e6986d23a7040f"

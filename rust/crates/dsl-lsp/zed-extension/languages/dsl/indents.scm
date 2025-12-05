@@ -1,2 +1,2 @@
-(list) @indent
+(list_lit) @indent
 ")" @outdent

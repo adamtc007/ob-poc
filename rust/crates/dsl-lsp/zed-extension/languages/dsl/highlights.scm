@@ -1,25 +1,29 @@
-; Keywords (verb names)
-(symbol) @function
-((symbol) @function.builtin
-  (#match? @function.builtin "^(cbu|entity|document|investigation|risk|screening|decision)\\."))
+; Symbols (verb names, identifiers)
+(sym_lit) @function
 
-; Keywords (arguments)
-(keyword) @property
+; Keywords (:arg-name)
+(kwd_lit) @property
 
 ; Strings
-(string) @string
+(str_lit) @string
 
 ; Numbers
-(number) @number
+(num_lit) @number
 
-; Symbol references (@name)
-(symbol_ref) @variable.special
+; Booleans
+(bool_lit) @constant.builtin
+
+; Nil
+(nil_lit) @constant.builtin
 
 ; Comments
 (comment) @comment
 
-; Parentheses
-["(" ")"] @punctuation.bracket
+; Lists (S-expressions)
+(list_lit) @punctuation.bracket
 
-; Colons
-":" @punctuation.delimiter
+; Brackets
+["(" ")" "[" "]" "{" "}"] @punctuation.bracket
+
+; Deref (@symbol)
+(derefing_lit) @variable.special

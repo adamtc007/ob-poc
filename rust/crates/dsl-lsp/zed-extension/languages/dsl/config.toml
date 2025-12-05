@@ -1,5 +1,5 @@
 name = "DSL"
-grammar = "tree-sitter-dsl"
+grammar = "clojure"
 path_suffixes = ["dsl", "obl", "onboard"]
 line_comments = [";"]
 block_comments = []
