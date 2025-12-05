@@ -209,6 +209,78 @@ The UI follows a **single pipeline** pattern. Server returns flat graph data; UI
 | ubo | entity (UBO-specific) | Ownership chains, control relationships |
 | services | product, service, resource | Products → Services → Resource instances |
 
+## Zed Extension (DSL Syntax Highlighting)
+
+The project includes a Zed editor extension for DSL syntax highlighting located at `rust/crates/dsl-lsp/zed-extension/`.
+
+### Extension Structure
+
+```
+rust/crates/dsl-lsp/zed-extension/
+├── extension.toml          # Extension manifest
+├── extension.wasm          # Compiled WASM extension
+├── Cargo.toml              # Rust crate for extension logic
+├── src/lib.rs              # Extension entry point
+├── languages/dsl/
+│   ├── config.toml         # Language configuration
+│   ├── highlights.scm      # Syntax highlighting queries
+│   └── indents.scm         # Indentation rules
+└── grammars/               # Tree-sitter grammar (cloned by Zed)
+```
+
+### Installing the Dev Extension
+
+1. Open Zed
+2. Open Command Palette (`Cmd+Shift+P`)
+3. Run "zed: install dev extension"
+4. Select the `rust/crates/dsl-lsp/zed-extension/` directory
+5. Files with `.dsl`, `.obl`, or `.onboard` extensions will now have syntax highlighting
+
+### Key Configuration Files
+
+**extension.toml** - Extension manifest:
+```toml
+id = "onboarding-dsl"
+name = "Onboarding DSL"
+version = "0.1.0"
+schema_version = 1
+languages = ["languages/dsl"]
+
+[grammars.clojure]
+repository = "https://github.com/sogaiu/tree-sitter-clojure"
+rev = "e43eff80d17cf34852dcd92ca5e6986d23a7040f"
+```
+
+**languages/dsl/config.toml** - Language settings:
+```toml
+name = "DSL"
+grammar = "clojure"
+path_suffixes = ["dsl", "obl", "onboard"]
+line_comments = [";"]
+```
+
+### Grammar Notes
+
+The extension uses `tree-sitter-clojure` as the grammar since the DSL uses S-expression syntax similar to Clojure/Lisp. The `highlights.scm` file maps clojure node types to highlight groups:
+
+- `sym_lit` → function names (verbs)
+- `kwd_lit` → keywords (`:arg-name`)
+- `str_lit` → strings
+- `num_lit` → numbers
+- `derefing_lit` → symbol references (`@name`)
+
+### Troubleshooting
+
+If the extension fails to load, check Zed logs:
+```bash
+tail -100 ~/Library/Logs/Zed/Zed.log | grep -i "dsl\|error\|language"
+```
+
+Common issues:
+- **"failed to compile grammar"**: Delete `grammars/` directory and reinstall
+- **"Invalid node type"**: `highlights.scm` or `indents.scm` uses wrong node names for the grammar
+- **Language not recognized**: Check `path_suffixes` in `config.toml`
+
 ## Commands
 
 ### Layout Persistence
