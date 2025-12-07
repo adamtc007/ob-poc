@@ -1283,117 +1283,108 @@ async fn generate_dsl_with_tools(
     })
 }
 
-/// Execute a tool call and return the result as a string
-async fn execute_tool(pool: &PgPool, tool_name: &str, input: &serde_json::Value) -> String {
+/// Execute a tool call via EntityGateway and return the result as a string
+///
+/// All lookups go through the central EntityGateway service for consistent
+/// fuzzy matching behavior across LSP, validation, MCP tools, and Claude tool_use.
+async fn execute_tool(_pool: &PgPool, tool_name: &str, input: &serde_json::Value) -> String {
+    // Connect to EntityGateway
+    let addr = crate::dsl_v2::gateway_resolver::gateway_addr();
+    let mut client = match entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient::connect(addr.clone()).await {
+        Ok(c) => c,
+        Err(e) => return format!("Failed to connect to EntityGateway at {}: {}", addr, e),
+    };
+
+    // Helper to search via gateway
+    async fn gateway_search(
+        client: &mut entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<tonic::transport::Channel>,
+        nickname: &str,
+        search: &str,
+        limit: i32,
+    ) -> Result<Vec<(String, String, f32)>, String> {
+        use entity_gateway::proto::ob::gateway::v1::{SearchMode, SearchRequest};
+
+        let request = SearchRequest {
+            nickname: nickname.to_string(),
+            values: vec![search.to_string()],
+            search_key: None,
+            mode: SearchMode::Fuzzy as i32,
+            limit: Some(limit),
+        };
+
+        let response = client
+            .search(request)
+            .await
+            .map_err(|e| format!("EntityGateway search failed: {}", e))?;
+
+        Ok(response
+            .into_inner()
+            .matches
+            .into_iter()
+            .map(|m| (m.token, m.display, m.score))
+            .collect())
+    }
+
     match tool_name {
         "lookup_cbu" => {
             let name = input["name"].as_str().unwrap_or("");
-            match sqlx::query!(
-                r#"SELECT cbu_id, name, client_type, jurisdiction
-                   FROM "ob-poc".cbus
-                   WHERE LOWER(name) LIKE LOWER('%' || $1 || '%')
-                   LIMIT 5"#,
-                name
-            )
-            .fetch_all(pool)
-            .await
-            {
-                Ok(rows) if !rows.is_empty() => {
-                    let results: Vec<String> = rows
+            match gateway_search(&mut client, "CBU", name, 5).await {
+                Ok(matches) if !matches.is_empty() => {
+                    let results: Vec<String> = matches
                         .iter()
-                        .map(|r| {
-                            format!(
-                                "- {} (id: {}, type: {:?}, jurisdiction: {:?})",
-                                r.name, r.cbu_id, r.client_type, r.jurisdiction
-                            )
-                        })
+                        .map(|(id, display, _)| format!("- {} (id: {})", display, id))
                         .collect();
-                    format!("Found {} CBU(s):\n{}", rows.len(), results.join("\n"))
+                    format!("Found {} CBU(s):\n{}", matches.len(), results.join("\n"))
                 }
                 Ok(_) => format!("No CBU found matching '{}'", name),
-                Err(e) => format!("Error looking up CBU: {}", e),
+                Err(e) => e,
             }
         }
         "lookup_entity" => {
             let name = input["name"].as_str().unwrap_or("");
-            let entity_type = input["entity_type"].as_str();
-            match sqlx::query!(
-                r#"SELECT e.entity_id, e.name, et.type_code
-                   FROM "ob-poc".entities e
-                   JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
-                   WHERE LOWER(e.name) LIKE LOWER('%' || $1 || '%')
-                     AND ($2::text IS NULL OR et.type_code = $2)
-                   LIMIT 5"#,
-                name,
-                entity_type
-            )
-            .fetch_all(pool)
-            .await
-            {
-                Ok(rows) if !rows.is_empty() => {
-                    let results: Vec<String> = rows
+            // Use ENTITY nickname which searches across all entity types
+            match gateway_search(&mut client, "ENTITY", name, 5).await {
+                Ok(matches) if !matches.is_empty() => {
+                    let results: Vec<String> = matches
                         .iter()
-                        .map(|r| {
-                            format!(
-                                "- {} (id: {}, type: {:?})",
-                                r.name, r.entity_id, r.type_code
-                            )
-                        })
+                        .map(|(id, display, _)| format!("- {} (id: {})", display, id))
                         .collect();
-                    format!("Found {} entity(s):\n{}", rows.len(), results.join("\n"))
+                    format!("Found {} entity(s):\n{}", matches.len(), results.join("\n"))
                 }
                 Ok(_) => format!("No entity found matching '{}'", name),
-                Err(e) => format!("Error looking up entity: {}", e),
+                Err(e) => e,
             }
         }
         "lookup_product" => {
             let name = input["name"].as_str().unwrap_or("");
-            match sqlx::query!(
-                r#"SELECT product_id, name, product_code
-                   FROM "ob-poc".products
-                   WHERE LOWER(name) LIKE LOWER('%' || $1 || '%')
-                   LIMIT 5"#,
-                name
-            )
-            .fetch_all(pool)
-            .await
-            {
-                Ok(rows) if !rows.is_empty() => {
-                    let results: Vec<String> = rows
+            match gateway_search(&mut client, "PRODUCT", name, 5).await {
+                Ok(matches) if !matches.is_empty() => {
+                    let results: Vec<String> = matches
                         .iter()
-                        .map(|r| format!("- {} (code: {:?})", r.name, r.product_code))
+                        .map(|(id, display, _)| format!("- {} (code: {})", display, id))
                         .collect();
-                    format!("Found {} product(s):\n{}", rows.len(), results.join("\n"))
+                    format!(
+                        "Found {} product(s):\n{}",
+                        matches.len(),
+                        results.join("\n")
+                    )
                 }
                 Ok(_) => format!("No product found matching '{}'", name),
-                Err(e) => format!("Error looking up product: {}", e),
+                Err(e) => e,
             }
         }
         "list_cbus" => {
-            let limit = input["limit"].as_i64().unwrap_or(10);
-            match sqlx::query!(
-                r#"SELECT cbu_id, name, client_type, jurisdiction
-                   FROM "ob-poc".cbus
-                   ORDER BY name
-                   LIMIT $1"#,
-                limit
-            )
-            .fetch_all(pool)
-            .await
-            {
-                Ok(rows) => {
-                    let results: Vec<String> = rows
+            let limit = input["limit"].as_i64().unwrap_or(10) as i32;
+            // Empty search with high limit to list all
+            match gateway_search(&mut client, "CBU", "", limit).await {
+                Ok(matches) => {
+                    let results: Vec<String> = matches
                         .iter()
-                        .map(|r| {
-                            format!(
-                                "- {} (type: {:?}, jurisdiction: {:?})",
-                                r.name, r.client_type, r.jurisdiction
-                            )
-                        })
+                        .map(|(_, display, _)| format!("- {}", display))
                         .collect();
                     format!("CBUs in system:\n{}", results.join("\n"))
                 }
-                Err(e) => format!("Error listing CBUs: {}", e),
+                Err(e) => e,
             }
         }
         _ => format!("Unknown tool: {}", tool_name),

@@ -1,26 +1,37 @@
 //! MCP Tool Handlers
 //!
 //! Implements the business logic for each MCP tool.
-//! All database access goes through VisualizationRepository.
+//! All entity lookups go through EntityGateway (single source of truth).
+//! Other database access goes through VisualizationRepository.
 
 use anyhow::{anyhow, Result};
+use entity_gateway::proto::ob::gateway::v1::{
+    entity_gateway_client::EntityGatewayClient, SearchMode, SearchRequest,
+};
 use serde_json::{json, Value};
 use sqlx::PgPool;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use tonic::transport::Channel;
 use uuid::Uuid;
 
 use crate::database::generation_log_repository::{
     CompileResult, GenerationAttempt, GenerationLogRepository, LintResult, ParseResult,
 };
 use crate::database::VisualizationRepository;
-use crate::dsl_v2::{compile, parse_program, registry, DslExecutor, ExecutionContext};
+use crate::dsl_v2::{
+    compile, gateway_resolver, parse_program, registry, DslExecutor, ExecutionContext,
+};
 
 use super::protocol::ToolCallResult;
 
-/// Tool handlers with database access
+/// Tool handlers with database access and EntityGateway client
 pub struct ToolHandlers {
     pool: PgPool,
     generation_log: GenerationLogRepository,
     repo: VisualizationRepository,
+    /// EntityGateway client for all entity lookups (lazy-initialized)
+    gateway_client: Arc<Mutex<Option<EntityGatewayClient<Channel>>>>,
 }
 
 impl ToolHandlers {
@@ -29,7 +40,58 @@ impl ToolHandlers {
             generation_log: GenerationLogRepository::new(pool.clone()),
             repo: VisualizationRepository::new(pool.clone()),
             pool,
+            gateway_client: Arc::new(Mutex::new(None)),
         }
+    }
+
+    /// Get or create EntityGateway client
+    async fn get_gateway_client(&self) -> Result<EntityGatewayClient<Channel>> {
+        let mut guard = self.gateway_client.lock().await;
+        if let Some(client) = guard.as_ref() {
+            return Ok(client.clone());
+        }
+
+        let addr = gateway_resolver::gateway_addr();
+        let client = EntityGatewayClient::connect(addr.clone())
+            .await
+            .map_err(|e| anyhow!("Failed to connect to EntityGateway at {}: {}", addr, e))?;
+
+        *guard = Some(client.clone());
+        Ok(client)
+    }
+
+    /// Search via EntityGateway
+    async fn gateway_search(
+        &self,
+        nickname: &str,
+        search: Option<&str>,
+        limit: i32,
+    ) -> Result<Vec<(String, String, f32)>> {
+        let mut client = self.get_gateway_client().await?;
+
+        let request = SearchRequest {
+            nickname: nickname.to_string(),
+            values: search.map(|s| vec![s.to_string()]).unwrap_or_default(),
+            search_key: None,
+            mode: if search.is_some() {
+                SearchMode::Fuzzy as i32
+            } else {
+                SearchMode::Exact as i32
+            },
+            limit: Some(limit),
+        };
+
+        let response = client
+            .search(request)
+            .await
+            .map_err(|e| anyhow!("EntityGateway search failed: {}", e))?;
+
+        Ok(response
+            .into_inner()
+            .matches
+            .into_iter()
+            .map(|m| (m.token, m.display, m.score))
+            .collect())
     }
 
     /// Handle a tool call by name
@@ -559,256 +621,54 @@ impl ToolHandlers {
         Ok(result)
     }
 
-    /// Look up database IDs - the key tool to prevent UUID hallucination
+    /// Look up database IDs via EntityGateway - the key tool to prevent UUID hallucination
+    ///
+    /// All lookups go through the central EntityGateway service for consistent
+    /// fuzzy matching behavior across LSP, validation, and MCP tools.
     async fn dsl_lookup(&self, args: Value) -> Result<Value> {
         let lookup_type = args["lookup_type"]
             .as_str()
             .ok_or_else(|| anyhow!("lookup_type required"))?;
         let search = args["search"].as_str();
-        let limit = args["limit"].as_i64().unwrap_or(10);
-        let filters = &args["filters"];
+        let limit = args["limit"].as_i64().unwrap_or(10) as i32;
 
-        match lookup_type {
-            "cbu" => {
-                let jurisdiction = filters["jurisdiction"].as_str();
-                let client_type = filters["client_type"].as_str();
-
-                let rows = sqlx::query!(
-                    r#"
-                    SELECT cbu_id, name, client_type, jurisdiction, status
-                    FROM "ob-poc".cbus
-                    WHERE ($1::text IS NULL OR LOWER(name) LIKE LOWER('%' || $1 || '%'))
-                      AND ($2::text IS NULL OR jurisdiction = $2)
-                      AND ($3::text IS NULL OR client_type = $3)
-                    ORDER BY name
-                    LIMIT $4
-                    "#,
-                    search,
-                    jurisdiction,
-                    client_type,
-                    limit
-                )
-                .fetch_all(&self.pool)
-                .await?;
-
-                Ok(json!({
-                    "type": "cbu",
-                    "count": rows.len(),
-                    "results": rows.iter().map(|r| json!({
-                        "id": r.cbu_id.to_string(),
-                        "name": r.name,
-                        "client_type": r.client_type,
-                        "jurisdiction": r.jurisdiction,
-                        "status": r.status
-                    })).collect::<Vec<_>>()
-                }))
+        // Map lookup_type to EntityGateway nickname
+        let nickname = match lookup_type {
+            "cbu" => "CBU",
+            "entity" => "ENTITY",
+            "person" => "PERSON",
+            "legal_entity" | "company" => "LEGAL_ENTITY",
+            "document" => "DOCUMENT",
+            "product" => "PRODUCT",
+            "service" => "SERVICE",
+            "role" => "ROLE",
+            "jurisdiction" => "JURISDICTION",
+            "currency" => "CURRENCY",
+            "document_type" => "DOCUMENT_TYPE",
+            "entity_type" => "ENTITY_TYPE",
+            "attribute" => "ATTRIBUTE",
+            "instrument_class" => "INSTRUMENT_CLASS",
+            "market" => "MARKET",
+            _ => {
+                return Err(anyhow!(
+                    "Unknown lookup_type: {}. Valid types: cbu, entity, person, legal_entity, document, product, service, role, jurisdiction, currency, document_type, entity_type, attribute, instrument_class, market",
+                    lookup_type
+                ));
             }
+        };
 
-            "entity" => {
-                let entity_type = filters["entity_type"].as_str();
+        // Search via EntityGateway
+        let matches = self.gateway_search(nickname, search, limit).await?;
 
-                let rows = sqlx::query!(
-                    r#"
-                    SELECT e.entity_id, e.name, et.type_code as entity_type
-                    FROM "ob-poc".entities e
-                    JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
-                    WHERE ($1::text IS NULL OR LOWER(e.name) LIKE LOWER('%' || $1 || '%'))
-                      AND ($2::text IS NULL OR et.type_code = $2)
-                    ORDER BY e.name
-                    LIMIT $3
-                    "#,
-                    search,
-                    entity_type,
-                    limit
-                )
-                .fetch_all(&self.pool)
-                .await?;
-
-                Ok(json!({
-                    "type": "entity",
-                    "count": rows.len(),
-                    "results": rows.iter().map(|r| json!({
-                        "id": r.entity_id.to_string(),
-                        "name": r.name,
-                        "entity_type": r.entity_type
-                    })).collect::<Vec<_>>()
-                }))
-            }
-
-            "document" => {
-                let document_type = filters["document_type"].as_str();
-                let cbu_id = filters["cbu_id"]
-                    .as_str()
-                    .and_then(|s| Uuid::parse_str(s).ok());
-
-                let rows = sqlx::query!(
-                    r#"
-                    SELECT d.doc_id, d.document_name, d.document_type_code, d.status, c.name as cbu_name
-                    FROM "ob-poc".document_catalog d
-                    LEFT JOIN "ob-poc".cbus c ON d.cbu_id = c.cbu_id
-                    WHERE ($1::text IS NULL OR LOWER(d.document_name) LIKE LOWER('%' || $1 || '%'))
-                      AND ($2::text IS NULL OR d.document_type_code = $2)
-                      AND ($3::uuid IS NULL OR d.cbu_id = $3)
-                    ORDER BY d.created_at DESC
-                    LIMIT $4
-                    "#,
-                    search,
-                    document_type,
-                    cbu_id,
-                    limit
-                )
-                .fetch_all(&self.pool)
-                .await?;
-
-                Ok(json!({
-                    "type": "document",
-                    "count": rows.len(),
-                    "results": rows.iter().map(|r| json!({
-                        "id": r.doc_id.to_string(),
-                        "name": r.document_name,
-                        "document_type": r.document_type_code,
-                        "status": r.status,
-                        "cbu_name": r.cbu_name
-                    })).collect::<Vec<_>>()
-                }))
-            }
-
-            "product" => {
-                let rows = sqlx::query!(
-                    r#"
-                    SELECT product_id, name, product_code, description
-                    FROM "ob-poc".products
-                    WHERE ($1::text IS NULL OR LOWER(name) LIKE LOWER('%' || $1 || '%'))
-                    ORDER BY name
-                    LIMIT $2
-                    "#,
-                    search,
-                    limit
-                )
-                .fetch_all(&self.pool)
-                .await?;
-
-                Ok(json!({
-                    "type": "product",
-                    "count": rows.len(),
-                    "results": rows.iter().map(|r| json!({
-                        "id": r.product_id.to_string(),
-                        "name": r.name,
-                        "code": r.product_code,
-                        "description": r.description
-                    })).collect::<Vec<_>>()
-                }))
-            }
-
-            "service" => {
-                let rows = sqlx::query!(
-                    r#"
-                    SELECT service_id, name, service_code, description
-                    FROM "ob-poc".services
-                    WHERE ($1::text IS NULL OR LOWER(name) LIKE LOWER('%' || $1 || '%'))
-                    ORDER BY name
-                    LIMIT $2
-                    "#,
-                    search,
-                    limit
-                )
-                .fetch_all(&self.pool)
-                .await?;
-
-                Ok(json!({
-                    "type": "service",
-                    "count": rows.len(),
-                    "results": rows.iter().map(|r| json!({
-                        "id": r.service_id.to_string(),
-                        "name": r.name,
-                        "code": r.service_code,
-                        "description": r.description
-                    })).collect::<Vec<_>>()
-                }))
-            }
-
-            "kyc_case" => {
-                let cbu_id = filters["cbu_id"]
-                    .as_str()
-                    .and_then(|s| Uuid::parse_str(s).ok());
-                let status = filters["status"].as_str();
-
-                let rows = sqlx::query!(
-                    r#"
-                    SELECT c.case_id, c.status, c.case_type, c.risk_rating, cb.name as cbu_name
-                    FROM kyc.cases c
-                    JOIN "ob-poc".cbus cb ON c.cbu_id = cb.cbu_id
-                    WHERE ($1::uuid IS NULL OR c.cbu_id = $1)
-                      AND ($2::text IS NULL OR c.status = $2)
-                    ORDER BY c.opened_at DESC
-                    LIMIT $3
-                    "#,
-                    cbu_id,
-                    status,
-                    limit
-                )
-                .fetch_all(&self.pool)
-                .await?;
-
-                Ok(json!({
-                    "type": "kyc_case",
-                    "count": rows.len(),
-                    "results": rows.iter().map(|r| json!({
-                        "id": r.case_id.to_string(),
-                        "status": r.status,
-                        "case_type": r.case_type,
-                        "risk_rating": r.risk_rating,
-                        "cbu_name": r.cbu_name
-                    })).collect::<Vec<_>>()
-                }))
-            }
-
-            "attribute" => {
-                let category = filters["category"].as_str();
-                let value_type = filters["value_type"].as_str();
-                let domain = filters["domain"].as_str();
-
-                let rows = sqlx::query!(
-                    r#"
-                    SELECT id, uuid, display_name, category, value_type, domain, is_required
-                    FROM "ob-poc".attribute_registry
-                    WHERE ($1::text IS NULL OR LOWER(id) LIKE LOWER('%' || $1 || '%')
-                           OR LOWER(display_name) LIKE LOWER('%' || $1 || '%'))
-                      AND ($2::text IS NULL OR category = $2)
-                      AND ($3::text IS NULL OR value_type = $3)
-                      AND ($4::text IS NULL OR domain = $4)
-                    ORDER BY category, id
-                    LIMIT $5
-                    "#,
-                    search,
-                    category,
-                    value_type,
-                    domain,
-                    limit
-                )
-                .fetch_all(&self.pool)
-                .await?;
-
-                Ok(json!({
-                    "type": "attribute",
-                    "count": rows.len(),
-                    "results": rows.iter().map(|r| json!({
-                        "id": r.id,
-                        "uuid": r.uuid.to_string(),
-                        "display_name": r.display_name,
-                        "category": r.category,
-                        "value_type": r.value_type,
-                        "domain": r.domain,
-                        "is_required": r.is_required
-                    })).collect::<Vec<_>>()
-                }))
-            }
-
-            _ => Err(anyhow!(
-                "Unknown lookup_type: {}. Valid types: cbu, entity, document, product, service, kyc_case, attribute",
-                lookup_type
-            )),
-        }
+        Ok(json!({
+            "type": lookup_type,
+            "count": matches.len(),
+            "results": matches.iter().map(|(id, display, score)| json!({
+                "id": id,
+                "display": display,
+                "score": score
+            })).collect::<Vec<_>>()
+        }))
     }
 
     /// Get completions for DSL - verbs, domains, products, roles

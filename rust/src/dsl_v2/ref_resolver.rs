@@ -11,8 +11,12 @@
 //!
 //! ## Resolver Implementations
 //!
-//! - `RefTypeResolver` - Direct SQL queries (legacy, for tests/fallback)
-//! - `GatewayRefResolver` - Uses EntityGateway gRPC service (preferred)
+//! - `GatewayRefResolver` - Uses EntityGateway gRPC service (**PREFERRED**)
+//! - `RefTypeResolver` - Direct SQL queries (**DEPRECATED** - for tests/fallback only)
+//!
+//! All production code should use `GatewayRefResolver` from `gateway_resolver.rs`.
+//! The `RefTypeResolver` is kept only for test environments where EntityGateway
+//! is not available.
 //!
 //! Both implement the `RefResolver` trait for use in SemanticValidator.
 
@@ -78,10 +82,18 @@ pub trait RefResolver: Send + Sync {
 }
 
 // =============================================================================
-// SQL-BASED RESOLVER (Legacy)
+// SQL-BASED RESOLVER (DEPRECATED - use GatewayRefResolver instead)
 // =============================================================================
 
 /// Reference resolver with DB connection
+///
+/// **DEPRECATED**: Use `GatewayRefResolver` from `gateway_resolver.rs` instead.
+/// This resolver uses direct SQL queries which bypasses the central EntityGateway
+/// service. It is kept only for test environments where EntityGateway is not running.
+#[deprecated(
+    since = "0.1.0",
+    note = "Use GatewayRefResolver from gateway_resolver.rs instead"
+)]
 pub struct RefTypeResolver {
     pool: PgPool,
     /// Cache for repeated lookups (cleared per validation batch)

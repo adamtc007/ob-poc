@@ -21,6 +21,9 @@ pub mod dictionary_service;
 pub mod document_service;
 pub mod dsl_repository;
 pub mod entity_service;
+// DEPRECATED: Use EntityGateway gRPC service instead
+// All entity lookups should go through the central EntityGateway service.
+#[deprecated(since = "0.1.0", note = "Use EntityGateway gRPC service instead")]
 pub mod fuzzy_search_service;
 pub mod generation_log_repository;
 pub mod investigation_service;
@@ -75,8 +78,8 @@ pub use visualization_repository::{
     CbuBasicView, CbuDocumentView, CbuEntityView, CbuRoleView, CbuScreeningView, CbuSummaryView,
     CbuView, ControlRelationshipView, DocumentAttributeView, DocumentTypeView, EntityAttributeView,
     EntityBasicView, EntityCbuView, EntityRoleView, EntityScreeningView, EntityTypeView,
-    EntityView, EntityWithRoleView, HoldingView, OfficerView, RoleView, ServiceDeliveryView,
-    ShareClassView, LayoutOverrideView, VisualizationRepository,
+    EntityView, EntityWithRoleView, HoldingView, LayoutOverrideView, OfficerView, RoleView,
+    ServiceDeliveryView, ShareClassView, VisualizationRepository,
 };
 
 // KYC Investigation services

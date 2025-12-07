@@ -82,7 +82,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(create_graph_router(pool.clone()))
         .merge(create_agent_router(pool.clone()))
         .merge(create_attribute_router(pool.clone()))
-        .merge(create_entity_router(pool.clone()))
+        .merge(create_entity_router())
         .merge(create_dsl_viewer_router(pool))
         .layer(
             CorsLayer::new()
