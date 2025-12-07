@@ -19,8 +19,14 @@ pub enum CompletionContext {
         prefix: String,
         in_string: bool,
     },
-    /// Completing a symbol reference (after @)
+    /// Completing a symbol reference (after @) - for existing symbols
     SymbolRef { prefix: String },
+    /// Completing an entity lookup that will be inserted as @symbol (after keyword + @)
+    EntityAsSymbol {
+        verb_name: String,
+        keyword: String,
+        prefix: String,
+    },
     /// No specific completion context
     None,
 }
@@ -49,13 +55,36 @@ pub fn detect_completion_context(doc: &DocumentState, position: Position) -> Com
         prefix
     );
 
-    // Check for symbol reference: @
+    // Check for @ symbol - could be existing symbol ref OR entity lookup for keyword
     if let Some(at_pos) = prefix.rfind('@') {
         let after_at = &prefix[at_pos + 1..];
         if after_at
             .chars()
             .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
         {
+            // Check if we're after a keyword that expects an entity lookup
+            let before_at = &prefix[..at_pos];
+            let (verb_name, keyword) = parse_sexp_context(before_at);
+
+            tracing::debug!(
+                "@ context: before_at='{}', verb={:?}, keyword={:?}",
+                before_at,
+                verb_name,
+                keyword
+            );
+
+            if let (Some(verb), Some(kw)) = (verb_name, keyword) {
+                // Keywords that expect entity references
+                if is_entity_keyword(&kw) {
+                    return CompletionContext::EntityAsSymbol {
+                        verb_name: verb,
+                        keyword: kw,
+                        prefix: after_at.to_string(),
+                    };
+                }
+            }
+
+            // Otherwise, it's a regular symbol reference
             return CompletionContext::SymbolRef {
                 prefix: after_at.to_string(),
             };
@@ -229,6 +258,33 @@ fn extract_value_prefix(prefix: &str) -> String {
     result
 }
 
+/// Check if a keyword expects an entity reference (UUID lookup)
+fn is_entity_keyword(keyword: &str) -> bool {
+    matches!(
+        keyword,
+        "cbu-id"
+            | "entity-id"
+            | "owner-entity-id"
+            | "owned-entity-id"
+            | "ubo-person-id"
+            | "subject-entity-id"
+            | "investor-entity-id"
+            | "commercial-client-entity-id"
+            | "case-id"
+            | "workstream-id"
+            | "screening-id"
+            | "document-id"
+            | "ssi-id"
+            | "rule-id"
+            | "instance-id"
+            | "share-class-id"
+            | "holding-id"
+            | "movement-id"
+            | "product-id"
+            | "service-id"
+    )
+}
+
 /// Check if cursor is inside a string.
 fn is_in_string(prefix: &str) -> bool {
     let mut in_string = false;
@@ -286,6 +342,24 @@ mod tests {
 
     #[test]
     fn test_symbol_ref_completion() {
+        // After :as @ - should complete with existing symbols
+        let doc = make_doc("(cbu.ensure :name \"Test\" :as @fu");
+        let ctx = detect_completion_context(
+            &doc,
+            Position {
+                line: 0,
+                character: 32,
+            },
+        );
+        match ctx {
+            CompletionContext::SymbolRef { prefix } => assert_eq!(prefix, "fu"),
+            other => panic!("Expected SymbolRef context, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_entity_as_symbol_completion() {
+        // After :entity-id @ - should trigger entity lookup (not symbol ref)
         let doc = make_doc("(cbu.attach-entity :entity-id @co");
         let ctx = detect_completion_context(
             &doc,
@@ -295,8 +369,13 @@ mod tests {
             },
         );
         match ctx {
-            CompletionContext::SymbolRef { prefix } => assert_eq!(prefix, "co"),
-            _ => panic!("Expected SymbolRef context"),
+            CompletionContext::EntityAsSymbol {
+                keyword, prefix, ..
+            } => {
+                assert_eq!(keyword, "entity-id");
+                assert_eq!(prefix, "co");
+            }
+            other => panic!("Expected EntityAsSymbol context, got {:?}", other),
         }
     }
 

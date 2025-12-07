@@ -250,6 +250,20 @@ impl DslExecutor {
             Value::NestedCall(_) => {
                 bail!("NestedCall found during value conversion. Use compile() + execute_plan() for nested DSL.")
             }
+            Value::LookupRef {
+                ref_type: _,
+                search_key,
+                primary_key,
+            } => {
+                // Use resolved primary_key if available, otherwise fall back to search_key
+                // The executor's resolve_lookup will handle the final resolution if needed
+                if let Some(pk) = primary_key {
+                    Ok(JsonValue::String(pk.clone()))
+                } else {
+                    // Not yet resolved - pass search_key for lookup during execution
+                    Ok(JsonValue::String(search_key.clone()))
+                }
+            }
         }
     }
 }

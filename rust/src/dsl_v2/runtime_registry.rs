@@ -169,7 +169,7 @@ impl RuntimeVerbRegistry {
         // Query entity types from database
         let query = format!(
             r#"SELECT {} FROM "{}".{}"#,
-            source.code_column, schema, source.table
+            source.type_code_column, schema, source.table
         );
 
         let rows: Vec<(String,)> = sqlx::query_as(&query).fetch_all(pool).await?;

@@ -37,6 +37,7 @@ domains:
             maps_to: commercial_client_entity_id
             lookup:
               table: entities
+              entity_type: entity
               schema: ob-poc
               search_key: name
               primary_key: entity_id
@@ -58,6 +59,7 @@ domains:
             maps_to: cbu_id
             lookup:
               table: cbus
+              entity_type: cbu
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
@@ -78,6 +80,7 @@ domains:
             maps_to: cbu_id
             lookup:
               table: cbus
+              entity_type: cbu
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
@@ -103,6 +106,7 @@ domains:
             maps_to: commercial_client_entity_id
             lookup:
               table: entities
+              entity_type: entity
               schema: ob-poc
               search_key: name
               primary_key: entity_id
@@ -123,6 +127,7 @@ domains:
             maps_to: cbu_id
             lookup:
               table: cbus
+              entity_type: cbu
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
@@ -192,6 +197,7 @@ domains:
             maps_to: commercial_client_entity_id
             lookup:
               table: entities
+              entity_type: entity
               schema: ob-poc
               search_key: name
               primary_key: entity_id
@@ -218,6 +224,7 @@ domains:
             maps_to: cbu_id
             lookup:
               table: cbus
+              entity_type: cbu
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
@@ -227,6 +234,7 @@ domains:
             maps_to: entity_id
             lookup:
               table: entities
+              entity_type: entity
               schema: ob-poc
               search_key: name
               primary_key: entity_id
@@ -236,6 +244,7 @@ domains:
             lookup:
               schema: ob-poc
               table: roles
+              entity_type: role
               code_column: name
               id_column: role_id
         returns:
@@ -258,6 +267,7 @@ domains:
             required: true
             lookup:
               table: cbus
+              entity_type: cbu
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
@@ -266,6 +276,7 @@ domains:
             required: true
             lookup:
               table: entities
+              entity_type: entity
               schema: ob-poc
               search_key: name
               primary_key: entity_id
@@ -275,6 +286,7 @@ domains:
             lookup:
               schema: ob-poc
               table: roles
+              entity_type: role
               code_column: name
               id_column: role_id
         returns:
@@ -293,6 +305,7 @@ domains:
             required: true
             lookup:
               table: cbus
+              entity_type: cbu
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
@@ -313,6 +326,7 @@ domains:
             maps_to: cbu_id
             lookup:
               table: cbus
+              entity_type: cbu
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
@@ -342,6 +356,7 @@ domains:
             description: CBU to check (if null, checks all CBUs)
             lookup:
               table: cbus
+              entity_type: cbu
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
@@ -358,6 +373,7 @@ domains:
             required: true
             lookup:
               table: cbus
+              entity_type: cbu
               schema: ob-poc
               search_key: name
               primary_key: cbu_id

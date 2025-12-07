@@ -16,6 +16,7 @@ domains:
             maps_to: product_id
             lookup:
               table: products
+              entity_type: product
               schema: ob-poc
               search_key: name
               primary_key: product_id

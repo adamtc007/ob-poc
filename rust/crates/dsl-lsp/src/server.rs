@@ -112,11 +112,10 @@ impl LanguageServer for DslLanguageServer {
                 completion_provider: Some(CompletionOptions {
                     resolve_provider: Some(false),
                     trigger_characters: Some(vec![
-                        ":".to_string(),  // Keywords
-                        "@".to_string(),  // Symbols
-                        "(".to_string(),  // S-expressions
-                        "\"".to_string(), // Strings (for refs)
-                        " ".to_string(),  // After keyword
+                        ":".to_string(), // Keywords
+                        "@".to_string(), // Symbols/entity refs
+                        "(".to_string(), // S-expressions (verbs)
+                        " ".to_string(), // After keyword (for values)
                     ]),
                     ..Default::default()
                 }),
@@ -211,15 +210,25 @@ impl LanguageServer for DslLanguageServer {
         let uri = &params.text_document_position.text_document.uri;
         let position = params.text_document_position.position;
 
+        tracing::info!(
+            "Completion request: uri={}, line={}, char={}",
+            uri,
+            position.line,
+            position.character
+        );
+
         if let Some(doc) = self.get_document(uri).await {
             let symbols = self.symbols.read().await;
             let entity_client = self.get_entity_client().await;
+            tracing::info!("Entity client connected: {}", entity_client.is_some());
             let completions =
                 handlers::completion::get_completions(&doc, position, &symbols, entity_client)
                     .await;
+            tracing::info!("Returning {} completions", completions.len());
             return Ok(Some(CompletionResponse::Array(completions)));
         }
 
+        tracing::warn!("No document found for completion request");
         Ok(None)
     }
 

@@ -929,7 +929,7 @@ impl GenericCrudExecutor {
 
         let lookup_sql = format!(
             r#"SELECT "{}" FROM "{}"."{}" WHERE "{}" = $1"#,
-            lookup.id_column, crud.schema, lookup.table, lookup.code_column
+            lookup.primary_key, crud.schema, lookup.table, lookup.search_key
         );
 
         let role_row = sqlx::query(&lookup_sql)
@@ -937,7 +937,7 @@ impl GenericCrudExecutor {
             .fetch_one(&self.pool)
             .await?;
 
-        let role_id: Uuid = role_row.try_get(&lookup.id_column as &str)?;
+        let role_id: Uuid = role_row.try_get(&lookup.primary_key as &str)?;
 
         // Get from/to values
         let mut from_value: Option<SqlValue> = None;
@@ -1380,7 +1380,7 @@ impl GenericCrudExecutor {
     }
 
     /// Resolve a lookup argument by querying the lookup table
-    /// Returns the UUID (id_column) for the given code (code_column)
+    /// Returns the UUID (primary_key) for the given name (search_key)
     /// If not found, provides "did you mean?" suggestions based on similar values
     async fn resolve_lookup(&self, arg: &RuntimeArg, code_value: &str) -> Result<Uuid> {
         let lookup = arg
@@ -1392,10 +1392,10 @@ impl GenericCrudExecutor {
 
         let sql = format!(
             r#"SELECT "{}" FROM "{}"."{}" WHERE "{}" = $1"#,
-            lookup.id_column, schema, lookup.table, lookup.code_column
+            lookup.primary_key, schema, lookup.table, lookup.search_key
         );
 
-        debug!("LOOKUP SQL: {} with code={}", sql, code_value);
+        debug!("LOOKUP SQL: {} with search_key={}", sql, code_value);
 
         let row = sqlx::query(&sql)
             .bind(code_value)
@@ -1404,13 +1404,13 @@ impl GenericCrudExecutor {
 
         match row {
             Some(r) => {
-                let uuid: Uuid = r.try_get(&*lookup.id_column)?;
+                let uuid: Uuid = r.try_get(&*lookup.primary_key)?;
                 Ok(uuid)
             }
             None => {
                 // Lookup failed - fetch similar values for "did you mean?" suggestions
                 let suggestions = self
-                    .get_lookup_suggestions(schema, &lookup.table, &lookup.code_column, code_value)
+                    .get_lookup_suggestions(schema, &lookup.table, &lookup.search_key, code_value)
                     .await
                     .unwrap_or_default();
 
@@ -1427,7 +1427,7 @@ impl GenericCrudExecutor {
                 Err(anyhow!(
                     "Lookup failed: no {} with {} = '{}' in {}.{}{}",
                     lookup.table,
-                    lookup.code_column,
+                    lookup.search_key,
                     code_value,
                     schema,
                     lookup.table,

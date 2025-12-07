@@ -15,29 +15,32 @@ domains:
           type: uuid
           required: true
           maps_to: cbu_id
-            lookup:
-              table: cbus
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
         - name: entity-id
           type: uuid
           required: true
           maps_to: entity_id
-            lookup:
-              table: entities
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         - name: attribute-id
           type: uuid
           required: true
           maps_to: attribute_id
-            lookup:
-              table: attribute_registry
-              schema: ob-poc
-              search_key: attribute_code
-              primary_key: attribute_id
+          lookup:
+            table: attribute_registry
+            entity_type: attribute
+            schema: ob-poc
+            search_key: attribute_code
+            primary_key: attribute_id
         - name: value
           type: json
           required: true
@@ -58,20 +61,22 @@ domains:
           type: uuid
           required: false
           maps_to: case_id
-            lookup:
-              table: cases
-              schema: kyc
-              search_key: case_id
-              primary_key: case_id
+          lookup:
+            table: cases
+            entity_type: kyc_case
+            schema: kyc
+            search_key: case_id
+            primary_key: case_id
         - name: workstream-id
           type: uuid
           required: false
           maps_to: workstream_id
-            lookup:
-              table: entity_workstreams
-              schema: kyc
-              search_key: workstream_id
-              primary_key: workstream_id
+          lookup:
+            table: entity_workstreams
+            entity_type: workstream
+            schema: kyc
+            search_key: workstream_id
+            primary_key: workstream_id
         returns:
           type: uuid
           name: allegation_id
@@ -92,20 +97,22 @@ domains:
           type: uuid
           required: true
           maps_to: allegation_id
-            lookup:
-              table: client_allegations
-              schema: ob-poc
-              search_key: allegation_id
-              primary_key: allegation_id
+          lookup:
+            table: client_allegations
+            entity_type: allegation
+            schema: ob-poc
+            search_key: allegation_id
+            primary_key: allegation_id
         - name: observation-id
           type: uuid
           required: true
           maps_to: verified_by_observation_id
-            lookup:
-              table: attribute_observations
-              schema: ob-poc
-              search_key: observation_id
-              primary_key: observation_id
+          lookup:
+            table: attribute_observations
+            entity_type: observation
+            schema: ob-poc
+            search_key: observation_id
+            primary_key: observation_id
         - name: result
           type: string
           required: false
@@ -132,20 +139,22 @@ domains:
           type: uuid
           required: true
           maps_to: allegation_id
-            lookup:
-              table: client_allegations
-              schema: ob-poc
-              search_key: allegation_id
-              primary_key: allegation_id
+          lookup:
+            table: client_allegations
+            entity_type: allegation
+            schema: ob-poc
+            search_key: allegation_id
+            primary_key: allegation_id
         - name: observation-id
           type: uuid
           required: true
           maps_to: verified_by_observation_id
-            lookup:
-              table: attribute_observations
-              schema: ob-poc
-              search_key: observation_id
-              primary_key: observation_id
+          lookup:
+            table: attribute_observations
+            entity_type: observation
+            schema: ob-poc
+            search_key: observation_id
+            primary_key: observation_id
         - name: result
           type: string
           required: false
@@ -172,20 +181,22 @@ domains:
           type: uuid
           required: true
           maps_to: allegation_id
-            lookup:
-              table: client_allegations
-              schema: ob-poc
-              search_key: allegation_id
-              primary_key: allegation_id
+          lookup:
+            table: client_allegations
+            entity_type: allegation
+            schema: ob-poc
+            search_key: allegation_id
+            primary_key: allegation_id
         - name: observation-id
           type: uuid
           required: true
           maps_to: verified_by_observation_id
-            lookup:
-              table: attribute_observations
-              schema: ob-poc
-              search_key: observation_id
-              primary_key: observation_id
+          lookup:
+            table: attribute_observations
+            entity_type: observation
+            schema: ob-poc
+            search_key: observation_id
+            primary_key: observation_id
         - name: notes
           type: string
           required: true
@@ -206,6 +217,7 @@ domains:
           required: true
           lookup:
             table: entities
+            entity_type: entity
             schema: ob-poc
             search_key: name
             primary_key: entity_id
@@ -227,10 +239,11 @@ domains:
           type: uuid
           required: true
           maps_to: cbu_id
-            lookup:
-              table: cbus
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
         returns:
           type: record_set

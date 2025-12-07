@@ -8,10 +8,18 @@
 //! - `:entity-id @company` → symbol must resolve to existing entities.entity_id
 //! - `:jurisdiction "UK"` → must exist in master_jurisdictions.iso_code
 //! - `:attribute-id "full_legal_name"` → must exist in attribute_registry.id
+//!
+//! ## Resolver Implementations
+//!
+//! - `RefTypeResolver` - Direct SQL queries (legacy, for tests/fallback)
+//! - `GatewayRefResolver` - Uses EntityGateway gRPC service (preferred)
+//!
+//! Both implement the `RefResolver` trait for use in SemanticValidator.
 
 use crate::dsl_v2::validation::{
     Diagnostic, DiagnosticCode, RefType, Severity, SourceSpan, Suggestion,
 };
+use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -45,6 +53,33 @@ impl SuggestedMatch {
         Suggestion::new(message, self.value, self.score)
     }
 }
+
+// =============================================================================
+// RESOLVER TRAIT
+// =============================================================================
+
+/// Trait for reference resolution - implemented by both SQL and Gateway resolvers
+#[async_trait]
+pub trait RefResolver: Send + Sync {
+    /// Resolve a reference by type
+    async fn resolve(&mut self, ref_type: RefType, value: &str) -> Result<ResolveResult, String>;
+
+    /// Create a diagnostic for a failed resolution
+    fn diagnostic_for_failure(
+        &self,
+        ref_type: RefType,
+        value: &str,
+        span: SourceSpan,
+        result: &ResolveResult,
+    ) -> Diagnostic;
+
+    /// Clear any internal cache (optional, default no-op)
+    fn clear_cache(&mut self) {}
+}
+
+// =============================================================================
+// SQL-BASED RESOLVER (Legacy)
+// =============================================================================
 
 /// Reference resolver with DB connection
 pub struct RefTypeResolver {
@@ -398,6 +433,28 @@ impl RefTypeResolver {
         let suggestions = fuzzy_match(code, &candidates, 5);
 
         Ok(ResolveResult::NotFound { suggestions })
+    }
+}
+
+// Implement the trait for RefTypeResolver
+#[async_trait]
+impl RefResolver for RefTypeResolver {
+    async fn resolve(&mut self, ref_type: RefType, value: &str) -> Result<ResolveResult, String> {
+        RefTypeResolver::resolve(self, ref_type, value).await
+    }
+
+    fn diagnostic_for_failure(
+        &self,
+        ref_type: RefType,
+        value: &str,
+        span: SourceSpan,
+        result: &ResolveResult,
+    ) -> Diagnostic {
+        RefTypeResolver::diagnostic_for_failure(self, ref_type, value, span, result)
+    }
+
+    fn clear_cache(&mut self) {
+        RefTypeResolver::clear_cache(self)
     }
 }
 

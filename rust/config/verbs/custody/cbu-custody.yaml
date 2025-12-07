@@ -22,6 +22,7 @@ domains:
             maps_to: cbu_id
             lookup:
               table: cbus
+              entity_type: cbu
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
@@ -31,6 +32,7 @@ domains:
             maps_to: instrument_class_id
             lookup:
               table: instrument_classes
+              entity_type: instrument_class
               schema: custody
               code_column: code
               id_column: class_id
@@ -40,6 +42,7 @@ domains:
             maps_to: market_id
             lookup:
               table: markets
+              entity_type: market
               schema: custody
               code_column: mic
               id_column: market_id
@@ -85,6 +88,7 @@ domains:
             required: true
             lookup:
               table: cbus
+              entity_type: cbu
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
@@ -105,6 +109,7 @@ domains:
             maps_to: cbu_id
             lookup:
               table: cbus
+              entity_type: cbu
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
@@ -179,6 +184,7 @@ domains:
             required: true
             lookup:
               table: cbus
+              entity_type: cbu
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
@@ -209,6 +215,7 @@ domains:
             maps_to: ssi_id
             lookup:
               table: cbu_ssi
+              entity_type: ssi
               schema: custody
               search_key: ssi_name
               primary_key: ssi_id
@@ -231,6 +238,7 @@ domains:
             maps_to: ssi_id
             lookup:
               table: cbu_ssi
+              entity_type: ssi
               schema: custody
               search_key: ssi_name
               primary_key: ssi_id
@@ -251,6 +259,7 @@ domains:
             maps_to: cbu_id
             lookup:
               table: cbus
+              entity_type: cbu
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
@@ -260,6 +269,7 @@ domains:
             maps_to: ssi_id
             lookup:
               table: cbu_ssi
+              entity_type: ssi
               schema: custody
               search_key: ssi_name
               primary_key: ssi_id
@@ -277,6 +287,7 @@ domains:
             maps_to: instrument_class_id
             lookup:
               table: instrument_classes
+              entity_type: instrument_class
               schema: custody
               code_column: code
               id_column: class_id
@@ -295,6 +306,7 @@ domains:
             maps_to: market_id
             lookup:
               table: markets
+              entity_type: market
               schema: custody
               code_column: mic
               id_column: market_id
@@ -341,6 +353,7 @@ domains:
             required: true
             lookup:
               table: cbus
+              entity_type: cbu
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
@@ -365,6 +378,7 @@ domains:
             maps_to: rule_id
             lookup:
               table: ssi_booking_rules
+              entity_type: booking_rule
               schema: custody
               search_key: rule_name
               primary_key: rule_id
@@ -391,6 +405,7 @@ domains:
             maps_to: rule_id
             lookup:
               table: ssi_booking_rules
+              entity_type: booking_rule
               schema: custody
               search_key: rule_name
               primary_key: rule_id
@@ -406,6 +421,7 @@ domains:
             required: true
             lookup:
               table: cbus
+              entity_type: cbu
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
@@ -421,6 +437,7 @@ domains:
             required: true
             lookup:
               table: cbus
+              entity_type: cbu
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
@@ -436,6 +453,7 @@ domains:
             required: true
             lookup:
               table: cbus
+              entity_type: cbu
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
@@ -474,6 +492,7 @@ domains:
             maps_to: ssi_id
             lookup:
               table: cbu_ssi
+              entity_type: ssi
               schema: custody
               search_key: ssi_name
               primary_key: ssi_id
@@ -528,6 +547,7 @@ domains:
             maps_to: ssi_id
             lookup:
               table: cbu_ssi
+              entity_type: ssi
               schema: custody
               search_key: ssi_name
               primary_key: ssi_id
@@ -543,6 +563,7 @@ domains:
             required: true
             lookup:
               table: cbus
+              entity_type: cbu
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
@@ -551,6 +572,7 @@ domains:
             required: true
             lookup:
               table: document_catalog
+              entity_type: document
               schema: ob-poc
               search_key: document_name
               primary_key: doc_id

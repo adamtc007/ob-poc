@@ -11,6 +11,7 @@ domains:
           required: true
           lookup:
             table: cbus
+            entity_type: cbu
             schema: ob-poc
             search_key: name
             primary_key: cbu_id
@@ -19,6 +20,7 @@ domains:
           required: true
           lookup:
             table: entities
+            entity_type: entity
             schema: ob-poc
             search_key: name
             primary_key: entity_id
@@ -27,6 +29,7 @@ domains:
           required: true
           lookup:
             table: document_types
+            entity_type: document_type
             code_column: type_code
             id_column: type_id
         - name: file-path
@@ -48,6 +51,7 @@ domains:
           required: true
           lookup:
             table: document_catalog
+            entity_type: document
             schema: ob-poc
             search_key: document_name
             primary_key: doc_id
@@ -70,6 +74,7 @@ domains:
           required: true
           lookup:
             table: document_catalog
+            entity_type: document
             schema: ob-poc
             search_key: document_name
             primary_key: doc_id
@@ -78,6 +83,7 @@ domains:
           required: true
           lookup:
             table: entities
+            entity_type: entity
             schema: ob-poc
             search_key: name
             primary_key: entity_id

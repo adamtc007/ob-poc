@@ -310,6 +310,8 @@ fn value_parser<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
         map(attribute_ref, Value::AttributeRef),
         map(document_ref, Value::DocumentRef),
         map(reference, Value::Reference),
+        // Lookup ref triplet: ("ref_type" "search_key" "pk") - must come before verb_call
+        lookup_ref_triplet,
         map(string_literal, Value::String),
         number_literal, // Returns Value directly (Integer or Decimal)
         // Nested verb call - allows (verb.call ...) as a value
@@ -331,6 +333,8 @@ fn value_parser_with_span<'a, E: NomParseError<&'a str> + ContextError<&'a str>>
         map(attribute_ref, Value::AttributeRef),
         map(document_ref, Value::DocumentRef),
         map(reference, Value::Reference),
+        // Lookup ref triplet: ("ref_type" "search_key" "pk") - must come before verb_call
+        lookup_ref_triplet,
         map(string_literal, Value::String),
         number_literal,
         // Nested verb call with span tracking
@@ -421,6 +425,48 @@ fn attribute_ref<'a, E: NomParseError<&'a str>>(input: &'a str) -> IResult<&'a s
 // Document reference: @doc{uuid}
 fn document_ref<'a, E: NomParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Uuid, E> {
     delimited(tag("@doc{"), uuid_parser, char('}'))(input)
+}
+
+// Lookup reference triplet: ("ref_type" "search_key" "primary_key") or ("ref_type" "search_key" nil)
+// This is the canonical format for all lookup references (entities, roles, jurisdictions, etc.)
+//
+// Examples:
+//   ("proper_person" "John Smith" "550e8400-e29b-41d4-a716-446655440000")
+//   ("role" "DIRECTOR" nil)
+//   ("jurisdiction" "LU" "LU")
+fn lookup_ref_triplet<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
+    input: &'a str,
+) -> IResult<&'a str, Value, E> {
+    let (input, _) = char('(')(input)?;
+    let (input, _) = multispace0(input)?;
+
+    // ref_type: the lookup type from verb definition
+    let (input, ref_type) = string_literal(input)?;
+    let (input, _) = multispace1(input)?;
+
+    // search_key: human-readable identifier
+    let (input, search_key) = string_literal(input)?;
+    let (input, _) = multispace1(input)?;
+
+    // primary_key: resolved key (UUID or code string) or nil if unresolved
+    let (input, primary_key) = alt((
+        // Quoted string for resolved primary key (UUID or code)
+        map(string_literal, Some),
+        // nil for unresolved
+        map(tag("nil"), |_| None),
+    ))(input)?;
+
+    let (input, _) = multispace0(input)?;
+    let (input, _) = char(')')(input)?;
+
+    Ok((
+        input,
+        Value::LookupRef {
+            ref_type,
+            search_key,
+            primary_key,
+        },
+    ))
 }
 
 // UUID parser
@@ -767,6 +813,150 @@ mod tests {
                 assert_eq!(items.len(), 2);
                 assert!(matches!(&items[0], Value::NestedCall(_)));
                 assert!(matches!(&items[1], Value::NestedCall(_)));
+            } else {
+                panic!("Expected List");
+            }
+        }
+    }
+
+    #[test]
+    fn test_lookup_ref_triplet_with_uuid() {
+        // Lookup reference triplet with resolved UUID: (ref_type search_key primary_key)
+        let input = r#"(cbu.assign-role :entity-id ("proper_person" "John Smith" "550e8400-e29b-41d4-a716-446655440000") :role "DIRECTOR")"#;
+        let result = parse_program(input).unwrap();
+
+        if let Statement::VerbCall(vc) = &result.statements[0] {
+            let entity_arg = vc
+                .arguments
+                .iter()
+                .find(|a| a.key.canonical() == "entity-id")
+                .unwrap();
+
+            match &entity_arg.value {
+                Value::LookupRef {
+                    ref_type,
+                    search_key,
+                    primary_key,
+                } => {
+                    assert_eq!(ref_type, "proper_person");
+                    assert_eq!(search_key, "John Smith");
+                    assert!(primary_key.is_some());
+                    assert_eq!(
+                        primary_key.as_ref().unwrap(),
+                        "550e8400-e29b-41d4-a716-446655440000"
+                    );
+                }
+                _ => panic!("Expected LookupRef, got {:?}", entity_arg.value),
+            }
+        } else {
+            panic!("Expected VerbCall");
+        }
+    }
+
+    #[test]
+    fn test_lookup_ref_triplet_with_nil() {
+        // Lookup reference triplet with unresolved (nil) primary key
+        let input =
+            r#"(cbu.assign-role :entity-id ("proper_person" "John Smith" nil) :role "DIRECTOR")"#;
+        let result = parse_program(input).unwrap();
+
+        if let Statement::VerbCall(vc) = &result.statements[0] {
+            let entity_arg = vc
+                .arguments
+                .iter()
+                .find(|a| a.key.canonical() == "entity-id")
+                .unwrap();
+
+            match &entity_arg.value {
+                Value::LookupRef {
+                    ref_type,
+                    search_key,
+                    primary_key,
+                } => {
+                    assert_eq!(ref_type, "proper_person");
+                    assert_eq!(search_key, "John Smith");
+                    assert!(primary_key.is_none());
+                }
+                _ => panic!("Expected LookupRef, got {:?}", entity_arg.value),
+            }
+        } else {
+            panic!("Expected VerbCall");
+        }
+    }
+
+    #[test]
+    fn test_lookup_ref_triplet_for_role() {
+        // Lookup reference triplet for non-UUID lookups (role codes)
+        let input = r#"(cbu.assign-role :entity-id @john :role ("role" "DIRECTOR" "DIRECTOR"))"#;
+        let result = parse_program(input).unwrap();
+
+        if let Statement::VerbCall(vc) = &result.statements[0] {
+            let role_arg = vc
+                .arguments
+                .iter()
+                .find(|a| a.key.canonical() == "role")
+                .unwrap();
+
+            match &role_arg.value {
+                Value::LookupRef {
+                    ref_type,
+                    search_key,
+                    primary_key,
+                } => {
+                    assert_eq!(ref_type, "role");
+                    assert_eq!(search_key, "DIRECTOR");
+                    assert_eq!(primary_key.as_ref().unwrap(), "DIRECTOR");
+                }
+                _ => panic!("Expected LookupRef for role, got {:?}", role_arg.value),
+            }
+        } else {
+            panic!("Expected VerbCall");
+        }
+    }
+
+    #[test]
+    fn test_lookup_ref_in_list() {
+        // Lookup references in a list
+        let input = r#"(test.verb :entities [("proper_person" "Alice" "11111111-1111-1111-1111-111111111111") ("proper_person" "Bob" nil)])"#;
+        let result = parse_program(input).unwrap();
+
+        if let Statement::VerbCall(vc) = &result.statements[0] {
+            let entities_arg = vc
+                .arguments
+                .iter()
+                .find(|a| a.key.canonical() == "entities")
+                .unwrap();
+
+            if let Value::List(items) = &entities_arg.value {
+                assert_eq!(items.len(), 2);
+
+                // First item: Alice with UUID
+                match &items[0] {
+                    Value::LookupRef {
+                        ref_type,
+                        search_key,
+                        primary_key,
+                    } => {
+                        assert_eq!(ref_type, "proper_person");
+                        assert_eq!(search_key, "Alice");
+                        assert!(primary_key.is_some());
+                    }
+                    _ => panic!("Expected LookupRef for Alice"),
+                }
+
+                // Second item: Bob with nil
+                match &items[1] {
+                    Value::LookupRef {
+                        ref_type,
+                        search_key,
+                        primary_key,
+                    } => {
+                        assert_eq!(ref_type, "proper_person");
+                        assert_eq!(search_key, "Bob");
+                        assert!(primary_key.is_none());
+                    }
+                    _ => panic!("Expected LookupRef for Bob"),
+                }
             } else {
                 panic!("Expected List");
             }

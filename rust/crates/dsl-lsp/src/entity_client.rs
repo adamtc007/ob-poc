@@ -36,7 +36,7 @@ impl EntityLookupClient {
     /// Search for entities by nickname and prefix.
     ///
     /// # Arguments
-    /// * `nickname` - Entity type (e.g., "cbu", "person", "entity")
+    /// * `nickname` - Entity type (e.g., "CBU", "PERSON", "ENTITY")
     /// * `prefix` - Search prefix for fuzzy matching
     /// * `limit` - Maximum results to return
     pub async fn search(
@@ -75,7 +75,7 @@ impl EntityLookupClient {
         prefix: &str,
         limit: usize,
     ) -> Result<Vec<EntityMatch>, tonic::Status> {
-        self.search("cbu", prefix, limit).await
+        self.search("CBU", prefix, limit).await
     }
 
     /// Search for entities (all types) by name prefix.
@@ -84,7 +84,7 @@ impl EntityLookupClient {
         prefix: &str,
         limit: usize,
     ) -> Result<Vec<EntityMatch>, tonic::Status> {
-        self.search("entity", prefix, limit).await
+        self.search("ENTITY", prefix, limit).await
     }
 
     /// Search for persons by name prefix.
@@ -93,7 +93,7 @@ impl EntityLookupClient {
         prefix: &str,
         limit: usize,
     ) -> Result<Vec<EntityMatch>, tonic::Status> {
-        self.search("person", prefix, limit).await
+        self.search("PERSON", prefix, limit).await
     }
 
     /// Search for products by name prefix.
@@ -102,7 +102,7 @@ impl EntityLookupClient {
         prefix: &str,
         limit: usize,
     ) -> Result<Vec<EntityMatch>, tonic::Status> {
-        self.search("product", prefix, limit).await
+        self.search("PRODUCT", prefix, limit).await
     }
 
     /// Search for legal entities (companies) by name prefix.
@@ -111,7 +111,7 @@ impl EntityLookupClient {
         prefix: &str,
         limit: usize,
     ) -> Result<Vec<EntityMatch>, tonic::Status> {
-        self.search("legal_entity", prefix, limit).await
+        self.search("LEGAL_ENTITY", prefix, limit).await
     }
 }
 

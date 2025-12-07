@@ -95,6 +95,35 @@ pub enum Value {
     /// Late-bound identifier resolved at execution time
     Reference(String),
 
+    /// Lookup reference triplet: (ref_type, search_key, primary_key)
+    ///
+    /// This is the canonical pattern for all verb arguments that reference
+    /// external data (entities, roles, jurisdictions, etc.)
+    ///
+    /// The triplet captures:
+    /// - ref_type: The entity/lookup type from verb definition (e.g., "proper_person", "role", "cbu")
+    /// - search_key: Human-readable identifier (what user types/sees)
+    /// - primary_key: Resolved database key (UUID or code) - populated during validation
+    ///
+    /// DSL syntax: ("proper_person" "John Smith" "550e8400-...")
+    /// UI display: "John Smith" (ref_type and primary_key suppressed)
+    ///
+    /// Round-trip flow:
+    /// 1. User types partial → ("entity" "John Sm" nil)
+    /// 2. Autocomplete resolves → ("proper_person" "John Smith" "uuid")
+    /// 3. Save persists triplet
+    /// 4. Reload validates UUID still exists
+    LookupRef {
+        /// The lookup type from verb definition (entity_type, table nickname)
+        /// Examples: "proper_person", "limited_company", "role", "jurisdiction", "cbu"
+        ref_type: String,
+        /// Human-readable search key (what appears in DSL source/UI)
+        search_key: String,
+        /// Resolved primary key - None if unresolved, Some if validated
+        /// Can be UUID (for entities) or code string (for roles, jurisdictions)
+        primary_key: Option<String>,
+    },
+
     /// Attribute reference: @attr{uuid}
     AttributeRef(Uuid),
 
@@ -119,15 +148,67 @@ impl Value {
     pub fn as_string(&self) -> Option<&str> {
         match self {
             Value::String(s) => Some(s),
+            Value::LookupRef { search_key, .. } => Some(search_key),
             _ => None,
         }
     }
 
-    /// Try to extract as UUID (from string, reference result, or typed ref)
+    /// Try to extract as UUID (from string, reference result, typed ref, or resolved LookupRef)
     pub fn as_uuid(&self) -> Option<Uuid> {
         match self {
             Value::String(s) => Uuid::parse_str(s).ok(),
             Value::AttributeRef(u) | Value::DocumentRef(u) => Some(*u),
+            Value::LookupRef { primary_key, .. } => {
+                primary_key.as_ref().and_then(|pk| Uuid::parse_str(pk).ok())
+            }
+            _ => None,
+        }
+    }
+
+    /// Try to extract the search key from a LookupRef
+    pub fn as_lookup_search_key(&self) -> Option<&str> {
+        match self {
+            Value::LookupRef { search_key, .. } => Some(search_key),
+            Value::String(s) => Some(s), // Fallback for unresolved strings
+            _ => None,
+        }
+    }
+
+    /// Try to extract the ref_type from a LookupRef
+    pub fn as_lookup_ref_type(&self) -> Option<&str> {
+        match self {
+            Value::LookupRef { ref_type, .. } => Some(ref_type),
+            _ => None,
+        }
+    }
+
+    /// Try to extract the primary_key from a LookupRef (as string, may be UUID or code)
+    pub fn as_lookup_primary_key(&self) -> Option<&str> {
+        match self {
+            Value::LookupRef { primary_key, .. } => primary_key.as_deref(),
+            _ => None,
+        }
+    }
+
+    /// Check if this is a LookupRef with a resolved primary key
+    pub fn is_resolved_lookup_ref(&self) -> bool {
+        matches!(
+            self,
+            Value::LookupRef {
+                primary_key: Some(_),
+                ..
+            }
+        )
+    }
+
+    /// Get the full LookupRef triplet if this is one
+    pub fn as_lookup_ref(&self) -> Option<(&str, &str, Option<&str>)> {
+        match self {
+            Value::LookupRef {
+                ref_type,
+                search_key,
+                primary_key,
+            } => Some((ref_type, search_key, primary_key.as_deref())),
             _ => None,
         }
     }

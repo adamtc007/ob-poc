@@ -49,6 +49,8 @@ pub mod custom_ops;
 pub mod execution_plan;
 pub mod executor;
 #[cfg(feature = "database")]
+pub mod gateway_resolver;
+#[cfg(feature = "database")]
 pub mod generic_executor;
 #[cfg(feature = "database")]
 pub mod idempotency;
@@ -71,10 +73,14 @@ pub use csg_linter::{CsgLinter, InferredContext, LintResult};
 pub use execution_plan::{compile, CompileError, ExecutionPlan, ExecutionStep, Injection};
 pub use executor::{DslExecutor, ExecutionContext, ExecutionResult, ReturnType};
 #[cfg(feature = "database")]
+pub use gateway_resolver::GatewayRefResolver;
+#[cfg(feature = "database")]
 pub use generic_executor::{GenericCrudExecutor, GenericExecutionResult};
 #[cfg(feature = "database")]
 pub use idempotency::{compute_idempotency_key, IdempotencyManager};
 pub use parser::{parse_program, parse_single_verb};
+#[cfg(feature = "database")]
+pub use ref_resolver::RefResolver;
 pub use runtime_registry::{runtime_registry, RuntimeVerbRegistry};
 pub use semantic_context::SemanticContextStore;
 pub use verb_registry::{

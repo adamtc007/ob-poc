@@ -22,6 +22,7 @@ domains:
           maps_to: market_id
           lookup:
             table: markets
+            entity_type: market
             schema: custody
             code_column: mic
             id_column: market_id
@@ -81,6 +82,7 @@ domains:
           maps_to: market_id
           lookup:
             table: markets
+            entity_type: market
             schema: custody
             code_column: mic
             id_column: market_id

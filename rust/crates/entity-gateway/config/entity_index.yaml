@@ -16,9 +16,9 @@ database:
 entities:
   # Natural persons - maps to existing entity_proper_persons table
   person:
-    nickname: "person"
+    nickname: "PERSON"
     source_table: '"ob-poc".entity_proper_persons'
-    return_key: "search_name" # Return full name for DSL (resolved to UUID at execution)
+    return_key: "search_name" # Return name for DSL source (resolved to UUID at execution)
     display_template: "{first_name} {last_name}"
     index_mode: trigram # Names need fuzzy substring search
     search_keys:
@@ -37,9 +37,9 @@ entities:
 
   # Funds - maps to existing cbus table filtered by client_type
   fund:
-    nickname: "fund"
+    nickname: "FUND"
     source_table: '"ob-poc".cbus'
-    return_key: "name" # Return name for DSL (resolved to UUID at execution)
+    return_key: "name" # Return name for DSL source (resolved to UUID at execution)
     display_template: "{name}"
     index_mode: trigram # Fund names need fuzzy search
     filter: "client_type IN ('FUND', 'fund')"
@@ -55,9 +55,9 @@ entities:
 
   # CBUs (all types) - maps to existing cbus table
   cbu:
-    nickname: "cbu"
+    nickname: "CBU"
     source_table: '"ob-poc".cbus'
-    return_key: "name" # Return name for DSL (resolved to UUID at execution)
+    return_key: "name" # Return name for DSL source (resolved to UUID at execution)
     display_template: "{name}"
     index_mode: trigram # CBU names need fuzzy search
     search_keys:
@@ -74,7 +74,7 @@ entities:
 
   # Products - maps to existing products table
   product:
-    nickname: "product"
+    nickname: "PRODUCT"
     source_table: '"ob-poc".products'
     return_key: "product_code" # Return the code for DSL insertion
     display_template: "{name} ({product_code})"
@@ -91,9 +91,9 @@ entities:
 
   # Legal entities (companies) - maps to existing entity_limited_companies table
   legal_entity:
-    nickname: "legal_entity"
+    nickname: "LEGAL_ENTITY"
     source_table: '"ob-poc".entity_limited_companies'
-    return_key: "company_name" # Return name for DSL (resolved to UUID at execution)
+    return_key: "company_name" # Return name for DSL source (resolved to UUID at execution)
     display_template: "{company_name}"
     index_mode: trigram # Company names need fuzzy search
     search_keys:
@@ -108,26 +108,26 @@ entities:
       enabled: true
       prefix_len: 1
 
-  # Generic entities - maps to base entities table
+  # Generic entities - uses entity_search_view which combines all entity types
   entity:
-    nickname: "entity"
-    source_table: '"ob-poc".entities'
-    return_key: "name" # Return name for DSL (resolved to UUID at execution)
-    display_template: "{name}"
+    nickname: "ENTITY"
+    source_table: '"ob-poc".entity_search_view'
+    return_key: "display_name" # Return name for DSL source (resolved to UUID at execution)
+    display_template: "{display_name} ({entity_type})"
     index_mode: trigram # Entity names need fuzzy search
     search_keys:
       - name: "name"
-        column: "name"
+        column: "search_text"
         default: true
-      - name: "external_id"
-        column: "external_id"
+      - name: "type"
+        column: "entity_type"
     shard:
       enabled: true
       prefix_len: 1
 
   # Services - maps to existing services table
   service:
-    nickname: "service"
+    nickname: "SERVICE"
     source_table: '"ob-poc".services'
     return_key: "service_code" # Return code for DSL
     display_template: "{name}"
@@ -148,7 +148,7 @@ entities:
 
   # Roles - entity roles within a CBU
   role:
-    nickname: "role"
+    nickname: "ROLE"
     source_table: '"ob-poc".roles'
     return_key: "name"
     display_template: "{name}"
@@ -162,7 +162,7 @@ entities:
 
   # Jurisdictions
   jurisdiction:
-    nickname: "jurisdiction"
+    nickname: "JURISDICTION"
     source_table: '"ob-poc".master_jurisdictions'
     return_key: "jurisdiction_code"
     display_template: "{jurisdiction_name}"
@@ -178,7 +178,7 @@ entities:
 
   # Currencies
   currency:
-    nickname: "currency"
+    nickname: "CURRENCY"
     source_table: '"ob-poc".currencies'
     return_key: "iso_code"
     display_template: "{name}"
@@ -195,7 +195,7 @@ entities:
 
   # Client Types
   client_type:
-    nickname: "client_type"
+    nickname: "CLIENT_TYPE"
     source_table: '"ob-poc".client_types'
     return_key: "code"
     display_template: "{name}"
@@ -212,7 +212,7 @@ entities:
 
   # Case Types (KYC)
   case_type:
-    nickname: "case_type"
+    nickname: "CASE_TYPE"
     source_table: '"ob-poc".case_types'
     return_key: "code"
     display_template: "{name}"
@@ -229,7 +229,7 @@ entities:
 
   # Screening Types
   screening_type:
-    nickname: "screening_type"
+    nickname: "SCREENING_TYPE"
     source_table: '"ob-poc".screening_types'
     return_key: "code"
     display_template: "{name}"
@@ -246,7 +246,7 @@ entities:
 
   # Risk Ratings
   risk_rating:
-    nickname: "risk_rating"
+    nickname: "RISK_RATING"
     source_table: '"ob-poc".risk_ratings'
     return_key: "code"
     display_template: "{name}"
@@ -263,7 +263,7 @@ entities:
 
   # Settlement Types
   settlement_type:
-    nickname: "settlement_type"
+    nickname: "SETTLEMENT_TYPE"
     source_table: '"ob-poc".settlement_types'
     return_key: "code"
     display_template: "{name}"
@@ -280,7 +280,7 @@ entities:
 
   # SSI Types
   ssi_type:
-    nickname: "ssi_type"
+    nickname: "SSI_TYPE"
     source_table: '"ob-poc".ssi_types'
     return_key: "code"
     display_template: "{name}"
@@ -297,7 +297,7 @@ entities:
 
   # Instrument Classes (custody schema)
   instrument_class:
-    nickname: "instrument_class"
+    nickname: "INSTRUMENT_CLASS"
     source_table: "custody.instrument_classes"
     return_key: "class_id"
     display_template: "{name}"
@@ -313,7 +313,7 @@ entities:
 
   # Markets (custody schema)
   market:
-    nickname: "market"
+    nickname: "MARKET"
     source_table: "custody.markets"
     return_key: "market_id"
     display_template: "{market_name}"
@@ -324,5 +324,73 @@ entities:
         default: true
       - name: "name"
         column: "market_name"
+    shard:
+      enabled: false
+
+  # ============================================
+  # VALIDATION TABLES (for parser/linter)
+  # ============================================
+
+  # Document Types - for :document-type and :doc-type args
+  document_type:
+    nickname: "DOCUMENT_TYPE"
+    source_table: '"ob-poc".document_types'
+    return_key: "type_code"
+    display_template: "{display_name}"
+    index_mode: exact
+    search_keys:
+      - name: "code"
+        column: "type_code"
+        default: true
+      - name: "name"
+        column: "display_name"
+    shard:
+      enabled: false
+
+  # Entity Types - for :entity-type and :type args
+  entity_type:
+    nickname: "ENTITY_TYPE"
+    source_table: '"ob-poc".entity_types'
+    return_key: "name"
+    display_template: "{name}"
+    index_mode: exact
+    search_keys:
+      - name: "name"
+        column: "name"
+        default: true
+      - name: "type_code"
+        column: "type_code"
+    shard:
+      enabled: false
+
+  # Attribute Registry - for :attribute-id and :attribute args
+  attribute:
+    nickname: "ATTRIBUTE"
+    source_table: '"ob-poc".attribute_registry'
+    return_key: "id"
+    display_template: "{display_name}"
+    index_mode: exact
+    search_keys:
+      - name: "id"
+        column: "id"
+        default: true
+      - name: "name"
+        column: "display_name"
+    shard:
+      enabled: false
+
+  # Document Catalog - for :document-id and :doc-id args (UUID lookup)
+  document:
+    nickname: "DOCUMENT"
+    source_table: '"ob-poc".document_catalog'
+    return_key: "doc_id"
+    display_template: "{document_name}"
+    index_mode: trigram
+    search_keys:
+      - name: "name"
+        column: "document_name"
+        default: true
+      - name: "id"
+        column: "doc_id"
     shard:
       enabled: false

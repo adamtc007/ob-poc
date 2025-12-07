@@ -17,6 +17,7 @@ domains:
             maps_to: resource_id
             lookup:
               table: service_resource_types
+              entity_type: resource_type
               schema: ob-poc
               search_key: name
               primary_key: resource_type_id
@@ -75,6 +76,7 @@ domains:
             required: true
             lookup:
               table: services
+              entity_type: service
               schema: ob-poc
               search_key: name
               primary_key: service_id
@@ -96,6 +98,7 @@ domains:
             required: true
             lookup:
               table: service_resource_types
+              entity_type: resource_type
               schema: ob-poc
               search_key: name
               primary_key: resource_type_id
@@ -116,6 +119,7 @@ domains:
             required: true
             lookup:
               table: cbus
+              entity_type: cbu
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
@@ -136,6 +140,7 @@ domains:
             required: false
             lookup:
               table: products
+              entity_type: product
               schema: ob-poc
               search_key: name
               primary_key: product_id
@@ -144,6 +149,7 @@ domains:
             required: false
             lookup:
               table: services
+              entity_type: service
               schema: ob-poc
               search_key: name
               primary_key: service_id
@@ -165,6 +171,7 @@ domains:
             required: true
             lookup:
               table: cbu_resource_instances
+              entity_type: resource_instance
               schema: ob-poc
               search_key: instance_name
               primary_key: instance_id
@@ -197,11 +204,6 @@ domains:
 
       suspend:
         description: Suspend a service resource instance
-            lookup:
-              table: cbu_resource_instances
-              schema: ob-poc
-              search_key: instance_name
-              primary_key: instance_id
         behavior: plugin
         handler: resource_suspend
         args:
@@ -210,6 +212,7 @@ domains:
             required: true
             lookup:
               table: cbu_resource_instances
+              entity_type: resource_instance
               schema: ob-poc
               search_key: instance_name
               primary_key: instance_id
@@ -227,6 +230,7 @@ domains:
             required: true
             lookup:
               table: cbu_resource_instances
+              entity_type: resource_instance
               schema: ob-poc
               search_key: instance_name
               primary_key: instance_id
@@ -244,6 +248,7 @@ domains:
             required: true
             lookup:
               table: cbu_resource_instances
+              entity_type: resource_instance
               schema: ob-poc
               search_key: instance_name
               primary_key: instance_id

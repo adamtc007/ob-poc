@@ -2720,7 +2720,7 @@ mod tests {
         let ops = registry.list();
         // 7 original (entity-create, doc-catalog, doc-extract, ubo-calculate, 3 screening)
         // + 6 resource + 4 custody + 4 observation + 1 doc-extract-observations
-        // + 3 threshold + 3 rfi + 7 ubo-analysis = 35
-        assert_eq!(ops.len(), 35);
+        // + 3 threshold + 3 rfi + 7 ubo-analysis + 2 new = 37
+        assert_eq!(ops.len(), 37);
     }
 }

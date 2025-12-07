@@ -709,6 +709,50 @@ Claude will:
 (service-resource.activate :instance-id @account)
 ```
 
+### LookupRef Triplet Pattern
+
+For arguments that reference existing database entities, the DSL supports a **triplet pattern** that captures the entity type, human-readable search key, and resolved primary key:
+
+```clojure
+;; Triplet syntax: (ref_type search_key primary_key)
+;; - ref_type: Entity type from verb YAML definition (e.g., "proper_person", "role", "jurisdiction")
+;; - search_key: Human-readable identifier displayed in UI
+;; - primary_key: Resolved UUID or code (or nil if unresolved)
+
+;; Example: Resolved entity reference
+(cbu.assign-role :entity-id ("proper_person" "John Smith" "550e8400-e29b-41d4-a716-446655440000"))
+
+;; Example: Unresolved reference (needs resolution via EntityGateway)
+(cbu.assign-role :entity-id ("proper_person" "John Smith" nil))
+
+;; Example: Reference data (codes instead of UUIDs)
+(cbu.assign-role :role ("role" "DIRECTOR" "DIRECTOR"))
+```
+
+**How it works:**
+1. **UI Autocomplete**: User types partial name → EntityGateway fuzzy search → returns matches
+2. **Selection**: User selects match → UI stores triplet with resolved primary_key
+3. **Validation**: On reload, semantic validator confirms primary_key still exists
+4. **Execution**: Executor uses primary_key for database operations
+
+**Verb YAML configuration** drives the expected `entity_type` for each argument:
+
+```yaml
+args:
+  - name: entity-id
+    type: uuid
+    required: true
+    maps_to: entity_id
+    lookup:
+      table: entities
+      schema: ob-poc
+      entity_type: entity        # ← Becomes ref_type in triplet
+      search_key: name
+      primary_key: entity_id
+```
+
+**Supported entity types**: `cbu`, `entity`, `proper_person`, `limited_company`, `product`, `service`, `document`, `role`, `jurisdiction`, `currency`, `kyc_case`, `workstream`, `share_class`, `holding`, `movement`, `ssi`, `market`, `instrument_class`, etc.
+
 ## Verb Domains
 
 | Domain | Purpose |
@@ -1401,7 +1445,7 @@ The `share-class`, `holding`, and `movement` domains implement a Clearstream-sty
 
 **Database**: `data_designer` on PostgreSQL 17  
 **Schemas**: `ob-poc` (55 tables), `custody` (17 tables), `kyc` (11 tables)  
-**Updated**: 2025-12-02
+**Updated**: 2025-12-07
 
 ## Overview
 

@@ -220,9 +220,16 @@ impl SearchIndex for TantivyIndex {
             let tantivy_query: Box<dyn Query> = match query.mode {
                 MatchMode::Fuzzy => self.build_fuzzy_query(search_field, exact_field, &input_lower),
                 MatchMode::Exact => {
-                    // Exact term match on the exact field
-                    let term = Term::from_field_text(exact_field, &input_lower);
-                    Box::new(TermQuery::new(term, Default::default()))
+                    // For exact mode, use prefix query to allow incremental search
+                    // e.g., "D" matches "DIRECTOR", "DIR" matches "DIRECTOR"
+                    if input_lower.is_empty() {
+                        // Empty query - match all (return all values for this field)
+                        Box::new(tantivy::query::AllQuery)
+                    } else {
+                        // Use fuzzy prefix for typo tolerance on short inputs
+                        let term = Term::from_field_text(exact_field, &input_lower);
+                        Box::new(FuzzyTermQuery::new_prefix(term, 1, true))
+                    }
                 }
             };
 

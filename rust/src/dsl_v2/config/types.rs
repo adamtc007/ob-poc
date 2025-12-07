@@ -173,8 +173,16 @@ pub struct LookupConfig {
     pub table: String,
     #[serde(default)]
     pub schema: Option<String>,
-    pub code_column: String,
-    pub id_column: String,
+    /// The entity type for this lookup (e.g., "proper_person", "limited_company", "role", "jurisdiction")
+    /// This becomes the ref_type in the LookupRef triplet: (ref_type, search_key, primary_key)
+    #[serde(default)]
+    pub entity_type: Option<String>,
+    /// The column containing human-readable search key (what user sees/types)
+    #[serde(alias = "code_column")]
+    pub search_key: String,
+    /// The column containing primary key (UUID for entities, code for reference data)
+    #[serde(alias = "id_column")]
+    pub primary_key: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -191,6 +199,7 @@ pub struct ReturnsConfig {
 #[serde(rename_all = "snake_case")]
 pub enum ReturnTypeConfig {
     Uuid,
+    String,
     Record,
     RecordSet,
     Affected,
@@ -217,7 +226,10 @@ pub struct DynamicVerbConfig {
 pub struct DynamicSourceConfig {
     pub table: String,
     pub schema: Option<String>,
-    pub code_column: String,
+    /// Column containing the type code (e.g., "proper_person", "limited_company")
+    #[serde(alias = "code_column")]
+    pub type_code_column: String,
+    /// Column containing the display name
     pub name_column: Option<String>,
     #[serde(default)]
     pub transform: Option<String>,

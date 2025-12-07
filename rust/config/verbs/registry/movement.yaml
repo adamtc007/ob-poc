@@ -15,11 +15,12 @@ domains:
           type: uuid
           required: true
           maps_to: holding_id
-            lookup:
-              table: holdings
-              schema: kyc
-              search_key: id
-              primary_key: id
+          lookup:
+            table: holdings
+            entity_type: holding
+            schema: kyc
+            search_key: id
+            primary_key: id
         - name: units
           type: decimal
           required: true
@@ -72,11 +73,12 @@ domains:
           type: uuid
           required: true
           maps_to: holding_id
-            lookup:
-              table: holdings
-              schema: kyc
-              search_key: id
-              primary_key: id
+          lookup:
+            table: holdings
+            entity_type: holding
+            schema: kyc
+            search_key: id
+            primary_key: id
         - name: units
           type: decimal
           required: true
@@ -129,11 +131,12 @@ domains:
           type: uuid
           required: true
           maps_to: holding_id
-            lookup:
-              table: holdings
-              schema: kyc
-              search_key: id
-              primary_key: id
+          lookup:
+            table: holdings
+            entity_type: holding
+            schema: kyc
+            search_key: id
+            primary_key: id
         - name: units
           type: decimal
           required: true
@@ -173,11 +176,12 @@ domains:
           type: uuid
           required: true
           maps_to: holding_id
-            lookup:
-              table: holdings
-              schema: kyc
-              search_key: id
-              primary_key: id
+          lookup:
+            table: holdings
+            entity_type: holding
+            schema: kyc
+            search_key: id
+            primary_key: id
         - name: units
           type: decimal
           required: true
@@ -219,11 +223,12 @@ domains:
           type: uuid
           required: true
           maps_to: id
-            lookup:
-              table: movements
-              schema: kyc
-              search_key: id
-              primary_key: id
+          lookup:
+            table: movements
+            entity_type: movement
+            schema: kyc
+            search_key: id
+            primary_key: id
         returns:
           type: affected
       settle:
@@ -241,11 +246,12 @@ domains:
           type: uuid
           required: true
           maps_to: id
-            lookup:
-              table: movements
-              schema: kyc
-              search_key: id
-              primary_key: id
+          lookup:
+            table: movements
+            entity_type: movement
+            schema: kyc
+            search_key: id
+            primary_key: id
         - name: settlement-date
           type: date
           required: false
@@ -267,11 +273,12 @@ domains:
           type: uuid
           required: true
           maps_to: id
-            lookup:
-              table: movements
-              schema: kyc
-              search_key: id
-              primary_key: id
+          lookup:
+            table: movements
+            entity_type: movement
+            schema: kyc
+            search_key: id
+            primary_key: id
         - name: notes
           type: string
           required: false
@@ -292,6 +299,7 @@ domains:
           required: true
           lookup:
             table: holdings
+            entity_type: holding
             schema: kyc
             search_key: id
             primary_key: id
@@ -317,10 +325,11 @@ domains:
           type: uuid
           required: true
           maps_to: id
-            lookup:
-              table: movements
-              schema: kyc
-              search_key: id
-              primary_key: id
+          lookup:
+            table: movements
+            entity_type: movement
+            schema: kyc
+            search_key: id
+            primary_key: id
         returns:
           type: record

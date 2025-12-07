@@ -16,11 +16,12 @@ domains:
           type: uuid
           required: true
           maps_to: cbu_id
-            lookup:
-              table: cbus
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
         - name: case-type
           type: string
           required: false
@@ -39,11 +40,12 @@ domains:
           type: uuid
           required: false
           maps_to: assigned_analyst_id
-            lookup:
-              table: entities
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         - name: notes
           type: string
           required: false
@@ -66,11 +68,12 @@ domains:
           type: uuid
           required: true
           maps_to: case_id
-            lookup:
-              table: cases
-              schema: kyc
-              search_key: case_id
-              primary_key: case_id
+          lookup:
+            table: cases
+            entity_type: kyc_case
+            schema: kyc
+            search_key: case_id
+            primary_key: case_id
         - name: status
           type: string
           required: true
@@ -101,11 +104,12 @@ domains:
           type: uuid
           required: true
           maps_to: case_id
-            lookup:
-              table: cases
-              schema: kyc
-              search_key: case_id
-              primary_key: case_id
+          lookup:
+            table: cases
+            entity_type: kyc_case
+            schema: kyc
+            search_key: case_id
+            primary_key: case_id
         - name: escalation-level
           type: string
           required: true
@@ -131,29 +135,32 @@ domains:
           type: uuid
           required: true
           maps_to: case_id
-            lookup:
-              table: cases
-              schema: kyc
-              search_key: case_id
-              primary_key: case_id
+          lookup:
+            table: cases
+            entity_type: kyc_case
+            schema: kyc
+            search_key: case_id
+            primary_key: case_id
         - name: analyst-id
           type: uuid
           required: false
           maps_to: assigned_analyst_id
-            lookup:
-              table: entities
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         - name: reviewer-id
           type: uuid
           required: false
           maps_to: assigned_reviewer_id
-            lookup:
-              table: entities
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         returns:
           type: affected
       set-risk-rating:
@@ -170,11 +177,12 @@ domains:
           type: uuid
           required: true
           maps_to: case_id
-            lookup:
-              table: cases
-              schema: kyc
-              search_key: case_id
-              primary_key: case_id
+          lookup:
+            table: cases
+            entity_type: kyc_case
+            schema: kyc
+            search_key: case_id
+            primary_key: case_id
         - name: risk-rating
           type: string
           required: true
@@ -203,11 +211,12 @@ domains:
           type: uuid
           required: true
           maps_to: case_id
-            lookup:
-              table: cases
-              schema: kyc
-              search_key: case_id
-              primary_key: case_id
+          lookup:
+            table: cases
+            entity_type: kyc_case
+            schema: kyc
+            search_key: case_id
+            primary_key: case_id
         - name: status
           type: string
           required: true
@@ -235,11 +244,12 @@ domains:
           type: uuid
           required: true
           maps_to: case_id
-            lookup:
-              table: cases
-              schema: kyc
-              search_key: case_id
-              primary_key: case_id
+          lookup:
+            table: cases
+            entity_type: kyc_case
+            schema: kyc
+            search_key: case_id
+            primary_key: case_id
         returns:
           type: record
       list-by-cbu:
@@ -256,6 +266,7 @@ domains:
           required: true
           lookup:
             table: cbus
+            entity_type: cbu
             schema: ob-poc
             search_key: name
             primary_key: cbu_id

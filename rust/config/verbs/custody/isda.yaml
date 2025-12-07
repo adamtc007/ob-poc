@@ -15,11 +15,12 @@ domains:
           type: uuid
           required: true
           maps_to: cbu_id
-            lookup:
-              table: cbus
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
         - name: counterparty
           type: uuid
           required: true
@@ -56,17 +57,19 @@ domains:
           type: uuid
           required: true
           maps_to: isda_id
-            lookup:
-              table: isda_agreements
-              schema: custody
-              search_key: isda_id
-              primary_key: isda_id
+          lookup:
+            table: isda_agreements
+            entity_type: isda
+            schema: custody
+            search_key: isda_id
+            primary_key: isda_id
         - name: instrument-class
           type: lookup
           required: true
           maps_to: instrument_class_id
           lookup:
             table: instrument_classes
+            entity_type: instrument_class
             schema: custody
             code_column: code
             id_column: class_id
@@ -95,11 +98,12 @@ domains:
           type: uuid
           required: true
           maps_to: isda_id
-            lookup:
-              table: isda_agreements
-              schema: custody
-              search_key: isda_id
-              primary_key: isda_id
+          lookup:
+            table: isda_agreements
+            entity_type: isda
+            schema: custody
+            search_key: isda_id
+            primary_key: isda_id
         - name: csa-type
           type: string
           required: true
@@ -145,6 +149,7 @@ domains:
           required: true
           lookup:
             table: cbus
+            entity_type: cbu
             schema: ob-poc
             search_key: name
             primary_key: cbu_id

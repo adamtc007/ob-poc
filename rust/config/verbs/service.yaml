@@ -16,6 +16,7 @@ domains:
             maps_to: service_id
             lookup:
               table: services
+              entity_type: service
               schema: ob-poc
               search_key: name
               primary_key: service_id
@@ -69,6 +70,7 @@ domains:
             required: true
             lookup:
               table: products
+              entity_type: product
               schema: ob-poc
               search_key: name
               primary_key: product_id

@@ -15,20 +15,22 @@ domains:
           type: uuid
           required: true
           maps_to: share_class_id
-            lookup:
-              table: share_classes
-              schema: kyc
-              search_key: name
-              primary_key: id
+          lookup:
+            table: share_classes
+            entity_type: share_class
+            schema: kyc
+            search_key: name
+            primary_key: id
         - name: investor-entity-id
           type: uuid
           required: true
           maps_to: investor_entity_id
-            lookup:
-              table: entities
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         - name: units
           type: decimal
           required: false
@@ -62,20 +64,22 @@ domains:
           type: uuid
           required: true
           maps_to: share_class_id
-            lookup:
-              table: share_classes
-              schema: kyc
-              search_key: name
-              primary_key: id
+          lookup:
+            table: share_classes
+            entity_type: share_class
+            schema: kyc
+            search_key: name
+            primary_key: id
         - name: investor-entity-id
           type: uuid
           required: true
           maps_to: investor_entity_id
-            lookup:
-              table: entities
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         - name: units
           type: decimal
           required: false
@@ -105,11 +109,12 @@ domains:
           type: uuid
           required: true
           maps_to: id
-            lookup:
-              table: holdings
-              schema: kyc
-              search_key: id
-              primary_key: id
+          lookup:
+            table: holdings
+            entity_type: holding
+            schema: kyc
+            search_key: id
+            primary_key: id
         - name: units
           type: decimal
           required: true
@@ -132,11 +137,12 @@ domains:
           type: uuid
           required: true
           maps_to: id
-            lookup:
-              table: holdings
-              schema: kyc
-              search_key: id
-              primary_key: id
+          lookup:
+            table: holdings
+            entity_type: holding
+            schema: kyc
+            search_key: id
+            primary_key: id
         returns:
           type: record
       list-by-share-class:
@@ -153,6 +159,7 @@ domains:
           required: true
           lookup:
             table: share_classes
+            entity_type: share_class
             schema: kyc
             search_key: name
             primary_key: id
@@ -176,6 +183,7 @@ domains:
           required: true
           lookup:
             table: entities
+            entity_type: entity
             schema: ob-poc
             search_key: name
             primary_key: entity_id
@@ -196,10 +204,11 @@ domains:
           type: uuid
           required: true
           maps_to: id
-            lookup:
-              table: holdings
-              schema: kyc
-              search_key: id
-              primary_key: id
+          lookup:
+            table: holdings
+            entity_type: holding
+            schema: kyc
+            search_key: id
+            primary_key: id
         returns:
           type: affected

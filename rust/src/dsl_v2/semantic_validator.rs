@@ -14,8 +14,9 @@
 
 use crate::dsl_v2::ast::{Span, Statement, Value, VerbCall};
 use crate::dsl_v2::csg_linter::{CsgLinter, LintResult};
+use crate::dsl_v2::gateway_resolver::GatewayRefResolver;
 use crate::dsl_v2::parser::parse_program;
-use crate::dsl_v2::ref_resolver::{arg_to_ref_type, RefTypeResolver, ResolveResult};
+use crate::dsl_v2::ref_resolver::{arg_to_ref_type, RefResolver, RefTypeResolver, ResolveResult};
 use crate::dsl_v2::validation::{
     Diagnostic, DiagnosticBuilder, DiagnosticCode, RefType, RustStyleFormatter, Severity,
     SourceSpan, ValidatedProgram, ValidatedStatement, ValidationContext, ValidationRequest,
@@ -24,18 +25,40 @@ use crate::dsl_v2::validation::{
 use crate::dsl_v2::verb_registry::registry;
 use sqlx::PgPool;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 /// Semantic validator that checks AST against live database
 pub struct SemanticValidator {
-    resolver: RefTypeResolver,
+    resolver: Box<dyn RefResolver>,
     csg_linter: Option<CsgLinter>,
     pool: PgPool,
 }
 
 impl SemanticValidator {
+    /// Create a new SemanticValidator with SQL-based resolver (legacy)
     pub fn new(pool: PgPool) -> Self {
         Self {
-            resolver: RefTypeResolver::new(pool.clone()),
+            resolver: Box::new(RefTypeResolver::new(pool.clone())),
+            csg_linter: None,
+            pool,
+        }
+    }
+
+    /// Create a SemanticValidator with EntityGateway-based resolver
+    /// This is the preferred method when EntityGateway is available
+    pub async fn with_gateway(pool: PgPool, gateway_url: &str) -> Result<Self, String> {
+        let gateway_resolver = GatewayRefResolver::connect(gateway_url).await?;
+        Ok(Self {
+            resolver: Box::new(gateway_resolver),
+            csg_linter: None,
+            pool,
+        })
+    }
+
+    /// Create a SemanticValidator with a custom resolver
+    pub fn with_resolver(pool: PgPool, resolver: Box<dyn RefResolver>) -> Self {
+        Self {
+            resolver,
             csg_linter: None,
             pool,
         }
@@ -517,6 +540,84 @@ impl SemanticValidator {
                     }
                 }
                 Some(ResolvedArg::Map(resolved_map))
+            }
+
+            // LookupRef - already resolved during prior validation or needs resolution
+            Value::LookupRef {
+                ref_type: lookup_type,
+                search_key,
+                primary_key,
+            } => {
+                if let Some(pk) = primary_key {
+                    // Already resolved - validate the primary key still exists
+                    let key_with_colon = format!(":{}", key);
+                    let ref_type =
+                        arg_to_ref_type(verb, &key_with_colon).unwrap_or(RefType::Entity);
+
+                    // Try to parse as UUID, otherwise treat as code
+                    if let Ok(uuid) = Uuid::parse_str(pk) {
+                        Some(ResolvedArg::Ref {
+                            ref_type,
+                            id: uuid,
+                            display: search_key.clone(),
+                        })
+                    } else {
+                        // It's a code (like "DIRECTOR" for roles)
+                        Some(ResolvedArg::Ref {
+                            ref_type,
+                            id: Uuid::nil(),
+                            display: format!("{}:{}", lookup_type, pk),
+                        })
+                    }
+                } else {
+                    // Needs resolution - treat like a string lookup
+                    let key_with_colon = format!(":{}", key);
+                    if let Some(ref_type) = arg_to_ref_type(verb, &key_with_colon) {
+                        match self.resolver.resolve(ref_type, search_key).await {
+                            Ok(ResolveResult::Found { id, display }) => Some(ResolvedArg::Ref {
+                                ref_type,
+                                id,
+                                display,
+                            }),
+                            Ok(ResolveResult::FoundByCode { uuid, display, .. }) => {
+                                Some(ResolvedArg::Ref {
+                                    ref_type,
+                                    id: uuid.unwrap_or_default(),
+                                    display,
+                                })
+                            }
+                            Ok(ResolveResult::NotFound { suggestions }) => {
+                                let suggestion_text = if suggestions.is_empty() {
+                                    String::new()
+                                } else {
+                                    let names: Vec<_> =
+                                        suggestions.iter().map(|s| s.display.as_str()).collect();
+                                    format!(". Did you mean: {}?", names.join(", "))
+                                };
+                                diagnostics.error(
+                                    DiagnosticCode::InvalidValue,
+                                    src_span,
+                                    format!(
+                                        "'{}' not found for type '{}'{}",
+                                        search_key, lookup_type, suggestion_text
+                                    ),
+                                );
+                                None
+                            }
+                            Err(e) => {
+                                diagnostics.error(
+                                    DiagnosticCode::InvalidValue,
+                                    src_span,
+                                    format!("DB error validating '{}': {}", search_key, e),
+                                );
+                                None
+                            }
+                        }
+                    } else {
+                        // No lookup config - pass through as string
+                        Some(ResolvedArg::String(search_key.clone()))
+                    }
+                }
             }
         }
     }

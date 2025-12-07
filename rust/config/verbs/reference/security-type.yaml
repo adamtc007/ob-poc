@@ -19,6 +19,7 @@ domains:
           maps_to: instrument_class_id
           lookup:
             table: instrument_classes
+            entity_type: instrument_class
             schema: custody
             code_column: code
             id_column: class_id
@@ -53,6 +54,7 @@ domains:
           maps_to: class_id
           lookup:
             table: instrument_classes
+            entity_type: instrument_class
             schema: custody
             code_column: code
             id_column: class_id
