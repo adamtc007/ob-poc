@@ -41,11 +41,14 @@
 //! - `custom_ops`: Plugin trait and implementations
 
 pub mod applicability_rules;
+pub mod assembler;
 pub mod assembly;
 pub mod ast;
 pub mod config;
 pub mod csg_linter;
 pub mod custom_ops;
+#[cfg(feature = "database")]
+pub mod entity_resolver;
 pub mod execution_plan;
 pub mod executor;
 #[cfg(feature = "database")]
@@ -54,6 +57,8 @@ pub mod gateway_resolver;
 pub mod generic_executor;
 #[cfg(feature = "database")]
 pub mod idempotency;
+pub mod intent;
+pub mod intent_extractor;
 pub mod parser;
 #[cfg(feature = "database")]
 pub mod ref_resolver;
@@ -68,9 +73,12 @@ pub mod verb_schema;
 
 // Re-export key types for convenience
 pub use applicability_rules::{ApplicabilityRules, AttributeApplicability, DocumentApplicability};
+pub use assembler::{ArgResolver, AssembledStatement, AssemblyError, DslAssembler};
 pub use ast::{Argument, Key, Program, Span, Statement, Value, VerbCall};
 pub use config::types::LookupConfig;
 pub use csg_linter::{CsgLinter, InferredContext, LintResult};
+#[cfg(feature = "database")]
+pub use entity_resolver::{needs_quoting, AsyncEntityGatewayResolver, EntityGatewayResolver};
 pub use execution_plan::{compile, CompileError, ExecutionPlan, ExecutionStep, Injection};
 pub use executor::{DslExecutor, ExecutionContext, ExecutionResult, ReturnType};
 #[cfg(feature = "database")]
@@ -79,6 +87,8 @@ pub use gateway_resolver::GatewayRefResolver;
 pub use generic_executor::{GenericCrudExecutor, GenericExecutionResult};
 #[cfg(feature = "database")]
 pub use idempotency::{compute_idempotency_key, IdempotencyManager};
+pub use intent::{ArgIntent, DslIntent, DslIntentBatch, ResolvedArg};
+pub use intent_extractor::IntentExtractor;
 pub use parser::{parse_program, parse_single_verb};
 #[cfg(feature = "database")]
 pub use ref_resolver::RefResolver;
