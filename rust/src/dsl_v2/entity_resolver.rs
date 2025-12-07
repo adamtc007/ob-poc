@@ -190,10 +190,10 @@ pub fn needs_quoting(value: &str) -> bool {
     // Check if it's a pure number (integer or decimal, possibly negative)
     // Must start with digit or minus followed by digit
     if let Some(first) = value.chars().next() {
-        if first.is_ascii_digit() || (first == '-' && value.len() > 1) {
-            if value.parse::<f64>().is_ok() || value.parse::<i64>().is_ok() {
-                return false;
-            }
+        if (first.is_ascii_digit() || (first == '-' && value.len() > 1))
+            && (value.parse::<f64>().is_ok() || value.parse::<i64>().is_ok())
+        {
+            return false;
         }
     }
 
