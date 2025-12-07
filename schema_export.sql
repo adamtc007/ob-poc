@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict sKjtb1rYccjHQ9ZW1cOe9jZey7GZCeexvGnosXpaeaMD5xXoZRNV4OKfgE8Qvh9
+\restrict 4k9grZuIpc2HkHvT0XWtJSQFgSo5EXgSUMLHWKUUBPDiVTFILRfxSOuU0DKUv86
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -10809,5 +10809,5 @@ ALTER TABLE ONLY public.rules
 -- PostgreSQL database dump complete
 --
 
-\unrestrict sKjtb1rYccjHQ9ZW1cOe9jZey7GZCeexvGnosXpaeaMD5xXoZRNV4OKfgE8Qvh9
+\unrestrict 4k9grZuIpc2HkHvT0XWtJSQFgSo5EXgSUMLHWKUUBPDiVTFILRfxSOuU0DKUv86
 

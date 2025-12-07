@@ -2565,6 +2565,119 @@ dsl_cli custody -i "..." --format json
 
 **Retry Loop**: Validation failures feed back to Claude with error messages for self-correction (max 3 attempts).
 
+## Intent-to-DSL Assembly Pipeline
+
+The `rust/src/dsl_v2/` module provides a **deterministic** DSL generation pipeline that minimizes AI variance. Unlike the agentic module which has Claude generate DSL text directly, this pipeline has Claude extract **structured intent** which is then assembled into valid DSL by Rust code.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     USER REQUEST                                 │
+│  "Add John Smith as director of Apex Capital"                   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│         PHASE 1: INTENT EXTRACTION (Claude API)                  │
+│  Natural language → DslIntentBatch (structured JSON)            │
+│  AI extracts WHAT to do, not HOW to write DSL                   │
+│  rust/src/dsl_v2/intent_extractor.rs                            │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│         PHASE 2: ENTITY RESOLUTION (EntityGateway)               │
+│  ArgIntent lookups → ResolvedArg with real UUIDs/codes          │
+│  - EntityLookup: "Apex Capital" → UUID                          │
+│  - RefDataLookup: "director" → "DIRECTOR"                       │
+│  rust/src/dsl_v2/entity_resolver.rs                             │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│         PHASE 3: DSL ASSEMBLY (Deterministic Rust)               │
+│  Resolved intents → Valid DSL source code                       │
+│  - Verb registry validates args                                 │
+│  - Symbol tracking across batch                                 │
+│  - Proper quoting (all strings quoted in DSL)                   │
+│  rust/src/dsl_v2/assembler.rs                                   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│         PHASE 4: VALIDATION                                      │
+│  Parse → CSG Lint → Ready for execution                         │
+│  rust/src/dsl_v2/parser.rs, csg_linter.rs                       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Types
+
+**DslIntent** - A single DSL action:
+```rust
+pub struct DslIntent {
+    pub verb: Option<String>,       // e.g., "cbu.assign-role"
+    pub action: String,             // e.g., "assign" (for inference)
+    pub domain: String,             // e.g., "cbu"
+    pub args: HashMap<String, ArgIntent>,
+    pub bind_as: Option<String>,    // Symbol binding
+    pub source_text: Option<String>,
+}
+```
+
+**ArgIntent** - Argument value types:
+```rust
+pub enum ArgIntent {
+    Literal { value: serde_json::Value },           // Direct value
+    SymbolRef { symbol: String },                   // @previously-bound
+    EntityLookup { search_text: String, entity_type: Option<String> },
+    RefDataLookup { search_text: String, ref_type: String },
+}
+```
+
+### Module Structure
+
+```
+rust/src/dsl_v2/
+├── intent.rs           # DslIntent, ArgIntent, DslIntentBatch
+├── intent_extractor.rs # IntentExtractor (Claude API client)
+├── assembler.rs        # DslAssembler, ArgResolver trait
+├── entity_resolver.rs  # EntityGatewayResolver, needs_quoting()
+└── prompts/
+    └── general_intent_extraction.md  # Claude extraction prompt
+```
+
+### Usage Example
+
+```rust
+// 1. Extract intent from natural language
+let extractor = IntentExtractor::from_env()?;
+let batch = extractor.extract("Add John Smith as director of Apex Capital").await?;
+
+// 2. Create resolver (connects to EntityGateway)
+let resolver = EntityGatewayResolver::from_env().await?;
+
+// 3. Assemble DSL
+let mut assembler = DslAssembler::new();
+let dsl = assembler.assemble_batch(&batch, &resolver)?;
+
+// 4. Validate
+let ast = parse_program(&dsl)?;
+```
+
+### Why This Design?
+
+| Aspect | Agentic (text gen) | Intent Pipeline |
+|--------|-------------------|-----------------|
+| AI output | DSL source code | Structured JSON |
+| Entity IDs | Can hallucinate | Resolved via EntityGateway |
+| Validation | Post-hoc (retry loop) | Built into assembly |
+| Determinism | Low (text varies) | High (templates) |
+| Debugging | Parse error messages | Typed assembly errors |
+
+**Key insight**: AI is good at understanding intent, but prone to syntax errors and hallucinating IDs. By having AI produce structured data and Rust produce DSL, we get the best of both.
+
 ## Environment Variables
 ## Complete DSL Verb Reference
 
