@@ -123,11 +123,10 @@ impl RefreshPipeline {
                 for key in &entity_config.search_keys {
                     if let Ok(value) = row.try_get::<String, _>(key.column.as_str()) {
                         search_values.insert(key.name.clone(), value);
-                    } else if let Ok(value) = row.try_get::<Option<String>, _>(key.column.as_str())
+                    } else if let Ok(Some(v)) =
+                        row.try_get::<Option<String>, _>(key.column.as_str())
                     {
-                        if let Some(v) = value {
-                            search_values.insert(key.name.clone(), v);
-                        }
+                        search_values.insert(key.name.clone(), v);
                     }
                 }
 

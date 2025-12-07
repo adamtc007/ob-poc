@@ -83,6 +83,8 @@ pub use parser::{parse_program, parse_single_verb};
 pub use ref_resolver::RefResolver;
 pub use runtime_registry::{runtime_registry, RuntimeVerbRegistry};
 pub use semantic_context::SemanticContextStore;
+#[cfg(feature = "database")]
+pub use semantic_validator::{validate_dsl, validate_dsl_with_csg, SemanticValidator};
 pub use verb_registry::{
     find_unified_verb, registry, verb_exists, ArgDef, UnifiedVerbDef, UnifiedVerbRegistry,
     VerbBehavior,

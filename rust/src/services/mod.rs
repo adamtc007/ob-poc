@@ -18,14 +18,12 @@ pub use agent_e2e_test_harness::{AgentE2ETestHarness, E2ETestScenario, TestResul
 
 // Attribute services
 pub mod attribute_executor;
-pub mod attribute_lifecycle;
 
 // Dictionary and document services
 pub mod dictionary_service_impl;
 pub mod document_attribute_crud_service;
 pub mod document_catalog_source;
 pub mod document_extraction_service;
-pub mod document_type_detector;
 pub mod extraction_service;
 
 // Executor services
@@ -34,9 +32,6 @@ pub mod source_executor;
 
 // Test harness
 pub mod document_attribute_test_harness;
-
-// Taxonomy
-pub mod product_services_resources;
 
 // Re-exports
 pub use dictionary_service_impl::DictionaryServiceImpl;

@@ -16,7 +16,6 @@ pub mod attribute_values_service;
 pub mod cbu_entity_roles_service;
 pub mod cbu_service;
 pub mod crud_service;
-pub mod decision_service;
 pub mod dictionary_service;
 pub mod document_service;
 pub mod dsl_repository;
@@ -24,12 +23,8 @@ pub mod entity_service;
 // Fuzzy search is now handled by EntityGateway gRPC service.
 // See rust/crates/entity-gateway/ for the central lookup service.
 pub mod generation_log_repository;
-pub mod investigation_service;
-pub mod monitoring_service;
 pub mod product_service;
 pub mod resource_instance_service;
-pub mod risk_service;
-pub mod screening_service;
 pub mod service_resource_service;
 pub mod service_service;
 pub mod session_repository;
@@ -77,27 +72,6 @@ pub use visualization_repository::{
     ServiceDeliveryView, ShareClassView, VisualizationRepository,
 };
 
-// KYC Investigation services
-pub use decision_service::{
-    DecisionConditionRow, DecisionRow, DecisionService, NewConditionFields, NewDecisionFields,
-    SatisfyConditionFields,
-};
-pub use investigation_service::{
-    InvestigationAssignmentRow, InvestigationRow, InvestigationService, NewAssignmentFields,
-    NewInvestigationFields,
-};
-pub use monitoring_service::{
-    MonitoringEventRow, MonitoringService, MonitoringSetupFields, MonitoringSetupRow,
-    NewMonitoringEventFields, NewScheduledReviewFields, ScheduledReviewRow,
-};
-pub use risk_service::{
-    NewRiskAssessmentFields, NewRiskFlagFields, RiskAssessmentRow, RiskFlagRow, RiskRatingFields,
-    RiskService,
-};
-pub use screening_service::{
-    NewAdverseMediaScreeningFields, NewPepScreeningFields, NewSanctionsScreeningFields,
-    ScreeningResolutionFields, ScreeningResultFields, ScreeningRow, ScreeningService,
-};
 pub use session_repository::{
     detect_domain, extract_domains, DslSnapshot, EntityCreated, PersistedSession, SessionEventType,
     SessionRepository, SessionStatus,

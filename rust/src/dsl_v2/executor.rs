@@ -7,6 +7,7 @@
 //! - GenericCrudExecutor for CRUD operations (defined in verbs.yaml)
 //! - CustomOperationRegistry for plugins (complex logic, external APIs)
 
+#[cfg(feature = "database")]
 use anyhow::{anyhow, bail, Result};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;

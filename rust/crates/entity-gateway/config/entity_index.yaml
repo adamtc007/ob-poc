@@ -415,3 +415,60 @@ entities:
         column: "resource_code"
     shard:
       enabled: false
+
+  # ============================================
+  # CUSTODY TABLES (name-based lookups)
+  # ============================================
+
+  # Standing Settlement Instructions - for :ssi-id name-based lookup
+  ssi:
+    nickname: "SSI"
+    source_table: "custody.cbu_ssi"
+    return_key: "ssi_id"
+    display_template: "{ssi_name} ({ssi_type})"
+    index_mode: trigram # SSI names need fuzzy search
+    filter: "status = 'ACTIVE'"
+    search_keys:
+      - name: "name"
+        column: "ssi_name"
+        default: true
+      - name: "type"
+        column: "ssi_type"
+    shard:
+      enabled: false
+
+  # Booking Rules - for :rule-id name-based lookup
+  booking_rule:
+    nickname: "BOOKING_RULE"
+    source_table: "custody.ssi_booking_rules"
+    return_key: "rule_id"
+    display_template: "{rule_name}"
+    index_mode: trigram # Rule names need fuzzy search
+    filter: "is_active = true"
+    search_keys:
+      - name: "name"
+        column: "rule_name"
+        default: true
+    shard:
+      enabled: false
+
+  # ============================================
+  # INVESTOR REGISTRY TABLES (name-based lookups)
+  # ============================================
+
+  # Share Classes - for :share-class-id name-based lookup
+  share_class:
+    nickname: "SHARE_CLASS"
+    source_table: "kyc.share_classes"
+    return_key: "id"
+    display_template: "{name} ({isin})"
+    index_mode: trigram # Share class names need fuzzy search
+    filter: "status = 'active'"
+    search_keys:
+      - name: "name"
+        column: "name"
+        default: true
+      - name: "isin"
+        column: "isin"
+    shard:
+      enabled: false

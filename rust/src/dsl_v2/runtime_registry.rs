@@ -3,6 +3,7 @@
 //! This replaces the static STANDARD_VERBS array with a dynamic
 //! registry that can be reloaded at runtime.
 
+#[cfg(feature = "database")]
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
@@ -239,6 +240,7 @@ impl RuntimeVerbRegistry {
         Ok(())
     }
 
+    #[cfg(any(feature = "database", test))]
     fn transform_name(name: &str, transform: Option<&str>) -> String {
         match transform {
             Some("kebab_case") => name.to_lowercase().replace('_', "-"),

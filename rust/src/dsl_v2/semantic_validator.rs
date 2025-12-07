@@ -14,10 +14,9 @@
 
 use crate::dsl_v2::ast::{Span, Statement, Value, VerbCall};
 use crate::dsl_v2::csg_linter::{CsgLinter, LintResult};
-use crate::dsl_v2::gateway_resolver::GatewayRefResolver;
+use crate::dsl_v2::gateway_resolver::{gateway_addr, GatewayRefResolver};
 use crate::dsl_v2::parser::parse_program;
-#[allow(deprecated)]
-use crate::dsl_v2::ref_resolver::{arg_to_ref_type, RefResolver, RefTypeResolver, ResolveResult};
+use crate::dsl_v2::ref_resolver::{arg_to_ref_type, RefResolver, ResolveResult};
 use crate::dsl_v2::validation::{
     Diagnostic, DiagnosticBuilder, DiagnosticCode, RefType, RustStyleFormatter, Severity,
     SourceSpan, ValidatedProgram, ValidatedStatement, ValidationContext, ValidationRequest,
@@ -36,20 +35,9 @@ pub struct SemanticValidator {
 }
 
 impl SemanticValidator {
-    /// Create a SemanticValidator with SQL-based resolver (fallback)
-    /// For production with EntityGateway, use `with_gateway()` instead
-    #[allow(deprecated)]
-    pub fn new(pool: PgPool) -> Self {
-        Self {
-            resolver: Box::new(RefTypeResolver::new(pool.clone())),
-            csg_linter: None,
-            pool,
-        }
-    }
-
-    /// Create a SemanticValidator with EntityGateway-based resolver (preferred)
-    pub async fn with_gateway(pool: PgPool, gateway_url: &str) -> Result<Self, String> {
-        let gateway_resolver = GatewayRefResolver::connect(gateway_url).await?;
+    /// Create a SemanticValidator with EntityGateway resolver
+    pub async fn new(pool: PgPool) -> Result<Self, String> {
+        let gateway_resolver = GatewayRefResolver::connect(&gateway_addr()).await?;
         Ok(Self {
             resolver: Box::new(gateway_resolver),
             csg_linter: None,
@@ -57,13 +45,14 @@ impl SemanticValidator {
         })
     }
 
-    /// Create a SemanticValidator with a custom resolver
-    pub fn with_resolver(pool: PgPool, resolver: Box<dyn RefResolver>) -> Self {
-        Self {
-            resolver,
+    /// Create a SemanticValidator with EntityGateway at specific URL
+    pub async fn with_gateway(pool: PgPool, gateway_url: &str) -> Result<Self, String> {
+        let gateway_resolver = GatewayRefResolver::connect(gateway_url).await?;
+        Ok(Self {
+            resolver: Box::new(gateway_resolver),
             csg_linter: None,
             pool,
-        }
+        })
     }
 
     /// Initialize with CSG linter for context-sensitive validation
@@ -701,14 +690,14 @@ fn verb_return_type(verb: &str) -> RefType {
 // PUBLIC API - Simple entry point
 // =============================================================================
 
-/// Validate DSL source against database
+/// Validate DSL source against database via EntityGateway
 /// Returns Ok(validated_program) or Err(formatted_error_string)
 pub async fn validate_dsl(
     pool: &PgPool,
     source: &str,
     context: ValidationContext,
 ) -> Result<ValidatedProgram, String> {
-    let mut validator = SemanticValidator::new(pool.clone());
+    let mut validator = SemanticValidator::new(pool.clone()).await?;
 
     let request = ValidationRequest {
         source: source.to_string(),
@@ -730,6 +719,7 @@ pub async fn validate_dsl_with_csg(
     context: ValidationContext,
 ) -> Result<ValidatedProgram, String> {
     let mut validator = SemanticValidator::new(pool.clone())
+        .await?
         .with_csg_linter()
         .await?;
 
