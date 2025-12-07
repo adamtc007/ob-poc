@@ -18,6 +18,7 @@
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
+use super::config::types::LookupConfig;
 use super::runtime_registry::{runtime_registry, RuntimeBehavior};
 
 // =============================================================================
@@ -42,6 +43,9 @@ pub struct ArgDef {
     pub arg_type: String,
     pub required: bool,
     pub description: String,
+    /// Lookup configuration for entity/reference data resolution
+    /// Contains: entity_type (nickname), search_key, primary_key
+    pub lookup: Option<LookupConfig>,
 }
 
 /// Unified verb definition combining CRUD and custom ops
@@ -124,7 +128,7 @@ impl UnifiedVerbRegistry {
         for runtime_verb in runtime_reg.all_verbs() {
             let key = runtime_verb.full_name.clone();
 
-            // Convert RuntimeArg to ArgDef
+            // Convert RuntimeArg to ArgDef (preserving lookup config)
             let args: Vec<ArgDef> = runtime_verb
                 .args
                 .iter()
@@ -133,6 +137,7 @@ impl UnifiedVerbRegistry {
                     arg_type: format!("{:?}", a.arg_type),
                     required: a.required,
                     description: String::new(),
+                    lookup: a.lookup.clone(),
                 })
                 .collect();
 

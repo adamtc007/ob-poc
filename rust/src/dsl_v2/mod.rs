@@ -69,6 +69,7 @@ pub mod verb_schema;
 // Re-export key types for convenience
 pub use applicability_rules::{ApplicabilityRules, AttributeApplicability, DocumentApplicability};
 pub use ast::{Argument, Key, Program, Span, Statement, Value, VerbCall};
+pub use config::types::LookupConfig;
 pub use csg_linter::{CsgLinter, InferredContext, LintResult};
 pub use execution_plan::{compile, CompileError, ExecutionPlan, ExecutionStep, Injection};
 pub use executor::{DslExecutor, ExecutionContext, ExecutionResult, ReturnType};

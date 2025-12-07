@@ -26,17 +26,29 @@ pub async fn get_completions(
         CompletionContext::VerbName { prefix } => complete_verb_names(&prefix, position),
         CompletionContext::Keyword { verb_name, prefix } => complete_keywords(&verb_name, &prefix),
         CompletionContext::KeywordValue {
-            verb_name: _,
+            verb_name,
             keyword,
             prefix,
             in_string,
-        } => complete_keyword_values(&keyword, &prefix, in_string, position, entity_client).await,
+        } => {
+            complete_keyword_values(
+                &verb_name,
+                &keyword,
+                &prefix,
+                in_string,
+                position,
+                entity_client,
+            )
+            .await
+        }
         CompletionContext::SymbolRef { prefix } => complete_symbols(&prefix, symbols),
         CompletionContext::EntityAsSymbol {
-            verb_name: _,
+            verb_name,
             keyword,
             prefix,
-        } => complete_entity_as_symbol(&keyword, &prefix, position, entity_client).await,
+        } => {
+            complete_entity_as_symbol(&verb_name, &keyword, &prefix, position, entity_client).await
+        }
         CompletionContext::None => vec![],
     }
 }
@@ -159,7 +171,11 @@ fn complete_keywords(verb_name: &str, prefix: &str) -> Vec<CompletionItem> {
 
 /// Complete keyword values - uses EntityGateway for all lookups.
 /// Uses text_edit to replace any existing prefix (including quotes) with bare token.
+///
+/// Looks up the LookupConfig from the verb registry to determine the entity_type
+/// for the EntityGateway search, making this fully dynamic based on verbs.yaml.
 async fn complete_keyword_values(
+    verb_name: &str,
     keyword: &str,
     prefix: &str,
     in_string: bool,
@@ -167,19 +183,20 @@ async fn complete_keyword_values(
     entity_client: Option<EntityLookupClient>,
 ) -> Vec<CompletionItem> {
     tracing::debug!(
-        "complete_keyword_values: keyword={}, prefix={}, in_string={}, has_client={}",
+        "complete_keyword_values: verb={}, keyword={}, prefix={}, in_string={}, has_client={}",
+        verb_name,
         keyword,
         prefix,
         in_string,
         entity_client.is_some()
     );
 
-    // Map keyword to EntityGateway nickname
-    let nickname = keyword_to_nickname(keyword);
+    // Look up the entity_type from the verb's arg LookupConfig
+    let nickname = get_lookup_entity_type(verb_name, keyword);
 
     if let Some(nickname) = nickname {
         if let Some(mut client) = entity_client {
-            match client.search(nickname, prefix, 15).await {
+            match client.search(&nickname, prefix, 15).await {
                 Ok(results) => {
                     tracing::debug!("{} lookup returned {} results", nickname, results.len());
                     if !results.is_empty() {
@@ -248,23 +265,26 @@ async fn complete_keyword_values(
 /// - textEdit: replaces from @ to cursor with `@KEY`
 /// - label: display name shown in completion menu
 async fn complete_entity_as_symbol(
+    verb_name: &str,
     keyword: &str,
     prefix: &str,
     position: Position,
     entity_client: Option<EntityLookupClient>,
 ) -> Vec<CompletionItem> {
     tracing::debug!(
-        "complete_entity_as_symbol: keyword={}, prefix={}, position={:?}",
+        "complete_entity_as_symbol: verb={}, keyword={}, prefix={}, position={:?}",
+        verb_name,
         keyword,
         prefix,
         position
     );
 
-    let nickname = keyword_to_nickname(keyword);
+    // Look up the entity_type from the verb's arg LookupConfig
+    let nickname = get_lookup_entity_type(verb_name, keyword);
 
     if let Some(nickname) = nickname {
         if let Some(mut client) = entity_client {
-            match client.search(nickname, prefix, 15).await {
+            match client.search(&nickname, prefix, 15).await {
                 Ok(results) => {
                     tracing::debug!("{} lookup returned {} results", nickname, results.len());
                     if !results.is_empty() {
@@ -326,35 +346,49 @@ async fn complete_entity_as_symbol(
     vec![]
 }
 
-/// Map DSL keyword names to EntityGateway nicknames.
-fn keyword_to_nickname(keyword: &str) -> Option<&'static str> {
-    match keyword {
-        // Entity ID lookups
-        "cbu-id" => Some("CBU"),
-        "entity-id"
-        | "owner-entity-id"
-        | "owned-entity-id"
-        | "ubo-person-id"
-        | "subject-entity-id"
-        | "investor-entity-id"
-        | "commercial-client-entity-id" => Some("ENTITY"),
-
-        // Reference data lookups
-        "role" => Some("ROLE"),
-        "jurisdiction" => Some("JURISDICTION"),
-        "currency" | "cash-currency" => Some("CURRENCY"),
-        "client-type" => Some("CLIENT_TYPE"),
-        "case-type" => Some("CASE_TYPE"),
-        "screening-type" => Some("SCREENING_TYPE"),
-        "risk-rating" => Some("RISK_RATING"),
-        "settlement-type" => Some("SETTLEMENT_TYPE"),
-        "ssi-type" | "type" => Some("SSI_TYPE"),
-        "product-code" | "product" => Some("PRODUCT"),
-        "instrument-class" => Some("INSTRUMENT_CLASS"),
-        "market" => Some("MARKET"),
-
-        _ => None,
+/// Get the entity_type from the verb's arg LookupConfig.
+///
+/// Looks up the verb in the registry, finds the arg by keyword name,
+/// and returns the entity_type from its LookupConfig if present.
+///
+/// This replaces the hardcoded keyword_to_nickname mapping with
+/// a dynamic lookup from verbs.yaml configuration.
+fn get_lookup_entity_type(verb_name: &str, keyword: &str) -> Option<String> {
+    // Parse domain.verb
+    let parts: Vec<&str> = verb_name.split('.').collect();
+    if parts.len() != 2 {
+        tracing::debug!(
+            "get_lookup_entity_type: invalid verb_name format: {}",
+            verb_name
+        );
+        return None;
     }
+
+    let verb = find_unified_verb(parts[0], parts[1])?;
+
+    // Find the arg matching this keyword
+    for arg in &verb.args {
+        if arg.name == keyword {
+            if let Some(ref lookup) = arg.lookup {
+                if let Some(ref entity_type) = lookup.entity_type {
+                    tracing::debug!(
+                        "get_lookup_entity_type: {}:{} -> entity_type={}",
+                        verb_name,
+                        keyword,
+                        entity_type
+                    );
+                    return Some(entity_type.clone());
+                }
+            }
+        }
+    }
+
+    tracing::debug!(
+        "get_lookup_entity_type: no lookup config for {}:{}",
+        verb_name,
+        keyword
+    );
+    None
 }
 
 /// Complete symbol references.
@@ -381,19 +415,10 @@ fn complete_symbols(prefix: &str, symbols: &SymbolTable) -> Vec<CompletionItem> 
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    // Note: Verb/keyword completion tests require DSL_CONFIG_DIR to be set
+    // Note: All completion tests require DSL_CONFIG_DIR to be set
     // pointing to the config directory. These are tested in integration tests.
-
-    #[test]
-    fn test_keyword_to_nickname() {
-        assert_eq!(keyword_to_nickname("cbu-id"), Some("CBU"));
-        assert_eq!(keyword_to_nickname("role"), Some("ROLE"));
-        assert_eq!(keyword_to_nickname("jurisdiction"), Some("JURISDICTION"));
-        assert_eq!(keyword_to_nickname("currency"), Some("CURRENCY"));
-        assert_eq!(keyword_to_nickname("cash-currency"), Some("CURRENCY"));
-        assert_eq!(keyword_to_nickname("client-type"), Some("CLIENT_TYPE"));
-        assert_eq!(keyword_to_nickname("unknown-field"), None);
-    }
+    //
+    // The get_lookup_entity_type function now dynamically looks up entity_type
+    // from the verb registry based on verbs.yaml configuration, so tests
+    // need the full config loaded.
 }

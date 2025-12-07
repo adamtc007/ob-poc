@@ -152,7 +152,7 @@ fn convert_value(value: &Value, span: &V2Span, text: &str) -> ParsedExpr {
             // Recursively convert nested verb call
             return convert_verb_call(vc, text);
         }
-        Value::EntityRef { search_key, .. } => {
+        Value::LookupRef { search_key, .. } => {
             // Display the human-readable search key (UUID is hidden)
             ExprKind::String {
                 value: search_key.clone(),
