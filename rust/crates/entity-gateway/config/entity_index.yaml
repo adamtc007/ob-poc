@@ -394,3 +394,24 @@ entities:
         column: "doc_id"
     shard:
       enabled: false
+
+  # ============================================
+  # SERVICE/RESOURCE TABLES (name-based lookups)
+  # ============================================
+
+  # Service Resource Types - for provisioning by name/code
+  resource_type:
+    nickname: "RESOURCE_TYPE"
+    source_table: '"ob-poc".service_resource_types'
+    return_key: "resource_type_id"
+    display_template: "{name}"
+    index_mode: exact
+    filter: "is_active = true"
+    search_keys:
+      - name: "name"
+        column: "name"
+        default: true
+      - name: "code"
+        column: "resource_code"
+    shard:
+      enabled: false

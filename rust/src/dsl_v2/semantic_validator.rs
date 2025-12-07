@@ -16,6 +16,7 @@ use crate::dsl_v2::ast::{Span, Statement, Value, VerbCall};
 use crate::dsl_v2::csg_linter::{CsgLinter, LintResult};
 use crate::dsl_v2::gateway_resolver::GatewayRefResolver;
 use crate::dsl_v2::parser::parse_program;
+#[allow(deprecated)]
 use crate::dsl_v2::ref_resolver::{arg_to_ref_type, RefResolver, RefTypeResolver, ResolveResult};
 use crate::dsl_v2::validation::{
     Diagnostic, DiagnosticBuilder, DiagnosticCode, RefType, RustStyleFormatter, Severity,
@@ -35,7 +36,9 @@ pub struct SemanticValidator {
 }
 
 impl SemanticValidator {
-    /// Create a new SemanticValidator with SQL-based resolver (legacy)
+    /// Create a SemanticValidator with SQL-based resolver (fallback)
+    /// For production with EntityGateway, use `with_gateway()` instead
+    #[allow(deprecated)]
     pub fn new(pool: PgPool) -> Self {
         Self {
             resolver: Box::new(RefTypeResolver::new(pool.clone())),
@@ -44,8 +47,7 @@ impl SemanticValidator {
         }
     }
 
-    /// Create a SemanticValidator with EntityGateway-based resolver
-    /// This is the preferred method when EntityGateway is available
+    /// Create a SemanticValidator with EntityGateway-based resolver (preferred)
     pub async fn with_gateway(pool: PgPool, gateway_url: &str) -> Result<Self, String> {
         let gateway_resolver = GatewayRefResolver::connect(gateway_url).await?;
         Ok(Self {

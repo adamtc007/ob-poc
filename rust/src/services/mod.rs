@@ -7,11 +7,8 @@
 //! DSL operations flow through dsl_v2::DslExecutor. Services here provide
 //! specialized operations for entity search, document extraction, etc.
 
-// Entity search service - DEPRECATED: Use EntityGateway instead
-// All entity lookups should go through the central EntityGateway gRPC service.
-// This module is kept for backwards compatibility but will be removed.
-#[deprecated(since = "0.1.0", note = "Use EntityGateway gRPC service instead")]
-pub mod entity_search;
+// Entity search is now handled by EntityGateway gRPC service.
+// See rust/crates/entity-gateway/ for the central lookup service.
 
 // Agent E2E test harness
 #[cfg(feature = "database")]

@@ -11,11 +11,20 @@
 use anyhow::{anyhow, bail, Result};
 use serde_json::{json, Value as JsonValue};
 use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use tracing::debug;
 use uuid::Uuid;
 
 #[cfg(feature = "database")]
 use sqlx::{postgres::PgRow, PgPool, Row};
+
+#[cfg(feature = "database")]
+use entity_gateway::proto::ob::gateway::v1::{
+    entity_gateway_client::EntityGatewayClient, SearchMode, SearchRequest,
+};
+#[cfg(feature = "database")]
+use tonic::transport::Channel;
 
 use super::config::types::{ArgType, CrudOperation, ReturnTypeConfig};
 use super::runtime_registry::{RuntimeArg, RuntimeBehavior, RuntimeCrudConfig, RuntimeVerb};
@@ -85,12 +94,37 @@ enum SqlValue {
 #[cfg(feature = "database")]
 pub struct GenericCrudExecutor {
     pool: PgPool,
+    /// EntityGateway client for lookup resolution (lazy initialized)
+    gateway_client: Arc<Mutex<Option<EntityGatewayClient<Channel>>>>,
 }
 
 #[cfg(feature = "database")]
 impl GenericCrudExecutor {
     pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+        Self {
+            pool,
+            gateway_client: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    /// Get or create EntityGateway client
+    async fn get_gateway_client(
+        &self,
+    ) -> Result<tokio::sync::MutexGuard<'_, Option<EntityGatewayClient<Channel>>>> {
+        let mut guard = self.gateway_client.lock().await;
+        if guard.is_none() {
+            let addr = super::gateway_resolver::gateway_addr();
+            match EntityGatewayClient::connect(addr.clone()).await {
+                Ok(client) => {
+                    *guard = Some(client);
+                }
+                Err(e) => {
+                    debug!("EntityGateway not available at {}: {}", addr, e);
+                    // Return guard with None - caller will fall back to SQL
+                }
+            }
+        }
+        Ok(guard)
     }
 
     /// Execute a verb from RuntimeVerb configuration
@@ -1379,23 +1413,81 @@ impl GenericCrudExecutor {
         Ok(result.rows_affected())
     }
 
-    /// Resolve a lookup argument by querying the lookup table
+    /// Resolve a lookup argument using EntityGateway
     /// Returns the UUID (primary_key) for the given name (search_key)
-    /// If not found, provides "did you mean?" suggestions based on similar values
+    /// Uses EntityGateway for fuzzy search and suggestions
     async fn resolve_lookup(&self, arg: &RuntimeArg, code_value: &str) -> Result<Uuid> {
         let lookup = arg
             .lookup
             .as_ref()
             .ok_or_else(|| anyhow!("Lookup arg {} missing lookup config", arg.name))?;
 
-        let schema = lookup.schema.as_deref().unwrap_or("public");
+        // Get entity_type from lookup config (maps to EntityGateway nickname)
+        let entity_type = lookup
+            .entity_type
+            .as_ref()
+            .ok_or_else(|| anyhow!("Lookup arg {} missing entity_type in config", arg.name))?;
 
+        // Try EntityGateway first
+        let mut guard = self.get_gateway_client().await?;
+        if let Some(client) = guard.as_mut() {
+            let request = SearchRequest {
+                nickname: entity_type.to_uppercase(),
+                values: vec![code_value.to_string()],
+                search_key: None,
+                mode: SearchMode::Exact as i32,
+                limit: Some(5),
+            };
+
+            match client.search(request).await {
+                Ok(response) => {
+                    let matches = response.into_inner().matches;
+
+                    // Look for exact match
+                    let code_upper = code_value.to_uppercase();
+                    for m in &matches {
+                        if m.token.to_uppercase() == code_upper
+                            || m.display.to_uppercase() == code_upper
+                        {
+                            // Try to parse token as UUID
+                            if let Ok(uuid) = Uuid::parse_str(&m.token) {
+                                return Ok(uuid);
+                            }
+                            // Token might be a code - need to fetch UUID from DB
+                            break;
+                        }
+                    }
+
+                    // No exact match - provide suggestions
+                    if !matches.is_empty() {
+                        let suggestions: Vec<String> =
+                            matches.iter().map(|m| m.display.clone()).collect();
+                        return Err(anyhow!(
+                            "Lookup failed: '{}' not found for {}\n  Did you mean: {}?\n  Available: {}",
+                            code_value,
+                            entity_type,
+                            suggestions.first().unwrap(),
+                            suggestions.join(", ")
+                        ));
+                    }
+                }
+                Err(e) => {
+                    debug!("EntityGateway search failed, falling back to SQL: {}", e);
+                }
+            }
+        }
+
+        // Fallback to direct SQL if EntityGateway unavailable or no match
+        let schema = lookup.schema.as_deref().unwrap_or("public");
         let sql = format!(
             r#"SELECT "{}" FROM "{}"."{}" WHERE "{}" = $1"#,
             lookup.primary_key, schema, lookup.table, lookup.search_key
         );
 
-        debug!("LOOKUP SQL: {} with search_key={}", sql, code_value);
+        debug!(
+            "LOOKUP SQL fallback: {} with search_key={}",
+            sql, code_value
+        );
 
         let row = sqlx::query(&sql)
             .bind(code_value)
@@ -1407,46 +1499,56 @@ impl GenericCrudExecutor {
                 let uuid: Uuid = r.try_get(&*lookup.primary_key)?;
                 Ok(uuid)
             }
-            None => {
-                // Lookup failed - fetch similar values for "did you mean?" suggestions
-                let suggestions = self
-                    .get_lookup_suggestions(schema, &lookup.table, &lookup.search_key, code_value)
-                    .await
-                    .unwrap_or_default();
-
-                let suggestion_text = if suggestions.is_empty() {
-                    String::new()
-                } else {
-                    format!(
-                        "\n  Did you mean: {}?\n  Available values: {}",
-                        suggestions.first().unwrap(),
-                        suggestions.join(", ")
-                    )
-                };
-
-                Err(anyhow!(
-                    "Lookup failed: no {} with {} = '{}' in {}.{}{}",
-                    lookup.table,
-                    lookup.search_key,
-                    code_value,
-                    schema,
-                    lookup.table,
-                    suggestion_text
-                ))
-            }
+            None => Err(anyhow!(
+                "Lookup failed: no {} with {} = '{}' in {}.{}",
+                lookup.table,
+                lookup.search_key,
+                code_value,
+                schema,
+                lookup.table,
+            )),
         }
     }
 
-    /// Get suggestions for failed lookup - returns similar values from the table
-    async fn get_lookup_suggestions(
+    /// Get suggestions for failed lookup using EntityGateway fuzzy search
+    #[allow(dead_code)]
+    async fn get_lookup_suggestions_gateway(
+        &self,
+        entity_type: &str,
+        attempted_value: &str,
+    ) -> Result<Vec<String>> {
+        let mut guard = self.get_gateway_client().await?;
+        if let Some(client) = guard.as_mut() {
+            let request = SearchRequest {
+                nickname: entity_type.to_uppercase(),
+                values: vec![attempted_value.to_string()],
+                search_key: None,
+                mode: SearchMode::Fuzzy as i32,
+                limit: Some(5),
+            };
+
+            if let Ok(response) = client.search(request).await {
+                let suggestions: Vec<String> = response
+                    .into_inner()
+                    .matches
+                    .into_iter()
+                    .map(|m| m.display)
+                    .collect();
+                return Ok(suggestions);
+            }
+        }
+        Ok(vec![])
+    }
+
+    /// Fallback: Get suggestions using SQL (when EntityGateway unavailable)
+    #[allow(dead_code)]
+    async fn get_lookup_suggestions_sql(
         &self,
         schema: &str,
         table: &str,
         code_column: &str,
         attempted_value: &str,
     ) -> Result<Vec<String>> {
-        // Use PostgreSQL's similarity function (pg_trgm) if available, otherwise ILIKE
-        // First try to get all values and rank by Levenshtein distance
         let sql = format!(
             r#"SELECT "{}" FROM "{}"."{}"
                WHERE "{}" IS NOT NULL

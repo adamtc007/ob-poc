@@ -21,10 +21,8 @@ pub mod dictionary_service;
 pub mod document_service;
 pub mod dsl_repository;
 pub mod entity_service;
-// DEPRECATED: Use EntityGateway gRPC service instead
-// All entity lookups should go through the central EntityGateway service.
-#[deprecated(since = "0.1.0", note = "Use EntityGateway gRPC service instead")]
-pub mod fuzzy_search_service;
+// Fuzzy search is now handled by EntityGateway gRPC service.
+// See rust/crates/entity-gateway/ for the central lookup service.
 pub mod generation_log_repository;
 pub mod investigation_service;
 pub mod monitoring_service;
@@ -57,10 +55,7 @@ pub use entity_service::{
     NewLimitedCompanyFields, NewPartnershipFields, NewProperPersonFields, NewTrustFields,
     PartnershipRow, TrustRow,
 };
-pub use fuzzy_search_service::{
-    fuzzy_match_small_list, FuzzyCbuMatch, FuzzyCompanyMatch, FuzzyEntityMatch, FuzzyPersonMatch,
-    FuzzySearchResult, FuzzySearchService,
-};
+
 pub use generation_log_repository::{
     CompileResult, CorrectionPair, GenerationAttempt, GenerationLogRepository, GenerationLogRow,
     GenerationStatsSummary, LintResult, ParseResult, PromptStats, TrainingPair,
