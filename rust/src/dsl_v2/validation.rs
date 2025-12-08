@@ -210,6 +210,10 @@ pub struct ValidatedProgram {
 
     /// Resolved symbol bindings (name -> type info)
     pub bindings: HashMap<String, BindingInfo>,
+
+    /// Resolved AST with LookupRef.primary_key populated
+    /// This is the canonical representation for serialization/persistence
+    pub resolved_ast: crate::dsl_v2::ast::Program,
 }
 
 /// A validated statement
@@ -273,6 +277,10 @@ pub enum RefType {
     Role,
     EntityType,
     ScreeningType,
+    Product,
+    Service,
+    Currency,
+    ClientType,
 }
 
 /// Info about a symbol binding
@@ -388,6 +396,8 @@ pub enum DiagnosticCode {
     // Binding errors
     UndefinedSymbol,
     DuplicateBinding,
+    /// Unresolved symbol - referenced but not yet defined (incomplete, not error)
+    UnresolvedSymbol,
 
     // CSG Context Errors (C0xx series)
     /// Document type not applicable to entity type
@@ -408,13 +418,19 @@ pub enum DiagnosticCode {
     // Warnings
     DeprecatedVerb,
     UnusedBinding,
+    /// Fuzzy match warning - similar entity exists
+    FuzzyMatchWarning,
 }
 
 impl DiagnosticCode {
     pub fn default_severity(&self) -> Severity {
         match self {
-            DiagnosticCode::DeprecatedVerb | DiagnosticCode::UnusedBinding => Severity::Warning,
+            DiagnosticCode::DeprecatedVerb
+            | DiagnosticCode::UnusedBinding
+            | DiagnosticCode::FuzzyMatchWarning => Severity::Warning,
             DiagnosticCode::InternalError => Severity::Error,
+            // UnresolvedSymbol is an Error - blocks execution, but UI can show it differently
+            // since it's "incomplete" rather than "invalid" (user just needs to add the definition)
             _ => Severity::Error,
         }
     }
@@ -443,6 +459,7 @@ impl DiagnosticCode {
             DiagnosticCode::InvalidDocumentState => "E044",
             DiagnosticCode::UndefinedSymbol => "E050",
             DiagnosticCode::DuplicateBinding => "E051",
+            DiagnosticCode::UnresolvedSymbol => "I001", // I for Incomplete
             // CSG Context Errors
             DiagnosticCode::DocumentNotApplicableToEntityType => "C001",
             DiagnosticCode::DocumentNotApplicableToJurisdiction => "C002",
@@ -454,6 +471,7 @@ impl DiagnosticCode {
             // Warnings
             DiagnosticCode::DeprecatedVerb => "W001",
             DiagnosticCode::UnusedBinding => "W002",
+            DiagnosticCode::FuzzyMatchWarning => "W003",
         }
     }
 }

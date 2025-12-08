@@ -13,7 +13,13 @@ pub mod agent_routes;
 pub mod intent;
 
 #[cfg(feature = "server")]
+pub mod dsl_builder;
+
+#[cfg(feature = "server")]
 pub mod session;
+
+#[cfg(feature = "server")]
+pub mod dsl_session_file;
 
 #[cfg(feature = "server")]
 pub mod entity_routes;

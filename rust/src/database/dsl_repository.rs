@@ -45,6 +45,25 @@ pub struct DslInstanceVersionRow {
     pub compilation_status: String,
     pub ast_json: Option<serde_json::Value>,
     pub created_at: Option<DateTime<Utc>>,
+    /// Number of unresolved EntityRefs in the AST
+    pub unresolved_count: Option<i32>,
+    /// Total number of EntityRefs in the AST
+    pub total_refs: Option<i32>,
+}
+
+/// Compilation status values for DSL versions
+///
+/// - PARSED: Syntax OK, needs entity resolution
+/// - PARTIAL: Some EntityRefs resolved
+/// - RESOLVED: All EntityRefs resolved, ready to execute
+/// - EXECUTED: Has been run successfully
+/// - FAILED: Execution failed
+pub mod compilation_status {
+    pub const PARSED: &str = "PARSED";
+    pub const PARTIAL: &str = "PARTIAL";
+    pub const RESOLVED: &str = "RESOLVED";
+    pub const EXECUTED: &str = "EXECUTED";
+    pub const FAILED: &str = "FAILED";
 }
 
 /// Data for DSL visualization - used by DSL Viewer UI
@@ -59,6 +78,8 @@ pub struct DslDisplayData {
     pub compilation_status: String,
     pub operation_type: String,
     pub created_at: Option<DateTime<Utc>>,
+    pub unresolved_count: i32,
+    pub total_refs: i32,
 }
 
 /// Summary for listing DSL instances in the viewer UI
@@ -150,8 +171,8 @@ impl DslRepository {
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".dsl_instance_versions
-            (instance_id, version_number, dsl_content, operation_type, compilation_status, ast_json, created_at)
-            VALUES ($1, $2, $3, $4, 'COMPILED', $5, NOW())
+            (instance_id, version_number, dsl_content, operation_type, compilation_status, ast_json, unresolved_count, total_refs, created_at)
+            VALUES ($1, $2, $3, $4, 'COMPILED', $5, 0, 0, NOW())
             "#,
         )
         .bind(instance_id)
@@ -384,6 +405,8 @@ impl DslRepository {
             compilation_status: String,
             operation_type: String,
             created_at: Option<DateTime<Utc>>,
+            unresolved_count: Option<i32>,
+            total_refs: Option<i32>,
         }
 
         let result = if let Some(ver) = version {
@@ -392,7 +415,8 @@ impl DslRepository {
                 r#"
                 SELECT i.instance_id, i.business_reference, i.domain_name,
                        v.version_number, v.dsl_content, v.ast_json,
-                       v.compilation_status, v.operation_type, v.created_at
+                       v.compilation_status, v.operation_type, v.created_at,
+                       v.unresolved_count, v.total_refs
                 FROM "ob-poc".dsl_instances i
                 JOIN "ob-poc".dsl_instance_versions v ON i.instance_id = v.instance_id
                 WHERE i.business_reference = $1 AND v.version_number = $2
@@ -408,7 +432,8 @@ impl DslRepository {
                 r#"
                 SELECT i.instance_id, i.business_reference, i.domain_name,
                        v.version_number, v.dsl_content, v.ast_json,
-                       v.compilation_status, v.operation_type, v.created_at
+                       v.compilation_status, v.operation_type, v.created_at,
+                       v.unresolved_count, v.total_refs
                 FROM "ob-poc".dsl_instances i
                 JOIN "ob-poc".dsl_instance_versions v ON i.instance_id = v.instance_id
                 WHERE i.business_reference = $1
@@ -431,6 +456,8 @@ impl DslRepository {
             compilation_status: r.compilation_status,
             operation_type: r.operation_type,
             created_at: r.created_at,
+            unresolved_count: r.unresolved_count.unwrap_or(0),
+            total_refs: r.total_refs.unwrap_or(0),
         }))
     }
 

@@ -16,8 +16,9 @@
 // Domain modules will be implemented as needed
 // For now, providing stub implementations
 
-use crate::dsl_v2::Value;
-type PropertyMap = std::collections::HashMap<String, Value>;
+use crate::dsl_v2::AstNode;
+use serde_json::Value as JsonValue;
+type PropertyMap = std::collections::HashMap<String, AstNode>;
 use async_trait::async_trait;
 use std::collections::HashMap;
 
@@ -50,7 +51,7 @@ pub struct DomainResult {
     pub success: bool,
     pub domain: String,
     pub verb: String,
-    pub result_data: HashMap<String, Value>,
+    pub result_data: HashMap<String, JsonValue>,
     pub generated_artifacts: Vec<String>,
     pub next_actions: Vec<String>,
     pub compliance_flags: Vec<String>,
@@ -74,11 +75,11 @@ impl DomainResult {
         result.success = false;
         result
             .result_data
-            .insert("error".to_string(), Value::String(reason.to_string()));
+            .insert("error".to_string(), JsonValue::String(reason.to_string()));
         result
     }
 
-    pub fn with_data(mut self, key: &str, value: Value) -> Self {
+    pub fn with_data(mut self, key: &str, value: JsonValue) -> Self {
         self.result_data.insert(key.to_string(), value);
         self
     }

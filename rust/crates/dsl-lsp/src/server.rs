@@ -77,7 +77,8 @@ impl DslLanguageServer {
 
     /// Analyze a document and publish diagnostics.
     async fn analyze_document(&self, uri: &Url, text: &str) {
-        let (state, diagnostics) = handlers::diagnostics::analyze_document(text);
+        // Use async validation with EntityGateway for full semantic validation
+        let (state, diagnostics) = handlers::diagnostics::analyze_document_async(text).await;
 
         // Store document state
         {

@@ -18,7 +18,7 @@
 //!                            }
 //! ```
 
-use super::ast::{Argument, Program, Statement, Value, VerbCall};
+use super::ast::{Argument, AstNode, Program, Statement, VerbCall};
 use super::verb_registry::{registry, VerbBehavior};
 
 /// A compiled execution plan - dependency sorted sequence of steps
@@ -211,19 +211,156 @@ fn get_verb_suggestions(domain: &str, verb: &str) -> Vec<String> {
 }
 
 /// Compile an AST into an execution plan
+///
+/// The compiler performs:
+/// 1. Collect all top-level statements
+/// 2. Build dependency graph from @reference usage
+/// 3. Topologically sort to ensure definitions come before uses
+/// 4. Detect circular dependencies
 pub fn compile(program: &Program) -> Result<ExecutionPlan, CompileError> {
-    let mut compiler = Compiler::new();
+    // Collect top-level verb calls (ignore comments)
+    let verb_calls: Vec<&VerbCall> = program
+        .statements
+        .iter()
+        .filter_map(|s| match s {
+            Statement::VerbCall(vc) => Some(vc),
+            Statement::Comment(_) => None,
+        })
+        .collect();
 
-    for statement in &program.statements {
-        if let Statement::VerbCall(vc) = statement {
-            compiler.compile_verb_call(vc, None)?;
-        }
-        // Comments are ignored at compile time
+    if verb_calls.is_empty() {
+        return Ok(ExecutionPlan { steps: Vec::new() });
+    }
+
+    // Build dependency graph and topologically sort
+    let sorted_indices = topological_sort(&verb_calls)?;
+
+    // Compile in sorted order
+    let mut compiler = Compiler::new();
+    for idx in sorted_indices {
+        compiler.compile_verb_call(verb_calls[idx], None)?;
     }
 
     Ok(ExecutionPlan {
         steps: compiler.steps,
     })
+}
+
+// ============================================================================
+// Topological Sort for @reference Dependencies
+// ============================================================================
+
+/// Extract symbol binding from a VerbCall (the :as @name part)
+fn get_binding(vc: &VerbCall) -> Option<&str> {
+    vc.binding.as_deref()
+}
+
+/// Extract all @references used in a VerbCall's arguments
+fn get_references(vc: &VerbCall) -> Vec<&str> {
+    let mut refs = Vec::new();
+    for arg in &vc.arguments {
+        collect_references_from_node(&arg.value, &mut refs);
+    }
+    refs
+}
+
+/// Recursively collect @references from an AstNode
+fn collect_references_from_node<'a>(node: &'a AstNode, refs: &mut Vec<&'a str>) {
+    match node {
+        AstNode::SymbolRef { name, .. } => {
+            refs.push(name.as_str());
+        }
+        AstNode::List { items, .. } => {
+            for item in items {
+                collect_references_from_node(item, refs);
+            }
+        }
+        AstNode::Map { entries, .. } => {
+            for (_, v) in entries {
+                collect_references_from_node(v, refs);
+            }
+        }
+        AstNode::Nested(nested_vc) => {
+            // Nested calls also have their own references
+            for arg in &nested_vc.arguments {
+                collect_references_from_node(&arg.value, refs);
+            }
+        }
+        // Other nodes don't contain references
+        AstNode::Literal(_) | AstNode::EntityRef { .. } => {}
+    }
+}
+
+/// Topologically sort statements based on @reference dependencies
+/// Returns indices in execution order, or error if circular dependency
+fn topological_sort(verb_calls: &[&VerbCall]) -> Result<Vec<usize>, CompileError> {
+    use std::collections::{HashMap, VecDeque};
+
+    let n = verb_calls.len();
+
+    // Build symbol -> statement index map
+    let mut symbol_to_idx: HashMap<&str, usize> = HashMap::new();
+    for (idx, vc) in verb_calls.iter().enumerate() {
+        if let Some(binding) = get_binding(vc) {
+            symbol_to_idx.insert(binding, idx);
+        }
+    }
+
+    // Build adjacency list (edges from dependency to dependent)
+    // If statement B uses @foo defined by statement A, then A -> B
+    let mut adj: Vec<Vec<usize>> = vec![Vec::new(); n];
+    let mut in_degree: Vec<usize> = vec![0; n];
+
+    for (idx, vc) in verb_calls.iter().enumerate() {
+        for ref_name in get_references(vc) {
+            if let Some(&dep_idx) = symbol_to_idx.get(ref_name) {
+                // dep_idx defines the symbol, idx uses it
+                // So dep_idx must come before idx
+                adj[dep_idx].push(idx);
+                in_degree[idx] += 1;
+            }
+            // If reference not found in our statements, it might be:
+            // - Pre-bound in context (e.g., @last_cbu)
+            // - An error (caught at execution time)
+        }
+    }
+
+    // Kahn's algorithm for topological sort
+    // Use VecDeque with pop_front to preserve original order for independent nodes
+    let mut queue: VecDeque<usize> = VecDeque::new();
+    for (idx, &deg) in in_degree.iter().enumerate() {
+        if deg == 0 {
+            queue.push_back(idx);
+        }
+    }
+
+    let mut sorted: Vec<usize> = Vec::with_capacity(n);
+    while let Some(u) = queue.pop_front() {
+        sorted.push(u);
+        for &v in &adj[u] {
+            in_degree[v] -= 1;
+            if in_degree[v] == 0 {
+                queue.push_back(v);
+            }
+        }
+    }
+
+    // Check for circular dependency
+    if sorted.len() != n {
+        // Find the cycle - statements with remaining in_degree > 0
+        let cycle_members: Vec<usize> = in_degree
+            .iter()
+            .enumerate()
+            .filter(|(_, &deg)| deg > 0)
+            .map(|(idx, _)| idx)
+            .collect();
+
+        return Err(CompileError::CircularDependency {
+            steps: cycle_members,
+        });
+    }
+
+    Ok(sorted)
 }
 
 /// Compiler state
@@ -278,7 +415,7 @@ impl Compiler {
         self.steps.push(ExecutionStep {
             verb_call: flat_vc,
             injections,
-            bind_as: vc.as_binding.clone(),
+            bind_as: vc.binding.clone(),
             step_index: my_step_index,
             behavior: verb_def.behavior,
             custom_op_id: verb_def.custom_op_id.clone(),
@@ -318,11 +455,11 @@ fn extract_nested_children(vc: &VerbCall) -> (VerbCall, Vec<VerbCall>) {
     for arg in &vc.arguments {
         match &arg.value {
             // List might contain nested verb calls
-            Value::List(items) => {
+            AstNode::List { items, span } => {
                 let mut flat_items = Vec::new();
                 for item in items {
-                    if let Value::NestedCall(child_vc) = item {
-                        nested.push(*child_vc.clone());
+                    if let AstNode::Nested(child_vc) = item {
+                        nested.push((**child_vc).clone());
                     } else {
                         flat_items.push(item.clone());
                     }
@@ -331,17 +468,19 @@ fn extract_nested_children(vc: &VerbCall) -> (VerbCall, Vec<VerbCall>) {
                 if !flat_items.is_empty() {
                     flat_args.push(Argument {
                         key: arg.key.clone(),
-                        key_span: arg.key_span,
-                        value: Value::List(flat_items),
-                        value_span: arg.value_span,
+                        value: AstNode::List {
+                            items: flat_items,
+                            span: *span,
+                        },
+                        span: arg.span,
                     });
                 }
                 // If list was purely nested calls, we might want to track the key
                 // for semantic purposes (e.g., :roles, :children)
             }
             // Single nested call
-            Value::NestedCall(child_vc) => {
-                nested.push(*child_vc.clone());
+            AstNode::Nested(child_vc) => {
+                nested.push((**child_vc).clone());
             }
             // Regular values pass through
             _ => {
@@ -353,10 +492,8 @@ fn extract_nested_children(vc: &VerbCall) -> (VerbCall, Vec<VerbCall>) {
     let flat_vc = VerbCall {
         domain: vc.domain.clone(),
         verb: vc.verb.clone(),
-        verb_span: vc.verb_span,
         arguments: flat_args,
-        as_binding: vc.as_binding.clone(),
-        as_binding_span: vc.as_binding_span,
+        binding: vc.binding.clone(),
         span: vc.span,
     };
 
@@ -394,7 +531,7 @@ impl ExecutionPlan {
 
             // Show args
             for arg in &step.verb_call.arguments {
-                out.push_str(&format!("  :{} = {:?}\n", arg.key.canonical(), arg.value));
+                out.push_str(&format!("  :{} = {:?}\n", arg.key, arg.value));
             }
         }
 
@@ -427,24 +564,21 @@ impl ExecutionPlan {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dsl_v2::ast::{Key, Span};
+    use crate::dsl_v2::ast::{Literal, Span};
 
-    fn make_verb_call(domain: &str, verb: &str, args: Vec<(&str, Value)>) -> VerbCall {
+    fn make_verb_call(domain: &str, verb: &str, args: Vec<(&str, AstNode)>) -> VerbCall {
         VerbCall {
             domain: domain.to_string(),
             verb: verb.to_string(),
-            verb_span: Span::default(),
             arguments: args
                 .into_iter()
                 .map(|(k, v)| Argument {
-                    key: Key::Simple(k.to_string()),
-                    key_span: Span::default(),
+                    key: k.to_string(),
                     value: v,
-                    value_span: Span::default(),
+                    span: Span::default(),
                 })
                 .collect(),
-            as_binding: None,
-            as_binding_span: None,
+            binding: None,
             span: Span::default(),
         }
     }
@@ -457,12 +591,18 @@ mod tests {
                 Statement::VerbCall(make_verb_call(
                     "cbu",
                     "create",
-                    vec![("name", Value::String("Test Fund".into()))],
+                    vec![(
+                        "name",
+                        AstNode::Literal(Literal::String("Test Fund".into())),
+                    )],
                 )),
                 Statement::VerbCall(make_verb_call(
                     "entity",
                     "read",
-                    vec![("entity-id", Value::String("some-uuid".into()))],
+                    vec![(
+                        "entity-id",
+                        AstNode::Literal(Literal::String("some-uuid".into())),
+                    )],
                 )),
             ],
         };
@@ -484,42 +624,47 @@ mod tests {
             "cbu",
             "assign-role",
             vec![
-                ("entity-id", Value::String("entity-uuid-1".into())),
-                ("role", Value::String("Manager".into())),
+                (
+                    "entity-id",
+                    AstNode::Literal(Literal::String("entity-uuid-1".into())),
+                ),
+                ("role", AstNode::Literal(Literal::String("Manager".into()))),
             ],
         );
         let child2 = make_verb_call(
             "cbu",
             "assign-role",
             vec![
-                ("entity-id", Value::String("entity-uuid-2".into())),
-                ("role", Value::String("Director".into())),
+                (
+                    "entity-id",
+                    AstNode::Literal(Literal::String("entity-uuid-2".into())),
+                ),
+                ("role", AstNode::Literal(Literal::String("Director".into()))),
             ],
         );
 
         let parent = VerbCall {
             domain: "cbu".to_string(),
             verb: "create".to_string(),
-            verb_span: Span::default(),
             arguments: vec![
                 Argument {
-                    key: Key::Simple("name".into()),
-                    key_span: Span::default(),
-                    value: Value::String("Test Fund".into()),
-                    value_span: Span::default(),
+                    key: "name".into(),
+                    value: AstNode::Literal(Literal::String("Test Fund".into())),
+                    span: Span::default(),
                 },
                 Argument {
-                    key: Key::Simple("roles".into()),
-                    key_span: Span::default(),
-                    value: Value::List(vec![
-                        Value::NestedCall(Box::new(child1)),
-                        Value::NestedCall(Box::new(child2)),
-                    ]),
-                    value_span: Span::default(),
+                    key: "roles".into(),
+                    value: AstNode::List {
+                        items: vec![
+                            AstNode::Nested(Box::new(child1)),
+                            AstNode::Nested(Box::new(child2)),
+                        ],
+                        span: Span::default(),
+                    },
+                    span: Span::default(),
                 },
             ],
-            as_binding: None,
-            as_binding_span: None,
+            binding: None,
             span: Span::default(),
         };
 
@@ -575,7 +720,9 @@ mod tests {
                 "read",
                 vec![(
                     "product-id",
-                    Value::String("00000000-0000-0000-0000-000000000001".into()),
+                    AstNode::Literal(Literal::String(
+                        "00000000-0000-0000-0000-000000000001".into(),
+                    )),
                 )],
             ))],
         };

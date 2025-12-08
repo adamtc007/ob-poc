@@ -1,203 +1,156 @@
 //! Diagnostics handler for the DSL Language Server.
 //!
-//! Uses the v2 parser for parsing and provides semantic validation.
+//! Uses the unified LspValidator from ob_poc for semantic validation.
+//! This ensures LSP and Server use the SAME validation pipeline.
 
 use tower_lsp::lsp_types::*;
 
-use crate::analysis::document::{DocumentState, ExprKind, ParsedExpr, SymbolDef};
+use crate::analysis::document::DocumentState;
 use crate::analysis::parse_with_v2;
 
-use ob_poc::dsl_v2::{find_unified_verb, registry};
+use ob_poc::dsl_v2::validation::{Severity, ValidationContext};
+use ob_poc::dsl_v2::LspValidator;
 
-/// Analyze a document and return state + diagnostics.
-pub fn analyze_document(text: &str) -> (DocumentState, Vec<Diagnostic>) {
-    // Use v2 parser via adapter
+/// Analyze a document with full semantic validation via EntityGateway.
+///
+/// This is the primary validation path - uses the same validator as the server.
+pub async fn analyze_document_async(text: &str) -> (DocumentState, Vec<Diagnostic>) {
+    // Step 1: Parse to get DocumentState (for LSP features like symbols, completions)
     let (state, mut diagnostics) = parse_with_v2(text);
 
-    // Validate expressions against verb schema
-    for expr in &state.expressions {
-        validate_expression(expr, &state.symbol_defs, &mut diagnostics);
-    }
+    // Step 2: Run full semantic validation via EntityGateway
+    match LspValidator::connect().await {
+        Ok(mut validator) => {
+            let context = ValidationContext::default();
+            let (semantic_diags, _validated) = validator.validate(text, &context).await;
 
-    // Check for undefined symbol references
-    for sym_ref in &state.symbol_refs {
-        if !state.symbol_defs.iter().any(|d| d.name == sym_ref.name) {
-            diagnostics.push(Diagnostic {
-                range: sym_ref.range,
-                severity: Some(DiagnosticSeverity::ERROR),
-                code: Some(NumberOrString::String("E007".to_string())),
-                source: Some("dsl-lsp".to_string()),
-                message: format!("undefined symbol '@{}'", sym_ref.name),
-                related_information: if !state.symbol_defs.is_empty() {
-                    Some(vec![DiagnosticRelatedInformation {
-                        location: Location {
-                            uri: Url::parse("file:///").unwrap(),
-                            range: Range::default(),
-                        },
-                        message: format!(
-                            "defined symbols: {}",
-                            state
-                                .symbol_defs
-                                .iter()
-                                .map(|d| format!("@{}", d.name))
-                                .collect::<Vec<_>>()
-                                .join(", ")
-                        ),
-                    }])
-                } else {
-                    None
-                },
-                ..Default::default()
-            });
+            // Convert semantic diagnostics to LSP format
+            for diag in semantic_diags {
+                diagnostics.push(convert_diagnostic(&diag, text));
+            }
+        }
+        Err(e) => {
+            // EntityGateway not available - fall back to syntax-only validation
+            tracing::warn!(
+                "EntityGateway not available for validation: {}. Using syntax-only mode.",
+                e
+            );
+            // The parse_with_v2 diagnostics are still useful
         }
     }
 
     (state, diagnostics)
 }
 
-/// Validate an expression against verb schema.
-fn validate_expression(
-    expr: &ParsedExpr,
-    symbol_defs: &[SymbolDef],
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    if let ExprKind::Call {
-        verb_name,
-        verb_range,
-        args,
-    } = &expr.kind
-    {
-        // Parse domain.verb
-        let parts: Vec<&str> = verb_name.split('.').collect();
-        if parts.len() != 2 {
-            diagnostics.push(Diagnostic {
-                range: *verb_range,
-                severity: Some(DiagnosticSeverity::ERROR),
-                code: Some(NumberOrString::String("E001".to_string())),
-                source: Some("dsl-lsp".to_string()),
-                message: format!(
-                    "invalid verb format '{}', expected 'domain.verb'",
-                    verb_name
-                ),
-                ..Default::default()
-            });
-            return;
-        }
+/// Synchronous fallback for when async isn't available.
+/// Only performs syntax validation (no EntityGateway).
+pub fn analyze_document(text: &str) -> (DocumentState, Vec<Diagnostic>) {
+    // Use v2 parser via adapter - syntax validation only
+    parse_with_v2(text)
+}
 
-        // Check verb exists
-        let verb = match find_unified_verb(parts[0], parts[1]) {
-            Some(v) => v,
-            None => {
-                // Suggest similar verbs
-                let reg = registry();
-                let suggestions: Vec<String> = reg
-                    .all_verbs()
-                    .filter(|v| {
-                        v.domain == parts[0]
-                            || v.verb.contains(parts[1])
-                            || v.full_name().contains(verb_name)
-                    })
-                    .take(3)
-                    .map(|v| v.full_name())
-                    .collect();
+/// Convert internal Diagnostic to LSP Diagnostic format
+fn convert_diagnostic(diag: &ob_poc::dsl_v2::validation::Diagnostic, source: &str) -> Diagnostic {
+    // Convert SourceSpan to LSP Range
+    let range = span_to_range(&diag.span, source);
 
-                let message = if suggestions.is_empty() {
-                    format!("unknown verb '{}'", verb_name)
-                } else {
-                    format!(
-                        "unknown verb '{}'. Did you mean: {}?",
-                        verb_name,
-                        suggestions.join(", ")
-                    )
-                };
+    // Convert severity
+    let severity = match diag.severity {
+        Severity::Error => Some(DiagnosticSeverity::ERROR),
+        Severity::Warning => Some(DiagnosticSeverity::WARNING),
+        Severity::Hint => Some(DiagnosticSeverity::HINT),
+    };
 
-                diagnostics.push(Diagnostic {
-                    range: *verb_range,
-                    severity: Some(DiagnosticSeverity::ERROR),
-                    code: Some(NumberOrString::String("E001".to_string())),
-                    source: Some("dsl-lsp".to_string()),
-                    message,
-                    ..Default::default()
-                });
-                return;
-            }
-        };
-
-        // Check for unknown arguments
-        let all_known_args: Vec<&str> = verb
-            .required_arg_names()
-            .into_iter()
-            .chain(verb.optional_arg_names())
-            .collect();
-
-        for arg in args {
-            if arg.keyword.is_empty() {
-                continue; // Skip nested expressions without keyword
-            }
-
-            let arg_name = arg.keyword.trim_start_matches(':');
-            let is_known = all_known_args.contains(&arg_name) || arg_name == "as";
-
-            if !is_known {
-                diagnostics.push(Diagnostic {
-                    range: arg.keyword_range,
-                    severity: Some(DiagnosticSeverity::WARNING),
-                    code: Some(NumberOrString::String("E002".to_string())),
-                    source: Some("dsl-lsp".to_string()),
-                    message: format!(
-                        "unknown argument '{}' for verb '{}'",
-                        arg.keyword, verb_name
-                    ),
-                    ..Default::default()
-                });
-            }
-        }
-
-        // Check for missing required arguments
-        let provided: std::collections::HashSet<&str> = args
+    // Build message with suggestions if any
+    let message = if diag.suggestions.is_empty() {
+        diag.message.clone()
+    } else {
+        let suggestions: Vec<String> = diag
+            .suggestions
             .iter()
-            .map(|a| a.keyword.trim_start_matches(':'))
+            .map(|s| format!("'{}' ({:.0}%)", s.replacement, s.confidence * 100.0))
             .collect();
+        format!(
+            "{}. Did you mean: {}?",
+            diag.message,
+            suggestions.join(", ")
+        )
+    };
 
-        for required_arg in verb.required_arg_names() {
-            if !provided.contains(required_arg) {
-                diagnostics.push(Diagnostic {
-                    range: expr.range,
-                    severity: Some(DiagnosticSeverity::ERROR),
-                    code: Some(NumberOrString::String("E003".to_string())),
-                    source: Some("dsl-lsp".to_string()),
-                    message: format!(
-                        "missing required argument '{}' for '{}'",
-                        required_arg, verb_name
-                    ),
-                    ..Default::default()
-                });
-            }
-        }
-
-        // Recursively validate nested expressions
-        for arg in args {
-            if let Some(value) = &arg.value {
-                validate_nested_expr(value, symbol_defs, diagnostics);
-            }
-        }
+    Diagnostic {
+        range,
+        severity,
+        code: Some(NumberOrString::String(diag.code.as_str().to_string())),
+        source: Some("dsl-lsp".to_string()),
+        message,
+        related_information: None,
+        tags: None,
+        code_description: None,
+        data: None,
     }
 }
 
-fn validate_nested_expr(
-    expr: &ParsedExpr,
-    symbol_defs: &[SymbolDef],
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    match &expr.kind {
-        ExprKind::Call { .. } => {
-            validate_expression(expr, symbol_defs, diagnostics);
-        }
-        ExprKind::List { items } => {
-            for item in items {
-                validate_nested_expr(item, symbol_defs, diagnostics);
+/// Convert SourceSpan to LSP Range
+fn span_to_range(span: &ob_poc::dsl_v2::validation::SourceSpan, source: &str) -> Range {
+    // Calculate end position
+    let start_line = span.line.saturating_sub(1); // LSP is 0-indexed
+    let start_char = span.column;
+
+    // Find end line and column
+    let mut end_line = start_line;
+    let mut end_char = start_char + span.length;
+
+    // Check if span crosses lines
+    let start_offset = span.offset as usize;
+    let end_offset = start_offset + span.length as usize;
+
+    if end_offset <= source.len() {
+        let span_text = &source[start_offset..end_offset];
+        for ch in span_text.chars() {
+            if ch == '\n' {
+                end_line += 1;
+                end_char = 0;
+            } else {
+                end_char += 1;
             }
         }
-        _ => {}
+        // Reset to start of span text for correct end_char
+        if span_text.contains('\n') {
+            end_char = span_text
+                .lines()
+                .last()
+                .map(|l| l.len() as u32)
+                .unwrap_or(0);
+        }
+    }
+
+    Range {
+        start: Position {
+            line: start_line,
+            character: start_char,
+        },
+        end: Position {
+            line: end_line,
+            character: end_char,
+        },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_span_to_range_single_line() {
+        let source = "(cbu.ensure :name \"Test\")";
+        let span = ob_poc::dsl_v2::validation::SourceSpan {
+            line: 1,
+            column: 1,
+            offset: 1,
+            length: 10,
+        };
+        let range = span_to_range(&span, source);
+        assert_eq!(range.start.line, 0);
+        assert_eq!(range.start.character, 1);
     }
 }

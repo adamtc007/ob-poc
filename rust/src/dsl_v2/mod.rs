@@ -1,54 +1,35 @@
 //! DSL v2 - Unified S-Expression DSL
 //!
-//! This module implements a complete refactoring of the ob-poc DSL system
-//! from the dual-grammar, vocab-sprawl architecture to a unified, data-driven design.
+//! Single pipeline from source text to execution.
 //!
-//! ## Architecture
-//!
-//! ```text
-//! DSL Source Text → Parser (Nom) → AST → Compiler → Plan → Executor → Database
-//! ```
-//!
-//! ## Execution Model
-//!
-//! The DSL supports **declarative nested structures** that are compiled into
-//! a linear execution plan with dependency injection:
+//! ## Pipeline
 //!
 //! ```text
-//! (cbu.create :name "Fund"           →  Step 0: cbu.create → $0
-//!   :roles [                            Step 1: assign-role($0, aviva)
-//!     (cbu.assign-role :entity-id       Step 2: assign-role($0, bob)
-//!       @aviva :role "Mgr")
-//!   ])
+//! Source → Parser → Raw AST → Enrichment → Enriched AST → Compiler → Plan → Executor
+//!                                 ↓
+//!                          YAML verb defs
 //! ```
 //!
-//! ## Key Features
+//! ## AST Node Types
 //!
-//! - **Single Grammar**: One S-expression syntax: `(domain.verb :key value ...)`
-//! - **Nested Operations**: Child verb calls compiled with parent dependency injection
-//! - **YAML-Driven Execution**: Verbs defined in `config/verbs.yaml`
-//! - **Explicit Custom Operations**: Plugins for complex logic (external APIs, etc.)
+//! - `Literal`: Terminal values (strings, numbers, booleans)
+//! - `SymbolRef`: `@name` bindings resolved at execution time
+//! - `EntityRef`: External references resolved via EntityGateway
 //!
-//! ## Modules
+//! ## Key Files
 //!
-//! - `ast`: AST type definitions
-//! - `parser`: Nom-based parser
-//! - `execution_plan`: Compiler and execution plan types
-//! - `config`: YAML configuration loading
-//! - `runtime_registry`: Runtime verb registry from YAML
-//! - `generic_executor`: YAML-driven CRUD executor
-//! - `executor`: DslExecutor orchestration
-//! - `custom_ops`: Plugin trait and implementations
+//! - `ast.rs`: Self-describing AST types
+//! - `parser.rs`: Nom-based S-expression parser
+//! - `enrichment.rs`: Converts raw AST strings to EntityRefs using YAML config
+//! - `execution_plan.rs`: Compiles AST to dependency-sorted execution plan
+//! - `executor.rs`: Executes plan against database
 
 pub mod applicability_rules;
-pub mod assembler;
-pub mod assembly;
 pub mod ast;
 pub mod config;
 pub mod csg_linter;
 pub mod custom_ops;
-#[cfg(feature = "database")]
-pub mod entity_resolver;
+pub mod enrichment;
 pub mod execution_plan;
 pub mod executor;
 #[cfg(feature = "database")]
@@ -59,26 +40,27 @@ pub mod generic_executor;
 pub mod idempotency;
 pub mod intent;
 pub mod intent_extractor;
+#[cfg(feature = "database")]
+pub mod lsp_validator;
 pub mod parser;
 #[cfg(feature = "database")]
 pub mod ref_resolver;
 pub mod runtime_registry;
 pub mod semantic_context;
-pub mod semantic_intent;
 #[cfg(feature = "database")]
 pub mod semantic_validator;
 pub mod validation;
 pub mod verb_registry;
-pub mod verb_schema;
 
 // Re-export key types for convenience
 pub use applicability_rules::{ApplicabilityRules, AttributeApplicability, DocumentApplicability};
-pub use assembler::{ArgResolver, AssembledStatement, AssemblyError, DslAssembler};
-pub use ast::{Argument, Key, Program, Span, Statement, Value, VerbCall};
+pub use ast::{
+    count_entity_refs, Argument, AstNode, EntityRefStats, Literal, Program, Span, Statement,
+    VerbCall,
+};
 pub use config::types::LookupConfig;
 pub use csg_linter::{CsgLinter, InferredContext, LintResult};
-#[cfg(feature = "database")]
-pub use entity_resolver::{needs_quoting, AsyncEntityGatewayResolver, EntityGatewayResolver};
+pub use enrichment::{enrich_program, EnrichmentError, EnrichmentResult};
 pub use execution_plan::{compile, CompileError, ExecutionPlan, ExecutionStep, Injection};
 pub use executor::{DslExecutor, ExecutionContext, ExecutionResult, ReturnType};
 #[cfg(feature = "database")]
@@ -89,6 +71,8 @@ pub use generic_executor::{GenericCrudExecutor, GenericExecutionResult};
 pub use idempotency::{compute_idempotency_key, IdempotencyManager};
 pub use intent::{ArgIntent, DslIntent, DslIntentBatch, ResolvedArg};
 pub use intent_extractor::IntentExtractor;
+#[cfg(feature = "database")]
+pub use lsp_validator::LspValidator;
 pub use parser::{parse_program, parse_single_verb};
 #[cfg(feature = "database")]
 pub use ref_resolver::RefResolver;

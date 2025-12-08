@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 #[cfg(feature = "database")]
-use super::ast::{Value, VerbCall};
+use super::ast::{AstNode, Literal, VerbCall};
 #[cfg(feature = "database")]
 use super::custom_ops::CustomOperationRegistry;
 #[cfg(feature = "database")]
@@ -212,59 +212,65 @@ impl DslExecutor {
     ) -> Result<HashMap<String, JsonValue>> {
         let mut result = HashMap::new();
         for arg in args {
-            let key = arg.key.canonical();
-            let value = Self::value_to_json(&arg.value, ctx)?;
+            let key = arg.key.clone();
+            let value = Self::node_to_json(&arg.value, ctx)?;
             result.insert(key, value);
         }
         Ok(result)
     }
 
-    /// Convert AST Value to JSON, resolving references
+    /// Convert AST AstNode to JSON, resolving references
     #[cfg(feature = "database")]
-    fn value_to_json(value: &Value, ctx: &ExecutionContext) -> Result<JsonValue> {
-        match value {
-            Value::String(s) => Ok(JsonValue::String(s.clone())),
-            Value::Integer(i) => Ok(serde_json::json!(*i)),
-            Value::Decimal(d) => Ok(serde_json::json!(d.to_string())),
-            Value::Boolean(b) => Ok(JsonValue::Bool(*b)),
-            Value::Null => Ok(JsonValue::Null),
-            Value::Reference(name) => {
+    fn node_to_json(node: &AstNode, ctx: &ExecutionContext) -> Result<JsonValue> {
+        match node {
+            AstNode::Literal(lit) => Self::literal_to_json(lit),
+            AstNode::SymbolRef { name, .. } => {
                 let uuid = ctx
                     .resolve(name)
                     .ok_or_else(|| anyhow!("Unresolved reference: @{}", name))?;
                 Ok(JsonValue::String(uuid.to_string()))
             }
-            Value::AttributeRef(uuid) => Ok(JsonValue::String(uuid.to_string())),
-            Value::DocumentRef(uuid) => Ok(JsonValue::String(uuid.to_string())),
-            Value::List(items) => {
+            AstNode::EntityRef {
+                resolved_key,
+                value,
+                ..
+            } => {
+                // Use resolved primary_key if available, otherwise fall back to value
+                if let Some(pk) = resolved_key {
+                    Ok(JsonValue::String(pk.clone()))
+                } else {
+                    // Not yet resolved - pass value for lookup during execution
+                    Ok(JsonValue::String(value.clone()))
+                }
+            }
+            AstNode::List { items, .. } => {
                 let json_items: Result<Vec<JsonValue>> =
-                    items.iter().map(|v| Self::value_to_json(v, ctx)).collect();
+                    items.iter().map(|v| Self::node_to_json(v, ctx)).collect();
                 Ok(JsonValue::Array(json_items?))
             }
-            Value::Map(map) => {
+            AstNode::Map { entries, .. } => {
                 let mut json_map = serde_json::Map::new();
-                for (k, v) in map {
-                    json_map.insert(k.clone(), Self::value_to_json(v, ctx)?);
+                for (k, v) in entries {
+                    json_map.insert(k.clone(), Self::node_to_json(v, ctx)?);
                 }
                 Ok(JsonValue::Object(json_map))
             }
-            Value::NestedCall(_) => {
-                bail!("NestedCall found during value conversion. Use compile() + execute_plan() for nested DSL.")
+            AstNode::Nested(_) => {
+                bail!("Nested VerbCall found during value conversion. Use compile() + execute_plan() for nested DSL.")
             }
-            Value::LookupRef {
-                ref_type: _,
-                search_key,
-                primary_key,
-            } => {
-                // Use resolved primary_key if available, otherwise fall back to search_key
-                // The executor's resolve_lookup will handle the final resolution if needed
-                if let Some(pk) = primary_key {
-                    Ok(JsonValue::String(pk.clone()))
-                } else {
-                    // Not yet resolved - pass search_key for lookup during execution
-                    Ok(JsonValue::String(search_key.clone()))
-                }
-            }
+        }
+    }
+
+    /// Convert Literal to JSON
+    #[cfg(feature = "database")]
+    fn literal_to_json(lit: &Literal) -> Result<JsonValue> {
+        match lit {
+            Literal::String(s) => Ok(JsonValue::String(s.clone())),
+            Literal::Integer(i) => Ok(serde_json::json!(*i)),
+            Literal::Decimal(d) => Ok(serde_json::json!(d.to_string())),
+            Literal::Boolean(b) => Ok(JsonValue::Bool(*b)),
+            Literal::Null => Ok(JsonValue::Null),
+            Literal::Uuid(u) => Ok(JsonValue::String(u.to_string())),
         }
     }
 }
@@ -315,10 +321,9 @@ impl DslExecutor {
                 if let Some(ExecutionResult::Uuid(id)) = results.get(inj.from_step) {
                     // Add the injected argument
                     vc.arguments.push(super::ast::Argument {
-                        key: super::ast::Key::Simple(inj.into_arg.clone()),
-                        key_span: super::ast::Span::default(),
-                        value: super::ast::Value::String(id.to_string()),
-                        value_span: super::ast::Span::default(),
+                        key: inj.into_arg.clone(),
+                        value: AstNode::Literal(Literal::String(id.to_string())),
+                        span: super::ast::Span::default(),
                     });
                 }
             }

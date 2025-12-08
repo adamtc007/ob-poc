@@ -68,6 +68,13 @@ pub trait RefResolver: Send + Sync {
 
     /// Clear any internal cache (optional, default no-op)
     fn clear_cache(&mut self) {}
+
+    /// Downcast to GatewayRefResolver for fuzzy search (returns None for non-Gateway resolvers)
+    fn as_gateway_resolver(
+        &mut self,
+    ) -> Option<&mut crate::dsl_v2::gateway_resolver::GatewayRefResolver> {
+        None
+    }
 }
 
 // =============================================================================
@@ -100,6 +107,16 @@ pub fn arg_to_ref_type(verb: &str, arg_key: &str) -> Option<RefType> {
 
         // Screening type
         ":screening-type" | ":check-type" => Some(RefType::ScreeningType),
+
+        // Product and service references
+        ":product" | ":product-code" => Some(RefType::Product),
+        ":service" | ":service-code" => Some(RefType::Service),
+
+        // Currency references
+        ":currency" | ":cash-currency" => Some(RefType::Currency),
+
+        // Client type references
+        ":client-type" => Some(RefType::ClientType),
 
         // Not a DB reference
         _ => None,

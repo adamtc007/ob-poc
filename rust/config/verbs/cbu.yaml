@@ -17,8 +17,16 @@ domains:
             maps_to: name
           - name: jurisdiction
             type: string
-            required: false
+            required: true
             maps_to: jurisdiction
+            description: Jurisdiction code (e.g., US, GB, LU, IE, KY)
+            lookup:
+              table: master_jurisdictions
+              entity_type: jurisdiction
+              schema: ob-poc
+              search_key: jurisdiction_code
+              primary_key: jurisdiction_code
+              resolution_mode: reference # small static table - autocomplete
           - name: client-type
             type: string
             required: false
@@ -41,6 +49,7 @@ domains:
               schema: ob-poc
               search_key: name
               primary_key: entity_id
+              resolution_mode: entity # growing table - search modal
         returns:
           type: uuid
           name: cbu_id
@@ -63,6 +72,7 @@ domains:
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
+              resolution_mode: entity # growing table - search modal
         returns:
           type: record
       update:
@@ -179,10 +189,20 @@ domains:
             type: string
             required: true
             maps_to: name
+            fuzzy_check:
+              entity_type: cbu
+              threshold: 0.5
           - name: jurisdiction
             type: string
-            required: false
+            required: true
             maps_to: jurisdiction
+            description: Jurisdiction code (e.g., US, GB, LU, IE, KY)
+            lookup:
+              table: master_jurisdictions
+              entity_type: jurisdiction
+              schema: ob-poc
+              search_key: jurisdiction_code
+              primary_key: jurisdiction_code
           - name: client-type
             type: string
             required: false
@@ -380,12 +400,12 @@ domains:
           - name: product
             type: string
             required: true
-            description: Product name (looked up in products table)
+            description: Product code (e.g., CUSTODY, FUND_ACCOUNTING)
             lookup:
               table: products
               entity_type: product
               schema: ob-poc
-              search_key: name
+              search_key: product_code
               primary_key: product_code
         returns:
           type: affected

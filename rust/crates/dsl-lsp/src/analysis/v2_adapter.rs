@@ -2,9 +2,18 @@
 //!
 //! This module bridges the v2 parser with the LSP's document representation,
 //! ensuring a single source of truth for parsing.
+//!
+//! ## Pipeline Alignment
+//!
+//! Both LSP and Agent use the SAME pipeline:
+//! 1. `parse_program()` - Nom parser → Raw AST
+//! 2. `enrich_program()` - YAML lookup config → Enriched AST (optional for LSP)
+//! 3. `LspValidator` - EntityGateway resolution → Resolved AST
+//!
+//! This adapter converts the raw AST to LSP's DocumentState for editor features.
 
 use ob_poc::dsl_v2::{
-    ast::{Argument, Key, Program, Span as V2Span, Statement, Value, VerbCall},
+    ast::{Argument, AstNode, Literal, Program, Span as V2Span, Statement, VerbCall},
     parse_program,
 };
 use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, NumberOrString, Position, Range};
@@ -12,6 +21,8 @@ use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, NumberOrString, Posit
 use super::document::{DocumentState, ExprKind, ParsedArg, ParsedExpr, SymbolDef, SymbolRef};
 
 /// Parse document using v2 parser and convert to LSP types.
+///
+/// This uses the SAME parser as the agent pipeline, ensuring consistency.
 pub fn parse_with_v2(text: &str) -> (DocumentState, Vec<Diagnostic>) {
     let mut state = DocumentState::new(text.to_string());
     let mut diagnostics = Vec::new();
@@ -27,7 +38,6 @@ pub fn parse_with_v2(text: &str) -> (DocumentState, Vec<Diagnostic>) {
         }
         Err(err) => {
             // V2 parse error - convert to diagnostic
-            // Try to extract position from error message
             let range = extract_error_range(&err, text);
             diagnostics.push(Diagnostic {
                 range,
@@ -59,7 +69,10 @@ fn convert_program(program: &Program, text: &str) -> Vec<ParsedExpr> {
 fn convert_verb_call(vc: &VerbCall, text: &str) -> ParsedExpr {
     let verb_name = format!("{}.{}", vc.domain, vc.verb);
     let range = span_to_range(&vc.span, text);
-    let verb_range = span_to_range(&vc.verb_span, text);
+
+    // Verb range is approximated from the full span (verb is at start after '(')
+    let verb_end = vc.span.start + 1 + vc.domain.len() + 1 + vc.verb.len();
+    let verb_range = span_to_range(&V2Span::new(vc.span.start + 1, verb_end), text);
 
     let mut args: Vec<ParsedArg> = vc
         .arguments
@@ -68,14 +81,35 @@ fn convert_verb_call(vc: &VerbCall, text: &str) -> ParsedExpr {
         .collect();
 
     // Add :as binding as a special argument if present
-    if let Some(ref binding) = vc.as_binding {
-        if let Some(span) = vc.as_binding_span {
-            let as_range = span_to_range(&span, text);
+    if let Some(ref binding) = vc.binding {
+        // Approximate the :as span from the verb call text
+        let binding_text = format!(":as @{}", binding);
+        let span_end = vc.span.end.min(text.len());
+        let span_start = vc.span.start.min(span_end);
+        if let Some(pos) = text
+            .get(span_start..span_end)
+            .and_then(|s| s.rfind(&binding_text))
+        {
+            let as_start = span_start + pos;
+            let as_end = (as_start + binding_text.len()).min(text.len());
+            let as_range = span_to_range(&V2Span::new(as_start, as_end), text);
             args.push(ParsedArg {
                 keyword: ":as".to_string(),
                 keyword_range: as_range,
                 value: Some(Box::new(ParsedExpr {
                     range: as_range,
+                    kind: ExprKind::SymbolRef {
+                        name: binding.clone(),
+                    },
+                })),
+            });
+        } else {
+            // Fallback: still add the binding even if we can't find the exact span
+            args.push(ParsedArg {
+                keyword: ":as".to_string(),
+                keyword_range: range, // Use verb call range as fallback
+                value: Some(Box::new(ParsedExpr {
+                    range,
                     kind: ExprKind::SymbolRef {
                         name: binding.clone(),
                     },
@@ -96,12 +130,15 @@ fn convert_verb_call(vc: &VerbCall, text: &str) -> ParsedExpr {
 
 /// Convert v2 Argument to LSP ParsedArg.
 fn convert_argument(arg: &Argument, text: &str) -> ParsedArg {
-    let keyword = match &arg.key {
-        Key::Simple(k) => format!(":{}", k),
-        Key::Dotted(parts) => format!(":{}", parts.join(".")),
-    };
-    let keyword_range = span_to_range(&arg.key_span, text);
-    let value = Some(Box::new(convert_value(&arg.value, &arg.value_span, text)));
+    let keyword = format!(":{}", arg.key);
+
+    // Use argument span for keyword range (approximation - key is at start of span)
+    let key_end = arg.span.start + 1 + arg.key.len(); // +1 for ':'
+    let keyword_range = span_to_range(&V2Span::new(arg.span.start, key_end), text);
+
+    // Value span is the rest of the argument span
+    let value_span = V2Span::new(key_end + 1, arg.span.end); // +1 for space
+    let value = Some(Box::new(convert_node(&arg.value, &value_span, text)));
 
     ParsedArg {
         keyword,
@@ -110,53 +147,60 @@ fn convert_argument(arg: &Argument, text: &str) -> ParsedArg {
     }
 }
 
-/// Convert v2 Value to LSP ParsedExpr.
-fn convert_value(value: &Value, span: &V2Span, text: &str) -> ParsedExpr {
+/// Convert v2 AstNode to LSP ParsedExpr.
+fn convert_node(node: &AstNode, span: &V2Span, text: &str) -> ParsedExpr {
     let range = span_to_range(span, text);
 
-    let kind = match value {
-        Value::String(s) => ExprKind::String { value: s.clone() },
-        Value::Integer(n) => ExprKind::Number {
-            value: n.to_string(),
+    let kind = match node {
+        AstNode::Literal(lit) => match lit {
+            Literal::String(s) => ExprKind::String { value: s.clone() },
+            Literal::Integer(n) => ExprKind::Number {
+                value: n.to_string(),
+            },
+            Literal::Decimal(d) => ExprKind::Number {
+                value: d.to_string(),
+            },
+            Literal::Boolean(b) => ExprKind::Identifier {
+                value: b.to_string(),
+            },
+            Literal::Null => ExprKind::Identifier {
+                value: "nil".to_string(),
+            },
+            Literal::Uuid(uuid) => ExprKind::String {
+                value: uuid.to_string(),
+            },
         },
-        Value::Decimal(d) => ExprKind::Number {
-            value: d.to_string(),
-        },
-        Value::Boolean(b) => ExprKind::Identifier {
-            value: b.to_string(),
-        },
-        Value::Reference(s) => ExprKind::SymbolRef { name: s.clone() },
-        Value::AttributeRef(uuid) => ExprKind::Identifier {
-            value: format!("@attr{{{}}}", uuid),
-        },
-        Value::DocumentRef(uuid) => ExprKind::Identifier {
-            value: format!("@doc{{{}}}", uuid),
-        },
-        Value::Null => ExprKind::Identifier {
-            value: "nil".to_string(),
-        },
-        Value::List(items) => {
+
+        AstNode::SymbolRef { name, .. } => ExprKind::SymbolRef { name: name.clone() },
+
+        AstNode::EntityRef { value, .. } => {
+            // Display the human-readable value (resolution happens later)
+            ExprKind::String {
+                value: value.clone(),
+            }
+        }
+
+        AstNode::List {
+            items,
+            span: list_span,
+        } => {
             let converted: Vec<ParsedExpr> = items
                 .iter()
-                .map(|v| convert_value(v, span, text)) // Approximate span for items
+                .map(|v| convert_node(v, list_span, text))
                 .collect();
             ExprKind::List { items: converted }
         }
-        Value::Map(_) => {
-            // Maps are rare in DSL, just represent as identifier for now
+
+        AstNode::Map { .. } => {
+            // Maps are rare in DSL, represent as identifier for now
             ExprKind::Identifier {
                 value: "{...}".to_string(),
             }
         }
-        Value::NestedCall(vc) => {
+
+        AstNode::Nested(vc) => {
             // Recursively convert nested verb call
             return convert_verb_call(vc, text);
-        }
-        Value::LookupRef { search_key, .. } => {
-            // Display the human-readable search key (UUID is hidden)
-            ExprKind::String {
-                value: search_key.clone(),
-            }
         }
     };
 
@@ -267,7 +311,6 @@ fn infer_id_type(verb_name: &str) -> String {
 fn extract_error_range(error: &str, text: &str) -> Range {
     // Nom verbose errors often have line numbers like "at line 2:"
     // For now, default to start of document
-    // A more sophisticated implementation could parse the error message
     let _ = (error, text);
     Range::default()
 }

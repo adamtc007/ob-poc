@@ -1,3 +1,6 @@
+// Package rustclient provides a minimal HTTP client for the Rust DSL API.
+// Most API calls are handled via direct HTTP proxying in main.go.
+// This client is used for: index page health/verbs, validation, and test harness.
 package rustclient
 
 import (
@@ -26,12 +29,6 @@ func NewClient(baseURL string) *Client {
 			Timeout: 30 * time.Second,
 		},
 	}
-}
-
-// WithTimeout sets a custom timeout.
-func (c *Client) WithTimeout(d time.Duration) *Client {
-	c.httpClient.Timeout = d
-	return c
 }
 
 // Health checks API health.
@@ -63,6 +60,7 @@ func (c *Client) ValidateDSL(ctx context.Context, dsl string) (*ValidationResult
 }
 
 // ExecuteDSL executes DSL and returns results with bindings.
+// Used by the test harness.
 func (c *Client) ExecuteDSL(ctx context.Context, dsl string) (*ExecuteResponse, error) {
 	req := ExecuteDSLRequest{DSL: dsl}
 	var resp ExecuteResponse
@@ -72,36 +70,8 @@ func (c *Client) ExecuteDSL(ctx context.Context, dsl string) (*ExecuteResponse, 
 	return &resp, nil
 }
 
-// ListCBUs returns all CBUs.
-func (c *Client) ListCBUs(ctx context.Context) ([]CbuSummary, error) {
-	var resp []CbuSummary
-	if err := c.get(ctx, "/query/cbus", &resp); err != nil {
-		return nil, err
-	}
-	return resp, nil
-}
-
-// GetCBU returns a CBU with full details (entities, roles).
-func (c *Client) GetCBU(ctx context.Context, cbuID uuid.UUID) (*CbuDetail, error) {
-	var resp CbuDetail
-	path := fmt.Sprintf("/query/cbus/%s", cbuID)
-	if err := c.get(ctx, path, &resp); err != nil {
-		return nil, err
-	}
-	return &resp, nil
-}
-
-// GetKYCCase returns a KYC case with workstreams and flags.
-func (c *Client) GetKYCCase(ctx context.Context, caseID uuid.UUID) (*KycCaseDetail, error) {
-	var resp KycCaseDetail
-	path := fmt.Sprintf("/query/kyc/cases/%s", caseID)
-	if err := c.get(ctx, path, &resp); err != nil {
-		return nil, err
-	}
-	return &resp, nil
-}
-
 // CleanupCBU deletes a CBU and all related data.
+// Used by the test harness for cleanup.
 func (c *Client) CleanupCBU(ctx context.Context, cbuID uuid.UUID) (*CleanupResponse, error) {
 	var resp CleanupResponse
 	path := fmt.Sprintf("/cleanup/cbu/%s", cbuID)

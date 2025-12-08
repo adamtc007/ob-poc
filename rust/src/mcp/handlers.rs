@@ -107,6 +107,7 @@ impl ToolHandlers {
             "dsl_validate" => self.dsl_validate(args).await,
             "dsl_execute" => self.dsl_execute(args).await,
             "dsl_plan" => self.dsl_plan(args).await,
+            "dsl_generate" => self.dsl_generate(args).await,
             "cbu_get" => self.cbu_get(args).await,
             "cbu_list" => self.cbu_list(args).await,
             "entity_get" => self.entity_get(args).await,
@@ -422,7 +423,7 @@ impl ToolHandlers {
                     "binding": s.bind_as,
                     "args": s.verb_call.arguments.iter().map(|a| {
                         json!({
-                            "key": a.key.canonical(),
+                            "key": a.key.clone(),
                             "value": format!("{:?}", a.value)
                         })
                     }).collect::<Vec<_>>()
@@ -434,6 +435,127 @@ impl ToolHandlers {
             "valid": true,
             "step_count": plan.steps.len(),
             "steps": steps
+        }))
+    }
+
+    /// Generate DSL from natural language using intent extraction
+    async fn dsl_generate(&self, args: Value) -> Result<Value> {
+        let instruction = args["instruction"]
+            .as_str()
+            .ok_or_else(|| anyhow!("instruction required"))?;
+        let _domain = args["domain"].as_str();
+        let execute = args["execute"].as_bool().unwrap_or(false);
+
+        // Get API key
+        let api_key = std::env::var("ANTHROPIC_API_KEY")
+            .map_err(|_| anyhow!("ANTHROPIC_API_KEY not configured"))?;
+
+        // Build vocabulary prompt for context
+        let reg = registry();
+        let vocab: Vec<_> = reg
+            .all_verbs()
+            .take(50) // Limit for context
+            .map(|v| format!("{}: {}", v.full_name(), v.description))
+            .collect();
+
+        let system_prompt = format!(
+            r#"You are a DSL generator for a KYC/AML onboarding system.
+Generate valid DSL S-expressions from natural language instructions.
+
+DSL SYNTAX:
+- Format: (domain.verb :key "value" :key2 value2)
+- Strings must be quoted: "text"
+- Numbers are unquoted: 42
+- References start with @: @symbol_name
+- Use :as @name to capture results
+
+COMMON VERBS:
+{}
+
+Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, respond with: ERROR: <reason>"#,
+            vocab.join("\n")
+        );
+
+        // Call Claude API
+        let client = reqwest::Client::new();
+        let response = client
+            .post("https://api.anthropic.com/v1/messages")
+            .header("x-api-key", &api_key)
+            .header("anthropic-version", "2023-06-01")
+            .header("content-type", "application/json")
+            .json(&json!({
+                "model": "claude-sonnet-4-20250514",
+                "max_tokens": 1024,
+                "system": system_prompt,
+                "messages": [{"role": "user", "content": instruction}]
+            }))
+            .send()
+            .await
+            .map_err(|e| anyhow!("API request failed: {}", e))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(anyhow!("Claude API error {}: {}", status, body));
+        }
+
+        let json_resp: Value = response
+            .json()
+            .await
+            .map_err(|e| anyhow!("Failed to parse response: {}", e))?;
+
+        let dsl = json_resp["content"][0]["text"]
+            .as_str()
+            .unwrap_or("")
+            .trim()
+            .to_string();
+
+        if dsl.starts_with("ERROR:") {
+            return Ok(json!({
+                "success": false,
+                "error": dsl
+            }));
+        }
+
+        // Validate the generated DSL
+        let validation = match parse_program(&dsl) {
+            Ok(ast) => match compile(&ast) {
+                Ok(plan) => json!({
+                    "valid": true,
+                    "step_count": plan.steps.len()
+                }),
+                Err(e) => json!({
+                    "valid": false,
+                    "error": format!("Compile error: {:?}", e)
+                }),
+            },
+            Err(e) => json!({
+                "valid": false,
+                "error": format!("Parse error: {:?}", e)
+            }),
+        };
+
+        // Execute if requested and valid
+        if execute && validation["valid"].as_bool().unwrap_or(false) {
+            let exec_result = self
+                .dsl_execute(json!({
+                    "source": dsl,
+                    "intent": instruction
+                }))
+                .await?;
+
+            return Ok(json!({
+                "success": true,
+                "dsl": dsl,
+                "validation": validation,
+                "execution": exec_result
+            }));
+        }
+
+        Ok(json!({
+            "success": validation["valid"].as_bool().unwrap_or(false),
+            "dsl": dsl,
+            "validation": validation
         }))
     }
 

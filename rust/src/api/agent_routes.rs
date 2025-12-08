@@ -121,6 +121,46 @@ pub struct HealthResponse {
 }
 
 // ============================================================================
+// Completion Request/Response Types (LSP-style via EntityGateway)
+// ============================================================================
+
+/// Request for entity completion
+#[derive(Debug, Deserialize)]
+pub struct CompleteRequest {
+    /// The type of entity to complete: "cbu", "entity", "product", "role", "jurisdiction", etc.
+    pub entity_type: String,
+    /// The search query (partial text to match)
+    pub query: String,
+    /// Maximum number of results (default 10)
+    #[serde(default = "default_limit")]
+    pub limit: i32,
+}
+
+fn default_limit() -> i32 {
+    10
+}
+
+/// A single completion item
+#[derive(Debug, Serialize)]
+pub struct CompletionItem {
+    /// The value to insert (UUID or code)
+    pub value: String,
+    /// Display label for the completion
+    pub label: String,
+    /// Additional detail (e.g., entity type, jurisdiction)
+    pub detail: Option<String>,
+    /// Relevance score (0.0-1.0)
+    pub score: f32,
+}
+
+/// Response with completion items
+#[derive(Debug, Serialize)]
+pub struct CompleteResponse {
+    pub items: Vec<CompletionItem>,
+    pub total: usize,
+}
+
+// ============================================================================
 // Onboarding Request/Response Types
 // ============================================================================
 
@@ -209,6 +249,8 @@ pub fn create_agent_router(pool: PgPool) -> Router {
         .route("/api/agent/domains", get(list_domains))
         .route("/api/agent/vocabulary", get(get_vocabulary))
         .route("/api/agent/health", get(health_check))
+        // Completions (LSP-style lookup via EntityGateway)
+        .route("/api/agent/complete", post(complete_entity))
         // Onboarding
         .route("/api/agent/onboard", post(generate_onboarding_dsl))
         // Enhanced generation with tool use
@@ -288,11 +330,44 @@ async fn delete_session(
 }
 
 /// POST /api/session/:id/chat - Process chat message and generate DSL via Claude
+///
+/// Pipeline: User message → Intent extraction (tool call) → DSL builder → Linter → Feedback loop
+///
+/// This mirrors the Claude Code workflow:
+/// 1. Extract structured intents from natural language (tool call)
+/// 2. Build DSL from intents (deterministic Rust code)
+/// 3. Validate with CSG linter (same as Zed/LSP)
+/// 4. If errors, feed back to agent and retry
+/// 5. Write valid DSL to session file
 async fn chat_session(
     State(state): State<AgentState>,
     Path(session_id): Path<Uuid>,
     Json(req): Json<ChatRequest>,
 ) -> Result<Json<ChatResponse>, StatusCode> {
+    use crate::api::dsl_builder::{build_dsl_program, validate_intent};
+    use crate::api::dsl_session_file::DslSessionFileManager;
+    use crate::api::intent::{IntentValidation, VerbIntent};
+    use crate::dsl_v2::semantic_validator::SemanticValidator;
+    use crate::dsl_v2::validation::ValidationContext;
+
+    const MAX_RETRIES: usize = 3;
+
+    // Initialize file-based session storage
+    let file_manager = DslSessionFileManager::new();
+
+    // Ensure session file exists (create if needed)
+    if !file_manager.session_exists(session_id).await {
+        let domain_hint = {
+            let sessions = state.sessions.read().await;
+            sessions
+                .get(&session_id)
+                .and_then(|s| s.context.domain_hint.clone())
+        };
+        if let Err(e) = file_manager.create_session(session_id, domain_hint).await {
+            tracing::error!("Failed to create session file: {}", e);
+        }
+    }
+
     // Store the user message first
     {
         let mut sessions = state.sessions.write().await;
@@ -300,7 +375,7 @@ async fn chat_session(
         session.add_user_message(req.message.clone());
     }
 
-    // Call Claude API to generate DSL
+    // Get API key
     let api_key = match std::env::var("ANTHROPIC_API_KEY") {
         Ok(key) => key,
         Err(_) => {
@@ -322,122 +397,323 @@ async fn chat_session(
         }
     };
 
-    // Build vocabulary prompt and system prompt
+    // Build system prompt for intent extraction
     let vocab = build_vocab_prompt(None);
-    let system_prompt = build_chat_system_prompt(&vocab);
+    let system_prompt = build_intent_extraction_prompt(&vocab);
 
-    // Call Claude API
     let client = reqwest::Client::new();
-    let response = client
-        .post("https://api.anthropic.com/v1/messages")
-        .header("x-api-key", &api_key)
-        .header("anthropic-version", "2023-06-01")
-        .header("content-type", "application/json")
-        .json(&serde_json::json!({
-            "model": "claude-sonnet-4-20250514",
-            "max_tokens": 2048,
-            "system": system_prompt,
-            "messages": [
-                {"role": "user", "content": req.message}
-            ]
-        }))
-        .send()
-        .await;
+    let mut feedback_context = String::new();
+    let mut final_dsl: Option<String> = None;
+    let mut final_explanation = String::new();
+    let mut all_intents: Vec<VerbIntent> = Vec::new();
+    let mut validation_results: Vec<IntentValidation> = Vec::new();
 
-    let (dsl_result, error_msg) = match response {
-        Ok(resp) => {
-            if resp.status().is_success() {
+    // Retry loop with linter feedback
+    for attempt in 0..MAX_RETRIES {
+        // Build message with optional feedback from previous attempt
+        let user_message = if feedback_context.is_empty() {
+            req.message.clone()
+        } else {
+            format!(
+                "{}\n\n[LINTER FEEDBACK - Please fix these issues]\n{}",
+                req.message, feedback_context
+            )
+        };
+
+        // Call Claude with tool use for structured intent extraction
+        let response = client
+            .post("https://api.anthropic.com/v1/messages")
+            .header("x-api-key", &api_key)
+            .header("anthropic-version", "2023-06-01")
+            .header("content-type", "application/json")
+            .json(&serde_json::json!({
+                "model": "claude-sonnet-4-20250514",
+                "max_tokens": 2048,
+                "system": system_prompt,
+                "messages": [
+                    {"role": "user", "content": user_message}
+                ],
+                "tools": [{
+                    "name": "generate_dsl_intents",
+                    "description": "Generate structured DSL intents from user request. Each intent represents a single DSL verb call.",
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {
+                            "intents": {
+                                "type": "array",
+                                "description": "List of DSL verb intents",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "verb": {
+                                            "type": "string",
+                                            "description": "The DSL verb, e.g., 'cbu.ensure', 'entity.create-proper-person'"
+                                        },
+                                        "params": {
+                                            "type": "object",
+                                            "description": "Parameters with literal values",
+                                            "additionalProperties": true
+                                        },
+                                        "refs": {
+                                            "type": "object",
+                                            "description": "References to previous results, e.g., {\"cbu-id\": \"@result_1\"}",
+                                            "additionalProperties": {"type": "string"}
+                                        }
+                                    },
+                                    "required": ["verb", "params"]
+                                }
+                            },
+                            "explanation": {
+                                "type": "string",
+                                "description": "Brief explanation of what the DSL will do"
+                            }
+                        },
+                        "required": ["intents", "explanation"]
+                    }
+                }],
+                "tool_choice": {"type": "tool", "name": "generate_dsl_intents"}
+            }))
+            .send()
+            .await;
+
+        // Parse response
+        let (intents, explanation) = match response {
+            Ok(resp) => {
+                if !resp.status().is_success() {
+                    tracing::error!(
+                        "Claude API error: {} - {}",
+                        resp.status(),
+                        resp.text().await.unwrap_or_default()
+                    );
+                    return Err(StatusCode::BAD_GATEWAY);
+                }
+
                 match resp.json::<serde_json::Value>().await {
                     Ok(json) => {
-                        let content = json["content"][0]["text"]
-                            .as_str()
-                            .unwrap_or("")
-                            .trim()
-                            .to_string();
+                        // Extract tool use result
+                        let tool_input = &json["content"][0]["input"];
+                        let intents_json = &tool_input["intents"];
+                        let explanation =
+                            tool_input["explanation"].as_str().unwrap_or("").to_string();
 
-                        if content.starts_with("ERROR:") {
-                            (None, Some(content))
-                        } else {
-                            // Validate the generated DSL
-                            match parse_program(&content) {
-                                Ok(_) => (Some(content), None),
-                                Err(e) => (Some(content), Some(format!("Syntax error: {}", e))),
+                        // Parse intents
+                        let intents: Vec<VerbIntent> =
+                            serde_json::from_value(intents_json.clone()).unwrap_or_default();
+
+                        (intents, explanation)
+                    }
+                    Err(_) => (Vec::new(), String::new()),
+                }
+            }
+            Err(_) => (Vec::new(), String::new()),
+        };
+
+        if intents.is_empty() {
+            // No intents extracted - try one more time or give up
+            if attempt < MAX_RETRIES - 1 {
+                feedback_context = "Could not extract any DSL intents. Please try again with clearer verb and parameter names.".to_string();
+                continue;
+            }
+            break;
+        }
+
+        // Validate intents against registry (uses same registry as LSP)
+        validation_results.clear();
+        let mut has_errors = false;
+        let mut error_feedback = Vec::new();
+
+        for intent in &intents {
+            let validation = validate_intent(intent);
+            if !validation.valid {
+                has_errors = true;
+                for err in &validation.errors {
+                    error_feedback.push(format!(
+                        "Verb '{}': {} {}",
+                        intent.verb,
+                        err.message,
+                        err.param
+                            .as_deref()
+                            .map(|p| format!("(param: {})", p))
+                            .unwrap_or_default()
+                    ));
+                }
+            }
+            validation_results.push(validation);
+        }
+
+        // Build DSL from intents (deterministic - no LLM involved)
+        let dsl = build_dsl_program(&intents);
+
+        // Run SemanticValidator with EntityGateway (same pipeline as Zed/LSP)
+        // This validates embedded data values (products, roles, jurisdictions, etc.)
+        match SemanticValidator::new(state.pool.clone()).await {
+            Ok(mut validator) => {
+                let request = crate::dsl_v2::validation::ValidationRequest {
+                    source: dsl.clone(),
+                    context: ValidationContext::default(),
+                };
+                match validator.validate(&request).await {
+                    crate::dsl_v2::validation::ValidationResult::Err(diagnostics) => {
+                        has_errors = true;
+                        for diag in diagnostics {
+                            if diag.severity == crate::dsl_v2::validation::Severity::Error {
+                                error_feedback.push(format!("Validation: {}", diag.message));
                             }
                         }
                     }
-                    Err(e) => (None, Some(format!("Failed to parse API response: {}", e))),
+                    crate::dsl_v2::validation::ValidationResult::Ok(_) => {
+                        // Validation passed
+                    }
                 }
-            } else {
-                let status = resp.status();
-                let body = resp.text().await.unwrap_or_default();
-                (None, Some(format!("API error {}: {}", status, body)))
+            }
+            Err(e) => {
+                // EntityGateway not available - log warning but don't fail
+                tracing::warn!("EntityGateway validation unavailable: {}", e);
             }
         }
-        Err(e) => (None, Some(format!("Request failed: {}", e))),
-    };
+
+        // If no errors, we're done
+        if !has_errors {
+            final_dsl = Some(dsl);
+            final_explanation = explanation;
+            all_intents = intents;
+            break;
+        }
+
+        // Build feedback for next attempt
+        if attempt < MAX_RETRIES - 1 {
+            feedback_context = error_feedback.join("\n");
+        } else {
+            // Last attempt - return what we have with errors
+            final_dsl = Some(dsl);
+            final_explanation = format!(
+                "{}\n\nNote: DSL has validation issues:\n{}",
+                explanation,
+                error_feedback.join("\n")
+            );
+            all_intents = intents;
+        }
+    }
 
     // Update session with results
     let mut sessions = state.sessions.write().await;
     let session = sessions.get_mut(&session_id).ok_or(StatusCode::NOT_FOUND)?;
 
-    let (response_msg, can_execute, assembled) = match (&dsl_result, &error_msg) {
-        (Some(dsl), None) => {
-            // Success - store DSL in session
+    let (response_msg, can_execute, assembled) = match final_dsl {
+        Some(ref dsl) => {
+            let has_errors = validation_results.iter().any(|v| !v.valid);
             session.assembled_dsl = vec![dsl.clone()];
-            session.state = SessionState::ReadyToExecute;
-            session.add_agent_message(
-                "DSL generated successfully. Ready to execute.".to_string(),
-                None,
-                Some(dsl.clone()),
-            );
+            session.state = if has_errors {
+                SessionState::PendingValidation
+            } else {
+                SessionState::ReadyToExecute
+            };
+
+            let msg = if final_explanation.is_empty() {
+                "DSL generated successfully.".to_string()
+            } else {
+                final_explanation.clone()
+            };
+
+            session.add_agent_message(msg.clone(), None, Some(dsl.clone()));
+
+            // Write DSL to session file (like Claude Code writes to source files)
+            let description = req.message.chars().take(50).collect::<String>();
+            if let Err(e) = file_manager.append_dsl(session_id, dsl, &description).await {
+                tracing::error!("Failed to write DSL to session file: {}", e);
+            }
+
             (
-                "DSL generated successfully. Ready to execute.".to_string(),
-                true,
+                msg,
+                !has_errors,
                 Some(crate::api::intent::AssembledDsl {
                     statements: vec![dsl.clone()],
                     combined: dsl.clone(),
-                    intent_count: 1,
+                    intent_count: all_intents.len(),
                 }),
             )
         }
-        (Some(dsl), Some(err)) => {
-            // DSL generated but has validation errors
-            session.assembled_dsl = vec![dsl.clone()];
-            session.state = SessionState::PendingValidation;
-            session.add_agent_message(
-                format!("DSL generated with warnings: {}", err),
-                None,
-                Some(dsl.clone()),
-            );
-            (
-                format!("DSL generated with warnings: {}", err),
-                false,
-                Some(crate::api::intent::AssembledDsl {
-                    statements: vec![dsl.clone()],
-                    combined: dsl.clone(),
-                    intent_count: 1,
-                }),
-            )
-        }
-        (None, Some(err)) => {
-            // Generation failed
-            session.add_agent_message(format!("Error: {}", err), None, None);
-            (format!("Error: {}", err), false, None)
-        }
-        (None, None) => {
-            session.add_agent_message("Unknown error occurred".to_string(), None, None);
-            ("Unknown error occurred".to_string(), false, None)
+        None => {
+            let msg =
+                "Could not generate valid DSL. Please try rephrasing your request.".to_string();
+            session.add_agent_message(msg.clone(), None, None);
+            (msg, false, None)
         }
     };
 
     Ok(Json(ChatResponse {
         message: response_msg,
-        intents: vec![],
+        intents: all_intents,
         assembled_dsl: assembled,
-        validation_results: vec![],
+        validation_results,
         session_state: session.state.clone(),
         can_execute,
     }))
+}
+
+/// Build system prompt for intent extraction (tool-based)
+fn build_intent_extraction_prompt(vocab: &str) -> String {
+    format!(
+        r#"You are a DSL intent extraction assistant. Your job is to convert natural language requests into structured DSL intents.
+
+IMPORTANT: You MUST use the generate_dsl_intents tool to return your response. Do NOT return plain text.
+
+## Available DSL Verbs
+
+{}
+
+## Intent Structure
+
+Each intent represents a single DSL verb call with:
+- verb: The verb name (e.g., "cbu.ensure", "entity.create-proper-person")
+- params: Literal parameter values (e.g., {{"name": "Acme Corp", "jurisdiction": "LU"}})
+- refs: References to previous results (e.g., {{"cbu-id": "@result_1"}})
+
+## Rules
+
+1. Use exact verb names from the vocabulary
+2. Use exact parameter names (with hyphens, e.g., "client-type" not "clientType")
+3. For sequences, use @result_N references where N is the sequence number
+4. Common client types: "fund", "corporate", "individual"
+5. Use ISO codes for jurisdictions: "LU", "US", "GB", "IE", etc.
+
+## Product Codes (MUST use exact uppercase codes)
+
+| User Says | Product Code |
+|-----------|--------------|
+| custody, safekeeping | CUSTODY |
+| fund accounting, fund admin, NAV | FUND_ACCOUNTING |
+| transfer agency, TA, investor registry | TRANSFER_AGENCY |
+| middle office, trade capture | MIDDLE_OFFICE |
+| collateral, margin | COLLATERAL_MGMT |
+| FX, foreign exchange | MARKETS_FX |
+| alternatives, alts, hedge fund admin | ALTS |
+
+IMPORTANT: Always use the UPPERCASE product codes, never the display names.
+
+## Examples
+
+User: "Create a fund called Test Fund in Luxembourg"
+Intent: {{
+  "verb": "cbu.ensure",
+  "params": {{"name": "Test Fund", "jurisdiction": "LU", "client-type": "fund"}},
+  "refs": {{}}
+}}
+
+User: "Add custody product to the fund"
+Intent: {{
+  "verb": "cbu.add-product",
+  "params": {{"product": "CUSTODY"}},
+  "refs": {{"cbu-id": "@result_1"}}
+}}
+
+User: "Add fund accounting and transfer agency"
+Intents: [
+  {{"verb": "cbu.add-product", "params": {{"product": "FUND_ACCOUNTING"}}, "refs": {{"cbu-id": "@result_1"}}}},
+  {{"verb": "cbu.add-product", "params": {{"product": "TRANSFER_AGENCY"}}, "refs": {{"cbu-id": "@result_1"}}}}
+]"#,
+        vocab
+    )
 }
 
 /// POST /api/session/:id/execute - Execute DSL
@@ -906,32 +1182,32 @@ DSL SYNTAX:
 ### EXAMPLE: Adding product to EXISTING CBU
 User: "Onboard Aviva to Custody product"
 ```
-(cbu.add-product :cbu-id "Aviva" :product "Custody")
+(cbu.add-product :cbu-id "Aviva" :product "CUSTODY")
 ```
 
 User: "Add Fund Accounting to Apex Capital"
 ```
-(cbu.add-product :cbu-id "Apex Capital" :product "Fund Accounting")
+(cbu.add-product :cbu-id "Apex Capital" :product "FUND_ACCOUNTING")
 ```
 
 ### EXAMPLE: Creating NEW CBU and adding product
 User: "Create a new fund called Pacific Growth in Luxembourg and add Custody"
 ```
 (cbu.ensure :name "Pacific Growth" :jurisdiction "LU" :client-type "fund" :as @fund)
-(cbu.add-product :cbu-id @fund :product "Custody")
+(cbu.add-product :cbu-id @fund :product "CUSTODY")
 ```
 
-## Available Products (use exact names)
+## Available Products (use product CODE, not display name)
 
-| Product Name | Description |
+| Product Code | Description |
 |--------------|-------------|
-| `Custody` | Asset safekeeping, settlement, corporate actions |
-| `Fund Accounting` | NAV calculation, investor accounting, reporting |
-| `Transfer Agency` | Investor registry, subscriptions, redemptions |
-| `Middle Office` | Position management, trade capture, P&L |
-| `Collateral Management` | Collateral optimization and margin |
-| `Markets FX` | Foreign exchange services |
-| `Alternatives` | Alternative investment administration |
+| `CUSTODY` | Asset safekeeping, settlement, corporate actions |
+| `FUND_ACCOUNTING` | NAV calculation, investor accounting, reporting |
+| `TRANSFER_AGENCY` | Investor registry, subscriptions, redemptions |
+| `MIDDLE_OFFICE` | Position management, trade capture, P&L |
+| `COLLATERAL_MGMT` | Collateral optimization and margin |
+| `MARKETS_FX` | Foreign exchange services |
+| `ALTS` | Alternative investment administration |
 
 ## Client Types
 - `fund` - Investment fund (hedge fund, mutual fund, etc.)
@@ -976,7 +1252,12 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
         }
     };
 
+    // Call Claude API - request JSON response in system prompt
     let client = reqwest::Client::new();
+    let json_system_prompt = format!(
+        "{}\n\nIMPORTANT: Always respond with valid JSON in this exact format:\n{{\n  \"dsl\": \"(verb.name :arg value ...)\",\n  \"explanation\": \"Brief explanation of what the DSL does\"\n}}\n\nIf you cannot generate DSL, respond with:\n{{\n  \"dsl\": null,\n  \"explanation\": null,\n  \"error\": \"Error message explaining why\"\n}}",
+        system_prompt
+    );
     let response = client
         .post("https://api.anthropic.com/v1/messages")
         .header("x-api-key", &api_key)
@@ -985,7 +1266,7 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
         .json(&serde_json::json!({
             "model": "claude-sonnet-4-20250514",
             "max_tokens": 1024,
-            "system": system_prompt,
+            "system": json_system_prompt,
             "messages": [
                 {"role": "user", "content": req.instruction}
             ]
@@ -998,32 +1279,49 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
             if resp.status().is_success() {
                 match resp.json::<serde_json::Value>().await {
                     Ok(json) => {
-                        let content = json["content"][0]["text"]
-                            .as_str()
-                            .unwrap_or("")
-                            .trim()
-                            .to_string();
+                        // Structured output: response is guaranteed valid JSON in content[0].text
+                        let content = json["content"][0]["text"].as_str().unwrap_or("{}");
 
-                        if content.starts_with("ERROR:") {
-                            Json(GenerateDslResponse {
+                        match serde_json::from_str::<serde_json::Value>(content) {
+                            Ok(structured) => {
+                                let dsl = structured["dsl"].as_str().map(|s| s.to_string());
+                                let explanation =
+                                    structured["explanation"].as_str().map(|s| s.to_string());
+                                let error = structured["error"].as_str().map(|s| s.to_string());
+
+                                if let Some(err) = error {
+                                    Json(GenerateDslResponse {
+                                        dsl: None,
+                                        explanation,
+                                        error: Some(err),
+                                    })
+                                } else if let Some(ref dsl_str) = dsl {
+                                    // Validate the generated DSL
+                                    match parse_program(dsl_str) {
+                                        Ok(_) => Json(GenerateDslResponse {
+                                            dsl,
+                                            explanation,
+                                            error: None,
+                                        }),
+                                        Err(e) => Json(GenerateDslResponse {
+                                            dsl,
+                                            explanation,
+                                            error: Some(format!("Syntax error: {}", e)),
+                                        }),
+                                    }
+                                } else {
+                                    Json(GenerateDslResponse {
+                                        dsl: None,
+                                        explanation,
+                                        error: Some("No DSL in response".to_string()),
+                                    })
+                                }
+                            }
+                            Err(e) => Json(GenerateDslResponse {
                                 dsl: None,
                                 explanation: None,
-                                error: Some(content),
-                            })
-                        } else {
-                            // Validate the generated DSL
-                            match parse_program(&content) {
-                                Ok(_) => Json(GenerateDslResponse {
-                                    dsl: Some(content),
-                                    explanation: Some("DSL generated successfully".to_string()),
-                                    error: None,
-                                }),
-                                Err(e) => Json(GenerateDslResponse {
-                                    dsl: Some(content),
-                                    explanation: None,
-                                    error: Some(format!("Generated DSL has syntax error: {}", e)),
-                                }),
-                            }
+                                error: Some(format!("Failed to parse structured response: {}", e)),
+                            }),
                         }
                     }
                     Err(e) => Json(GenerateDslResponse {
@@ -1234,6 +1532,7 @@ async fn generate_dsl_with_tools(
         }
 
         // Claude finished - extract the DSL
+        // Note: tool_use mode doesn't support structured outputs, so we extract DSL from text
         let empty_vec2 = vec![];
         let content = json["content"].as_array().unwrap_or(&empty_vec2);
         for block in content {
@@ -1248,8 +1547,11 @@ async fn generate_dsl_with_tools(
                     });
                 }
 
+                // Try to extract DSL from the response (handle markdown fencing, etc.)
+                let dsl_text = extract_dsl_from_text(text);
+
                 // Validate the generated DSL
-                match parse_program(text) {
+                match parse_program(&dsl_text) {
                     Ok(_) => {
                         let explanation = if tool_results.is_empty() {
                             "DSL generated successfully".to_string()
@@ -1257,14 +1559,14 @@ async fn generate_dsl_with_tools(
                             format!("DSL generated with lookups: {}", tool_results.join(", "))
                         };
                         return Json(GenerateDslResponse {
-                            dsl: Some(text.to_string()),
+                            dsl: Some(dsl_text),
                             explanation: Some(explanation),
                             error: None,
                         });
                     }
                     Err(e) => {
                         return Json(GenerateDslResponse {
-                            dsl: Some(text.to_string()),
+                            dsl: Some(dsl_text),
                             explanation: None,
                             error: Some(format!("Generated DSL has syntax error: {}", e)),
                         });
@@ -1406,12 +1708,12 @@ Generate valid DSL S-expressions from natural language instructions.
    - Use `list_cbus` if unsure what clients exist
 
 2. **Use names, not UUIDs** - The DSL system accepts names for CBUs:
-   - `(cbu.add-product :cbu-id "Apex Capital" :product "Custody")` ✓
+   - `(cbu.add-product :cbu-id "Apex Capital" :product "CUSTODY")` ✓
    - The name is matched case-insensitively in the database
 
 3. **Create new entities with @references**:
    - `(cbu.ensure :name "New Fund" :jurisdiction "LU" :as @fund)`
-   - Then reference: `(cbu.add-product :cbu-id @fund :product "Custody")`
+   - Then reference: `(cbu.add-product :cbu-id @fund :product "CUSTODY")`
 
 ## AVAILABLE VERBS
 {}
@@ -1427,27 +1729,115 @@ Generate valid DSL S-expressions from natural language instructions.
 
 Adding product to EXISTING CBU (after lookup confirms it exists):
 ```
-(cbu.add-product :cbu-id "Apex Capital" :product "Custody")
+(cbu.add-product :cbu-id "Apex Capital" :product "CUSTODY")
 ```
 
 Creating NEW CBU and adding product:
 ```
 (cbu.ensure :name "Pacific Growth" :jurisdiction "LU" :client-type "fund" :as @fund)
-(cbu.add-product :cbu-id @fund :product "Custody")
+(cbu.add-product :cbu-id @fund :product "CUSTODY")
 ```
 
-## PRODUCTS (use exact names)
-- Custody
-- Fund Accounting
-- Transfer Agency
-- Middle Office
-- Collateral Management
-- Markets FX
-- Alternatives
+## PRODUCTS (use exact CODES)
+- CUSTODY
+- FUND_ACCOUNTING
+- TRANSFER_AGENCY
+- MIDDLE_OFFICE
+- COLLATERAL_MGMT
+- MARKETS_FX
+- ALTS
 
 Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, respond with: ERROR: <reason>"#,
         vocab
     )
+}
+
+/// Extract DSL from agent response text
+///
+/// Handles common agent output formats:
+/// 1. Raw DSL text (ideal)
+/// 2. Markdown code fences (```dsl ... ``` or ``` ... ```)
+/// 3. Text with DSL embedded (extracts S-expressions)
+fn extract_dsl_from_text(text: &str) -> String {
+    let trimmed = text.trim();
+
+    // If it already parses as DSL, return as-is
+    if trimmed.starts_with('(') && parse_program(trimmed).is_ok() {
+        return trimmed.to_string();
+    }
+
+    // Try to extract from markdown code fence
+    // Matches ```dsl, ```clojure, ```lisp, or just ```
+    let fence_patterns = ["```dsl", "```clojure", "```lisp", "```"];
+    for pattern in fence_patterns {
+        if let Some(start_idx) = trimmed.find(pattern) {
+            let after_fence = &trimmed[start_idx + pattern.len()..];
+            // Skip to newline after opening fence
+            let content_start = after_fence.find('\n').map(|i| i + 1).unwrap_or(0);
+            let content = &after_fence[content_start..];
+            // Find closing fence
+            if let Some(end_idx) = content.find("```") {
+                let extracted = content[..end_idx].trim();
+                if parse_program(extracted).is_ok() {
+                    return extracted.to_string();
+                }
+            }
+        }
+    }
+
+    // Try to find S-expression block in text
+    // Look for opening paren and find matching close
+    if let Some(start) = trimmed.find('(') {
+        let mut depth = 0;
+        let mut end = start;
+        for (i, c) in trimmed[start..].char_indices() {
+            match c {
+                '(' => depth += 1,
+                ')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        end = start + i + 1;
+                        // Check if there are more statements
+                        let remaining = trimmed[end..].trim();
+                        if remaining.starts_with('(') {
+                            // Multiple statements - find the last closing paren
+                            continue;
+                        }
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        // Find last balanced paren for multi-statement DSL
+        let mut last_end = end;
+        let mut search_start = end;
+        while let Some(next_start) = trimmed[search_start..].find('(') {
+            let abs_start = search_start + next_start;
+            let mut d = 0;
+            for (i, c) in trimmed[abs_start..].char_indices() {
+                match c {
+                    '(' => d += 1,
+                    ')' => {
+                        d -= 1;
+                        if d == 0 {
+                            last_end = abs_start + i + 1;
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            search_start = last_end;
+        }
+        let extracted = trimmed[start..last_end].trim();
+        if parse_program(extracted).is_ok() {
+            return extracted.to_string();
+        }
+    }
+
+    // Fall back to original text
+    trimmed.to_string()
 }
 
 /// Build vocabulary prompt for a domain
@@ -1473,55 +1863,6 @@ fn build_vocab_prompt(domain: Option<&str>) -> String {
     }
 
     lines.join("\n")
-}
-
-/// Build system prompt for chat-based DSL generation
-fn build_chat_system_prompt(vocab: &str) -> String {
-    format!(
-        r#"You are a DSL generator for a KYC/AML onboarding system.
-Generate valid DSL S-expressions from natural language instructions.
-
-AVAILABLE VERBS:
-{}
-
-DSL SYNTAX:
-- Format: (domain.verb :key "value" :key2 value2)
-- Strings must be quoted: "text"
-- Numbers are unquoted: 42, 25.5
-- References start with @: @symbol_name (use underscores, not hyphens)
-- Use :as @name to capture results
-
-EXAMPLES:
-
-;; Create a CBU (Client Business Unit)
-(cbu.ensure :name "Acme Corp" :jurisdiction "GB" :client-type "corporate" :as @cbu)
-
-;; Create a person entity
-(entity.create-proper-person :first-name "John" :last-name "Smith" :date-of-birth "1980-01-15" :as @john)
-
-;; Create a company entity
-(entity.create-limited-company :name "Holdings Ltd" :jurisdiction "GB" :as @company)
-
-;; Assign a role to an entity within a CBU
-(cbu.assign-role :cbu-id @cbu :entity-id @john :role "DIRECTOR")
-
-;; Create a fund with multiple entities
-(cbu.ensure :name "Growth Fund" :jurisdiction "LU" :client-type "fund" :as @fund)
-(entity.create-proper-person :first-name "Jane" :last-name "Doe" :as @jane)
-(entity.create-limited-company :name "Fund Manager SA" :jurisdiction "LU" :as @manager)
-(cbu.assign-role :cbu-id @fund :entity-id @jane :role "BENEFICIAL_OWNER")
-(cbu.assign-role :cbu-id @fund :entity-id @manager :role "INVESTMENT_MANAGER")
-
-;; Record service delivery (product and service names MUST be quoted strings)
-(delivery.record :cbu-id @cbu :product "CUSTODY" :service "ASSET_SAFEKEEPING")
-(delivery.record :cbu-id @cbu :product "FUND_ADMIN" :service "NAV_CALCULATION")
-
-IMPORTANT: All string values with spaces or special characters MUST be quoted.
-Product codes are typically uppercase with underscores: "CUSTODY", "FUND_ADMIN", "PRIME_BROKERAGE"
-
-Respond with ONLY the DSL code, no explanation or markdown. If you cannot generate valid DSL, respond with: ERROR: <reason>"#,
-        vocab
-    )
 }
 
 /// POST /api/agent/validate - Validate DSL syntax
@@ -1632,6 +1973,87 @@ async fn health_check() -> Json<HealthResponse> {
         verb_count: reg.len(),
         domain_count: reg.domains().len(),
     })
+}
+
+// ============================================================================
+// Completion Handler (LSP-style via EntityGateway)
+// ============================================================================
+
+/// POST /api/agent/complete - Get completions for entities
+///
+/// Provides LSP-style autocomplete for CBUs, entities, products, roles,
+/// jurisdictions, and other reference data via EntityGateway.
+async fn complete_entity(
+    Json(req): Json<CompleteRequest>,
+) -> Result<Json<CompleteResponse>, StatusCode> {
+    // Map entity_type to EntityGateway nickname
+    let nickname = match req.entity_type.to_lowercase().as_str() {
+        "cbu" => "CBU",
+        "entity" | "person" | "company" => "ENTITY",
+        "product" => "PRODUCT",
+        "role" => "ROLE",
+        "jurisdiction" => "JURISDICTION",
+        "currency" => "CURRENCY",
+        "client_type" | "clienttype" => "CLIENT_TYPE",
+        "instrument_class" | "instrumentclass" => "INSTRUMENT_CLASS",
+        "market" => "MARKET",
+        _ => {
+            // Unknown type - return empty
+            return Ok(Json(CompleteResponse {
+                items: vec![],
+                total: 0,
+            }));
+        }
+    };
+
+    // Connect to EntityGateway
+    let addr = crate::dsl_v2::gateway_resolver::gateway_addr();
+    let mut client = match entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient::connect(addr.clone()).await {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::error!("Failed to connect to EntityGateway at {}: {}", addr, e);
+            return Err(StatusCode::SERVICE_UNAVAILABLE);
+        }
+    };
+
+    // Search via EntityGateway
+    use entity_gateway::proto::ob::gateway::v1::{SearchMode, SearchRequest};
+
+    let search_request = SearchRequest {
+        nickname: nickname.to_string(),
+        values: vec![req.query.clone()],
+        search_key: None,
+        mode: SearchMode::Fuzzy as i32,
+        limit: Some(req.limit),
+    };
+
+    let response = match client.search(search_request).await {
+        Ok(r) => r.into_inner(),
+        Err(e) => {
+            tracing::error!("EntityGateway search failed: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    // Convert to completion items
+    let items: Vec<CompletionItem> = response
+        .matches
+        .into_iter()
+        .map(|m| CompletionItem {
+            value: m.token,
+            label: m.display.clone(),
+            detail: if m.display.contains('(') {
+                // Extract detail from display if present, e.g., "Apex Fund (LU)"
+                None
+            } else {
+                Some(nickname.to_string())
+            },
+            score: m.score,
+        })
+        .collect();
+
+    let total = items.len();
+    Ok(Json(CompleteResponse { items, total }))
 }
 
 // ============================================================================

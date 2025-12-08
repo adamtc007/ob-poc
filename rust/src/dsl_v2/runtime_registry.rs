@@ -78,6 +78,8 @@ pub struct RuntimeArg {
     pub lookup: Option<LookupConfig>,
     pub valid_values: Option<Vec<String>>,
     pub default: Option<serde_yaml::Value>,
+    pub description: Option<String>,
+    pub fuzzy_check: Option<FuzzyCheckConfig>,
 }
 
 #[derive(Debug, Clone)]
@@ -347,6 +349,8 @@ impl RuntimeVerbRegistry {
             lookup: arg.lookup.clone(),
             valid_values: arg.valid_values.clone(),
             default: arg.default.clone(),
+            description: arg.description.clone(),
+            fuzzy_check: arg.fuzzy_check.clone(),
         }
     }
 
@@ -508,6 +512,9 @@ mod tests {
                     lookup: None,
                     valid_values: None,
                     default: None,
+                    description: None,
+                    validation: None,
+                    fuzzy_check: None,
                 }],
                 returns: Some(ReturnsConfig {
                     return_type: ReturnTypeConfig::Uuid,

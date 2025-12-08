@@ -188,6 +188,10 @@ impl GatewayRefResolver {
             RefType::Entity => (DiagnosticCode::EntityNotFound, "entity"),
             RefType::Document => (DiagnosticCode::DocumentNotFound, "document"),
             RefType::ScreeningType => (DiagnosticCode::InvalidValue, "screening type"),
+            RefType::Product => (DiagnosticCode::InvalidValue, "product"),
+            RefType::Service => (DiagnosticCode::InvalidValue, "service"),
+            RefType::Currency => (DiagnosticCode::InvalidValue, "currency"),
+            RefType::ClientType => (DiagnosticCode::InvalidValue, "client type"),
         };
 
         Diagnostic {
@@ -223,6 +227,10 @@ impl RefResolver for GatewayRefResolver {
 
     // GatewayRefResolver doesn't need caching - EntityGateway handles it
     fn clear_cache(&mut self) {}
+
+    fn as_gateway_resolver(&mut self) -> Option<&mut GatewayRefResolver> {
+        Some(self)
+    }
 }
 
 /// Map RefType to EntityGateway nickname
@@ -237,6 +245,10 @@ fn ref_type_to_nickname(ref_type: RefType) -> &'static str {
         RefType::Entity => "ENTITY",
         RefType::Document => "DOCUMENT",
         RefType::ScreeningType => "SCREENING_TYPE",
+        RefType::Product => "PRODUCT",
+        RefType::Service => "SERVICE",
+        RefType::Currency => "CURRENCY",
+        RefType::ClientType => "CLIENT_TYPE",
     }
 }
 

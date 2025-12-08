@@ -151,6 +151,48 @@ pub struct ArgConfig {
     pub valid_values: Option<Vec<String>>,
     #[serde(default)]
     pub default: Option<serde_yaml::Value>,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub validation: Option<ArgValidation>,
+    /// Fuzzy check config - for upsert verbs, check for similar existing records
+    /// and emit a warning if fuzzy matches are found
+    #[serde(default)]
+    pub fuzzy_check: Option<FuzzyCheckConfig>,
+}
+
+/// Configuration for fuzzy match checking on upsert args
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct FuzzyCheckConfig {
+    /// Entity type to search (e.g., "cbu", "entity")
+    pub entity_type: String,
+    /// Field to search by (defaults to arg name if not specified)
+    #[serde(default)]
+    pub search_key: Option<String>,
+    /// Minimum score threshold for warnings (0.0-1.0, default 0.5)
+    #[serde(default = "default_fuzzy_threshold")]
+    pub threshold: f32,
+}
+
+fn default_fuzzy_threshold() -> f32 {
+    0.5
+}
+
+/// Validation rules for an argument
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ArgValidation {
+    /// Valid enum values
+    #[serde(default)]
+    pub r#enum: Option<Vec<String>>,
+    /// Minimum value (for numbers)
+    #[serde(default)]
+    pub min: Option<f64>,
+    /// Maximum value (for numbers)
+    #[serde(default)]
+    pub max: Option<f64>,
+    /// Regex pattern (for strings)
+    #[serde(default)]
+    pub pattern: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -183,6 +225,27 @@ pub struct LookupConfig {
     /// The column containing primary key (UUID for entities, code for reference data)
     #[serde(alias = "id_column")]
     pub primary_key: String,
+    /// Resolution mode: how the LSP/UI should resolve this reference.
+    ///
+    /// - `reference`: Small static lookup tables (< 100 items) - use autocomplete dropdown
+    /// - `entity`: Large/growing tables (people, CBUs, cases) - use search modal
+    ///
+    /// Defaults to "reference" if not specified (backwards compatible).
+    #[serde(default)]
+    pub resolution_mode: Option<ResolutionMode>,
+}
+
+/// How entity references should be resolved in the UI
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ResolutionMode {
+    /// Small static lookup tables (roles, jurisdictions, currencies)
+    /// UI: Autocomplete dropdown with all values
+    #[default]
+    Reference,
+    /// Large/growing entity tables (people, CBUs, funds, cases)
+    /// UI: Search modal with refinement
+    Entity,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -395,5 +458,45 @@ mod tests {
         let yaml = "record_set";
         let ret_type: ReturnTypeConfig = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(ret_type, ReturnTypeConfig::RecordSet);
+    }
+
+    #[test]
+    fn test_resolution_mode_serde() {
+        // Test explicit values
+        let yaml = "reference";
+        let mode: ResolutionMode = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(mode, ResolutionMode::Reference);
+
+        let yaml = "entity";
+        let mode: ResolutionMode = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(mode, ResolutionMode::Entity);
+
+        // Test default
+        assert_eq!(ResolutionMode::default(), ResolutionMode::Reference);
+    }
+
+    #[test]
+    fn test_lookup_config_with_resolution_mode() {
+        let yaml = r#"
+table: cbus
+schema: ob-poc
+entity_type: cbu
+search_key: name
+primary_key: cbu_id
+resolution_mode: entity
+"#;
+        let config: LookupConfig = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(config.resolution_mode, Some(ResolutionMode::Entity));
+
+        // Test without resolution_mode (defaults to None, which means Reference)
+        let yaml = r#"
+table: roles
+schema: ob-poc
+entity_type: role
+search_key: name
+primary_key: role_id
+"#;
+        let config: LookupConfig = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(config.resolution_mode, None);
     }
 }

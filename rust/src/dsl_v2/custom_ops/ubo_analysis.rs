@@ -44,9 +44,9 @@ impl CustomOperation for UboDiscoverOwnerOp {
         let cbu_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("cbu-id"))
+            .find(|a| a.key == "cbu-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -57,9 +57,9 @@ impl CustomOperation for UboDiscoverOwnerOp {
         let entity_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("entity-id"))
+            .find(|a| a.key == "entity-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -70,14 +70,14 @@ impl CustomOperation for UboDiscoverOwnerOp {
         let source_type = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("source-type"))
+            .find(|a| a.key == "source-type")
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing source-type argument"))?;
 
         let source_ref = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("source-ref"))
+            .find(|a| a.key == "source-ref")
             .and_then(|a| a.value.as_string());
 
         // Look for ownership information based on source type
@@ -227,9 +227,9 @@ impl CustomOperation for UboTraceChainsOp {
         let cbu_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("cbu-id"))
+            .find(|a| a.key == "cbu-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -240,9 +240,9 @@ impl CustomOperation for UboTraceChainsOp {
         let target_entity_id: Option<Uuid> = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("target-entity-id"))
+            .find(|a| a.key == "target-entity-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -252,7 +252,7 @@ impl CustomOperation for UboTraceChainsOp {
         let threshold: f64 = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("threshold"))
+            .find(|a| a.key == "threshold")
             .and_then(|a| a.value.as_decimal())
             .map(|d| d.to_string().parse().unwrap_or(25.0))
             .unwrap_or(25.0);
@@ -350,9 +350,9 @@ impl CustomOperation for UboInferChainOp {
         let cbu_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("cbu-id"))
+            .find(|a| a.key == "cbu-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -363,9 +363,9 @@ impl CustomOperation for UboInferChainOp {
         let start_entity_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("start-entity-id"))
+            .find(|a| a.key == "start-entity-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -376,7 +376,7 @@ impl CustomOperation for UboInferChainOp {
         let max_depth: i32 = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("max-depth"))
+            .find(|a| a.key == "max-depth")
             .and_then(|a| a.value.as_integer())
             .map(|i| i as i32)
             .unwrap_or(10);
@@ -503,9 +503,9 @@ impl CustomOperation for UboCheckCompletenessOp {
         let cbu_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("cbu-id"))
+            .find(|a| a.key == "cbu-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -516,7 +516,7 @@ impl CustomOperation for UboCheckCompletenessOp {
         let threshold: f64 = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("threshold"))
+            .find(|a| a.key == "threshold")
             .and_then(|a| a.value.as_decimal())
             .map(|d| d.to_string().parse().unwrap_or(25.0))
             .unwrap_or(25.0);
@@ -606,9 +606,9 @@ impl CustomOperation for UboSupersedeOp {
         let old_ubo_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("old-ubo-id"))
+            .find(|a| a.key == "old-ubo-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -619,9 +619,9 @@ impl CustomOperation for UboSupersedeOp {
         let new_ubo_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("new-ubo-id"))
+            .find(|a| a.key == "new-ubo-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -682,9 +682,9 @@ impl CustomOperation for UboSnapshotCbuOp {
         let cbu_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("cbu-id"))
+            .find(|a| a.key == "cbu-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -695,9 +695,9 @@ impl CustomOperation for UboSnapshotCbuOp {
         let case_id: Option<Uuid> = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("case-id"))
+            .find(|a| a.key == "case-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -707,14 +707,14 @@ impl CustomOperation for UboSnapshotCbuOp {
         let snapshot_type = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("snapshot-type"))
+            .find(|a| a.key == "snapshot-type")
             .and_then(|a| a.value.as_string())
             .unwrap_or("MANUAL");
 
         let reason = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("reason"))
+            .find(|a| a.key == "reason")
             .and_then(|a| a.value.as_string());
 
         // Call the SQL function
@@ -772,9 +772,9 @@ impl CustomOperation for UboCompareSnapshotOp {
         let cbu_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("cbu-id"))
+            .find(|a| a.key == "cbu-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -785,9 +785,9 @@ impl CustomOperation for UboCompareSnapshotOp {
         let baseline_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("baseline-snapshot-id"))
+            .find(|a| a.key == "baseline-snapshot-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -798,9 +798,9 @@ impl CustomOperation for UboCompareSnapshotOp {
         let current_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("current-snapshot-id"))
+            .find(|a| a.key == "current-snapshot-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()

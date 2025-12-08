@@ -14,7 +14,7 @@
 //! 3. **Applicability Validation**: Enforce business rules from DB
 
 use crate::dsl_v2::applicability_rules::ApplicabilityRules;
-use crate::dsl_v2::ast::{Program, Span, Statement, Value, VerbCall};
+use crate::dsl_v2::ast::{AstNode, Program, Span, Statement, VerbCall};
 #[cfg(feature = "database")]
 use crate::dsl_v2::semantic_context::SemanticContextStore;
 use crate::dsl_v2::validation::{
@@ -42,16 +42,48 @@ pub struct LintResult {
 }
 
 impl LintResult {
+    /// Returns true if there are any errors (invalid or incomplete DSL)
     pub fn has_errors(&self) -> bool {
         self.diagnostics
             .iter()
             .any(|d| d.severity == Severity::Error)
     }
 
+    /// Returns true if there are any warnings
     pub fn has_warnings(&self) -> bool {
         self.diagnostics
             .iter()
             .any(|d| d.severity == Severity::Warning)
+    }
+
+    /// Returns true if DSL has unresolved symbol errors (incomplete but fixable)
+    /// UI can use this to show "incomplete" state vs other errors
+    pub fn has_unresolved_symbols(&self) -> bool {
+        self.diagnostics
+            .iter()
+            .any(|d| d.code == DiagnosticCode::UnresolvedSymbol)
+    }
+
+    /// Returns true if DSL is incomplete (only has unresolved symbol errors)
+    /// This means the user just needs to add definitions, not fix invalid syntax
+    pub fn is_incomplete(&self) -> bool {
+        self.has_errors()
+            && self
+                .diagnostics
+                .iter()
+                .filter(|d| d.severity == Severity::Error)
+                .all(|d| d.code == DiagnosticCode::UnresolvedSymbol)
+    }
+
+    /// Returns true if DSL is valid and complete (no errors)
+    /// This means the DSL is ready to execute
+    pub fn is_valid(&self) -> bool {
+        !self.has_errors()
+    }
+
+    /// Returns true if DSL is invalid (has errors other than unresolved symbols)
+    pub fn is_invalid(&self) -> bool {
+        self.has_errors() && !self.is_incomplete()
     }
 }
 
@@ -238,7 +270,7 @@ impl CsgLinter {
         let span = self.span_to_source_span(&vc.span, source);
 
         // Extract symbol binding (:as @name)
-        if let Some(ref binding) = vc.as_binding {
+        if let Some(ref binding) = vc.binding {
             let entity_type = self.infer_entity_type(vc);
             inferred.symbols.insert(
                 binding.clone(),
@@ -255,7 +287,7 @@ impl CsgLinter {
         match (vc.domain.as_str(), vc.verb.as_str()) {
             ("cbu", "create") | ("cbu", "ensure") => {
                 inferred.cbu_creates.push(CbuCreate {
-                    symbol: vc.as_binding.clone(),
+                    symbol: vc.binding.clone(),
                     name: self
                         .extract_string_arg(vc, "name")
                         .or_else(|| self.extract_string_arg(vc, "cbu-name")),
@@ -267,7 +299,7 @@ impl CsgLinter {
             ("entity", verb) if verb.starts_with("create") => {
                 let entity_type = self.infer_entity_type_from_verb(verb, vc);
                 inferred.entity_creates.push(EntityCreate {
-                    symbol: vc.as_binding.clone(),
+                    symbol: vc.binding.clone(),
                     name: self.extract_string_arg(vc, "name"),
                     entity_type,
                     span,
@@ -280,7 +312,7 @@ impl CsgLinter {
                     if verb_def.accepts_arg("document-type") {
                         if let Some(doc_type) = self.extract_string_arg(vc, "document-type") {
                             inferred.document_catalogs.push(DocumentCatalog {
-                                symbol: vc.as_binding.clone(),
+                                symbol: vc.binding.clone(),
                                 document_type: doc_type,
                                 cbu_ref: self.extract_ref_arg(vc, "cbu-id"),
                                 entity_ref: self.extract_ref_arg(vc, "entity-id"),
@@ -292,14 +324,18 @@ impl CsgLinter {
             }
         }
 
-        // Track all entity references
+        // Track all entity references (SymbolRef nodes)
         for arg in &vc.arguments {
-            if let Value::Reference(ref name) = arg.value {
+            if let AstNode::SymbolRef {
+                ref name,
+                span: ref sym_span,
+            } = arg.value
+            {
                 inferred.entity_refs.push(EntityRef {
                     symbol: name.clone(),
-                    argument_key: arg.key.canonical(),
-                    expected_type: self.expected_type_for_arg(&arg.key.canonical()),
-                    span: self.span_to_source_span(&arg.value_span, source),
+                    argument_key: arg.key.clone(),
+                    expected_type: self.expected_type_for_arg(&arg.key),
+                    span: self.span_to_source_span(sym_span, source),
                 });
             }
         }
@@ -322,7 +358,7 @@ impl CsgLinter {
         };
 
         // Collect provided argument keys
-        let provided_keys: Vec<String> = vc.arguments.iter().map(|a| a.key.canonical()).collect();
+        let provided_keys: Vec<String> = vc.arguments.iter().map(|a| a.key.clone()).collect();
 
         // Check each required argument is present
         for required_arg in verb_def.required_args() {
@@ -350,11 +386,17 @@ impl CsgLinter {
         for entity_ref in &inferred.entity_refs {
             match inferred.symbols.get(&entity_ref.symbol) {
                 None => {
+                    // Use UnresolvedSymbol - this is an error that blocks execution,
+                    // but the UI can distinguish it from other errors since it indicates
+                    // "incomplete" DSL (user needs to add the definition) vs "invalid" DSL
                     diagnostics.push(Diagnostic {
                         severity: Severity::Error,
                         span: entity_ref.span,
-                        code: DiagnosticCode::UndefinedSymbol,
-                        message: format!("undefined symbol '@{}'", entity_ref.symbol),
+                        code: DiagnosticCode::UnresolvedSymbol,
+                        message: format!(
+                            "unresolved symbol '@{}' - define it with :as @{}",
+                            entity_ref.symbol, entity_ref.symbol
+                        ),
                         suggestions: self.suggest_similar_symbols(&entity_ref.symbol, inferred),
                     });
                 }
@@ -540,15 +582,15 @@ impl CsgLinter {
     fn extract_string_arg(&self, vc: &VerbCall, key: &str) -> Option<String> {
         vc.arguments
             .iter()
-            .find(|a| a.key.canonical() == key)
+            .find(|a| a.key == key)
             .and_then(|a| a.value.as_string().map(|s| s.to_string()))
     }
 
     fn extract_ref_arg(&self, vc: &VerbCall, key: &str) -> Option<String> {
         vc.arguments
             .iter()
-            .find(|a| a.key.canonical() == key)
-            .and_then(|a| a.value.as_reference().map(|s| s.to_string()))
+            .find(|a| a.key == key)
+            .and_then(|a| a.value.as_symbol().map(|s| s.to_string()))
     }
 
     fn expected_type_for_arg(&self, arg_key: &str) -> Option<String> {

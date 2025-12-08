@@ -40,6 +40,8 @@ This file provides guidance to Claude Code when working with this repository.
 
 ### DSL Pipeline Detail
 
+The pipeline is split into fast local stages (parse, enrich) and slower network stages (validate, execute):
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                     DSL Source Text                              │
@@ -48,34 +50,92 @@ This file provides guidance to Claude Code when working with this repository.
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                   Parser (Nom) → AST                             │
+│              Stage 1: Parser (Nom) → Raw AST                     │
+│  ~16µs for 10 statements - instant keystroke feedback           │
 │  rust/src/dsl_v2/parser.rs                                      │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                CSG Linter (Validation)                           │
-│  - Verb existence, argument validation                          │
-│  - Entity type constraints (passport→person, cert→company)      │
-│  - Symbol resolution (@ref must be defined before use)          │
-│  rust/src/dsl_v2/csg_linter.rs                                  │
+│              Stage 2: Enrichment → EntityRef AST                 │
+│  Adds entity_type, search_column from YAML config               │
+│  EntityRef { resolved_key: None } = unresolved (valid state)    │
+│  rust/src/dsl_v2/enrichment.rs                                  │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│              Compiler → Execution Plan                           │
+│              Stage 3: Semantic Validation (DB/gRPC)              │
+│  Resolves EntityRefs via EntityGateway                          │
+│  EntityRef { resolved_key: Some(uuid) } = resolved              │
+│  rust/src/dsl_v2/semantic_validator.rs                          │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              Stage 4: Compiler → Execution Plan                  │
 │  rust/src/dsl_v2/execution_plan.rs                              │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│        GenericCrudExecutor (YAML-driven)                         │
-│  - Reads verb config from config/verbs.yaml                     │
+│        Stage 5: GenericCrudExecutor (YAML-driven)                │
+│  - Reads verb config from config/verbs/*.yaml                   │
 │  - All 13 CRUD operations driven by YAML config                 │
 │  - Custom ops via plugin pattern                                │
 │  rust/src/dsl_v2/generic_executor.rs                            │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+### AST Types (rust/src/dsl_v2/ast.rs)
+
+| Type | Description |
+|------|-------------|
+| `Program` | Root node containing statements |
+| `Statement` | VerbCall or Comment |
+| `VerbCall` | `(domain.verb :key value :as @binding)` |
+| `Argument` | Key-value pair with span |
+| `AstNode` | Literal, SymbolRef, EntityRef, List, Map, Nested |
+| `EntityRef` | External reference needing resolution |
+| `SymbolRef` | `@name` binding reference |
+| `Span` | Source location (start, end byte offsets) |
+
+**Key Design: EntityRef as Valid Intermediate State**
+
+```rust
+// Unresolved - valid state for draft saving
+EntityRef { entity_type: "cbu", value: "Apex Fund", resolved_key: None }
+
+// Resolved - ready for execution
+EntityRef { entity_type: "cbu", value: "Apex Fund", resolved_key: Some("uuid...") }
+```
+
+This enables:
+- Saving DSL with unresolved references (draft mode)
+- Incremental resolution (resolve entities one at a time)
+- Offline editing (parse/enrich without DB)
+
+### Resolution Mode (YAML lookup config)
+
+Each argument with a `lookup:` block can specify how the UI should resolve it:
+
+```yaml
+args:
+  - name: jurisdiction
+    lookup:
+      entity_type: jurisdiction
+      resolution_mode: reference  # < 100 items - autocomplete dropdown
+
+  - name: cbu-id
+    lookup:
+      entity_type: cbu
+      resolution_mode: entity     # growing table - search modal
+```
+
+| Mode | Use Case | UI Behavior |
+|------|----------|-------------|
+| `reference` | Roles, jurisdictions, currencies | Autocomplete dropdown |
+| `entity` | CBUs, people, funds, cases | Search modal with refinement |
 
 ### YAML-Driven Configuration
 

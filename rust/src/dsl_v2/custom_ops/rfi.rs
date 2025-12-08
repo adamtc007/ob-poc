@@ -46,9 +46,9 @@ impl CustomOperation for RfiGenerateOp {
         let case_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("case-id"))
+            .find(|a| a.key == "case-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -60,7 +60,7 @@ impl CustomOperation for RfiGenerateOp {
         let batch_ref = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("batch-reference"))
+            .find(|a| a.key == "batch-reference")
             .and_then(|a| a.value.as_string());
 
         // Call the SQL function to generate doc_requests
@@ -129,9 +129,9 @@ impl CustomOperation for RfiCheckCompletionOp {
         let case_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("case-id"))
+            .find(|a| a.key == "case-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -203,9 +203,9 @@ impl CustomOperation for RfiListByCaseOp {
         let case_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("case-id"))
+            .find(|a| a.key == "case-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -217,7 +217,7 @@ impl CustomOperation for RfiListByCaseOp {
         let status_filter = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("status"))
+            .find(|a| a.key == "status")
             .and_then(|a| a.value.as_string());
 
         let requests = sqlx::query!(

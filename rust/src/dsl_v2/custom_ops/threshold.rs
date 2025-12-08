@@ -41,9 +41,9 @@ impl CustomOperation for ThresholdDeriveOp {
         let cbu_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("cbu-id"))
+            .find(|a| a.key == "cbu-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -189,9 +189,9 @@ impl CustomOperation for ThresholdEvaluateOp {
         let cbu_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("cbu-id"))
+            .find(|a| a.key == "cbu-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -202,9 +202,9 @@ impl CustomOperation for ThresholdEvaluateOp {
         let entity_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("entity-id"))
+            .find(|a| a.key == "entity-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -215,7 +215,7 @@ impl CustomOperation for ThresholdEvaluateOp {
         let role_filter = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("role"))
+            .find(|a| a.key == "role")
             .and_then(|a| a.value.as_string());
 
         // Get risk band
@@ -354,9 +354,9 @@ impl CustomOperation for ThresholdCheckEntityOp {
         let cbu_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("cbu-id"))
+            .find(|a| a.key == "cbu-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()

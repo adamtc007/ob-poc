@@ -7,6 +7,7 @@ import (
 	"embed"
 	"flag"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 
@@ -63,6 +64,8 @@ func main() {
 	http.HandleFunc("/api/dsl/validate-with-fixes", handleValidateWithFixes)
 	// Entity search endpoint
 	http.HandleFunc("/api/entities/search", handleEntitySearch)
+	// LSP-style completions (via EntityGateway)
+	http.HandleFunc("/api/agent/complete", handleAgentComplete)
 	http.Handle("/static/", http.FileServer(http.FS(static)))
 
 	log.Printf("Starting server on %s", *addr)
@@ -208,8 +211,14 @@ func handleAgentSession(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
+	// Use ReadAll+Unmarshal for json/v2 compatibility (avoids EOF handling differences)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		jsonError(w, "Failed to read response: "+err.Error(), 502)
+		return
+	}
 	var result map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(body, &result); err != nil {
 		jsonError(w, "Invalid JSON from Agent: "+err.Error(), 502)
 		return
 	}
@@ -232,16 +241,22 @@ func handleAgentChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, _ := json.Marshal(map[string]string{"message": req.Message})
-	resp, err := http.Post(agentURL+"/api/session/"+req.SessionID+"/chat", "application/json", bytes.NewReader(body))
+	reqBody, _ := json.Marshal(map[string]string{"message": req.Message})
+	resp, err := http.Post(agentURL+"/api/session/"+req.SessionID+"/chat", "application/json", bytes.NewReader(reqBody))
 	if err != nil {
 		jsonError(w, "Agent connection failed: "+err.Error(), 503)
 		return
 	}
 	defer resp.Body.Close()
 
+	// Use ReadAll+Unmarshal for json/v2 compatibility
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		jsonError(w, "Failed to read response: "+err.Error(), 502)
+		return
+	}
 	var result map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(respBody, &result); err != nil {
 		jsonError(w, "Invalid JSON from Agent: "+err.Error(), 502)
 		return
 	}
@@ -275,16 +290,22 @@ func handleAgentGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, _ := json.Marshal(req)
-	resp, err := http.Post(agentURL+"/api/agent/generate", "application/json", bytes.NewReader(body))
+	reqBody, _ := json.Marshal(req)
+	resp, err := http.Post(agentURL+"/api/agent/generate", "application/json", bytes.NewReader(reqBody))
 	if err != nil {
 		jsonError(w, "Agent connection failed: "+err.Error(), 503)
 		return
 	}
 	defer resp.Body.Close()
 
+	// Use ReadAll+Unmarshal for json/v2 compatibility
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		jsonError(w, "Failed to read response: "+err.Error(), 502)
+		return
+	}
 	var result map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(respBody, &result); err != nil {
 		jsonError(w, "Invalid JSON from Agent: "+err.Error(), 502)
 		return
 	}
@@ -307,16 +328,22 @@ func handleAgentExecute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, _ := json.Marshal(map[string]string{"dsl": req.DSL})
-	resp, err := http.Post(agentURL+"/api/session/"+req.SessionID+"/execute", "application/json", bytes.NewReader(body))
+	reqBody, _ := json.Marshal(map[string]string{"dsl": req.DSL})
+	resp, err := http.Post(agentURL+"/api/session/"+req.SessionID+"/execute", "application/json", bytes.NewReader(reqBody))
 	if err != nil {
 		jsonError(w, "Agent connection failed: "+err.Error(), 503)
 		return
 	}
 	defer resp.Body.Close()
 
+	// Use ReadAll+Unmarshal for json/v2 compatibility
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		jsonError(w, "Failed to read response: "+err.Error(), 502)
+		return
+	}
 	var result map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(respBody, &result); err != nil {
 		jsonError(w, "Invalid JSON from Agent: "+err.Error(), 502)
 		return
 	}
@@ -338,17 +365,22 @@ func handleDirectExecute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, _ := json.Marshal(req)
-	resp, err := http.Post(rustURL+"/execute", "application/json", bytes.NewReader(body))
+	reqBody, _ := json.Marshal(req)
+	resp, err := http.Post(rustURL+"/execute", "application/json", bytes.NewReader(reqBody))
 	if err != nil {
 		jsonError(w, "DSL API connection failed: "+err.Error(), 503)
 		return
 	}
 	defer resp.Body.Close()
 
-	// Decode and re-encode to ensure valid JSON
+	// Use ReadAll+Unmarshal for json/v2 compatibility
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		jsonError(w, "Failed to read response: "+err.Error(), 502)
+		return
+	}
 	var result map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(respBody, &result); err != nil {
 		jsonError(w, "Invalid JSON from DSL API: "+err.Error(), 502)
 		return
 	}
@@ -377,8 +409,14 @@ func handleKycCase(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
+	// Use ReadAll+Unmarshal for json/v2 compatibility
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		jsonError(w, "Failed to read response: "+err.Error(), 502)
+		return
+	}
 	var result map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(respBody, &result); err != nil {
 		jsonError(w, "Invalid JSON from DSL API: "+err.Error(), 502)
 		return
 	}
@@ -401,16 +439,22 @@ func handleAnalyzeErrors(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, _ := json.Marshal(req)
-	resp, err := http.Post(rustURL+"/analyze-errors", "application/json", bytes.NewReader(body))
+	reqBody, _ := json.Marshal(req)
+	resp, err := http.Post(rustURL+"/analyze-errors", "application/json", bytes.NewReader(reqBody))
 	if err != nil {
 		jsonError(w, "DSL API connection failed: "+err.Error(), 503)
 		return
 	}
 	defer resp.Body.Close()
 
+	// Use ReadAll+Unmarshal for json/v2 compatibility
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		jsonError(w, "Failed to read response: "+err.Error(), 502)
+		return
+	}
 	var result map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(respBody, &result); err != nil {
 		jsonError(w, "Invalid JSON from DSL API: "+err.Error(), 502)
 		return
 	}
@@ -433,22 +477,67 @@ func handleValidateWithFixes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, _ := json.Marshal(req)
-	resp, err := http.Post(rustURL+"/validate-with-fixes", "application/json", bytes.NewReader(body))
+	reqBody, _ := json.Marshal(req)
+	resp, err := http.Post(rustURL+"/validate-with-fixes", "application/json", bytes.NewReader(reqBody))
 	if err != nil {
 		jsonError(w, "DSL API connection failed: "+err.Error(), 503)
 		return
 	}
 	defer resp.Body.Close()
 
+	// Use ReadAll+Unmarshal for json/v2 compatibility
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		jsonError(w, "Failed to read response: "+err.Error(), 502)
+		return
+	}
 	var result map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(respBody, &result); err != nil {
 		jsonError(w, "Invalid JSON from DSL API: "+err.Error(), 502)
 		return
 	}
 	jsonResponse(w, result)
 }
 
+// Agent completions: proxy to agent API for LSP-style entity completions
+// Used for autocomplete in the chat input
+func handleAgentComplete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		EntityType string `json:"entity_type"`
+		Query      string `json:"query"`
+		Limit      int    `json:"limit,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, err.Error(), 400)
+		return
+	}
+
+	reqBody, _ := json.Marshal(req)
+	resp, err := http.Post(agentURL+"/api/agent/complete", "application/json", bytes.NewReader(reqBody))
+	if err != nil {
+		jsonError(w, "Agent API connection failed: "+err.Error(), 503)
+		return
+	}
+	defer resp.Body.Close()
+
+	// Use ReadAll+Unmarshal for json/v2 compatibility
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		jsonError(w, "Failed to read response: "+err.Error(), 502)
+		return
+	}
+	var result map[string]any
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		jsonError(w, "Invalid JSON from Agent API: "+err.Error(), 502)
+		return
+	}
+	jsonResponse(w, result)
+}
 
 // Entity search: proxy to dsl_api for fuzzy entity lookup
 // Used to find existing entities before creating new ones (prevents duplicates)
@@ -469,16 +558,22 @@ func handleEntitySearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, _ := json.Marshal(req)
-	resp, err := http.Post(rustURL+"/query/entities/search", "application/json", bytes.NewReader(body))
+	reqBody, _ := json.Marshal(req)
+	resp, err := http.Post(rustURL+"/query/entities/search", "application/json", bytes.NewReader(reqBody))
 	if err != nil {
 		jsonError(w, "DSL API connection failed: "+err.Error(), 503)
 		return
 	}
 	defer resp.Body.Close()
 
+	// Use ReadAll+Unmarshal for json/v2 compatibility
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		jsonError(w, "Failed to read response: "+err.Error(), 502)
+		return
+	}
 	var result map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(respBody, &result); err != nil {
 		jsonError(w, "Invalid JSON from DSL API: "+err.Error(), 502)
 		return
 	}

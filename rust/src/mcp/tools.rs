@@ -203,5 +203,28 @@ pub fn get_tools() -> Vec<Tool> {
                 "required": ["verb"]
             }),
         },
+        Tool {
+            name: "dsl_generate".into(),
+            description: "Generate DSL from natural language. Extracts structured intent and assembles valid DSL code.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "instruction": {
+                        "type": "string",
+                        "description": "Natural language description of what to create/do (e.g., 'Create a fund in Luxembourg called Apex Capital')"
+                    },
+                    "domain": {
+                        "type": "string",
+                        "description": "Optional domain hint to focus generation (e.g., 'cbu', 'entity', 'kyc')"
+                    },
+                    "execute": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "If true, execute the generated DSL immediately"
+                    }
+                },
+                "required": ["instruction"]
+            }),
+        },
     ]
 }

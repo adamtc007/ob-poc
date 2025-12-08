@@ -1,24 +1,17 @@
+"use strict";
 // Enterprise Onboarding Agent - Chat-based interface with context tracking
 // Maintains CBU/Case context across conversation for incremental building
-
 document.addEventListener("DOMContentLoaded", () => {
     // ==================== STATE ====================
     let sessionId = null;
-
     let context = {
-        cbu: null,
-        case: null,
         entities: new Map(),
-        bindings: new Map()
+        bindings: new Map(),
     };
-
+    // Pending state for confirmation flow
     let pendingDsl = null;
     let pendingCorrections = null;
     let pendingEntitySelection = null;
-    
-    // Accumulated DSL tracking
-    let accumulatedDsl = [];  // Array of { dsl: string, timestamp: Date, description: string }
-
     // ==================== DOM ELEMENTS ====================
     const chatMessages = document.getElementById("chat-messages");
     const chatInput = document.getElementById("chat-input");
@@ -32,159 +25,116 @@ document.addEventListener("DOMContentLoaded", () => {
     const contextCaseType = document.getElementById("context-case-type");
     const contextCaseId = document.getElementById("context-case-id");
     const contextClearBtn = document.getElementById("context-clear-btn");
-    
-    // DSL Panel elements
-    const dslPanel = document.getElementById("dsl-panel");
-    const dslPanelToggle = document.getElementById("dsl-panel-toggle");
-    const dslCount = document.getElementById("dsl-count");
-    const dslEmpty = document.getElementById("dsl-empty");
-    const dslCode = document.getElementById("dsl-code");
-    const copyDslBtn = document.getElementById("copy-dsl-btn");
-    const clearDslBtn = document.getElementById("clear-dsl-btn");
-
     // ==================== BINDING NORMALIZATION ====================
+    // Map common agent-generated variants to canonical binding names
     const bindingAliases = {
-        'cbu': ['cbu_id', 'cbu-id', 'client', 'client_id', 'client-id'],
-        'case': ['case_id', 'case-id', 'kyc_case', 'kyc-case', 'kyc_case_id'],
-        'entity': ['entity_id', 'entity-id'],
-        'company': ['company_id', 'company-id', 'corp', 'corp_id'],
-        'person': ['person_id', 'person-id', 'ubo', 'ubo_id'],
+        cbu: ["cbu_id", "cbu-id", "client", "client_id", "client-id"],
+        case: ["case_id", "case-id", "kyc_case", "kyc-case", "kyc_case_id"],
+        entity: ["entity_id", "entity-id"],
+        company: ["company_id", "company-id", "corp", "corp_id"],
+        person: ["person_id", "person-id", "ubo", "ubo_id"],
     };
-
-    const reverseAliases = {
-        'cbu_id': 'cbu',
-        'cbu-id': 'cbu',
-        'client': 'cbu',
-        'client_id': 'cbu',
-        'case_id': 'case',
-        'case-id': 'case',
-        'kyc_case': 'case',
-        'kyc_case_id': 'case',
-        'entity_id': 'entity',
-        'company_id': 'company',
-        'person_id': 'person',
-    };
-
     function normalizeDslBindings(dsl) {
         let normalized = dsl;
+        // For each canonical binding we have in context, replace variants
         for (const [canonical, aliases] of Object.entries(bindingAliases)) {
             if (context.bindings.has(canonical)) {
                 for (const alias of aliases) {
-                    const regex = new RegExp(`@${alias}\\b`, 'g');
+                    // Replace @alias with @canonical (word boundary to avoid partial matches)
+                    const regex = new RegExp(`@${alias}\\b`, "g");
                     normalized = normalized.replace(regex, `@${canonical}`);
                 }
             }
         }
         return normalized;
     }
-
-    // ==================== DSL PANEL ====================
-    function updateDslPanel() {
-        const count = accumulatedDsl.length;
-        dslCount.textContent = count;
-        
-        if (count === 0) {
-            dslEmpty.style.display = "block";
-            dslCode.style.display = "none";
-            copyDslBtn.disabled = true;
-            clearDslBtn.disabled = true;
-        } else {
-            dslEmpty.style.display = "none";
-            dslCode.style.display = "block";
-            copyDslBtn.disabled = false;
-            clearDslBtn.disabled = false;
-            
-            // Render accumulated DSL with statements
-            let html = "";
-            for (const item of accumulatedDsl) {
-                const time = item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                html += `<div class="dsl-statement">`;
-                if (item.description) {
-                    html += `<div class="dsl-statement-meta">${escapeHtml(item.description)} - ${time}</div>`;
-                } else {
-                    html += `<div class="dsl-statement-meta">${time}</div>`;
-                }
-                html += escapeHtml(item.dsl);
-                html += `</div>`;
-            }
-            dslCode.innerHTML = html;
-            
-            // Scroll to bottom
-            const content = document.getElementById("dsl-panel-content");
-            content.scrollTop = content.scrollHeight;
-        }
-    }
-    
-    function addToAccumulatedDsl(dsl, description) {
-        // Parse DSL into individual statements
-        const statements = dsl.split('\n').filter(line => line.trim().startsWith('('));
-        
-        if (statements.length > 0) {
-            accumulatedDsl.push({
-                dsl: statements.join('\n'),
-                timestamp: new Date(),
-                description: description || null
-            });
-            updateDslPanel();
-        }
-    }
-    
-    function getFullAccumulatedDsl() {
-        return accumulatedDsl.map(item => item.dsl).join('\n\n');
-    }
-    
-    function clearAccumulatedDsl() {
-        accumulatedDsl = [];
-        updateDslPanel();
-    }
-
     // ==================== ENTITY SEARCH ====================
+    // Detect potential entity names from user message
     function detectEntityNames(message) {
         const names = [];
+        // Pattern: "add/assign/create [Name] as [role]"
         const addPattern = /(?:add|assign|make|appoint)\s+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\s+(?:as|to be)/gi;
         let match;
         while ((match = addPattern.exec(message)) !== null) {
             names.push(match[1]);
         }
+        // Pattern: "[Name] as director/UBO/etc"
         const rolePattern = /([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\s+as\s+(?:director|ubo|beneficial owner|shareholder|officer|manager)/gi;
         while ((match = rolePattern.exec(message)) !== null) {
-            if (!names.includes(match[1])) names.push(match[1]);
+            if (!names.includes(match[1])) {
+                names.push(match[1]);
+            }
         }
+        // Pattern: "person/individual named [Name]" or "company called [Name]"
         const namedPattern = /(?:person|individual|company|entity)\s+(?:named|called)\s+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)/gi;
         while ((match = namedPattern.exec(message)) !== null) {
-            if (!names.includes(match[1])) names.push(match[1]);
+            if (!names.includes(match[1])) {
+                names.push(match[1]);
+            }
         }
         return names;
     }
-
     async function searchEntities(query, jurisdiction) {
         try {
             const body = { query, limit: 5 };
-            if (jurisdiction) body.jurisdiction = jurisdiction;
+            if (jurisdiction) {
+                body.jurisdiction = jurisdiction;
+            }
             const resp = await fetch("/api/entities/search", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(body)
+                body: JSON.stringify(body),
             });
-            if (!resp.ok) return { results: [], create_option: `Create new entity "${query}"` };
+            if (!resp.ok) {
+                return { results: [], create_option: `Create new entity "${query}"` };
+            }
             return await resp.json();
-        } catch (e) {
+        }
+        catch (e) {
             console.error("Entity search failed:", e);
             return { results: [], create_option: `Create new entity "${query}"` };
         }
     }
-
+    /**
+     * Get completions for a given entity type and query.
+     * Uses EntityGateway for fast fuzzy matching.
+     *
+     * @param entityType - Type of entity: "cbu", "entity", "product", "role", "jurisdiction", etc.
+     * @param query - Partial text to match
+     * @param limit - Max results (default 10)
+     */
+    async function getCompletions(entityType, query, limit = 10) {
+        try {
+            const resp = await fetch("/api/agent/complete", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ entity_type: entityType, query, limit }),
+            });
+            if (!resp.ok) {
+                console.error("Completion request failed:", resp.status);
+                return [];
+            }
+            const data = await resp.json();
+            return data.items;
+        }
+        catch (e) {
+            console.error("Completion error:", e);
+            return [];
+        }
+    }
+    // Export for potential use in other modules or debugging
+    window.getCompletions =
+        getCompletions;
     // ==================== CONTEXT MANAGEMENT ====================
     function updateContextBar() {
         const hasCbu = !!context.cbu;
         const hasCase = !!context.case;
-
         if (hasCbu || hasCase) {
             contextBar.classList.add("active");
-        } else {
+        }
+        else {
             contextBar.classList.remove("active");
         }
-
         if (hasCbu) {
             contextCbu.style.display = "flex";
             contextCbuName.textContent = context.cbu.name;
@@ -192,97 +142,87 @@ document.addEventListener("DOMContentLoaded", () => {
                 contextCbuName.textContent += ` (${context.cbu.jurisdiction})`;
             }
             contextCbuId.textContent = context.cbu.id.substring(0, 8) + "...";
-        } else {
+        }
+        else {
             contextCbu.style.display = "none";
         }
-
         if (hasCase) {
             contextCase.style.display = "flex";
-            contextCaseType.textContent = context.case.type + (context.case.status ? ` - ${context.case.status}` : "");
+            contextCaseType.textContent =
+                context.case.type +
+                    (context.case.status ? ` - ${context.case.status}` : "");
             contextCaseId.textContent = context.case.id.substring(0, 8) + "...";
-        } else {
+        }
+        else {
             contextCase.style.display = "none";
         }
     }
-
     function clearContext() {
-        context = { cbu: null, case: null, entities: new Map(), bindings: new Map() };
+        context = { entities: new Map(), bindings: new Map() };
         updateContextBar();
     }
-
     function extractEntitiesFromDsl(dsl) {
         const entities = [];
+        // Match entity.create-* patterns
         const entityPattern = /\(entity\.create-(\w+)[^)]*:(?:name|first-name)\s+"([^"]+)"[^)]*(?::as\s+@(\w+))?/g;
         let match;
         while ((match = entityPattern.exec(dsl)) !== null) {
-            entities.push({ type: match[1].replace(/-/g, ' '), name: match[2], binding: match[3] });
+            entities.push({
+                type: match[1].replace(/-/g, " "),
+                name: match[2],
+                binding: match[3],
+            });
         }
         return entities;
     }
-    
-    function extractDescriptionFromDsl(dsl) {
-        // Try to extract a meaningful description from the DSL
-        const cbuMatch = dsl.match(/\(cbu\.ensure[^)]*:name\s+"([^"]+)"/);
-        if (cbuMatch) return `Create CBU: ${cbuMatch[1]}`;
-        
-        const entityMatch = dsl.match(/\(entity\.create-(\w+)[^)]*:(?:name|first-name)\s+"([^"]+)"/);
-        if (entityMatch) return `Create ${entityMatch[1].replace(/-/g, ' ')}: ${entityMatch[2]}`;
-        
-        const roleMatch = dsl.match(/\(cbu\.assign-role[^)]*:role\s+"([^"]+)"/);
-        if (roleMatch) return `Assign role: ${roleMatch[1]}`;
-        
-        const caseMatch = dsl.match(/\(kyc-case\.create/);
-        if (caseMatch) return "Create KYC case";
-        
-        return null;
-    }
-
     async function updateContextFromBindings(bindings) {
+        // Store all bindings
         for (const [key, value] of Object.entries(bindings)) {
             context.bindings.set(key, value);
-            if (reverseAliases[key]) {
-                context.bindings.set(reverseAliases[key], value);
-            }
         }
-
-        const cbuId = bindings.cbu || bindings.cbu_id;
-        if (cbuId && !context.cbu) {
+        // If we got a cbu binding, fetch its details
+        if (bindings.cbu && !context.cbu) {
             try {
-                const resp = await fetch(`/api/dsl/query/cbu/${cbuId}`);
+                const resp = await fetch(`/api/dsl/query/cbu/${bindings.cbu}`);
                 if (resp.ok) {
                     const data = await resp.json();
                     context.cbu = {
-                        id: cbuId,
+                        id: bindings.cbu,
                         name: data.name || "Unknown",
                         jurisdiction: data.jurisdiction,
-                        clientType: data.client_type
+                        clientType: data.client_type,
                     };
                 }
-            } catch (e) {
-                context.cbu = { id: cbuId, name: "CBU " + cbuId.substring(0, 8) };
+            }
+            catch (e) {
+                // Fallback - just use the ID
+                context.cbu = {
+                    id: bindings.cbu,
+                    name: "CBU " + bindings.cbu.substring(0, 8),
+                };
             }
         }
-
-        const caseId = bindings.case || bindings.case_id;
-        if (caseId && !context.case) {
-            context.case = { id: caseId, type: "KYC Case", status: "INTAKE" };
+        // If we got a case binding, store it
+        if (bindings.case && !context.case) {
+            context.case = {
+                id: bindings.case,
+                type: "KYC Case",
+                status: "INTAKE",
+            };
         }
-
         updateContextBar();
     }
-
     // ==================== UI HELPERS ====================
     function escapeHtml(text) {
         const div = document.createElement("div");
         div.textContent = text;
         return div.innerHTML;
     }
-
     function clearEmptyState() {
         const empty = chatMessages.querySelector(".empty-state");
-        if (empty) empty.remove();
+        if (empty)
+            empty.remove();
     }
-
     function addUserMessage(text) {
         clearEmptyState();
         const msg = document.createElement("div");
@@ -291,41 +231,38 @@ document.addEventListener("DOMContentLoaded", () => {
         chatMessages.appendChild(msg);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
-
     function addAssistantMessage(options) {
         clearEmptyState();
         const msg = document.createElement("div");
         msg.className = "msg msg-assistant";
-
         let html = `<div class="msg-bubble">${escapeHtml(options.text)}`;
-
         if (options.dsl) {
             html += `<div class="msg-dsl">${escapeHtml(options.dsl)}</div>`;
         }
-
         if (options.status) {
             html += `<div class="msg-status ${options.status.type}">${escapeHtml(options.status.text)}</div>`;
         }
-
         if (options.suggestions && options.suggestions.length > 0) {
             html += `<div class="suggestion-list">`;
             options.suggestions.forEach((s, i) => {
                 const pct = Math.round(s.confidence * 100);
                 html += `<div class="suggestion-item" data-index="${i}">
                     <span class="num">${i + 1}</span>
-                    <span>"${escapeHtml(s.current)}" -> "${escapeHtml(s.suggested)}"</span>
+                    <span>"${escapeHtml(s.current)}" → "${escapeHtml(s.suggested)}"</span>
                     <span class="confidence">${pct}%</span>
                 </div>`;
             });
             html += `</div>`;
         }
-
+        // Entity choices for disambiguation
         if (options.entityChoices && options.entityChoices.results.length > 0) {
             html += `<div class="suggestion-list entity-choices">`;
             options.entityChoices.results.forEach((e, i) => {
                 const pct = Math.round(e.similarity * 100);
-                const typeDisplay = (e.entity_type_code || e.entity_type).replace(/_/g, ' ').toLowerCase();
-                const jurisdictionDisplay = e.jurisdiction ? ` (${e.jurisdiction})` : '';
+                const typeDisplay = e.entity_type_code?.replace(/_/g, " ").toLowerCase() || e.entity_type;
+                const jurisdictionDisplay = e.jurisdiction
+                    ? ` (${e.jurisdiction})`
+                    : "";
                 html += `<div class="suggestion-item entity-choice" data-entity-idx="${i}">
                     <span class="num">${i + 1}</span>
                     <span class="entity-info">
@@ -335,84 +272,81 @@ document.addEventListener("DOMContentLoaded", () => {
                     <span class="confidence">${pct}%</span>
                 </div>`;
             });
+            // Add "create new" option
             html += `<div class="suggestion-item entity-choice create-new" data-entity-idx="create">
                 <span class="num">+</span>
                 <span>${escapeHtml(options.entityChoices.createOption)}</span>
             </div>`;
             html += `</div>`;
         }
-
         if (options.createdEntities && options.createdEntities.length > 0) {
             html += `<div class="created-entities">`;
             for (const e of options.createdEntities) {
                 html += `<div class="created-entity">
                     <span class="type">${escapeHtml(e.type)}</span>
                     <span class="name">${escapeHtml(e.name)}</span>
-                    ${e.binding ? `<span class="binding">@${escapeHtml(e.binding)}</span>` : ''}
+                    ${e.binding ? `<span class="binding">@${escapeHtml(e.binding)}</span>` : ""}
                 </div>`;
             }
             html += `</div>`;
         }
-
-        html += `</div>`;
-
+        html += `</div>`; // close msg-bubble
         if (options.actions && options.actions.length > 0) {
             html += `<div class="msg-actions">`;
             options.actions.forEach((a, i) => {
-                html += `<button class="${a.class || ''}" data-action="${i}">${escapeHtml(a.label)}</button>`;
+                html += `<button class="${a.class || ""}" data-action="${i}">${escapeHtml(a.label)}</button>`;
             });
             html += `</div>`;
         }
-
         msg.innerHTML = html;
         chatMessages.appendChild(msg);
         chatMessages.scrollTop = chatMessages.scrollHeight;
-
+        // Attach action handlers
         if (options.actions) {
             msg.querySelectorAll("[data-action]").forEach((btn, i) => {
                 btn.addEventListener("click", () => options.actions[i].onClick());
             });
         }
-
+        // Attach suggestion click handlers
         if (options.suggestions) {
-            msg.querySelectorAll(".suggestion-item:not(.entity-choice)").forEach((item) => {
+            msg
+                .querySelectorAll(".suggestion-item:not(.entity-choice)")
+                .forEach((item) => {
                 item.addEventListener("click", () => {
                     const idx = parseInt(item.getAttribute("data-index") || "0");
                     handleSuggestionSelect(idx + 1);
                 });
             });
         }
-
+        // Attach entity choice handlers
         if (options.entityChoices) {
             msg.querySelectorAll(".entity-choice").forEach((item) => {
                 item.addEventListener("click", () => {
                     const idxAttr = item.getAttribute("data-entity-idx");
                     if (idxAttr === "create") {
                         options.entityChoices.onSelect("create");
-                    } else {
+                    }
+                    else {
                         const idx = parseInt(idxAttr || "0");
                         options.entityChoices.onSelect(options.entityChoices.results[idx]);
                     }
                 });
             });
         }
-
         return msg;
     }
-
     function addExecutionResult(success, message, bindings) {
         clearEmptyState();
         const msg = document.createElement("div");
         msg.className = "msg msg-assistant";
-
         let html = `<div class="msg-bubble">`;
-        html += `<div class="execution-result ${success ? 'success' : 'error'}">`;
-        html += success ? 'OK ' : 'X ';
+        html += `<div class="execution-result ${success ? "success" : "error"}">`;
+        html += success ? "✓ " : "✗ ";
         html += escapeHtml(message);
-
         if (success && bindings && Object.keys(bindings).length > 0) {
             html += `<div class="created-entities" style="margin-top: 0.5rem;">`;
             for (const [binding, id] of Object.entries(bindings)) {
+                // Try to get human-readable name from context
                 const entity = context.entities.get(binding);
                 const displayName = entity ? entity.name : id.substring(0, 8) + "...";
                 html += `<div class="created-entity">
@@ -422,265 +356,308 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             html += `</div>`;
         }
-
         html += `</div></div>`;
         msg.innerHTML = html;
         chatMessages.appendChild(msg);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
-
     // ==================== CONVERSATION FLOW ====================
     function handleSuggestionSelect(num) {
         if (!pendingCorrections || num < 1 || num > pendingCorrections.length) {
-            addAssistantMessage({ text: `Please select a number between 1 and ${pendingCorrections?.length || 0}.` });
+            addAssistantMessage({
+                text: `Please select a number between 1 and ${pendingCorrections?.length || 0}.`,
+            });
             return;
         }
-
         const correction = pendingCorrections[num - 1];
-
         if (pendingDsl) {
             if (correction.type === "lookup") {
                 pendingDsl = pendingDsl.replace(`"${correction.current}"`, `"${correction.suggested}"`);
-            } else {
+            }
+            else {
                 pendingDsl = pendingDsl.replace(`(${correction.current}`, `(${correction.suggested}`);
             }
         }
-
         addUserMessage(String(num));
         validateAndPrompt(pendingDsl);
     }
-
     async function handleEntitySelection(choice) {
-        if (!pendingEntitySelection) return;
-
+        if (!pendingEntitySelection)
+            return;
         const { originalMessage } = pendingEntitySelection;
         pendingEntitySelection = null;
-
         if (choice === "create") {
+            // User wants to create new - proceed with original message
             addUserMessage("Create new");
             await generateDslForMessage(originalMessage);
-        } else {
+        }
+        else {
+            // User selected an existing entity - modify message to reference it
             addUserMessage(`Use existing: ${choice.name}`);
-            const bindingName = choice.name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+            // Store entity in context with a binding
+            const bindingName = choice.name
+                .toLowerCase()
+                .replace(/\s+/g, "_")
+                .replace(/[^a-z0-9_]/g, "");
             context.bindings.set(bindingName, choice.entity_id);
             context.entities.set(bindingName, {
                 id: choice.entity_id,
                 name: choice.name,
                 type: choice.entity_type,
-                binding: bindingName
+                binding: bindingName,
             });
+            // Modify the message to tell agent to use existing entity
             const modifiedMessage = `${originalMessage}\n\n[Use existing entity: "${choice.name}" (ID: ${choice.entity_id}, binding: @${bindingName})]`;
             await generateDslForMessage(modifiedMessage);
         }
     }
-
     async function handleConfirmExecute(confirmed) {
         if (!confirmed) {
             pendingDsl = null;
             pendingCorrections = null;
-            addAssistantMessage({ text: "Okay, cancelled. What would you like to do?" });
+            addAssistantMessage({
+                text: "Okay, cancelled. What would you like to do?",
+            });
             return;
         }
-
         if (!pendingDsl) {
-            addAssistantMessage({ text: "Nothing to execute. Describe what you want to onboard." });
+            addAssistantMessage({
+                text: "Nothing to execute. Describe what you want to onboard.",
+            });
             return;
         }
-
         await executeDsl(pendingDsl);
         pendingDsl = null;
         pendingCorrections = null;
     }
-
     async function validateAndPrompt(dsl) {
+        // NORMALIZE BINDINGS FIRST - map @cbu_id -> @cbu etc.
         const normalizedDsl = normalizeDslBindings(dsl);
+        // Pre-extract entities for display
         const extractedEntities = extractEntitiesFromDsl(normalizedDsl);
-
         try {
             const resp = await fetch("/api/dsl/validate-with-fixes", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ dsl: normalizedDsl })
+                body: JSON.stringify({ dsl: normalizedDsl }),
             });
-
-            if (!resp.ok) throw new Error("Validation failed");
-
+            if (!resp.ok)
+                throw new Error("Validation failed");
             const data = await resp.json();
-
             if (data.status === "valid") {
                 pendingDsl = normalizedDsl;
                 pendingCorrections = null;
                 addAssistantMessage({
                     text: "I've prepared this for you:",
                     dsl: normalizedDsl,
-                    status: { type: "valid", text: "Ready to run" },
+                    status: { type: "valid", text: "✓ Ready to run" },
                     createdEntities: extractedEntities,
                     actions: [
-                        { label: "Yes, run it", class: "success", onClick: () => handleConfirmExecute(true) },
-                        { label: "No", class: "secondary", onClick: () => handleConfirmExecute(false) }
-                    ]
+                        {
+                            label: "Yes, run it",
+                            class: "success",
+                            onClick: () => handleConfirmExecute(true),
+                        },
+                        {
+                            label: "No",
+                            class: "secondary",
+                            onClick: () => handleConfirmExecute(false),
+                        },
+                    ],
                 });
-            } else if (data.status === "auto_fixed") {
+            }
+            else if (data.status === "auto_fixed") {
                 pendingDsl = data.corrected_dsl;
                 pendingCorrections = null;
                 addAssistantMessage({
                     text: `I auto-corrected: ${data.message}`,
                     dsl: data.corrected_dsl,
-                    status: { type: "valid", text: "Auto-corrected, ready to run" },
+                    status: { type: "valid", text: "✓ Auto-corrected, ready to run" },
                     createdEntities: extractEntitiesFromDsl(data.corrected_dsl),
                     actions: [
-                        { label: "Yes, run it", class: "success", onClick: () => handleConfirmExecute(true) },
-                        { label: "No", class: "secondary", onClick: () => handleConfirmExecute(false) }
-                    ]
+                        {
+                            label: "Yes, run it",
+                            class: "success",
+                            onClick: () => handleConfirmExecute(true),
+                        },
+                        {
+                            label: "No",
+                            class: "secondary",
+                            onClick: () => handleConfirmExecute(false),
+                        },
+                    ],
                 });
-            } else if (data.status === "needs_confirmation") {
+            }
+            else if (data.status === "needs_confirmation") {
                 pendingDsl = normalizedDsl;
                 pendingCorrections = [];
-
                 for (const lc of data.lookup_corrections) {
                     if (lc.action === "needs_confirmation") {
                         pendingCorrections.push({
-                            type: "lookup", line: lc.line, current: lc.current_value,
-                            suggested: lc.suggested_value, confidence: lc.confidence,
-                            action: lc.action, available: lc.available_values, arg_name: lc.arg_name
+                            type: "lookup",
+                            line: lc.line,
+                            current: lc.current_value,
+                            suggested: lc.suggested_value,
+                            confidence: lc.confidence,
+                            action: lc.action,
+                            available: lc.available_values,
+                            arg_name: lc.arg_name,
                         });
                     }
                 }
                 for (const vc of data.verb_corrections) {
                     if (vc.action === "needs_confirmation") {
                         pendingCorrections.push({
-                            type: "verb", line: vc.line, current: vc.current_verb,
-                            suggested: vc.suggested_verb, confidence: vc.confidence,
-                            action: vc.action, available: vc.available_verbs
+                            type: "verb",
+                            line: vc.line,
+                            current: vc.current_verb,
+                            suggested: vc.suggested_verb,
+                            confidence: vc.confidence,
+                            action: vc.action,
+                            available: vc.available_verbs,
                         });
                     }
                 }
-
                 addAssistantMessage({
                     text: data.message || "I found some issues. Please confirm:",
                     dsl: normalizedDsl,
                     status: { type: "warning", text: "Needs your input" },
-                    suggestions: pendingCorrections
+                    suggestions: pendingCorrections,
                 });
-            } else {
+            }
+            else {
                 pendingDsl = null;
                 pendingCorrections = null;
                 addAssistantMessage({
                     text: data.message || "I couldn't generate valid DSL.",
                     dsl: normalizedDsl,
-                    status: { type: "error", text: data.compile_error || data.parse_error || "Invalid" }
+                    status: {
+                        type: "error",
+                        text: data.compile_error || data.parse_error || "Invalid",
+                    },
                 });
             }
-        } catch (e) {
+        }
+        catch (e) {
             pendingDsl = normalizedDsl;
             addAssistantMessage({
                 text: "Here's what I've prepared:",
                 dsl: normalizedDsl,
                 createdEntities: extractedEntities,
                 actions: [
-                    { label: "Yes, run it", class: "success", onClick: () => handleConfirmExecute(true) },
-                    { label: "No", class: "secondary", onClick: () => handleConfirmExecute(false) }
-                ]
+                    {
+                        label: "Yes, run it",
+                        class: "success",
+                        onClick: () => handleConfirmExecute(true),
+                    },
+                    {
+                        label: "No",
+                        class: "secondary",
+                        onClick: () => handleConfirmExecute(false),
+                    },
+                ],
             });
         }
     }
-
     async function executeDsl(dsl) {
         addAssistantMessage({ text: "Executing..." });
-
         try {
-            const resp = await fetch("/api/agent/execute", {
+            const resp = await fetch("/api/dsl/execute", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ session_id: sessionId, dsl })
+                body: JSON.stringify({ dsl }),
             });
-
             const data = await resp.json();
-
             if (data.success) {
-                // Add to accumulated DSL on successful execution
-                const description = extractDescriptionFromDsl(dsl);
-                addToAccumulatedDsl(dsl, description);
-                
                 if (data.bindings) {
                     await updateContextFromBindings(data.bindings);
                 }
                 addExecutionResult(true, "Executed successfully!", data.bindings);
-            } else {
+            }
+            else {
                 const errorMsg = data.errors?.join("; ") || data.error || "Execution failed";
                 addExecutionResult(false, errorMsg);
             }
-        } catch (e) {
+        }
+        catch (e) {
             addExecutionResult(false, `Error: ${e.message}`);
         }
     }
-
+    // Build context string for agent
     function getContextForAgent() {
         const parts = [];
-
         if (context.cbu) {
-            parts.push(`Current CBU: "${context.cbu.name}" (ID: ${context.cbu.id}) - use @cbu to reference it`);
+            parts.push(`Current CBU: "${context.cbu.name}" - use @cbu to reference it`);
         }
         if (context.case) {
             parts.push(`Current KYC Case: ${context.case.type} - use @case to reference it`);
         }
         if (context.bindings.size > 0) {
             const bindings = Array.from(context.bindings.entries())
-                .map(([k, v]) => `@${k}=${v.substring(0,8)}`)
+                .map(([k, _]) => `@${k}`)
                 .join(", ");
             parts.push(`Available bindings: ${bindings}`);
         }
-
         return parts.length > 0 ? parts.join("\n") : "";
     }
-
     async function generateDslForMessage(message) {
         try {
             if (!sessionId) {
                 const sessResp = await fetch("/api/agent/session", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" }
+                    headers: { "Content-Type": "application/json" },
                 });
                 const sessData = await sessResp.json();
-                if (sessData.session_id) sessionId = sessData.session_id;
+                if (sessData.session_id) {
+                    sessionId = sessData.session_id;
+                }
             }
-
+            // Include context in the message
             const contextStr = getContextForAgent();
             const messageWithContext = contextStr
                 ? `[Context]\n${contextStr}\n\n[Request]\n${message}`
                 : message;
-
             const resp = await fetch("/api/agent/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ session_id: sessionId, message: messageWithContext })
+                body: JSON.stringify({
+                    session_id: sessionId,
+                    message: messageWithContext,
+                }),
             });
-
             const data = await resp.json();
-
             if (data.error) {
                 addAssistantMessage({ text: `Error: ${data.error}` });
-            } else {
+            }
+            else {
                 const dsl = data.assembled_dsl?.combined || data.dsl;
                 if (dsl) {
                     await validateAndPrompt(dsl);
-                } else {
-                    addAssistantMessage({ text: data.message || "I couldn't generate DSL for that." });
+                }
+                else {
+                    addAssistantMessage({
+                        text: data.message || "I couldn't generate DSL for that.",
+                    });
                 }
             }
-        } catch (e) {
-            addAssistantMessage({ text: `Connection error: ${e.message}` });
+        }
+        catch (e) {
+            addAssistantMessage({
+                text: `Connection error: ${e.message}`,
+            });
         }
     }
-
     async function sendMessage() {
         const text = chatInput.value.trim();
-        if (!text) return;
-
+        if (!text)
+            return;
         chatInput.value = "";
-
+        // Simple confirmations
         const lower = text.toLowerCase();
-        if (lower === "yes" || lower === "y" || lower === "run" || lower === "execute") {
+        if (lower === "yes" ||
+            lower === "y" ||
+            lower === "run" ||
+            lower === "execute") {
             addUserMessage(text);
             handleConfirmExecute(true);
             return;
@@ -690,76 +667,81 @@ document.addEventListener("DOMContentLoaded", () => {
             handleConfirmExecute(false);
             return;
         }
-
+        // Number selection for corrections
         const num = parseInt(text);
-        if (!isNaN(num) && pendingCorrections && num >= 1 && num <= pendingCorrections.length) {
+        if (!isNaN(num) &&
+            pendingCorrections &&
+            num >= 1 &&
+            num <= pendingCorrections.length) {
             handleSuggestionSelect(num);
             return;
         }
-
+        // Number selection for entity choices
         if (!isNaN(num) && pendingEntitySelection) {
             if (num >= 1 && num <= pendingEntitySelection.results.length) {
                 handleEntitySelection(pendingEntitySelection.results[num - 1]);
                 return;
-            } else if (num === pendingEntitySelection.results.length + 1) {
+            }
+            else if (num === pendingEntitySelection.results.length + 1 ||
+                lower === "create" ||
+                lower === "new") {
                 handleEntitySelection("create");
                 return;
             }
         }
-
+        // "create" or "new" for entity selection
         if ((lower === "create" || lower === "new") && pendingEntitySelection) {
             handleEntitySelection("create");
             return;
         }
-
         addUserMessage(text);
-
         sendBtn.disabled = true;
         sendBtn.innerHTML = `<span class="spinner"></span>`;
-
         try {
+            // Check for potential entity names that might already exist
             const entityNames = detectEntityNames(text);
-
             if (entityNames.length > 0) {
+                // Search for the first entity name found
                 const searchName = entityNames[0];
-                const jurisdiction = context.cbu?.jurisdiction;
+                const jurisdiction = context.cbu?.jurisdiction; // Use CBU jurisdiction if available
                 const searchResult = await searchEntities(searchName, jurisdiction);
-                const goodMatches = searchResult.results.filter(r => r.similarity >= 0.7);
-
+                // Only show choices if we have good matches (>= 70% similarity)
+                const goodMatches = searchResult.results.filter((r) => r.similarity >= 0.7);
                 if (goodMatches.length > 0) {
+                    // Found potential matches - ask user to choose
                     pendingEntitySelection = {
                         originalMessage: text,
                         searchQuery: searchName,
                         results: goodMatches,
-                        createOption: searchResult.create_option
+                        createOption: searchResult.create_option,
                     };
-
                     addAssistantMessage({
                         text: `I found existing entities matching "${searchName}". Would you like to use one of these, or create a new one?`,
                         entityChoices: {
                             results: goodMatches,
                             createOption: searchResult.create_option,
-                            onSelect: handleEntitySelection
-                        }
+                            onSelect: handleEntitySelection,
+                        },
                     });
                     return;
                 }
             }
-
+            // No entity matches found or no entity names detected - proceed with generation
             await generateDslForMessage(text);
-
-        } catch (e) {
-            addAssistantMessage({ text: `Connection error: ${e.message}` });
-        } finally {
+        }
+        catch (e) {
+            addAssistantMessage({
+                text: `Connection error: ${e.message}`,
+            });
+        }
+        finally {
             sendBtn.disabled = false;
             sendBtn.textContent = "Send";
         }
     }
-
     function newSession() {
         sessionId = null;
         clearContext();
-        clearAccumulatedDsl();
         pendingDsl = null;
         pendingCorrections = null;
         pendingEntitySelection = null;
@@ -769,35 +751,13 @@ document.addEventListener("DOMContentLoaded", () => {
             <p style="font-size: 0.85rem;">e.g., "Create a fund in Luxembourg called Apex Capital"</p>
         </div>`;
     }
-
     // Event listeners
     sendBtn.addEventListener("click", sendMessage);
     chatInput.addEventListener("keypress", (e) => {
-        if (e.key === "Enter") sendMessage();
+        if (e.key === "Enter")
+            sendMessage();
     });
     newSessionBtn.addEventListener("click", newSession);
     contextClearBtn.addEventListener("click", clearContext);
-    
-    // DSL Panel event listeners
-    dslPanelToggle.addEventListener("click", () => {
-        dslPanel.classList.toggle("collapsed");
-    });
-    
-    copyDslBtn.addEventListener("click", () => {
-        const fullDsl = getFullAccumulatedDsl();
-        navigator.clipboard.writeText(fullDsl).then(() => {
-            const originalText = copyDslBtn.textContent;
-            copyDslBtn.textContent = "Copied!";
-            setTimeout(() => { copyDslBtn.textContent = originalText; }, 1500);
-        });
-    });
-    
-    clearDslBtn.addEventListener("click", () => {
-        if (confirm("Clear all accumulated DSL?")) {
-            clearAccumulatedDsl();
-        }
-    });
-    
-    // Initialize DSL panel
-    updateDslPanel();
 });
+//# sourceMappingURL=app.js.map

@@ -514,9 +514,7 @@ async fn validate_with_fixes(
                     // Check if this arg has a lookup configuration
                     if let Some(lookup_config) = &arg.lookup {
                         // Find this arg in the verb call
-                        if let Some(call_arg) =
-                            vc.arguments.iter().find(|a| a.key.matches(&arg.name))
-                        {
+                        if let Some(call_arg) = vc.arguments.iter().find(|a| a.key == arg.name) {
                             if let Some(value) = call_arg.value.as_string() {
                                 // Query DB for valid values
                                 let valid_values = get_lookup_values(
@@ -722,7 +720,7 @@ async fn validate_with_fixes(
     })
 }
 
-/// Query database for valid lookup values
+/// Query database for valid lookup values (search_key only, for simple lookups)
 async fn get_lookup_values(
     pool: &PgPool,
     schema: &str,

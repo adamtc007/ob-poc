@@ -219,7 +219,7 @@ impl CustomOperation for EntityCreateOp {
         let entity_type = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("type"))
+            .find(|a| a.key == "type")
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing :type argument"))?;
 
@@ -227,7 +227,7 @@ impl CustomOperation for EntityCreateOp {
         let name = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("name"))
+            .find(|a| a.key == "name")
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing :name argument"))?;
 
@@ -432,7 +432,7 @@ impl CustomOperation for DocumentCatalogOp {
         let doc_type = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("doc-type") || a.key.matches("document-type"))
+            .find(|a| a.key == "doc-type" || a.key == "document-type")
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing doc-type argument"))?;
 
@@ -451,7 +451,7 @@ impl CustomOperation for DocumentCatalogOp {
         let document_name = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("title") || a.key.matches("document-name"))
+            .find(|a| a.key == "title" || a.key == "document-name")
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string());
 
@@ -459,9 +459,9 @@ impl CustomOperation for DocumentCatalogOp {
         let cbu_id: Option<Uuid> = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("cbu-id"))
+            .find(|a| a.key == "cbu-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -472,9 +472,9 @@ impl CustomOperation for DocumentCatalogOp {
         let entity_id: Option<Uuid> = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("entity-id"))
+            .find(|a| a.key == "entity-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -563,9 +563,9 @@ impl CustomOperation for DocumentExtractOp {
         let doc_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("document-id") || a.key.matches("doc-id"))
+            .find(|a| a.key == "document-id" || a.key == "doc-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -636,9 +636,9 @@ impl CustomOperation for UboCalculateOp {
         let cbu_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("cbu-id"))
+            .find(|a| a.key == "cbu-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -650,7 +650,7 @@ impl CustomOperation for UboCalculateOp {
         let threshold: f64 = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("threshold"))
+            .find(|a| a.key == "threshold")
             .and_then(|a| a.value.as_decimal())
             .map(|d| d.to_string().parse().unwrap_or(25.0))
             .unwrap_or(25.0);
@@ -777,9 +777,9 @@ impl CustomOperation for ScreeningPepOp {
         let entity_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("entity-id"))
+            .find(|a| a.key == "entity-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -885,9 +885,9 @@ impl CustomOperation for ScreeningSanctionsOp {
         let entity_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("entity-id"))
+            .find(|a| a.key == "entity-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -1042,9 +1042,9 @@ impl CustomOperation for ResourceCreateOp {
         let cbu_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("cbu-id"))
+            .find(|a| a.key == "cbu-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -1056,7 +1056,7 @@ impl CustomOperation for ResourceCreateOp {
         let resource_type_code = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("resource-type"))
+            .find(|a| a.key == "resource-type")
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing resource-type argument"))?;
 
@@ -1064,7 +1064,7 @@ impl CustomOperation for ResourceCreateOp {
         let instance_url = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("instance-url"))
+            .find(|a| a.key == "instance-url")
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing instance-url argument"))?;
 
@@ -1083,14 +1083,14 @@ impl CustomOperation for ResourceCreateOp {
         let instance_identifier = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("instance-id"))
+            .find(|a| a.key == "instance-id")
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string());
 
         let instance_name = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("instance-name"))
+            .find(|a| a.key == "instance-name")
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string());
 
@@ -1098,9 +1098,9 @@ impl CustomOperation for ResourceCreateOp {
         let product_id: Option<Uuid> = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("product-id"))
+            .find(|a| a.key == "product-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -1111,9 +1111,9 @@ impl CustomOperation for ResourceCreateOp {
         let mut service_id: Option<Uuid> = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("service-id"))
+            .find(|a| a.key == "service-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -1214,9 +1214,9 @@ impl CustomOperation for ResourceSetAttrOp {
         let instance_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("instance-id"))
+            .find(|a| a.key == "instance-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -1228,7 +1228,7 @@ impl CustomOperation for ResourceSetAttrOp {
         let attr_name = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("attr"))
+            .find(|a| a.key == "attr")
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing attr argument"))?;
 
@@ -1236,7 +1236,7 @@ impl CustomOperation for ResourceSetAttrOp {
         let value = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("value"))
+            .find(|a| a.key == "value")
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing value argument"))?;
 
@@ -1254,7 +1254,7 @@ impl CustomOperation for ResourceSetAttrOp {
         let state = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("state"))
+            .find(|a| a.key == "state")
             .and_then(|a| a.value.as_string())
             .unwrap_or("proposed");
 
@@ -1321,9 +1321,9 @@ impl CustomOperation for ResourceActivateOp {
         let instance_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("instance-id"))
+            .find(|a| a.key == "instance-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -1435,9 +1435,9 @@ impl CustomOperation for ResourceSuspendOp {
         let instance_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("instance-id"))
+            .find(|a| a.key == "instance-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -1494,9 +1494,9 @@ impl CustomOperation for ResourceDecommissionOp {
         let instance_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("instance-id"))
+            .find(|a| a.key == "instance-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -1553,9 +1553,9 @@ impl CustomOperation for ResourceValidateAttrsOp {
         let instance_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("instance-id"))
+            .find(|a| a.key == "instance-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -1689,13 +1689,13 @@ impl CustomOperation for CbuAddProductOp {
         let cbu_id_arg = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("cbu-id"))
+            .find(|a| a.key == "cbu-id")
             .ok_or_else(|| anyhow::anyhow!("cbu.add-product: Missing required argument :cbu-id"))?;
 
         let product_name = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("product"))
+            .find(|a| a.key == "product")
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| {
                 anyhow::anyhow!("cbu.add-product: Missing required argument :product")
@@ -1705,7 +1705,7 @@ impl CustomOperation for CbuAddProductOp {
         // Step 2: Resolve CBU - by reference, UUID, or name
         // =====================================================================
         let (cbu_id, cbu_name): (Uuid, String) =
-            if let Some(ref_name) = cbu_id_arg.value.as_reference() {
+            if let Some(ref_name) = cbu_id_arg.value.as_symbol() {
                 // It's a @reference - resolve from context
                 let resolved_id = ctx.resolve(ref_name).ok_or_else(|| {
                     anyhow::anyhow!("cbu.add-product: Unresolved reference @{}", ref_name)
@@ -1770,10 +1770,10 @@ impl CustomOperation for CbuAddProductOp {
         // Note: We don't touch cbus.product_id - service_delivery_map is source of truth
 
         // =====================================================================
-        // Step 3: Validate product exists and get its ID
+        // Step 3: Validate product exists and get its ID (lookup by product_code)
         // =====================================================================
         let product_row = sqlx::query!(
-            r#"SELECT product_id, name FROM "ob-poc".products WHERE name = $1"#,
+            r#"SELECT product_id, name, product_code FROM "ob-poc".products WHERE product_code = $1"#,
             product_name
         )
         .fetch_optional(pool)
@@ -1781,7 +1781,7 @@ impl CustomOperation for CbuAddProductOp {
 
         let product = product_row.ok_or_else(|| {
             anyhow::anyhow!(
-                "cbu.add-product: Product '{}' not found. Available products can be listed with product.list",
+                "cbu.add-product: Product '{}' not found. Use product codes: CUSTODY, FUND_ACCOUNTING, TRANSFER_AGENCY, MIDDLE_OFFICE, COLLATERAL_MGMT, MARKETS_FX, ALTS",
                 product_name
             )
         })?;
@@ -1966,9 +1966,9 @@ impl CustomOperation for ObservationFromDocumentOp {
         let entity_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("entity-id"))
+            .find(|a| a.key == "entity-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -1980,9 +1980,9 @@ impl CustomOperation for ObservationFromDocumentOp {
         let document_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("document-id"))
+            .find(|a| a.key == "document-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -1994,7 +1994,7 @@ impl CustomOperation for ObservationFromDocumentOp {
         let attr_name = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("attribute"))
+            .find(|a| a.key == "attribute")
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing attribute argument"))?;
 
@@ -2012,7 +2012,7 @@ impl CustomOperation for ObservationFromDocumentOp {
         let value = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("value"))
+            .find(|a| a.key == "value")
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing value argument"))?;
 
@@ -2020,14 +2020,14 @@ impl CustomOperation for ObservationFromDocumentOp {
         let extraction_method = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("extraction-method"))
+            .find(|a| a.key == "extraction-method")
             .and_then(|a| a.value.as_string());
 
         // Get optional confidence (default 0.80 for document extractions)
         let confidence: f64 = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("confidence"))
+            .find(|a| a.key == "confidence")
             .and_then(|a| a.value.as_string())
             .and_then(|s| s.parse().ok())
             .unwrap_or(0.80);
@@ -2112,9 +2112,9 @@ impl CustomOperation for ObservationGetCurrentOp {
         let entity_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("entity-id"))
+            .find(|a| a.key == "entity-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -2126,7 +2126,7 @@ impl CustomOperation for ObservationGetCurrentOp {
         let attr_name = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("attribute"))
+            .find(|a| a.key == "attribute")
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing attribute argument"))?;
 
@@ -2232,9 +2232,9 @@ impl CustomOperation for ObservationReconcileOp {
         let entity_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("entity-id"))
+            .find(|a| a.key == "entity-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -2246,7 +2246,7 @@ impl CustomOperation for ObservationReconcileOp {
         let attr_name = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("attribute"))
+            .find(|a| a.key == "attribute")
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing attribute argument"))?;
 
@@ -2265,9 +2265,9 @@ impl CustomOperation for ObservationReconcileOp {
         let case_id: Option<Uuid> = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("case-id"))
+            .find(|a| a.key == "case-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -2278,7 +2278,7 @@ impl CustomOperation for ObservationReconcileOp {
         let auto_create = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("auto-create-discrepancies"))
+            .find(|a| a.key == "auto-create-discrepancies")
             .and_then(|a| a.value.as_boolean())
             .unwrap_or(true);
 
@@ -2387,9 +2387,9 @@ impl CustomOperation for ObservationVerifyAllegationsOp {
         let cbu_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("cbu-id"))
+            .find(|a| a.key == "cbu-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -2401,9 +2401,9 @@ impl CustomOperation for ObservationVerifyAllegationsOp {
         let entity_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("entity-id"))
+            .find(|a| a.key == "entity-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -2540,9 +2540,9 @@ impl CustomOperation for DocumentExtractObservationsOp {
         let document_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("document-id"))
+            .find(|a| a.key == "document-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -2554,9 +2554,9 @@ impl CustomOperation for DocumentExtractObservationsOp {
         let entity_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("entity-id"))
+            .find(|a| a.key == "entity-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -2568,7 +2568,7 @@ impl CustomOperation for DocumentExtractObservationsOp {
         let auto_verify = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("auto-verify-allegations"))
+            .find(|a| a.key == "auto-verify-allegations")
             .and_then(|a| a.value.as_boolean())
             .unwrap_or(true);
 

@@ -49,7 +49,7 @@ impl CustomOperation for SubcustodianLookupOp {
         let market = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("market"))
+            .find(|a| a.key == "market")
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing market argument"))?;
 
@@ -57,7 +57,7 @@ impl CustomOperation for SubcustodianLookupOp {
         let currency = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("currency"))
+            .find(|a| a.key == "currency")
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing currency argument"))?;
 
@@ -65,7 +65,7 @@ impl CustomOperation for SubcustodianLookupOp {
         let as_of_date: Option<chrono::NaiveDate> = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("as-of-date"))
+            .find(|a| a.key == "as-of-date")
             .and_then(|a| a.value.as_string())
             .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
 
@@ -162,9 +162,9 @@ impl CustomOperation for LookupSsiForTradeOp {
         let cbu_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("cbu-id"))
+            .find(|a| a.key == "cbu-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -176,7 +176,7 @@ impl CustomOperation for LookupSsiForTradeOp {
         let instrument_class = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("instrument-class"))
+            .find(|a| a.key == "instrument-class")
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing instrument-class argument"))?;
 
@@ -184,21 +184,21 @@ impl CustomOperation for LookupSsiForTradeOp {
         let security_type = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("security-type"))
+            .find(|a| a.key == "security-type")
             .and_then(|a| a.value.as_string());
 
         // Get optional market MIC
         let market = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("market"))
+            .find(|a| a.key == "market")
             .and_then(|a| a.value.as_string());
 
         // Get currency (required)
         let currency = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("currency"))
+            .find(|a| a.key == "currency")
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing currency argument"))?;
 
@@ -206,14 +206,14 @@ impl CustomOperation for LookupSsiForTradeOp {
         let settlement_type = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("settlement-type"))
+            .find(|a| a.key == "settlement-type")
             .and_then(|a| a.value.as_string());
 
         // Get optional counterparty BIC (we'd need to look up entity)
         let _counterparty_bic = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("counterparty-bic"))
+            .find(|a| a.key == "counterparty-bic")
             .and_then(|a| a.value.as_string());
 
         // Look up instrument class ID
@@ -335,9 +335,9 @@ impl CustomOperation for ValidateBookingCoverageOp {
         let cbu_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("cbu-id"))
+            .find(|a| a.key == "cbu-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -482,9 +482,9 @@ impl CustomOperation for DeriveRequiredCoverageOp {
         let cbu_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("cbu-id"))
+            .find(|a| a.key == "cbu-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -641,9 +641,9 @@ impl CustomOperation for SetupSsiFromDocumentOp {
         let cbu_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("cbu-id"))
+            .find(|a| a.key == "cbu-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -655,9 +655,9 @@ impl CustomOperation for SetupSsiFromDocumentOp {
         let document_id: Uuid = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("document-id"))
+            .find(|a| a.key == "document-id")
             .and_then(|a| {
-                if let Some(name) = a.value.as_reference() {
+                if let Some(name) = a.value.as_symbol() {
                     ctx.resolve(name)
                 } else {
                     a.value.as_uuid()
@@ -669,7 +669,7 @@ impl CustomOperation for SetupSsiFromDocumentOp {
         let validation_mode = verb_call
             .arguments
             .iter()
-            .find(|a| a.key.matches("validation-mode"))
+            .find(|a| a.key == "validation-mode")
             .and_then(|a| a.value.as_string())
             .unwrap_or("STRICT");
 
