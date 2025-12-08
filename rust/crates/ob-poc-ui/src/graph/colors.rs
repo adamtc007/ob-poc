@@ -131,19 +131,45 @@ pub fn entity_type_border(entity_type: EntityType) -> Color32 {
 /// Get color for primary role
 pub fn role_color(role: PrimaryRole) -> Color32 {
     match role {
+        // Ownership/Control - Green family (KYC focus)
         PrimaryRole::UltimateBeneficialOwner => Color32::from_rgb(76, 175, 80), // Green
-        PrimaryRole::Shareholder => Color32::from_rgb(139, 195, 74),            // Light green
-        PrimaryRole::ManagementCompany => Color32::from_rgb(255, 152, 0),       // Orange
-        PrimaryRole::Director => Color32::from_rgb(33, 150, 243),               // Blue
-        PrimaryRole::Officer => Color32::from_rgb(3, 169, 244),                 // Light blue
-        PrimaryRole::Principal => Color32::from_rgb(156, 39, 176),              // Purple
-        PrimaryRole::Trustee => Color32::from_rgb(121, 85, 72),                 // Brown
-        PrimaryRole::Protector => Color32::from_rgb(96, 125, 139),              // Blue-gray
-        PrimaryRole::Beneficiary => Color32::from_rgb(0, 188, 212),             // Cyan
-        PrimaryRole::Settlor => Color32::from_rgb(233, 30, 99),                 // Pink
-        PrimaryRole::AuthorizedSignatory => Color32::from_rgb(63, 81, 181),     // Indigo
-        PrimaryRole::ContactPerson => Color32::from_rgb(158, 158, 158),         // Gray
-        PrimaryRole::Unknown => Color32::from_rgb(117, 117, 117),               // Dark gray
+        PrimaryRole::BeneficialOwner => Color32::from_rgb(102, 187, 106),       // Light green
+        PrimaryRole::Shareholder => Color32::from_rgb(139, 195, 74),            // Lime
+        PrimaryRole::GeneralPartner => Color32::from_rgb(67, 160, 71),          // Green darker
+        PrimaryRole::LimitedPartner => Color32::from_rgb(129, 199, 132),        // Green lighter
+        // Governance - Blue family (KYC focus)
+        PrimaryRole::Director => Color32::from_rgb(33, 150, 243), // Blue
+        PrimaryRole::Officer => Color32::from_rgb(3, 169, 244),   // Light blue
+        PrimaryRole::ConductingOfficer => Color32::from_rgb(0, 188, 212), // Cyan
+        PrimaryRole::ChiefComplianceOfficer => Color32::from_rgb(0, 151, 167), // Cyan dark
+        PrimaryRole::Trustee => Color32::from_rgb(121, 85, 72),   // Brown
+        PrimaryRole::Protector => Color32::from_rgb(96, 125, 139), // Blue-gray
+        PrimaryRole::Beneficiary => Color32::from_rgb(77, 208, 225), // Cyan light
+        PrimaryRole::Settlor => Color32::from_rgb(233, 30, 99),   // Pink
+        // Fund structure - Purple/Orange family (Trading focus)
+        PrimaryRole::Principal => Color32::from_rgb(156, 39, 176), // Purple
+        PrimaryRole::AssetOwner => Color32::from_rgb(171, 71, 188), // Purple light
+        PrimaryRole::MasterFund => Color32::from_rgb(123, 31, 162), // Purple dark
+        PrimaryRole::FeederFund => Color32::from_rgb(186, 104, 200), // Purple lighter
+        PrimaryRole::SegregatedPortfolio => Color32::from_rgb(149, 117, 205), // Deep purple
+        PrimaryRole::ManagementCompany => Color32::from_rgb(255, 152, 0), // Orange
+        PrimaryRole::InvestmentManager => Color32::from_rgb(255, 167, 38), // Orange light
+        PrimaryRole::InvestmentAdvisor => Color32::from_rgb(255, 183, 77), // Orange lighter
+        PrimaryRole::Sponsor => Color32::from_rgb(251, 140, 0),    // Orange dark
+        // Service providers - Teal/Gray family
+        PrimaryRole::Administrator => Color32::from_rgb(0, 150, 136), // Teal
+        PrimaryRole::Custodian => Color32::from_rgb(38, 166, 154),    // Teal light
+        PrimaryRole::Depositary => Color32::from_rgb(0, 137, 123),    // Teal dark
+        PrimaryRole::TransferAgent => Color32::from_rgb(77, 182, 172), // Teal lighter
+        PrimaryRole::Distributor => Color32::from_rgb(128, 203, 196), // Teal lightest
+        PrimaryRole::PrimeBroker => Color32::from_rgb(255, 87, 34),   // Deep orange
+        PrimaryRole::Auditor => Color32::from_rgb(120, 144, 156),     // Blue-gray
+        PrimaryRole::LegalCounsel => Color32::from_rgb(84, 110, 122), // Blue-gray dark
+        // Other
+        PrimaryRole::AuthorizedSignatory => Color32::from_rgb(63, 81, 181), // Indigo
+        PrimaryRole::ContactPerson => Color32::from_rgb(158, 158, 158),     // Gray
+        PrimaryRole::CommercialClient => Color32::from_rgb(255, 193, 7),    // Amber
+        PrimaryRole::Unknown => Color32::from_rgb(117, 117, 117),           // Dark gray
     }
 }
 

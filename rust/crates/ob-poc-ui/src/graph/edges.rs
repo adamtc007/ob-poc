@@ -252,7 +252,8 @@ pub fn render_edge_label(
 
 /// Check if edge label should be shown based on zoom level
 pub fn should_show_edge_label(has_label: bool, zoom: f32) -> bool {
-    has_label && zoom > 0.6
+    // Show labels at lower zoom levels (was 0.6)
+    has_label && zoom > 0.3
 }
 
 // =============================================================================

@@ -37,6 +37,9 @@ pub struct GraphNode {
     /// All roles for this entity (for Entity nodes)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub roles: Vec<String>,
+    /// Role categories: OWNERSHIP_CONTROL, TRADING_EXECUTION, BOTH
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub role_categories: Vec<String>,
     /// Primary role determined by priority (for Entity nodes)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub primary_role: Option<String>,

@@ -210,28 +210,44 @@ impl CbuGraphWidget {
     }
 
     /// Filter graph data based on current view mode
-    /// - KycUbo: Core (CBU + entities) + Kyc + Ubo layers (full ownership/KYC picture)
-    /// - ServiceDelivery: Core (CBU + entities) + Services (excludes UBO layer)
+    /// - KycUbo: CBU + OWNERSHIP_CONTROL entities + UBO layer (ownership/control chain)
+    /// - ServiceDelivery: CBU + TRADING_EXECUTION entities + Services (products/resources)
     fn filter_by_view_mode(&self, data: &CbuGraphData) -> CbuGraphData {
-        // Filter nodes based on view mode
-        // - KycUbo: CBU + entities (core) + KYC status + UBO ownership chain
-        // - ServiceDelivery: CBU + business entities (core) + products/services/resources
-        //   Excludes: UBO layer (ownership links), KYC layer (verification status)
+        // Filter nodes based on view mode using role_categories
         let filtered_nodes: Vec<GraphNodeData> = match self.view_mode {
             ViewMode::KycUbo => {
-                // Include core, kyc, ubo layers - full KYC/ownership picture
+                // Include: CBU, entities with OWNERSHIP_CONTROL roles, UBO layer, KYC layer
+                // These are the ownership/control entities (UBOs, shareholders, directors, GPs)
                 data.nodes
                     .iter()
-                    .filter(|n| matches!(n.layer.as_str(), "core" | "kyc" | "ubo"))
+                    .filter(|n| {
+                        // Always include non-entity nodes in appropriate layers
+                        if n.node_type != "entity" {
+                            return matches!(n.layer.as_str(), "core" | "kyc" | "ubo");
+                        }
+                        // For entities, include if they have OWNERSHIP_CONTROL or BOTH role category
+                        n.role_categories
+                            .iter()
+                            .any(|cat| cat == "OWNERSHIP_CONTROL" || cat == "BOTH")
+                    })
                     .cloned()
                     .collect()
             }
             ViewMode::ServiceDelivery => {
-                // Include: core layer (CBU + business entities) + services layer
-                // Exclude: ubo layer (ownership links) and kyc layer (verification status)
+                // Include: CBU, entities with TRADING_EXECUTION roles, Services layer
+                // These are the trading/operating entities (funds, managers, service providers)
                 data.nodes
                     .iter()
-                    .filter(|n| matches!(n.layer.as_str(), "core" | "services"))
+                    .filter(|n| {
+                        // Always include non-entity nodes in appropriate layers
+                        if n.node_type != "entity" {
+                            return matches!(n.layer.as_str(), "core" | "services");
+                        }
+                        // For entities, include if they have TRADING_EXECUTION or BOTH role category
+                        n.role_categories
+                            .iter()
+                            .any(|cat| cat == "TRADING_EXECUTION" || cat == "BOTH")
+                    })
                     .cloned()
                     .collect()
             }

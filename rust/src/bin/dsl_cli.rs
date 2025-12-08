@@ -185,6 +185,45 @@ enum Commands {
         #[arg(long, short)]
         output: Option<PathBuf>,
     },
+
+    /// Generate CBU from predefined templates (hedge fund, SICAV, 40 Act, SPC)
+    #[cfg(feature = "database")]
+    Template {
+        /// Template type: hedge_fund, lux_sicav, us_40_act, spc (or 'list' to show all)
+        template_type: String,
+
+        /// Fund name (required unless listing)
+        #[arg(short, long)]
+        name: Option<String>,
+
+        /// Execute the generated DSL
+        #[arg(long)]
+        execute: bool,
+
+        /// Database URL (required if --execute, or use DATABASE_URL env var)
+        #[arg(long, env = "DATABASE_URL")]
+        db_url: Option<String>,
+
+        /// Include KYC case with workstreams and screenings
+        #[arg(long, default_value = "true")]
+        kyc: bool,
+
+        /// Include share classes / investor registry
+        #[arg(long, default_value = "true")]
+        share_classes: bool,
+
+        /// Include product/service provisioning
+        #[arg(long, default_value = "true")]
+        products: bool,
+
+        /// Include custody setup (universe, SSI, booking rules)
+        #[arg(long)]
+        custody_setup: bool,
+
+        /// Save generated DSL to file
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
 }
 
 // =============================================================================
@@ -275,6 +314,36 @@ fn main() -> ExitCode {
                     execute,
                     db_url,
                     plan_only,
+                    output,
+                    cli.format,
+                )),
+                Err(e) => Err(e),
+            }
+        }
+        #[cfg(feature = "database")]
+        Commands::Template {
+            template_type,
+            name,
+            execute,
+            db_url,
+            kyc,
+            share_classes,
+            products,
+            custody_setup,
+            output,
+        } => {
+            let rt = tokio::runtime::Runtime::new()
+                .map_err(|e| format!("Failed to create runtime: {}", e));
+            match rt {
+                Ok(rt) => rt.block_on(cmd_template(
+                    &template_type,
+                    name,
+                    execute,
+                    db_url,
+                    kyc,
+                    share_classes,
+                    products,
+                    custody_setup,
                     output,
                     cli.format,
                 )),
@@ -1993,6 +2062,286 @@ async fn cmd_custody(
     }
 
     Ok(())
+}
+
+// =============================================================================
+// TEMPLATE COMMAND - Generate CBU from predefined templates
+// =============================================================================
+
+#[cfg(feature = "database")]
+async fn cmd_template(
+    template_type: &str,
+    name: Option<String>,
+    execute: bool,
+    db_url: Option<String>,
+    include_kyc: bool,
+    include_share_classes: bool,
+    include_products: bool,
+    include_custody_setup: bool,
+    output: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<(), String> {
+    use ob_poc::dsl_v2::{
+        executor::{DslExecutor, ExecutionContext, ExecutionResult},
+        CsgLinter,
+    };
+    use ob_poc::templates::{generate_template, TemplateParams, TemplateType};
+
+    // Handle 'list' command
+    if template_type == "list" || template_type == "help" {
+        if format == OutputFormat::Json {
+            let templates: Vec<_> = TemplateType::all()
+                .iter()
+                .map(|t| {
+                    serde_json::json!({
+                        "type": t.name(),
+                        "description": t.description(),
+                    })
+                })
+                .collect();
+            println!("{}", serde_json::to_string_pretty(&templates).unwrap());
+        } else {
+            println!("{}", "Available CBU Templates:".cyan().bold());
+            println!();
+            for t in TemplateType::all() {
+                println!("  {} - {}", t.name().green().bold(), t.description());
+            }
+            println!();
+            println!("Usage: dsl_cli template <type> --name \"Fund Name\" [--execute]");
+            println!();
+            println!("Options:");
+            println!("  --kyc             Include KYC case (default: true)");
+            println!("  --share-classes   Include share classes (default: true)");
+            println!("  --products        Include product provisioning (default: true)");
+            println!("  --custody-setup   Include custody universe/SSI/rules");
+        }
+        return Ok(());
+    }
+
+    // Parse template type
+    let template = TemplateType::from_str(template_type)
+        .ok_or_else(|| format!(
+            "Unknown template type: '{}'\n\nAvailable types: hedge_fund, lux_sicav, us_40_act, spc\nUse 'dsl_cli template list' to see descriptions.",
+            template_type
+        ))?;
+
+    // Name is required
+    let fund_name =
+        name.ok_or_else(|| "Fund name is required. Use --name \"Your Fund Name\"".to_string())?;
+
+    // Build params
+    let params = TemplateParams {
+        fund_name: fund_name.clone(),
+        jurisdiction: None, // Use template defaults
+        ubos: vec![],       // Use template defaults
+        include_kyc,
+        include_share_classes,
+        include_products,
+        include_custody_setup,
+    };
+
+    // Generate DSL
+    if format == OutputFormat::Pretty {
+        println!(
+            "{} Generating {} template for \"{}\"...",
+            "→".cyan(),
+            template.name(),
+            fund_name
+        );
+    }
+
+    let dsl = generate_template(template, &params);
+
+    // Save to file if requested
+    if let Some(ref path) = output {
+        std::fs::write(path, &dsl).map_err(|e| format!("Failed to write output file: {}", e))?;
+        if format == OutputFormat::Pretty {
+            println!("{} Saved DSL to {}", "✓".green(), path.display());
+        }
+    }
+
+    // If not executing, just show the DSL
+    if !execute {
+        if format == OutputFormat::Json {
+            let output = serde_json::json!({
+                "template": template.name(),
+                "fund_name": fund_name,
+                "dsl": dsl,
+                "line_count": dsl.lines().count(),
+            });
+            println!("{}", serde_json::to_string_pretty(&output).unwrap());
+        } else {
+            println!();
+            println!("{}", "Generated DSL:".yellow().bold());
+            println!("{}", "-".repeat(60));
+            for line in dsl.lines() {
+                if line.trim().starts_with(";;") {
+                    println!("{}", line.dimmed());
+                } else if !line.trim().is_empty() {
+                    println!("{}", line);
+                } else {
+                    println!();
+                }
+            }
+            println!("{}", "-".repeat(60));
+            println!();
+            println!("{} {} lines generated", "✓".green(), dsl.lines().count());
+            println!("  Use --execute to run against the database");
+        }
+        return Ok(());
+    }
+
+    // =========================================================================
+    // EXECUTE THE TEMPLATE
+    // =========================================================================
+
+    let db_url = db_url.ok_or("--db-url or DATABASE_URL required for execution")?;
+
+    if format == OutputFormat::Pretty {
+        println!("{}", "Connecting to database...".dimmed());
+    }
+
+    let pool = sqlx::PgPool::connect(&db_url)
+        .await
+        .map_err(|e| format!("Database connection failed: {}", e))?;
+
+    // Parse
+    if format == OutputFormat::Pretty {
+        println!("{}", "Parsing DSL...".dimmed());
+    }
+
+    let ast = parse_program(&dsl).map_err(|e| format!("Parse error: {:?}", e))?;
+
+    if format == OutputFormat::Pretty {
+        println!("{} Parsed {} statements", "✓".green(), ast.statements.len());
+    }
+
+    // Validate
+    if format == OutputFormat::Pretty {
+        println!("{}", "Validating...".dimmed());
+    }
+
+    let mut linter = CsgLinter::new(pool.clone());
+    linter
+        .initialize()
+        .await
+        .map_err(|e| format!("Linter init failed: {}", e))?;
+
+    let context = ValidationContext::default();
+    let lint_result = linter.lint(ast.clone(), &context, &dsl).await;
+
+    if lint_result.has_errors() {
+        let formatted = RustStyleFormatter::format(&dsl, &lint_result.diagnostics);
+        eprintln!("{}", formatted);
+        return Err("Validation failed".to_string());
+    }
+
+    if format == OutputFormat::Pretty {
+        println!("{} Validation passed", "✓".green());
+    }
+
+    // Compile
+    let plan = compile(&ast).map_err(|e| format!("Compile error: {:?}", e))?;
+
+    if format == OutputFormat::Pretty {
+        println!("{} Compiled {} steps", "✓".green(), plan.steps.len());
+        println!();
+        println!("{}", "Executing...".yellow().bold());
+        println!();
+    }
+
+    // Execute
+    let executor = DslExecutor::new(pool);
+    let mut exec_ctx = ExecutionContext::default();
+
+    match executor.execute_plan(&plan, &mut exec_ctx).await {
+        Ok(results) => {
+            if format == OutputFormat::Json {
+                let bindings: std::collections::HashMap<_, _> = exec_ctx
+                    .symbols
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.to_string()))
+                    .collect();
+
+                let output = serde_json::json!({
+                    "success": true,
+                    "template": template.name(),
+                    "fund_name": fund_name,
+                    "steps_executed": results.len(),
+                    "bindings": bindings,
+                });
+                println!("{}", serde_json::to_string_pretty(&output).unwrap());
+            } else {
+                // Pretty print key results
+                for (i, result) in results.iter().enumerate() {
+                    let step = &plan.steps[i];
+                    let verb_name = format!("{}.{}", step.verb_call.domain, step.verb_call.verb);
+
+                    match result {
+                        ExecutionResult::Uuid(id) => {
+                            let binding_info = step
+                                .bind_as
+                                .as_ref()
+                                .map(|b| format!(" @{} =", b))
+                                .unwrap_or_default();
+                            println!(
+                                "  [{}] {}{} {}",
+                                i,
+                                verb_name.cyan(),
+                                binding_info.yellow(),
+                                id.to_string().dimmed()
+                            );
+                        }
+                        ExecutionResult::Affected(n) => {
+                            println!("  [{}] {} ({} rows)", i, verb_name.cyan(), n);
+                        }
+                        _ => {
+                            println!("  [{}] {} {}", i, verb_name.cyan(), "✓".green());
+                        }
+                    }
+                }
+
+                println!();
+                println!(
+                    "{} Template \"{}\" executed successfully ({} steps)",
+                    "✓".green().bold(),
+                    fund_name,
+                    results.len()
+                );
+
+                // Show key bindings
+                let key_bindings: Vec<_> = exec_ctx
+                    .symbols
+                    .iter()
+                    .filter(|(k, _)| {
+                        k.contains("fund")
+                            || k.contains("cbu")
+                            || k.contains("case")
+                            || k.contains("master")
+                    })
+                    .collect();
+
+                if !key_bindings.is_empty() {
+                    println!();
+                    println!("Key entities created:");
+                    for (name, value) in key_bindings {
+                        println!("  @{} = {}", name.yellow(), value.to_string().dimmed());
+                    }
+                }
+            }
+            Ok(())
+        }
+        Err(e) => {
+            if format == OutputFormat::Json {
+                let output = serde_json::json!({
+                    "success": false,
+                    "error": e.to_string(),
+                });
+                println!("{}", serde_json::to_string_pretty(&output).unwrap());
+            }
+            Err(format!("Execution failed: {}", e))
+        }
+    }
 }
 
 /// Build system prompt for DSL generation

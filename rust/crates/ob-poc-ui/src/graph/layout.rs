@@ -670,43 +670,88 @@ fn node_style_for_role(role: PrimaryRole, is_cbu: bool) -> NodeStyle {
     }
 
     match role {
-        PrimaryRole::UltimateBeneficialOwner => NodeStyle {
+        // Ownership/Control - Green family
+        PrimaryRole::UltimateBeneficialOwner | PrimaryRole::BeneficialOwner => NodeStyle {
             fill_color: Color32::from_rgb(21, 128, 61),
             border_color: Color32::from_rgb(34, 197, 94),
             text_color: Color32::WHITE,
             border_width: 2.0,
         },
-        PrimaryRole::Shareholder => NodeStyle {
-            fill_color: Color32::from_rgb(22, 101, 52),
-            border_color: Color32::from_rgb(74, 222, 128),
-            text_color: Color32::WHITE,
-            border_width: 2.0,
-        },
-        PrimaryRole::ManagementCompany => NodeStyle {
-            fill_color: Color32::from_rgb(124, 45, 18),
-            border_color: Color32::from_rgb(251, 146, 60),
-            text_color: Color32::WHITE,
-            border_width: 2.0,
-        },
-        PrimaryRole::Director => NodeStyle {
+        PrimaryRole::Shareholder | PrimaryRole::GeneralPartner | PrimaryRole::LimitedPartner => {
+            NodeStyle {
+                fill_color: Color32::from_rgb(22, 101, 52),
+                border_color: Color32::from_rgb(74, 222, 128),
+                text_color: Color32::WHITE,
+                border_width: 2.0,
+            }
+        }
+        // Governance - Blue family
+        PrimaryRole::Director
+        | PrimaryRole::Officer
+        | PrimaryRole::ConductingOfficer
+        | PrimaryRole::ChiefComplianceOfficer => NodeStyle {
             fill_color: Color32::from_rgb(30, 64, 175),
             border_color: Color32::from_rgb(96, 165, 250),
             text_color: Color32::WHITE,
             border_width: 2.0,
         },
-        PrimaryRole::Principal => NodeStyle {
-            fill_color: Color32::from_rgb(88, 28, 135),
-            border_color: Color32::from_rgb(192, 132, 252),
-            text_color: Color32::WHITE,
-            border_width: 2.0,
-        },
-        PrimaryRole::Trustee | PrimaryRole::Protector => NodeStyle {
+        // Trust roles - Brown family
+        PrimaryRole::Trustee
+        | PrimaryRole::Protector
+        | PrimaryRole::Beneficiary
+        | PrimaryRole::Settlor => NodeStyle {
             fill_color: Color32::from_rgb(120, 53, 15),
             border_color: Color32::from_rgb(217, 119, 6),
             text_color: Color32::WHITE,
             border_width: 2.0,
         },
-        _ => NodeStyle::default(),
+        // Fund structure - Purple family
+        PrimaryRole::Principal
+        | PrimaryRole::AssetOwner
+        | PrimaryRole::MasterFund
+        | PrimaryRole::FeederFund
+        | PrimaryRole::SegregatedPortfolio => NodeStyle {
+            fill_color: Color32::from_rgb(88, 28, 135),
+            border_color: Color32::from_rgb(192, 132, 252),
+            text_color: Color32::WHITE,
+            border_width: 2.0,
+        },
+        // Management - Orange family
+        PrimaryRole::ManagementCompany
+        | PrimaryRole::InvestmentManager
+        | PrimaryRole::InvestmentAdvisor
+        | PrimaryRole::Sponsor
+        | PrimaryRole::CommercialClient => NodeStyle {
+            fill_color: Color32::from_rgb(124, 45, 18),
+            border_color: Color32::from_rgb(251, 146, 60),
+            text_color: Color32::WHITE,
+            border_width: 2.0,
+        },
+        // Service providers - Teal family
+        PrimaryRole::Administrator
+        | PrimaryRole::Custodian
+        | PrimaryRole::Depositary
+        | PrimaryRole::TransferAgent
+        | PrimaryRole::Distributor => NodeStyle {
+            fill_color: Color32::from_rgb(17, 94, 89),
+            border_color: Color32::from_rgb(45, 212, 191),
+            text_color: Color32::WHITE,
+            border_width: 2.0,
+        },
+        PrimaryRole::PrimeBroker | PrimaryRole::Auditor | PrimaryRole::LegalCounsel => NodeStyle {
+            fill_color: Color32::from_rgb(55, 65, 81),
+            border_color: Color32::from_rgb(156, 163, 175),
+            text_color: Color32::WHITE,
+            border_width: 2.0,
+        },
+        // Other
+        PrimaryRole::AuthorizedSignatory | PrimaryRole::ContactPerson => NodeStyle {
+            fill_color: Color32::from_rgb(55, 65, 81),
+            border_color: Color32::from_rgb(107, 114, 128),
+            text_color: Color32::WHITE,
+            border_width: 1.5,
+        },
+        PrimaryRole::Unknown => NodeStyle::default(),
     }
 }
 

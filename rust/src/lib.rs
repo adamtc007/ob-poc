@@ -58,6 +58,9 @@ pub mod mcp;
 // Agentic DSL generation module
 pub mod agentic;
 
+// CBU Templates - market-accurate fund structures
+pub mod templates;
+
 // Graph visualization module
 #[cfg(feature = "database")]
 pub mod graph;

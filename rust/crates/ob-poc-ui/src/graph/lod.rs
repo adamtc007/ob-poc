@@ -4,7 +4,6 @@
 
 use egui::{Color32, FontId, Pos2, Stroke, Vec2};
 
-use super::colors::role_color;
 use super::types::{EntityType, LayoutNode, PrimaryRole};
 
 // =============================================================================
@@ -91,6 +90,7 @@ pub fn render_node_at_lod(
                 fill,
                 border,
                 text_color,
+                opacity,
             );
         }
         DetailLevel::Standard => {
@@ -193,6 +193,7 @@ fn render_compact(
     fill: Color32,
     border: Color32,
     text_color: Color32,
+    opacity: f32,
 ) {
     let rect = egui::Rect::from_center_size(pos, size);
     let corner = 6.0;
@@ -210,6 +211,11 @@ fn render_compact(
         FontId::proportional(font_size),
         text_color,
     );
+
+    // Role badge (top-right) - also show in compact view
+    if !node.is_cbu_root {
+        render_role_badge(painter, node, rect, opacity);
+    }
 }
 
 /// Standard: Full name + role badge
@@ -308,11 +314,13 @@ fn render_expanded(
 /// Render role badge in top-right corner
 fn render_role_badge(painter: &egui::Painter, node: &LayoutNode, rect: egui::Rect, opacity: f32) {
     let badge_text = role_badge_text(&node.primary_role);
+
     if badge_text.is_empty() {
         return;
     }
 
-    let badge_color = apply_opacity(role_color(node.primary_role), opacity);
+    // Use black text for visibility
+    let text_color = apply_opacity(Color32::BLACK, opacity);
     let badge_pos = rect.right_top() + Vec2::new(-5.0, 5.0);
 
     painter.text(
@@ -320,7 +328,7 @@ fn render_role_badge(painter: &egui::Painter, node: &LayoutNode, rect: egui::Rec
         egui::Align2::RIGHT_TOP,
         badge_text,
         FontId::proportional(9.0),
-        badge_color,
+        text_color,
     );
 }
 
@@ -376,18 +384,44 @@ fn apply_opacity(color: Color32, opacity: f32) -> Color32 {
 /// Get abbreviated role text for badge
 fn role_badge_text(role: &PrimaryRole) -> &'static str {
     match role {
+        // Ownership/Control
         PrimaryRole::UltimateBeneficialOwner => "UBO",
+        PrimaryRole::BeneficialOwner => "BO",
         PrimaryRole::Shareholder => "SH",
-        PrimaryRole::ManagementCompany => "ManCo",
+        PrimaryRole::GeneralPartner => "GP",
+        PrimaryRole::LimitedPartner => "LP",
+        // Governance
         PrimaryRole::Director => "Dir",
         PrimaryRole::Officer => "Off",
-        PrimaryRole::Principal => "Prin",
+        PrimaryRole::ConductingOfficer => "CO",
+        PrimaryRole::ChiefComplianceOfficer => "CCO",
         PrimaryRole::Trustee => "Trustee",
         PrimaryRole::Protector => "Prot",
         PrimaryRole::Beneficiary => "Ben",
         PrimaryRole::Settlor => "Settlor",
+        // Fund structure
+        PrimaryRole::Principal => "Prin",
+        PrimaryRole::AssetOwner => "AO",
+        PrimaryRole::MasterFund => "Master",
+        PrimaryRole::FeederFund => "Feeder",
+        PrimaryRole::SegregatedPortfolio => "SP",
+        PrimaryRole::ManagementCompany => "ManCo",
+        PrimaryRole::InvestmentManager => "IM",
+        PrimaryRole::InvestmentAdvisor => "IA",
+        PrimaryRole::Sponsor => "Sponsor",
+        // Service providers
+        PrimaryRole::Administrator => "Admin",
+        PrimaryRole::Custodian => "Cust",
+        PrimaryRole::Depositary => "Dep",
+        PrimaryRole::TransferAgent => "TA",
+        PrimaryRole::Distributor => "Dist",
+        PrimaryRole::PrimeBroker => "PB",
+        PrimaryRole::Auditor => "Audit",
+        PrimaryRole::LegalCounsel => "Legal",
+        // Other
         PrimaryRole::AuthorizedSignatory => "AS",
         PrimaryRole::ContactPerson => "CP",
+        PrimaryRole::CommercialClient => "Client",
         PrimaryRole::Unknown => "",
     }
 }

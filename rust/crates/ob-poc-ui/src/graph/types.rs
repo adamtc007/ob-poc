@@ -50,40 +50,88 @@ impl CbuCategory {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum PrimaryRole {
-    // Highest priority - ownership/control
+    // Highest priority - ownership/control (KYC view)
     UltimateBeneficialOwner,
+    BeneficialOwner,
     Shareholder,
-    // Management
-    ManagementCompany,
+    GeneralPartner,
+    LimitedPartner,
+    // Governance (KYC view)
     Director,
     Officer,
-    // Structure
-    Principal,
+    ConductingOfficer,
+    ChiefComplianceOfficer,
     Trustee,
     Protector,
     Beneficiary,
     Settlor,
+    // Fund structure - trading entities (Service Delivery view)
+    Principal,
+    AssetOwner,
+    MasterFund,
+    FeederFund,
+    SegregatedPortfolio,
+    ManagementCompany,
+    InvestmentManager,
+    InvestmentAdvisor,
+    Sponsor,
+    // Service providers (Service Delivery view)
+    Administrator,
+    Custodian,
+    Depositary,
+    TransferAgent,
+    Distributor,
+    PrimeBroker,
+    Auditor,
+    LegalCounsel,
     // Other
     AuthorizedSignatory,
     ContactPerson,
+    CommercialClient,
     Unknown,
 }
 
 impl PrimaryRole {
     pub fn from_str(s: &str) -> Self {
         match s.to_uppercase().replace('-', "_").as_str() {
+            // Ownership/Control
             "ULTIMATE_BENEFICIAL_OWNER" | "UBO" => Self::UltimateBeneficialOwner,
+            "BENEFICIAL_OWNER" => Self::BeneficialOwner,
             "SHAREHOLDER" => Self::Shareholder,
-            "MANAGEMENT_COMPANY" | "MANCO" => Self::ManagementCompany,
+            "GENERAL_PARTNER" | "GP" => Self::GeneralPartner,
+            "LIMITED_PARTNER" | "LP" => Self::LimitedPartner,
+            // Governance
             "DIRECTOR" => Self::Director,
             "OFFICER" => Self::Officer,
-            "PRINCIPAL" => Self::Principal,
+            "CONDUCTING_OFFICER" => Self::ConductingOfficer,
+            "CHIEF_COMPLIANCE_OFFICER" | "CCO" => Self::ChiefComplianceOfficer,
             "TRUSTEE" => Self::Trustee,
             "PROTECTOR" => Self::Protector,
             "BENEFICIARY" => Self::Beneficiary,
             "SETTLOR" => Self::Settlor,
+            // Fund structure
+            "PRINCIPAL" => Self::Principal,
+            "ASSET_OWNER" => Self::AssetOwner,
+            "MASTER_FUND" => Self::MasterFund,
+            "FEEDER_FUND" => Self::FeederFund,
+            "SEGREGATED_PORTFOLIO" => Self::SegregatedPortfolio,
+            "MANAGEMENT_COMPANY" | "MANCO" => Self::ManagementCompany,
+            "INVESTMENT_MANAGER" => Self::InvestmentManager,
+            "INVESTMENT_ADVISOR" => Self::InvestmentAdvisor,
+            "SPONSOR" => Self::Sponsor,
+            // Service providers
+            "ADMINISTRATOR" => Self::Administrator,
+            "CUSTODIAN" => Self::Custodian,
+            "DEPOSITARY" => Self::Depositary,
+            "TRANSFER_AGENT" => Self::TransferAgent,
+            "DISTRIBUTOR" => Self::Distributor,
+            "PRIME_BROKER" => Self::PrimeBroker,
+            "AUDITOR" => Self::Auditor,
+            "LEGAL_COUNSEL" => Self::LegalCounsel,
+            // Other
             "AUTHORIZED_SIGNATORY" => Self::AuthorizedSignatory,
             "CONTACT_PERSON" => Self::ContactPerson,
+            "COMMERCIAL_CLIENT" => Self::CommercialClient,
             _ => Self::Unknown,
         }
     }
@@ -91,16 +139,42 @@ impl PrimaryRole {
     /// Priority for layout ordering (higher = more important = placed first)
     pub fn priority(&self) -> i32 {
         match self {
+            // Ownership/control - highest priority
             Self::UltimateBeneficialOwner => 100,
+            Self::BeneficialOwner => 95,
             Self::Shareholder => 90,
-            Self::ManagementCompany => 75,
+            Self::GeneralPartner => 88,
+            Self::LimitedPartner => 85,
+            // Governance
             Self::Director => 70,
             Self::Officer => 65,
-            Self::Principal => 60,
+            Self::ConductingOfficer => 64,
+            Self::ChiefComplianceOfficer => 63,
             Self::Trustee => 55,
             Self::Protector => 50,
             Self::Beneficiary => 45,
             Self::Settlor => 40,
+            // Fund structure - trading entities
+            Self::Principal => 80,
+            Self::AssetOwner => 78,
+            Self::MasterFund => 76,
+            Self::FeederFund => 74,
+            Self::SegregatedPortfolio => 72,
+            Self::ManagementCompany => 75,
+            Self::InvestmentManager => 73,
+            Self::InvestmentAdvisor => 71,
+            Self::Sponsor => 69,
+            Self::CommercialClient => 77,
+            // Service providers
+            Self::Administrator => 50,
+            Self::Custodian => 48,
+            Self::Depositary => 47,
+            Self::TransferAgent => 46,
+            Self::Distributor => 45,
+            Self::PrimeBroker => 44,
+            Self::Auditor => 42,
+            Self::LegalCounsel => 40,
+            // Other
             Self::AuthorizedSignatory => 30,
             Self::ContactPerson => 20,
             Self::Unknown => 0,
@@ -179,6 +253,9 @@ pub struct GraphNodeData {
     pub status: String,
     #[serde(default)]
     pub roles: Vec<String>,
+    /// Role categories: OWNERSHIP_CONTROL, TRADING_EXECUTION, BOTH
+    #[serde(default)]
+    pub role_categories: Vec<String>,
     pub primary_role: Option<String>,
     pub jurisdiction: Option<String>,
     pub role_priority: Option<i32>,

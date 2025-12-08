@@ -86,6 +86,7 @@ impl CbuGraphBuilder {
             status: NodeStatus::Active,
             parent_id: None,
             roles: Vec::new(),
+            role_categories: Vec::new(),
             primary_role: None,
             jurisdiction: cbu_record.jurisdiction.clone(),
             role_priority: None,
@@ -149,12 +150,14 @@ impl CbuGraphBuilder {
                     status: NodeStatus::Active,
                     parent_id: None,
                     roles: ent.roles.clone(),
+                    role_categories: ent.role_categories.clone(),
                     primary_role: ent.primary_role.clone(),
                     jurisdiction: ent.jurisdiction.clone(),
                     role_priority: ent.role_priority,
                     data: serde_json::json!({
                         "entity_id": ent.entity_id,
                         "roles": ent.roles,
+                        "role_categories": ent.role_categories,
                         "primary_role": ent.primary_role,
                         "jurisdiction": ent.jurisdiction,
                         "role_priority": ent.role_priority

@@ -5,11 +5,11 @@
 //!
 //! This enables database portability (e.g., Postgres → Oracle migration).
 
+use crate::graph::{NodeOffset, NodeSizeOverride};
 use anyhow::Result;
 use sqlx::types::Json;
 use sqlx::PgPool;
 use uuid::Uuid;
-use crate::graph::{NodeOffset, NodeSizeOverride};
 
 // =============================================================================
 // VIEW MODELS (read-only structs for visualization)
@@ -242,6 +242,7 @@ pub struct GraphEntityView {
     pub role_name: String,
     pub jurisdiction: Option<String>,
     pub roles: Vec<String>,
+    pub role_categories: Vec<String>,
     pub primary_role: Option<String>,
     pub role_priority: Option<i32>,
 }
@@ -1102,6 +1103,7 @@ impl VisualizationRepository {
                 entity_type as "entity_type!",
                 jurisdiction,
                 roles,
+                role_categories,
                 primary_role,
                 max_role_priority as role_priority
                FROM "ob-poc".v_cbu_entity_with_roles
@@ -1123,6 +1125,7 @@ impl VisualizationRepository {
                 role_name: r.primary_role.clone().unwrap_or_default(),
                 jurisdiction: r.jurisdiction,
                 roles: r.roles.unwrap_or_default(),
+                role_categories: r.role_categories.unwrap_or_default(),
                 primary_role: r.primary_role,
                 role_priority: r.role_priority,
             })
@@ -1432,11 +1435,11 @@ impl VisualizationRepository {
     pub async fn get_ownerships(&self, cbu_id: Uuid) -> Result<Vec<OwnershipView>> {
         let rows = sqlx::query!(
             r#"SELECT
-                o.ownership_id,
-                o.owner_entity_id,
-                o.owned_entity_id,
-                o.ownership_type,
-                o.ownership_percent,
+                o.ownership_id as "ownership_id!",
+                o.owner_entity_id as "owner_entity_id!",
+                o.owned_entity_id as "owned_entity_id!",
+                o.ownership_type as "ownership_type!",
+                o.ownership_percent as "ownership_percent!",
                 owner.name as "owner_name?",
                 owned.name as "owned_name?"
                FROM "ob-poc".ownership_relationships o
@@ -1455,16 +1458,14 @@ impl VisualizationRepository {
 
         Ok(rows
             .into_iter()
-            .filter_map(|r| {
-                Some(OwnershipView {
-                    ownership_id: r.ownership_id?,
-                    owner_entity_id: r.owner_entity_id?,
-                    owned_entity_id: r.owned_entity_id?,
-                    ownership_type: r.ownership_type?,
-                    ownership_percent: r.ownership_percent?,
-                    owner_name: r.owner_name,
-                    owned_name: r.owned_name,
-                })
+            .map(|r| OwnershipView {
+                ownership_id: r.ownership_id,
+                owner_entity_id: r.owner_entity_id,
+                owned_entity_id: r.owned_entity_id,
+                ownership_type: r.ownership_type,
+                ownership_percent: r.ownership_percent,
+                owner_name: r.owner_name,
+                owned_name: r.owned_name,
             })
             .collect())
     }
@@ -1799,6 +1800,4 @@ impl VisualizationRepository {
         .await?;
         Ok(())
     }
-
-
 }
