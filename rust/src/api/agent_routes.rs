@@ -329,7 +329,7 @@ async fn delete_session(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// POST /api/session/:id/chat - Process chat message and generate DSL via Claude
+/// POST /api/session/:id/chat - Process chat message and generate DSL via LLM
 ///
 /// Pipeline: User message → Intent extraction (tool call) → DSL builder → Linter → Feedback loop
 ///
@@ -339,11 +339,14 @@ async fn delete_session(
 /// 3. Validate with CSG linter (same as Zed/LSP)
 /// 4. If errors, feed back to agent and retry
 /// 5. Write valid DSL to session file
+///
+/// Supports both Anthropic and OpenAI backends via AGENT_BACKEND env var.
 async fn chat_session(
     State(state): State<AgentState>,
     Path(session_id): Path<Uuid>,
     Json(req): Json<ChatRequest>,
 ) -> Result<Json<ChatResponse>, StatusCode> {
+    use crate::agentic::llm_client::ToolDefinition;
     use crate::api::dsl_builder::{build_dsl_program, validate_intent};
     use crate::api::dsl_session_file::DslSessionFileManager;
     use crate::api::intent::{IntentValidation, VerbIntent};
@@ -375,19 +378,16 @@ async fn chat_session(
         session.add_user_message(req.message.clone());
     }
 
-    // Get API key
-    let api_key = match std::env::var("ANTHROPIC_API_KEY") {
-        Ok(key) => key,
-        Err(_) => {
+    // Create LLM client (uses AGENT_BACKEND env var to select provider)
+    let llm_client = match crate::agentic::create_llm_client() {
+        Ok(client) => client,
+        Err(e) => {
             let mut sessions = state.sessions.write().await;
             let session = sessions.get_mut(&session_id).ok_or(StatusCode::NOT_FOUND)?;
-            session.add_agent_message(
-                "Error: ANTHROPIC_API_KEY not configured".to_string(),
-                None,
-                None,
-            );
+            let error_msg = format!("Error: LLM client initialization failed: {}", e);
+            session.add_agent_message(error_msg.clone(), None, None);
             return Ok(Json(ChatResponse {
-                message: "Error: ANTHROPIC_API_KEY not configured".to_string(),
+                message: error_msg,
                 intents: vec![],
                 assembled_dsl: None,
                 validation_results: vec![],
@@ -397,11 +397,56 @@ async fn chat_session(
         }
     };
 
+    tracing::info!(
+        "Chat session using {} ({})",
+        llm_client.provider_name(),
+        llm_client.model_name()
+    );
+
     // Build system prompt for intent extraction
     let vocab = build_vocab_prompt(None);
     let system_prompt = build_intent_extraction_prompt(&vocab);
 
-    let client = reqwest::Client::new();
+    // Define the tool for structured intent extraction
+    let tool = ToolDefinition {
+        name: "generate_dsl_intents".to_string(),
+        description: "Generate structured DSL intents from user request. Each intent represents a single DSL verb call.".to_string(),
+        parameters: serde_json::json!({
+            "type": "object",
+            "properties": {
+                "intents": {
+                    "type": "array",
+                    "description": "List of DSL verb intents",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "verb": {
+                                "type": "string",
+                                "description": "The DSL verb, e.g., 'cbu.ensure', 'entity.create-proper-person'"
+                            },
+                            "params": {
+                                "type": "object",
+                                "description": "Parameters with literal values",
+                                "additionalProperties": true
+                            },
+                            "refs": {
+                                "type": "object",
+                                "description": "References to previous results, e.g., {\"cbu-id\": \"@result_1\"}",
+                                "additionalProperties": {"type": "string"}
+                            }
+                        },
+                        "required": ["verb", "params"]
+                    }
+                },
+                "explanation": {
+                    "type": "string",
+                    "description": "Brief explanation of what the DSL will do"
+                }
+            },
+            "required": ["intents", "explanation"]
+        }),
+    };
+
     let mut feedback_context = String::new();
     let mut final_dsl: Option<String> = None;
     let mut final_explanation = String::new();
@@ -420,92 +465,34 @@ async fn chat_session(
             )
         };
 
-        // Call Claude with tool use for structured intent extraction
-        let response = client
-            .post("https://api.anthropic.com/v1/messages")
-            .header("x-api-key", &api_key)
-            .header("anthropic-version", "2023-06-01")
-            .header("content-type", "application/json")
-            .json(&serde_json::json!({
-                "model": "claude-sonnet-4-20250514",
-                "max_tokens": 2048,
-                "system": system_prompt,
-                "messages": [
-                    {"role": "user", "content": user_message}
-                ],
-                "tools": [{
-                    "name": "generate_dsl_intents",
-                    "description": "Generate structured DSL intents from user request. Each intent represents a single DSL verb call.",
-                    "input_schema": {
-                        "type": "object",
-                        "properties": {
-                            "intents": {
-                                "type": "array",
-                                "description": "List of DSL verb intents",
-                                "items": {
-                                    "type": "object",
-                                    "properties": {
-                                        "verb": {
-                                            "type": "string",
-                                            "description": "The DSL verb, e.g., 'cbu.ensure', 'entity.create-proper-person'"
-                                        },
-                                        "params": {
-                                            "type": "object",
-                                            "description": "Parameters with literal values",
-                                            "additionalProperties": true
-                                        },
-                                        "refs": {
-                                            "type": "object",
-                                            "description": "References to previous results, e.g., {\"cbu-id\": \"@result_1\"}",
-                                            "additionalProperties": {"type": "string"}
-                                        }
-                                    },
-                                    "required": ["verb", "params"]
-                                }
-                            },
-                            "explanation": {
-                                "type": "string",
-                                "description": "Brief explanation of what the DSL will do"
-                            }
-                        },
-                        "required": ["intents", "explanation"]
-                    }
-                }],
-                "tool_choice": {"type": "tool", "name": "generate_dsl_intents"}
-            }))
-            .send()
+        // Call LLM with tool use for structured intent extraction
+        let tool_result = llm_client
+            .chat_with_tool(&system_prompt, &user_message, &tool)
             .await;
 
         // Parse response
-        let (intents, explanation) = match response {
-            Ok(resp) => {
-                if !resp.status().is_success() {
-                    tracing::error!(
-                        "Claude API error: {} - {}",
-                        resp.status(),
-                        resp.text().await.unwrap_or_default()
-                    );
+        let (intents, explanation) = match tool_result {
+            Ok(result) => {
+                // Extract intents and explanation from tool result
+                let intents_json = &result.arguments["intents"];
+                let explanation = result.arguments["explanation"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string();
+
+                // Parse intents
+                let intents: Vec<VerbIntent> =
+                    serde_json::from_value(intents_json.clone()).unwrap_or_default();
+
+                (intents, explanation)
+            }
+            Err(e) => {
+                tracing::error!("LLM API error (attempt {}): {}", attempt + 1, e);
+                if attempt == MAX_RETRIES - 1 {
                     return Err(StatusCode::BAD_GATEWAY);
                 }
-
-                match resp.json::<serde_json::Value>().await {
-                    Ok(json) => {
-                        // Extract tool use result
-                        let tool_input = &json["content"][0]["input"];
-                        let intents_json = &tool_input["intents"];
-                        let explanation =
-                            tool_input["explanation"].as_str().unwrap_or("").to_string();
-
-                        // Parse intents
-                        let intents: Vec<VerbIntent> =
-                            serde_json::from_value(intents_json.clone()).unwrap_or_default();
-
-                        (intents, explanation)
-                    }
-                    Err(_) => (Vec::new(), String::new()),
-                }
+                (Vec::new(), String::new())
             }
-            Err(_) => (Vec::new(), String::new()),
         };
 
         if intents.is_empty() {

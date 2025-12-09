@@ -6,7 +6,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serde::Deserialize;
 
-use super::llm_client::LlmClient;
+use super::llm_client::{LlmClient, ToolCallResult, ToolDefinition};
 
 /// Default Anthropic model
 const DEFAULT_MODEL: &str = "claude-sonnet-4-20250514";
@@ -46,7 +46,7 @@ impl AnthropicClient {
         Ok(Self::new(api_key))
     }
 
-    /// Internal API call implementation
+    /// Internal API call implementation for plain chat
     async fn call_api(&self, system_prompt: &str, user_prompt: &str) -> Result<String> {
         let response = self
             .client
@@ -85,6 +85,71 @@ impl AnthropicClient {
             .and_then(|c| c.text.clone())
             .ok_or_else(|| anyhow!("Empty response from Anthropic"))
     }
+
+    /// Internal API call with tool_use for structured output
+    async fn call_api_with_tool(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        tool: &ToolDefinition,
+    ) -> Result<ToolCallResult> {
+        let response = self
+            .client
+            .post("https://api.anthropic.com/v1/messages")
+            .header("x-api-key", &self.api_key)
+            .header("anthropic-version", "2023-06-01")
+            .header("content-type", "application/json")
+            .json(&serde_json::json!({
+                "model": &self.model,
+                "max_tokens": 4096,
+                "system": system_prompt,
+                "messages": [{"role": "user", "content": user_prompt}],
+                "tools": [{
+                    "name": &tool.name,
+                    "description": &tool.description,
+                    "input_schema": &tool.parameters
+                }],
+                "tool_choice": {"type": "tool", "name": &tool.name}
+            }))
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(anyhow!("Anthropic API error {}: {}", status, body));
+        }
+
+        // Parse tool_use response
+        // Response format: { "content": [{ "type": "tool_use", "name": "...", "input": {...} }] }
+        #[derive(Deserialize)]
+        struct ContentBlock {
+            #[serde(rename = "type")]
+            block_type: String,
+            name: Option<String>,
+            input: Option<serde_json::Value>,
+        }
+        #[derive(Deserialize)]
+        struct ApiResponse {
+            content: Vec<ContentBlock>,
+        }
+
+        let api_response: ApiResponse = response.json().await?;
+
+        // Find the tool_use block
+        for block in api_response.content {
+            if block.block_type == "tool_use" {
+                if let (Some(name), Some(input)) = (block.name, block.input) {
+                    return Ok(ToolCallResult {
+                        tool_name: name,
+                        arguments: input,
+                    });
+                }
+            }
+        }
+
+        Err(anyhow!("No tool_use block in Anthropic response"))
+    }
 }
 
 #[async_trait]
@@ -100,6 +165,16 @@ impl LlmClient for AnthropicClient {
             system_prompt
         );
         self.call_api(&json_system, user_prompt).await
+    }
+
+    async fn chat_with_tool(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        tool: &ToolDefinition,
+    ) -> Result<ToolCallResult> {
+        self.call_api_with_tool(system_prompt, user_prompt, tool)
+            .await
     }
 
     fn model_name(&self) -> &str {

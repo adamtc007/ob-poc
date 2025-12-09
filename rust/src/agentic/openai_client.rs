@@ -6,7 +6,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serde::Deserialize;
 
-use super::llm_client::LlmClient;
+use super::llm_client::{LlmClient, ToolCallResult, ToolDefinition};
 
 /// Default OpenAI model
 const DEFAULT_MODEL: &str = "gpt-4.1";
@@ -101,6 +101,79 @@ impl OpenAiClient {
             .map(|c| c.message.content.clone())
             .ok_or_else(|| anyhow!("OpenAI returned no choices"))
     }
+
+    /// Internal API call with function_calling for structured output
+    async fn call_api_with_tool(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        tool: &ToolDefinition,
+    ) -> Result<ToolCallResult> {
+        let response = self
+            .client
+            .post("https://api.openai.com/v1/chat/completions")
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Content-Type", "application/json")
+            .json(&serde_json::json!({
+                "model": &self.model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                "temperature": 0.1,
+                "functions": [{
+                    "name": &tool.name,
+                    "description": &tool.description,
+                    "parameters": &tool.parameters
+                }],
+                "function_call": {"name": &tool.name}
+            }))
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(anyhow!("OpenAI API error {}: {}", status, body));
+        }
+
+        // Parse function_call response
+        // Response format: { "choices": [{ "message": { "function_call": { "name": "...", "arguments": "..." } } }] }
+        #[derive(Deserialize)]
+        struct FunctionCall {
+            name: String,
+            arguments: String, // OpenAI returns arguments as a JSON string
+        }
+        #[derive(Deserialize)]
+        struct Message {
+            function_call: Option<FunctionCall>,
+        }
+        #[derive(Deserialize)]
+        struct Choice {
+            message: Message,
+        }
+        #[derive(Deserialize)]
+        struct ApiResponse {
+            choices: Vec<Choice>,
+        }
+
+        let api_response: ApiResponse = response.json().await?;
+
+        let function_call = api_response
+            .choices
+            .first()
+            .and_then(|c| c.message.function_call.as_ref())
+            .ok_or_else(|| anyhow!("No function_call in OpenAI response"))?;
+
+        // Parse the arguments JSON string into a Value
+        let arguments: serde_json::Value = serde_json::from_str(&function_call.arguments)
+            .map_err(|e| anyhow!("Failed to parse function arguments: {}", e))?;
+
+        Ok(ToolCallResult {
+            tool_name: function_call.name.clone(),
+            arguments,
+        })
+    }
 }
 
 #[async_trait]
@@ -111,6 +184,16 @@ impl LlmClient for OpenAiClient {
 
     async fn chat_json(&self, system_prompt: &str, user_prompt: &str) -> Result<String> {
         self.call_api(system_prompt, user_prompt, true).await
+    }
+
+    async fn chat_with_tool(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        tool: &ToolDefinition,
+    ) -> Result<ToolCallResult> {
+        self.call_api_with_tool(system_prompt, user_prompt, tool)
+            .await
     }
 
     fn model_name(&self) -> &str {
