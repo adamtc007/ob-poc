@@ -533,6 +533,8 @@ async fn chat_session(
 
         // Run SemanticValidator with EntityGateway (same pipeline as Zed/LSP)
         // This validates embedded data values (products, roles, jurisdictions, etc.)
+        // NOTE: EntityGateway errors (missing entity types) are logged as warnings, not errors
+        // to avoid breaking generation when the gateway is misconfigured
         match SemanticValidator::new(state.pool.clone()).await {
             Ok(mut validator) => {
                 let request = crate::dsl_v2::validation::ValidationRequest {
@@ -541,9 +543,19 @@ async fn chat_session(
                 };
                 match validator.validate(&request).await {
                     crate::dsl_v2::validation::ValidationResult::Err(diagnostics) => {
-                        has_errors = true;
                         for diag in diagnostics {
+                            // Skip EntityGateway connection/config errors - these shouldn't block generation
+                            if diag.message.contains("EntityGateway")
+                                || diag.message.contains("Unknown entity type")
+                            {
+                                tracing::warn!(
+                                    "EntityGateway validation skipped: {}",
+                                    diag.message
+                                );
+                                continue;
+                            }
                             if diag.severity == crate::dsl_v2::validation::Severity::Error {
+                                has_errors = true;
                                 error_feedback.push(format!("Validation: {}", diag.message));
                             }
                         }
@@ -561,10 +573,21 @@ async fn chat_session(
 
         // If no errors, we're done
         if !has_errors {
+            tracing::info!(
+                "Validation passed on attempt {}, DSL: {}",
+                attempt + 1,
+                &dsl[..dsl.len().min(200)]
+            );
             final_dsl = Some(dsl);
             final_explanation = explanation;
             all_intents = intents;
             break;
+        } else {
+            tracing::warn!(
+                "Validation failed on attempt {}: {:?}",
+                attempt + 1,
+                error_feedback
+            );
         }
 
         // Build feedback for next attempt

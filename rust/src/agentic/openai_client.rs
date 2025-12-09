@@ -9,7 +9,7 @@ use serde::Deserialize;
 use super::llm_client::{LlmClient, ToolCallResult, ToolDefinition};
 
 /// Default OpenAI model
-const DEFAULT_MODEL: &str = "gpt-4.1";
+const DEFAULT_MODEL: &str = "gpt-4o";
 
 /// OpenAI API client
 #[derive(Clone)]
@@ -157,7 +157,14 @@ impl OpenAiClient {
             choices: Vec<Choice>,
         }
 
-        let api_response: ApiResponse = response.json().await?;
+        let response_text = response.text().await?;
+        tracing::debug!(
+            "OpenAI raw response: {}",
+            &response_text[..response_text.len().min(1000)]
+        );
+
+        let api_response: ApiResponse = serde_json::from_str(&response_text)
+            .map_err(|e| anyhow!("Failed to parse OpenAI response: {}", e))?;
 
         let function_call = api_response
             .choices
@@ -165,9 +172,16 @@ impl OpenAiClient {
             .and_then(|c| c.message.function_call.as_ref())
             .ok_or_else(|| anyhow!("No function_call in OpenAI response"))?;
 
+        tracing::debug!(
+            "OpenAI function_call arguments: {}",
+            &function_call.arguments
+        );
+
         // Parse the arguments JSON string into a Value
         let arguments: serde_json::Value = serde_json::from_str(&function_call.arguments)
             .map_err(|e| anyhow!("Failed to parse function arguments: {}", e))?;
+
+        tracing::info!("OpenAI returned intents: {:?}", arguments.get("intents"));
 
         Ok(ToolCallResult {
             tool_name: function_call.name.clone(),
