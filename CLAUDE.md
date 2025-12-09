@@ -137,6 +137,68 @@ args:
 | `reference` | Roles, jurisdictions, currencies | Autocomplete dropdown |
 | `entity` | CBUs, people, funds, cases | Search modal with refinement |
 
+## Centralized Entity Lookup Architecture
+
+All entity lookup and resolution flows through the **EntityGateway** gRPC service. This ensures consistent fuzzy search behavior across the entire system.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    All Entity Lookups                            │
+│  LSP Completions | Semantic Validator | Executor | Agent Routes │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   EntityGateway (gRPC)                           │
+│  rust/crates/entity-gateway/                                    │
+│  Port 50051 | In-memory Tantivy indexes                         │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      PostgreSQL                                  │
+│  Periodic refresh (300s) from reference tables                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Resolution Rule
+
+| Input | Action |
+|-------|--------|
+| Have UUID primary key | Direct SQL lookup (no EntityGateway) |
+| Have name/partial match | EntityGateway fuzzy search → UUID |
+
+### Consumers
+
+| Consumer | File | Usage |
+|----------|------|-------|
+| LSP Completions | `rust/crates/dsl-lsp/src/handlers/completion.rs` | Autocomplete for entity references |
+| Semantic Validator | `rust/src/dsl_v2/semantic_validator.rs` | Resolve EntityRef values |
+| Gateway Resolver | `rust/src/dsl_v2/gateway_resolver.rs` | CSG linter reference validation |
+| Generic Executor | `rust/src/dsl_v2/generic_executor.rs` | Runtime entity lookup with SQL fallback |
+| Agent Routes | `rust/src/api/agent_routes.rs` | Tool-use entity lookup |
+
+### Go UI Proxy Pattern
+
+The Go web UI (`go/cmd/web/main.go`) is purely a proxy to Rust APIs - no business logic or side doors:
+
+```go
+// All routes proxy to Rust
+r.HandleFunc("/api/dsl/execute", proxyTo(agentURL + "/execute"))
+r.HandleFunc("/api/agent/chat", proxyTo(agentURL + "/api/session/{id}/chat"))
+```
+
+## Code Statistics
+
+As of 2025-12-09:
+
+| Language | Files | Lines |
+|----------|-------|-------|
+| Rust | 264 | 198,458 |
+| Go | 6 | 1,443 |
+| YAML Config | 5 | 7,789 |
+| **Total** | **275** | **~207,690** |
+
 ### YAML-Driven Configuration
 
 The DSL system is entirely YAML-driven. Adding new verbs requires editing YAML, not Rust code.
@@ -1504,8 +1566,8 @@ The `share-class`, `holding`, and `movement` domains implement a Clearstream-sty
 ## Database Schema Reference
 
 **Database**: `data_designer` on PostgreSQL 17  
-**Schemas**: `ob-poc` (55 tables), `custody` (17 tables), `kyc` (11 tables)  
-**Updated**: 2025-12-07
+**Schemas**: `ob-poc` (77 tables), `custody` (17 tables), `kyc` (12 tables)  
+**Updated**: 2025-12-09
 
 ## Overview
 
@@ -2422,11 +2484,11 @@ Subscription, redemption, and transfer transactions.
 | DSL/Execution | 6 | dsl_instances, dsl_instance_versions, dsl_execution_log, dsl_domains, dsl_examples |
 | Onboarding | 4 | onboarding_requests, onboarding_products, service_option_definitions, service_option_choices |
 | Attributes | 4 | attribute_registry, attribute_values_typed, attribute_dictionary, resource_attribute_requirements |
-| Other | 13 | Various support tables |
-| **ob-poc Total** | **51** | |
+| Other | 39 | Various support tables |
+| **ob-poc Total** | **77** | |
 | **Custody** | **17** | cbu_instrument_universe, cbu_ssi, ssi_booking_rules, isda_agreements, csa_agreements |
-| **KYC** | **11** | cases, entity_workstreams, red_flags, doc_requests, screenings, share_classes, holdings, movements |
-| **Grand Total** | **79** | |
+| **KYC** | **12** | cases, entity_workstreams, red_flags, doc_requests, screenings, share_classes, holdings, movements |
+| **Grand Total** | **106** | |
 
 ## Rebuilding the Schema
 
@@ -3226,12 +3288,6 @@ UBO ownership and control chain management
 | `ubo.update-ownership` | Update ownership percentage or end date |
 | `ubo.verify-ubo` | Mark a UBO as verified |
 
-
-```bash
-DATABASE_URL="postgresql:///data_designer"
-ANTHROPIC_API_KEY="sk-ant-..."
-DSL_CONFIG_DIR="/path/to/config"  # Optional: override config location
-```
 
 ## Adding New Verbs
 
