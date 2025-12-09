@@ -292,6 +292,16 @@ config/dev.yaml
 # Generated SQL dumps
 *.sql.dump
 *.sql.gz
+*.dump
+
+# Go compiled binaries (specific paths)
+go/web-server
+go/cmd/web/webserver
+
+# WASM build artifacts
+rust/static/pkg/
+rust/crates/dsl-lsp/zed-extension/extension.wasm
+rust/crates/dsl-lsp/zed-extension/grammars/
 
 # Performance and profiling
 perf.data
