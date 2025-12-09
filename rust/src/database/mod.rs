@@ -73,8 +73,8 @@ pub use visualization_repository::{
 };
 
 pub use session_repository::{
-    detect_domain, extract_domains, DslSnapshot, EntityCreated, PersistedSession, SessionEventType,
-    SessionRepository, SessionStatus,
+    detect_domain, extract_domains, CbuDslState, DslSnapshot, EntityCreated, PersistedSession,
+    SessionEventType, SessionRepository, SessionStatus,
 };
 
 /// Database configuration

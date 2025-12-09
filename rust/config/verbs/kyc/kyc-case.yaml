@@ -5,6 +5,13 @@ domains:
       create:
         description: Create a new KYC case for a CBU
         behavior: crud
+        produces:
+          type: case
+          resolved: false
+        consumes:
+          - arg: cbu-id
+            type: cbu
+            required: true
         crud:
           operation: insert
           table: cases
@@ -12,44 +19,44 @@ domains:
           returning: case_id
         emits_event: case.created
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          maps_to: cbu_id
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
-        - name: case-type
-          type: string
-          required: false
-          maps_to: case_type
-          default: NEW_CLIENT
-          valid_values:
-          - NEW_CLIENT
-          - PERIODIC_REVIEW
-          - EVENT_DRIVEN
-          - REMEDIATION
-        - name: sla-deadline
-          type: timestamp
-          required: false
-          maps_to: sla_deadline
-        - name: assigned-analyst-id
-          type: uuid
-          required: false
-          maps_to: assigned_analyst_id
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
-        - name: notes
-          type: string
-          required: false
-          maps_to: notes
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: case-type
+            type: string
+            required: false
+            maps_to: case_type
+            default: NEW_CLIENT
+            valid_values:
+              - NEW_CLIENT
+              - PERIODIC_REVIEW
+              - EVENT_DRIVEN
+              - REMEDIATION
+          - name: sla-deadline
+            type: timestamp
+            required: false
+            maps_to: sla_deadline
+          - name: assigned-analyst-id
+            type: uuid
+            required: false
+            maps_to: assigned_analyst_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
         returns:
           type: uuid
           name: case_id
@@ -64,30 +71,30 @@ domains:
           key: case_id
         emits_event: case.status-changed
         args:
-        - name: case-id
-          type: uuid
-          required: true
-          maps_to: case_id
-          lookup:
-            table: cases
-            entity_type: kyc_case
-            schema: kyc
-            search_key: case_id
-            primary_key: case_id
-        - name: status
-          type: string
-          required: true
-          maps_to: status
-          valid_values:
-          - INTAKE
-          - DISCOVERY
-          - ASSESSMENT
-          - REVIEW
-          - APPROVED
-          - REJECTED
-          - BLOCKED
-          - WITHDRAWN
-          - EXPIRED
+          - name: case-id
+            type: uuid
+            required: true
+            maps_to: case_id
+            lookup:
+              table: cases
+              entity_type: kyc_case
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
+          - name: status
+            type: string
+            required: true
+            maps_to: status
+            valid_values:
+              - INTAKE
+              - DISCOVERY
+              - ASSESSMENT
+              - REVIEW
+              - APPROVED
+              - REJECTED
+              - BLOCKED
+              - WITHDRAWN
+              - EXPIRED
         returns:
           type: affected
       escalate:
@@ -100,25 +107,25 @@ domains:
           key: case_id
         emits_event: case.escalated
         args:
-        - name: case-id
-          type: uuid
-          required: true
-          maps_to: case_id
-          lookup:
-            table: cases
-            entity_type: kyc_case
-            schema: kyc
-            search_key: case_id
-            primary_key: case_id
-        - name: escalation-level
-          type: string
-          required: true
-          maps_to: escalation_level
-          valid_values:
-          - STANDARD
-          - SENIOR_COMPLIANCE
-          - EXECUTIVE
-          - BOARD
+          - name: case-id
+            type: uuid
+            required: true
+            maps_to: case_id
+            lookup:
+              table: cases
+              entity_type: kyc_case
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
+          - name: escalation-level
+            type: string
+            required: true
+            maps_to: escalation_level
+            valid_values:
+              - STANDARD
+              - SENIOR_COMPLIANCE
+              - EXECUTIVE
+              - BOARD
         returns:
           type: affected
       assign:
@@ -131,36 +138,36 @@ domains:
           key: case_id
         emits_event: case.assigned
         args:
-        - name: case-id
-          type: uuid
-          required: true
-          maps_to: case_id
-          lookup:
-            table: cases
-            entity_type: kyc_case
-            schema: kyc
-            search_key: case_id
-            primary_key: case_id
-        - name: analyst-id
-          type: uuid
-          required: false
-          maps_to: assigned_analyst_id
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
-        - name: reviewer-id
-          type: uuid
-          required: false
-          maps_to: assigned_reviewer_id
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
+          - name: case-id
+            type: uuid
+            required: true
+            maps_to: case_id
+            lookup:
+              table: cases
+              entity_type: kyc_case
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
+          - name: analyst-id
+            type: uuid
+            required: false
+            maps_to: assigned_analyst_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: reviewer-id
+            type: uuid
+            required: false
+            maps_to: assigned_reviewer_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         returns:
           type: affected
       set-risk-rating:
@@ -173,26 +180,26 @@ domains:
           key: case_id
         emits_event: case.risk-rated
         args:
-        - name: case-id
-          type: uuid
-          required: true
-          maps_to: case_id
-          lookup:
-            table: cases
-            entity_type: kyc_case
-            schema: kyc
-            search_key: case_id
-            primary_key: case_id
-        - name: risk-rating
-          type: string
-          required: true
-          maps_to: risk_rating
-          valid_values:
-          - LOW
-          - MEDIUM
-          - HIGH
-          - VERY_HIGH
-          - PROHIBITED
+          - name: case-id
+            type: uuid
+            required: true
+            maps_to: case_id
+            lookup:
+              table: cases
+              entity_type: kyc_case
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
+          - name: risk-rating
+            type: string
+            required: true
+            maps_to: risk_rating
+            valid_values:
+              - LOW
+              - MEDIUM
+              - HIGH
+              - VERY_HIGH
+              - PROHIBITED
         returns:
           type: affected
       close:
@@ -207,29 +214,29 @@ domains:
             closed_at: now()
         emits_event: case.closed
         args:
-        - name: case-id
-          type: uuid
-          required: true
-          maps_to: case_id
-          lookup:
-            table: cases
-            entity_type: kyc_case
-            schema: kyc
-            search_key: case_id
-            primary_key: case_id
-        - name: status
-          type: string
-          required: true
-          maps_to: status
-          valid_values:
-          - APPROVED
-          - REJECTED
-          - WITHDRAWN
-          - EXPIRED
-        - name: notes
-          type: string
-          required: false
-          maps_to: notes
+          - name: case-id
+            type: uuid
+            required: true
+            maps_to: case_id
+            lookup:
+              table: cases
+              entity_type: kyc_case
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
+          - name: status
+            type: string
+            required: true
+            maps_to: status
+            valid_values:
+              - APPROVED
+              - REJECTED
+              - WITHDRAWN
+              - EXPIRED
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
         returns:
           type: affected
       read:
@@ -240,16 +247,16 @@ domains:
           table: cases
           schema: kyc
         args:
-        - name: case-id
-          type: uuid
-          required: true
-          maps_to: case_id
-          lookup:
-            table: cases
-            entity_type: kyc_case
-            schema: kyc
-            search_key: case_id
-            primary_key: case_id
+          - name: case-id
+            type: uuid
+            required: true
+            maps_to: case_id
+            lookup:
+              table: cases
+              entity_type: kyc_case
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
         returns:
           type: record
       list-by-cbu:
@@ -261,18 +268,18 @@ domains:
           schema: kyc
           fk_col: cbu_id
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
-        - name: status
-          type: string
-          required: false
-          maps_to: status
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: status
+            type: string
+            required: false
+            maps_to: status
         returns:
           type: record_set

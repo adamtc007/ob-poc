@@ -221,6 +221,68 @@ impl ToolHandlers {
             }
         };
 
+        // CSG validation (includes dataflow)
+        {
+            use crate::dsl_v2::semantic_validator::SemanticValidator;
+            use crate::dsl_v2::validation::{Severity, ValidationContext, ValidationRequest};
+
+            let validator_result = async {
+                let v = SemanticValidator::new(self.pool.clone()).await?;
+                v.with_csg_linter().await
+            }
+            .await;
+
+            if let Ok(mut validator) = validator_result {
+                let request = ValidationRequest {
+                    source: source.to_string(),
+                    context: ValidationContext::default(),
+                };
+                if let crate::dsl_v2::validation::ValidationResult::Err(diagnostics) =
+                    validator.validate(&request).await
+                {
+                    let errors: Vec<String> = diagnostics
+                        .iter()
+                        .filter(|d| d.severity == Severity::Error)
+                        .map(|d| format!("[{}] {}", d.code.as_str(), d.message))
+                        .collect();
+                    if !errors.is_empty() {
+                        // Log validation failure
+                        if let Some(lid) = log_id {
+                            let attempt = GenerationAttempt {
+                                attempt: 1,
+                                timestamp: chrono::Utc::now(),
+                                prompt_template: None,
+                                prompt_text: String::new(),
+                                raw_response: String::new(),
+                                extracted_dsl: Some(source.to_string()),
+                                parse_result: ParseResult {
+                                    success: true,
+                                    error: None,
+                                },
+                                lint_result: LintResult {
+                                    valid: false,
+                                    errors: errors.clone(),
+                                    warnings: vec![],
+                                },
+                                compile_result: CompileResult {
+                                    success: false,
+                                    error: None,
+                                    step_count: 0,
+                                },
+                                latency_ms: Some(start_time.elapsed().as_millis() as i32),
+                                input_tokens: None,
+                                output_tokens: None,
+                            };
+                            let _ = self.generation_log.add_attempt(lid, &attempt).await;
+                            let _ = self.generation_log.mark_failed(lid).await;
+                        }
+
+                        return Err(anyhow!("Validation errors: {}", errors.join("; ")));
+                    }
+                }
+            }
+        }
+
         // Compile
         let plan = match compile(&ast) {
             Ok(p) => p,

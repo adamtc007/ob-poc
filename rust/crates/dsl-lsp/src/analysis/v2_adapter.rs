@@ -291,20 +291,39 @@ fn extract_symbols_from_expr(
     }
 }
 
-/// Infer the ID type from the verb that defined the symbol.
+/// Infer the ID type from the verb registry's `produces` metadata.
+///
+/// This aligns with the REPL's BindingContext and uses the same source of truth.
 fn infer_id_type(verb_name: &str) -> String {
-    match verb_name {
-        "cbu.ensure" | "cbu.create" => "CbuId".to_string(),
-        "entity.create-limited-company"
-        | "entity.create-proper-person"
-        | "entity.create-partnership"
-        | "entity.create-trust" => "EntityId".to_string(),
-        "investigation.create" => "InvestigationId".to_string(),
-        "document.request" => "DocumentRequestId".to_string(),
-        "screening.pep" | "screening.sanctions" => "ScreeningId".to_string(),
-        "decision.record" => "DecisionId".to_string(),
-        _ => "uuid".to_string(),
+    use ob_poc::dsl_v2::config::ConfigLoader;
+    use ob_poc::dsl_v2::RuntimeVerbRegistry;
+
+    // Try to load from registry (cached after first load)
+    static REGISTRY: std::sync::OnceLock<Option<RuntimeVerbRegistry>> = std::sync::OnceLock::new();
+
+    let registry = REGISTRY.get_or_init(|| {
+        let loader = ConfigLoader::from_env();
+        loader
+            .load_verbs()
+            .ok()
+            .map(|config| RuntimeVerbRegistry::from_config(&config))
+    });
+
+    if let Some(reg) = registry {
+        // Parse domain.verb
+        if let Some((domain, verb)) = verb_name.split_once('.') {
+            if let Some(produces) = reg.get_produces(domain, verb) {
+                // Format as "type" or "type/subtype"
+                return match &produces.subtype {
+                    Some(sub) => format!("{}/{}", produces.produced_type, sub),
+                    None => produces.produced_type.clone(),
+                };
+            }
+        }
     }
+
+    // Fallback for unknown verbs
+    "uuid".to_string()
 }
 
 /// Try to extract a position from nom's verbose error message.

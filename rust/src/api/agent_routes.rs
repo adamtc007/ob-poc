@@ -27,7 +27,7 @@ use crate::database::generation_log_repository::{
 };
 use crate::dsl_v2::{
     compile, parse_program, verb_registry::registry, DslExecutor, ExecutionContext,
-    ExecutionResult as DslV2Result,
+    ExecutionResult as DslV2Result, SemanticValidator,
 };
 
 use axum::{
@@ -258,6 +258,8 @@ pub fn create_agent_router(pool: PgPool) -> Router {
             "/api/agent/generate-with-tools",
             post(generate_dsl_with_tools),
         )
+        // Direct DSL execution (no session required)
+        .route("/execute", post(direct_execute_dsl))
         .with_state(state)
 }
 
@@ -371,12 +373,14 @@ async fn chat_session(
         }
     }
 
-    // Store the user message first
-    {
+    // Store the user message and get session context (available bindings with type info)
+    let session_bindings_for_llm: Vec<String> = {
         let mut sessions = state.sessions.write().await;
         let session = sessions.get_mut(&session_id).ok_or(StatusCode::NOT_FOUND)?;
         session.add_user_message(req.message.clone());
-    }
+        // Get typed bindings formatted for LLM context
+        session.context.bindings_for_llm()
+    };
 
     // Create LLM client (uses AGENT_BACKEND env var to select provider)
     let llm_client = match crate::agentic::create_llm_client() {
@@ -393,6 +397,9 @@ async fn chat_session(
                 validation_results: vec![],
                 session_state: session.state.clone(),
                 can_execute: false,
+                dsl_source: None,
+                ast: None,
+                bindings: None,
             }));
         }
     };
@@ -406,6 +413,18 @@ async fn chat_session(
     // Build system prompt for intent extraction
     let vocab = build_vocab_prompt(None);
     let system_prompt = build_intent_extraction_prompt(&vocab);
+
+    // Build context about available bindings from previous executions
+    // This is appended to the user message so it works with any LLM provider
+    // Format: @binding_name (TYPE: Display Name) so LLM knows what each binding represents
+    let bindings_context = if !session_bindings_for_llm.is_empty() {
+        format!(
+            "\n\n[SESSION CONTEXT: Available references from previous commands: {}. Use these exact @names in the refs field when referring to these entities.]",
+            session_bindings_for_llm.join(", ")
+        )
+    } else {
+        String::new()
+    };
 
     // Define the tool for structured intent extraction
     let tool = ToolDefinition {
@@ -455,13 +474,13 @@ async fn chat_session(
 
     // Retry loop with linter feedback
     for attempt in 0..MAX_RETRIES {
-        // Build message with optional feedback from previous attempt
+        // Build message with session context and optional feedback from previous attempt
         let user_message = if feedback_context.is_empty() {
-            req.message.clone()
+            format!("{}{}", req.message, bindings_context)
         } else {
             format!(
-                "{}\n\n[LINTER FEEDBACK - Please fix these issues]\n{}",
-                req.message, feedback_context
+                "{}{}\n\n[LINTER FEEDBACK - Please fix these issues]\n{}",
+                req.message, bindings_context, feedback_context
             )
         };
 
@@ -535,7 +554,13 @@ async fn chat_session(
         // This validates embedded data values (products, roles, jurisdictions, etc.)
         // NOTE: EntityGateway errors (missing entity types) are logged as warnings, not errors
         // to avoid breaking generation when the gateway is misconfigured
-        match SemanticValidator::new(state.pool.clone()).await {
+        let validator_result = async {
+            let v = SemanticValidator::new(state.pool.clone()).await?;
+            v.with_csg_linter().await
+        }
+        .await;
+
+        match validator_result {
             Ok(mut validator) => {
                 let request = crate::dsl_v2::validation::ValidationRequest {
                     source: dsl.clone(),
@@ -619,6 +644,22 @@ async fn chat_session(
                 SessionState::ReadyToExecute
             };
 
+            // Parse DSL into AST and add to session context
+            if !has_errors {
+                match crate::dsl_v2::parse_program(dsl) {
+                    Ok(program) => {
+                        session.context.add_statements(program.statements);
+                        tracing::info!(
+                            "Added {} statements to session AST",
+                            session.context.statement_count()
+                        );
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to parse DSL for AST storage: {}", e);
+                    }
+                }
+            }
+
             let msg = if final_explanation.is_empty() {
                 "DSL generated successfully.".to_string()
             } else {
@@ -651,6 +692,23 @@ async fn chat_session(
         }
     };
 
+    // Get AST and bindings for UI
+    let dsl_source = if session.context.ast.is_empty() {
+        None
+    } else {
+        Some(session.context.to_dsl_source())
+    };
+    let ast = if session.context.ast.is_empty() {
+        None
+    } else {
+        Some(session.context.ast.clone())
+    };
+    let bindings = if session.context.bindings.is_empty() {
+        None
+    } else {
+        Some(session.context.bindings.clone())
+    };
+
     Ok(Json(ChatResponse {
         message: response_msg,
         intents: all_intents,
@@ -658,6 +716,9 @@ async fn chat_session(
         validation_results,
         session_state: session.state.clone(),
         can_execute,
+        dsl_source,
+        ast,
+        bindings,
     }))
 }
 
@@ -850,6 +911,72 @@ async fn execute_session_dsl(
     };
 
     // =========================================================================
+    // CSG VALIDATION (includes dataflow)
+    // =========================================================================
+    let validator_result = async {
+        let v = SemanticValidator::new(state.pool.clone()).await?;
+        v.with_csg_linter().await
+    }
+    .await;
+
+    if let Ok(mut validator) = validator_result {
+        use crate::dsl_v2::validation::{Severity, ValidationContext, ValidationRequest};
+        let request = ValidationRequest {
+            source: dsl.clone(),
+            context: ValidationContext::default(),
+        };
+        if let crate::dsl_v2::validation::ValidationResult::Err(diagnostics) =
+            validator.validate(&request).await
+        {
+            let csg_errors: Vec<String> = diagnostics
+                .iter()
+                .filter(|d| d.severity == Severity::Error)
+                .map(|d| format!("[{}] {}", d.code.as_str(), d.message))
+                .collect();
+            if !csg_errors.is_empty() {
+                // Log failed attempt
+                if let Some(lid) = log_id {
+                    let attempt = GenerationAttempt {
+                        attempt: 1,
+                        timestamp: chrono::Utc::now(),
+                        prompt_template: None,
+                        prompt_text: String::new(),
+                        raw_response: String::new(),
+                        extracted_dsl: Some(dsl.clone()),
+                        parse_result: ParseResult {
+                            success: true,
+                            error: None,
+                        },
+                        lint_result: LintResult {
+                            valid: false,
+                            errors: csg_errors.clone(),
+                            warnings: vec![],
+                        },
+                        compile_result: CompileResult {
+                            success: false,
+                            error: None,
+                            step_count: 0,
+                        },
+                        latency_ms: Some(start_time.elapsed().as_millis() as i32),
+                        input_tokens: None,
+                        output_tokens: None,
+                    };
+                    let _ = state.generation_log.add_attempt(lid, &attempt).await;
+                    let _ = state.generation_log.mark_failed(lid).await;
+                }
+
+                return Ok(Json(ExecuteResponse {
+                    success: false,
+                    results: Vec::new(),
+                    errors: csg_errors,
+                    new_state: current_state,
+                    bindings: None,
+                }));
+            }
+        }
+    }
+
+    // =========================================================================
     // COMPILE (includes lint)
     // =========================================================================
     let plan = match compile(&program) {
@@ -913,15 +1040,28 @@ async fn execute_session_dsl(
         Ok(exec_results) => {
             for (idx, exec_result) in exec_results.iter().enumerate() {
                 let mut entity_id: Option<Uuid> = None;
-                if let DslV2Result::Uuid(uuid) = exec_result {
-                    entity_id = Some(*uuid);
+                let mut result_data: Option<serde_json::Value> = None;
 
-                    // Only set last_cbu_id if this was a cbu.* verb
-                    if let Some(step) = plan.steps.get(idx) {
-                        if step.verb_call.domain == "cbu" {
-                            context.last_cbu_id = Some(*uuid);
-                            context.cbu_ids.push(*uuid);
+                match exec_result {
+                    DslV2Result::Uuid(uuid) => {
+                        entity_id = Some(*uuid);
+
+                        // Only set last_cbu_id if this was a cbu.* verb
+                        if let Some(step) = plan.steps.get(idx) {
+                            if step.verb_call.domain == "cbu" {
+                                context.last_cbu_id = Some(*uuid);
+                                context.cbu_ids.push(*uuid);
+                            }
                         }
+                    }
+                    DslV2Result::Record(json) => {
+                        result_data = Some(json.clone());
+                    }
+                    DslV2Result::RecordSet(records) => {
+                        result_data = Some(serde_json::Value::Array(records.clone()));
+                    }
+                    DslV2Result::Affected(_) | DslV2Result::Void => {
+                        // No special handling needed
                     }
                 }
 
@@ -932,14 +1072,51 @@ async fn execute_session_dsl(
                     message: "Executed successfully".to_string(),
                     entity_id,
                     entity_type: None,
+                    result: result_data,
                 });
             }
 
             // =========================================================================
-            // PERSIST SYMBOLS TO SESSION CONTEXT
+            // PERSIST SYMBOLS TO SESSION CONTEXT WITH TYPE INFO
             // =========================================================================
-            // Copy all symbols from execution context back to session's named_refs
-            // This allows @cbu, @entity, etc. to be referenced in subsequent messages
+            // Extract binding metadata from plan steps and store typed bindings
+            for (idx, exec_result) in exec_results.iter().enumerate() {
+                if let DslV2Result::Uuid(uuid) = exec_result {
+                    if let Some(step) = plan.steps.get(idx) {
+                        if let Some(ref binding_name) = step.bind_as {
+                            // Get entity type from domain
+                            let entity_type = step.verb_call.domain.clone();
+
+                            // Extract display name from arguments (look for :name param)
+                            let display_name = step
+                                .verb_call
+                                .arguments
+                                .iter()
+                                .find(|arg| {
+                                    arg.key == "name"
+                                        || arg.key == "cbu-name"
+                                        || arg.key == "first-name"
+                                })
+                                .and_then(|arg| {
+                                    if let crate::dsl_v2::ast::AstNode::Literal(
+                                        crate::dsl_v2::ast::Literal::String(s),
+                                    ) = &arg.value
+                                    {
+                                        Some(s.clone())
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .unwrap_or_else(|| binding_name.clone());
+
+                            // Store typed binding
+                            context.set_binding(binding_name, *uuid, &entity_type, &display_name);
+                        }
+                    }
+                }
+            }
+
+            // Also copy raw symbols for backward compatibility
             for (name, id) in &exec_ctx.symbols {
                 context.named_refs.insert(name.clone(), *id);
             }
@@ -1020,6 +1197,7 @@ async fn execute_session_dsl(
                 message: error_msg,
                 entity_id: None,
                 entity_type: None,
+                result: None,
             });
         }
     }
@@ -1107,6 +1285,7 @@ async fn execute_session_dsl(
                     message: r.message.clone(),
                     entity_id: r.entity_id,
                     entity_type: r.entity_type.clone(),
+                    result: r.result.clone(),
                 })
                 .collect();
             session.record_execution(session_results);
@@ -1239,9 +1418,10 @@ Create entities:
 (entity.create-proper-person :first-name "John" :last-name "Smith" :date-of-birth "1980-01-15" :as @john)
 (entity.create-limited-company :name "Holdings Ltd" :jurisdiction "GB" :as @company)
 
-Assign roles:
-(cbu.assign-role :cbu-id @cbu :entity-id @john :role "DIRECTOR")
-(cbu.assign-role :cbu-id @cbu :entity-id @company :role "PRINCIPAL")
+Assign roles (note: @fund must be defined first with cbu.ensure):
+(cbu.ensure :name "Acme Fund" :jurisdiction "LU" :client-type "fund" :as @fund)
+(cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")
+(cbu.assign-role :cbu-id @fund :entity-id @company :role "PRINCIPAL")
 
 List CBUs:
 (cbu.list)
@@ -1840,17 +2020,16 @@ fn build_vocab_prompt(domain: Option<&str>) -> String {
     lines.join("\n")
 }
 
-/// POST /api/agent/validate - Validate DSL syntax
+/// POST /api/agent/validate - Validate DSL syntax and semantics (including dataflow)
 async fn validate_dsl(
+    State(state): State<AgentState>,
     Json(req): Json<ValidateDslRequest>,
 ) -> Result<Json<ValidationResult>, StatusCode> {
-    match parse_program(&req.dsl) {
-        Ok(_) => Ok(Json(ValidationResult {
-            valid: true,
-            errors: vec![],
-            warnings: vec![],
-        })),
-        Err(e) => Ok(Json(ValidationResult {
+    use crate::dsl_v2::validation::{Severity, ValidationContext, ValidationRequest};
+
+    // First parse
+    if let Err(e) = parse_program(&req.dsl) {
+        return Ok(Json(ValidationResult {
             valid: false,
             errors: vec![ValidationError {
                 line: None,
@@ -1859,7 +2038,60 @@ async fn validate_dsl(
                 suggestion: None,
             }],
             warnings: vec![],
-        })),
+        }));
+    }
+
+    // Then run full semantic validation with CSG linter (includes dataflow)
+    let validator_result = async {
+        let v = SemanticValidator::new(state.pool.clone()).await?;
+        v.with_csg_linter().await
+    }
+    .await;
+
+    match validator_result {
+        Ok(mut validator) => {
+            let request = ValidationRequest {
+                source: req.dsl.clone(),
+                context: ValidationContext::default(),
+            };
+            match validator.validate(&request).await {
+                crate::dsl_v2::validation::ValidationResult::Ok(_) => Ok(Json(ValidationResult {
+                    valid: true,
+                    errors: vec![],
+                    warnings: vec![],
+                })),
+                crate::dsl_v2::validation::ValidationResult::Err(diagnostics) => {
+                    let errors: Vec<ValidationError> = diagnostics
+                        .iter()
+                        .filter(|d| d.severity == Severity::Error)
+                        .map(|d| ValidationError {
+                            line: Some(d.span.line as usize),
+                            column: Some(d.span.column as usize),
+                            message: format!("[{}] {}", d.code.as_str(), d.message),
+                            suggestion: d.suggestions.first().map(|s| s.message.clone()),
+                        })
+                        .collect();
+                    let warnings: Vec<String> = diagnostics
+                        .iter()
+                        .filter(|d| d.severity == Severity::Warning)
+                        .map(|d| format!("[{}] {}", d.code.as_str(), d.message))
+                        .collect();
+                    Ok(Json(ValidationResult {
+                        valid: errors.is_empty(),
+                        errors,
+                        warnings,
+                    }))
+                }
+            }
+        }
+        Err(_) => {
+            // If validator fails to initialize, fall back to parse-only validation
+            Ok(Json(ValidationResult {
+                valid: true,
+                errors: vec![],
+                warnings: vec![],
+            }))
+        }
     }
 }
 
@@ -2122,7 +2354,36 @@ async fn execute_onboarding_dsl(
     state: &AgentState,
     dsl: &str,
 ) -> Result<OnboardingExecutionResult, String> {
+    use crate::dsl_v2::validation::{Severity, ValidationContext, ValidationRequest};
+
     let program = parse_program(dsl).map_err(|e| format!("Parse error: {}", e))?;
+
+    // CSG validation (includes dataflow)
+    let validator_result = async {
+        let v = SemanticValidator::new(state.pool.clone()).await?;
+        v.with_csg_linter().await
+    }
+    .await;
+
+    if let Ok(mut validator) = validator_result {
+        let request = ValidationRequest {
+            source: dsl.to_string(),
+            context: ValidationContext::default(),
+        };
+        if let crate::dsl_v2::validation::ValidationResult::Err(diagnostics) =
+            validator.validate(&request).await
+        {
+            let errors: Vec<String> = diagnostics
+                .iter()
+                .filter(|d| d.severity == Severity::Error)
+                .map(|d| format!("[{}] {}", d.code.as_str(), d.message))
+                .collect();
+            if !errors.is_empty() {
+                return Err(format!("Validation errors: {}", errors.join("; ")));
+            }
+        }
+    }
+
     let plan = compile(&program).map_err(|e| format!("Compile error: {}", e))?;
 
     let mut ctx = ExecutionContext::new();
@@ -2191,6 +2452,156 @@ fn get_domain_description(domain: &str) -> String {
 #[derive(Debug, Deserialize)]
 pub struct ExecuteDslRequest {
     pub dsl: String,
+}
+
+// ============================================================================
+// Direct Execute Handler (no session required)
+// ============================================================================
+
+/// Request for direct DSL execution
+#[derive(Debug, Deserialize)]
+pub struct DirectExecuteRequest {
+    pub dsl: String,
+    #[serde(default)]
+    pub bindings: Option<std::collections::HashMap<String, Uuid>>,
+}
+
+/// Response from direct DSL execution
+#[derive(Debug, Serialize)]
+pub struct DirectExecuteResponse {
+    pub success: bool,
+    pub results: Vec<ExecutionResult>,
+    pub bindings: std::collections::HashMap<String, Uuid>,
+    pub errors: Vec<String>,
+}
+
+/// POST /execute - Direct DSL execution without session
+/// Used by Go UI and egui WASM for executing DSL directly
+async fn direct_execute_dsl(
+    State(state): State<AgentState>,
+    Json(req): Json<DirectExecuteRequest>,
+) -> Json<DirectExecuteResponse> {
+    use crate::dsl_v2::validation::{Severity, ValidationContext, ValidationRequest};
+
+    // Parse
+    let program = match parse_program(&req.dsl) {
+        Ok(p) => p,
+        Err(e) => {
+            return Json(DirectExecuteResponse {
+                success: false,
+                results: vec![],
+                bindings: std::collections::HashMap::new(),
+                errors: vec![format!("Parse error: {}", e)],
+            });
+        }
+    };
+
+    // Validate with CSG linter (includes dataflow validation)
+    let validator_result = async {
+        let v = SemanticValidator::new(state.pool.clone()).await?;
+        v.with_csg_linter().await
+    }
+    .await;
+
+    if let Ok(mut validator) = validator_result {
+        let request = ValidationRequest {
+            source: req.dsl.clone(),
+            context: ValidationContext::default(),
+        };
+        if let crate::dsl_v2::validation::ValidationResult::Err(diagnostics) =
+            validator.validate(&request).await
+        {
+            let errors: Vec<String> = diagnostics
+                .iter()
+                .filter(|d| d.severity == Severity::Error)
+                .map(|d| format!("[{}] {}", d.code.as_str(), d.message))
+                .collect();
+            if !errors.is_empty() {
+                return Json(DirectExecuteResponse {
+                    success: false,
+                    results: vec![],
+                    bindings: std::collections::HashMap::new(),
+                    errors,
+                });
+            }
+        }
+    }
+
+    // Compile
+    let plan = match compile(&program) {
+        Ok(p) => p,
+        Err(e) => {
+            return Json(DirectExecuteResponse {
+                success: false,
+                results: vec![],
+                bindings: std::collections::HashMap::new(),
+                errors: vec![format!("Compile error: {}", e)],
+            });
+        }
+    };
+
+    // Execute
+    let mut ctx = ExecutionContext::new().with_audit_user("direct_execute");
+
+    // Pre-bind any symbols passed from previous executions
+    if let Some(bindings) = &req.bindings {
+        for (name, id) in bindings {
+            ctx.bind(name, *id);
+        }
+    }
+
+    match state.dsl_v2_executor.execute_plan(&plan, &mut ctx).await {
+        Ok(exec_results) => {
+            let results: Vec<ExecutionResult> = exec_results
+                .iter()
+                .enumerate()
+                .map(|(idx, r)| {
+                    let (entity_id, result_data) = match r {
+                        DslV2Result::Uuid(id) => (Some(*id), None),
+                        DslV2Result::Record(json) => (None, Some(json.clone())),
+                        DslV2Result::RecordSet(records) => {
+                            (None, Some(serde_json::Value::Array(records.clone())))
+                        }
+                        _ => (None, None),
+                    };
+                    ExecutionResult {
+                        statement_index: idx,
+                        dsl: req.dsl.clone(),
+                        success: true,
+                        message: format!("{:?}", r),
+                        entity_id,
+                        entity_type: None,
+                        result: result_data,
+                    }
+                })
+                .collect();
+
+            // Add cbu_id to bindings if a CBU was created
+            let mut bindings = ctx.symbols.clone();
+            for (idx, r) in exec_results.iter().enumerate() {
+                if let DslV2Result::Uuid(id) = r {
+                    if let Some(step) = plan.steps.get(idx) {
+                        if step.verb_call.domain == "cbu" {
+                            bindings.insert("cbu_id".to_string(), *id);
+                        }
+                    }
+                }
+            }
+
+            Json(DirectExecuteResponse {
+                success: true,
+                results,
+                bindings,
+                errors: vec![],
+            })
+        }
+        Err(e) => Json(DirectExecuteResponse {
+            success: false,
+            results: vec![],
+            bindings: ctx.symbols.clone(),
+            errors: vec![e.to_string()],
+        }),
+    }
 }
 
 #[cfg(test)]

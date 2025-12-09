@@ -584,6 +584,184 @@ impl SessionRepository {
 
         Ok(result)
     }
+
+    // ------------------------------------------------------------------------
+    // CBU-Specific Methods (for REPL/incremental editing)
+    // ------------------------------------------------------------------------
+
+    /// Get or create an active session for a specific CBU
+    ///
+    /// Returns the existing active session if one exists, otherwise creates a new one.
+    pub async fn get_or_create_session_for_cbu(
+        &self,
+        cbu_id: Uuid,
+    ) -> Result<PersistedSession, sqlx::Error> {
+        // Try to find existing active session for this CBU
+        let existing = sqlx::query!(
+            r#"
+            SELECT
+                session_id, status, primary_domain, cbu_id, kyc_case_id, onboarding_request_id,
+                named_refs, client_type, jurisdiction, created_at, last_activity_at, expires_at,
+                completed_at, error_count, last_error, last_error_at
+            FROM "ob-poc".dsl_sessions
+            WHERE cbu_id = $1 AND status = 'active'
+            ORDER BY last_activity_at DESC
+            LIMIT 1
+            "#,
+            cbu_id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        if let Some(r) = existing {
+            let named_refs: HashMap<String, Uuid> =
+                serde_json::from_value(r.named_refs.clone()).unwrap_or_default();
+
+            return Ok(PersistedSession {
+                session_id: r.session_id,
+                status: match r.status.as_str() {
+                    "active" => SessionStatus::Active,
+                    "completed" => SessionStatus::Completed,
+                    "aborted" => SessionStatus::Aborted,
+                    "expired" => SessionStatus::Expired,
+                    "error" => SessionStatus::Error,
+                    _ => SessionStatus::Active,
+                },
+                primary_domain: r.primary_domain,
+                cbu_id: r.cbu_id,
+                kyc_case_id: r.kyc_case_id,
+                onboarding_request_id: r.onboarding_request_id,
+                named_refs,
+                client_type: r.client_type,
+                jurisdiction: r.jurisdiction,
+                created_at: r.created_at,
+                last_activity_at: r.last_activity_at,
+                expires_at: r.expires_at,
+                completed_at: r.completed_at,
+                error_count: r.error_count,
+                last_error: r.last_error,
+                last_error_at: r.last_error_at,
+            });
+        }
+
+        // Create new session for this CBU
+        let session_id = Uuid::new_v4();
+        let now = Utc::now();
+        let expires_at = now + chrono::Duration::hours(24);
+
+        sqlx::query!(
+            r#"
+            INSERT INTO "ob-poc".dsl_sessions
+                (session_id, status, cbu_id, primary_domain, created_at, last_activity_at, expires_at, named_refs)
+            VALUES ($1, 'active', $2, 'cbu', $3, $3, $4, '{}'::jsonb)
+            "#,
+            session_id,
+            cbu_id,
+            now,
+            expires_at,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        // Log creation event
+        self.log_event(session_id, SessionEventType::Created, None, None, None)
+            .await?;
+
+        Ok(PersistedSession {
+            session_id,
+            status: SessionStatus::Active,
+            primary_domain: Some("cbu".to_string()),
+            cbu_id: Some(cbu_id),
+            kyc_case_id: None,
+            onboarding_request_id: None,
+            named_refs: HashMap::new(),
+            client_type: None,
+            jurisdiction: None,
+            created_at: now,
+            last_activity_at: now,
+            expires_at,
+            completed_at: None,
+            error_count: 0,
+            last_error: None,
+            last_error_at: None,
+        })
+    }
+
+    /// Get accumulated DSL source for a CBU from all successful snapshots
+    ///
+    /// Returns the concatenated DSL source from all snapshots in execution order.
+    pub async fn get_accumulated_dsl_for_cbu(&self, cbu_id: Uuid) -> Result<String, sqlx::Error> {
+        let rows = sqlx::query!(
+            r#"
+            SELECT s.dsl_source
+            FROM "ob-poc".dsl_snapshots s
+            JOIN "ob-poc".dsl_sessions sess ON s.session_id = sess.session_id
+            WHERE sess.cbu_id = $1 AND s.success = true
+            ORDER BY s.executed_at ASC
+            "#,
+            cbu_id
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let dsl_parts: Vec<String> = rows.into_iter().map(|r| r.dsl_source).collect();
+        Ok(dsl_parts.join("\n\n"))
+    }
+
+    /// Get all bindings for a CBU from the active session
+    pub async fn get_bindings_for_cbu(
+        &self,
+        cbu_id: Uuid,
+    ) -> Result<HashMap<String, Uuid>, sqlx::Error> {
+        let row = sqlx::query!(
+            r#"
+            SELECT named_refs
+            FROM "ob-poc".dsl_sessions
+            WHERE cbu_id = $1 AND status = 'active'
+            ORDER BY last_activity_at DESC
+            LIMIT 1
+            "#,
+            cbu_id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        match row {
+            Some(r) => {
+                let bindings: HashMap<String, Uuid> =
+                    serde_json::from_value(r.named_refs).unwrap_or_default();
+                Ok(bindings)
+            }
+            None => Ok(HashMap::new()),
+        }
+    }
+
+    /// Get CBU state summary (for loading into REPL/UI)
+    pub async fn get_cbu_state(&self, cbu_id: Uuid) -> Result<CbuDslState, sqlx::Error> {
+        let session = self.get_or_create_session_for_cbu(cbu_id).await?;
+        let accumulated_dsl = self.get_accumulated_dsl_for_cbu(cbu_id).await?;
+        let snapshots = self.get_snapshots(session.session_id).await?;
+
+        Ok(CbuDslState {
+            cbu_id,
+            session_id: session.session_id,
+            executed_dsl: accumulated_dsl,
+            bindings: session.named_refs,
+            snapshot_count: snapshots.len(),
+            last_executed_at: snapshots.last().map(|s| s.executed_at),
+        })
+    }
+}
+
+/// CBU DSL state summary
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CbuDslState {
+    pub cbu_id: Uuid,
+    pub session_id: Uuid,
+    pub executed_dsl: String,
+    pub bindings: HashMap<String, Uuid>,
+    pub snapshot_count: usize,
+    pub last_executed_at: Option<DateTime<Utc>>,
 }
 
 // ============================================================================

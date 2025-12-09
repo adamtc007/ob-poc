@@ -144,11 +144,44 @@ impl AgentOrchestrator {
         executor: &crate::dsl_v2::DslExecutor,
         source: &str,
     ) -> Result<ExecutionResult> {
+        use crate::dsl_v2::semantic_validator::SemanticValidator;
+        use crate::dsl_v2::validation::{Severity, ValidationContext, ValidationRequest};
         use crate::dsl_v2::{compile, parse_program, ExecutionContext};
 
         // Parse and compile
         let program = parse_program(source).map_err(|e| anyhow!("Parse error: {}", e))?;
         let plan = compile(&program).map_err(|e| anyhow!("Compile error: {}", e))?;
+
+        // CSG validation (includes dataflow validation)
+        let pool = executor.pool();
+        let validator_result = async {
+            let v = SemanticValidator::new(pool.clone()).await?;
+            v.with_csg_linter().await
+        }
+        .await;
+
+        if let Ok(mut validator) = validator_result {
+            let request = ValidationRequest {
+                source: source.to_string(),
+                context: ValidationContext::default(),
+            };
+            if let crate::dsl_v2::validation::ValidationResult::Err(diagnostics) =
+                validator.validate(&request).await
+            {
+                let errors: Vec<String> = diagnostics
+                    .iter()
+                    .filter(|d| d.severity == Severity::Error)
+                    .map(|d| format!("[{}] {}", d.code.as_str(), d.message))
+                    .collect();
+                if !errors.is_empty() {
+                    return Ok(ExecutionResult {
+                        success: false,
+                        bindings: vec![],
+                        error: Some(format!("Validation errors: {}", errors.join("; "))),
+                    });
+                }
+            }
+        }
 
         // Execute
         let mut ctx = ExecutionContext::new();

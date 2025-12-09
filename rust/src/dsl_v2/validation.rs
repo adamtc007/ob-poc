@@ -399,6 +399,14 @@ pub enum DiagnosticCode {
     /// Unresolved symbol - referenced but not yet defined (incomplete, not error)
     UnresolvedSymbol,
 
+    // Dataflow errors
+    /// Reference to undefined binding in dataflow validation
+    DataflowUndefinedBinding,
+    /// Binding type doesn't match expected consumer type
+    DataflowTypeMismatch,
+    /// Duplicate binding name in same program
+    DataflowDuplicateBinding,
+
     // CSG Context Errors (C0xx series)
     /// Document type not applicable to entity type
     DocumentNotApplicableToEntityType,
@@ -468,6 +476,10 @@ impl DiagnosticCode {
             DiagnosticCode::MissingPrerequisiteOperation => "C005",
             DiagnosticCode::SymbolTypeMismatch => "C006",
             DiagnosticCode::InternalError => "C099",
+            // Dataflow errors
+            DiagnosticCode::DataflowUndefinedBinding => "D001",
+            DiagnosticCode::DataflowTypeMismatch => "D002",
+            DiagnosticCode::DataflowDuplicateBinding => "D003",
             // Warnings
             DiagnosticCode::DeprecatedVerb => "W001",
             DiagnosticCode::UnusedBinding => "W002",

@@ -5,6 +5,13 @@ domains:
       run:
         description: Initiate a screening
         behavior: crud
+        produces:
+          type: screening
+          resolved: false
+        consumes:
+          - arg: workstream-id
+            type: workstream
+            required: true
         crud:
           operation: insert
           table: screenings
@@ -12,32 +19,32 @@ domains:
           returning: screening_id
         emits_event: screening.started
         args:
-        - name: workstream-id
-          type: uuid
-          required: true
-          maps_to: workstream_id
-          lookup:
-            table: entity_workstreams
-            entity_type: workstream
-            schema: kyc
-            search_key: workstream_id
-            primary_key: workstream_id
-        - name: screening-type
-          type: string
-          required: true
-          maps_to: screening_type
-          valid_values:
-          - SANCTIONS
-          - PEP
-          - ADVERSE_MEDIA
-          - CREDIT
-          - CRIMINAL
-          - REGULATORY
-          - CONSOLIDATED
-        - name: provider
-          type: string
-          required: false
-          maps_to: provider
+          - name: workstream-id
+            type: uuid
+            required: true
+            maps_to: workstream_id
+            lookup:
+              table: entity_workstreams
+              entity_type: workstream
+              schema: kyc
+              search_key: workstream_id
+              primary_key: workstream_id
+          - name: screening-type
+            type: string
+            required: true
+            maps_to: screening_type
+            valid_values:
+              - SANCTIONS
+              - PEP
+              - ADVERSE_MEDIA
+              - CREDIT
+              - CRIMINAL
+              - REGULATORY
+              - CONSOLIDATED
+          - name: provider
+            type: string
+            required: false
+            maps_to: provider
         returns:
           type: uuid
           name: screening_id
@@ -45,6 +52,10 @@ domains:
       complete:
         description: Record screening completion
         behavior: crud
+        consumes:
+          - arg: screening-id
+            type: screening
+            required: true
         crud:
           operation: update
           table: screenings
@@ -54,32 +65,32 @@ domains:
             completed_at: now()
         emits_event: screening.completed
         args:
-        - name: screening-id
-          type: uuid
-          required: true
-          maps_to: screening_id
-          lookup:
-            table: screenings
-            entity_type: screening
-            schema: kyc
-            search_key: screening_id
-            primary_key: screening_id
-        - name: status
-          type: string
-          required: true
-          maps_to: status
-          valid_values:
-          - CLEAR
-          - HIT_PENDING_REVIEW
-          - ERROR
-        - name: result-summary
-          type: string
-          required: false
-          maps_to: result_summary
-        - name: match-count
-          type: integer
-          required: false
-          maps_to: match_count
+          - name: screening-id
+            type: uuid
+            required: true
+            maps_to: screening_id
+            lookup:
+              table: screenings
+              entity_type: screening
+              schema: kyc
+              search_key: screening_id
+              primary_key: screening_id
+          - name: status
+            type: string
+            required: true
+            maps_to: status
+            valid_values:
+              - CLEAR
+              - HIT_PENDING_REVIEW
+              - ERROR
+          - name: result-summary
+            type: string
+            required: false
+            maps_to: result_summary
+          - name: match-count
+            type: integer
+            required: false
+            maps_to: match_count
         returns:
           type: affected
       review-hit:
@@ -94,37 +105,37 @@ domains:
             reviewed_at: now()
         emits_event: screening.reviewed
         args:
-        - name: screening-id
-          type: uuid
-          required: true
-          maps_to: screening_id
-          lookup:
-            table: screenings
-            entity_type: screening
-            schema: kyc
-            search_key: screening_id
-            primary_key: screening_id
-        - name: status
-          type: string
-          required: true
-          maps_to: status
-          valid_values:
-          - HIT_CONFIRMED
-          - HIT_DISMISSED
-        - name: notes
-          type: string
-          required: true
-          maps_to: review_notes
-        - name: red-flag-id
-          type: uuid
-          required: false
-          maps_to: red_flag_id
-          lookup:
-            table: red_flags
-            entity_type: red_flag
-            schema: kyc
-            search_key: red_flag_id
-            primary_key: red_flag_id
+          - name: screening-id
+            type: uuid
+            required: true
+            maps_to: screening_id
+            lookup:
+              table: screenings
+              entity_type: screening
+              schema: kyc
+              search_key: screening_id
+              primary_key: screening_id
+          - name: status
+            type: string
+            required: true
+            maps_to: status
+            valid_values:
+              - HIT_CONFIRMED
+              - HIT_DISMISSED
+          - name: notes
+            type: string
+            required: true
+            maps_to: review_notes
+          - name: red-flag-id
+            type: uuid
+            required: false
+            maps_to: red_flag_id
+            lookup:
+              table: red_flags
+              entity_type: red_flag
+              schema: kyc
+              search_key: red_flag_id
+              primary_key: red_flag_id
         returns:
           type: affected
       list-by-workstream:
@@ -136,22 +147,22 @@ domains:
           schema: kyc
           fk_col: workstream_id
         args:
-        - name: workstream-id
-          type: uuid
-          required: true
-          lookup:
-            table: entity_workstreams
-            entity_type: workstream
-            schema: kyc
-            search_key: workstream_id
-            primary_key: workstream_id
-        - name: screening-type
-          type: string
-          required: false
-          maps_to: screening_type
-        - name: status
-          type: string
-          required: false
-          maps_to: status
+          - name: workstream-id
+            type: uuid
+            required: true
+            lookup:
+              table: entity_workstreams
+              entity_type: workstream
+              schema: kyc
+              search_key: workstream_id
+              primary_key: workstream_id
+          - name: screening-type
+            type: string
+            required: false
+            maps_to: screening_type
+          - name: status
+            type: string
+            required: false
+            maps_to: status
         returns:
           type: record_set

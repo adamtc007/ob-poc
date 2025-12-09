@@ -59,6 +59,47 @@ pub struct VerbConfig {
     pub args: Vec<ArgConfig>,
     #[serde(default)]
     pub returns: Option<ReturnsConfig>,
+    /// Dataflow: what this verb produces (binding type)
+    #[serde(default)]
+    pub produces: Option<VerbProduces>,
+    /// Dataflow: what this verb consumes (required bindings)
+    #[serde(default)]
+    pub consumes: Vec<VerbConsumes>,
+}
+
+// =============================================================================
+// DATAFLOW CONFIG
+// =============================================================================
+
+/// Dataflow: what a verb produces when executed with :as @binding
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct VerbProduces {
+    /// The type of entity produced: "cbu", "entity", "case", "workstream", etc.
+    #[serde(rename = "type")]
+    pub produced_type: String,
+    /// Optional subtype for entities: "proper_person", "limited_company", etc.
+    #[serde(default)]
+    pub subtype: Option<String>,
+    /// True if this is a lookup (resolved existing) rather than create (new)
+    #[serde(default)]
+    pub resolved: bool,
+}
+
+/// Dataflow: what a verb consumes (dependencies)
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct VerbConsumes {
+    /// Which argument carries the reference (e.g., "cbu-id", "entity-id")
+    pub arg: String,
+    /// Expected type of the binding (e.g., "cbu", "entity", "case")
+    #[serde(rename = "type")]
+    pub consumed_type: String,
+    /// Whether this dependency is required (default: true)
+    #[serde(default = "default_true")]
+    pub required: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]

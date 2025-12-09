@@ -11,6 +11,8 @@ use crate::database::generation_log_repository::{
     CompileResult, GenerationAttempt, GenerationLogRepository, LintResult, ParseResult,
 };
 use crate::database::DslRepository;
+use crate::dsl_v2::semantic_validator::SemanticValidator;
+use crate::dsl_v2::validation::{Severity, ValidationContext, ValidationRequest};
 use crate::dsl_v2::ExecutionResult as DslExecResult;
 use crate::dsl_v2::{compile, parse_program, DslExecutor, ExecutionContext};
 use sqlx::PgPool;
@@ -263,6 +265,63 @@ impl AgentE2ETestHarness {
                 return result;
             }
         };
+
+        // =====================================================================
+        // STEP 2.5: CSG Validation (includes dataflow)
+        // =====================================================================
+        println!("\n--- Step 2.5: CSG Validation ---");
+
+        let csg_valid = {
+            let validator_result = async {
+                let v = SemanticValidator::new(self.pool.clone()).await?;
+                v.with_csg_linter().await
+            }
+            .await;
+
+            match validator_result {
+                Ok(mut validator) => {
+                    let request = ValidationRequest {
+                        source: scenario.dsl.clone(),
+                        context: ValidationContext::default(),
+                    };
+                    match validator.validate(&request).await {
+                        crate::dsl_v2::validation::ValidationResult::Ok(_) => {
+                            println!("  [OK] CSG validation passed");
+                            result.add_step("CSG Validation", true);
+                            true
+                        }
+                        crate::dsl_v2::validation::ValidationResult::Err(diagnostics) => {
+                            let errors: Vec<String> = diagnostics
+                                .iter()
+                                .filter(|d| d.severity == Severity::Error)
+                                .map(|d| format!("[{}] {}", d.code.as_str(), d.message))
+                                .collect();
+                            if errors.is_empty() {
+                                println!("  [OK] CSG validation passed (warnings only)");
+                                result.add_step("CSG Validation", true);
+                                true
+                            } else {
+                                println!("  [FAIL] CSG validation failed: {:?}", errors);
+                                result.add_step("CSG Validation", !scenario.should_succeed);
+                                if !scenario.should_succeed {
+                                    result.set_expected_failure("CSG validation error as expected");
+                                }
+                                false
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    println!("  [WARN] Could not initialize CSG validator: {}", e);
+                    // Continue without CSG validation if it fails to init
+                    true
+                }
+            }
+        };
+
+        if !csg_valid && scenario.should_succeed {
+            return result;
+        }
 
         // =====================================================================
         // STEP 3: Compile

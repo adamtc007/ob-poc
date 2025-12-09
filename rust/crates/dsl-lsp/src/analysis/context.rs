@@ -20,7 +20,14 @@ pub enum CompletionContext {
         in_string: bool,
     },
     /// Completing a symbol reference (after @) - for existing symbols
-    SymbolRef { prefix: String },
+    /// Includes optional verb/keyword context for type-aware ranking
+    SymbolRef {
+        prefix: String,
+        /// The verb being called (if inside an s-expression)
+        verb_name: Option<String>,
+        /// The keyword this symbol is a value for (e.g., "cbu-id", "entity-id")
+        keyword: Option<String>,
+    },
     /// Completing an entity lookup that will be inserted as @symbol (after keyword + @)
     EntityAsSymbol {
         verb_name: String,
@@ -73,20 +80,22 @@ pub fn detect_completion_context(doc: &DocumentState, position: Position) -> Com
                 keyword
             );
 
-            if let (Some(verb), Some(kw)) = (verb_name, keyword) {
+            if let (Some(ref verb), Some(ref kw)) = (&verb_name, &keyword) {
                 // Keywords that expect entity references
-                if is_entity_keyword(&kw) {
+                if is_entity_keyword(kw) {
                     return CompletionContext::EntityAsSymbol {
-                        verb_name: verb,
-                        keyword: kw,
+                        verb_name: verb.clone(),
+                        keyword: kw.clone(),
                         prefix: after_at.to_string(),
                     };
                 }
             }
 
-            // Otherwise, it's a regular symbol reference
+            // Otherwise, it's a regular symbol reference with optional context
             return CompletionContext::SymbolRef {
                 prefix: after_at.to_string(),
+                verb_name,
+                keyword,
             };
         }
     }
@@ -352,7 +361,7 @@ mod tests {
             },
         );
         match ctx {
-            CompletionContext::SymbolRef { prefix } => assert_eq!(prefix, "fu"),
+            CompletionContext::SymbolRef { prefix, .. } => assert_eq!(prefix, "fu"),
             other => panic!("Expected SymbolRef context, got {:?}", other),
         }
     }

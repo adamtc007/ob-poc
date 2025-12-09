@@ -241,6 +241,8 @@ mod tests {
             VerbConfig {
                 description: "Create or update CBU".to_string(),
                 behavior: VerbBehavior::Crud,
+                produces: None,
+                consumes: vec![],
                 crud: Some(CrudConfig {
                     operation: CrudOperation::Upsert,
                     table: Some("cbus".to_string()),
@@ -320,6 +322,8 @@ mod tests {
             VerbConfig {
                 description: "Assign role to entity".to_string(),
                 behavior: VerbBehavior::Crud,
+                produces: None,
+                consumes: vec![],
                 crud: Some(CrudConfig {
                     operation: CrudOperation::RoleLink,
                     table: None,

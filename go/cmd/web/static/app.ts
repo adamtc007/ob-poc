@@ -21,6 +21,92 @@ document.addEventListener("DOMContentLoaded", () => {
     bindings: Map<string, string>; // @symbol -> uuid
   }
 
+  // Typed binding info from API (matches Rust BoundEntity)
+  interface BoundEntity {
+    id: string;
+    entity_type: string;
+    display_name: string;
+  }
+
+  // CBU structure from API (matches cbu.show output)
+  interface CbuEntity {
+    entity_id: string;
+    name: string;
+    entity_type: string;
+    roles: string[];
+    binding?: string;
+  }
+
+  interface CbuDocument {
+    doc_id: string;
+    document_type_code: string;
+    document_name?: string;
+    status: string;
+    extraction_status?: string;
+  }
+
+  interface CbuService {
+    instance_id: string;
+    service_name?: string;
+    resource_type?: string;
+    status: string;
+    instance_name?: string;
+  }
+
+  interface CbuScreening {
+    screening_id: string;
+    screening_type: string;
+    status: string;
+    result?: string;
+    entity_name?: string;
+  }
+
+  interface CbuKycCase {
+    case_id: string;
+    case_type: string;
+    status: string;
+    risk_rating?: string;
+    workstream_count?: number;
+  }
+
+  interface CbuSummary {
+    entity_count: number;
+    document_count: number;
+    service_count: number;
+    screening_count: number;
+    case_count: number;
+  }
+
+  interface CbuData {
+    cbu_id: string;
+    name: string;
+    jurisdiction?: string;
+    client_type?: string;
+    description?: string;
+    nature_purpose?: string;
+    entities: CbuEntity[];
+    documents?: CbuDocument[];
+    services?: CbuService[];
+    screenings?: CbuScreening[];
+    kyc_cases?: CbuKycCase[];
+    summary?: CbuSummary;
+  }
+
+  // Debug panel state
+  interface DebugPanelState {
+    dslSource: string;
+    ast: unknown[];
+    bindings: Record<string, BoundEntity>;
+    cbu: CbuData | null;
+  }
+
+  let debugState: DebugPanelState = {
+    dslSource: "",
+    ast: [],
+    bindings: {},
+    cbu: null,
+  };
+
   let context: SessionContext = {
     entities: new Map(),
     bindings: new Map(),
@@ -129,6 +215,17 @@ document.addEventListener("DOMContentLoaded", () => {
   ) as HTMLSpanElement;
   const contextClearBtn = document.getElementById(
     "context-clear-btn",
+  ) as HTMLButtonElement;
+
+  // Panel elements
+  const dslCode = document.getElementById("dsl-code") as HTMLDivElement;
+  const dslEmpty = document.getElementById("dsl-empty") as HTMLDivElement;
+  const astCode = document.getElementById("ast-code") as HTMLPreElement;
+  const astEmpty = document.getElementById("ast-empty") as HTMLDivElement;
+  const cbuTree = document.getElementById("cbu-tree") as HTMLDivElement;
+  const cbuEmpty = document.getElementById("cbu-empty") as HTMLDivElement;
+  const copyDslBtn = document.getElementById(
+    "copy-dsl-btn",
   ) as HTMLButtonElement;
 
   // ==================== BINDING NORMALIZATION ====================
@@ -307,6 +404,272 @@ document.addEventListener("DOMContentLoaded", () => {
     updateContextBar();
   }
 
+  // ==================== PANEL MANAGEMENT ====================
+  function initPanels() {
+    // Copy DSL button
+    if (copyDslBtn) {
+      copyDslBtn.addEventListener("click", () => {
+        if (debugState.dslSource) {
+          navigator.clipboard.writeText(debugState.dslSource);
+          copyDslBtn.textContent = "Copied!";
+          setTimeout(() => {
+            copyDslBtn.textContent = "Copy";
+          }, 1500);
+        }
+      });
+    }
+  }
+
+  function updateDebugPanels() {
+    // Update DSL Source panel
+    if (debugState.dslSource) {
+      dslCode.textContent = debugState.dslSource;
+      dslCode.style.display = "block";
+      dslEmpty.style.display = "none";
+      copyDslBtn.disabled = false;
+    } else {
+      dslCode.style.display = "none";
+      dslEmpty.style.display = "block";
+      copyDslBtn.disabled = true;
+    }
+
+    // Update AST panel
+    if (debugState.ast && debugState.ast.length > 0) {
+      astCode.textContent = JSON.stringify(debugState.ast, null, 2);
+      astCode.style.display = "block";
+      astEmpty.style.display = "none";
+    } else {
+      astCode.style.display = "none";
+      astEmpty.style.display = "block";
+    }
+
+    // Update CBU panel
+    if (debugState.cbu) {
+      cbuTree.innerHTML = renderCbuTree(debugState.cbu);
+      cbuTree.style.display = "block";
+      cbuEmpty.style.display = "none";
+    } else {
+      cbuTree.style.display = "none";
+      cbuEmpty.style.display = "block";
+    }
+  }
+
+  function updateDebugFromResponse(data: {
+    dsl_source?: string;
+    ast?: unknown[];
+    bindings?: Record<string, BoundEntity>;
+  }) {
+    if (data.dsl_source !== undefined) {
+      debugState.dslSource = data.dsl_source;
+    }
+    if (data.ast !== undefined) {
+      debugState.ast = data.ast;
+    }
+    if (data.bindings !== undefined) {
+      debugState.bindings = data.bindings;
+      // If we have a CBU binding, fetch the CBU data
+      for (const [, entity] of Object.entries(data.bindings)) {
+        if (entity.entity_type === "cbu" && entity.id) {
+          fetchCbuData(entity.id);
+          break;
+        }
+      }
+    }
+    updateDebugPanels();
+  }
+
+  // Fetch CBU data using cbu.show verb and update the debug panel
+  async function fetchCbuData(cbuId: string) {
+    try {
+      // Use cbu.show verb to get full CBU structure
+      const dsl = `(cbu.show :cbu-id "${cbuId}")`;
+      const resp = await fetch("/api/dsl/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dsl }),
+      });
+
+      if (!resp.ok) {
+        console.error("Failed to fetch CBU:", resp.status);
+        return;
+      }
+
+      const data = await resp.json();
+
+      if (data.success && data.results && data.results.length > 0) {
+        // The cbu.show verb returns a record with the full CBU structure
+        const cbuResult = data.results[0];
+        if (cbuResult.result) {
+          // Map the cbu.show result to our CbuData interface
+          const cbuData = cbuResult.result;
+          debugState.cbu = mapCbuShowResult(cbuData, cbuId);
+          updateDebugPanels();
+        }
+      } else {
+        console.error("cbu.show failed:", data.error || data.errors);
+      }
+    } catch (e) {
+      console.error("Error fetching CBU:", e);
+    }
+  }
+
+  // Map cbu.show result to CbuData interface
+  function mapCbuShowResult(
+    cbuData: Record<string, unknown>,
+    cbuId: string,
+  ): CbuData {
+    return {
+      cbu_id: (cbuData.cbu_id as string) || cbuId,
+      name: (cbuData.name as string) || "Unknown",
+      jurisdiction: cbuData.jurisdiction as string | undefined,
+      client_type: cbuData.client_type as string | undefined,
+      entities: (
+        (cbuData.entities as Array<Record<string, unknown>>) || []
+      ).map((e) => ({
+        entity_id: e.entity_id as string,
+        name: e.name as string,
+        entity_type: e.entity_type as string,
+        roles: (e.roles as string[]) || [],
+      })),
+      summary: cbuData.summary as CbuSummary | undefined,
+    };
+  }
+
+  // Role clustering: UBO/ownership roles at top, business/execution at bottom
+  const UBO_ROLES = new Set([
+    "BENEFICIAL_OWNER",
+    "UBO",
+    "SHAREHOLDER",
+    "OWNER",
+    "SETTLER",
+    "SETTLOR",
+    "BENEFICIARY",
+    "TRUSTEE",
+    "PROTECTOR",
+    "PARTNER",
+    "GENERAL_PARTNER",
+    "LIMITED_PARTNER",
+    "NOMINEE",
+    "CONTROLLING_PERSON",
+  ]);
+
+  const BUSINESS_ROLES = new Set([
+    "DIRECTOR",
+    "OFFICER",
+    "CEO",
+    "CFO",
+    "COO",
+    "SECRETARY",
+    "MANAGER",
+    "AUTHORIZED_SIGNATORY",
+    "SIGNATORY",
+    "CONTACT",
+    "ADMINISTRATOR",
+    "CUSTODIAN",
+    "AUDITOR",
+    "LEGAL_COUNSEL",
+    "COMPLIANCE_OFFICER",
+  ]);
+
+  function getRoleCategory(role: string): "ubo" | "business" | "other" {
+    const upper = role.toUpperCase();
+    if (UBO_ROLES.has(upper)) return "ubo";
+    if (BUSINESS_ROLES.has(upper)) return "business";
+    return "other";
+  }
+
+  // Render CBU as horizontal tree: UBO roles at top, business roles at bottom
+  function renderCbuTree(cbu: CbuData): string {
+    const esc = escapeHtml;
+    const lines: string[] = [];
+
+    // CBU header line (compact, horizontal)
+    const headerParts = [
+      `<span class="t-node">CBU</span>`,
+      `<span class="t-val">"${esc(cbu.name)}"</span>`,
+    ];
+    if (cbu.jurisdiction) {
+      headerParts.push(`<span class="t-id">${esc(cbu.jurisdiction)}</span>`);
+    }
+    if (cbu.client_type) {
+      headerParts.push(`<span class="t-type">${esc(cbu.client_type)}</span>`);
+    }
+    lines.push(headerParts.join(" "));
+
+    // Summary counts (compact, single line)
+    if (cbu.summary) {
+      const s = cbu.summary;
+      const counts = [
+        s.entity_count > 0 ? `${s.entity_count} entities` : null,
+        s.document_count > 0 ? `${s.document_count} docs` : null,
+        s.service_count > 0 ? `${s.service_count} services` : null,
+        s.case_count > 0 ? `${s.case_count} cases` : null,
+      ].filter(Boolean);
+      if (counts.length > 0) {
+        lines.push(
+          `<span class="t-br">│</span> <span class="t-id">${counts.join(" · ")}</span>`,
+        );
+      }
+    }
+
+    // Group entities by role (only entities with roles)
+    const byRole: Record<string, CbuEntity[]> = {};
+    for (const entity of cbu.entities || []) {
+      const roles =
+        entity.roles && entity.roles.length > 0 ? entity.roles : null;
+      if (roles) {
+        for (const role of roles) {
+          if (!byRole[role]) byRole[role] = [];
+          byRole[role].push(entity);
+        }
+      }
+    }
+
+    // Sort: UBO/ownership roles first (top), then other, then business (bottom)
+    const roles = Object.keys(byRole).sort((a, b) => {
+      const catA = getRoleCategory(a);
+      const catB = getRoleCategory(b);
+      const order = { ubo: 0, other: 1, business: 2 };
+      if (order[catA] !== order[catB]) return order[catA] - order[catB];
+      return a.localeCompare(b);
+    });
+
+    if (roles.length > 0) {
+      lines.push(`<span class="t-br">│</span>`);
+
+      roles.forEach((role, ri) => {
+        const isLast = ri === roles.length - 1;
+        const branch = isLast ? "└" : "├";
+        const category = getRoleCategory(role);
+        const roleClass =
+          category === "ubo"
+            ? "t-role-ubo"
+            : category === "business"
+              ? "t-role-biz"
+              : "t-role";
+
+        // Entities inline (horizontal: role → entity1, entity2, ...)
+        const entityStrs = byRole[role].map((entity) => {
+          const entityType = entity.entity_type?.replace(/_/g, " ") || "";
+          const typeStr = entityType
+            ? ` <span class="t-type">(${entityType})</span>`
+            : "";
+          return `<span class="t-val">"${esc(entity.name)}"</span>${typeStr}`;
+        });
+
+        lines.push(
+          `<span class="t-br">${branch}─</span> <span class="${roleClass}">${esc(role)}</span> → ${entityStrs.join(", ")}`,
+        );
+      });
+    } else {
+      lines.push(
+        `<span class="t-br">└─</span> <span class="t-id">(no entities with roles)</span>`,
+      );
+    }
+
+    return lines.join("\n");
+  }
+
   function extractEntitiesFromDsl(
     dsl: string,
   ): Array<{ name: string; type: string; binding?: string }> {
@@ -334,26 +697,11 @@ document.addEventListener("DOMContentLoaded", () => {
       context.bindings.set(key, value);
     }
 
-    // If we got a cbu binding, fetch its details
-    if (bindings.cbu && !context.cbu) {
-      try {
-        const resp = await fetch(`/api/dsl/query/cbu/${bindings.cbu}`);
-        if (resp.ok) {
-          const data = await resp.json();
-          context.cbu = {
-            id: bindings.cbu,
-            name: data.name || "Unknown",
-            jurisdiction: data.jurisdiction,
-            clientType: data.client_type,
-          };
-        }
-      } catch (e) {
-        // Fallback - just use the ID
-        context.cbu = {
-          id: bindings.cbu,
-          name: "CBU " + bindings.cbu.substring(0, 8),
-        };
-      }
+    // Look for CBU binding - could be "cbu", "cbu_id", or any other name
+    // The execute response includes cbu_id as a special key
+    const cbuId = bindings.cbu_id || bindings.cbu;
+    if (cbuId && !context.cbu) {
+      await fetchAndDisplayCbu(cbuId);
     }
 
     // If we got a case binding, store it
@@ -362,6 +710,50 @@ document.addEventListener("DOMContentLoaded", () => {
         id: bindings.case,
         type: "KYC Case",
         status: "INTAKE",
+      };
+    }
+
+    updateContextBar();
+  }
+
+  // Fetch CBU data using cbu.show verb and update both context and debug panel
+  async function fetchAndDisplayCbu(cbuId: string) {
+    try {
+      // Use cbu.show verb to get full CBU structure
+      const dsl = `(cbu.show :cbu-id "${cbuId}")`;
+      const resp = await fetch("/api/dsl/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dsl }),
+      });
+
+      if (resp.ok) {
+        const data = await resp.json();
+
+        if (data.success && data.results && data.results.length > 0) {
+          const cbuResult = data.results[0];
+          if (cbuResult.result) {
+            const cbuData = cbuResult.result;
+
+            // Update context
+            context.cbu = {
+              id: cbuId,
+              name: cbuData.name || "Unknown",
+              jurisdiction: cbuData.jurisdiction,
+              clientType: cbuData.client_type,
+            };
+
+            // Update debug panel with full CBU data
+            debugState.cbu = mapCbuShowResult(cbuData, cbuId);
+            updateDebugPanels();
+          }
+        }
+      }
+    } catch (e) {
+      // Fallback - just use the ID
+      context.cbu = {
+        id: cbuId,
+        name: "CBU " + cbuId.substring(0, 8),
       };
     }
 
@@ -852,6 +1244,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const data = await resp.json();
 
+      // Update debug panels with session state from response
+      if (data.dsl_source || data.ast || data.bindings) {
+        updateDebugFromResponse(data);
+      }
+
       if (data.error) {
         addAssistantMessage({ text: `Error: ${data.error}` });
       } else {
@@ -987,6 +1384,9 @@ document.addEventListener("DOMContentLoaded", () => {
     pendingDsl = null;
     pendingCorrections = null;
     pendingEntitySelection = null;
+    // Clear debug panel state
+    debugState = { dslSource: "", ast: [], bindings: {}, cbu: null };
+    updateDebugPanels();
     chatMessages.innerHTML = `<div class="empty-state">
             <p><strong>Enterprise Onboarding Agent</strong></p>
             <p>Describe what you want to onboard in natural language.</p>
@@ -1001,4 +1401,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   newSessionBtn.addEventListener("click", newSession);
   contextClearBtn.addEventListener("click", clearContext);
+
+  // Initialize panels
+  initPanels();
 });

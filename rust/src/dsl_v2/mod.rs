@@ -26,6 +26,7 @@
 
 pub mod applicability_rules;
 pub mod ast;
+pub mod binding_context;
 pub mod config;
 pub mod csg_linter;
 pub mod custom_ops;
@@ -49,6 +50,7 @@ pub mod runtime_registry;
 pub mod semantic_context;
 #[cfg(feature = "database")]
 pub mod semantic_validator;
+pub mod topo_sort;
 pub mod validation;
 pub mod verb_registry;
 
@@ -58,6 +60,7 @@ pub use ast::{
     count_entity_refs, Argument, AstNode, EntityRefStats, Literal, Program, Span, Statement,
     VerbCall,
 };
+pub use binding_context::{BindingContext, BindingInfo};
 pub use config::types::LookupConfig;
 pub use csg_linter::{CsgLinter, InferredContext, LintResult};
 pub use enrichment::{enrich_program, EnrichmentError, EnrichmentResult};
@@ -80,6 +83,7 @@ pub use runtime_registry::{runtime_registry, RuntimeVerbRegistry};
 pub use semantic_context::SemanticContextStore;
 #[cfg(feature = "database")]
 pub use semantic_validator::{validate_dsl, validate_dsl_with_csg, SemanticValidator};
+pub use topo_sort::{emit_dsl, topological_sort, TopoSortError, TopoSortResult};
 pub use verb_registry::{
     find_unified_verb, registry, verb_exists, ArgDef, UnifiedVerbDef, UnifiedVerbRegistry,
     VerbBehavior,

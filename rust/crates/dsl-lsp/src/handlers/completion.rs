@@ -41,7 +41,11 @@ pub async fn get_completions(
             )
             .await
         }
-        CompletionContext::SymbolRef { prefix } => complete_symbols(&prefix, symbols),
+        CompletionContext::SymbolRef {
+            prefix,
+            verb_name,
+            keyword,
+        } => complete_symbols(&prefix, symbols, verb_name.as_deref(), keyword.as_deref()),
         CompletionContext::EntityAsSymbol {
             verb_name,
             keyword,
@@ -391,26 +395,101 @@ fn get_lookup_entity_type(verb_name: &str, keyword: &str) -> Option<String> {
     None
 }
 
-/// Complete symbol references.
-fn complete_symbols(prefix: &str, symbols: &SymbolTable) -> Vec<CompletionItem> {
+/// Complete symbol references with dataflow-aware ranking.
+///
+/// When verb_name and keyword are provided, symbols matching the expected type
+/// are ranked higher. For example, `:cbu-id @` will rank cbu-type symbols first.
+fn complete_symbols(
+    prefix: &str,
+    symbols: &SymbolTable,
+    verb_name: Option<&str>,
+    keyword: Option<&str>,
+) -> Vec<CompletionItem> {
     let prefix_lower = prefix.to_lowercase();
 
-    symbols
+    // Determine expected type from keyword (if any)
+    let expected_type = keyword.and_then(infer_expected_type_from_keyword);
+
+    let mut completions: Vec<_> = symbols
         .all()
         .filter(|(name, _)| name.to_lowercase().starts_with(&prefix_lower))
-        .map(|(name, info)| CompletionItem {
-            label: format!("@{}", name),
-            kind: Some(CompletionItemKind::VARIABLE),
-            detail: Some(format!("{} from {}", info.id_type, info.defined_by)),
-            documentation: Some(Documentation::String(format!(
-                "Defined at line {}",
-                info.definition.range.start.line + 1
-            ))),
-            insert_text: Some(format!("@{}", name)),
-            insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
-            ..Default::default()
+        .map(|(name, info)| {
+            // Check if this symbol's type matches the expected type
+            let type_matches = expected_type
+                .as_ref()
+                .map(|exp| info.id_type.to_lowercase().contains(&exp.to_lowercase()))
+                .unwrap_or(false);
+
+            // Sort key: matching types first (0), then non-matching (1)
+            let sort_priority = if type_matches { "0" } else { "1" };
+
+            let detail = if type_matches {
+                format!("{} from {} ✓", info.id_type, info.defined_by)
+            } else {
+                format!("{} from {}", info.id_type, info.defined_by)
+            };
+
+            CompletionItem {
+                label: format!("@{}", name),
+                kind: Some(CompletionItemKind::VARIABLE),
+                detail: Some(detail),
+                documentation: Some(Documentation::String(format!(
+                    "Defined at line {}{}",
+                    info.definition.range.start.line + 1,
+                    if let Some(ref v) = verb_name {
+                        format!(" (for {})", v)
+                    } else {
+                        String::new()
+                    }
+                ))),
+                insert_text: Some(format!("@{}", name)),
+                insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
+                sort_text: Some(format!("{}-{}", sort_priority, name)),
+                ..Default::default()
+            }
         })
-        .collect()
+        .collect();
+
+    // Sort by sort_text to ensure type-matched symbols appear first
+    completions.sort_by(|a, b| {
+        a.sort_text
+            .as_ref()
+            .unwrap_or(&a.label)
+            .cmp(b.sort_text.as_ref().unwrap_or(&b.label))
+    });
+
+    completions
+}
+
+/// Infer expected symbol type from keyword name.
+/// Maps common keyword patterns to their expected binding types.
+fn infer_expected_type_from_keyword(keyword: &str) -> Option<String> {
+    let kw_lower = keyword.to_lowercase();
+
+    if kw_lower.contains("cbu") {
+        Some("cbu".to_string())
+    } else if kw_lower.contains("entity") || kw_lower.contains("person") || kw_lower.contains("ubo")
+    {
+        Some("entity".to_string())
+    } else if kw_lower.contains("case") {
+        Some("case".to_string())
+    } else if kw_lower.contains("workstream") {
+        Some("workstream".to_string())
+    } else if kw_lower.contains("ssi") {
+        Some("ssi".to_string())
+    } else if kw_lower.contains("instance") {
+        Some("instance".to_string())
+    } else if kw_lower.contains("document") || kw_lower.contains("doc") {
+        Some("document".to_string())
+    } else if kw_lower.contains("screening") {
+        Some("screening".to_string())
+    } else if kw_lower.contains("share-class") {
+        Some("share_class".to_string())
+    } else if kw_lower.contains("holding") {
+        Some("holding".to_string())
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]

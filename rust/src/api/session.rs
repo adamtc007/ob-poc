@@ -1,9 +1,11 @@
 //! Session state management for Agent API
 //!
 //! Provides stateful session handling for multi-turn DSL generation conversations.
-//! Sessions accumulate intents, validate them, assemble DSL, and track execution.
+//! Sessions accumulate AST statements, validate them, and track execution.
+//! The AST is the source of truth - DSL source is generated from it for display.
 
 use super::intent::VerbIntent;
+use crate::dsl_v2::ast::{Program, Statement};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -222,6 +224,17 @@ pub enum MessageRole {
 // Session Context
 // ============================================================================
 
+/// Information about a bound entity in the session
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BoundEntity {
+    /// The UUID of the entity
+    pub id: Uuid,
+    /// The entity type (e.g., "cbu", "entity", "case")
+    pub entity_type: String,
+    /// Human-readable display name (e.g., "Aviva Lux 9")
+    pub display_name: String,
+}
+
 /// Context maintained across the session for reference resolution
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SessionContext {
@@ -240,9 +253,21 @@ pub struct SessionContext {
     /// Domain hint for RAG context
     #[serde(skip_serializing_if = "Option::is_none")]
     pub domain_hint: Option<String>,
-    /// Named references for complex workflows
+    /// Named references for complex workflows (legacy - UUID only)
     #[serde(default)]
     pub named_refs: HashMap<String, Uuid>,
+    /// Typed bindings with display names for LLM context (populated after execution)
+    #[serde(default)]
+    pub bindings: HashMap<String, BoundEntity>,
+    /// Pending bindings from assembled DSL that hasn't been executed yet
+    /// Format: binding_name -> (inferred_type, display_name)
+    /// These are extracted from :as @name patterns in DSL
+    #[serde(default)]
+    pub pending_bindings: HashMap<String, (String, String)>,
+    /// The accumulated AST - source of truth for the session's DSL
+    /// Each chat message can add/modify statements in this AST
+    #[serde(default)]
+    pub ast: Vec<Statement>,
 }
 
 impl SessionContext {
@@ -262,6 +287,146 @@ impl SessionContext {
     /// Set a named reference
     pub fn set_named_ref(&mut self, name: &str, id: Uuid) {
         self.named_refs.insert(name.to_string(), id);
+    }
+
+    /// Set a typed binding with display name
+    /// Returns the actual binding name used (may have suffix if collision)
+    pub fn set_binding(
+        &mut self,
+        name: &str,
+        id: Uuid,
+        entity_type: &str,
+        display_name: &str,
+    ) -> String {
+        // Handle collision - append suffix if name already exists
+        let actual_name = if self.bindings.contains_key(name) {
+            // Find unique name with suffix
+            let mut suffix = 2;
+            loop {
+                let candidate = format!("{}_{}", name, suffix);
+                if !self.bindings.contains_key(&candidate) {
+                    break candidate;
+                }
+                suffix += 1;
+            }
+        } else {
+            name.to_string()
+        };
+
+        // Also set in named_refs for backward compatibility
+        self.named_refs.insert(actual_name.clone(), id);
+        self.bindings.insert(
+            actual_name.clone(),
+            BoundEntity {
+                id,
+                entity_type: entity_type.to_string(),
+                display_name: display_name.to_string(),
+            },
+        );
+
+        actual_name
+    }
+
+    /// Get bindings formatted for LLM context
+    /// Returns strings like "@aviva_lux_9 (CBU: Aviva Lux 9)"
+    pub fn bindings_for_llm(&self) -> Vec<String> {
+        self.bindings
+            .iter()
+            .map(|(name, binding)| {
+                format!(
+                    "@{} ({}: {})",
+                    name,
+                    binding.entity_type.to_uppercase(),
+                    binding.display_name
+                )
+            })
+            .collect()
+    }
+
+    // =========================================================================
+    // AST MANIPULATION
+    // =========================================================================
+
+    /// Add statements to the AST
+    pub fn add_statements(&mut self, statements: Vec<Statement>) {
+        self.ast.extend(statements);
+    }
+
+    /// Add a single statement to the AST
+    pub fn add_statement(&mut self, statement: Statement) {
+        self.ast.push(statement);
+    }
+
+    /// Get the AST as a Program for compilation/execution
+    pub fn as_program(&self) -> Program {
+        Program {
+            statements: self.ast.clone(),
+        }
+    }
+
+    /// Render the AST back to DSL source for display
+    pub fn to_dsl_source(&self) -> String {
+        self.ast
+            .iter()
+            .map(|s| s.to_dsl_string())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Find a statement by binding name
+    pub fn find_by_binding(&self, binding_name: &str) -> Option<&Statement> {
+        self.ast.iter().find(|s| {
+            if let Statement::VerbCall(vc) = s {
+                vc.binding.as_deref() == Some(binding_name)
+            } else {
+                false
+            }
+        })
+    }
+
+    /// Update a statement's argument value by binding name
+    pub fn update_arg(
+        &mut self,
+        binding_name: &str,
+        arg_key: &str,
+        new_value: crate::dsl_v2::ast::AstNode,
+    ) -> bool {
+        for stmt in &mut self.ast {
+            if let Statement::VerbCall(vc) = stmt {
+                if vc.binding.as_deref() == Some(binding_name) {
+                    for arg in &mut vc.arguments {
+                        if arg.key == arg_key {
+                            arg.value = new_value;
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Remove a statement by binding name
+    pub fn remove_by_binding(&mut self, binding_name: &str) -> bool {
+        let original_len = self.ast.len();
+        self.ast.retain(|s| {
+            if let Statement::VerbCall(vc) = s {
+                vc.binding.as_deref() != Some(binding_name)
+            } else {
+                true
+            }
+        });
+        self.ast.len() != original_len
+    }
+
+    /// Clear all AST statements
+    pub fn clear_ast(&mut self) {
+        self.ast.clear();
+    }
+
+    /// Get count of statements
+    pub fn statement_count(&self) -> usize {
+        self.ast.len()
     }
 }
 
@@ -286,6 +451,9 @@ pub struct ExecutionResult {
     /// Type of entity created (CBU, ENTITY, etc.)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub entity_type: Option<String>,
+    /// Result data for Record/RecordSet operations (e.g., cbu.show)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<serde_json::Value>,
 }
 
 // ============================================================================
@@ -345,6 +513,15 @@ pub struct ChatResponse {
     pub session_state: SessionState,
     /// Whether the session can execute
     pub can_execute: bool,
+    /// DSL source rendered from AST (for display in UI)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dsl_source: Option<String>,
+    /// The full AST for debugging (JSON serialized)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ast: Option<Vec<Statement>>,
+    /// Session bindings with type info
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bindings: Option<HashMap<String, BoundEntity>>,
 }
 
 /// Response with session state
@@ -439,6 +616,7 @@ mod tests {
             message: "OK".to_string(),
             entity_id: Some(Uuid::new_v4()),
             entity_type: Some("CBU".to_string()),
+            result: None,
         }]);
         assert_eq!(session.state, SessionState::Executed);
         assert!(session.assembled_dsl.is_empty());

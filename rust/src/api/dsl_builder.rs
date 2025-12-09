@@ -5,11 +5,24 @@
 //!
 //! Mirrors the Zed/LSP pipeline: Intent → Build DSL → Validate → Feedback
 
-use crate::api::intent::{IntentError, IntentValidation, VerbIntent};
+use crate::api::intent::{IntentError, IntentValidation, ParamValue, VerbIntent};
 use crate::dsl_v2::{find_unified_verb, registry};
 
-/// Build DSL string from a single VerbIntent
-pub fn build_dsl_statement(intent: &VerbIntent, binding_counter: &mut u32) -> String {
+/// Result of building a DSL statement, includes binding metadata
+#[derive(Debug, Clone)]
+pub struct DslBuildResult {
+    /// The DSL statement string
+    pub statement: String,
+    /// The binding name if one was generated (e.g., "aviva_lux_9")
+    pub binding_name: Option<String>,
+    /// The display name for the entity (e.g., "Aviva Lux 9")
+    pub display_name: Option<String>,
+    /// The entity type (e.g., "cbu", "entity")
+    pub entity_type: Option<String>,
+}
+
+/// Build DSL string from a single VerbIntent, returning binding metadata
+pub fn build_dsl_statement_with_metadata(intent: &VerbIntent) -> DslBuildResult {
     let mut parts = vec![format!("({}", intent.verb)];
 
     // Add parameters in sorted order for determinism
@@ -32,24 +45,111 @@ pub fn build_dsl_statement(intent: &VerbIntent, binding_counter: &mut u32) -> St
         }
     }
 
-    // Generate binding if this verb returns something
-    // Convention: use @result_N for auto-generated bindings
-    if should_generate_binding(&intent.verb) {
-        *binding_counter += 1;
-        parts.push(format!(":as @result_{}", binding_counter));
-    }
+    // Generate semantic binding if this verb returns something
+    let (binding_name, display_name, entity_type) = if should_generate_binding(&intent.verb) {
+        let (name, display, etype) = generate_semantic_binding(intent);
+        parts.push(format!(":as @{}", name));
+        (Some(name), Some(display), Some(etype))
+    } else {
+        (None, None, None)
+    };
 
     parts.push(")".to_string());
-    parts.join(" ")
+
+    DslBuildResult {
+        statement: parts.join(" "),
+        binding_name,
+        display_name,
+        entity_type,
+    }
+}
+
+/// Build DSL string from a single VerbIntent (legacy interface)
+pub fn build_dsl_statement(intent: &VerbIntent, _binding_counter: &mut u32) -> String {
+    build_dsl_statement_with_metadata(intent).statement
+}
+
+/// Generate a semantic binding name from the intent's parameters
+/// Returns (binding_name, display_name, entity_type)
+fn generate_semantic_binding(intent: &VerbIntent) -> (String, String, String) {
+    let entity_type = get_entity_type_from_verb(&intent.verb);
+
+    // Try to get a name from common parameter names
+    let display_name = intent
+        .params
+        .get("name")
+        .or_else(|| intent.params.get("cbu-name"))
+        .or_else(|| intent.params.get("first-name"))
+        .or_else(|| intent.params.get("company-name"))
+        .or_else(|| intent.params.get("trust-name"))
+        .or_else(|| intent.params.get("partnership-name"))
+        .and_then(|v| match v {
+            ParamValue::String(s) => Some(s.clone()),
+            _ => None,
+        })
+        .unwrap_or_else(|| entity_type.clone());
+
+    // Convert display name to valid binding name (lowercase, underscores)
+    let binding_name = display_name
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '_' })
+        .collect::<String>()
+        .trim_matches('_')
+        .to_string();
+
+    // Ensure binding name is not empty
+    let binding_name = if binding_name.is_empty() {
+        entity_type.clone()
+    } else {
+        binding_name
+    };
+
+    (binding_name, display_name, entity_type)
+}
+
+/// Get the entity type from the verb name
+fn get_entity_type_from_verb(verb: &str) -> String {
+    match verb {
+        v if v.starts_with("cbu.") => "cbu".to_string(),
+        v if v.starts_with("entity.") => "entity".to_string(),
+        v if v.starts_with("kyc-case.") => "case".to_string(),
+        v if v.starts_with("entity-workstream.") => "workstream".to_string(),
+        v if v.starts_with("share-class.") => "share_class".to_string(),
+        v if v.starts_with("holding.") => "holding".to_string(),
+        v if v.starts_with("service-resource.") => "resource".to_string(),
+        v if v.starts_with("document.") => "document".to_string(),
+        _ => "entity".to_string(),
+    }
 }
 
 /// Build complete DSL program from a sequence of intents
+/// Tracks bindings generated for each statement and replaces @result_N references
 pub fn build_dsl_program(intents: &[VerbIntent]) -> String {
-    let mut binding_counter = 0;
-    let statements: Vec<String> = intents
-        .iter()
-        .map(|intent| build_dsl_statement(intent, &mut binding_counter))
-        .collect();
+    let mut statements = Vec::new();
+    // Map from @result_N -> actual semantic binding name
+    let mut result_bindings: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+
+    for (idx, intent) in intents.iter().enumerate() {
+        // Build the statement and get binding metadata
+        let build_result = build_dsl_statement_with_metadata(intent);
+        let mut statement = build_result.statement;
+
+        // Replace any @result_N references with actual binding names
+        for (result_ref, actual_binding) in &result_bindings {
+            statement = statement.replace(result_ref, &format!("@{}", actual_binding));
+        }
+
+        statements.push(statement);
+
+        // Track this statement's binding for future references
+        // AI uses @result_1 for first statement, @result_2 for second, etc.
+        if let Some(binding_name) = build_result.binding_name {
+            let result_ref = format!("@result_{}", idx + 1);
+            result_bindings.insert(result_ref, binding_name);
+        }
+    }
 
     statements.join("\n")
 }
@@ -315,6 +415,15 @@ mod tests {
         let program = build_dsl_program(&intents);
         assert!(program.contains("cbu.ensure"));
         assert!(program.contains("cbu.add-product"));
-        assert!(program.contains("@result_1"));
+        // @result_1 should be replaced with the semantic binding from cbu.ensure
+        assert!(
+            !program.contains("@result_1"),
+            "Expected @result_1 to be replaced with semantic binding"
+        );
+        // The cbu.ensure generates binding @test from :name "Test"
+        assert!(
+            program.contains(":cbu-id @test"),
+            "Expected @result_1 to be replaced with @test"
+        );
     }
 }

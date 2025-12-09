@@ -255,6 +255,9 @@ impl CsgLinter {
         // Pass 5: Unused symbol warnings
         self.check_unused_symbols(&inferred, &mut diagnostics);
 
+        // Pass 6: Dataflow validation (produces/consumes)
+        self.validate_dataflow(&ast, source, &mut diagnostics);
+
         LintResult {
             ast,
             diagnostics,
@@ -532,6 +535,107 @@ impl CsgLinter {
                     message: format!("symbol '@{}' is defined but never used", name),
                     suggestions: vec![],
                 });
+            }
+        }
+    }
+
+    // =========================================================================
+    // PASS 6: DATAFLOW VALIDATION
+    // =========================================================================
+
+    /// Validate dataflow: check that all @ref bindings are defined before use
+    /// and that binding types match expected consumer types.
+    fn validate_dataflow(&self, ast: &Program, source: &str, diagnostics: &mut Vec<Diagnostic>) {
+        use crate::dsl_v2::binding_context::{BindingContext, BindingInfo};
+        use crate::dsl_v2::runtime_registry::runtime_registry;
+
+        let registry = runtime_registry();
+        let mut pending_context = BindingContext::new();
+
+        for stmt in &ast.statements {
+            if let Statement::VerbCall(vc) = stmt {
+                let span = self.span_to_source_span(&vc.span, source);
+
+                // Get verb's consumes declarations
+                let consumes = registry.get_consumes(&vc.domain, &vc.verb);
+
+                // Check each consumed binding
+                for consume in consumes {
+                    // Find the argument that carries this reference
+                    if let Some(arg) = vc.arguments.iter().find(|a| a.key == consume.arg) {
+                        // Check if the argument is a symbol reference
+                        if let Some(ref_name) = arg.value.as_symbol() {
+                            // Look up the binding
+                            match pending_context.get(ref_name) {
+                                None => {
+                                    // Binding not found
+                                    if consume.required {
+                                        diagnostics.push(Diagnostic {
+                                            severity: Severity::Error,
+                                            span,
+                                            code: DiagnosticCode::DataflowUndefinedBinding,
+                                            message: format!(
+                                                "@{} is not defined. {}.{} argument :{} expects a {} binding.",
+                                                ref_name, vc.domain, vc.verb, consume.arg, consume.consumed_type
+                                            ),
+                                            suggestions: vec![Suggestion::new(
+                                                format!(
+                                                    "Define @{} before this statement using a verb that produces a {}",
+                                                    ref_name, consume.consumed_type
+                                                ),
+                                                String::new(), // No automatic replacement
+                                                0.5,
+                                            )],
+                                        });
+                                    }
+                                }
+                                Some(info) => {
+                                    // Check type matches
+                                    if !info.matches_type(&consume.consumed_type) {
+                                        diagnostics.push(Diagnostic {
+                                            severity: Severity::Error,
+                                            span,
+                                            code: DiagnosticCode::DataflowTypeMismatch,
+                                            message: format!(
+                                                "@{} is {} but {}.{} argument :{} expects {}.",
+                                                ref_name,
+                                                info.produced_type,
+                                                vc.domain,
+                                                vc.verb,
+                                                consume.arg,
+                                                consume.consumed_type
+                                            ),
+                                            suggestions: vec![],
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Register this statement's produces in pending context
+                if let Some(ref binding_name) = vc.binding {
+                    // Check for duplicate binding
+                    if pending_context.contains(binding_name) {
+                        diagnostics.push(Diagnostic {
+                            severity: Severity::Error,
+                            span,
+                            code: DiagnosticCode::DataflowDuplicateBinding,
+                            message: format!(
+                                "@{} is already defined earlier in this program.",
+                                binding_name
+                            ),
+                            suggestions: vec![Suggestion::new(
+                                "Use a different binding name",
+                                String::new(),
+                                0.5,
+                            )],
+                        });
+                    } else if let Some(produces) = registry.get_produces(&vc.domain, &vc.verb) {
+                        pending_context.insert(BindingInfo::from_produces(binding_name, produces));
+                    }
+                }
             }
         }
     }

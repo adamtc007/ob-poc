@@ -43,20 +43,41 @@ use uuid::Uuid;
 // =============================================================================
 
 /// A complete DSL program
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Program {
     pub statements: Vec<Statement>,
 }
 
+impl Program {
+    /// Render the program back to DSL source
+    pub fn to_dsl_string(&self) -> String {
+        self.statements
+            .iter()
+            .map(|s| s.to_dsl_string())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+}
+
 /// A single statement
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Statement {
     VerbCall(VerbCall),
     Comment(String),
 }
 
+impl Statement {
+    /// Render the statement back to DSL source
+    pub fn to_dsl_string(&self) -> String {
+        match self {
+            Statement::VerbCall(vc) => vc.to_dsl_string(),
+            Statement::Comment(c) => format!("; {}", c),
+        }
+    }
+}
+
 /// A verb call: (domain.verb :key value ... :as @symbol)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct VerbCall {
     pub domain: String,
     pub verb: String,
@@ -64,6 +85,24 @@ pub struct VerbCall {
     /// Optional symbol binding: :as @name
     pub binding: Option<String>,
     pub span: Span,
+}
+
+impl VerbCall {
+    /// Render the verb call back to DSL source
+    pub fn to_dsl_string(&self) -> String {
+        let mut parts = vec![format!("({}.{}", self.domain, self.verb)];
+
+        for arg in &self.arguments {
+            parts.push(format!(":{} {}", arg.key, arg.value.to_dsl_string()));
+        }
+
+        if let Some(ref binding) = self.binding {
+            parts.push(format!(":as @{}", binding));
+        }
+
+        parts.push(")".to_string());
+        parts.join(" ")
+    }
 }
 
 impl VerbCall {
@@ -84,7 +123,7 @@ impl VerbCall {
 }
 
 /// A keyword-value argument
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Argument {
     /// Argument key (without colon): "name", "entity-id"
     pub key: String,
@@ -106,7 +145,7 @@ pub struct Argument {
 /// - EntityRef: External references that need gateway resolution
 /// - Containers: Lists and Maps
 /// - Nested: Nested verb calls
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AstNode {
     /// Literal value - no resolution needed
     Literal(Literal),
@@ -151,6 +190,42 @@ pub enum AstNode {
 }
 
 impl AstNode {
+    // =========================================================================
+    // DSL RENDERING
+    // =========================================================================
+
+    /// Render the node back to DSL source
+    pub fn to_dsl_string(&self) -> String {
+        match self {
+            AstNode::Literal(lit) => lit.to_dsl_string(),
+            AstNode::SymbolRef { name, .. } => format!("@{}", name),
+            AstNode::EntityRef {
+                value,
+                resolved_key,
+                ..
+            } => {
+                // If resolved, use the resolved key (UUID), otherwise use original value
+                if let Some(key) = resolved_key {
+                    format!("\"{}\"", key)
+                } else {
+                    format!("\"{}\"", value)
+                }
+            }
+            AstNode::List { items, .. } => {
+                let inner: Vec<String> = items.iter().map(|i| i.to_dsl_string()).collect();
+                format!("[{}]", inner.join(" "))
+            }
+            AstNode::Map { entries, .. } => {
+                let pairs: Vec<String> = entries
+                    .iter()
+                    .map(|(k, v)| format!(":{} {}", k, v.to_dsl_string()))
+                    .collect();
+                format!("{{{}}}", pairs.join(" "))
+            }
+            AstNode::Nested(vc) => vc.to_dsl_string(),
+        }
+    }
+
     // =========================================================================
     // CONSTRUCTORS
     // =========================================================================
@@ -398,6 +473,18 @@ impl Literal {
     /// Get the span (literals don't track span individually, return default)
     pub fn span(&self) -> Span {
         Span::default()
+    }
+
+    /// Render the literal back to DSL source
+    pub fn to_dsl_string(&self) -> String {
+        match self {
+            Literal::String(s) => format!("\"{}\"", s.replace('\"', "\\\"")),
+            Literal::Integer(i) => i.to_string(),
+            Literal::Decimal(d) => d.to_string(),
+            Literal::Boolean(b) => if *b { "true" } else { "false" }.to_string(),
+            Literal::Null => "nil".to_string(),
+            Literal::Uuid(u) => format!("\"{}\"", u),
+        }
     }
 }
 

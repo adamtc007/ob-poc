@@ -24,6 +24,7 @@ use colored::Colorize;
 use std::io::{self, Read};
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::str::FromStr;
 use tracing_subscriber::EnvFilter;
 
 // Import from library
@@ -224,6 +225,18 @@ enum Commands {
         #[arg(long)]
         output: Option<PathBuf>,
     },
+
+    /// Interactive REPL for incremental DSL editing with a CBU
+    #[cfg(feature = "database")]
+    Repl {
+        /// CBU ID to load existing state (optional - creates new session if not provided)
+        #[arg(short, long)]
+        cbu: Option<String>,
+
+        /// Database URL (or use DATABASE_URL env var)
+        #[arg(long, env = "DATABASE_URL")]
+        db_url: String,
+    },
 }
 
 // =============================================================================
@@ -347,6 +360,15 @@ fn main() -> ExitCode {
                     output,
                     cli.format,
                 )),
+                Err(e) => Err(e),
+            }
+        }
+        #[cfg(feature = "database")]
+        Commands::Repl { cbu, db_url } => {
+            let rt = tokio::runtime::Runtime::new()
+                .map_err(|e| format!("Failed to create runtime: {}", e));
+            match rt {
+                Ok(rt) => rt.block_on(cmd_repl(cbu, db_url, cli.format)),
                 Err(e) => Err(e),
             }
         }
@@ -2120,7 +2142,7 @@ async fn cmd_template(
 
     // Parse template type
     let template = TemplateType::from_str(template_type)
-        .ok_or_else(|| format!(
+        .map_err(|_| format!(
             "Unknown template type: '{}'\n\nAvailable types: hedge_fund, lux_sicav, us_40_act, spc\nUse 'dsl_cli template list' to see descriptions.",
             template_type
         ))?;
@@ -2517,4 +2539,457 @@ The custody domain supports a three-layer model for settlement instruction routi
 Respond with ONLY the DSL code, no explanations or markdown. If you cannot generate valid DSL, respond with: ERROR: <reason>"#,
         vocab
     )
+}
+
+// =============================================================================
+// REPL COMMAND - Interactive DSL session with CBU state
+// =============================================================================
+
+#[cfg(feature = "database")]
+async fn cmd_repl(
+    cbu_id: Option<String>,
+    db_url: String,
+    format: OutputFormat,
+) -> Result<(), String> {
+    use ob_poc::database::SessionRepository;
+    use ob_poc::dsl_v2::{
+        compile,
+        config::ConfigLoader,
+        emit_dsl,
+        executor::{DslExecutor, ExecutionContext, ExecutionResult},
+        parse_program, topological_sort,
+        validation::{RustStyleFormatter, ValidationContext},
+        BindingContext, BindingInfo, CsgLinter, RuntimeVerbRegistry,
+    };
+    use std::io::Write;
+    use uuid::Uuid;
+
+    // Connect to database
+    if format == OutputFormat::Pretty {
+        println!("{}", "DSL REPL - Interactive Session".cyan().bold());
+        println!("{}", "=".repeat(50));
+        println!();
+        println!("{}", "Connecting to database...".dimmed());
+    }
+
+    let pool = sqlx::PgPool::connect(&db_url)
+        .await
+        .map_err(|e| format!("Database connection failed: {}", e))?;
+
+    let repo = SessionRepository::new(pool.clone());
+    let executor = DslExecutor::new(pool.clone());
+
+    // Parse CBU ID if provided
+    let cbu_uuid = if let Some(id) = &cbu_id {
+        Some(Uuid::parse_str(id).map_err(|e| format!("Invalid CBU UUID: {}", e))?)
+    } else {
+        None
+    };
+
+    // Load or create session state
+    let (session, mut binding_context) = if let Some(cbu) = cbu_uuid {
+        if format == OutputFormat::Pretty {
+            println!("{} Loading CBU state...", "→".cyan());
+        }
+
+        let state = repo
+            .get_cbu_state(cbu)
+            .await
+            .map_err(|e| format!("Failed to load CBU state: {}", e))?;
+
+        // Build binding context from existing bindings
+        let mut ctx = BindingContext::new();
+        for (name, uuid) in &state.bindings {
+            // For now, mark all as Entity type - could be enhanced with type tracking
+            ctx.insert(BindingInfo {
+                name: name.clone(),
+                produced_type: "entity".to_string(),
+                subtype: None,
+                entity_pk: *uuid,
+                resolved: true,
+                source_sheet_id: None,
+            });
+        }
+
+        if format == OutputFormat::Pretty {
+            println!(
+                "{} Loaded session {} with {} bindings",
+                "✓".green(),
+                state.session_id.to_string().dimmed(),
+                state.bindings.len()
+            );
+            if !state.bindings.is_empty() {
+                println!();
+                println!("{}:", "Available bindings".yellow());
+                for (name, uuid) in &state.bindings {
+                    println!("  @{} = {}", name.cyan(), uuid.to_string().dimmed());
+                }
+            }
+        }
+
+        (state, ctx)
+    } else {
+        if format == OutputFormat::Pretty {
+            println!("{} No CBU specified - starting fresh session", "→".cyan());
+            println!();
+            println!("{}:", "Bootstrap hint".yellow());
+            println!("  Start with a CBU to enable all other commands:");
+            println!(
+                "  {}",
+                "(cbu.ensure :name \"My Fund\" :jurisdiction \"LU\" :as @fund)".cyan()
+            );
+            println!();
+            println!("  Or attach to existing CBU: :cbu <uuid>");
+        }
+        (
+            ob_poc::database::CbuDslState {
+                cbu_id: Uuid::nil(),
+                session_id: Uuid::new_v4(),
+                executed_dsl: String::new(),
+                bindings: std::collections::HashMap::new(),
+                snapshot_count: 0,
+                last_executed_at: None,
+            },
+            BindingContext::new(),
+        )
+    };
+
+    // Initialize linter
+    let mut linter = CsgLinter::new(pool.clone());
+    linter
+        .initialize()
+        .await
+        .map_err(|e| format!("Linter initialization failed: {}", e))?;
+
+    // Load verb registry for topological sort
+    // Load verb registry for topological sort
+    let loader = ConfigLoader::from_env();
+    let verbs_config = loader
+        .load_verbs()
+        .map_err(|e| format!("Failed to load verb config: {}", e))?;
+    let registry = RuntimeVerbRegistry::from_config(&verbs_config);
+
+    // Pending DSL buffer (not yet executed)
+    let mut pending_dsl = String::new();
+    let mut exec_ctx = ExecutionContext::default();
+
+    // Populate exec_ctx with existing bindings
+    for (name, uuid) in &session.bindings {
+        exec_ctx.symbols.insert(name.clone(), *uuid);
+    }
+
+    if format == OutputFormat::Pretty {
+        println!();
+        println!("{}:", "Commands".yellow());
+        println!("  {}    - Execute pending DSL", ":commit".green());
+        println!("  {}  - Discard pending DSL", ":rollback".green());
+        println!("  {}   - Show pending DSL", ":pending".green());
+        println!("  {}  - Show current bindings", ":bindings".green());
+        println!(
+            "  {} - Reorder pending DSL by dependencies",
+            ":reorder".green()
+        );
+        println!("  {}      - Show this help", ":help".green());
+        println!("  {}      - Exit REPL", ":quit".green());
+        println!();
+        println!("Enter DSL statements (multi-line supported, blank line to finish input):");
+        println!();
+    }
+
+    // REPL loop
+    let stdin = std::io::stdin();
+    let mut stdout = std::io::stdout();
+
+    loop {
+        // Print prompt
+        let prompt = if pending_dsl.is_empty() {
+            "dsl> ".green().to_string()
+        } else {
+            "dsl+ ".yellow().to_string()
+        };
+        print!("{}", prompt);
+        stdout.flush().map_err(|e| format!("IO error: {}", e))?;
+
+        // Read line
+        let mut line = String::new();
+        match stdin.read_line(&mut line) {
+            Ok(0) => break, // EOF
+            Ok(_) => {}
+            Err(e) => return Err(format!("Read error: {}", e)),
+        }
+
+        let trimmed = line.trim();
+
+        // Handle commands
+        if trimmed.starts_with(':') {
+            match trimmed {
+                ":quit" | ":q" | ":exit" => {
+                    if !pending_dsl.is_empty() {
+                        println!(
+                            "{} Warning: {} lines of pending DSL will be discarded",
+                            "!".yellow(),
+                            pending_dsl.lines().count()
+                        );
+                    }
+                    println!("{}", "Goodbye!".cyan());
+                    break;
+                }
+
+                ":help" | ":h" | ":?" => {
+                    println!();
+                    println!("{}:", "Commands".yellow());
+                    println!("  :commit    - Execute pending DSL statements");
+                    println!("  :rollback  - Discard pending DSL without executing");
+                    println!("  :pending   - Show pending DSL buffer");
+                    println!("  :bindings  - Show all available symbol bindings");
+                    println!("  :reorder   - Topologically sort pending DSL by dependencies");
+                    println!("  :clear     - Clear screen");
+                    println!("  :quit      - Exit REPL");
+                    println!();
+                }
+
+                ":pending" | ":p" => {
+                    if pending_dsl.is_empty() {
+                        println!("{}", "(no pending DSL)".dimmed());
+                    } else {
+                        println!();
+                        println!("{}:", "Pending DSL".yellow());
+                        for line in pending_dsl.lines() {
+                            println!("  {}", line.cyan());
+                        }
+                        println!();
+                    }
+                }
+
+                ":bindings" | ":b" => {
+                    if exec_ctx.symbols.is_empty() {
+                        println!("{}", "(no bindings)".dimmed());
+                    } else {
+                        println!();
+                        println!("{}:", "Bindings".yellow());
+                        for (name, uuid) in &exec_ctx.symbols {
+                            println!("  @{} = {}", name.cyan(), uuid.to_string().dimmed());
+                        }
+                        println!();
+                    }
+                }
+
+                ":rollback" | ":r" => {
+                    if pending_dsl.is_empty() {
+                        println!("{}", "(nothing to rollback)".dimmed());
+                    } else {
+                        let count = pending_dsl.lines().count();
+                        pending_dsl.clear();
+                        println!("{} Discarded {} lines", "✓".green(), count);
+                    }
+                }
+
+                ":reorder" => {
+                    if pending_dsl.is_empty() {
+                        println!("{}", "(nothing to reorder)".dimmed());
+                    } else {
+                        // Parse pending DSL
+                        match parse_program(&pending_dsl) {
+                            Ok(ast) => {
+                                // Perform topological sort
+                                match topological_sort(&ast, &binding_context, &registry) {
+                                    Ok(result) => {
+                                        if !result.reordered {
+                                            println!("{} Already in correct order", "✓".green());
+                                        } else {
+                                            // Emit reordered DSL
+                                            let reordered = emit_dsl(&result.program);
+                                            pending_dsl = reordered;
+                                            println!(
+                                                "{} Reordered {} statements",
+                                                "✓".green(),
+                                                result.program.statements.len()
+                                            );
+                                            println!();
+                                            println!("{}:", "Reordered DSL".yellow());
+                                            for line in pending_dsl.lines() {
+                                                println!("  {}", line.cyan());
+                                            }
+                                            println!();
+                                        }
+                                    }
+                                    Err(e) => {
+                                        println!("{} Reorder failed: {:?}", "✗".red(), e);
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                println!("{} Parse error: {:?}", "✗".red(), e);
+                            }
+                        }
+                    }
+                }
+
+                ":commit" | ":c" => {
+                    if pending_dsl.is_empty() {
+                        println!("{}", "(nothing to commit)".dimmed());
+                        continue;
+                    }
+
+                    println!();
+                    println!("{}", "Validating and executing...".dimmed());
+
+                    // 1. Parse
+                    let ast = match parse_program(&pending_dsl) {
+                        Ok(ast) => ast,
+                        Err(e) => {
+                            println!("{} Parse error: {:?}", "✗".red(), e);
+                            continue;
+                        }
+                    };
+
+                    // 2. CSG Lint
+                    // Note: CSG linter builds its own binding context from the AST.
+                    // Pre-existing bindings from previous executions are tracked in
+                    // binding_context for topological sort, but linter validates
+                    // self-contained DSL programs.
+                    let context = ValidationContext::default();
+                    let lint_result = linter.lint(ast.clone(), &context, &pending_dsl).await;
+
+                    if lint_result.has_errors() {
+                        let formatted =
+                            RustStyleFormatter::format(&pending_dsl, &lint_result.diagnostics);
+                        println!("{}", formatted);
+                        println!("{} Validation failed - not executed", "✗".red());
+                        continue;
+                    }
+
+                    if lint_result.has_warnings() {
+                        let formatted =
+                            RustStyleFormatter::format(&pending_dsl, &lint_result.diagnostics);
+                        println!("{}", formatted);
+                    }
+
+                    // 3. Compile
+                    let plan = match compile(&ast) {
+                        Ok(plan) => plan,
+                        Err(e) => {
+                            println!("{} Compile error: {:?}", "✗".red(), e);
+                            continue;
+                        }
+                    };
+
+                    // 4. Execute
+                    match executor.execute_plan(&plan, &mut exec_ctx).await {
+                        Ok(results) => {
+                            println!();
+                            for (i, result) in results.iter().enumerate() {
+                                let step = &plan.steps[i];
+                                let verb_name =
+                                    format!("{}.{}", step.verb_call.domain, step.verb_call.verb);
+
+                                match result {
+                                    ExecutionResult::Uuid(id) => {
+                                        let binding_info = step
+                                            .bind_as
+                                            .as_ref()
+                                            .map(|b| format!(" @{} =", b))
+                                            .unwrap_or_default();
+                                        println!(
+                                            "  [{}] {}{} {}",
+                                            i,
+                                            verb_name.cyan(),
+                                            binding_info.yellow(),
+                                            id.to_string().dimmed()
+                                        );
+
+                                        // Update binding context
+                                        if let Some(ref binding) = step.bind_as {
+                                            binding_context.insert(BindingInfo {
+                                                name: binding.clone(),
+                                                produced_type: "entity".to_string(),
+                                                subtype: None,
+                                                entity_pk: *id,
+                                                resolved: false,
+                                                source_sheet_id: None,
+                                            });
+                                        }
+                                    }
+                                    ExecutionResult::Affected(n) => {
+                                        println!("  [{}] {} ({} rows)", i, verb_name.cyan(), n);
+                                    }
+                                    _ => {
+                                        println!("  [{}] {} {}", i, verb_name.cyan(), "✓".green());
+                                    }
+                                }
+                            }
+
+                            println!();
+                            println!(
+                                "{} Executed {} step(s) successfully",
+                                "✓".green().bold(),
+                                results.len()
+                            );
+
+                            // Clear pending buffer
+                            pending_dsl.clear();
+                        }
+                        Err(e) => {
+                            println!("{} Execution failed: {}", "✗".red(), e);
+                        }
+                    }
+                }
+
+                ":clear" => {
+                    print!("\x1B[2J\x1B[1;1H"); // ANSI clear screen
+                    stdout.flush().map_err(|e| format!("IO error: {}", e))?;
+                }
+
+                cmd if cmd.starts_with(":cbu ") => {
+                    let id_str = cmd.strip_prefix(":cbu ").unwrap().trim();
+                    match Uuid::parse_str(id_str) {
+                        Ok(new_cbu) => {
+                            println!("{} Switching to CBU {}...", "→".cyan(), new_cbu);
+                            // This would require reloading state - simplified for now
+                            println!(
+                                "{} CBU switch not yet implemented in active session",
+                                "!".yellow()
+                            );
+                            println!("  Restart REPL with: dsl_cli repl --cbu {}", id_str);
+                        }
+                        Err(e) => {
+                            println!("{} Invalid UUID: {}", "✗".red(), e);
+                        }
+                    }
+                }
+
+                _ => {
+                    println!("{} Unknown command: {}", "?".yellow(), trimmed);
+                    println!("  Type :help for available commands");
+                }
+            }
+            continue;
+        }
+
+        // Empty line - validate pending DSL inline
+        if trimmed.is_empty() {
+            if !pending_dsl.is_empty() {
+                // Quick validation feedback
+                match parse_program(&pending_dsl) {
+                    Ok(ast) => {
+                        println!(
+                            "{} {} statement(s) parsed - use :commit to execute",
+                            "✓".green(),
+                            ast.statements.len()
+                        );
+                    }
+                    Err(e) => {
+                        println!("{} Parse error: {:?}", "✗".red(), e);
+                    }
+                }
+            }
+            continue;
+        }
+
+        // Add line to pending buffer
+        pending_dsl.push_str(trimmed);
+        pending_dsl.push('\n');
+    }
+
+    Ok(())
 }

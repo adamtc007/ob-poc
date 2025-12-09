@@ -29,6 +29,10 @@ pub struct RuntimeVerb {
     pub behavior: RuntimeBehavior,
     pub args: Vec<RuntimeArg>,
     pub returns: RuntimeReturn,
+    /// Dataflow: what this verb produces (binding type)
+    pub produces: Option<VerbProduces>,
+    /// Dataflow: what this verb consumes (required bindings)
+    pub consumes: Vec<VerbConsumes>,
 }
 
 #[derive(Debug, Clone)]
@@ -229,6 +233,13 @@ impl RuntimeVerbRegistry {
                     name: Some("entity_id".to_string()),
                     capture: true,
                 },
+                // Dynamic entity.create-* verbs produce an entity with subtype
+                produces: Some(VerbProduces {
+                    produced_type: "entity".to_string(),
+                    subtype: Some(type_code.clone()),
+                    resolved: false,
+                }),
+                consumes: vec![],
             };
 
             self.verbs.insert(full_name.clone(), runtime_verb);
@@ -337,6 +348,8 @@ impl RuntimeVerbRegistry {
                     name: None,
                     capture: false,
                 }),
+            produces: config.produces.clone(),
+            consumes: config.consumes.clone(),
         }
     }
 
@@ -392,6 +405,70 @@ impl RuntimeVerbRegistry {
 
     pub fn contains(&self, domain: &str, verb: &str) -> bool {
         self.get(domain, verb).is_some()
+    }
+
+    // =========================================================================
+    // DATAFLOW METHODS
+    // =========================================================================
+
+    /// Get what a verb produces (if anything)
+    pub fn get_produces(&self, domain: &str, verb: &str) -> Option<&VerbProduces> {
+        self.get(domain, verb)?.produces.as_ref()
+    }
+
+    /// Get what a verb consumes
+    pub fn get_consumes(&self, domain: &str, verb: &str) -> &[VerbConsumes] {
+        self.get(domain, verb)
+            .map(|v| v.consumes.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// Get the expected ref_type for an argument (from lookup config)
+    pub fn get_arg_ref_type(&self, domain: &str, verb: &str, arg: &str) -> Option<&str> {
+        self.get(domain, verb)?
+            .args
+            .iter()
+            .find(|a| a.name == arg)?
+            .lookup
+            .as_ref()?
+            .entity_type
+            .as_deref()
+    }
+
+    /// Get all verbs that can execute given available binding types
+    /// Returns verbs where all required consumes are satisfied
+    pub fn verbs_satisfiable_by<'a>(
+        &'a self,
+        available_types: &'a std::collections::HashSet<String>,
+    ) -> impl Iterator<Item = &'a RuntimeVerb> {
+        self.verbs.values().filter(move |v| {
+            v.consumes
+                .iter()
+                .all(|c| !c.required || available_types.contains(&c.consumed_type))
+        })
+    }
+
+    /// Get verbs grouped by satisfaction status
+    pub fn verbs_by_satisfaction<'a>(
+        &'a self,
+        available_types: &'a std::collections::HashSet<String>,
+    ) -> (Vec<&'a RuntimeVerb>, Vec<&'a RuntimeVerb>) {
+        let mut satisfied = vec![];
+        let mut unsatisfied = vec![];
+
+        for verb in self.verbs.values() {
+            let all_satisfied = verb
+                .consumes
+                .iter()
+                .all(|c| !c.required || available_types.contains(&c.consumed_type));
+            if all_satisfied {
+                satisfied.push(verb);
+            } else {
+                unsatisfied.push(verb);
+            }
+        }
+
+        (satisfied, unsatisfied)
     }
 }
 
@@ -480,6 +557,8 @@ mod tests {
             VerbConfig {
                 description: "Create a CBU".to_string(),
                 behavior: VerbBehavior::Crud,
+                produces: None,
+                consumes: vec![],
                 handler: None,
                 crud: Some(CrudConfig {
                     operation: CrudOperation::Insert,

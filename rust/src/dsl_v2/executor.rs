@@ -142,6 +142,12 @@ impl DslExecutor {
         }
     }
 
+    /// Get a reference to the database pool
+    #[cfg(feature = "database")]
+    pub fn pool(&self) -> &PgPool {
+        &self.pool
+    }
+
     /// Create an executor without database (for testing/parsing only)
     #[cfg(not(feature = "database"))]
     pub fn new_without_db() -> Self {

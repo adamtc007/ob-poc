@@ -350,7 +350,7 @@ func handleAgentExecute(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, result)
 }
 
-// Direct DSL execution via dsl_api (simpler, no session required)
+// Direct DSL execution via agentic_server (supports cbu.show and all verbs)
 func handleDirectExecute(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "POST required", http.StatusMethodNotAllowed)
@@ -366,9 +366,9 @@ func handleDirectExecute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	reqBody, _ := json.Marshal(req)
-	resp, err := http.Post(rustURL+"/execute", "application/json", bytes.NewReader(reqBody))
+	resp, err := http.Post(agentURL+"/execute", "application/json", bytes.NewReader(reqBody))
 	if err != nil {
-		jsonError(w, "DSL API connection failed: "+err.Error(), 503)
+		jsonError(w, "Agent API connection failed: "+err.Error(), 503)
 		return
 	}
 	defer resp.Body.Close()
@@ -381,7 +381,7 @@ func handleDirectExecute(w http.ResponseWriter, r *http.Request) {
 	}
 	var result map[string]any
 	if err := json.Unmarshal(respBody, &result); err != nil {
-		jsonError(w, "Invalid JSON from DSL API: "+err.Error(), 502)
+		jsonError(w, "Invalid JSON from Agent API: "+err.Error(), 502)
 		return
 	}
 	jsonResponse(w, result)

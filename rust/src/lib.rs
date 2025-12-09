@@ -19,9 +19,6 @@
 // Core error handling
 pub mod error;
 
-// Essential AST types
-pub mod ast;
-
 // Data dictionary
 pub mod data_dictionary;
 
@@ -41,12 +38,6 @@ pub mod services;
 // DSL v2 - Unified S-expression DSL with data-driven execution
 pub mod dsl_v2;
 
-// Intent schema for agent-produced intents
-pub mod intent;
-
-// Planner - converts intents to DSL
-pub mod planner;
-
 // REST API module (when server feature is enabled)
 #[cfg(feature = "server")]
 pub mod api;
@@ -57,9 +48,6 @@ pub mod mcp;
 
 // Agentic DSL generation module
 pub mod agentic;
-
-// CBU Templates - market-accurate fund structures
-pub mod templates;
 
 // Graph visualization module
 #[cfg(feature = "database")]
@@ -74,9 +62,6 @@ pub use domains::{DomainHandler, DomainRegistry, DomainResult};
 
 // Essential error types
 pub use error::{DSLError, ParseError};
-
-// Core AST types (EntityLabel, EdgeType for graph operations)
-pub use ast::{EdgeType, EntityLabel};
 
 // DSL v2 types - unified S-expression DSL
 pub use dsl_v2::{

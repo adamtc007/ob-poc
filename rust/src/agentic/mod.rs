@@ -30,6 +30,7 @@ pub mod llm_client;
 pub mod openai_client;
 
 // Core agentic modules
+pub mod context_builder;
 pub mod feedback;
 pub mod generator;
 pub mod intent;

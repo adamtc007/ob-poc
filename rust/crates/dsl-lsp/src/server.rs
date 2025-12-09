@@ -57,10 +57,7 @@ impl DslLanguageServer {
     pub async fn get_entity_client(&self) -> Option<EntityLookupClient> {
         // Clone the client for use - we need to reconnect each time since gRPC clients are !Clone
         let addr = gateway_addr();
-        match EntityLookupClient::connect(&addr).await {
-            Ok(client) => Some(client),
-            Err(_) => None,
-        }
+        (EntityLookupClient::connect(&addr).await).ok()
     }
 
     /// Get a document by URL.

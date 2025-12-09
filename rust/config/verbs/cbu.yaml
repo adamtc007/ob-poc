@@ -5,6 +5,9 @@ domains:
       create:
         description: Create a new Client Business Unit
         behavior: crud
+        produces:
+          type: cbu
+          resolved: false
         crud:
           operation: insert
           table: cbus
@@ -176,6 +179,9 @@ domains:
       ensure:
         description: Create or update a CBU by natural key
         behavior: crud
+        produces:
+          type: cbu
+          resolved: false
         crud:
           operation: upsert
           table: cbus
@@ -228,6 +234,13 @@ domains:
       assign-role:
         description: Assign a role to an entity within a CBU
         behavior: crud
+        consumes:
+          - arg: cbu-id
+            type: cbu
+            required: true
+          - arg: entity-id
+            type: entity
+            required: true
         crud:
           operation: role_link
           junction: cbu_entity_roles
@@ -383,6 +396,26 @@ domains:
         returns:
           type: record_set
           description: List of violations (empty if valid)
+
+      show:
+        description: Show full CBU structure including entities, roles, documents, screenings
+        behavior: plugin
+        plugin:
+          handler: CbuShowOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: CBU to display
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record
+          description: Full CBU structure with nested entities, roles, documents, screenings
 
       add-product:
         description: Add a product to a CBU (creates service_delivery_map entries for all services)

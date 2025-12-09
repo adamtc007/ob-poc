@@ -45,7 +45,14 @@ impl ParamValue {
     /// Convert to DSL string representation
     pub fn to_dsl_string(&self) -> String {
         match self {
-            ParamValue::String(s) => format!("\"{}\"", s.replace('\"', "\\\"")),
+            ParamValue::String(s) => {
+                // If the string starts with @, it's a reference - don't quote it
+                if s.starts_with('@') {
+                    s.clone()
+                } else {
+                    format!("\"{}\"", s.replace('\"', "\\\""))
+                }
+            }
             ParamValue::Number(n) => n.to_string(),
             ParamValue::Integer(i) => i.to_string(),
             ParamValue::Boolean(b) => if *b { "true" } else { "false" }.to_string(),
