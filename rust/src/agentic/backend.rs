@@ -3,6 +3,7 @@
 //! Enum for selecting between LLM providers (Anthropic, OpenAI).
 
 use anyhow::{anyhow, Result};
+use std::str::FromStr;
 
 /// LLM backend provider selection
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -21,19 +22,9 @@ impl AgentBackend {
     /// Defaults to Anthropic if not set
     pub fn from_env() -> Result<Self> {
         let value = std::env::var("AGENT_BACKEND").unwrap_or_else(|_| "anthropic".to_string());
-        Self::from_str(&value)
-    }
-
-    /// Parse from string
-    pub fn from_str(s: &str) -> Result<Self> {
-        match s.to_lowercase().as_str() {
-            "anthropic" | "claude" => Ok(AgentBackend::Anthropic),
-            "openai" | "gpt" => Ok(AgentBackend::OpenAi),
-            other => Err(anyhow!(
-                "Unknown AGENT_BACKEND '{}'. Valid values: anthropic, claude, openai, gpt",
-                other
-            )),
-        }
+        value
+            .parse()
+            .map_err(|e: ParseBackendError| anyhow!("{}", e))
     }
 
     /// Get display name
@@ -41,6 +32,33 @@ impl AgentBackend {
         match self {
             AgentBackend::Anthropic => "Anthropic",
             AgentBackend::OpenAi => "OpenAI",
+        }
+    }
+}
+
+/// Error type for parsing AgentBackend
+#[derive(Debug)]
+pub struct ParseBackendError(String);
+
+impl std::fmt::Display for ParseBackendError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for ParseBackendError {}
+
+impl FromStr for AgentBackend {
+    type Err = ParseBackendError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "anthropic" | "claude" => Ok(AgentBackend::Anthropic),
+            "openai" | "gpt" => Ok(AgentBackend::OpenAi),
+            other => Err(ParseBackendError(format!(
+                "Unknown AGENT_BACKEND '{}'. Valid values: anthropic, claude, openai, gpt",
+                other
+            ))),
         }
     }
 }
@@ -58,23 +76,23 @@ mod tests {
     #[test]
     fn test_from_str() {
         assert_eq!(
-            AgentBackend::from_str("anthropic").unwrap(),
+            "anthropic".parse::<AgentBackend>().unwrap(),
             AgentBackend::Anthropic
         );
         assert_eq!(
-            AgentBackend::from_str("claude").unwrap(),
+            "claude".parse::<AgentBackend>().unwrap(),
             AgentBackend::Anthropic
         );
         assert_eq!(
-            AgentBackend::from_str("ANTHROPIC").unwrap(),
+            "ANTHROPIC".parse::<AgentBackend>().unwrap(),
             AgentBackend::Anthropic
         );
         assert_eq!(
-            AgentBackend::from_str("openai").unwrap(),
+            "openai".parse::<AgentBackend>().unwrap(),
             AgentBackend::OpenAi
         );
-        assert_eq!(AgentBackend::from_str("gpt").unwrap(), AgentBackend::OpenAi);
-        assert!(AgentBackend::from_str("invalid").is_err());
+        assert_eq!("gpt".parse::<AgentBackend>().unwrap(), AgentBackend::OpenAi);
+        assert!("invalid".parse::<AgentBackend>().is_err());
     }
 
     #[test]
