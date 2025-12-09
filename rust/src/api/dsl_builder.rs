@@ -72,7 +72,7 @@ fn should_generate_binding(verb: &str) -> bool {
         "service-resource.provision",
     ];
 
-    binding_verbs.iter().any(|v| verb == *v)
+    binding_verbs.contains(&verb)
 }
 
 /// Validate a VerbIntent against the verb registry

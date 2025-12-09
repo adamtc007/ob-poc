@@ -12,6 +12,7 @@
 //! - Segregated Portfolio Company (multi-strategy platform)
 
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 /// Available CBU template types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -54,14 +55,18 @@ impl TemplateType {
             TemplateType::Spc => "Cayman SPC - Multi-strategy platform with segregated portfolios, institutional UBO",
         }
     }
+}
 
-    pub fn from_str(s: &str) -> Option<Self> {
+impl FromStr for TemplateType {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().replace(['-', '_'], "").as_str() {
-            "hedgefund" | "hf" | "cayman" | "master" => Some(TemplateType::HedgeFund),
-            "luxsicav" | "sicav" | "ucits" | "luxembourg" => Some(TemplateType::LuxSicav),
-            "us40act" | "40act" | "ric" | "mutual" | "mutualfund" => Some(TemplateType::Us40Act),
-            "spc" | "segregated" | "platform" => Some(TemplateType::Spc),
-            _ => None,
+            "hedgefund" | "hf" | "cayman" | "master" => Ok(TemplateType::HedgeFund),
+            "luxsicav" | "sicav" | "ucits" | "luxembourg" => Ok(TemplateType::LuxSicav),
+            "us40act" | "40act" | "ric" | "mutual" | "mutualfund" => Ok(TemplateType::Us40Act),
+            "spc" | "segregated" | "platform" => Ok(TemplateType::Spc),
+            _ => Err(()),
         }
     }
 }
@@ -1680,24 +1685,15 @@ mod tests {
     #[test]
     fn test_template_type_from_str() {
         assert_eq!(
-            TemplateType::from_str("hedge_fund"),
-            Some(TemplateType::HedgeFund)
+            "hedge_fund".parse::<TemplateType>(),
+            Ok(TemplateType::HedgeFund)
         );
-        assert_eq!(TemplateType::from_str("hf"), Some(TemplateType::HedgeFund));
-        assert_eq!(
-            TemplateType::from_str("sicav"),
-            Some(TemplateType::LuxSicav)
-        );
-        assert_eq!(
-            TemplateType::from_str("ucits"),
-            Some(TemplateType::LuxSicav)
-        );
-        assert_eq!(TemplateType::from_str("40act"), Some(TemplateType::Us40Act));
-        assert_eq!(
-            TemplateType::from_str("mutual"),
-            Some(TemplateType::Us40Act)
-        );
-        assert_eq!(TemplateType::from_str("spc"), Some(TemplateType::Spc));
-        assert_eq!(TemplateType::from_str("unknown"), None);
+        assert_eq!("hf".parse::<TemplateType>(), Ok(TemplateType::HedgeFund));
+        assert_eq!("sicav".parse::<TemplateType>(), Ok(TemplateType::LuxSicav));
+        assert_eq!("ucits".parse::<TemplateType>(), Ok(TemplateType::LuxSicav));
+        assert_eq!("40act".parse::<TemplateType>(), Ok(TemplateType::Us40Act));
+        assert_eq!("mutual".parse::<TemplateType>(), Ok(TemplateType::Us40Act));
+        assert_eq!("spc".parse::<TemplateType>(), Ok(TemplateType::Spc));
+        assert!("unknown".parse::<TemplateType>().is_err());
     }
 }
