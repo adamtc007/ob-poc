@@ -268,6 +268,10 @@ pub struct SessionContext {
     /// Each chat message can add/modify statements in this AST
     #[serde(default)]
     pub ast: Vec<Statement>,
+    /// The ACTIVE CBU for this session - used as implicit context for incremental operations
+    /// When set, operations like cbu.add-product will auto-use this CBU ID
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active_cbu: Option<BoundEntity>,
 }
 
 impl SessionContext {
@@ -341,6 +345,28 @@ impl SessionContext {
                 )
             })
             .collect()
+    }
+
+    /// Get the active CBU context formatted for LLM
+    /// Returns something like "ACTIVE_CBU: Aviva Lux 9 (uuid: 327804f8-...)"
+    pub fn active_cbu_for_llm(&self) -> Option<String> {
+        self.active_cbu
+            .as_ref()
+            .map(|cbu| format!("ACTIVE_CBU: \"{}\" (id: {})", cbu.display_name, cbu.id))
+    }
+
+    /// Set the active CBU for this session
+    pub fn set_active_cbu(&mut self, id: Uuid, display_name: &str) {
+        self.active_cbu = Some(BoundEntity {
+            id,
+            entity_type: "cbu".to_string(),
+            display_name: display_name.to_string(),
+        });
+    }
+
+    /// Clear the active CBU
+    pub fn clear_active_cbu(&mut self) {
+        self.active_cbu = None;
     }
 
     // =========================================================================

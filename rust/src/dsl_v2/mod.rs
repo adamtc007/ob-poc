@@ -64,7 +64,11 @@ pub use binding_context::{BindingContext, BindingInfo};
 pub use config::types::LookupConfig;
 pub use csg_linter::{CsgLinter, InferredContext, LintResult};
 pub use enrichment::{enrich_program, EnrichmentError, EnrichmentResult};
-pub use execution_plan::{compile, CompileError, ExecutionPlan, ExecutionStep, Injection};
+pub use execution_plan::{
+    compile, compile_with_planning, BindingInfo as PlanningBindingInfo, CompileError,
+    ExecutionPlan, ExecutionStep, Injection, PlannerDiagnostic, PlanningContext, PlanningResult,
+    SyntheticStep,
+};
 pub use executor::{DslExecutor, ExecutionContext, ExecutionResult, ReturnType};
 #[cfg(feature = "database")]
 pub use gateway_resolver::GatewayRefResolver;
@@ -83,7 +87,9 @@ pub use runtime_registry::{runtime_registry, RuntimeVerbRegistry};
 pub use semantic_context::SemanticContextStore;
 #[cfg(feature = "database")]
 pub use semantic_validator::{validate_dsl, validate_dsl_with_csg, SemanticValidator};
-pub use topo_sort::{emit_dsl, topological_sort, TopoSortError, TopoSortResult};
+pub use topo_sort::{
+    emit_dsl, topological_sort, topological_sort_with_lifecycle, TopoSortError, TopoSortResult,
+};
 pub use verb_registry::{
     find_unified_verb, registry, verb_exists, ArgDef, UnifiedVerbDef, UnifiedVerbRegistry,
     VerbBehavior,

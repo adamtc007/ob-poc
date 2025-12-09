@@ -2,12 +2,22 @@
 //!
 //! Reorders statements so that producers come before consumers.
 //! This enables "write in any order" semantics for IDE and agent use.
+//!
+//! ## Lifecycle-Aware Sorting
+//!
+//! The `topological_sort_with_lifecycle` function extends basic binding-based
+//! sorting with lifecycle state tracking:
+//!
+//! - Verbs that `transitions_to` a state create state edges
+//! - Verbs with `requires_states` add dependencies on prior state transitions
+//! - Lifecycle violations are reported as diagnostics (warnings in non-strict mode)
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use super::ast::{AstNode, Literal, Program, Statement};
+use super::ast::{AstNode, Literal, Program, Statement, VerbCall};
 use super::binding_context::BindingContext;
-use super::runtime_registry::RuntimeVerbRegistry;
+use super::execution_plan::{PlannerDiagnostic, PlanningContext};
+use super::runtime_registry::{RuntimeVerb, RuntimeVerbRegistry};
 
 /// Errors from topological sort
 #[derive(Debug, Clone)]
@@ -40,6 +50,8 @@ pub struct TopoSortResult {
     pub reordered: bool,
     /// Original indices in new order (for mapping diagnostics)
     pub index_map: Vec<usize>,
+    /// Lifecycle-related diagnostics (violations, reorderings)
+    pub lifecycle_diagnostics: Vec<PlannerDiagnostic>,
 }
 
 /// Topologically sort pending statements respecting dataflow dependencies
@@ -64,6 +76,7 @@ pub fn topological_sort(
             program: pending.clone(),
             reordered: false,
             index_map: vec![],
+            lifecycle_diagnostics: vec![],
         });
     }
 
@@ -176,7 +189,317 @@ pub fn topological_sort(
         },
         reordered,
         index_map: sorted_indices,
+        lifecycle_diagnostics: vec![],
     })
+}
+
+/// Topologically sort statements with lifecycle state tracking
+///
+/// This extends basic dataflow sorting with lifecycle awareness:
+/// - Verbs with `transitions_to` update binding state
+/// - Verbs with `requires_states` add dependencies on prior transitions
+/// - Lifecycle violations are reported as diagnostics
+///
+/// # Arguments
+/// * `pending` - The program to sort
+/// * `executed_context` - Bindings from previously executed statements
+/// * `planning_context` - Planning context with binding lifecycle info
+/// * `registry` - Verb registry for lifecycle and produces/consumes lookup
+///
+/// # Returns
+/// * `Ok(TopoSortResult)` - Sorted program with lifecycle diagnostics
+/// * `Err(TopoSortError)` - If cyclic dependency detected
+pub fn topological_sort_with_lifecycle(
+    pending: &Program,
+    executed_context: &BindingContext,
+    planning_context: &PlanningContext,
+    registry: &RuntimeVerbRegistry,
+) -> Result<TopoSortResult, TopoSortError> {
+    let statements = &pending.statements;
+
+    if statements.is_empty() {
+        return Ok(TopoSortResult {
+            program: pending.clone(),
+            reordered: false,
+            index_map: vec![],
+            lifecycle_diagnostics: vec![],
+        });
+    }
+
+    // Build dependency graph with lifecycle edges
+    let mut deps: HashMap<usize, HashSet<usize>> = HashMap::new();
+    let mut binding_to_stmt: HashMap<String, usize> = HashMap::new();
+    let mut lifecycle_diagnostics: Vec<PlannerDiagnostic> = vec![];
+
+    // Track which statement transitions each binding to which state
+    // Key: (binding_name, target_state), Value: statement index
+    let mut state_transitions: HashMap<(String, String), usize> = HashMap::new();
+
+    // First pass: record what each statement produces and its state transitions
+    for (idx, stmt) in statements.iter().enumerate() {
+        deps.insert(idx, HashSet::new());
+
+        if let Statement::VerbCall(vc) = stmt {
+            // Record binding production
+            if let Some(ref binding) = vc.binding {
+                binding_to_stmt.insert(binding.clone(), idx);
+            }
+
+            // Look up verb config for lifecycle info
+            if let Some(runtime_verb) = registry.get(&vc.domain, &vc.verb) {
+                if let Some(ref lifecycle) = runtime_verb.lifecycle {
+                    // Record state transition if this verb transitions_to a state
+                    if let Some(ref target_state) = lifecycle.transitions_to {
+                        // Find which binding this verb operates on
+                        if let Some(binding_name) = get_target_binding(vc, runtime_verb) {
+                            state_transitions.insert((binding_name, target_state.clone()), idx);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Second pass: record dependencies (dataflow + lifecycle)
+    for (idx, stmt) in statements.iter().enumerate() {
+        if let Statement::VerbCall(vc) = stmt {
+            // Standard dataflow dependencies (symbol references)
+            for arg in &vc.arguments {
+                collect_symbol_refs(
+                    &arg.value,
+                    &binding_to_stmt,
+                    executed_context,
+                    idx,
+                    &mut deps,
+                );
+            }
+
+            // Lifecycle dependencies: requires_states
+            let verb_key = format!("{}.{}", vc.domain, vc.verb);
+            if let Some(runtime_verb) = registry.get(&vc.domain, &vc.verb) {
+                if let Some(ref lifecycle) = runtime_verb.lifecycle {
+                    if !lifecycle.requires_states.is_empty() {
+                        // Find which binding this verb operates on
+                        if let Some(binding_name) = get_target_binding(vc, runtime_verb) {
+                            // Check if this binding comes from executed context
+                            let from_executed = executed_context.get(&binding_name).is_some();
+                            let from_planning =
+                                planning_context.get_binding(&binding_name).is_some();
+
+                            if from_executed || from_planning {
+                                // Binding exists in prior context - check state
+                                let current_state = planning_context
+                                    .get_binding(&binding_name)
+                                    .and_then(|b| b.state.clone());
+
+                                if let Some(ref state) = current_state {
+                                    if !lifecycle.requires_states.contains(state) {
+                                        // State violation from prior context
+                                        lifecycle_diagnostics.push(
+                                            PlannerDiagnostic::LifecycleViolation {
+                                                binding: binding_name.clone(),
+                                                verb: verb_key.clone(),
+                                                current_state: state.clone(),
+                                                required_states: lifecycle.requires_states.clone(),
+                                                stmt_index: idx,
+                                            },
+                                        );
+                                    }
+                                }
+                            } else {
+                                // Look for state transition in pending statements
+                                let mut found_transition = false;
+                                for required_state in &lifecycle.requires_states {
+                                    let key = (binding_name.clone(), required_state.clone());
+                                    if let Some(&transition_idx) = state_transitions.get(&key) {
+                                        if transition_idx != idx {
+                                            // Add lifecycle dependency edge
+                                            deps.get_mut(&idx).unwrap().insert(transition_idx);
+                                            found_transition = true;
+                                        }
+                                    }
+                                }
+
+                                if !found_transition && !lifecycle.requires_states.is_empty() {
+                                    // No transition found - this may be a problem
+                                    // Check if the producer verb itself sets the required state
+                                    if let Some(&producer_idx) = binding_to_stmt.get(&binding_name)
+                                    {
+                                        if let Statement::VerbCall(producer_vc) =
+                                            &statements[producer_idx]
+                                        {
+                                            if let Some(producer_verb) =
+                                                registry.get(&producer_vc.domain, &producer_vc.verb)
+                                            {
+                                                if let Some(ref producer_lifecycle) =
+                                                    producer_verb.lifecycle
+                                                {
+                                                    if let Some(ref initial_state) =
+                                                        producer_lifecycle.transitions_to
+                                                    {
+                                                        if lifecycle
+                                                            .requires_states
+                                                            .contains(initial_state)
+                                                        {
+                                                            // Producer sets the required state, add dataflow dep
+                                                            deps.get_mut(&idx)
+                                                                .unwrap()
+                                                                .insert(producer_idx);
+                                                            found_transition = true;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if !found_transition {
+                                        // Report lifecycle violation warning
+                                        lifecycle_diagnostics.push(
+                                            PlannerDiagnostic::LifecycleViolation {
+                                                binding: binding_name.clone(),
+                                                verb: verb_key.clone(),
+                                                current_state: "unknown".to_string(),
+                                                required_states: lifecycle.requires_states.clone(),
+                                                stmt_index: idx,
+                                            },
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Kahn's algorithm for topological sort (same as basic version)
+    let mut in_degree: HashMap<usize, usize> = HashMap::new();
+    for idx in 0..statements.len() {
+        in_degree.insert(idx, deps[&idx].len());
+    }
+
+    let mut queue: VecDeque<usize> = in_degree
+        .iter()
+        .filter(|(_, &deg)| deg == 0)
+        .map(|(&idx, _)| idx)
+        .collect();
+
+    // Sort initial queue by original index for stable ordering
+    let mut queue_vec: Vec<usize> = queue.drain(..).collect();
+    queue_vec.sort();
+    queue = queue_vec.into_iter().collect();
+
+    let mut sorted_indices = vec![];
+
+    while let Some(idx) = queue.pop_front() {
+        sorted_indices.push(idx);
+
+        let mut next_ready = vec![];
+        for (other_idx, other_deps) in &deps {
+            if other_deps.contains(&idx) {
+                let deg = in_degree.get_mut(other_idx).unwrap();
+                *deg -= 1;
+                if *deg == 0 {
+                    next_ready.push(*other_idx);
+                }
+            }
+        }
+
+        next_ready.sort();
+        for ready_idx in next_ready {
+            queue.push_back(ready_idx);
+        }
+    }
+
+    // Check for cycles
+    if sorted_indices.len() != statements.len() {
+        let remaining: Vec<String> = (0..statements.len())
+            .filter(|i| !sorted_indices.contains(i))
+            .filter_map(|i| {
+                if let Statement::VerbCall(vc) = &statements[i] {
+                    Some(format!("{}.{}", vc.domain, vc.verb))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        return Err(TopoSortError::CyclicDependency { cycle: remaining });
+    }
+
+    // Check if reordering occurred
+    let reordered = sorted_indices
+        .iter()
+        .enumerate()
+        .any(|(new, &old)| new != old);
+
+    // Record reordering diagnostic if applicable
+    if reordered {
+        let original_order: Vec<usize> = (0..statements.len()).collect();
+        lifecycle_diagnostics.push(PlannerDiagnostic::StatementsReordered {
+            original_order,
+            new_order: sorted_indices.clone(),
+            reason: "Dataflow and lifecycle dependencies".to_string(),
+        });
+    }
+
+    // Build sorted program
+    let sorted_statements: Vec<Statement> = sorted_indices
+        .iter()
+        .map(|&idx| statements[idx].clone())
+        .collect();
+
+    Ok(TopoSortResult {
+        program: Program {
+            statements: sorted_statements,
+        },
+        reordered,
+        index_map: sorted_indices,
+        lifecycle_diagnostics,
+    })
+}
+
+/// Extract the target binding that a verb operates on
+///
+/// For verbs that transition or require state, we need to know which binding
+/// they affect. This looks at the verb's primary_target_arg or common patterns.
+fn get_target_binding(vc: &VerbCall, runtime_verb: &RuntimeVerb) -> Option<String> {
+    // Check if verb config specifies a primary target argument via entity_arg
+    if let Some(ref lifecycle) = runtime_verb.lifecycle {
+        if let Some(ref entity_arg) = lifecycle.entity_arg {
+            // Look for this argument in the verb call
+            for arg in &vc.arguments {
+                if &arg.key == entity_arg {
+                    if let AstNode::SymbolRef { name, .. } = &arg.value {
+                        return Some(name.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    // Fallback: check common argument names that indicate target binding
+    let target_arg_names = [
+        "instance-id",
+        "entity-id",
+        "cbu-id",
+        "ssi-id",
+        "case-id",
+        "workstream-id",
+    ];
+    for arg_name in &target_arg_names {
+        for arg in &vc.arguments {
+            if arg.key == *arg_name {
+                if let AstNode::SymbolRef { name, .. } = &arg.value {
+                    return Some(name.clone());
+                }
+            }
+        }
+    }
+
+    // If verb produces a binding, that's also a target
+    vc.binding.clone()
 }
 
 /// Recursively collect symbol references from an AST node
@@ -443,5 +766,146 @@ mod tests {
             "Independent statements should maintain order"
         );
         assert_eq!(result.index_map, vec![0, 1]);
+    }
+
+    // =========================================================================
+    // Lifecycle-aware topological sort tests
+    // =========================================================================
+
+    #[test]
+    fn test_lifecycle_sort_empty_program() {
+        let ast = Program { statements: vec![] };
+        let registry = runtime_registry();
+        let ctx = BindingContext::new();
+        let planning_ctx = PlanningContext::new();
+
+        let result =
+            topological_sort_with_lifecycle(&ast, &ctx, &planning_ctx, registry).expect("sort");
+
+        assert!(!result.reordered);
+        assert!(result.index_map.is_empty());
+        assert!(result.lifecycle_diagnostics.is_empty());
+    }
+
+    #[test]
+    fn test_lifecycle_sort_basic_dataflow() {
+        // Basic dataflow sorting should still work
+        let source = r#"
+            (cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")
+            (entity.create-proper-person :first-name "John" :last-name "Smith" :as @john)
+            (cbu.ensure :name "Fund" :jurisdiction "LU" :as @fund)
+        "#;
+
+        let ast = parse_program(source).expect("parse");
+        let registry = runtime_registry();
+        let ctx = BindingContext::new();
+        let planning_ctx = PlanningContext::new();
+
+        let result =
+            topological_sort_with_lifecycle(&ast, &ctx, &planning_ctx, registry).expect("sort");
+
+        assert!(result.reordered, "Should reorder out-of-order program");
+
+        // Last statement should be cbu.assign-role (consumes both @fund and @john)
+        if let Statement::VerbCall(vc) = &result.program.statements[2] {
+            assert_eq!(vc.verb, "assign-role", "Last should be cbu.assign-role");
+        }
+    }
+
+    #[test]
+    fn test_lifecycle_sort_records_reordering_diagnostic() {
+        let source = r#"
+            (cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")
+            (cbu.ensure :name "Fund" :jurisdiction "LU" :as @fund)
+            (entity.create-proper-person :first-name "John" :last-name "Smith" :as @john)
+        "#;
+
+        let ast = parse_program(source).expect("parse");
+        let registry = runtime_registry();
+        let ctx = BindingContext::new();
+        let planning_ctx = PlanningContext::new();
+
+        let result =
+            topological_sort_with_lifecycle(&ast, &ctx, &planning_ctx, registry).expect("sort");
+
+        assert!(result.reordered);
+
+        // Should have a reordering diagnostic
+        let has_reorder_diag = result
+            .lifecycle_diagnostics
+            .iter()
+            .any(|d| matches!(d, PlannerDiagnostic::StatementsReordered { .. }));
+        assert!(
+            has_reorder_diag,
+            "Should record reordering diagnostic when statements are reordered"
+        );
+    }
+
+    #[test]
+    fn test_lifecycle_sort_no_reorder_already_sorted() {
+        let source = r#"
+            (cbu.ensure :name "Fund" :jurisdiction "LU" :as @fund)
+            (entity.create-proper-person :first-name "John" :last-name "Smith" :as @john)
+            (cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")
+        "#;
+
+        let ast = parse_program(source).expect("parse");
+        let registry = runtime_registry();
+        let ctx = BindingContext::new();
+        let planning_ctx = PlanningContext::new();
+
+        let result =
+            topological_sort_with_lifecycle(&ast, &ctx, &planning_ctx, registry).expect("sort");
+
+        assert!(
+            !result.reordered,
+            "Should not reorder already-sorted program"
+        );
+
+        // No reordering diagnostic when already in order
+        let has_reorder_diag = result
+            .lifecycle_diagnostics
+            .iter()
+            .any(|d| matches!(d, PlannerDiagnostic::StatementsReordered { .. }));
+        assert!(
+            !has_reorder_diag,
+            "Should not have reordering diagnostic when already sorted"
+        );
+    }
+
+    #[test]
+    fn test_lifecycle_sort_with_executed_context() {
+        // @fund already exists in executed context
+        let mut ctx = BindingContext::new();
+        ctx.insert(super::super::binding_context::BindingInfo {
+            name: "fund".to_string(),
+            produced_type: "cbu".to_string(),
+            subtype: None,
+            entity_pk: uuid::Uuid::new_v4(),
+            resolved: false,
+            source_sheet_id: None,
+        });
+
+        let source = r#"
+            (cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")
+            (entity.create-proper-person :first-name "John" :last-name "Smith" :as @john)
+        "#;
+
+        let ast = parse_program(source).expect("parse");
+        let registry = runtime_registry();
+        let planning_ctx = PlanningContext::new();
+
+        let result =
+            topological_sort_with_lifecycle(&ast, &ctx, &planning_ctx, registry).expect("sort");
+
+        // Should reorder: entity.create before assign-role
+        assert!(result.reordered);
+
+        if let Statement::VerbCall(vc) = &result.program.statements[0] {
+            assert_eq!(
+                vc.verb, "create-proper-person",
+                "First should create entity"
+            );
+        }
     }
 }

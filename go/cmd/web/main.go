@@ -6,10 +6,12 @@ import (
 	"context"
 	"embed"
 	"flag"
+	"fmt"
 	"html/template"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 
 	"encoding/json"
 
@@ -66,6 +68,8 @@ func main() {
 	http.HandleFunc("/api/entities/search", handleEntitySearch)
 	// LSP-style completions (via EntityGateway)
 	http.HandleFunc("/api/agent/complete", handleAgentComplete)
+	// CBU list endpoint (for CBU picker)
+	http.HandleFunc("/api/cbus", handleListCbus)
 	http.Handle("/static/", http.FileServer(http.FS(static)))
 
 	log.Printf("Starting server on %s", *addr)
@@ -539,7 +543,34 @@ func handleAgentComplete(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, result)
 }
 
-// Entity search: proxy to dsl_api for fuzzy entity lookup
+// List CBUs: proxy to agent API for CBU picker dropdown
+func handleListCbus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "GET required", http.StatusMethodNotAllowed)
+		return
+	}
+
+	resp, err := http.Get(agentURL + "/api/cbu")
+	if err != nil {
+		jsonError(w, "Agent API connection failed: "+err.Error(), 503)
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		jsonError(w, "Failed to read response: "+err.Error(), 502)
+		return
+	}
+	var result []map[string]any
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		jsonError(w, "Invalid JSON from Agent API: "+err.Error(), 502)
+		return
+	}
+	jsonResponse(w, result)
+}
+
+// Entity search: proxy to Rust API for fuzzy entity lookup via EntityGateway
 // Used to find existing entities before creating new ones (prevents duplicates)
 func handleEntitySearch(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
@@ -558,8 +589,20 @@ func handleEntitySearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reqBody, _ := json.Marshal(req)
-	resp, err := http.Post(rustURL+"/query/entities/search", "application/json", bytes.NewReader(reqBody))
+	// Build query params for Rust GET endpoint
+	limit := req.Limit
+	if limit == 0 {
+		limit = 10
+	}
+	searchURL := fmt.Sprintf("%s/api/entities/search?q=%s&limit=%d",
+		rustURL,
+		url.QueryEscape(req.Query),
+		limit)
+	if req.EntityType != "" {
+		searchURL += "&entity_type=" + url.QueryEscape(req.EntityType)
+	}
+
+	resp, err := http.Get(searchURL)
 	if err != nil {
 		jsonError(w, "DSL API connection failed: "+err.Error(), 503)
 		return
@@ -572,10 +615,49 @@ func handleEntitySearch(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "Failed to read response: "+err.Error(), 502)
 		return
 	}
-	var result map[string]any
-	if err := json.Unmarshal(respBody, &result); err != nil {
+
+	// Transform response to match expected JS format
+	var rustResp struct {
+		Results []struct {
+			ID      *string `json:"id"`
+			Token   string  `json:"token"`
+			Display string  `json:"display"`
+			Score   float64 `json:"score"`
+		} `json:"results"`
+		Total int `json:"total"`
+	}
+	if err := json.Unmarshal(respBody, &rustResp); err != nil {
 		jsonError(w, "Invalid JSON from DSL API: "+err.Error(), 502)
 		return
 	}
-	jsonResponse(w, result)
+
+	// Transform to JS-expected format
+	type JSResult struct {
+		EntityID       string  `json:"entity_id"`
+		Name           string  `json:"name"`
+		EntityType     string  `json:"entity_type"`
+		EntityTypeCode *string `json:"entity_type_code"`
+		Jurisdiction   *string `json:"jurisdiction"`
+		Similarity     float64 `json:"similarity"`
+	}
+	results := make([]JSResult, 0, len(rustResp.Results))
+	for _, r := range rustResp.Results {
+		entityID := r.Token
+		if r.ID != nil {
+			entityID = *r.ID
+		}
+		results = append(results, JSResult{
+			EntityID:       entityID,
+			Name:           r.Display,
+			EntityType:     "entity", // EntityGateway doesn't return type info yet
+			EntityTypeCode: nil,
+			Jurisdiction:   nil,
+			Similarity:     r.Score,
+		})
+	}
+
+	jsonResponse(w, map[string]any{
+		"results":       results,
+		"create_option": fmt.Sprintf("Create new entity \"%s\"", req.Query),
+	})
 }

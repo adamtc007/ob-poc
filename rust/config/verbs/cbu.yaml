@@ -443,3 +443,66 @@ domains:
         returns:
           type: affected
           description: Number of service delivery entries created
+
+      decide:
+        description: Record KYC/AML decision for CBU collective state (entities, UBOs, documents)
+        behavior: plugin
+        plugin:
+          handler: CbuDecideOp
+        consumes:
+          - arg: cbu-id
+            type: cbu
+            required: true
+        lifecycle:
+          entity_arg: cbu-id
+          requires_states:
+            - VALIDATION_PENDING
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: CBU to decide
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: decision
+            type: string
+            required: true
+            description: Decision outcome
+            validation:
+              enum:
+                - APPROVED
+                - REJECTED
+                - REFERRED
+          - name: decided-by
+            type: string
+            required: true
+            description: User/agent making the decision
+          - name: rationale
+            type: string
+            required: true
+            description: Reason for decision
+          - name: case-id
+            type: uuid
+            required: false
+            description: Associated KYC case (optional, inferred if single active case)
+            lookup:
+              table: cases
+              entity_type: kyc_case
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
+          - name: conditions
+            type: string
+            required: false
+            description: Conditions attached to approval (if any)
+          - name: escalation-reason
+            type: string
+            required: false
+            description: Reason for referral (required if decision=REFERRED)
+        returns:
+          type: record
+          description: Decision record with outcome and resulting CBU status

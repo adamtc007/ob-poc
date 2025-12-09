@@ -38,6 +38,9 @@ pub mod services;
 // DSL v2 - Unified S-expression DSL with data-driven execution
 pub mod dsl_v2;
 
+// Ontology - Entity taxonomy and lifecycle management
+pub mod ontology;
+
 // REST API module (when server feature is enabled)
 #[cfg(feature = "server")]
 pub mod api;

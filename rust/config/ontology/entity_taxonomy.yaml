@@ -1,0 +1,1045 @@
+# Entity Taxonomy Configuration
+# =============================================================================
+# Defines entity types, their DB mappings, lifecycles, and relationships.
+# This is the single source of truth for entity metadata used by the DSL planner.
+#
+# Two config sources drive the planner:
+#   1. This file (entity_taxonomy.yaml) - entity definitions
+#   2. Verb YAML files (config/verbs/*.yaml) - verb lifecycle semantics
+# =============================================================================
+
+version: "1.0"
+
+# =============================================================================
+# ENTITY DEFINITIONS
+# =============================================================================
+entities:
+
+  # ===========================================================================
+  # CBU - Client Business Unit (core synthetic entity)
+  # ===========================================================================
+  cbu:
+    description: "Client Business Unit - the core onboarding subject representing a fund mandate, corporate group, or institutional account"
+    category: subject
+    
+    db:
+      schema: ob-poc
+      table: cbus
+      pk: cbu_id
+      
+    search_keys:
+      - column: name
+        unique: false
+      - columns: [name, jurisdiction]
+        unique: true
+        
+    lifecycle:
+      status_column: status
+      states:
+        - DISCOVERED
+        - DRAFT
+        - PENDING_VALIDATION
+        - VALIDATED
+        - ACTIVE
+        - SUSPENDED
+        - TERMINATED
+      transitions:
+        - from: DISCOVERED
+          to: [DRAFT]
+        - from: DRAFT
+          to: [PENDING_VALIDATION, TERMINATED]
+        - from: PENDING_VALIDATION
+          to: [VALIDATED, DRAFT]
+        - from: VALIDATED
+          to: [ACTIVE, SUSPENDED]
+        - from: ACTIVE
+          to: [SUSPENDED, TERMINATED]
+        - from: SUSPENDED
+          to: [ACTIVE, TERMINATED]
+      initial_state: DISCOVERED
+      
+    implicit_create:
+      allowed: true
+      canonical_verb: cbu.create
+      required_args: [name, jurisdiction]
+
+  # ===========================================================================
+  # Entity - Legal/natural persons (base type with subtypes)
+  # ===========================================================================
+  entity:
+    description: "Legal or natural person entity - base type for all party types"
+    category: entity
+    
+    db:
+      schema: ob-poc
+      table: entities
+      pk: entity_id
+      type_column: type_id
+      type_lookup_table: entity_types
+      
+    search_keys:
+      - column: name
+        unique: false
+      - column: registration_number
+        unique: false
+        applies_to: [limited_company, partnership, trust]
+        
+    subtypes:
+      source_table: entity_types
+      code_column: type_code
+      extensions:
+        proper_person: entity_proper_persons
+        limited_company: entity_limited_companies
+        trust: entity_trusts
+        partnership: entity_partnerships
+        
+    lifecycle:
+      status_column: status
+      states:
+        - DRAFT
+        - ACTIVE
+        - INACTIVE
+        - MERGED
+      transitions:
+        - from: DRAFT
+          to: [ACTIVE]
+        - from: ACTIVE
+          to: [INACTIVE, MERGED]
+        - from: INACTIVE
+          to: [ACTIVE]
+      initial_state: DRAFT
+      
+    implicit_create:
+      allowed: true
+      canonical_verb_pattern: "entity.create-{subtype}"
+      required_args: [name]
+
+  # ===========================================================================
+  # Proper Person (entity subtype)
+  # ===========================================================================
+  proper_person:
+    description: "Natural person / individual"
+    category: entity
+    parent_type: entity
+    
+    db:
+      schema: ob-poc
+      table: entities
+      pk: entity_id
+      extension_table: entity_proper_persons
+      extension_fk: entity_id
+      type_code: proper_person
+      
+    search_keys:
+      - columns: [first_name, last_name]
+        unique: false
+      - column: national_id
+        unique: true
+        
+    implicit_create:
+      allowed: true
+      canonical_verb: entity.create-proper-person
+      required_args: [first-name, last-name]
+
+  # ===========================================================================
+  # Limited Company (entity subtype)
+  # ===========================================================================
+  limited_company:
+    description: "Incorporated company / corporation"
+    category: entity
+    parent_type: entity
+    
+    db:
+      schema: ob-poc
+      table: entities
+      pk: entity_id
+      extension_table: entity_limited_companies
+      extension_fk: entity_id
+      type_code: limited_company
+      
+    search_keys:
+      - column: name
+        unique: false
+      - column: registration_number
+        unique: true
+        
+    implicit_create:
+      allowed: true
+      canonical_verb: entity.create-limited-company
+      required_args: [name, jurisdiction]
+
+  # ===========================================================================
+  # Trust (entity subtype)
+  # ===========================================================================
+  trust:
+    description: "Trust structure"
+    category: entity
+    parent_type: entity
+    
+    db:
+      schema: ob-poc
+      table: entities
+      pk: entity_id
+      extension_table: entity_trusts
+      extension_fk: entity_id
+      type_code: trust
+      
+    search_keys:
+      - column: name
+        unique: false
+      - column: trust_deed_reference
+        unique: true
+        
+    implicit_create:
+      allowed: true
+      canonical_verb: entity.create-trust
+      required_args: [name]
+
+  # ===========================================================================
+  # Partnership (entity subtype)
+  # ===========================================================================
+  partnership:
+    description: "Partnership structure (LP, LLP, GP)"
+    category: entity
+    parent_type: entity
+    
+    db:
+      schema: ob-poc
+      table: entities
+      pk: entity_id
+      extension_table: entity_partnerships
+      extension_fk: entity_id
+      type_code: partnership
+      
+    search_keys:
+      - column: name
+        unique: false
+      - column: registration_number
+        unique: true
+        
+    implicit_create:
+      allowed: true
+      canonical_verb: entity.create-partnership
+      required_args: [name, partnership-type]
+
+  # ===========================================================================
+  # KYC Case
+  # ===========================================================================
+  kyc_case:
+    description: "KYC investigation case for a CBU"
+    category: kyc
+    
+    db:
+      schema: kyc
+      table: cases
+      pk: case_id
+      
+    search_keys:
+      - column: case_reference
+        unique: true
+      - columns: [cbu_id, case_type]
+        unique: false
+        
+    lifecycle:
+      status_column: status
+      states:
+        - OPEN
+        - IN_PROGRESS
+        - PENDING_DECISION
+        - APPROVED
+        - REJECTED
+        - CLOSED
+        - CANCELLED
+      transitions:
+        - from: OPEN
+          to: [IN_PROGRESS, CANCELLED]
+        - from: IN_PROGRESS
+          to: [PENDING_DECISION, CLOSED, CANCELLED]
+        - from: PENDING_DECISION
+          to: [APPROVED, REJECTED, IN_PROGRESS]
+        - from: APPROVED
+          to: [CLOSED]
+        - from: REJECTED
+          to: [CLOSED, IN_PROGRESS]
+        - from: CLOSED
+          to: []  # Terminal state
+        - from: CANCELLED
+          to: []  # Terminal state
+      initial_state: OPEN
+      
+    implicit_create:
+      allowed: true
+      canonical_verb: kyc.create-case
+      required_args: [cbu-id, case-type]
+
+  # ===========================================================================
+  # KYC Workstream
+  # ===========================================================================
+  kyc_workstream:
+    description: "Entity-level KYC workstream within a case"
+    category: kyc
+    
+    db:
+      schema: kyc
+      table: entity_workstreams
+      pk: workstream_id
+      
+    search_keys:
+      - columns: [case_id, entity_id]
+        unique: true
+        
+    lifecycle:
+      status_column: status
+      states:
+        - PENDING
+        - IN_PROGRESS
+        - COMPLETE
+        - BLOCKED
+        - WAIVED
+      transitions:
+        - from: PENDING
+          to: [IN_PROGRESS, WAIVED]
+        - from: IN_PROGRESS
+          to: [COMPLETE, BLOCKED]
+        - from: BLOCKED
+          to: [IN_PROGRESS, WAIVED]
+        - from: COMPLETE
+          to: []  # Terminal
+        - from: WAIVED
+          to: []  # Terminal
+      initial_state: PENDING
+      
+    implicit_create:
+      allowed: true
+      canonical_verb: kyc.create-workstream
+      required_args: [case-id, entity-id]
+
+  # ===========================================================================
+  # Document
+  # ===========================================================================
+  document:
+    description: "Document in the document catalog"
+    category: document
+    
+    db:
+      schema: ob-poc
+      table: document_catalog
+      pk: doc_id
+      
+    search_keys:
+      - column: doc_reference
+        unique: true
+      - columns: [entity_id, document_type_id]
+        unique: false
+        
+    lifecycle:
+      status_column: status
+      states:
+        - PENDING
+        - REQUESTED
+        - RECEIVED
+        - UNDER_REVIEW
+        - VERIFIED
+        - REJECTED
+        - EXPIRED
+      transitions:
+        - from: PENDING
+          to: [REQUESTED]
+        - from: REQUESTED
+          to: [RECEIVED, REJECTED]
+        - from: RECEIVED
+          to: [UNDER_REVIEW, REJECTED]
+        - from: UNDER_REVIEW
+          to: [VERIFIED, REJECTED]
+        - from: VERIFIED
+          to: [EXPIRED]
+        - from: REJECTED
+          to: [REQUESTED]  # Can re-request
+        - from: EXPIRED
+          to: [REQUESTED]  # Can re-request
+      initial_state: PENDING
+      
+    implicit_create:
+      allowed: true
+      canonical_verb: document.create
+      required_args: [entity-id, document-type]
+
+  # ===========================================================================
+  # Doc Request (KYC document request)
+  # ===========================================================================
+  doc_request:
+    description: "Document request within a KYC workstream"
+    category: kyc
+    
+    db:
+      schema: kyc
+      table: doc_requests
+      pk: request_id
+      
+    search_keys:
+      - columns: [workstream_id, document_type_id]
+        unique: false
+        
+    lifecycle:
+      status_column: status
+      states:
+        - PENDING
+        - REQUESTED
+        - RECEIVED
+        - ACCEPTED
+        - REJECTED
+        - WAIVED
+      transitions:
+        - from: PENDING
+          to: [REQUESTED, WAIVED]
+        - from: REQUESTED
+          to: [RECEIVED, WAIVED]
+        - from: RECEIVED
+          to: [ACCEPTED, REJECTED]
+        - from: REJECTED
+          to: [REQUESTED]  # Re-request
+        - from: ACCEPTED
+          to: []  # Terminal
+        - from: WAIVED
+          to: []  # Terminal
+      initial_state: PENDING
+      
+    implicit_create:
+      allowed: true
+      canonical_verb: kyc.request-document
+      required_args: [workstream-id, document-type]
+
+  # ===========================================================================
+  # UBO Record
+  # ===========================================================================
+  ubo_record:
+    description: "Ultimate Beneficial Owner registry entry"
+    category: ubo
+    
+    db:
+      schema: ob-poc
+      table: ubo_registry
+      pk: ubo_id
+      
+    search_keys:
+      - columns: [subject_entity_id, person_entity_id]
+        unique: true
+        
+    lifecycle:
+      status_column: verification_status
+      states:
+        - DECLARED
+        - EVIDENCED
+        - VERIFIED
+        - DISPUTED
+        - SUPERSEDED
+      transitions:
+        - from: DECLARED
+          to: [EVIDENCED, DISPUTED]
+        - from: EVIDENCED
+          to: [VERIFIED, DISPUTED]
+        - from: VERIFIED
+          to: [DISPUTED, SUPERSEDED]
+        - from: DISPUTED
+          to: [EVIDENCED, DECLARED, SUPERSEDED]
+        - from: SUPERSEDED
+          to: []  # Terminal
+      initial_state: DECLARED
+      
+    implicit_create:
+      allowed: true
+      canonical_verb: ubo.declare
+      required_args: [subject-entity-id, person-entity-id, ownership-percentage]
+
+  # ===========================================================================
+  # Ownership Relationship
+  # ===========================================================================
+  ownership_edge:
+    description: "Ownership relationship between entities in the UBO graph"
+    category: ubo
+    
+    db:
+      schema: ob-poc
+      table: ownership_relationships
+      pk: relationship_id
+      
+    search_keys:
+      - columns: [parent_entity_id, child_entity_id]
+        unique: true
+        
+    implicit_create:
+      allowed: true
+      canonical_verb: ubo.add-ownership
+      required_args: [parent-entity-id, child-entity-id, ownership-percentage]
+
+  # ===========================================================================
+  # Screening
+  # ===========================================================================
+  screening:
+    description: "Screening result (PEP, sanctions, adverse media)"
+    category: screening
+    
+    db:
+      schema: kyc
+      table: screenings
+      pk: screening_id
+      
+    search_keys:
+      - columns: [entity_id, screening_type]
+        unique: false
+        
+    lifecycle:
+      status_column: status
+      states:
+        - PENDING
+        - IN_PROGRESS
+        - COMPLETED
+        - MATCH_FOUND
+        - CLEARED
+        - ESCALATED
+      transitions:
+        - from: PENDING
+          to: [IN_PROGRESS]
+        - from: IN_PROGRESS
+          to: [COMPLETED, MATCH_FOUND]
+        - from: MATCH_FOUND
+          to: [CLEARED, ESCALATED]
+        - from: ESCALATED
+          to: [CLEARED]
+        - from: COMPLETED
+          to: []
+        - from: CLEARED
+          to: []
+      initial_state: PENDING
+      
+    implicit_create:
+      allowed: true
+      canonical_verb: screening.run
+      required_args: [entity-id, screening-type]
+
+  # ===========================================================================
+  # Red Flag
+  # ===========================================================================
+  red_flag:
+    description: "Risk red flag raised during KYC"
+    category: risk
+    
+    db:
+      schema: kyc
+      table: red_flags
+      pk: flag_id
+      
+    search_keys:
+      - columns: [case_id, flag_type_id]
+        unique: false
+        
+    lifecycle:
+      status_column: status
+      states:
+        - OPEN
+        - UNDER_REVIEW
+        - MITIGATED
+        - WAIVED
+        - ESCALATED
+      transitions:
+        - from: OPEN
+          to: [UNDER_REVIEW, ESCALATED]
+        - from: UNDER_REVIEW
+          to: [MITIGATED, WAIVED, ESCALATED]
+        - from: ESCALATED
+          to: [MITIGATED, WAIVED]
+        - from: MITIGATED
+          to: []
+        - from: WAIVED
+          to: []
+      initial_state: OPEN
+      
+    implicit_create:
+      allowed: false  # Red flags are raised by system, not user
+      canonical_verb: null
+
+  # ===========================================================================
+  # Product
+  # ===========================================================================
+  product:
+    description: "Product offering (CUSTODY, FUND_ACCOUNTING, etc.)"
+    category: product
+    
+    db:
+      schema: ob-poc
+      table: products
+      pk: product_id
+      
+    search_keys:
+      - column: product_code
+        unique: true
+      - column: name
+        unique: false
+        
+    # Products are reference data - no lifecycle
+    implicit_create:
+      allowed: false  # Reference data, pre-seeded
+      canonical_verb: null
+
+  # ===========================================================================
+  # Service
+  # ===========================================================================
+  service:
+    description: "Service within a product"
+    category: service
+    
+    db:
+      schema: ob-poc
+      table: services
+      pk: service_id
+      
+    search_keys:
+      - column: service_code
+        unique: true
+      - columns: [product_id, name]
+        unique: true
+        
+    # Services are reference data - no lifecycle
+    implicit_create:
+      allowed: false  # Reference data, pre-seeded
+      canonical_verb: null
+
+  # ===========================================================================
+  # Resource Type
+  # ===========================================================================
+  resource_type:
+    description: "Type of resource that can be provisioned"
+    category: resource
+    
+    db:
+      schema: ob-poc
+      table: service_resource_types
+      pk: resource_id
+      
+    search_keys:
+      - column: resource_code
+        unique: true
+        
+    # Reference data
+    implicit_create:
+      allowed: false
+      canonical_verb: null
+
+  # ===========================================================================
+  # CBU Resource Instance
+  # ===========================================================================
+  cbu_resource_instance:
+    description: "Provisioned resource instance for a CBU"
+    category: resource
+    
+    db:
+      schema: ob-poc
+      table: cbu_resource_instances
+      pk: instance_id
+      
+    search_keys:
+      - column: instance_identifier
+        unique: true
+      - columns: [cbu_id, resource_type_id]
+        unique: false
+        
+    lifecycle:
+      status_column: status
+      states:
+        - PENDING
+        - PROVISIONING
+        - PROVISIONED
+        - ACTIVE
+        - SUSPENDED
+        - DECOMMISSIONED
+      transitions:
+        - from: PENDING
+          to: [PROVISIONING]
+        - from: PROVISIONING
+          to: [PROVISIONED]
+        - from: PROVISIONED
+          to: [ACTIVE]
+        - from: ACTIVE
+          to: [SUSPENDED, DECOMMISSIONED]
+        - from: SUSPENDED
+          to: [ACTIVE, DECOMMISSIONED]
+        - from: DECOMMISSIONED
+          to: []  # Terminal
+      initial_state: PENDING
+      
+    implicit_create:
+      allowed: true
+      canonical_verb: resource.allocate
+      required_args: [cbu-id, resource-type]
+
+  # ===========================================================================
+  # Service Delivery
+  # ===========================================================================
+  service_delivery:
+    description: "Service delivery status for a CBU"
+    category: delivery
+    
+    db:
+      schema: ob-poc
+      table: service_delivery_map
+      pk: delivery_id
+      
+    search_keys:
+      - columns: [cbu_id, service_id]
+        unique: true
+        
+    lifecycle:
+      status_column: delivery_status
+      states:
+        - NOT_STARTED
+        - IN_PROGRESS
+        - READY
+        - ACTIVE
+        - SUSPENDED
+        - TERMINATED
+      transitions:
+        - from: NOT_STARTED
+          to: [IN_PROGRESS]
+        - from: IN_PROGRESS
+          to: [READY]
+        - from: READY
+          to: [ACTIVE]
+        - from: ACTIVE
+          to: [SUSPENDED, TERMINATED]
+        - from: SUSPENDED
+          to: [ACTIVE, TERMINATED]
+        - from: TERMINATED
+          to: []
+      initial_state: NOT_STARTED
+      
+    implicit_create:
+      allowed: true
+      canonical_verb: delivery.create
+      required_args: [cbu-id, service-id]
+
+  # ===========================================================================
+  # Investigation (alias for complex KYC investigations)
+  # ===========================================================================
+  investigation:
+    description: "Alias for KYC case - used in some verb domains"
+    category: kyc
+    alias_for: kyc_case
+    
+    db:
+      schema: kyc
+      table: cases
+      pk: case_id
+
+  # ===========================================================================
+  # Decision
+  # ===========================================================================
+  decision:
+    description: "KYC case decision record"
+    category: kyc
+    
+    db:
+      schema: ob-poc
+      table: case_evaluation_snapshots
+      pk: snapshot_id
+      
+    search_keys:
+      - columns: [case_id, evaluated_at]
+        unique: false
+        
+    implicit_create:
+      allowed: false  # Decisions are recorded, not created directly
+      canonical_verb: null
+
+  # ===========================================================================
+  # Monitoring Event
+  # ===========================================================================
+  monitoring_event:
+    description: "Ongoing monitoring event for a CBU"
+    category: monitoring
+    
+    db:
+      schema: ob-poc
+      table: monitoring_events
+      pk: event_id
+      
+    search_keys:
+      - columns: [cbu_id, event_type]
+        unique: false
+        
+    lifecycle:
+      status_column: status
+      states:
+        - DETECTED
+        - ACKNOWLEDGED
+        - INVESTIGATING
+        - RESOLVED
+        - ESCALATED
+      transitions:
+        - from: DETECTED
+          to: [ACKNOWLEDGED, ESCALATED]
+        - from: ACKNOWLEDGED
+          to: [INVESTIGATING, RESOLVED]
+        - from: INVESTIGATING
+          to: [RESOLVED, ESCALATED]
+        - from: ESCALATED
+          to: [RESOLVED]
+        - from: RESOLVED
+          to: []
+      initial_state: DETECTED
+      
+    implicit_create:
+      allowed: true
+      canonical_verb: monitoring.record-event
+      required_args: [cbu-id, event-type]
+
+
+# =============================================================================
+# FK RELATIONSHIPS
+# =============================================================================
+# Replaces the hardcoded PARENT_FK_MAP in execution_plan.rs
+# Pattern: when child verb runs under parent context, inject this FK arg
+# =============================================================================
+relationships:
+
+  # ---------------------------------------------------------------------------
+  # Same-domain self-references
+  # ---------------------------------------------------------------------------
+  - parent: cbu
+    child: cbu
+    fk_arg: cbu-id
+    description: "CBU operations reference parent CBU"
+    
+  - parent: entity
+    child: entity
+    fk_arg: entity-id
+    description: "Entity operations reference parent entity"
+    
+  - parent: document
+    child: document
+    fk_arg: document-id
+    description: "Document operations reference parent document"
+    
+  - parent: investigation
+    child: investigation
+    fk_arg: investigation-id
+    description: "Investigation operations reference parent investigation"
+    
+  - parent: decision
+    child: decision
+    fk_arg: decision-id
+    
+  - parent: screening
+    child: screening
+    fk_arg: screening-id
+    
+  - parent: product
+    child: product
+    fk_arg: product-id
+    
+  - parent: service
+    child: service
+    fk_arg: service-id
+    
+  - parent: monitoring
+    child: monitoring
+    fk_arg: monitoring-id
+    
+  - parent: risk
+    child: risk
+    fk_arg: risk-id
+
+  # ---------------------------------------------------------------------------
+  # CBU as parent
+  # ---------------------------------------------------------------------------
+  - parent: cbu
+    child: document
+    fk_arg: cbu-id
+    description: "Documents can be linked to CBU"
+    
+  - parent: cbu
+    child: investigation
+    fk_arg: cbu-id
+    description: "Investigations are opened for CBU"
+    
+  - parent: cbu
+    child: kyc
+    fk_arg: cbu-id
+    description: "KYC operations on CBU"
+    
+  - parent: cbu
+    child: decision
+    fk_arg: cbu-id
+    description: "Decisions recorded for CBU"
+    
+  - parent: cbu
+    child: monitoring
+    fk_arg: cbu-id
+    description: "Monitoring events for CBU"
+    
+  - parent: cbu
+    child: risk
+    fk_arg: cbu-id
+    description: "Risk flags/ratings for CBU"
+    
+  - parent: cbu
+    child: screening
+    fk_arg: cbu-id
+    description: "Screenings at CBU level"
+    
+  - parent: cbu
+    child: resource
+    fk_arg: cbu-id
+    description: "Resource instances for CBU"
+    
+  - parent: cbu
+    child: delivery
+    fk_arg: cbu-id
+    description: "Service delivery for CBU"
+    
+  - parent: cbu
+    child: ubo
+    fk_arg: cbu-id
+    description: "UBO declarations for CBU subject"
+
+  # ---------------------------------------------------------------------------
+  # Entity as parent
+  # ---------------------------------------------------------------------------
+  - parent: entity
+    child: document
+    fk_arg: entity-id
+    description: "Documents attached to entity"
+    
+  - parent: entity
+    child: screening
+    fk_arg: entity-id
+    description: "Screenings run on entity"
+    
+  - parent: entity
+    child: risk
+    fk_arg: entity-id
+    description: "Risk assessments on entity"
+    
+  - parent: entity
+    child: ubo
+    fk_arg: entity-id
+    description: "UBO relationships for entity"
+    
+  - parent: entity
+    child: attribute
+    fk_arg: entity-id
+    description: "Attributes observed for entity"
+
+  # ---------------------------------------------------------------------------
+  # KYC/Investigation relationships
+  # ---------------------------------------------------------------------------
+  - parent: investigation
+    child: screening
+    fk_arg: investigation-id
+    description: "Screenings within investigation"
+    
+  - parent: investigation
+    child: decision
+    fk_arg: investigation-id
+    description: "Decisions within investigation"
+    
+  - parent: kyc
+    child: screening
+    fk_arg: case-id
+    description: "Screenings within KYC case"
+    
+  - parent: kyc
+    child: decision
+    fk_arg: case-id
+    description: "Decisions within KYC case"
+    
+  - parent: kyc
+    child: workstream
+    fk_arg: case-id
+    description: "Workstreams within KYC case"
+
+  # ---------------------------------------------------------------------------
+  # Workstream relationships
+  # ---------------------------------------------------------------------------
+  - parent: workstream
+    child: document
+    fk_arg: workstream-id
+    description: "Documents requested in workstream"
+    
+  - parent: workstream
+    child: screening
+    fk_arg: workstream-id
+    description: "Screenings in workstream"
+
+  # ---------------------------------------------------------------------------
+  # Product/Service relationships
+  # ---------------------------------------------------------------------------
+  - parent: product
+    child: service
+    fk_arg: product-id
+    description: "Services belong to product"
+    
+  - parent: service
+    child: resource
+    fk_arg: service-id
+    description: "Resources belong to service"
+    
+  - parent: service
+    child: product
+    fk_arg: service-id
+    description: "Reverse link service to product"
+
+
+# =============================================================================
+# REFERENCE DATA TABLES
+# =============================================================================
+# These are lookup tables used for validation but not as DSL entities
+# =============================================================================
+reference_tables:
+
+  jurisdiction:
+    table: master_jurisdictions
+    schema: ob-poc
+    pk: jurisdiction_code
+    search_key: jurisdiction_code
+    
+  role:
+    table: roles
+    schema: ob-poc
+    pk: role_id
+    search_key: name
+    
+  document_type:
+    table: document_types
+    schema: ob-poc
+    pk: document_type_id
+    search_key: type_code
+    
+  entity_type:
+    table: entity_types
+    schema: ob-poc
+    pk: type_id
+    search_key: type_code
+    
+  case_type:
+    table: case_types
+    schema: ob-poc
+    pk: code
+    search_key: code
+    
+  flag_type:
+    table: red_flag_types
+    schema: kyc
+    pk: flag_type_id
+    search_key: flag_code
+    
+  screening_type:
+    table: screening_types
+    schema: kyc
+    pk: screening_type_id
+    search_key: type_code
+    
+  currency:
+    table: currencies
+    schema: ob-poc
+    pk: currency_code
+    search_key: currency_code

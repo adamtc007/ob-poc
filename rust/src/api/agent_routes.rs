@@ -379,7 +379,14 @@ async fn chat_session(
         let session = sessions.get_mut(&session_id).ok_or(StatusCode::NOT_FOUND)?;
         session.add_user_message(req.message.clone());
         // Get typed bindings formatted for LLM context
-        session.context.bindings_for_llm()
+        let bindings = session.context.bindings_for_llm();
+        tracing::info!(
+            "Session {} bindings for LLM: {:?} (named_refs: {:?})",
+            session_id,
+            bindings,
+            session.context.named_refs.keys().collect::<Vec<_>>()
+        );
+        bindings
     };
 
     // Create LLM client (uses AGENT_BACKEND env var to select provider)
@@ -2466,6 +2473,21 @@ pub struct DirectExecuteRequest {
     pub bindings: Option<std::collections::HashMap<String, Uuid>>,
 }
 
+/// Primary key returned from DSL execution - derived from verb's `produces` metadata
+#[derive(Debug, Clone, Serialize)]
+pub struct PrimaryKey {
+    /// The entity type produced (from verb YAML `produces.type`: cbu, entity, case, workstream, etc.)
+    pub entity_type: String,
+    /// Optional subtype for entities (from verb YAML `produces.subtype`: proper_person, limited_company, etc.)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub subtype: Option<String>,
+    /// The primary key UUID
+    pub id: Uuid,
+    /// Display name (from :name argument if available)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
 /// Response from direct DSL execution
 #[derive(Debug, Serialize)]
 pub struct DirectExecuteResponse {
@@ -2473,6 +2495,41 @@ pub struct DirectExecuteResponse {
     pub results: Vec<ExecutionResult>,
     pub bindings: std::collections::HashMap<String, Uuid>,
     pub errors: Vec<String>,
+    /// The resolved AST with EntityRefs containing resolved_key UUIDs
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ast: Option<Vec<crate::dsl_v2::ast::Statement>>,
+    /// Primary key(s) created/updated by this execution
+    /// Each domain returns its primary entity type PK
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub primary_keys: Vec<PrimaryKey>,
+    /// Whether statements were reordered by the planner
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub reordered: bool,
+    /// Synthetic steps injected by the planner (e.g., implicit entity creates)
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub synthetic_steps: Vec<SyntheticStepInfo>,
+    /// Planner diagnostics (warnings, lifecycle violations)
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub planner_diagnostics: Vec<PlannerDiagnosticInfo>,
+}
+
+/// Information about a synthetic step injected by the planner
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyntheticStepInfo {
+    pub binding: String,
+    pub verb: String,
+    pub entity_type: String,
+}
+
+/// Planner diagnostic information for API responses
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlannerDiagnosticInfo {
+    pub kind: String,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub binding: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stmt_index: Option<usize>,
 }
 
 /// POST /execute - Direct DSL execution without session
@@ -2492,6 +2549,11 @@ async fn direct_execute_dsl(
                 results: vec![],
                 bindings: std::collections::HashMap::new(),
                 errors: vec![format!("Parse error: {}", e)],
+                ast: None,
+                primary_keys: vec![],
+                reordered: false,
+                synthetic_steps: vec![],
+                planner_diagnostics: vec![],
             });
         }
     };
@@ -2522,21 +2584,158 @@ async fn direct_execute_dsl(
                     results: vec![],
                     bindings: std::collections::HashMap::new(),
                     errors,
+                    ast: None,
+                    primary_keys: vec![],
+                    reordered: false,
+                    synthetic_steps: vec![],
+                    planner_diagnostics: vec![],
                 });
             }
         }
     }
 
-    // Compile
-    let plan = match compile(&program) {
-        Ok(p) => p,
-        Err(e) => {
-            return Json(DirectExecuteResponse {
-                success: false,
-                results: vec![],
-                bindings: std::collections::HashMap::new(),
-                errors: vec![format!("Compile error: {}", e)],
-            });
+    // Check if planner is enabled via environment variable
+    let planner_enabled = std::env::var("PLANNER_ENABLED")
+        .map(|v| v == "1" || v.to_lowercase() == "true")
+        .unwrap_or(false);
+
+    // Track planner results for response
+    let mut reordered = false;
+    let mut synthetic_steps: Vec<SyntheticStepInfo> = vec![];
+    let mut planner_diagnostics: Vec<PlannerDiagnosticInfo> = vec![];
+
+    // Compile (with or without planning)
+    let plan = if planner_enabled {
+        // Create planning context from request bindings
+        let mut planning_context = crate::dsl_v2::PlanningContext::new();
+        if let Some(bindings) = &req.bindings {
+            for name in bindings.keys() {
+                // Add binding with unknown type (we don't track types in simple bindings)
+                planning_context.add_binding(name, "unknown");
+            }
+        }
+
+        match crate::dsl_v2::compile_with_planning(&program, &planning_context) {
+            Ok(result) => {
+                reordered = result.reordered;
+
+                // Convert synthetic steps to response format
+                synthetic_steps = result
+                    .synthetic_steps
+                    .iter()
+                    .map(|s| SyntheticStepInfo {
+                        binding: s.binding.clone(),
+                        verb: s.verb.clone(),
+                        entity_type: s.entity_type.clone(),
+                    })
+                    .collect();
+
+                // Convert diagnostics to response format
+                planner_diagnostics = result
+                    .diagnostics
+                    .iter()
+                    .map(|d| match d {
+                        crate::dsl_v2::PlannerDiagnostic::SyntheticStepInjected {
+                            binding,
+                            verb: _,
+                            entity_type,
+                            before_stmt,
+                        } => PlannerDiagnosticInfo {
+                            kind: "synthetic_step".to_string(),
+                            message: format!(
+                                "Injected synthetic {}.create for @{}",
+                                entity_type, binding
+                            ),
+                            binding: Some(binding.clone()),
+                            stmt_index: Some(*before_stmt),
+                        },
+                        crate::dsl_v2::PlannerDiagnostic::MissingProducer {
+                            binding,
+                            entity_type,
+                            required_by_stmt,
+                            reason,
+                        } => PlannerDiagnosticInfo {
+                            kind: "missing_producer".to_string(),
+                            message: format!(
+                                "Missing producer for @{} ({}): {}",
+                                binding, entity_type, reason
+                            ),
+                            binding: Some(binding.clone()),
+                            stmt_index: Some(*required_by_stmt),
+                        },
+                        crate::dsl_v2::PlannerDiagnostic::LifecycleViolation {
+                            binding,
+                            verb,
+                            current_state,
+                            required_states,
+                            stmt_index,
+                        } => PlannerDiagnosticInfo {
+                            kind: "lifecycle_violation".to_string(),
+                            message: format!(
+                                "{} requires @{} in state {:?}, but current state is '{}'",
+                                verb, binding, required_states, current_state
+                            ),
+                            binding: Some(binding.clone()),
+                            stmt_index: Some(*stmt_index),
+                        },
+                        crate::dsl_v2::PlannerDiagnostic::StatementsReordered {
+                            original_order,
+                            new_order,
+                            reason,
+                        } => PlannerDiagnosticInfo {
+                            kind: "reordered".to_string(),
+                            message: format!(
+                                "Statements reordered: {:?} -> {:?} ({})",
+                                original_order, new_order, reason
+                            ),
+                            binding: None,
+                            stmt_index: None,
+                        },
+                        crate::dsl_v2::PlannerDiagnostic::Warning {
+                            message,
+                            stmt_index,
+                        } => PlannerDiagnosticInfo {
+                            kind: "warning".to_string(),
+                            message: message.clone(),
+                            binding: None,
+                            stmt_index: *stmt_index,
+                        },
+                    })
+                    .collect();
+
+                result.plan
+            }
+            Err(e) => {
+                return Json(DirectExecuteResponse {
+                    success: false,
+                    results: vec![],
+                    bindings: std::collections::HashMap::new(),
+                    errors: vec![format!("Compile error: {}", e)],
+                    ast: None,
+                    primary_keys: vec![],
+                    reordered: false,
+                    synthetic_steps: vec![],
+                    planner_diagnostics: vec![],
+                });
+            }
+        }
+    } else {
+        // Standard compile without planning
+        match compile(&program) {
+            Ok(p) => p,
+            Err(e) => {
+                return Json(DirectExecuteResponse {
+                    success: false,
+                    results: vec![],
+                    bindings: std::collections::HashMap::new(),
+                    errors: vec![format!("Compile error: {}", e)],
+                    ast: None,
+                    primary_keys: vec![],
+                    reordered: false,
+                    synthetic_steps: vec![],
+                    planner_diagnostics: vec![],
+                });
+            }
         }
     };
 
@@ -2576,14 +2775,70 @@ async fn direct_execute_dsl(
                 })
                 .collect();
 
-            // Add cbu_id to bindings if a CBU was created
+            // Extract primary keys using verb's `produces` metadata from YAML config
+            // This is the same metadata used by entity resolution / dataflow validation
             let mut bindings = ctx.symbols.clone();
+            let mut primary_keys: Vec<PrimaryKey> = Vec::new();
+            let runtime_reg = crate::dsl_v2::runtime_registry();
+
             for (idx, r) in exec_results.iter().enumerate() {
                 if let DslV2Result::Uuid(id) = r {
                     if let Some(step) = plan.steps.get(idx) {
-                        if step.verb_call.domain == "cbu" {
-                            bindings.insert("cbu_id".to_string(), *id);
-                        }
+                        let domain = &step.verb_call.domain;
+                        let verb = &step.verb_call.verb;
+
+                        // Get the entity type from verb's `produces` metadata
+                        // This is authoritative - defined in verbs/*.yaml (same as entity resolution)
+                        let (entity_type, subtype) =
+                            if let Some(produces) = runtime_reg.get_produces(domain, verb) {
+                                (produces.produced_type.clone(), produces.subtype.clone())
+                            } else {
+                                // Fallback to domain if no produces defined
+                                (domain.clone(), None)
+                            };
+
+                        // Add to bindings with entity_type-specific key (e.g., cbu_id, entity_id)
+                        let binding_key = format!("{}_id", entity_type.replace('-', "_"));
+                        bindings.insert(binding_key, *id);
+
+                        // Extract display name from verb arguments
+                        // Look at the verb's args config to find the primary name field
+                        let name = if let Some(verb_def) = runtime_reg.get(domain, verb) {
+                            // Find the first string arg that looks like a name
+                            verb_def
+                                .args
+                                .iter()
+                                .find(|a| {
+                                    a.name == "name"
+                                        || a.name == "first-name"
+                                        || a.name.ends_with("-name")
+                                })
+                                .and_then(|name_arg| {
+                                    step.verb_call
+                                        .arguments
+                                        .iter()
+                                        .find(|arg| arg.key == name_arg.name)
+                                        .and_then(|arg| {
+                                            if let crate::dsl_v2::ast::AstNode::Literal(
+                                                crate::dsl_v2::ast::Literal::String(s),
+                                            ) = &arg.value
+                                            {
+                                                Some(s.clone())
+                                            } else {
+                                                None
+                                            }
+                                        })
+                                })
+                        } else {
+                            None
+                        };
+
+                        primary_keys.push(PrimaryKey {
+                            entity_type: entity_type.clone(),
+                            subtype,
+                            id: *id,
+                            name,
+                        });
                     }
                 }
             }
@@ -2593,6 +2848,11 @@ async fn direct_execute_dsl(
                 results,
                 bindings,
                 errors: vec![],
+                ast: Some(program.statements.clone()),
+                primary_keys,
+                reordered,
+                synthetic_steps,
+                planner_diagnostics,
             })
         }
         Err(e) => Json(DirectExecuteResponse {
@@ -2600,6 +2860,11 @@ async fn direct_execute_dsl(
             results: vec![],
             bindings: ctx.symbols.clone(),
             errors: vec![e.to_string()],
+            ast: None,
+            primary_keys: vec![],
+            reordered,
+            synthetic_steps,
+            planner_diagnostics,
         }),
     }
 }

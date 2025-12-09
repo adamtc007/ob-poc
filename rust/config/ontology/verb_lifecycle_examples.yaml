@@ -1,0 +1,747 @@
+# Verb Lifecycle Extension Examples
+# =============================================================================
+# This file shows how to extend existing verb YAML with lifecycle semantics.
+# These sections should be added to the corresponding verbs in config/verbs/*.yaml
+#
+# The `lifecycle` section defines:
+#   - entity_arg: Which argument carries the target entity
+#   - requires_states: States the entity must be in for this verb to execute
+#   - transitions_to: State the entity transitions to after execution
+#   - transitions_to_arg: Arg name containing target state (for generic set-state)
+#   - precondition_checks: Named checks to validate before execution
+# =============================================================================
+
+# =============================================================================
+# CBU VERBS (add to config/verbs/cbu.yaml)
+# =============================================================================
+
+cbu_create_extension:
+  # Add to cbu.create
+  produces:
+    type: cbu
+    resolved: false
+    initial_state: DISCOVERED  # NEW: created CBUs start in DISCOVERED state
+
+cbu_ensure_extension:
+  # Add to cbu.ensure
+  produces:
+    type: cbu
+    resolved: false
+    initial_state: DISCOVERED  # NEW: if created, starts in DISCOVERED
+
+cbu_set_status:
+  # NEW VERB: Generic status setter (if not exists, add it)
+  description: "Set CBU status (generic transition)"
+  behavior: crud
+  crud:
+    operation: update
+    table: cbus
+    schema: ob-poc
+    key: cbu_id
+  consumes:
+    - arg: cbu-id
+      type: cbu
+      required: true
+  lifecycle:
+    entity_arg: cbu-id
+    # No requires_states = any state allowed (transitions validated by config)
+    transitions_to_arg: status  # Target state comes from arg value
+  args:
+    - name: cbu-id
+      type: uuid
+      required: true
+      maps_to: cbu_id
+      lookup:
+        table: cbus
+        entity_type: cbu
+        schema: ob-poc
+        search_key: name
+        primary_key: cbu_id
+    - name: status
+      type: string
+      required: true
+      maps_to: status
+      validation:
+        enum:
+          - DISCOVERED
+          - DRAFT
+          - PENDING_VALIDATION
+          - VALIDATED
+          - ACTIVE
+          - SUSPENDED
+          - TERMINATED
+  returns:
+    type: affected
+
+cbu_mark_draft:
+  # NEW VERB: Transition to DRAFT
+  description: "Transition CBU to DRAFT state (ready for data collection)"
+  behavior: crud
+  crud:
+    operation: update
+    table: cbus
+    schema: ob-poc
+    key: cbu_id
+    set_values:
+      status: DRAFT
+  consumes:
+    - arg: cbu-id
+      type: cbu
+      required: true
+  lifecycle:
+    entity_arg: cbu-id
+    requires_states:
+      - DISCOVERED
+    transitions_to: DRAFT
+  args:
+    - name: cbu-id
+      type: uuid
+      required: true
+      maps_to: cbu_id
+      lookup:
+        table: cbus
+        entity_type: cbu
+        schema: ob-poc
+        search_key: name
+        primary_key: cbu_id
+  returns:
+    type: affected
+
+cbu_submit_for_validation:
+  # NEW VERB: Transition to PENDING_VALIDATION
+  description: "Submit CBU for validation review"
+  behavior: crud
+  crud:
+    operation: update
+    table: cbus
+    schema: ob-poc
+    key: cbu_id
+    set_values:
+      status: PENDING_VALIDATION
+  consumes:
+    - arg: cbu-id
+      type: cbu
+      required: true
+  lifecycle:
+    entity_arg: cbu-id
+    requires_states:
+      - DRAFT
+    transitions_to: PENDING_VALIDATION
+    precondition_checks:
+      - check_cbu_evidence_completeness
+      - check_required_parties_present
+  args:
+    - name: cbu-id
+      type: uuid
+      required: true
+      maps_to: cbu_id
+      lookup:
+        table: cbus
+        entity_type: cbu
+        schema: ob-poc
+        search_key: name
+        primary_key: cbu_id
+  returns:
+    type: affected
+
+cbu_mark_validated:
+  # NEW VERB: Transition to VALIDATED
+  description: "Mark CBU as validated (KYC approved)"
+  behavior: crud
+  crud:
+    operation: update
+    table: cbus
+    schema: ob-poc
+    key: cbu_id
+    set_values:
+      status: VALIDATED
+  consumes:
+    - arg: cbu-id
+      type: cbu
+      required: true
+  lifecycle:
+    entity_arg: cbu-id
+    requires_states:
+      - PENDING_VALIDATION
+    transitions_to: VALIDATED
+    precondition_checks:
+      - check_cbu_invariants
+      - check_ubo_completeness
+      - check_kyc_case_approved
+  args:
+    - name: cbu-id
+      type: uuid
+      required: true
+      maps_to: cbu_id
+      lookup:
+        table: cbus
+        entity_type: cbu
+        schema: ob-poc
+        search_key: name
+        primary_key: cbu_id
+  returns:
+    type: affected
+
+cbu_activate:
+  # NEW VERB: Transition to ACTIVE
+  description: "Activate CBU for live operations"
+  behavior: crud
+  crud:
+    operation: update
+    table: cbus
+    schema: ob-poc
+    key: cbu_id
+    set_values:
+      status: ACTIVE
+  consumes:
+    - arg: cbu-id
+      type: cbu
+      required: true
+  lifecycle:
+    entity_arg: cbu-id
+    requires_states:
+      - VALIDATED
+    transitions_to: ACTIVE
+    precondition_checks:
+      - check_service_delivery_ready
+      - check_resources_provisioned
+  args:
+    - name: cbu-id
+      type: uuid
+      required: true
+      maps_to: cbu_id
+      lookup:
+        table: cbus
+        entity_type: cbu
+        schema: ob-poc
+        search_key: name
+        primary_key: cbu_id
+  returns:
+    type: affected
+
+cbu_suspend:
+  # NEW VERB: Transition to SUSPENDED
+  description: "Suspend CBU operations"
+  behavior: crud
+  crud:
+    operation: update
+    table: cbus
+    schema: ob-poc
+    key: cbu_id
+    set_values:
+      status: SUSPENDED
+  consumes:
+    - arg: cbu-id
+      type: cbu
+      required: true
+  lifecycle:
+    entity_arg: cbu-id
+    requires_states:
+      - ACTIVE
+    transitions_to: SUSPENDED
+  args:
+    - name: cbu-id
+      type: uuid
+      required: true
+      maps_to: cbu_id
+      lookup:
+        table: cbus
+        entity_type: cbu
+        schema: ob-poc
+        search_key: name
+        primary_key: cbu_id
+    - name: reason
+      type: string
+      required: true
+      description: "Reason for suspension"
+  returns:
+    type: affected
+
+cbu_terminate:
+  # NEW VERB: Transition to TERMINATED (terminal state)
+  description: "Terminate CBU (offboarding complete)"
+  behavior: crud
+  crud:
+    operation: update
+    table: cbus
+    schema: ob-poc
+    key: cbu_id
+    set_values:
+      status: TERMINATED
+  consumes:
+    - arg: cbu-id
+      type: cbu
+      required: true
+  lifecycle:
+    entity_arg: cbu-id
+    requires_states:
+      - DRAFT
+      - ACTIVE
+      - SUSPENDED
+    transitions_to: TERMINATED
+  args:
+    - name: cbu-id
+      type: uuid
+      required: true
+      maps_to: cbu_id
+      lookup:
+        table: cbus
+        entity_type: cbu
+        schema: ob-poc
+        search_key: name
+        primary_key: cbu_id
+    - name: reason
+      type: string
+      required: true
+      description: "Reason for termination"
+  returns:
+    type: affected
+
+# =============================================================================
+# Existing verbs that need lifecycle.consumes (already have consumes, add lifecycle)
+# =============================================================================
+
+cbu_assign_role_extension:
+  # Add to cbu.assign-role
+  # This verb doesn't change CBU state, but requires CBU to exist
+  lifecycle:
+    entity_arg: cbu-id
+    # No state requirements - can assign roles in any state
+    # No transitions_to - doesn't change state
+
+cbu_add_product_extension:
+  # Add to cbu.add-product
+  lifecycle:
+    entity_arg: cbu-id
+    requires_states:
+      - DRAFT
+      - PENDING_VALIDATION
+      - VALIDATED
+    # Products should be added before ACTIVE
+    # No transitions_to - doesn't change CBU state
+
+
+# =============================================================================
+# KYC VERBS (add to config/verbs/kyc.yaml or create if not exists)
+# =============================================================================
+
+kyc_create_case:
+  description: "Create a new KYC case for a CBU"
+  behavior: crud
+  crud:
+    operation: insert
+    table: cases
+    schema: kyc
+    returning: case_id
+  produces:
+    type: kyc_case
+    initial_state: OPEN
+  consumes:
+    - arg: cbu-id
+      type: cbu
+      required: true
+  lifecycle:
+    entity_arg: cbu-id
+    requires_states:
+      - DRAFT
+      - PENDING_VALIDATION
+    # KYC cases opened during DRAFT or review, not after VALIDATED
+  args:
+    - name: cbu-id
+      type: uuid
+      required: true
+      maps_to: cbu_id
+      lookup:
+        table: cbus
+        entity_type: cbu
+        schema: ob-poc
+        search_key: name
+        primary_key: cbu_id
+    - name: case-type
+      type: string
+      required: true
+      maps_to: case_type
+      lookup:
+        table: case_types
+        entity_type: case_type
+        schema: ob-poc
+        search_key: code
+        primary_key: code
+  returns:
+    type: uuid
+    name: case_id
+    capture: true
+
+kyc_approve_case:
+  description: "Approve KYC case"
+  behavior: crud
+  crud:
+    operation: update
+    table: cases
+    schema: kyc
+    key: case_id
+    set_values:
+      status: APPROVED
+  consumes:
+    - arg: case-id
+      type: kyc_case
+      required: true
+  lifecycle:
+    entity_arg: case-id
+    requires_states:
+      - PENDING_DECISION
+    transitions_to: APPROVED
+    precondition_checks:
+      - check_all_workstreams_complete
+      - check_red_flags_resolved
+  args:
+    - name: case-id
+      type: uuid
+      required: true
+      maps_to: case_id
+      lookup:
+        table: cases
+        entity_type: kyc_case
+        schema: kyc
+        search_key: case_reference
+        primary_key: case_id
+    - name: approved-by
+      type: string
+      required: true
+      maps_to: decided_by
+    - name: notes
+      type: string
+      required: false
+      maps_to: decision_notes
+  returns:
+    type: affected
+
+kyc_reject_case:
+  description: "Reject KYC case"
+  behavior: crud
+  crud:
+    operation: update
+    table: cases
+    schema: kyc
+    key: case_id
+    set_values:
+      status: REJECTED
+  consumes:
+    - arg: case-id
+      type: kyc_case
+      required: true
+  lifecycle:
+    entity_arg: case-id
+    requires_states:
+      - PENDING_DECISION
+    transitions_to: REJECTED
+  args:
+    - name: case-id
+      type: uuid
+      required: true
+      maps_to: case_id
+      lookup:
+        table: cases
+        entity_type: kyc_case
+        schema: kyc
+        search_key: case_reference
+        primary_key: case_id
+    - name: rejected-by
+      type: string
+      required: true
+      maps_to: decided_by
+    - name: reason
+      type: string
+      required: true
+      maps_to: decision_notes
+  returns:
+    type: affected
+
+
+# =============================================================================
+# DOCUMENT VERBS (add to config/verbs/document.yaml)
+# =============================================================================
+
+document_create_extension:
+  # Add to document.create
+  produces:
+    type: document
+    initial_state: PENDING
+
+document_mark_received:
+  description: "Mark document as received"
+  behavior: crud
+  crud:
+    operation: update
+    table: document_catalog
+    schema: ob-poc
+    key: doc_id
+    set_values:
+      status: RECEIVED
+  consumes:
+    - arg: doc-id
+      type: document
+      required: true
+  lifecycle:
+    entity_arg: doc-id
+    requires_states:
+      - PENDING
+      - REQUESTED
+    transitions_to: RECEIVED
+  args:
+    - name: doc-id
+      type: uuid
+      required: true
+      maps_to: doc_id
+      lookup:
+        table: document_catalog
+        entity_type: document
+        schema: ob-poc
+        search_key: doc_reference
+        primary_key: doc_id
+    - name: received-date
+      type: date
+      required: false
+      maps_to: received_date
+  returns:
+    type: affected
+
+document_verify:
+  description: "Mark document as verified"
+  behavior: crud
+  crud:
+    operation: update
+    table: document_catalog
+    schema: ob-poc
+    key: doc_id
+    set_values:
+      status: VERIFIED
+  consumes:
+    - arg: doc-id
+      type: document
+      required: true
+  lifecycle:
+    entity_arg: doc-id
+    requires_states:
+      - RECEIVED
+      - UNDER_REVIEW
+    transitions_to: VERIFIED
+    precondition_checks:
+      - check_document_not_expired
+  args:
+    - name: doc-id
+      type: uuid
+      required: true
+      maps_to: doc_id
+      lookup:
+        table: document_catalog
+        entity_type: document
+        schema: ob-poc
+        search_key: doc_reference
+        primary_key: doc_id
+    - name: verified-by
+      type: string
+      required: true
+      maps_to: verified_by
+  returns:
+    type: affected
+
+
+# =============================================================================
+# UBO VERBS (add to config/verbs/ubo.yaml)
+# =============================================================================
+
+ubo_declare_extension:
+  # Add to ubo.declare
+  produces:
+    type: ubo_record
+    initial_state: DECLARED
+
+ubo_mark_evidenced:
+  description: "Mark UBO as evidenced (documents attached)"
+  behavior: crud
+  crud:
+    operation: update
+    table: ubo_registry
+    schema: ob-poc
+    key: ubo_id
+    set_values:
+      verification_status: EVIDENCED
+  consumes:
+    - arg: ubo-id
+      type: ubo_record
+      required: true
+  lifecycle:
+    entity_arg: ubo-id
+    requires_states:
+      - DECLARED
+      - DISPUTED
+    transitions_to: EVIDENCED
+    precondition_checks:
+      - check_ubo_evidence_attached
+  args:
+    - name: ubo-id
+      type: uuid
+      required: true
+      maps_to: ubo_id
+  returns:
+    type: affected
+
+ubo_verify:
+  description: "Mark UBO as verified"
+  behavior: crud
+  crud:
+    operation: update
+    table: ubo_registry
+    schema: ob-poc
+    key: ubo_id
+    set_values:
+      verification_status: VERIFIED
+  consumes:
+    - arg: ubo-id
+      type: ubo_record
+      required: true
+  lifecycle:
+    entity_arg: ubo-id
+    requires_states:
+      - EVIDENCED
+    transitions_to: VERIFIED
+    precondition_checks:
+      - check_ubo_chain_complete
+  args:
+    - name: ubo-id
+      type: uuid
+      required: true
+      maps_to: ubo_id
+    - name: verified-by
+      type: string
+      required: true
+  returns:
+    type: affected
+
+
+# =============================================================================
+# PRECONDITION CHECK REGISTRY
+# =============================================================================
+# These are named checks referenced in lifecycle.precondition_checks
+# Implementation can be:
+#   1. SQL function call
+#   2. Rust plugin handler
+#   3. Inline query
+# =============================================================================
+
+precondition_checks:
+  check_cbu_evidence_completeness:
+    description: "Verify all required evidence is attached to CBU"
+    implementation: sql_function
+    function: "ob-poc.check_cbu_evidence_completeness"
+    entity_arg: cbu_id
+    returns: boolean
+    
+  check_cbu_invariants:
+    description: "Verify CBU invariants hold (no violations)"
+    implementation: plugin
+    handler: CbuCheckInvariantsOp
+    entity_arg: cbu_id
+    returns: boolean  # true if no violations
+    
+  check_required_parties_present:
+    description: "Verify all required roles are assigned"
+    implementation: sql_query
+    query: |
+      SELECT COUNT(*) = 0 
+      FROM required_roles_by_client_type rr
+      LEFT JOIN cbu_entity_roles cer ON cer.cbu_id = $1 AND cer.role_id = rr.role_id
+      WHERE rr.client_type = (SELECT client_type FROM cbus WHERE cbu_id = $1)
+      AND cer.cbu_entity_role_id IS NULL
+    entity_arg: cbu_id
+    returns: boolean
+    
+  check_ubo_completeness:
+    description: "Verify UBO chain is complete and verified"
+    implementation: sql_function
+    function: "ob-poc.check_ubo_completeness"
+    entity_arg: cbu_id
+    returns: boolean
+    
+  check_kyc_case_approved:
+    description: "Verify active KYC case is approved"
+    implementation: sql_query
+    query: |
+      SELECT EXISTS (
+        SELECT 1 FROM kyc.cases 
+        WHERE cbu_id = $1 AND status = 'APPROVED'
+      )
+    entity_arg: cbu_id
+    returns: boolean
+    
+  check_service_delivery_ready:
+    description: "Verify all subscribed services are in READY state"
+    implementation: sql_query
+    query: |
+      SELECT NOT EXISTS (
+        SELECT 1 FROM "ob-poc".service_delivery_map 
+        WHERE cbu_id = $1 AND delivery_status NOT IN ('READY', 'ACTIVE')
+      )
+    entity_arg: cbu_id
+    returns: boolean
+    
+  check_resources_provisioned:
+    description: "Verify all resource instances are provisioned"
+    implementation: sql_query
+    query: |
+      SELECT NOT EXISTS (
+        SELECT 1 FROM "ob-poc".cbu_resource_instances 
+        WHERE cbu_id = $1 AND status IN ('PENDING', 'PROVISIONING')
+      )
+    entity_arg: cbu_id
+    returns: boolean
+    
+  check_all_workstreams_complete:
+    description: "Verify all workstreams in case are COMPLETE or WAIVED"
+    implementation: sql_query
+    query: |
+      SELECT NOT EXISTS (
+        SELECT 1 FROM kyc.entity_workstreams 
+        WHERE case_id = $1 AND status NOT IN ('COMPLETE', 'WAIVED')
+      )
+    entity_arg: case_id
+    returns: boolean
+    
+  check_red_flags_resolved:
+    description: "Verify all red flags are MITIGATED or WAIVED"
+    implementation: sql_query
+    query: |
+      SELECT NOT EXISTS (
+        SELECT 1 FROM kyc.red_flags 
+        WHERE case_id = $1 AND status NOT IN ('MITIGATED', 'WAIVED')
+      )
+    entity_arg: case_id
+    returns: boolean
+    
+  check_document_not_expired:
+    description: "Verify document has not expired"
+    implementation: sql_query
+    query: |
+      SELECT (expiry_date IS NULL OR expiry_date > CURRENT_DATE)
+      FROM "ob-poc".document_catalog WHERE doc_id = $1
+    entity_arg: doc_id
+    returns: boolean
+    
+  check_ubo_evidence_attached:
+    description: "Verify evidence documents attached to UBO"
+    implementation: sql_query
+    query: |
+      SELECT EXISTS (
+        SELECT 1 FROM "ob-poc".ubo_evidence 
+        WHERE ubo_id = $1 AND status = 'VERIFIED'
+      )
+    entity_arg: ubo_id
+    returns: boolean
+    
+  check_ubo_chain_complete:
+    description: "Verify ownership chain reaches natural persons or stops at threshold"
+    implementation: sql_function
+    function: "ob-poc.check_ubo_chain_complete"
+    entity_arg: ubo_id
+    returns: boolean

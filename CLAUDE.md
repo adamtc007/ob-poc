@@ -2944,12 +2944,14 @@ Client Business Unit operations
 |------|-------------|
 | `cbu.assign-role` | Assign a role to an entity within a CBU |
 | `cbu.create` | Create a new Client Business Unit |
+| `cbu.decide` | Record KYC/AML decision (APPROVED/REJECTED/REFERRED) for CBU collective state |
 | `cbu.delete` | Delete a CBU |
 | `cbu.ensure` | Create or update a CBU by natural key |
 | `cbu.list` | List CBUs with optional filters |
 | `cbu.parties` | List all parties (entities with their roles) for a CBU |
 | `cbu.read` | Read a CBU by ID |
 | `cbu.remove-role` | Remove a specific role from an entity within a CBU |
+| `cbu.show` | Show full CBU structure with entities, roles, documents, screenings |
 | `cbu.update` | Update a CBU |
 
 ### cbu-custody

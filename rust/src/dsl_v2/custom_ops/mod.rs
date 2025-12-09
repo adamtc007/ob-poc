@@ -106,6 +106,7 @@ impl CustomOperationRegistry {
         // CBU operations
         registry.register(Arc::new(CbuAddProductOp));
         registry.register(Arc::new(CbuShowOp));
+        registry.register(Arc::new(CbuDecideOp));
 
         // NOTE: delivery.record, delivery.complete, delivery.fail are now CRUD verbs
         // defined in config/verbs/delivery.yaml - no plugin needed
@@ -2193,6 +2194,230 @@ impl CustomOperation for CbuShowOp {
 }
 
 // ============================================================================
+// CBU Decision Operation
+// ============================================================================
+
+/// Record KYC/AML decision for CBU collective state
+///
+/// Rationale: This is the decision point verb. Its execution in DSL history
+/// IS the searchable snapshot boundary. Updates CBU status, case status,
+/// and creates evaluation snapshot.
+pub struct CbuDecideOp;
+
+#[async_trait]
+impl CustomOperation for CbuDecideOp {
+    fn domain(&self) -> &'static str {
+        "cbu"
+    }
+    fn verb(&self) -> &'static str {
+        "decide"
+    }
+    fn rationale(&self) -> &'static str {
+        "Decision point for CBU collective state - searchable in DSL history"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use uuid::Uuid;
+
+        // Extract required args
+        let cbu_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "cbu-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
+
+        let decision = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "decision")
+            .and_then(|a| a.value.as_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing decision argument"))?;
+
+        let decided_by = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "decided-by")
+            .and_then(|a| a.value.as_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing decided-by argument"))?;
+
+        let rationale = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "rationale")
+            .and_then(|a| a.value.as_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing rationale argument"))?;
+
+        // Optional args
+        let case_id: Option<Uuid> = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "case-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            });
+
+        let conditions = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "conditions")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        let escalation_reason = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "escalation-reason")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        // Validate: REFERRED requires escalation-reason
+        if decision == "REFERRED" && escalation_reason.is_none() {
+            return Err(anyhow::anyhow!(
+                "escalation-reason is required when decision is REFERRED"
+            ));
+        }
+
+        // Get current CBU
+        let cbu = sqlx::query!(
+            r#"SELECT name, status FROM "ob-poc".cbus WHERE cbu_id = $1"#,
+            cbu_id
+        )
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("CBU not found: {}", cbu_id))?;
+
+        // Map decision to new CBU status
+        // Valid statuses: DISCOVERED, VALIDATION_PENDING, VALIDATED, UPDATE_PENDING_PROOF, VALIDATION_FAILED
+        let new_cbu_status = match decision {
+            "APPROVED" => "VALIDATED",
+            "REJECTED" => "VALIDATION_FAILED",
+            "REFERRED" => "VALIDATION_PENDING", // Stays pending, escalated for review
+            _ => return Err(anyhow::anyhow!("Invalid decision: {}", decision)),
+        };
+
+        // Map decision to case status
+        // Valid: INTAKE, DISCOVERY, ASSESSMENT, REVIEW, APPROVED, REJECTED, BLOCKED, WITHDRAWN, EXPIRED, REFER_TO_REGULATOR, DO_NOT_ONBOARD
+        let new_case_status = match decision {
+            "APPROVED" => "APPROVED",
+            "REJECTED" => "REJECTED",
+            "REFERRED" => "REVIEW", // Stays in REVIEW with escalation
+            _ => "REVIEW",
+        };
+
+        // Find or validate case_id
+        let case_id = match case_id {
+            Some(id) => id,
+            None => {
+                // Find active case for this CBU
+                let row = sqlx::query!(
+                    r#"SELECT case_id FROM kyc.cases
+                       WHERE cbu_id = $1 AND status NOT IN ('APPROVED', 'REJECTED', 'WITHDRAWN', 'EXPIRED')
+                       ORDER BY opened_at DESC LIMIT 1"#,
+                    cbu_id
+                )
+                .fetch_optional(pool)
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("No active KYC case found for CBU"))?;
+                row.case_id
+            }
+        };
+
+        // Begin transaction
+        let mut tx = pool.begin().await?;
+
+        // 1. Update CBU status
+        sqlx::query!(
+            r#"UPDATE "ob-poc".cbus SET status = $1, updated_at = now() WHERE cbu_id = $2"#,
+            new_cbu_status,
+            cbu_id
+        )
+        .execute(&mut *tx)
+        .await?;
+
+        // 2. Update case status
+        let should_close = matches!(decision, "APPROVED" | "REJECTED");
+        if should_close {
+            sqlx::query!(
+                r#"UPDATE kyc.cases SET status = $1, closed_at = now(), last_activity_at = now() WHERE case_id = $2"#,
+                new_case_status,
+                case_id
+            )
+            .execute(&mut *tx)
+            .await?;
+        } else {
+            // REFERRED - update escalation level
+            sqlx::query!(
+                r#"UPDATE kyc.cases SET escalation_level = 'SENIOR_COMPLIANCE', last_activity_at = now() WHERE case_id = $1"#,
+                case_id
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        // 3. Create evaluation snapshot with decision
+        let snapshot_id = Uuid::new_v4();
+        sqlx::query!(
+            r#"INSERT INTO "ob-poc".case_evaluation_snapshots
+               (snapshot_id, case_id, soft_count, escalate_count, hard_stop_count, total_score,
+                recommended_action, evaluated_by, decision_made, decision_made_at, decision_made_by, decision_notes)
+               VALUES ($1, $2, 0, 0, 0, 0, $3, $4, $3, now(), $4, $5)"#,
+            snapshot_id,
+            case_id,
+            decision,
+            decided_by,
+            rationale
+        )
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+
+        // Return decision record
+        Ok(ExecutionResult::Record(serde_json::json!({
+            "cbu_id": cbu_id,
+            "cbu_name": cbu.name,
+            "case_id": case_id,
+            "snapshot_id": snapshot_id,
+            "decision": decision,
+            "previous_status": cbu.status,
+            "new_status": new_cbu_status,
+            "decided_by": decided_by,
+            "rationale": rationale,
+            "conditions": conditions,
+            "escalation_reason": escalation_reason
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(serde_json::json!({
+            "error": "Database required for cbu.decide"
+        })))
+    }
+}
+
+// ============================================================================
 // Observation Operations
 // ============================================================================
 
@@ -2981,7 +3206,7 @@ mod tests {
         let ops = registry.list();
         // 7 original (entity-create, doc-catalog, doc-extract, ubo-calculate, 3 screening)
         // + 6 resource + 4 custody + 4 observation + 1 doc-extract-observations
-        // + 3 threshold + 3 rfi + 7 ubo-analysis + 2 cbu (add-product, show) = 38
-        assert_eq!(ops.len(), 38);
+        // + 3 threshold + 3 rfi + 7 ubo-analysis + 3 cbu (add-product, show, decide) = 39
+        assert_eq!(ops.len(), 39);
     }
 }

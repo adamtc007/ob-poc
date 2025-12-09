@@ -65,6 +65,9 @@ pub struct VerbConfig {
     /// Dataflow: what this verb consumes (required bindings)
     #[serde(default)]
     pub consumes: Vec<VerbConsumes>,
+    /// Lifecycle constraints and transitions for this verb
+    #[serde(default)]
+    pub lifecycle: Option<VerbLifecycle>,
 }
 
 // =============================================================================
@@ -83,6 +86,9 @@ pub struct VerbProduces {
     /// True if this is a lookup (resolved existing) rather than create (new)
     #[serde(default)]
     pub resolved: bool,
+    /// Initial state when creating a new entity (for lifecycle tracking)
+    #[serde(default)]
+    pub initial_state: Option<String>,
 }
 
 /// Dataflow: what a verb consumes (dependencies)
@@ -100,6 +106,30 @@ pub struct VerbConsumes {
 
 fn default_true() -> bool {
     true
+}
+
+/// Verb lifecycle configuration - constraints and state transitions
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct VerbLifecycle {
+    /// Which argument contains the entity ID this verb operates on
+    #[serde(default)]
+    pub entity_arg: Option<String>,
+
+    /// Required states for the entity before this verb can execute
+    #[serde(default)]
+    pub requires_states: Vec<String>,
+
+    /// State the entity transitions to after this verb executes
+    #[serde(default)]
+    pub transitions_to: Option<String>,
+
+    /// Argument that specifies the target state (for generic set-status verbs)
+    #[serde(default)]
+    pub transitions_to_arg: Option<String>,
+
+    /// Precondition checks to run before execution
+    #[serde(default)]
+    pub precondition_checks: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]

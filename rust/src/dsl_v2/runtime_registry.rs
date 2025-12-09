@@ -33,6 +33,8 @@ pub struct RuntimeVerb {
     pub produces: Option<VerbProduces>,
     /// Dataflow: what this verb consumes (required bindings)
     pub consumes: Vec<VerbConsumes>,
+    /// Lifecycle constraints and transitions for this verb
+    pub lifecycle: Option<VerbLifecycle>,
 }
 
 #[derive(Debug, Clone)]
@@ -238,8 +240,10 @@ impl RuntimeVerbRegistry {
                     produced_type: "entity".to_string(),
                     subtype: Some(type_code.clone()),
                     resolved: false,
+                    initial_state: Some("DRAFT".to_string()),
                 }),
                 consumes: vec![],
+                lifecycle: None, // Dynamic verbs don't have lifecycle constraints by default
             };
 
             self.verbs.insert(full_name.clone(), runtime_verb);
@@ -350,6 +354,7 @@ impl RuntimeVerbRegistry {
                 }),
             produces: config.produces.clone(),
             consumes: config.consumes.clone(),
+            lifecycle: config.lifecycle.clone(),
         }
     }
 
@@ -559,6 +564,7 @@ mod tests {
                 behavior: VerbBehavior::Crud,
                 produces: None,
                 consumes: vec![],
+                lifecycle: None,
                 handler: None,
                 crud: Some(CrudConfig {
                     operation: CrudOperation::Insert,

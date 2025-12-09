@@ -243,6 +243,7 @@ mod tests {
                 behavior: VerbBehavior::Crud,
                 produces: None,
                 consumes: vec![],
+                lifecycle: None,
                 crud: Some(CrudConfig {
                     operation: CrudOperation::Upsert,
                     table: Some("cbus".to_string()),
@@ -324,6 +325,7 @@ mod tests {
                 behavior: VerbBehavior::Crud,
                 produces: None,
                 consumes: vec![],
+                lifecycle: None,
                 crud: Some(CrudConfig {
                     operation: CrudOperation::RoleLink,
                     table: None,

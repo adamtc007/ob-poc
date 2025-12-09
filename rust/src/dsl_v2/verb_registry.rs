@@ -222,6 +222,25 @@ impl UnifiedVerbRegistry {
     pub fn contains(&self, domain: &str, verb: &str) -> bool {
         self.get(domain, verb).is_some()
     }
+
+    /// Get what a verb produces (delegates to RuntimeVerbRegistry)
+    /// Returns the entity type and optional subtype from verb YAML config
+    pub fn get_produces(
+        &self,
+        domain: &str,
+        verb: &str,
+    ) -> Option<&super::config::types::VerbProduces> {
+        runtime_registry().get_produces(domain, verb)
+    }
+
+    /// Get a verb from the runtime registry (for full metadata access)
+    pub fn get_runtime_verb(
+        &self,
+        domain: &str,
+        verb: &str,
+    ) -> Option<&super::runtime_registry::RuntimeVerb> {
+        runtime_registry().get(domain, verb)
+    }
 }
 
 // =============================================================================

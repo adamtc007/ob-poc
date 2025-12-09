@@ -523,6 +523,22 @@ impl Span {
     pub fn is_empty(&self) -> bool {
         self.start >= self.end
     }
+
+    /// Create a synthetic span (for generated code)
+    ///
+    /// Synthetic spans use a special marker (usize::MAX) to indicate
+    /// they don't correspond to actual source text.
+    pub fn synthetic() -> Self {
+        Self {
+            start: usize::MAX,
+            end: usize::MAX,
+        }
+    }
+
+    /// Check if this span is synthetic (generated, not from source)
+    pub fn is_synthetic(&self) -> bool {
+        self.start == usize::MAX && self.end == usize::MAX
+    }
 }
 
 // =============================================================================

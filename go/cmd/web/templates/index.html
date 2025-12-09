@@ -464,12 +464,53 @@
             .context-bar {
                 display: none;
             }
+
+            /* CBU Picker */
+            .cbu-picker {
+                display: flex;
+                align-items: center;
+                gap: 0.25rem;
+            }
+            .cbu-picker select {
+                background: #2d2d2d;
+                color: #d4d4d4;
+                border: 1px solid #3c3c3c;
+                border-radius: 4px;
+                padding: 0.35rem 0.5rem;
+                font-size: 0.8rem;
+                min-width: 180px;
+                cursor: pointer;
+            }
+            .cbu-picker select:focus {
+                outline: none;
+                border-color: #007acc;
+            }
+            .cbu-picker select option {
+                background: #2d2d2d;
+                color: #d4d4d4;
+            }
+            .cbu-picker .active-cbu {
+                border-color: #4ec9b0;
+                background: #1e3a1e;
+            }
         </style>
     </head>
     <body>
         <div class="header">
             <h1>Enterprise Onboarding Agent</h1>
             <div class="header-actions">
+                <div class="cbu-picker">
+                    <select id="cbu-select">
+                        <option value="">-- Select CBU --</option>
+                    </select>
+                    <button
+                        class="secondary small"
+                        id="refresh-cbus-btn"
+                        title="Refresh CBU list"
+                    >
+                        ↻
+                    </button>
+                </div>
                 <button class="secondary small" id="new-session-btn">
                     New Session
                 </button>
