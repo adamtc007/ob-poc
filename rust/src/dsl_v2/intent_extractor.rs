@@ -1,39 +1,25 @@
 //! Intent Extractor - Extract structured DSL intent from natural language
 //!
-//! This module uses Claude API to convert natural language requests into
-//! structured DslIntentBatch objects that can be deterministically assembled
-//! into valid DSL code.
+//! This module uses LLM API (Anthropic or OpenAI) to convert natural language
+//! requests into structured DslIntentBatch objects that can be deterministically
+//! assembled into valid DSL code.
 //!
 //! The key insight: AI extracts STRUCTURE, not DSL text. All entity resolution
 //! and DSL assembly happens deterministically in Rust.
 
 use anyhow::{anyhow, Result};
 use serde::Deserialize;
+use std::sync::Arc;
 
+use crate::agentic::{create_llm_client, create_llm_client_with_key, LlmClient};
 use crate::dsl_v2::intent::{ArgIntent, DslIntent, DslIntentBatch};
 
-/// Intent extractor using Claude API
+/// Intent extractor using LLM API
 pub struct IntentExtractor {
-    api_key: String,
-    client: reqwest::Client,
-    model: String,
+    client: Arc<dyn LlmClient>,
 }
 
-/// Response from Claude API
-#[derive(Debug, Deserialize)]
-struct ClaudeResponse {
-    content: Vec<ContentBlock>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ContentBlock {
-    #[serde(rename = "type")]
-    #[allow(dead_code)]
-    content_type: String,
-    text: Option<String>,
-}
-
-/// Raw intent batch as returned by Claude (before conversion)
+/// Raw intent batch as returned by LLM (before conversion)
 #[derive(Debug, Deserialize)]
 struct RawIntentBatch {
     actions: Vec<RawIntent>,
@@ -71,67 +57,38 @@ enum RawArgIntent {
 }
 
 impl IntentExtractor {
-    /// Create a new intent extractor
+    /// Create a new intent extractor with explicit API key
     pub fn new(api_key: String) -> Self {
-        Self {
-            api_key,
-            client: reqwest::Client::new(),
-            model: "claude-sonnet-4-20250514".to_string(),
-        }
+        let client = create_llm_client_with_key(api_key).expect("Failed to create LLM client");
+        Self { client }
     }
 
-    /// Create with a specific model
-    pub fn with_model(api_key: String, model: &str) -> Self {
-        Self {
-            api_key,
-            client: reqwest::Client::new(),
-            model: model.to_string(),
-        }
+    /// Create with a specific model (legacy compatibility)
+    pub fn with_model(api_key: String, _model: &str) -> Self {
+        // Model is now controlled via environment variables
+        Self::new(api_key)
     }
 
     /// Create from environment variables
     pub fn from_env() -> Result<Self> {
-        let api_key = std::env::var("ANTHROPIC_API_KEY")
-            .map_err(|_| anyhow!("ANTHROPIC_API_KEY environment variable not set"))?;
-        Ok(Self::new(api_key))
+        let client = create_llm_client()?;
+        Ok(Self { client })
+    }
+
+    /// Create with a specific LLM client
+    pub fn with_client(client: Arc<dyn LlmClient>) -> Self {
+        Self { client }
     }
 
     /// Extract structured intent from natural language
     pub async fn extract(&self, user_request: &str) -> Result<DslIntentBatch> {
         let system_prompt = include_str!("prompts/general_intent_extraction.md");
 
-        let response = self
-            .client
-            .post("https://api.anthropic.com/v1/messages")
-            .header("x-api-key", &self.api_key)
-            .header("anthropic-version", "2023-06-01")
-            .header("content-type", "application/json")
-            .json(&serde_json::json!({
-                "model": &self.model,
-                "max_tokens": 4000,
-                "system": system_prompt,
-                "messages": [
-                    {"role": "user", "content": user_request}
-                ]
-            }))
-            .send()
-            .await?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            return Err(anyhow!("Claude API error {}: {}", status, body));
-        }
-
-        let claude_response: ClaudeResponse = response.json().await?;
-        let json_str = claude_response
-            .content
-            .first()
-            .and_then(|c| c.text.as_ref())
-            .ok_or_else(|| anyhow!("Empty response from Claude"))?;
+        // Use chat_json for structured output
+        let response = self.client.chat_json(system_prompt, user_request).await?;
 
         // Parse JSON response
-        let clean_json = Self::extract_json(json_str)?;
+        let clean_json = Self::extract_json(&response)?;
         let raw_batch: RawIntentBatch = serde_json::from_str(&clean_json).map_err(|e| {
             anyhow!(
                 "Failed to parse intent JSON: {}\n\nJSON was:\n{}",
@@ -156,37 +113,10 @@ impl IntentExtractor {
             system_prompt, additional_context
         );
 
-        let response = self
-            .client
-            .post("https://api.anthropic.com/v1/messages")
-            .header("x-api-key", &self.api_key)
-            .header("anthropic-version", "2023-06-01")
-            .header("content-type", "application/json")
-            .json(&serde_json::json!({
-                "model": &self.model,
-                "max_tokens": 4000,
-                "system": full_system,
-                "messages": [
-                    {"role": "user", "content": user_request}
-                ]
-            }))
-            .send()
-            .await?;
+        // Use chat_json for structured output
+        let response = self.client.chat_json(&full_system, user_request).await?;
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            return Err(anyhow!("Claude API error {}: {}", status, body));
-        }
-
-        let claude_response: ClaudeResponse = response.json().await?;
-        let json_str = claude_response
-            .content
-            .first()
-            .and_then(|c| c.text.as_ref())
-            .ok_or_else(|| anyhow!("Empty response from Claude"))?;
-
-        let clean_json = Self::extract_json(json_str)?;
+        let clean_json = Self::extract_json(&response)?;
         let raw_batch: RawIntentBatch = serde_json::from_str(&clean_json).map_err(|e| {
             anyhow!(
                 "Failed to parse intent JSON: {}\n\nJSON was:\n{}",
@@ -198,7 +128,7 @@ impl IntentExtractor {
         Ok(self.convert_batch(raw_batch))
     }
 
-    /// Convert raw Claude response to our internal types
+    /// Convert raw LLM response to our internal types
     fn convert_batch(&self, raw: RawIntentBatch) -> DslIntentBatch {
         let actions = raw
             .actions

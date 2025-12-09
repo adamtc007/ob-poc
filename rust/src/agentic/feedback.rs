@@ -25,10 +25,28 @@ pub struct FeedbackLoop {
 }
 
 impl FeedbackLoop {
-    /// Create a new feedback loop
+    /// Create a new feedback loop with explicit API key
     pub fn new(api_key: String, max_retries: usize) -> Result<Self> {
         Ok(Self {
             generator: DslGenerator::new(api_key),
+            validator: AgentValidator::new()?,
+            max_retries,
+        })
+    }
+
+    /// Create from environment variables
+    pub fn from_env(max_retries: usize) -> Result<Self> {
+        Ok(Self {
+            generator: DslGenerator::from_env()?,
+            validator: AgentValidator::new()?,
+            max_retries,
+        })
+    }
+
+    /// Create with an existing DslGenerator
+    pub fn with_generator(generator: DslGenerator, max_retries: usize) -> Result<Self> {
+        Ok(Self {
+            generator,
             validator: AgentValidator::new()?,
             max_retries,
         })
@@ -77,7 +95,7 @@ impl FeedbackLoop {
                 })
                 .collect();
 
-            // Ask Claude to fix
+            // Ask LLM to fix
             current_dsl = self
                 .generator
                 .generate_with_fix(plan, &current_dsl, &errors)

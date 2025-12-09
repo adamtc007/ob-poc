@@ -440,15 +440,16 @@ impl ToolHandlers {
 
     /// Generate DSL from natural language using intent extraction
     async fn dsl_generate(&self, args: Value) -> Result<Value> {
+        use crate::agentic::create_llm_client;
+
         let instruction = args["instruction"]
             .as_str()
             .ok_or_else(|| anyhow!("instruction required"))?;
         let _domain = args["domain"].as_str();
         let execute = args["execute"].as_bool().unwrap_or(false);
 
-        // Get API key
-        let api_key = std::env::var("ANTHROPIC_API_KEY")
-            .map_err(|_| anyhow!("ANTHROPIC_API_KEY not configured"))?;
+        // Create LLM client (uses AGENT_BACKEND env var to select provider)
+        let llm_client = create_llm_client()?;
 
         // Build vocabulary prompt for context
         let reg = registry();
@@ -476,37 +477,11 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
             vocab.join("\n")
         );
 
-        // Call Claude API
-        let client = reqwest::Client::new();
-        let response = client
-            .post("https://api.anthropic.com/v1/messages")
-            .header("x-api-key", &api_key)
-            .header("anthropic-version", "2023-06-01")
-            .header("content-type", "application/json")
-            .json(&json!({
-                "model": "claude-sonnet-4-20250514",
-                "max_tokens": 1024,
-                "system": system_prompt,
-                "messages": [{"role": "user", "content": instruction}]
-            }))
-            .send()
+        // Call LLM API (Anthropic or OpenAI based on AGENT_BACKEND)
+        let dsl = llm_client
+            .chat(&system_prompt, instruction)
             .await
-            .map_err(|e| anyhow!("API request failed: {}", e))?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            return Err(anyhow!("Claude API error {}: {}", status, body));
-        }
-
-        let json_resp: Value = response
-            .json()
-            .await
-            .map_err(|e| anyhow!("Failed to parse response: {}", e))?;
-
-        let dsl = json_resp["content"][0]["text"]
-            .as_str()
-            .unwrap_or("")
+            .map_err(|e| anyhow!("LLM API error: {}", e))?
             .trim()
             .to_string();
 

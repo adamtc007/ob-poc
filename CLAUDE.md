@@ -2739,6 +2739,104 @@ let ast = parse_program(&dsl)?;
 **Key insight**: AI is good at understanding intent, but prone to syntax errors and hallucinating IDs. By having AI produce structured data and Rust produce DSL, we get the best of both.
 
 ## Environment Variables
+
+```bash
+# Required
+DATABASE_URL="postgresql:///data_designer"
+
+# LLM Backend Selection (default: anthropic)
+AGENT_BACKEND=anthropic   # or "openai"
+
+# Anthropic (required if AGENT_BACKEND=anthropic)
+ANTHROPIC_API_KEY="sk-ant-..."
+ANTHROPIC_MODEL="claude-sonnet-4-20250514"  # optional override
+
+# OpenAI (required if AGENT_BACKEND=openai)
+OPENAI_API_KEY="sk-..."
+OPENAI_MODEL="gpt-4.1"  # optional, default: gpt-4.1
+
+# Optional
+DSL_CONFIG_DIR="/path/to/config"  # override config location
+ENTITY_GATEWAY_URL="http://[::1]:50051"  # EntityGateway gRPC endpoint
+```
+
+## LLM Backend Architecture
+
+The agentic DSL generation supports switchable LLM backends via the `AGENT_BACKEND` environment variable.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   Application Code                               │
+│  (DslGenerator, IntentExtractor, AgentOrchestrator, etc.)       │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   LlmClient Trait                                │
+│  rust/src/agentic/llm_client.rs                                 │
+│  - chat(system, user) → String                                  │
+│  - chat_json(system, user) → String (JSON mode)                 │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┴───────────────┐
+              │                               │
+              ▼                               ▼
+┌─────────────────────────┐     ┌─────────────────────────┐
+│    AnthropicClient      │     │     OpenAiClient        │
+│  anthropic_client.rs    │     │   openai_client.rs      │
+│  Claude API             │     │   OpenAI API            │
+└─────────────────────────┘     └─────────────────────────┘
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/src/agentic/backend.rs` | `AgentBackend` enum (Anthropic, OpenAi) |
+| `rust/src/agentic/llm_client.rs` | `LlmClient` trait definition |
+| `rust/src/agentic/anthropic_client.rs` | Anthropic Claude implementation |
+| `rust/src/agentic/openai_client.rs` | OpenAI GPT implementation |
+| `rust/src/agentic/client_factory.rs` | `create_llm_client()` factory |
+
+### Usage
+
+```rust
+use crate::agentic::{create_llm_client, LlmClient};
+
+// Create client based on AGENT_BACKEND env var
+let client = create_llm_client()?;
+
+// Use for chat
+let response = client.chat(&system_prompt, &user_prompt).await?;
+
+// Use for JSON output (OpenAI uses json_object mode)
+let json_response = client.chat_json(&system_prompt, &user_prompt).await?;
+
+// Check provider
+println!("Using: {} ({})", client.provider_name(), client.model_name());
+```
+
+### Switching Backends
+
+```bash
+# Use Anthropic Claude (default)
+export AGENT_BACKEND=anthropic
+export ANTHROPIC_API_KEY=sk-ant-...
+
+# Use OpenAI GPT
+export AGENT_BACKEND=openai
+export OPENAI_API_KEY=sk-...
+export OPENAI_MODEL=gpt-4.1  # or gpt-4o, gpt-4.1-mini
+```
+
+### Notes
+
+- The `generate_dsl_with_tools` endpoint still uses Anthropic-specific tool_use (no OpenAI equivalent yet)
+- Chat session endpoints with tool use remain Anthropic-only
+- Basic DSL generation (`/api/agent/generate`) works with both backends
+
 ## Complete DSL Verb Reference
 
 This section provides a complete reference of all DSL verbs organized by domain.

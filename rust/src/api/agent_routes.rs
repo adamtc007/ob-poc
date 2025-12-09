@@ -1240,110 +1240,75 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
         vocab
     );
 
-    // Try to call Claude API
-    let api_key = match std::env::var("ANTHROPIC_API_KEY") {
-        Ok(key) => key,
-        Err(_) => {
+    // Create LLM client (uses AGENT_BACKEND env var to select provider)
+    let llm_client = match crate::agentic::create_llm_client() {
+        Ok(client) => client,
+        Err(e) => {
             return Json(GenerateDslResponse {
                 dsl: None,
                 explanation: None,
-                error: Some("ANTHROPIC_API_KEY not configured".to_string()),
+                error: Some(format!("LLM client error: {}", e)),
             });
         }
     };
 
-    // Call Claude API - request JSON response in system prompt
-    let client = reqwest::Client::new();
+    // Call LLM API with JSON output format
     let json_system_prompt = format!(
         "{}\n\nIMPORTANT: Always respond with valid JSON in this exact format:\n{{\n  \"dsl\": \"(verb.name :arg value ...)\",\n  \"explanation\": \"Brief explanation of what the DSL does\"\n}}\n\nIf you cannot generate DSL, respond with:\n{{\n  \"dsl\": null,\n  \"explanation\": null,\n  \"error\": \"Error message explaining why\"\n}}",
         system_prompt
     );
-    let response = client
-        .post("https://api.anthropic.com/v1/messages")
-        .header("x-api-key", &api_key)
-        .header("anthropic-version", "2023-06-01")
-        .header("content-type", "application/json")
-        .json(&serde_json::json!({
-            "model": "claude-sonnet-4-20250514",
-            "max_tokens": 1024,
-            "system": json_system_prompt,
-            "messages": [
-                {"role": "user", "content": req.instruction}
-            ]
-        }))
-        .send()
+
+    let response = llm_client
+        .chat_json(&json_system_prompt, &req.instruction)
         .await;
 
     match response {
-        Ok(resp) => {
-            if resp.status().is_success() {
-                match resp.json::<serde_json::Value>().await {
-                    Ok(json) => {
-                        // Structured output: response is guaranteed valid JSON in content[0].text
-                        let content = json["content"][0]["text"].as_str().unwrap_or("{}");
+        Ok(content) => {
+            match serde_json::from_str::<serde_json::Value>(&content) {
+                Ok(structured) => {
+                    let dsl = structured["dsl"].as_str().map(|s| s.to_string());
+                    let explanation = structured["explanation"].as_str().map(|s| s.to_string());
+                    let error = structured["error"].as_str().map(|s| s.to_string());
 
-                        match serde_json::from_str::<serde_json::Value>(content) {
-                            Ok(structured) => {
-                                let dsl = structured["dsl"].as_str().map(|s| s.to_string());
-                                let explanation =
-                                    structured["explanation"].as_str().map(|s| s.to_string());
-                                let error = structured["error"].as_str().map(|s| s.to_string());
-
-                                if let Some(err) = error {
-                                    Json(GenerateDslResponse {
-                                        dsl: None,
-                                        explanation,
-                                        error: Some(err),
-                                    })
-                                } else if let Some(ref dsl_str) = dsl {
-                                    // Validate the generated DSL
-                                    match parse_program(dsl_str) {
-                                        Ok(_) => Json(GenerateDslResponse {
-                                            dsl,
-                                            explanation,
-                                            error: None,
-                                        }),
-                                        Err(e) => Json(GenerateDslResponse {
-                                            dsl,
-                                            explanation,
-                                            error: Some(format!("Syntax error: {}", e)),
-                                        }),
-                                    }
-                                } else {
-                                    Json(GenerateDslResponse {
-                                        dsl: None,
-                                        explanation,
-                                        error: Some("No DSL in response".to_string()),
-                                    })
-                                }
-                            }
+                    if let Some(err) = error {
+                        Json(GenerateDslResponse {
+                            dsl: None,
+                            explanation,
+                            error: Some(err),
+                        })
+                    } else if let Some(ref dsl_str) = dsl {
+                        // Validate the generated DSL
+                        match parse_program(dsl_str) {
+                            Ok(_) => Json(GenerateDslResponse {
+                                dsl,
+                                explanation,
+                                error: None,
+                            }),
                             Err(e) => Json(GenerateDslResponse {
-                                dsl: None,
-                                explanation: None,
-                                error: Some(format!("Failed to parse structured response: {}", e)),
+                                dsl,
+                                explanation,
+                                error: Some(format!("Syntax error: {}", e)),
                             }),
                         }
+                    } else {
+                        Json(GenerateDslResponse {
+                            dsl: None,
+                            explanation,
+                            error: Some("No DSL in response".to_string()),
+                        })
                     }
-                    Err(e) => Json(GenerateDslResponse {
-                        dsl: None,
-                        explanation: None,
-                        error: Some(format!("Failed to parse API response: {}", e)),
-                    }),
                 }
-            } else {
-                let status = resp.status();
-                let body = resp.text().await.unwrap_or_default();
-                Json(GenerateDslResponse {
+                Err(e) => Json(GenerateDslResponse {
                     dsl: None,
                     explanation: None,
-                    error: Some(format!("API error {}: {}", status, body)),
-                })
+                    error: Some(format!("Failed to parse structured response: {}", e)),
+                }),
             }
         }
         Err(e) => Json(GenerateDslResponse {
             dsl: None,
             explanation: None,
-            error: Some(format!("Request failed: {}", e)),
+            error: Some(format!("LLM API error: {}", e)),
         }),
     }
 }

@@ -1,51 +1,36 @@
 //! DSL Generator
 //!
-//! Uses Claude API to generate DSL from structured requirements.
+//! Uses LLM API (Anthropic or OpenAI) to generate DSL from structured requirements.
 
 use anyhow::{anyhow, Result};
-use serde::Deserialize;
+use std::sync::Arc;
 
+use crate::agentic::client_factory::{create_llm_client, create_llm_client_with_key};
+use crate::agentic::llm_client::LlmClient;
 use crate::agentic::patterns::OnboardingPattern;
 use crate::agentic::planner::OnboardingPlan;
 
-/// DSL generator using Claude API
+/// DSL generator using LLM API
 pub struct DslGenerator {
-    api_key: String,
-    client: reqwest::Client,
-    model: String,
-}
-
-/// Response from Claude API
-#[derive(Debug, Deserialize)]
-struct ClaudeResponse {
-    content: Vec<ContentBlock>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ContentBlock {
-    #[serde(rename = "type")]
-    #[allow(dead_code)]
-    content_type: String,
-    text: Option<String>,
+    client: Arc<dyn LlmClient>,
 }
 
 impl DslGenerator {
-    /// Create a new DSL generator
+    /// Create a new DSL generator with explicit API key
     pub fn new(api_key: String) -> Self {
-        Self {
-            api_key,
-            client: reqwest::Client::new(),
-            model: "claude-sonnet-4-20250514".to_string(),
-        }
+        let client = create_llm_client_with_key(api_key).expect("Failed to create LLM client");
+        Self { client }
     }
 
-    /// Create with a specific model
-    pub fn with_model(api_key: String, model: &str) -> Self {
-        Self {
-            api_key,
-            client: reqwest::Client::new(),
-            model: model.to_string(),
-        }
+    /// Create from environment variables
+    pub fn from_env() -> Result<Self> {
+        let client = create_llm_client()?;
+        Ok(Self { client })
+    }
+
+    /// Create with a specific LLM client
+    pub fn with_client(client: Arc<dyn LlmClient>) -> Self {
+        Self { client }
     }
 
     /// Generate DSL from an onboarding plan
@@ -53,37 +38,8 @@ impl DslGenerator {
         let system_prompt = self.build_system_prompt(plan.pattern);
         let user_prompt = self.build_user_prompt(plan);
 
-        let response = self
-            .client
-            .post("https://api.anthropic.com/v1/messages")
-            .header("x-api-key", &self.api_key)
-            .header("anthropic-version", "2023-06-01")
-            .header("content-type", "application/json")
-            .json(&serde_json::json!({
-                "model": &self.model,
-                "max_tokens": 4000,
-                "system": system_prompt,
-                "messages": [
-                    {"role": "user", "content": user_prompt}
-                ]
-            }))
-            .send()
-            .await?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            return Err(anyhow!("Claude API error {}: {}", status, body));
-        }
-
-        let claude_response: ClaudeResponse = response.json().await?;
-        let dsl = claude_response
-            .content
-            .first()
-            .and_then(|c| c.text.as_ref())
-            .ok_or_else(|| anyhow!("Empty response from Claude"))?;
-
-        Ok(Self::strip_code_blocks(dsl))
+        let response = self.client.chat(&system_prompt, &user_prompt).await?;
+        Ok(Self::strip_code_blocks(&response))
     }
 
     /// Generate DSL with error correction
@@ -115,36 +71,9 @@ Return ONLY the corrected DSL code, no explanations."#,
             self.build_user_prompt(plan)
         );
 
-        let response = self
-            .client
-            .post("https://api.anthropic.com/v1/messages")
-            .header("x-api-key", &self.api_key)
-            .header("anthropic-version", "2023-06-01")
-            .header("content-type", "application/json")
-            .json(&serde_json::json!({
-                "model": &self.model,
-                "max_tokens": 4000,
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ]
-            }))
-            .send()
-            .await?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            return Err(anyhow!("Claude API error {}: {}", status, body));
-        }
-
-        let claude_response: ClaudeResponse = response.json().await?;
-        let dsl = claude_response
-            .content
-            .first()
-            .and_then(|c| c.text.as_ref())
-            .ok_or_else(|| anyhow!("Empty response from Claude"))?;
-
-        Ok(Self::strip_code_blocks(dsl))
+        let system_prompt = self.build_system_prompt(plan.pattern);
+        let response = self.client.chat(&system_prompt, &prompt).await?;
+        Ok(Self::strip_code_blocks(&response))
     }
 
     fn build_system_prompt(&self, pattern: OnboardingPattern) -> String {
@@ -310,21 +239,27 @@ S-expression format:
     }
 }
 
-/// Intent extractor using Claude API
+/// Intent extractor using LLM API
 pub struct IntentExtractor {
-    api_key: String,
-    client: reqwest::Client,
-    model: String,
+    client: Arc<dyn LlmClient>,
 }
 
 impl IntentExtractor {
-    /// Create a new intent extractor
+    /// Create a new intent extractor with explicit API key
     pub fn new(api_key: String) -> Self {
-        Self {
-            api_key,
-            client: reqwest::Client::new(),
-            model: "claude-sonnet-4-20250514".to_string(),
-        }
+        let client = create_llm_client_with_key(api_key).expect("Failed to create LLM client");
+        Self { client }
+    }
+
+    /// Create from environment variables
+    pub fn from_env() -> Result<Self> {
+        let client = create_llm_client()?;
+        Ok(Self { client })
+    }
+
+    /// Create with a specific LLM client
+    pub fn with_client(client: Arc<dyn LlmClient>) -> Self {
+        Self { client }
     }
 
     /// Extract structured intent from natural language
@@ -333,42 +268,16 @@ impl IntentExtractor {
         user_request: &str,
     ) -> Result<crate::agentic::intent::OnboardingIntent> {
         let system_prompt = include_str!("prompts/intent_extraction_system.md");
+        let user_prompt = format!(
+            "Extract the onboarding intent from this request:\n\n{}",
+            user_request
+        );
 
-        let response = self
-            .client
-            .post("https://api.anthropic.com/v1/messages")
-            .header("x-api-key", &self.api_key)
-            .header("anthropic-version", "2023-06-01")
-            .header("content-type", "application/json")
-            .json(&serde_json::json!({
-                "model": &self.model,
-                "max_tokens": 2000,
-                "system": system_prompt,
-                "messages": [
-                    {"role": "user", "content": format!(
-                        "Extract the onboarding intent from this request:\n\n{}",
-                        user_request
-                    )}
-                ]
-            }))
-            .send()
-            .await?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            return Err(anyhow!("Claude API error {}: {}", status, body));
-        }
-
-        let claude_response: ClaudeResponse = response.json().await?;
-        let json_str = claude_response
-            .content
-            .first()
-            .and_then(|c| c.text.as_ref())
-            .ok_or_else(|| anyhow!("Empty response from Claude"))?;
+        // Use chat_json for structured output
+        let response = self.client.chat_json(system_prompt, &user_prompt).await?;
 
         // Parse JSON response
-        let clean_json = Self::extract_json(json_str)?;
+        let clean_json = Self::extract_json(&response)?;
         let intent: crate::agentic::intent::OnboardingIntent = serde_json::from_str(&clean_json)
             .map_err(|e| {
                 anyhow!(

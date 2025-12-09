@@ -44,11 +44,21 @@ pub struct BindingEntry {
 }
 
 impl AgentOrchestrator {
-    /// Create a new orchestrator without database support
+    /// Create a new orchestrator with explicit API key (without database support)
     pub fn new(api_key: String) -> Result<Self> {
         Ok(Self {
             intent_extractor: IntentExtractor::new(api_key.clone()),
             feedback_loop: FeedbackLoop::new(api_key, 3)?,
+            #[cfg(feature = "database")]
+            executor: None,
+        })
+    }
+
+    /// Create from environment variables (without database support)
+    pub fn from_env() -> Result<Self> {
+        Ok(Self {
+            intent_extractor: IntentExtractor::from_env()?,
+            feedback_loop: FeedbackLoop::from_env(3)?,
             #[cfg(feature = "database")]
             executor: None,
         })
@@ -60,6 +70,16 @@ impl AgentOrchestrator {
         Ok(Self {
             intent_extractor: IntentExtractor::new(api_key.clone()),
             feedback_loop: FeedbackLoop::new(api_key, 3)?,
+            executor: Some(crate::dsl_v2::DslExecutor::new(pool)),
+        })
+    }
+
+    /// Create from environment variables with database support
+    #[cfg(feature = "database")]
+    pub fn from_env_with_executor(pool: sqlx::PgPool) -> Result<Self> {
+        Ok(Self {
+            intent_extractor: IntentExtractor::from_env()?,
+            feedback_loop: FeedbackLoop::from_env(3)?,
             executor: Some(crate::dsl_v2::DslExecutor::new(pool)),
         })
     }
@@ -160,17 +180,27 @@ impl AgentOrchestrator {
 
 /// Builder for AgentOrchestrator
 pub struct OrchestratorBuilder {
-    api_key: String,
+    api_key: Option<String>,
     max_retries: usize,
     #[cfg(feature = "database")]
     pool: Option<sqlx::PgPool>,
 }
 
 impl OrchestratorBuilder {
-    /// Create a new builder
+    /// Create a new builder with explicit API key
     pub fn new(api_key: String) -> Self {
         Self {
-            api_key,
+            api_key: Some(api_key),
+            max_retries: 3,
+            #[cfg(feature = "database")]
+            pool: None,
+        }
+    }
+
+    /// Create a new builder that will use environment variables
+    pub fn from_env() -> Self {
+        Self {
+            api_key: None,
             max_retries: 3,
             #[cfg(feature = "database")]
             pool: None,
@@ -192,9 +222,21 @@ impl OrchestratorBuilder {
 
     /// Build the orchestrator
     pub fn build(self) -> Result<AgentOrchestrator> {
+        let (intent_extractor, feedback_loop) = if let Some(api_key) = self.api_key {
+            (
+                IntentExtractor::new(api_key.clone()),
+                FeedbackLoop::new(api_key, self.max_retries)?,
+            )
+        } else {
+            (
+                IntentExtractor::from_env()?,
+                FeedbackLoop::from_env(self.max_retries)?,
+            )
+        };
+
         Ok(AgentOrchestrator {
-            intent_extractor: IntentExtractor::new(self.api_key.clone()),
-            feedback_loop: FeedbackLoop::new(self.api_key, self.max_retries)?,
+            intent_extractor,
+            feedback_loop,
             #[cfg(feature = "database")]
             executor: self.pool.map(crate::dsl_v2::DslExecutor::new),
         })
