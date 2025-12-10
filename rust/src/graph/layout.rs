@@ -18,7 +18,7 @@ pub enum ViewMode {
 }
 
 impl ViewMode {
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.to_uppercase().as_str() {
             "SERVICE_DELIVERY" | "SERVICES" => ViewMode::ServiceDelivery,
             "CUSTODY" => ViewMode::Custody,
@@ -31,6 +31,33 @@ impl ViewMode {
             ViewMode::KycUbo => "KYC_UBO",
             ViewMode::ServiceDelivery => "SERVICE_DELIVERY",
             ViewMode::Custody => "CUSTODY",
+        }
+    }
+}
+
+/// Layout orientation determines flow direction
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Orientation {
+    /// Horizontal: tiers flow left-to-right, splits are top/bottom
+    #[default]
+    Horizontal,
+    /// Vertical: tiers flow top-to-bottom, splits are left/right
+    Vertical,
+}
+
+impl Orientation {
+    pub fn parse(s: &str) -> Self {
+        match s.to_uppercase().as_str() {
+            "HORIZONTAL" | "LTR" | "LEFT_TO_RIGHT" => Orientation::Horizontal,
+            "VERTICAL" | "TTB" | "TOP_TO_BOTTOM" => Orientation::Vertical,
+            _ => Orientation::Vertical, // Default to vertical (more natural for trees)
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Orientation::Horizontal => "HORIZONTAL",
+            Orientation::Vertical => "VERTICAL",
         }
     }
 }
@@ -67,10 +94,11 @@ impl Default for LayoutConfig {
     }
 }
 
-/// Layout engine that computes node positions based on view mode
+/// Layout engine that computes node positions based on view mode and orientation
 pub struct LayoutEngine {
     config: LayoutConfig,
     view_mode: ViewMode,
+    orientation: Orientation,
 }
 
 impl LayoutEngine {
@@ -78,23 +106,72 @@ impl LayoutEngine {
         Self {
             config: LayoutConfig::default(),
             view_mode,
+            orientation: Orientation::default(),
         }
     }
 
-    pub fn with_config(view_mode: ViewMode, config: LayoutConfig) -> Self {
-        Self { config, view_mode }
+    pub fn with_orientation(view_mode: ViewMode, orientation: Orientation) -> Self {
+        Self {
+            config: LayoutConfig::default(),
+            view_mode,
+            orientation,
+        }
+    }
+
+    pub fn with_config(
+        view_mode: ViewMode,
+        orientation: Orientation,
+        config: LayoutConfig,
+    ) -> Self {
+        Self {
+            config,
+            view_mode,
+            orientation,
+        }
     }
 
     /// Apply layout to the graph, computing x/y positions for all nodes
     pub fn layout(&self, graph: &mut CbuGraph) {
-        match self.view_mode {
-            ViewMode::KycUbo => self.layout_kyc_ubo(graph),
-            ViewMode::ServiceDelivery => self.layout_service_delivery(graph),
-            ViewMode::Custody => self.layout_custody(graph),
+        eprintln!(
+            "[LAYOUT] Applying {:?} layout ({:?}) to {} nodes",
+            self.view_mode,
+            self.orientation,
+            graph.nodes.len()
+        );
+
+        // Debug: show node types before layout
+        let mut type_counts: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
+        for node in &graph.nodes {
+            let key = format!("{:?}", node.node_type);
+            *type_counts.entry(key).or_insert(0) += 1;
         }
+        eprintln!("[LAYOUT] Node types: {:?}", type_counts);
+
+        match (self.view_mode, self.orientation) {
+            (ViewMode::KycUbo, Orientation::Vertical) => self.layout_kyc_ubo_vertical(graph),
+            (ViewMode::KycUbo, Orientation::Horizontal) => self.layout_kyc_ubo_horizontal(graph),
+            (ViewMode::ServiceDelivery, Orientation::Vertical) => {
+                self.layout_service_delivery_vertical(graph)
+            }
+            (ViewMode::ServiceDelivery, Orientation::Horizontal) => {
+                self.layout_service_delivery_horizontal(graph)
+            }
+            (ViewMode::Custody, _) => self.layout_custody(graph), // Custody is always vertical for now
+        }
+
+        // Debug: show tier distribution after layout
+        let mut tier_counts: std::collections::HashMap<i32, usize> =
+            std::collections::HashMap::new();
+        for node in &graph.nodes {
+            if let Some(tier) = node.layout_tier {
+                *tier_counts.entry(tier).or_insert(0) += 1;
+            }
+        }
+        eprintln!("[LAYOUT] Tier distribution: {:?}", tier_counts);
     }
 
-    /// KYC/UBO layout: Hierarchical by role priority with SHELL/PERSON split
+    /// KYC/UBO layout (VERTICAL - top to bottom): Hierarchical by role priority with SHELL/PERSON split
     ///
     /// ```text
     /// Tier 0: CBU (center)
@@ -103,7 +180,7 @@ impl LayoutEngine {
     /// Tier 3: BOTH entities (SHELL left, PERSON right)
     /// Tier 4: TRADING_EXECUTION entities (SHELL left, PERSON right)
     /// ```
-    fn layout_kyc_ubo(&self, graph: &mut CbuGraph) {
+    fn layout_kyc_ubo_vertical(&self, graph: &mut CbuGraph) {
         let center_x = self.config.canvas_width / 2.0;
 
         // Collect nodes by tier
@@ -124,6 +201,11 @@ impl LayoutEngine {
                 NodeType::Entity => {
                     let priority = node.role_priority.unwrap_or(0);
                     let is_shell = node.entity_category.as_deref() == Some("SHELL");
+
+                    eprintln!(
+                        "[LAYOUT-KYC] Entity '{}': priority={}, category={:?}, is_shell={}",
+                        node.label, priority, node.entity_category, is_shell
+                    );
 
                     if priority >= 100 {
                         // OWNERSHIP_CONTROL
@@ -156,6 +238,10 @@ impl LayoutEngine {
             }
         }
 
+        eprintln!("[LAYOUT-KYC] Tier counts: tier_0(CBU)={}, tier_1(Product)={}, tier_2_shell={}, tier_2_person={}, tier_3_shell={}, tier_3_person={}, tier_4_shell={}, tier_4_person={}, other={}",
+            tier_0.len(), tier_1.len(), tier_2_shell.len(), tier_2_person.len(),
+            tier_3_shell.len(), tier_3_person.len(), tier_4_shell.len(), tier_4_person.len(), other.len());
+
         // Layout each tier
         self.layout_tier_centered(&mut graph.nodes, &tier_0, 0, center_x);
         self.layout_tier_centered(&mut graph.nodes, &tier_1, 1, center_x + 200.0);
@@ -179,8 +265,8 @@ impl LayoutEngine {
         self.layout_tier_centered(&mut graph.nodes, &other, 5, center_x);
     }
 
-    /// Service Delivery layout: Tree from CBU → Products → Services → Resources
-    fn layout_service_delivery(&self, graph: &mut CbuGraph) {
+    /// Service Delivery layout (VERTICAL): Tree from CBU → Products → Services → Resources
+    fn layout_service_delivery_vertical(&self, graph: &mut CbuGraph) {
         let center_x = self.config.canvas_width / 2.0;
 
         let mut tier_0: Vec<usize> = Vec::new(); // CBU
@@ -241,6 +327,111 @@ impl LayoutEngine {
         self.layout_tier_centered(&mut graph.nodes, &csa, 4, center_x + 100.0);
     }
 
+    /// KYC/UBO layout (HORIZONTAL - left to right): Tiers flow horizontally, splits are top/bottom
+    ///
+    /// ```text
+    /// Tier 0: CBU (left, center-y)
+    /// Tier 1: Products (next column)
+    /// Tier 2: OWNERSHIP_CONTROL entities (SHELL top, PERSON bottom)
+    /// Tier 3: BOTH entities (SHELL top, PERSON bottom)
+    /// Tier 4: TRADING_EXECUTION entities (SHELL top, PERSON bottom)
+    /// ```
+    fn layout_kyc_ubo_horizontal(&self, graph: &mut CbuGraph) {
+        let center_y = 300.0; // Vertical center for the layout
+
+        // Collect nodes by tier (same logic as vertical)
+        let mut tier_0: Vec<usize> = Vec::new();
+        let mut tier_1: Vec<usize> = Vec::new();
+        let mut tier_2_shell: Vec<usize> = Vec::new();
+        let mut tier_2_person: Vec<usize> = Vec::new();
+        let mut tier_3_shell: Vec<usize> = Vec::new();
+        let mut tier_3_person: Vec<usize> = Vec::new();
+        let mut tier_4_shell: Vec<usize> = Vec::new();
+        let mut tier_4_person: Vec<usize> = Vec::new();
+        let mut other: Vec<usize> = Vec::new();
+
+        for (idx, node) in graph.nodes.iter().enumerate() {
+            match node.node_type {
+                NodeType::Cbu => tier_0.push(idx),
+                NodeType::Product => tier_1.push(idx),
+                NodeType::Entity => {
+                    let priority = node.role_priority.unwrap_or(0);
+                    let is_shell = node.entity_category.as_deref() == Some("SHELL");
+
+                    if priority >= 100 {
+                        if is_shell {
+                            tier_2_shell.push(idx);
+                        } else {
+                            tier_2_person.push(idx);
+                        }
+                    } else if priority >= 50 {
+                        if is_shell {
+                            tier_3_shell.push(idx);
+                        } else {
+                            tier_3_person.push(idx);
+                        }
+                    } else if is_shell {
+                        tier_4_shell.push(idx);
+                    } else {
+                        tier_4_person.push(idx);
+                    }
+                }
+                NodeType::Service | NodeType::Resource => other.push(idx),
+                _ => other.push(idx),
+            }
+        }
+
+        // Horizontal layout: x increases with tier, y splits for shell/person
+        self.layout_tier_horizontal_centered(&mut graph.nodes, &tier_0, 0, center_y);
+        self.layout_tier_horizontal_centered(&mut graph.nodes, &tier_1, 1, center_y - 80.0);
+
+        // Tier 2: OWNERSHIP_CONTROL - shells top, persons bottom
+        let tier_2_x = 2.0 * self.config.node_spacing_x + 100.0;
+        self.layout_tier_horizontal_top(&mut graph.nodes, &tier_2_shell, 2, tier_2_x);
+        self.layout_tier_horizontal_bottom(&mut graph.nodes, &tier_2_person, 2, tier_2_x);
+
+        // Tier 3: BOTH
+        let tier_3_x = 3.0 * self.config.node_spacing_x + 100.0;
+        self.layout_tier_horizontal_top(&mut graph.nodes, &tier_3_shell, 3, tier_3_x);
+        self.layout_tier_horizontal_bottom(&mut graph.nodes, &tier_3_person, 3, tier_3_x);
+
+        // Tier 4: TRADING_EXECUTION
+        let tier_4_x = 4.0 * self.config.node_spacing_x + 100.0;
+        self.layout_tier_horizontal_top(&mut graph.nodes, &tier_4_shell, 4, tier_4_x);
+        self.layout_tier_horizontal_bottom(&mut graph.nodes, &tier_4_person, 4, tier_4_x);
+
+        // Other nodes - far right
+        self.layout_tier_horizontal_centered(&mut graph.nodes, &other, 5, center_y);
+    }
+
+    /// Service Delivery layout (HORIZONTAL): Tree flows left to right
+    fn layout_service_delivery_horizontal(&self, graph: &mut CbuGraph) {
+        let center_y = 300.0;
+
+        let mut tier_0: Vec<usize> = Vec::new();
+        let mut tier_1: Vec<usize> = Vec::new();
+        let mut tier_2: Vec<usize> = Vec::new();
+        let mut tier_3: Vec<usize> = Vec::new();
+        let mut tier_4: Vec<usize> = Vec::new();
+
+        for (idx, node) in graph.nodes.iter().enumerate() {
+            match node.node_type {
+                NodeType::Cbu => tier_0.push(idx),
+                NodeType::Product => tier_1.push(idx),
+                NodeType::Service => tier_2.push(idx),
+                NodeType::Resource => tier_3.push(idx),
+                NodeType::Entity => tier_4.push(idx),
+                _ => {}
+            }
+        }
+
+        self.layout_tier_horizontal_centered(&mut graph.nodes, &tier_0, 0, center_y);
+        self.layout_tier_horizontal_centered(&mut graph.nodes, &tier_1, 1, center_y);
+        self.layout_tier_horizontal_centered(&mut graph.nodes, &tier_2, 2, center_y);
+        self.layout_tier_horizontal_centered(&mut graph.nodes, &tier_3, 3, center_y);
+        self.layout_tier_horizontal_centered(&mut graph.nodes, &tier_4, 4, center_y);
+    }
+
     /// Layout nodes centered around a given x position
     fn layout_tier_centered(
         &self,
@@ -291,14 +482,94 @@ impl LayoutEngine {
             return;
         }
 
-        let start_x = self.config.canvas_width
-            - self.config.person_margin_right
-            - (indices.len() as f32 * self.config.node_spacing_x);
+        // Calculate start position: right-aligned with margin
+        // Ensure we don't go negative - start at center if too many nodes
+        let total_width = indices.len() as f32 * self.config.node_spacing_x;
+        let ideal_start = self.config.canvas_width - self.config.person_margin_right - total_width;
+        let start_x = ideal_start.max(self.config.canvas_width / 2.0); // Don't go left of center
 
         for (i, &idx) in indices.iter().enumerate() {
             let node = &mut nodes[idx];
             node.x = Some(start_x + i as f32 * self.config.node_spacing_x);
             node.y = Some(y);
+            node.width = Some(self.config.node_width);
+            node.height = Some(self.config.node_height);
+            node.layout_tier = Some(tier);
+        }
+    }
+
+    // ========== HORIZONTAL LAYOUT HELPERS ==========
+
+    /// Layout nodes centered around a given y position (horizontal mode)
+    fn layout_tier_horizontal_centered(
+        &self,
+        nodes: &mut [GraphNode],
+        indices: &[usize],
+        tier: i32,
+        center_y: f32,
+    ) {
+        if indices.is_empty() {
+            return;
+        }
+
+        let x = tier as f32 * self.config.node_spacing_x + 100.0;
+        let total_height = indices.len() as f32 * self.config.tier_spacing_y;
+        let start_y = center_y - total_height / 2.0 + self.config.tier_spacing_y / 2.0;
+
+        for (i, &idx) in indices.iter().enumerate() {
+            let node = &mut nodes[idx];
+            node.x = Some(x);
+            node.y = Some(start_y + i as f32 * self.config.tier_spacing_y);
+            node.width = Some(self.config.node_width);
+            node.height = Some(self.config.node_height);
+            node.layout_tier = Some(tier);
+        }
+    }
+
+    /// Layout SHELL nodes on top (horizontal mode)
+    fn layout_tier_horizontal_top(
+        &self,
+        nodes: &mut [GraphNode],
+        indices: &[usize],
+        tier: i32,
+        x: f32,
+    ) {
+        if indices.is_empty() {
+            return;
+        }
+
+        let start_y = 50.0; // Top margin
+
+        for (i, &idx) in indices.iter().enumerate() {
+            let node = &mut nodes[idx];
+            node.x = Some(x);
+            node.y = Some(start_y + i as f32 * self.config.tier_spacing_y);
+            node.width = Some(self.config.node_width);
+            node.height = Some(self.config.node_height);
+            node.layout_tier = Some(tier);
+        }
+    }
+
+    /// Layout PERSON nodes on bottom (horizontal mode)
+    fn layout_tier_horizontal_bottom(
+        &self,
+        nodes: &mut [GraphNode],
+        indices: &[usize],
+        tier: i32,
+        x: f32,
+    ) {
+        if indices.is_empty() {
+            return;
+        }
+
+        let canvas_height = 600.0;
+        let total_height = indices.len() as f32 * self.config.tier_spacing_y;
+        let start_y = (canvas_height - 50.0 - total_height).max(canvas_height / 2.0);
+
+        for (i, &idx) in indices.iter().enumerate() {
+            let node = &mut nodes[idx];
+            node.x = Some(x);
+            node.y = Some(start_y + i as f32 * self.config.tier_spacing_y);
             node.width = Some(self.config.node_width);
             node.height = Some(self.config.node_height);
             node.layout_tier = Some(tier);
@@ -311,15 +582,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_view_mode_from_str() {
-        assert_eq!(ViewMode::from_str("KYC_UBO"), ViewMode::KycUbo);
-        assert_eq!(ViewMode::from_str("kyc_ubo"), ViewMode::KycUbo);
+    fn test_view_mode_parse() {
+        assert_eq!(ViewMode::parse("KYC_UBO"), ViewMode::KycUbo);
+        assert_eq!(ViewMode::parse("kyc_ubo"), ViewMode::KycUbo);
         assert_eq!(
-            ViewMode::from_str("SERVICE_DELIVERY"),
+            ViewMode::parse("SERVICE_DELIVERY"),
             ViewMode::ServiceDelivery
         );
-        assert_eq!(ViewMode::from_str("services"), ViewMode::ServiceDelivery);
-        assert_eq!(ViewMode::from_str("CUSTODY"), ViewMode::Custody);
-        assert_eq!(ViewMode::from_str("unknown"), ViewMode::KycUbo); // Default
+        assert_eq!(ViewMode::parse("services"), ViewMode::ServiceDelivery);
+        assert_eq!(ViewMode::parse("CUSTODY"), ViewMode::Custody);
+        assert_eq!(ViewMode::parse("unknown"), ViewMode::KycUbo); // Default
+    }
+
+    #[test]
+    fn test_orientation_parse() {
+        assert_eq!(Orientation::parse("VERTICAL"), Orientation::Vertical);
+        assert_eq!(Orientation::parse("vertical"), Orientation::Vertical);
+        assert_eq!(Orientation::parse("HORIZONTAL"), Orientation::Horizontal);
+        assert_eq!(Orientation::parse("LTR"), Orientation::Horizontal);
+        assert_eq!(Orientation::parse("TTB"), Orientation::Vertical);
+        assert_eq!(Orientation::parse("unknown"), Orientation::Vertical); // Default
     }
 }

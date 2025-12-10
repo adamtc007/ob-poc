@@ -311,20 +311,27 @@ ob-poc/
 
 ## Visualization Architecture
 
-The UI follows a **single pipeline** pattern. Server returns flat graph data; UI owns filtering and layout.
+The UI follows a **single pipeline** pattern. Server computes layout positions; UI renders SVG.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    WASM UI (egui)                                │
-│  CbuGraphWidget: filters by ViewMode, owns layout logic         │
-│  rust/crates/ob-poc-ui/src/graph/                               │
+│                    Go Web UI / WASM UI                           │
+│  SVG rendering with server-computed positions                   │
+│  go/cmd/web/ (Go) or rust/crates/ob-poc-ui/ (WASM)             │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│              /api/cbu/:id/graph endpoint                         │
-│  Returns COMPLETE graph (all layers)                            │
+│     /api/cbu/:id/graph?view_mode=KYC_UBO&orientation=VERTICAL   │
+│  Returns graph with pre-computed x,y positions                  │
 │  rust/src/api/graph_routes.rs                                   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    LayoutEngine                                  │
+│  Server-side layout: positions nodes by view mode + orientation │
+│  rust/src/graph/layout.rs                                       │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -347,18 +354,26 @@ The UI follows a **single pipeline** pattern. Server returns flat graph data; UI
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### View Modes (UI-side filtering)
+### View Modes
 
 | Mode | Layers Shown | Description |
 |------|--------------|-------------|
-| KYC/UBO | core, kyc, ubo | Entities, KYC status, ownership chains |
-| Service Delivery | core, services | Entities + Products → Services → Resources |
+| KYC_UBO | core, kyc, ubo | Entities, KYC status, ownership chains |
+| SERVICE_DELIVERY | core, services | Entities + Products → Services → Resources |
+| CUSTODY | core, custody | Markets, SSIs, Booking Rules |
+
+### Layout Orientations
+
+| Orientation | Description |
+|-------------|-------------|
+| VERTICAL | Top-to-bottom flow (default). Tiers flow downward, SHELL/PERSON split left/right |
+| HORIZONTAL | Left-to-right flow. Tiers flow rightward, SHELL/PERSON split top/bottom |
 
 ### Key Design Principles
 
-1. **Single Pipeline**: One endpoint (`/api/cbu/:id/graph`), one builder, UI filters by view mode.
+1. **Single Pipeline**: One endpoint (`/api/cbu/:id/graph`), one builder, server computes layout.
 
-2. **UI Owns Layout**: Server returns flat graph (nodes + edges). UI's `LayoutEngine` positions nodes based on roles and node types.
+2. **Server-Side Layout**: `LayoutEngine` computes x, y positions based on view mode and orientation. UI just renders.
 
 3. **Centralized DB Access**: All queries go through `VisualizationRepository`.
 

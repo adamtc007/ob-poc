@@ -616,7 +616,22 @@ func handleListCbus(c *gin.Context) {
 
 func handleCbuGraph(c *gin.Context) {
 	id := c.Param("id")
-	proxyGet(c, agentURL+"/api/cbu/"+id+"/graph")
+	viewMode := c.Query("view_mode")
+	orientation := c.Query("orientation")
+	targetURL := agentURL + "/api/cbu/" + id + "/graph"
+
+	// Build query string with both parameters
+	params := url.Values{}
+	if viewMode != "" {
+		params.Set("view_mode", viewMode)
+	}
+	if orientation != "" {
+		params.Set("orientation", orientation)
+	}
+	if len(params) > 0 {
+		targetURL += "?" + params.Encode()
+	}
+	proxyGet(c, targetURL)
 }
 
 func handleEntitySearchForFinder(c *gin.Context) {

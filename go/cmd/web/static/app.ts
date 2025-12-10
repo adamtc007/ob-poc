@@ -100,6 +100,56 @@ document.addEventListener("DOMContentLoaded", () => {
     cbu: CbuData | null;
   }
 
+  // ==================== GRAPH TYPES (from Rust API) ====================
+  type ViewMode = "KYC_UBO" | "SERVICE_DELIVERY" | "CUSTODY";
+  type Orientation = "VERTICAL" | "HORIZONTAL";
+
+  interface GraphNode {
+    id: string;
+    node_type: string; // "cbu", "entity", "product", "service", "resource"
+    label: string;
+    sublabel?: string;
+    roles?: string[];
+    role_priority?: number;
+    entity_category?: string; // "SHELL" or "PERSON"
+    jurisdiction?: string;
+    data?: Record<string, unknown>;
+    // Server-computed layout positions
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    layout_tier?: number;
+  }
+
+  interface GraphEdge {
+    source: string;
+    target: string;
+    edge_type: string;
+    label?: string;
+  }
+
+  interface CbuGraph {
+    cbu_id: string;
+    nodes: GraphNode[];
+    edges: GraphEdge[];
+  }
+
+  // Graph display state
+  interface GraphState {
+    graph: CbuGraph | null;
+    viewMode: ViewMode;
+    orientation: Orientation;
+    loading: boolean;
+  }
+
+  let graphState: GraphState = {
+    graph: null,
+    viewMode: "KYC_UBO",
+    orientation: "VERTICAL",
+    loading: false,
+  };
+
   // AST EntityRef node type (matches Rust AST)
   interface AstEntityRef {
     EntityRef: {
@@ -286,6 +336,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const copyDslBtn = document.getElementById(
     "copy-dsl-btn",
   ) as HTMLButtonElement;
+  const viewModeSelect = document.getElementById(
+    "view-mode-select",
+  ) as HTMLSelectElement;
+  const orientationSelect = document.getElementById(
+    "orientation-select",
+  ) as HTMLSelectElement;
 
   // ==================== BINDING NORMALIZATION ====================
   // Map common agent-generated variants to canonical binding names
@@ -479,6 +535,245 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // ==================== SVG GRAPH RENDERING ====================
+
+  /**
+   * Get color for a node based on its type
+   */
+  function getNodeColor(node: GraphNode): string {
+    switch (node.node_type) {
+      case "cbu":
+        return "#4ec9b0"; // teal
+      case "entity":
+        return node.entity_category === "PERSON" ? "#c586c0" : "#569cd6"; // purple for person, blue for shell
+      case "product":
+        return "#dcdcaa"; // yellow
+      case "service":
+        return "#ce9178"; // orange
+      case "resource":
+        return "#6a9955"; // green
+      default:
+        return "#888888";
+    }
+  }
+
+  /**
+   * Get edge color based on edge type
+   */
+  function getEdgeColor(edge: GraphEdge): string {
+    switch (edge.edge_type) {
+      case "has_role":
+        return "#569cd6";
+      case "ownership":
+        return "#c586c0";
+      case "provides":
+        return "#dcdcaa";
+      case "delivers":
+        return "#ce9178";
+      default:
+        return "#666666";
+    }
+  }
+
+  /**
+   * Render the graph as SVG using server-provided layout positions
+   */
+  function renderGraphSvg(graph: CbuGraph): string {
+    if (!graph.nodes || graph.nodes.length === 0) {
+      return "";
+    }
+
+    // Calculate SVG dimensions based on node positions
+    let maxX = 0;
+    let maxY = 0;
+    const nodeMap = new Map<string, GraphNode>();
+
+    for (const node of graph.nodes) {
+      nodeMap.set(node.id, node);
+      const x = node.x ?? 0;
+      const y = node.y ?? 0;
+      const w = node.width ?? 160;
+      const h = node.height ?? 60;
+      maxX = Math.max(maxX, x + w);
+      maxY = Math.max(maxY, y + h);
+    }
+
+    // Add padding
+    const svgWidth = maxX + 40;
+    const svgHeight = maxY + 40;
+
+    let svg = `<svg width="100%" height="100%" viewBox="0 0 ${svgWidth} ${svgHeight}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">`;
+
+    // Add defs for arrow markers
+    svg += `
+      <defs>
+        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#666" />
+        </marker>
+      </defs>
+    `;
+
+    // Render edges first (so they appear behind nodes)
+    for (const edge of graph.edges) {
+      const source = nodeMap.get(edge.source);
+      const target = nodeMap.get(edge.target);
+      if (!source || !target) continue;
+
+      const sx = (source.x ?? 0) + (source.width ?? 160) / 2;
+      const sy = (source.y ?? 0) + (source.height ?? 60);
+      const tx = (target.x ?? 0) + (target.width ?? 160) / 2;
+      const ty = target.y ?? 0;
+
+      const edgeColor = getEdgeColor(edge);
+
+      // Draw curved path
+      const midY = (sy + ty) / 2;
+      svg += `<path d="M ${sx} ${sy} C ${sx} ${midY}, ${tx} ${midY}, ${tx} ${ty}"
+                    fill="none" stroke="${edgeColor}" stroke-width="1.5"
+                    marker-end="url(#arrowhead)" opacity="0.7"/>`;
+
+      // Edge label
+      if (edge.label) {
+        const labelX = (sx + tx) / 2;
+        const labelY = midY - 5;
+        svg += `<text x="${labelX}" y="${labelY}" text-anchor="middle"
+                      fill="#888" font-size="10" font-family="system-ui">${escapeHtml(edge.label)}</text>`;
+      }
+    }
+
+    // Render nodes
+    for (const node of graph.nodes) {
+      const x = node.x ?? 0;
+      const y = node.y ?? 0;
+      const w = node.width ?? 160;
+      const h = node.height ?? 60;
+      const color = getNodeColor(node);
+
+      // Node rectangle with rounded corners
+      svg += `<rect x="${x}" y="${y}" width="${w}" height="${h}"
+                    rx="6" ry="6" fill="#252526" stroke="${color}" stroke-width="2"/>`;
+
+      // Node type indicator (small colored bar at top)
+      svg += `<rect x="${x}" y="${y}" width="${w}" height="4"
+                    rx="6" ry="6" fill="${color}"/>`;
+
+      // Main label
+      const labelY = y + 24;
+      svg += `<text x="${x + w / 2}" y="${labelY}" text-anchor="middle"
+                    fill="#d4d4d4" font-size="12" font-weight="500" font-family="system-ui">
+                ${escapeHtml(truncateText(node.label, 20))}
+              </text>`;
+
+      // Sublabel (entity type or node type)
+      const sublabel = node.sublabel || node.node_type;
+      svg += `<text x="${x + w / 2}" y="${labelY + 14}" text-anchor="middle"
+                    fill="#888" font-size="10" font-family="system-ui">
+                ${escapeHtml(sublabel)}
+              </text>`;
+
+      // Roles (if any)
+      if (node.roles && node.roles.length > 0) {
+        const rolesText = node.roles.slice(0, 2).join(", ");
+        svg += `<text x="${x + w / 2}" y="${labelY + 28}" text-anchor="middle"
+                      fill="${color}" font-size="9" font-family="system-ui">
+                  ${escapeHtml(rolesText)}
+                </text>`;
+      }
+    }
+
+    svg += "</svg>";
+    return svg;
+  }
+
+  /**
+   * Truncate text to max length
+   */
+  function truncateText(text: string, maxLen: number): string {
+    if (text.length <= maxLen) return text;
+    return text.substring(0, maxLen - 1) + "…";
+  }
+
+  /**
+   * Fetch graph data for a CBU with the current view mode and orientation
+   */
+  async function fetchCbuGraph(cbuId: string): Promise<CbuGraph | null> {
+    try {
+      const resp = await fetch(
+        `/api/cbu/${cbuId}/graph?view_mode=${graphState.viewMode}&orientation=${graphState.orientation}`,
+      );
+      if (!resp.ok) {
+        console.error("Failed to fetch graph:", resp.status);
+        return null;
+      }
+      return await resp.json();
+    } catch (e) {
+      console.error("Graph fetch error:", e);
+      return null;
+    }
+  }
+
+  /**
+   * Update the graph panel with the current graph state
+   */
+  function updateGraphPanel() {
+    if (graphState.loading) {
+      cbuTree.innerHTML =
+        '<div class="graph-loading"><span class="spinner"></span> Loading graph...</div>';
+      cbuTree.style.display = "block";
+      cbuEmpty.style.display = "none";
+      return;
+    }
+
+    if (graphState.graph && graphState.graph.nodes.length > 0) {
+      cbuTree.innerHTML = renderGraphSvg(graphState.graph);
+      cbuTree.style.display = "block";
+      cbuEmpty.style.display = "none";
+    } else {
+      cbuTree.style.display = "none";
+      cbuEmpty.style.display = "block";
+    }
+  }
+
+  /**
+   * Handle view mode change
+   */
+  async function handleViewModeChange(newMode: ViewMode) {
+    if (newMode === graphState.viewMode) return;
+
+    graphState.viewMode = newMode;
+
+    // Refetch graph if we have a CBU in context
+    if (context.cbu?.id) {
+      graphState.loading = true;
+      updateGraphPanel();
+
+      const graph = await fetchCbuGraph(context.cbu.id);
+      graphState.graph = graph;
+      graphState.loading = false;
+      updateGraphPanel();
+    }
+  }
+
+  /**
+   * Handle orientation change
+   */
+  async function handleOrientationChange(newOrientation: Orientation) {
+    if (newOrientation === graphState.orientation) return;
+
+    graphState.orientation = newOrientation;
+
+    // Refetch graph if we have a CBU in context
+    if (context.cbu?.id) {
+      graphState.loading = true;
+      updateGraphPanel();
+
+      const graph = await fetchCbuGraph(context.cbu.id);
+      graphState.graph = graph;
+      graphState.loading = false;
+      updateGraphPanel();
+    }
+  }
+
   function updateDebugPanels() {
     // Update DSL Source panel
     if (debugState.dslSource) {
@@ -506,8 +801,10 @@ document.addEventListener("DOMContentLoaded", () => {
       astEmpty.style.display = "block";
     }
 
-    // Update CBU panel
-    if (debugState.cbu) {
+    // Update CBU/Graph panel - use graph if available, fall back to tree
+    if (graphState.graph) {
+      updateGraphPanel();
+    } else if (debugState.cbu) {
       cbuTree.innerHTML = renderCbuTree(debugState.cbu);
       cbuTree.style.display = "block";
       cbuEmpty.style.display = "none";
@@ -1255,21 +1552,31 @@ document.addEventListener("DOMContentLoaded", () => {
     updateContextBar();
   }
 
-  // Fetch CBU data using cbu.show verb and update both context and debug panel
+  // Fetch CBU data using graph endpoint and update both context and graph panel
   async function fetchAndDisplayCbu(cbuId: string) {
     console.log("[DEBUG] fetchAndDisplayCbu called with:", cbuId);
+
+    // Show loading state
+    graphState.loading = true;
+    updateGraphPanel();
+
     try {
-      // Use graph endpoint for full CBU structure with sorted entities
-      const resp = await fetch(`/api/cbu/${cbuId}/graph`);
+      // Use graph endpoint with current view mode and orientation for layout
+      const resp = await fetch(
+        `/api/cbu/${cbuId}/graph?view_mode=${graphState.viewMode}&orientation=${graphState.orientation}`,
+      );
 
       console.log("[DEBUG] graph response status:", resp.status);
       if (resp.ok) {
-        const graph = await resp.json();
+        const graph: CbuGraph = await resp.json();
         console.log("[DEBUG] graph response:", graph);
+
+        // Store graph in state for SVG rendering
+        graphState.graph = graph;
 
         // Find CBU node
         const cbuNode = graph.nodes?.find(
-          (n: { node_type: string }) => n.node_type === "cbu",
+          (n: GraphNode) => n.node_type === "cbu",
         );
 
         if (cbuNode) {
@@ -1278,21 +1585,22 @@ document.addEventListener("DOMContentLoaded", () => {
             id: cbuId,
             name: cbuNode.label || "Unknown",
             jurisdiction: cbuNode.jurisdiction,
-            clientType: cbuNode.data?.client_type,
+            clientType: cbuNode.data?.client_type as string | undefined,
           };
 
-          // Map graph to CbuData for debug panel
+          // Map graph to CbuData for fallback tree panel
           debugState.cbu = mapGraphToCbuData(graph, cbuId);
           console.log("[DEBUG] debugState.cbu set to:", debugState.cbu);
-          updateDebugPanels();
         } else {
           console.log("[DEBUG] No CBU node found in graph");
         }
       } else {
         console.log("[DEBUG] graph request failed:", resp.status);
+        graphState.graph = null;
       }
     } catch (e) {
       console.error("[DEBUG] fetchAndDisplayCbu error:", e);
+      graphState.graph = null;
       // Fallback - just use the ID
       context.cbu = {
         id: cbuId,
@@ -1300,6 +1608,9 @@ document.addEventListener("DOMContentLoaded", () => {
       };
     }
 
+    graphState.loading = false;
+    updateGraphPanel();
+    updateDebugPanels();
     updateContextBar();
   }
 
@@ -2023,6 +2334,23 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   newSessionBtn.addEventListener("click", newSession);
   contextClearBtn.addEventListener("click", clearContext);
+
+  // View mode selector
+  if (viewModeSelect) {
+    viewModeSelect.addEventListener("change", (e) => {
+      const newMode = (e.target as HTMLSelectElement).value as ViewMode;
+      handleViewModeChange(newMode);
+    });
+  }
+
+  // Orientation selector
+  if (orientationSelect) {
+    orientationSelect.addEventListener("change", (e) => {
+      const newOrientation = (e.target as HTMLSelectElement)
+        .value as Orientation;
+      handleOrientationChange(newOrientation);
+    });
+  }
 
   // Initialize panels
   initPanels();

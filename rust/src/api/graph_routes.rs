@@ -19,7 +19,7 @@ use uuid::Uuid;
 use crate::database::{LayoutOverrideView, VisualizationRepository};
 use crate::graph::{
     CbuGraph, CbuGraphBuilder, CbuSummary, LayoutEngine, LayoutOverride, NodeOffset,
-    NodeSizeOverride, ViewMode,
+    NodeSizeOverride, Orientation, ViewMode,
 };
 
 /// Query parameters for graph endpoint
@@ -27,18 +27,22 @@ use crate::graph::{
 pub struct GraphQuery {
     /// View mode: KYC_UBO (default), SERVICE_DELIVERY, or CUSTODY
     pub view_mode: Option<String>,
+    /// Layout orientation: VERTICAL (default, top-to-bottom) or HORIZONTAL (left-to-right)
+    pub orientation: Option<String>,
 }
 
-/// GET /api/cbu/{cbu_id}/graph?view_mode=KYC_UBO
+/// GET /api/cbu/{cbu_id}/graph?view_mode=KYC_UBO&orientation=VERTICAL
 /// Returns graph data with server-computed layout positions
 /// View mode determines which layers are emphasized and how nodes are arranged
+/// Orientation determines flow direction: VERTICAL (top-to-bottom) or HORIZONTAL (left-to-right)
 pub async fn get_cbu_graph(
     State(pool): State<PgPool>,
     Path(cbu_id): Path<Uuid>,
     Query(params): Query<GraphQuery>,
 ) -> Result<Json<CbuGraph>, (StatusCode, String)> {
     let repo = VisualizationRepository::new(pool);
-    let view_mode = ViewMode::from_str(params.view_mode.as_deref().unwrap_or("KYC_UBO"));
+    let view_mode = ViewMode::parse(params.view_mode.as_deref().unwrap_or("KYC_UBO"));
+    let orientation = Orientation::parse(params.orientation.as_deref().unwrap_or("VERTICAL"));
 
     // Always load ALL layers - layout engine positions nodes based on view mode
     let mut graph = CbuGraphBuilder::new(cbu_id)
@@ -50,8 +54,8 @@ pub async fn get_cbu_graph(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    // Apply server-side layout based on view mode
-    let layout_engine = LayoutEngine::new(view_mode);
+    // Apply server-side layout based on view mode and orientation
+    let layout_engine = LayoutEngine::with_orientation(view_mode, orientation);
     layout_engine.layout(&mut graph);
 
     Ok(Json(graph))

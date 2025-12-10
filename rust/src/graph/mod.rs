@@ -10,5 +10,5 @@ pub mod layout;
 pub mod types;
 
 pub use builder::CbuGraphBuilder;
-pub use layout::{LayoutConfig, LayoutEngine, ViewMode};
+pub use layout::{LayoutConfig, LayoutEngine, Orientation, ViewMode};
 pub use types::*;

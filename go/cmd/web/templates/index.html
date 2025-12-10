@@ -77,7 +77,7 @@
                 padding: 0.75rem;
             }
 
-            /* CBU Panel - top left */
+            /* CBU/Graph Panel - top left */
             .cbu-panel {
                 grid-area: 1 / 1 / 2 / 2;
             }
@@ -87,6 +87,39 @@
                 line-height: 1.6;
                 color: #d4d4d4;
                 white-space: pre;
+                width: 100%;
+                height: 100%;
+                overflow: auto;
+            }
+            .cbu-tree svg {
+                min-width: 100%;
+                min-height: 100%;
+            }
+            .graph-loading {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 100%;
+                color: #888;
+                font-size: 0.85rem;
+            }
+
+            /* View mode selector */
+            .view-mode-select {
+                background: #2d2d2d;
+                color: #d4d4d4;
+                border: 1px solid #3c3c3c;
+                border-radius: 3px;
+                padding: 0.2rem 0.5rem;
+                font-size: 0.75rem;
+                cursor: pointer;
+            }
+            .view-mode-select:hover {
+                border-color: #007acc;
+            }
+            .view-mode-select:focus {
+                outline: none;
+                border-color: #007acc;
             }
             .cbu-tree .t-node {
                 color: #4ec9b0;
@@ -719,10 +752,29 @@
         </div>
 
         <div class="main">
-            <!-- CBU Structure - Top Left -->
+            <!-- CBU Structure / Graph - Top Left -->
             <div class="panel cbu-panel">
                 <div class="panel-header">
-                    <h2>CBU Structure</h2>
+                    <h2>CBU Graph</h2>
+                    <div style="display: flex; gap: 0.5rem">
+                        <select
+                            id="view-mode-select"
+                            class="view-mode-select"
+                            title="Select view mode"
+                        >
+                            <option value="KYC_UBO">KYC/UBO</option>
+                            <option value="SERVICE_DELIVERY">Services</option>
+                            <option value="CUSTODY">Custody</option>
+                        </select>
+                        <select
+                            id="orientation-select"
+                            class="view-mode-select"
+                            title="Select layout orientation"
+                        >
+                            <option value="VERTICAL">Top-Down</option>
+                            <option value="HORIZONTAL">Left-Right</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="panel-content">
                     <div class="empty-state" id="cbu-empty">
