@@ -112,13 +112,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // This matches what gateway_resolver.rs sends (e.g., "JURISDICTION" not "jurisdiction")
         let configs_by_nickname: std::collections::HashMap<String, _> = gateway_config
             .entities
-            .iter()
-            .map(|(_, cfg)| (cfg.nickname.clone(), cfg.clone()))
+            .values()
+            .map(|cfg| (cfg.nickname.clone(), cfg.clone()))
             .collect();
         let registry = Arc::new(IndexRegistry::new(configs_by_nickname));
 
         // Create Tantivy indexes for each entity type (using nickname from config)
-        for (_yaml_key, entity_config) in &gateway_config.entities {
+        for entity_config in gateway_config.entities.values() {
             match TantivyIndex::new(entity_config.clone()) {
                 Ok(index) => {
                     registry

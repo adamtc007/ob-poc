@@ -145,7 +145,7 @@ impl SemanticValidator {
             request.context.known_symbols.len(),
             request.context.known_symbols.keys().collect::<Vec<_>>()
         );
-        for (name, _uuid) in &request.context.known_symbols {
+        for name in request.context.known_symbols.keys() {
             tracing::debug!("[VALIDATOR] Adding known symbol: @{}", name);
             symbols.insert(
                 name.clone(),
