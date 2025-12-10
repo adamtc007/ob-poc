@@ -3,10 +3,41 @@
 ## Objective
 Review and refine all connections from CBU node through the entity tree for proper visualization layout.
 
+## Data Model (Baseline)
+
+### Node Types
+| Category | Description | Can Own | Can Be Owned |
+|----------|-------------|---------|--------------|
+| **CBU** | Virtual root node - grouping/umbrella | No | No |
+| **SHELL** | Legal vehicles (companies, trusts, partnerships) | Yes | Yes |
+| **PERSON** | Natural persons - always leaf nodes | Yes | No |
+
+### Entity Categories (`entity_types.entity_category`)
+- **SHELL**: LIMITED_COMPANY_*, PARTNERSHIP_*, TRUST_* (10 types)
+- **PERSON**: PROPER_PERSON_* (2 types)
+
+### Connection Types
+| Table | From | To | Via |
+|-------|------|-----|-----|
+| `cbu_entity_roles` | CBU | Entity | Role (41 types) |
+| `ownership_relationships` | Entity | Entity | Ownership (DIRECT/INDIRECT/BENEFICIAL) |
+
+### Graph Structure
+```
+CBU (root - grouping node)
+ │
+ ├──[role]──> SHELL ──[owns]──> SHELL ──[owns]──> PERSON (leaf)
+ │
+ ├──[role]──> SHELL ──[owns]──> PERSON (leaf)
+ │
+ └──[role]──> PERSON (leaf)
+```
+
 ## Current State
 - Products/services now show at top under CBU node
 - Entities grouped by role with OWNERSHIP_CONTROL at top, TRADING_EXECUTION at bottom
 - Role priority driven by `role_category` in database view `v_cbu_entity_with_roles`
+- Added `entity_category` column to `entity_types` table (SHELL/PERSON)
 
 ## Connection Types to Review
 
