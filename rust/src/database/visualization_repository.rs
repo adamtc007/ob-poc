@@ -239,6 +239,7 @@ pub struct GraphEntityView {
     pub entity_id: Uuid,
     pub entity_name: String,
     pub entity_type: String,
+    pub entity_category: Option<String>,
     pub role_name: String,
     pub jurisdiction: Option<String>,
     pub roles: Vec<String>,
@@ -1101,6 +1102,7 @@ impl VisualizationRepository {
                 entity_id as "entity_id!",
                 entity_name as "entity_name!",
                 entity_type as "entity_type!",
+                entity_category,
                 jurisdiction,
                 roles,
                 role_categories,
@@ -1121,6 +1123,7 @@ impl VisualizationRepository {
                 entity_id: r.entity_id,
                 entity_name: r.entity_name,
                 entity_type: r.entity_type,
+                entity_category: r.entity_category,
                 // Use primary_role as the main role_name
                 role_name: r.primary_role.clone().unwrap_or_default(),
                 jurisdiction: r.jurisdiction,

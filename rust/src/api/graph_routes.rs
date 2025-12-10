@@ -17,20 +17,31 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::database::{LayoutOverrideView, VisualizationRepository};
-use crate::graph::{CbuGraph, CbuGraphBuilder, CbuSummary, LayoutOverride, NodeOffset, NodeSizeOverride};
+use crate::graph::{
+    CbuGraph, CbuGraphBuilder, CbuSummary, LayoutEngine, LayoutOverride, NodeOffset,
+    NodeSizeOverride, ViewMode,
+};
 
-/// GET /api/cbu/{cbu_id}/graph
-/// Returns the COMPLETE graph data for a specific CBU
-/// Always loads ALL layers (Core, Custody, KYC, UBO, Services)
-/// UI is responsible for filtering by view mode
+/// Query parameters for graph endpoint
+#[derive(Debug, Deserialize)]
+pub struct GraphQuery {
+    /// View mode: KYC_UBO (default), SERVICE_DELIVERY, or CUSTODY
+    pub view_mode: Option<String>,
+}
+
+/// GET /api/cbu/{cbu_id}/graph?view_mode=KYC_UBO
+/// Returns graph data with server-computed layout positions
+/// View mode determines which layers are emphasized and how nodes are arranged
 pub async fn get_cbu_graph(
     State(pool): State<PgPool>,
     Path(cbu_id): Path<Uuid>,
+    Query(params): Query<GraphQuery>,
 ) -> Result<Json<CbuGraph>, (StatusCode, String)> {
     let repo = VisualizationRepository::new(pool);
+    let view_mode = ViewMode::from_str(params.view_mode.as_deref().unwrap_or("KYC_UBO"));
 
-    // Always load ALL layers - UI handles view mode filtering
-    let graph = CbuGraphBuilder::new(cbu_id)
+    // Always load ALL layers - layout engine positions nodes based on view mode
+    let mut graph = CbuGraphBuilder::new(cbu_id)
         .with_custody(true)
         .with_kyc(true)
         .with_ubo(true)
@@ -38,6 +49,10 @@ pub async fn get_cbu_graph(
         .build(&repo)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Apply server-side layout based on view mode
+    let layout_engine = LayoutEngine::new(view_mode);
+    layout_engine.layout(&mut graph);
 
     Ok(Json(graph))
 }
@@ -127,10 +142,29 @@ pub async fn get_cbu_layout(
 
     let overrides = match view {
         Some(v) => LayoutOverride {
-            positions: v.positions.into_iter().map(|p| NodeOffset { node_id: p.node_id, dx: p.dx, dy: p.dy }).collect(),
-            sizes: v.sizes.into_iter().map(|s| NodeSizeOverride { node_id: s.node_id, w: s.w, h: s.h }).collect(),
+            positions: v
+                .positions
+                .into_iter()
+                .map(|p| NodeOffset {
+                    node_id: p.node_id,
+                    dx: p.dx,
+                    dy: p.dy,
+                })
+                .collect(),
+            sizes: v
+                .sizes
+                .into_iter()
+                .map(|s| NodeSizeOverride {
+                    node_id: s.node_id,
+                    w: s.w,
+                    h: s.h,
+                })
+                .collect(),
         },
-        None => LayoutOverride { positions: Vec::new(), sizes: Vec::new() },
+        None => LayoutOverride {
+            positions: Vec::new(),
+            sizes: Vec::new(),
+        },
     };
 
     Ok(Json(overrides))
@@ -151,20 +185,23 @@ pub async fn save_cbu_layout(
         sizes: body.sizes.clone(),
     };
 
-    repo
-        .upsert_layout_override(cbu_id, user_id, &view_mode, LayoutOverrideView {
+    repo.upsert_layout_override(
+        cbu_id,
+        user_id,
+        &view_mode,
+        LayoutOverrideView {
             positions: overrides.positions.clone(),
             sizes: overrides.sizes.clone(),
-        })
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        },
+    )
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok(Json(LayoutOverride {
         positions: overrides.positions,
         sizes: overrides.sizes,
     }))
 }
-
 
 /// Create the graph router
 pub fn create_graph_router(pool: PgPool) -> Router {

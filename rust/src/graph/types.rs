@@ -49,6 +49,28 @@ pub struct GraphNode {
     /// Role priority score for layout ordering
     #[serde(skip_serializing_if = "Option::is_none")]
     pub role_priority: Option<i32>,
+    /// Entity category: SHELL (legal vehicles) or PERSON (natural persons)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entity_category: Option<String>,
+
+    // =========================================================================
+    // LAYOUT FIELDS - computed by server-side LayoutEngine
+    // =========================================================================
+    /// X position (computed by layout engine)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub x: Option<f32>,
+    /// Y position (computed by layout engine)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub y: Option<f32>,
+    /// Node width (computed by layout engine)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<f32>,
+    /// Node height (computed by layout engine)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<f32>,
+    /// Layout tier (0 = top, higher = lower on screen)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub layout_tier: Option<i32>,
 }
 
 /// Types of nodes in the graph

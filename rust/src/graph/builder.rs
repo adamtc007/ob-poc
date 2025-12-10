@@ -95,6 +95,7 @@ impl CbuGraphBuilder {
                 "client_type": cbu_record.client_type,
                 "cbu_category": cbu_record.cbu_category
             }),
+            ..Default::default()
         });
 
         // Always load linked entities (Core layer)
@@ -154,14 +155,17 @@ impl CbuGraphBuilder {
                     primary_role: ent.primary_role.clone(),
                     jurisdiction: ent.jurisdiction.clone(),
                     role_priority: ent.role_priority,
+                    entity_category: ent.entity_category.clone(),
                     data: serde_json::json!({
                         "entity_id": ent.entity_id,
+                        "entity_category": ent.entity_category,
                         "roles": ent.roles,
                         "role_categories": ent.role_categories,
                         "primary_role": ent.primary_role,
                         "jurisdiction": ent.jurisdiction,
                         "role_priority": ent.role_priority
                     }),
+                    ..Default::default()
                 });
             }
 
