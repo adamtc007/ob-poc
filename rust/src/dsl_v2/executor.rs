@@ -387,6 +387,9 @@ impl DslExecutor {
             if let Some(ref binding_name) = step.bind_as {
                 if let ExecutionResult::Uuid(id) = &result {
                     ctx.bind(binding_name, *id);
+                    // Also bind domain_id alias (e.g., cbu_id, entity_id) for convenience
+                    let alias = format!("{}_id", step.verb_call.domain);
+                    ctx.bind(&alias, *id);
                 }
             }
 

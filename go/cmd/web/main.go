@@ -1,4 +1,4 @@
-// Web server for test harness UI.
+// Web server for OB-POC UI using Gin framework.
 package main
 
 import (
@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"io/fs"
 	"log"
 	"net/http"
 	"net/url"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/adamtc007/ob-poc/go/internal/harness"
 	"github.com/adamtc007/ob-poc/go/internal/rustclient"
+	"github.com/gin-gonic/gin"
 )
 
 //go:embed templates/*.html
@@ -48,42 +50,142 @@ func main() {
 		log.Fatalf("parsing templates: %v", err)
 	}
 
-	http.HandleFunc("/", handleIndex)
-	http.HandleFunc("/health", handleHealth)
-	http.HandleFunc("/api/run", handleRunSuite)
-	http.HandleFunc("/api/validate", handleValidate)
-	http.HandleFunc("/api/config", handleConfig)
-	// Agent proxy endpoints
-	http.HandleFunc("/api/agent/session", handleAgentSession)
-	http.HandleFunc("/api/agent/chat", handleAgentChat)
-	http.HandleFunc("/api/agent/generate", handleAgentGenerate)
-	http.HandleFunc("/api/agent/execute", handleAgentExecute)
-	// KYC case query endpoint (proxies to dsl_api)
-	http.HandleFunc("/api/kyc/case/", handleKycCase)
-	// Direct DSL execution (no session needed)
-	http.HandleFunc("/api/dsl/execute", handleDirectExecute)
-	http.HandleFunc("/api/dsl/analyze-errors", handleAnalyzeErrors)
-	http.HandleFunc("/api/dsl/validate-with-fixes", handleValidateWithFixes)
-	// Entity search endpoint
-	http.HandleFunc("/api/entities/search", handleEntitySearch)
-	// LSP-style completions (via EntityGateway)
-	http.HandleFunc("/api/agent/complete", handleAgentComplete)
-	// CBU list endpoint (for CBU picker)
-	http.HandleFunc("/api/cbus", handleListCbus)
-	http.Handle("/static/", http.FileServer(http.FS(static)))
+	// Use release mode in production
+	gin.SetMode(gin.ReleaseMode)
 
-	log.Printf("Starting server on %s", *addr)
+	r := gin.New()
+	r.Use(gin.Logger())
+	r.Use(gin.Recovery())
+	r.Use(corsMiddleware())
+
+	// Static files - use fs.Sub to strip the "static" prefix from embed.FS
+	staticSub, err := fs.Sub(static, "static")
+	if err != nil {
+		log.Fatalf("failed to create static sub-filesystem: %v", err)
+	}
+	r.StaticFS("/static", http.FS(staticSub))
+
+	// HTML routes
+	r.GET("/", handleIndex)
+	r.GET("/health", handleHealth)
+
+	// API routes
+	api := r.Group("/api")
+	{
+		// Config endpoints
+		api.GET("/config", handleConfigGet)
+		api.POST("/config", handleConfigPost)
+		api.POST("/run", handleRunSuite)
+		api.POST("/validate", handleValidate)
+
+		// Agent proxy endpoints
+		agent := api.Group("/agent")
+		{
+			agent.POST("/session", handleAgentSession)
+			agent.POST("/chat", handleAgentChat)
+			agent.POST("/generate", handleAgentGenerate)
+			agent.POST("/execute", handleAgentExecute)
+			agent.POST("/bind", handleAgentBind)
+			agent.POST("/complete", handleAgentComplete)
+		}
+
+		// DSL endpoints
+		dsl := api.Group("/dsl")
+		{
+			dsl.POST("/execute", handleDirectExecute)
+			dsl.POST("/analyze-errors", handleAnalyzeErrors)
+			dsl.POST("/validate-with-fixes", handleValidateWithFixes)
+			dsl.POST("/resolve-ref", handleResolveRef)
+		}
+
+		// Entity endpoints
+		api.POST("/entities/search", handleEntitySearch)
+		api.POST("/entity/search", handleEntitySearchForFinder)
+		api.GET("/cbus", handleListCbus)
+		api.GET("/cbu/:id/graph", handleCbuGraph)
+
+		// KYC endpoints
+		api.GET("/kyc/case/:id", handleKycCase)
+	}
+
+	log.Printf("Starting Gin server on %s", *addr)
 	log.Printf("  DSL API: %s", rustURL)
 	log.Printf("  Agent API: %s", agentURL)
-	log.Fatal(http.ListenAndServe(*addr, nil))
+	if err := r.Run(*addr); err != nil {
+		log.Fatal(err)
+	}
 }
 
-func handleIndex(w http.ResponseWriter, r *http.Request) {
+// corsMiddleware adds CORS headers for cross-origin requests
+func corsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Content-Type")
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+		c.Next()
+	}
+}
+
+// ============================================================================
+// Proxy Helpers
+// ============================================================================
+
+// proxyPostJSON forwards a JSON POST request to a backend URL
+func proxyPostJSON(c *gin.Context, targetURL string) {
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Failed to read request: " + err.Error()})
+		return
+	}
+
+	resp, err := http.Post(targetURL, "application/json", bytes.NewReader(body))
+	if err != nil {
+		c.JSON(503, gin.H{"error": "Backend connection failed: " + err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.JSON(502, gin.H{"error": "Failed to read response: " + err.Error()})
+		return
+	}
+
+	c.Data(resp.StatusCode, "application/json", respBody)
+}
+
+// proxyGet forwards a GET request to a backend URL
+func proxyGet(c *gin.Context, targetURL string) {
+	resp, err := http.Get(targetURL)
+	if err != nil {
+		c.JSON(503, gin.H{"error": "Backend connection failed: " + err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.JSON(502, gin.H{"error": "Failed to read response: " + err.Error()})
+		return
+	}
+
+	c.Data(resp.StatusCode, "application/json", respBody)
+}
+
+// ============================================================================
+// HTML Handlers
+// ============================================================================
+
+func handleIndex(c *gin.Context) {
 	var health *rustclient.HealthResponse
 	var verbs *rustclient.VerbsResponse
 
 	if client != nil {
-		ctx := r.Context()
+		ctx := c.Request.Context()
 		health, _ = client.Health(ctx)
 		verbs, _ = client.ListVerbs(ctx)
 	}
@@ -102,88 +204,90 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 		"AgentURL":  agentURL,
 		"Connected": agentHealthy,
 	}
-	if err := tmpl.ExecuteTemplate(w, "index.html", data); err != nil {
-		http.Error(w, err.Error(), 500)
+
+	c.Header("Content-Type", "text/html; charset=utf-8")
+	if err := tmpl.ExecuteTemplate(c.Writer, "index.html", data); err != nil {
+		c.String(500, err.Error())
 	}
 }
 
-func handleConfig(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "POST" {
-		var req struct {
-			RustURL  string `json:"rust_url"`
-			AgentURL string `json:"agent_url"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			jsonError(w, err.Error(), 400)
-			return
-		}
-		if req.RustURL != "" {
-			rustURL = req.RustURL
-			client = rustclient.NewClient(rustURL)
-		}
-		if req.AgentURL != "" {
-			agentURL = req.AgentURL
-		}
-		jsonResponse(w, map[string]string{"status": "ok", "rust_url": rustURL, "agent_url": agentURL})
-		return
-	}
-	jsonResponse(w, map[string]any{"rust_url": rustURL, "agent_url": agentURL, "connected": client != nil})
-}
-
-func handleHealth(w http.ResponseWriter, r *http.Request) {
+func handleHealth(c *gin.Context) {
 	if client == nil {
-		jsonError(w, "Rust API not configured", 503)
+		c.JSON(503, gin.H{"error": "Rust API not configured"})
 		return
 	}
-	ctx := r.Context()
+	ctx := c.Request.Context()
 	health, err := client.Health(ctx)
 	if err != nil {
-		jsonError(w, err.Error(), 503)
+		c.JSON(503, gin.H{"error": err.Error()})
 		return
 	}
-	jsonResponse(w, health)
+	c.JSON(200, health)
 }
 
-func handleValidate(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+// ============================================================================
+// Config Handlers
+// ============================================================================
+
+func handleConfigGet(c *gin.Context) {
+	c.JSON(200, gin.H{
+		"rust_url":  rustURL,
+		"agent_url": agentURL,
+		"connected": client != nil,
+	})
+}
+
+func handleConfigPost(c *gin.Context) {
+	var req struct {
+		RustURL  string `json:"rust_url"`
+		AgentURL string `json:"agent_url"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
+	if req.RustURL != "" {
+		rustURL = req.RustURL
+		client = rustclient.NewClient(rustURL)
+	}
+	if req.AgentURL != "" {
+		agentURL = req.AgentURL
+	}
+	c.JSON(200, gin.H{"status": "ok", "rust_url": rustURL, "agent_url": agentURL})
+}
+
+func handleValidate(c *gin.Context) {
 	if client == nil {
-		jsonError(w, "Rust API not configured", 503)
+		c.JSON(503, gin.H{"error": "Rust API not configured"})
 		return
 	}
 	var req struct {
 		DSL string `json:"dsl"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonError(w, err.Error(), 400)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
-	result, err := client.ValidateDSL(r.Context(), req.DSL)
+	result, err := client.ValidateDSL(c.Request.Context(), req.DSL)
 	if err != nil {
-		jsonError(w, err.Error(), 500)
+		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
-	jsonResponse(w, result)
+	c.JSON(200, result)
 }
 
-func handleRunSuite(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "POST required", http.StatusMethodNotAllowed)
-		return
-	}
+func handleRunSuite(c *gin.Context) {
 	if rustURL == "" {
-		jsonError(w, "Rust API not configured", 503)
+		c.JSON(503, gin.H{"error": "Rust API not configured"})
 		return
 	}
 
 	var req struct {
 		Cases []harness.Case `json:"cases"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonError(w, err.Error(), 400)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -195,397 +299,413 @@ func handleRunSuite(w http.ResponseWriter, r *http.Request) {
 	runner := harness.NewRunner(rustURL)
 	result, err := runner.Run(context.Background(), suite)
 	if err != nil {
-		jsonError(w, err.Error(), 500)
+		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
-	jsonResponse(w, result)
+	c.JSON(200, result)
 }
 
-// Agent proxy: create session
-func handleAgentSession(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "POST required", http.StatusMethodNotAllowed)
-		return
-	}
+// ============================================================================
+// Agent Proxy Handlers
+// ============================================================================
 
+func handleAgentSession(c *gin.Context) {
 	resp, err := http.Post(agentURL+"/api/session", "application/json", bytes.NewReader([]byte("{}")))
 	if err != nil {
-		jsonError(w, "Agent connection failed: "+err.Error(), 503)
+		c.JSON(503, gin.H{"error": "Agent connection failed: " + err.Error()})
 		return
 	}
 	defer resp.Body.Close()
 
-	// Use ReadAll+Unmarshal for json/v2 compatibility (avoids EOF handling differences)
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		jsonError(w, "Failed to read response: "+err.Error(), 502)
+		c.JSON(502, gin.H{"error": "Failed to read response: " + err.Error()})
 		return
 	}
 	var result map[string]any
 	if err := json.Unmarshal(body, &result); err != nil {
-		jsonError(w, "Invalid JSON from Agent: "+err.Error(), 502)
+		c.JSON(502, gin.H{"error": "Invalid JSON from Agent: " + err.Error()})
 		return
 	}
-	jsonResponse(w, result)
+	c.JSON(200, result)
 }
 
-// Agent proxy: chat
-func handleAgentChat(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "POST required", http.StatusMethodNotAllowed)
-		return
-	}
-
+func handleAgentChat(c *gin.Context) {
 	var req struct {
 		SessionID string `json:"session_id"`
 		Message   string `json:"message"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonError(w, err.Error(), 400)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
 	reqBody, _ := json.Marshal(map[string]string{"message": req.Message})
 	resp, err := http.Post(agentURL+"/api/session/"+req.SessionID+"/chat", "application/json", bytes.NewReader(reqBody))
 	if err != nil {
-		jsonError(w, "Agent connection failed: "+err.Error(), 503)
+		c.JSON(503, gin.H{"error": "Agent connection failed: " + err.Error()})
 		return
 	}
 	defer resp.Body.Close()
 
-	// Use ReadAll+Unmarshal for json/v2 compatibility
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		jsonError(w, "Failed to read response: "+err.Error(), 502)
+		c.JSON(502, gin.H{"error": "Failed to read response: " + err.Error()})
 		return
 	}
 	var result map[string]any
 	if err := json.Unmarshal(respBody, &result); err != nil {
-		jsonError(w, "Invalid JSON from Agent: "+err.Error(), 502)
+		c.JSON(502, gin.H{"error": "Invalid JSON from Agent: " + err.Error()})
 		return
 	}
-	jsonResponse(w, result)
+	c.JSON(200, result)
 }
 
-func jsonResponse(w http.ResponseWriter, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(v)
-}
-
-func jsonError(w http.ResponseWriter, msg string, code int) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
-}
-
-// Agent proxy: generate DSL from natural language
-func handleAgentGenerate(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "POST required", http.StatusMethodNotAllowed)
-		return
-	}
-
+func handleAgentGenerate(c *gin.Context) {
 	var req struct {
 		Instruction string `json:"instruction"`
 		Domain      string `json:"domain,omitempty"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonError(w, err.Error(), 400)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
 	reqBody, _ := json.Marshal(req)
 	resp, err := http.Post(agentURL+"/api/agent/generate", "application/json", bytes.NewReader(reqBody))
 	if err != nil {
-		jsonError(w, "Agent connection failed: "+err.Error(), 503)
+		c.JSON(503, gin.H{"error": "Agent connection failed: " + err.Error()})
 		return
 	}
 	defer resp.Body.Close()
 
-	// Use ReadAll+Unmarshal for json/v2 compatibility
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		jsonError(w, "Failed to read response: "+err.Error(), 502)
+		c.JSON(502, gin.H{"error": "Failed to read response: " + err.Error()})
 		return
 	}
 	var result map[string]any
 	if err := json.Unmarshal(respBody, &result); err != nil {
-		jsonError(w, "Invalid JSON from Agent: "+err.Error(), 502)
+		c.JSON(502, gin.H{"error": "Invalid JSON from Agent: " + err.Error()})
 		return
 	}
-	jsonResponse(w, result)
+	c.JSON(200, result)
 }
 
-// Agent proxy: execute DSL
-func handleAgentExecute(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "POST required", http.StatusMethodNotAllowed)
-		return
-	}
-
+func handleAgentExecute(c *gin.Context) {
 	var req struct {
 		SessionID string `json:"session_id"`
 		DSL       string `json:"dsl"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonError(w, err.Error(), 400)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
 	reqBody, _ := json.Marshal(map[string]string{"dsl": req.DSL})
 	resp, err := http.Post(agentURL+"/api/session/"+req.SessionID+"/execute", "application/json", bytes.NewReader(reqBody))
 	if err != nil {
-		jsonError(w, "Agent connection failed: "+err.Error(), 503)
+		c.JSON(503, gin.H{"error": "Agent connection failed: " + err.Error()})
 		return
 	}
 	defer resp.Body.Close()
 
-	// Use ReadAll+Unmarshal for json/v2 compatibility
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		jsonError(w, "Failed to read response: "+err.Error(), 502)
+		c.JSON(502, gin.H{"error": "Failed to read response: " + err.Error()})
 		return
 	}
 	var result map[string]any
 	if err := json.Unmarshal(respBody, &result); err != nil {
-		jsonError(w, "Invalid JSON from Agent: "+err.Error(), 502)
+		c.JSON(502, gin.H{"error": "Invalid JSON from Agent: " + err.Error()})
 		return
 	}
-	jsonResponse(w, result)
+	c.JSON(200, result)
 }
 
-// Direct DSL execution via agentic_server (supports cbu.show and all verbs)
-func handleDirectExecute(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "POST required", http.StatusMethodNotAllowed)
-		return
-	}
+func handleAgentBind(c *gin.Context) {
+	log.Printf("[BIND-GO] Received bind request")
 
 	var req struct {
-		DSL string `json:"dsl"`
+		SessionID   string `json:"session_id"`
+		Name        string `json:"name"`
+		ID          string `json:"id"`
+		EntityType  string `json:"entity_type"`
+		DisplayName string `json:"display_name"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonError(w, err.Error(), 400)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("[BIND-GO] Decode error: %v", err)
+		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
+	log.Printf("[BIND-GO] Request: session=%s, name=%s, id=%s, type=%s, display=%s",
+		req.SessionID, req.Name, req.ID, req.EntityType, req.DisplayName)
 
-	reqBody, _ := json.Marshal(req)
-	resp, err := http.Post(agentURL+"/execute", "application/json", bytes.NewReader(reqBody))
+	// Forward to Rust API
+	reqBody, _ := json.Marshal(map[string]string{
+		"name":         req.Name,
+		"id":           req.ID,
+		"entity_type":  req.EntityType,
+		"display_name": req.DisplayName,
+	})
+	targetURL := agentURL + "/api/session/" + req.SessionID + "/bind"
+	log.Printf("[BIND-GO] Forwarding to: %s", targetURL)
+
+	resp, err := http.Post(targetURL, "application/json", bytes.NewReader(reqBody))
 	if err != nil {
-		jsonError(w, "Agent API connection failed: "+err.Error(), 503)
+		log.Printf("[BIND-GO] Connection failed: %v", err)
+		c.JSON(503, gin.H{"error": "Agent connection failed: " + err.Error()})
 		return
 	}
 	defer resp.Body.Close()
 
-	// Use ReadAll+Unmarshal for json/v2 compatibility
+	log.Printf("[BIND-GO] Rust response status: %d", resp.StatusCode)
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		jsonError(w, "Failed to read response: "+err.Error(), 502)
+		c.JSON(502, gin.H{"error": "Failed to read response: " + err.Error()})
 		return
 	}
+	log.Printf("[BIND-GO] Rust response body: %s", string(respBody))
+
 	var result map[string]any
 	if err := json.Unmarshal(respBody, &result); err != nil {
-		jsonError(w, "Invalid JSON from Agent API: "+err.Error(), 502)
+		c.JSON(502, gin.H{"error": "Invalid JSON from Agent: " + err.Error()})
 		return
 	}
-	jsonResponse(w, result)
+	c.JSON(200, result)
 }
 
-// KYC case query: proxy to dsl_api
-func handleKycCase(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
-		http.Error(w, "GET required", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Extract case ID from path: /api/kyc/case/{id}
-	caseID := r.URL.Path[len("/api/kyc/case/"):]
-	if caseID == "" {
-		jsonError(w, "Case ID required", 400)
-		return
-	}
-
-	// Proxy to dsl_api
-	resp, err := http.Get(rustURL + "/query/kyc/cases/" + caseID)
-	if err != nil {
-		jsonError(w, "DSL API connection failed: "+err.Error(), 503)
-		return
-	}
-	defer resp.Body.Close()
-
-	// Use ReadAll+Unmarshal for json/v2 compatibility
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		jsonError(w, "Failed to read response: "+err.Error(), 502)
-		return
-	}
-	var result map[string]any
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		jsonError(w, "Invalid JSON from DSL API: "+err.Error(), 502)
-		return
-	}
-	jsonResponse(w, result)
-}
-
-// Analyze DSL errors: proxy to dsl_api
-func handleAnalyzeErrors(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "POST required", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req struct {
-		DSL    string   `json:"dsl"`
-		Errors []string `json:"errors"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonError(w, err.Error(), 400)
-		return
-	}
-
-	reqBody, _ := json.Marshal(req)
-	resp, err := http.Post(rustURL+"/analyze-errors", "application/json", bytes.NewReader(reqBody))
-	if err != nil {
-		jsonError(w, "DSL API connection failed: "+err.Error(), 503)
-		return
-	}
-	defer resp.Body.Close()
-
-	// Use ReadAll+Unmarshal for json/v2 compatibility
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		jsonError(w, "Failed to read response: "+err.Error(), 502)
-		return
-	}
-	var result map[string]any
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		jsonError(w, "Invalid JSON from DSL API: "+err.Error(), 502)
-		return
-	}
-	jsonResponse(w, result)
-}
-
-// Validate DSL with auto-corrections: proxy to dsl_api
-// This proactively fixes lookup values before execution
-func handleValidateWithFixes(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "POST required", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req struct {
-		DSL string `json:"dsl"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonError(w, err.Error(), 400)
-		return
-	}
-
-	reqBody, _ := json.Marshal(req)
-	resp, err := http.Post(rustURL+"/validate-with-fixes", "application/json", bytes.NewReader(reqBody))
-	if err != nil {
-		jsonError(w, "DSL API connection failed: "+err.Error(), 503)
-		return
-	}
-	defer resp.Body.Close()
-
-	// Use ReadAll+Unmarshal for json/v2 compatibility
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		jsonError(w, "Failed to read response: "+err.Error(), 502)
-		return
-	}
-	var result map[string]any
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		jsonError(w, "Invalid JSON from DSL API: "+err.Error(), 502)
-		return
-	}
-	jsonResponse(w, result)
-}
-
-// Agent completions: proxy to agent API for LSP-style entity completions
-// Used for autocomplete in the chat input
-func handleAgentComplete(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "POST required", http.StatusMethodNotAllowed)
-		return
-	}
-
+func handleAgentComplete(c *gin.Context) {
 	var req struct {
 		EntityType string `json:"entity_type"`
 		Query      string `json:"query"`
 		Limit      int    `json:"limit,omitempty"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonError(w, err.Error(), 400)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
 	reqBody, _ := json.Marshal(req)
 	resp, err := http.Post(agentURL+"/api/agent/complete", "application/json", bytes.NewReader(reqBody))
 	if err != nil {
-		jsonError(w, "Agent API connection failed: "+err.Error(), 503)
+		c.JSON(503, gin.H{"error": "Agent API connection failed: " + err.Error()})
 		return
 	}
 	defer resp.Body.Close()
 
-	// Use ReadAll+Unmarshal for json/v2 compatibility
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		jsonError(w, "Failed to read response: "+err.Error(), 502)
+		c.JSON(502, gin.H{"error": "Failed to read response: " + err.Error()})
 		return
 	}
 	var result map[string]any
 	if err := json.Unmarshal(respBody, &result); err != nil {
-		jsonError(w, "Invalid JSON from Agent API: "+err.Error(), 502)
+		c.JSON(502, gin.H{"error": "Invalid JSON from Agent API: " + err.Error()})
 		return
 	}
-	jsonResponse(w, result)
+	c.JSON(200, result)
 }
 
-// List CBUs: proxy to agent API for CBU picker dropdown
-func handleListCbus(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
-		http.Error(w, "GET required", http.StatusMethodNotAllowed)
+// ============================================================================
+// DSL Handlers
+// ============================================================================
+
+func handleDirectExecute(c *gin.Context) {
+	var req struct {
+		DSL string `json:"dsl"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
-	resp, err := http.Get(agentURL + "/api/cbu")
+	reqBody, _ := json.Marshal(req)
+	resp, err := http.Post(agentURL+"/execute", "application/json", bytes.NewReader(reqBody))
 	if err != nil {
-		jsonError(w, "Agent API connection failed: "+err.Error(), 503)
+		c.JSON(503, gin.H{"error": "Agent API connection failed: " + err.Error()})
 		return
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		jsonError(w, "Failed to read response: "+err.Error(), 502)
+		c.JSON(502, gin.H{"error": "Failed to read response: " + err.Error()})
 		return
 	}
-	var result []map[string]any
+	var result map[string]any
 	if err := json.Unmarshal(respBody, &result); err != nil {
-		jsonError(w, "Invalid JSON from Agent API: "+err.Error(), 502)
+		c.JSON(502, gin.H{"error": "Invalid JSON from Agent API: " + err.Error()})
 		return
 	}
-	jsonResponse(w, result)
+	c.JSON(200, result)
 }
 
-// Entity search: proxy to Rust API for fuzzy entity lookup via EntityGateway
-// Used to find existing entities before creating new ones (prevents duplicates)
-func handleEntitySearch(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+func handleAnalyzeErrors(c *gin.Context) {
+	var req struct {
+		DSL    string   `json:"dsl"`
+		Errors []string `json:"errors"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
+	reqBody, _ := json.Marshal(req)
+	resp, err := http.Post(rustURL+"/analyze-errors", "application/json", bytes.NewReader(reqBody))
+	if err != nil {
+		c.JSON(503, gin.H{"error": "DSL API connection failed: " + err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.JSON(502, gin.H{"error": "Failed to read response: " + err.Error()})
+		return
+	}
+	var result map[string]any
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		c.JSON(502, gin.H{"error": "Invalid JSON from DSL API: " + err.Error()})
+		return
+	}
+	c.JSON(200, result)
+}
+
+func handleValidateWithFixes(c *gin.Context) {
+	var req struct {
+		DSL string `json:"dsl"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	reqBody, _ := json.Marshal(req)
+	resp, err := http.Post(rustURL+"/validate-with-fixes", "application/json", bytes.NewReader(reqBody))
+	if err != nil {
+		c.JSON(503, gin.H{"error": "DSL API connection failed: " + err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.JSON(502, gin.H{"error": "Failed to read response: " + err.Error()})
+		return
+	}
+	var result map[string]any
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		c.JSON(502, gin.H{"error": "Invalid JSON from DSL API: " + err.Error()})
+		return
+	}
+	c.JSON(200, result)
+}
+
+func handleResolveRef(c *gin.Context) {
+	proxyPostJSON(c, agentURL+"/api/dsl/resolve-ref")
+}
+
+// ============================================================================
+// Entity Handlers
+// ============================================================================
+
+func handleListCbus(c *gin.Context) {
+	proxyGet(c, agentURL+"/api/cbu")
+}
+
+func handleCbuGraph(c *gin.Context) {
+	id := c.Param("id")
+	proxyGet(c, agentURL+"/api/cbu/"+id+"/graph")
+}
+
+func handleEntitySearchForFinder(c *gin.Context) {
+	var req struct {
+		EntityType string `json:"entity_type"`
+		Query      string `json:"query"`
+		Limit      int    `json:"limit,omitempty"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid JSON: " + err.Error()})
+		return
+	}
+
+	// Build query params for Rust GET endpoint
+	limit := req.Limit
+	if limit == 0 {
+		limit = 10
+	}
+	searchURL := fmt.Sprintf("%s/api/entity/search?type=%s&q=%s&limit=%d",
+		agentURL,
+		url.QueryEscape(req.EntityType),
+		url.QueryEscape(req.Query),
+		limit)
+
+	resp, err := http.Get(searchURL)
+	if err != nil {
+		c.JSON(503, gin.H{"error": "Agent API connection failed: " + err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.JSON(502, gin.H{"error": "Failed to read response: " + err.Error()})
+		return
+	}
+
+	// Transform response to match JS-expected format
+	var rustResp struct {
+		Matches []struct {
+			Token   string  `json:"token"`
+			Display string  `json:"display"`
+			Score   float64 `json:"score"`
+		} `json:"matches"`
+		Total     int  `json:"total"`
+		Truncated bool `json:"truncated"`
+	}
+	if err := json.Unmarshal(respBody, &rustResp); err != nil {
+		// If parsing fails, pass through as-is
+		c.Data(resp.StatusCode, "application/json", respBody)
+		return
+	}
+
+	// Transform to JS-expected EntitySearchResult format
+	type JSResult struct {
+		EntityID       string  `json:"entity_id"`
+		Name           string  `json:"name"`
+		EntityType     string  `json:"entity_type"`
+		EntityTypeCode *string `json:"entity_type_code"`
+		Jurisdiction   *string `json:"jurisdiction"`
+		Similarity     float64 `json:"similarity"`
+	}
+	results := make([]JSResult, 0, len(rustResp.Matches))
+	for _, m := range rustResp.Matches {
+		results = append(results, JSResult{
+			EntityID:       m.Token,
+			Name:           m.Display,
+			EntityType:     req.EntityType,
+			EntityTypeCode: nil,
+			Jurisdiction:   nil,
+			Similarity:     m.Score,
+		})
+	}
+
+	c.JSON(200, gin.H{
+		"results": results,
+		"total":   rustResp.Total,
+	})
+}
+
+func handleEntitySearch(c *gin.Context) {
 	var req struct {
 		Query        string `json:"query"`
 		Limit        int    `json:"limit,omitempty"`
 		Jurisdiction string `json:"jurisdiction,omitempty"`
 		EntityType   string `json:"entity_type,omitempty"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonError(w, err.Error(), 400)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -604,15 +724,14 @@ func handleEntitySearch(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := http.Get(searchURL)
 	if err != nil {
-		jsonError(w, "DSL API connection failed: "+err.Error(), 503)
+		c.JSON(503, gin.H{"error": "DSL API connection failed: " + err.Error()})
 		return
 	}
 	defer resp.Body.Close()
 
-	// Use ReadAll+Unmarshal for json/v2 compatibility
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		jsonError(w, "Failed to read response: "+err.Error(), 502)
+		c.JSON(502, gin.H{"error": "Failed to read response: " + err.Error()})
 		return
 	}
 
@@ -627,7 +746,7 @@ func handleEntitySearch(w http.ResponseWriter, r *http.Request) {
 		Total int `json:"total"`
 	}
 	if err := json.Unmarshal(respBody, &rustResp); err != nil {
-		jsonError(w, "Invalid JSON from DSL API: "+err.Error(), 502)
+		c.JSON(502, gin.H{"error": "Invalid JSON from DSL API: " + err.Error()})
 		return
 	}
 
@@ -649,15 +768,28 @@ func handleEntitySearch(w http.ResponseWriter, r *http.Request) {
 		results = append(results, JSResult{
 			EntityID:       entityID,
 			Name:           r.Display,
-			EntityType:     "entity", // EntityGateway doesn't return type info yet
+			EntityType:     "entity",
 			EntityTypeCode: nil,
 			Jurisdiction:   nil,
 			Similarity:     r.Score,
 		})
 	}
 
-	jsonResponse(w, map[string]any{
+	c.JSON(200, gin.H{
 		"results":       results,
 		"create_option": fmt.Sprintf("Create new entity \"%s\"", req.Query),
 	})
+}
+
+// ============================================================================
+// KYC Handlers
+// ============================================================================
+
+func handleKycCase(c *gin.Context) {
+	caseID := c.Param("id")
+	if caseID == "" {
+		c.JSON(400, gin.H{"error": "Case ID required"})
+		return
+	}
+	proxyGet(c, rustURL+"/query/kyc/cases/"+caseID)
 }

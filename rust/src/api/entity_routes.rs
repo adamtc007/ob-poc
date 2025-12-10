@@ -2,6 +2,10 @@
 //!
 //! Uses EntityGateway gRPC service for all entity lookups.
 //! This ensures consistent fuzzy search behavior across the entire system.
+//!
+//! ## Endpoints
+//!
+//! - `GET /api/entity/search` - Server-side fuzzy search for entity resolution modal
 
 use crate::dsl_v2::gateway_resolver::gateway_addr;
 use axum::{extract::Query, http::StatusCode, response::Json, routing::get, Router};
@@ -9,87 +13,293 @@ use entity_gateway::proto::ob::gateway::v1::{
     entity_gateway_client::EntityGatewayClient, SearchMode, SearchRequest,
 };
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
-// Query params for search
+// ============================================================================
+// Request/Response Types
+// ============================================================================
+
+/// Query params for entity search
 #[derive(Debug, Deserialize)]
-pub struct SearchQuery {
-    /// Search query string
+pub struct EntitySearchQuery {
+    /// Entity type nickname: cbu, entity, person, company, product, role, jurisdiction, etc.
+    #[serde(rename = "type")]
+    pub entity_type: String,
+
+    /// Search query string (minimum 2 chars recommended)
     pub q: String,
 
-    /// Entity type nickname (e.g., "person", "entity", "cbu")
-    #[serde(default)]
-    pub entity_type: Option<String>,
-
-    /// Max results
+    /// Max results (default: 10, max: 50)
     #[serde(default = "default_limit")]
     pub limit: u32,
+
+    /// Optional jurisdiction filter (e.g., "LU", "US")
+    pub jurisdiction: Option<String>,
 }
 
 fn default_limit() -> u32 {
     10
 }
 
-/// Search result from EntityGateway
+/// A single match from entity search
 #[derive(Debug, Clone, Serialize)]
 pub struct EntityMatch {
-    pub id: Option<Uuid>,
-    pub token: String,
+    /// Primary key (UUID or code) to store in resolved_key
+    pub value: String,
+
+    /// Human-readable label for UI display
     pub display: String,
+
+    /// Additional context (entity type, jurisdiction)
+    pub detail: Option<String>,
+
+    /// Relevance score 0.0-1.0
     pub score: f32,
 }
 
-/// Search response
+/// Response from entity search
 #[derive(Debug, Clone, Serialize)]
 pub struct EntitySearchResponse {
-    pub results: Vec<EntityMatch>,
-    pub total: u32,
+    /// List of matches
+    pub matches: Vec<EntityMatch>,
+
+    /// Number of matches returned
+    pub total: usize,
+
+    /// True if more matches exist beyond limit
+    pub truncated: bool,
 }
 
-/// GET /api/entities/search
+// ============================================================================
+// Handlers
+// ============================================================================
+
+/// GET /api/entity/search
+///
+/// Server-side fuzzy search for entity resolution modal.
+/// Wraps EntityGateway gRPC service.
+///
+/// ## Query Parameters
+///
+/// - `type` (required): Entity type nickname
+/// - `q` (required): Search query
+/// - `limit` (optional): Max results (default 10, max 50)
+/// - `jurisdiction` (optional): Filter by jurisdiction code
+///
+/// ## Example
+///
+/// ```
+/// GET /api/entity/search?type=entity&q=john&limit=10
+/// ```
 async fn search_entities(
-    Query(query): Query<SearchQuery>,
-) -> Result<Json<EntitySearchResponse>, StatusCode> {
+    Query(query): Query<EntitySearchQuery>,
+) -> Result<Json<EntitySearchResponse>, (StatusCode, String)> {
+    // Validate query length
+    if query.q.len() < 2 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Search query must be at least 2 characters".to_string(),
+        ));
+    }
+
     let addr = gateway_addr();
 
-    let mut client = EntityGatewayClient::connect(addr).await.map_err(|e| {
-        eprintln!("Failed to connect to EntityGateway: {}", e);
-        StatusCode::SERVICE_UNAVAILABLE
-    })?;
+    let mut client = EntityGatewayClient::connect(addr.clone())
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to connect to EntityGateway at {}: {}", addr, e);
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                format!("EntityGateway unavailable: {}", e),
+            )
+        })?;
 
-    // Default to "entity" if no type specified
-    let nickname = query.entity_type.unwrap_or_else(|| "entity".to_string());
+    // Map common type aliases to gateway nicknames
+    let nickname = normalize_entity_type(&query.entity_type);
 
     let request = SearchRequest {
-        nickname,
-        values: vec![query.q],
+        nickname: nickname.to_string(),
+        values: vec![query.q.clone()],
         search_key: None,
         mode: SearchMode::Fuzzy as i32,
-        limit: Some(query.limit.min(50) as i32),
+        limit: Some(query.limit.min(50) as i32 + 1), // +1 to detect truncation
     };
 
     let response = client.search(request).await.map_err(|e| {
-        eprintln!("EntityGateway search error: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
+        tracing::error!("EntityGateway search error: {}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Search failed: {}", e),
+        )
     })?;
 
-    let matches = response.into_inner().matches;
-    let total = matches.len() as u32;
+    let mut matches: Vec<_> = response.into_inner().matches;
+    let limit = query.limit.min(50) as usize;
+    let truncated = matches.len() > limit;
 
-    let results: Vec<EntityMatch> = matches
+    // Truncate to limit
+    matches.truncate(limit);
+
+    // Apply jurisdiction filter if provided (post-filter)
+    // TODO: This should ideally be pushed to EntityGateway
+    let matches: Vec<EntityMatch> = matches
         .into_iter()
-        .map(|m| EntityMatch {
-            id: Uuid::parse_str(&m.token).ok(),
-            token: m.token,
-            display: m.display,
-            score: m.score,
+        .filter(|m| {
+            if let Some(ref jur) = query.jurisdiction {
+                // Check if display contains jurisdiction
+                m.display.to_uppercase().contains(&jur.to_uppercase())
+            } else {
+                true
+            }
+        })
+        .map(|m| {
+            // Build detail from entity type and any jurisdiction info
+            let detail = build_detail(&query.entity_type, &m.display);
+
+            EntityMatch {
+                value: m.token,
+                display: m.display,
+                detail,
+                score: m.score,
+            }
         })
         .collect();
 
-    Ok(Json(EntitySearchResponse { results, total }))
+    let total = matches.len();
+
+    Ok(Json(EntitySearchResponse {
+        matches,
+        total,
+        truncated,
+    }))
 }
+
+/// Normalize entity type aliases to gateway nicknames
+fn normalize_entity_type(entity_type: &str) -> &str {
+    match entity_type.to_lowercase().as_str() {
+        "cbu" | "client" => "cbu",
+        "entity" | "entities" => "entity",
+        "person" | "proper_person" | "individual" => "person",
+        "company" | "limited_company" | "legal_entity" => "legal_entity",
+        "product" | "products" => "product",
+        "service" | "services" => "service",
+        "role" | "roles" => "role",
+        "jurisdiction" | "jurisdictions" | "country" => "jurisdiction",
+        "currency" | "currencies" => "currency",
+        "document_type" | "doc_type" => "document_type",
+        "fund" => "fund",
+        _ => entity_type, // Pass through unknown types
+    }
+}
+
+/// Build detail string from entity type and display
+fn build_detail(entity_type: &str, display: &str) -> Option<String> {
+    // Try to extract jurisdiction from display if it's in format "Name | JURISDICTION"
+    let parts: Vec<&str> = display.split(" | ").collect();
+    if parts.len() > 1 {
+        Some(format!(
+            "{} | {}",
+            capitalize_entity_type(entity_type),
+            parts[1]
+        ))
+    } else {
+        Some(capitalize_entity_type(entity_type))
+    }
+}
+
+/// Capitalize entity type for display
+fn capitalize_entity_type(entity_type: &str) -> String {
+    match entity_type.to_lowercase().as_str() {
+        "cbu" => "CBU".to_string(),
+        "person" | "proper_person" => "Proper Person".to_string(),
+        "company" | "limited_company" | "legal_entity" => "Limited Company".to_string(),
+        "product" => "Product".to_string(),
+        "service" => "Service".to_string(),
+        "role" => "Role".to_string(),
+        "jurisdiction" => "Jurisdiction".to_string(),
+        "currency" => "Currency".to_string(),
+        "fund" => "Fund".to_string(),
+        "entity" => "Entity".to_string(),
+        other => other
+            .chars()
+            .next()
+            .map(|c| c.to_uppercase().collect::<String>() + &other[1..])
+            .unwrap_or_else(|| other.to_string()),
+    }
+}
+
+// ============================================================================
+// Legacy endpoint for backward compatibility
+// ============================================================================
+
+/// Legacy query params (deprecated - use EntitySearchQuery)
+#[derive(Debug, Deserialize)]
+pub struct LegacySearchQuery {
+    pub q: String,
+    #[serde(default)]
+    pub entity_type: Option<String>,
+    #[serde(default = "default_limit")]
+    pub limit: u32,
+}
+
+/// GET /api/entities/search (legacy endpoint)
+async fn search_entities_legacy(
+    Query(query): Query<LegacySearchQuery>,
+) -> Result<Json<EntitySearchResponse>, (StatusCode, String)> {
+    // Convert to new format
+    let new_query = EntitySearchQuery {
+        entity_type: query.entity_type.unwrap_or_else(|| "entity".to_string()),
+        q: query.q,
+        limit: query.limit,
+        jurisdiction: None,
+    };
+    search_entities(Query(new_query)).await
+}
+
+// ============================================================================
+// Router
+// ============================================================================
 
 /// Create router for entity endpoints
 pub fn create_entity_router() -> Router {
-    Router::new().route("/api/entities/search", get(search_entities))
+    Router::new()
+        // New endpoint per API contract
+        .route("/api/entity/search", get(search_entities))
+        // Legacy endpoint for backward compatibility
+        .route("/api/entities/search", get(search_entities_legacy))
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_entity_type() {
+        assert_eq!(normalize_entity_type("cbu"), "cbu");
+        assert_eq!(normalize_entity_type("CBU"), "cbu");
+        assert_eq!(normalize_entity_type("person"), "person");
+        assert_eq!(normalize_entity_type("proper_person"), "person");
+        assert_eq!(normalize_entity_type("company"), "legal_entity");
+        assert_eq!(normalize_entity_type("unknown"), "unknown");
+    }
+
+    #[test]
+    fn test_capitalize_entity_type() {
+        assert_eq!(capitalize_entity_type("cbu"), "CBU");
+        assert_eq!(capitalize_entity_type("person"), "Proper Person");
+        assert_eq!(capitalize_entity_type("company"), "Limited Company");
+        assert_eq!(capitalize_entity_type("role"), "Role");
+    }
+
+    #[test]
+    fn test_build_detail() {
+        assert_eq!(
+            build_detail("person", "John Smith | LU"),
+            Some("Proper Person | LU".to_string())
+        );
+        assert_eq!(build_detail("cbu", "Apex Fund"), Some("CBU".to_string()));
+    }
 }

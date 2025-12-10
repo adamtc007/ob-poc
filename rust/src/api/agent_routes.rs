@@ -161,6 +161,56 @@ pub struct CompleteResponse {
 }
 
 // ============================================================================
+// Entity Reference Resolution Types
+// ============================================================================
+
+/// Identifies a specific EntityRef in the AST
+#[derive(Debug, Deserialize)]
+pub struct RefId {
+    /// Index of statement in AST (0-based)
+    pub statement_index: usize,
+    /// Argument key containing the EntityRef (e.g., "entity-id")
+    pub arg_key: String,
+}
+
+/// Request to resolve an EntityRef in the session AST
+#[derive(Debug, Deserialize)]
+pub struct ResolveRefRequest {
+    /// Session containing the AST
+    pub session_id: Uuid,
+    /// Location of the EntityRef to resolve
+    pub ref_id: RefId,
+    /// Primary key from entity search (UUID or code)
+    pub resolved_key: String,
+}
+
+/// Statistics about EntityRef resolution in the AST
+#[derive(Debug, Serialize)]
+pub struct ResolutionStats {
+    /// Total EntityRef nodes in AST
+    pub total_refs: i32,
+    /// Remaining unresolved refs
+    pub unresolved_count: i32,
+}
+
+/// Response from resolving an EntityRef
+#[derive(Debug, Serialize)]
+pub struct ResolveRefResponse {
+    /// Whether the update succeeded
+    pub success: bool,
+    /// Full refreshed AST with updated triplet
+    pub ast: Option<Vec<crate::dsl_v2::ast::Statement>>,
+    /// Resolution statistics
+    pub resolution_stats: ResolutionStats,
+    /// True if all refs resolved (ready to execute)
+    pub can_execute: bool,
+    /// Error message if failed
+    pub error: Option<String>,
+    /// Error code for programmatic handling
+    pub code: Option<String>,
+}
+
+// ============================================================================
 // Onboarding Request/Response Types
 // ============================================================================
 
@@ -243,6 +293,9 @@ pub fn create_agent_router(pool: PgPool) -> Router {
         .route("/api/session/:id/chat", post(chat_session))
         .route("/api/session/:id/execute", post(execute_session_dsl))
         .route("/api/session/:id/clear", post(clear_session_dsl))
+        .route("/api/session/:id/bind", post(set_session_binding))
+        // Entity reference resolution
+        .route("/api/dsl/resolve-ref", post(resolve_entity_ref))
         // Vocabulary and metadata
         .route("/api/agent/generate", post(generate_dsl))
         .route("/api/agent/validate", post(validate_dsl))
@@ -374,19 +427,32 @@ async fn chat_session(
     }
 
     // Store the user message and get session context (available bindings with type info)
-    let session_bindings_for_llm: Vec<String> = {
+    let (session_bindings_for_llm, session_named_refs): (
+        Vec<String>,
+        std::collections::HashMap<String, uuid::Uuid>,
+    ) = {
         let mut sessions = state.sessions.write().await;
         let session = sessions.get_mut(&session_id).ok_or(StatusCode::NOT_FOUND)?;
         session.add_user_message(req.message.clone());
         // Get typed bindings formatted for LLM context
         let bindings = session.context.bindings_for_llm();
-        tracing::info!(
-            "Session {} bindings for LLM: {:?} (named_refs: {:?})",
+        tracing::debug!("[CHAT] Session {} - START chat_session_handler", session_id);
+        tracing::debug!(
+            "[CHAT] Session {} - named_refs keys: {:?}",
             session_id,
-            bindings,
             session.context.named_refs.keys().collect::<Vec<_>>()
         );
-        bindings
+        tracing::debug!(
+            "[CHAT] Session {} - named_refs values: {:?}",
+            session_id,
+            session.context.named_refs
+        );
+        tracing::debug!(
+            "[CHAT] Session {} - bindings_for_llm: {:?}",
+            session_id,
+            bindings
+        );
+        (bindings, session.context.named_refs.clone())
     };
 
     // Create LLM client (uses AGENT_BACKEND env var to select provider)
@@ -556,11 +622,16 @@ async fn chat_session(
 
         // Build DSL from intents (deterministic - no LLM involved)
         let dsl = build_dsl_program(&intents);
+        tracing::debug!("[CHAT] Built DSL from intents: {}", dsl);
 
         // Run SemanticValidator with EntityGateway (same pipeline as Zed/LSP)
         // This validates embedded data values (products, roles, jurisdictions, etc.)
         // NOTE: EntityGateway errors (missing entity types) are logged as warnings, not errors
         // to avoid breaking generation when the gateway is misconfigured
+        tracing::debug!(
+            "[CHAT] Validating with known_symbols: {:?}",
+            session_named_refs.keys().collect::<Vec<_>>()
+        );
         let validator_result = async {
             let v = SemanticValidator::new(state.pool.clone()).await?;
             v.with_csg_linter().await
@@ -571,8 +642,13 @@ async fn chat_session(
             Ok(mut validator) => {
                 let request = crate::dsl_v2::validation::ValidationRequest {
                     source: dsl.clone(),
-                    context: ValidationContext::default(),
+                    context: ValidationContext::default()
+                        .with_known_symbols(session_named_refs.clone()),
                 };
+                tracing::debug!(
+                    "[CHAT] ValidationRequest known_symbols: {:?}",
+                    request.context.known_symbols.keys().collect::<Vec<_>>()
+                );
                 match validator.validate(&request).await {
                     crate::dsl_v2::validation::ValidationResult::Err(diagnostics) => {
                         for diag in diagnostics {
@@ -644,28 +720,27 @@ async fn chat_session(
     let (response_msg, can_execute, assembled) = match final_dsl {
         Some(ref dsl) => {
             let has_errors = validation_results.iter().any(|v| !v.valid);
-            session.assembled_dsl = vec![dsl.clone()];
-            session.state = if has_errors {
-                SessionState::PendingValidation
-            } else {
-                SessionState::ReadyToExecute
+
+            // Parse DSL to get AST for pending state
+            let ast = match crate::dsl_v2::parse_program(dsl) {
+                Ok(program) => program.statements,
+                Err(_) => Vec::new(),
             };
 
-            // Parse DSL into AST and add to session context
-            if !has_errors {
-                match crate::dsl_v2::parse_program(dsl) {
-                    Ok(program) => {
-                        session.context.add_statements(program.statements);
-                        tracing::info!(
-                            "Added {} statements to session AST",
-                            session.context.statement_count()
-                        );
-                    }
-                    Err(e) => {
-                        tracing::warn!("Failed to parse DSL for AST storage: {}", e);
-                    }
-                }
+            // Set pending DSL with DRAFT status (awaiting user confirmation)
+            // This replaces any previous pending DSL
+            session.set_pending_dsl(dsl.clone(), ast);
+
+            // Also keep legacy assembled_dsl for backward compat
+            session.assembled_dsl = vec![dsl.clone()];
+
+            if has_errors {
+                session.state = SessionState::PendingValidation;
             }
+            // else state is already ReadyToExecute from set_pending_dsl
+
+            // NOTE: Don't add to session.context.ast here - only add after successful execution
+            // The context.ast accumulates only executed statements, not proposed ones
 
             let msg = if final_explanation.is_empty() {
                 "DSL generated successfully.".to_string()
@@ -675,11 +750,8 @@ async fn chat_session(
 
             session.add_agent_message(msg.clone(), None, Some(dsl.clone()));
 
-            // Write DSL to session file (like Claude Code writes to source files)
-            let description = req.message.chars().take(50).collect::<String>();
-            if let Err(e) = file_manager.append_dsl(session_id, dsl, &description).await {
-                tracing::error!("Failed to write DSL to session file: {}", e);
-            }
+            // NOTE: Don't write to session file or DB here - only write after successful execution
+            // Pending DSL stays in memory until EXECUTED status
 
             (
                 msg,
@@ -800,10 +872,18 @@ async fn execute_session_dsl(
     Path(session_id): Path<Uuid>,
     Json(req): Json<Option<ExecuteDslRequest>>,
 ) -> Result<Json<ExecuteResponse>, StatusCode> {
+    tracing::debug!("[EXEC] Session {} - START execute_session_dsl", session_id);
+
     // Get or create execution context
     let (mut context, current_state, user_intent) = {
         let sessions = state.sessions.read().await;
         let session = sessions.get(&session_id).ok_or(StatusCode::NOT_FOUND)?;
+
+        tracing::debug!(
+            "[EXEC] Session {} - Loading context, named_refs: {:?}",
+            session_id,
+            session.context.named_refs
+        );
 
         // Extract user intent from last user message
         let user_intent = session
@@ -859,13 +939,21 @@ async fn execute_session_dsl(
     // Pre-bind symbols from session context
     if let Some(id) = context.last_cbu_id {
         exec_ctx.bind("last_cbu", id);
+        tracing::debug!("[EXEC] Pre-bound last_cbu = {}", id);
     }
     if let Some(id) = context.last_entity_id {
         exec_ctx.bind("last_entity", id);
+        tracing::debug!("[EXEC] Pre-bound last_entity = {}", id);
     }
     // Pre-bind all named references from previous executions
+    tracing::debug!(
+        "[EXEC] Pre-binding {} named_refs: {:?}",
+        context.named_refs.len(),
+        context.named_refs
+    );
     for (name, id) in &context.named_refs {
         exec_ctx.bind(name, *id);
+        tracing::debug!("[EXEC] Pre-bound @{} = {}", name, id);
     }
 
     // =========================================================================
@@ -920,6 +1008,11 @@ async fn execute_session_dsl(
     // =========================================================================
     // CSG VALIDATION (includes dataflow)
     // =========================================================================
+    tracing::debug!("[EXEC] Starting CSG validation");
+    tracing::debug!(
+        "[EXEC] Validation known_symbols: {:?}",
+        context.named_refs.keys().collect::<Vec<_>>()
+    );
     let validator_result = async {
         let v = SemanticValidator::new(state.pool.clone()).await?;
         v.with_csg_linter().await
@@ -930,11 +1023,22 @@ async fn execute_session_dsl(
         use crate::dsl_v2::validation::{Severity, ValidationContext, ValidationRequest};
         let request = ValidationRequest {
             source: dsl.clone(),
-            context: ValidationContext::default(),
+            context: ValidationContext::default().with_known_symbols(context.named_refs.clone()),
         };
+        tracing::debug!(
+            "[EXEC] ValidationRequest.context.known_symbols: {:?}",
+            request.context.known_symbols
+        );
         if let crate::dsl_v2::validation::ValidationResult::Err(diagnostics) =
             validator.validate(&request).await
         {
+            tracing::debug!(
+                "[EXEC] Validation returned {} diagnostics",
+                diagnostics.len()
+            );
+            for diag in &diagnostics {
+                tracing::debug!("[EXEC] Diagnostic: [{:?}] {}", diag.severity, diag.message);
+            }
             let csg_errors: Vec<String> = diagnostics
                 .iter()
                 .filter(|d| d.severity == Severity::Error)
@@ -1058,6 +1162,12 @@ async fn execute_session_dsl(
                             if step.verb_call.domain == "cbu" {
                                 context.last_cbu_id = Some(*uuid);
                                 context.cbu_ids.push(*uuid);
+                                // Also add cbu_id alias so LLM can use @cbu_id
+                                context.named_refs.insert("cbu_id".to_string(), *uuid);
+                            }
+                            // Add entity_id alias for entity.* verbs
+                            if step.verb_call.domain == "entity" {
+                                context.named_refs.insert("entity_id".to_string(), *uuid);
                             }
                         }
                     }
@@ -1086,6 +1196,7 @@ async fn execute_session_dsl(
             // =========================================================================
             // PERSIST SYMBOLS TO SESSION CONTEXT WITH TYPE INFO
             // =========================================================================
+            tracing::debug!("[EXEC] Persisting symbols to session context");
             // Extract binding metadata from plan steps and store typed bindings
             for (idx, exec_result) in exec_results.iter().enumerate() {
                 if let DslV2Result::Uuid(uuid) = exec_result {
@@ -1117,16 +1228,36 @@ async fn execute_session_dsl(
                                 .unwrap_or_else(|| binding_name.clone());
 
                             // Store typed binding
+                            tracing::debug!(
+                                "[EXEC] set_binding: @{} = {} (type: {}, display: {})",
+                                binding_name,
+                                uuid,
+                                entity_type,
+                                display_name
+                            );
                             context.set_binding(binding_name, *uuid, &entity_type, &display_name);
+
+                            // Update primary domain keys
+                            context.update_primary_key(&entity_type, binding_name, *uuid);
                         }
                     }
                 }
             }
 
             // Also copy raw symbols for backward compatibility
+            tracing::debug!(
+                "[EXEC] Copying {} exec_ctx.symbols to named_refs: {:?}",
+                exec_ctx.symbols.len(),
+                exec_ctx.symbols
+            );
             for (name, id) in &exec_ctx.symbols {
                 context.named_refs.insert(name.clone(), *id);
+                tracing::debug!("[EXEC] named_refs.insert(@{} = {})", name, id);
             }
+            tracing::debug!(
+                "[EXEC] After symbol persist, context.named_refs: {:?}",
+                context.named_refs
+            );
 
             // =========================================================================
             // LOG SUCCESS
@@ -1282,7 +1413,40 @@ async fn execute_session_dsl(
     let new_state = {
         let mut sessions = state.sessions.write().await;
         if let Some(session) = sessions.get_mut(&session_id) {
+            // Only persist DSL to AST and file on successful execution
+            if all_success {
+                // Add executed statements to session AST
+                if let Ok(program) = crate::dsl_v2::parse_program(&dsl) {
+                    session.context.add_statements(program.statements);
+                    tracing::info!(
+                        "Added {} statements to session AST after successful execution",
+                        session.context.statement_count()
+                    );
+                }
+
+                // Write DSL to session file (only after successful execution)
+                let file_manager = crate::api::dsl_session_file::DslSessionFileManager::new();
+                let dsl_clone = dsl.clone();
+                let description = format!("Executed: {} statement(s)", plan.len());
+                tokio::spawn(async move {
+                    if let Err(e) = file_manager
+                        .append_dsl(session_id, &dsl_clone, &description)
+                        .await
+                    {
+                        tracing::error!("Failed to write DSL to session file: {}", e);
+                    }
+                });
+            }
+
+            tracing::debug!(
+                "[EXEC] Saving context to session, named_refs: {:?}",
+                context.named_refs
+            );
             session.context = context;
+            tracing::debug!(
+                "[EXEC] Session context after save, named_refs: {:?}",
+                session.context.named_refs
+            );
             let session_results: Vec<crate::api::session::ExecutionResult> = results
                 .iter()
                 .map(|r| crate::api::session::ExecutionResult {
@@ -1296,6 +1460,13 @@ async fn execute_session_dsl(
                 })
                 .collect();
             session.record_execution(session_results);
+
+            // Mark pending DSL as executed and clear it
+            // Only EXECUTED status triggers DB persistence
+            session.mark_executed();
+            session.pending = None; // Clear pending after successful execution
+            session.assembled_dsl.clear();
+
             session.state.clone()
         } else {
             SessionState::New
@@ -1315,7 +1486,7 @@ async fn execute_session_dsl(
     }))
 }
 
-/// POST /api/session/:id/clear - Clear session DSL
+/// POST /api/session/:id/clear - Clear/cancel pending DSL
 async fn clear_session_dsl(
     State(state): State<AgentState>,
     Path(session_id): Path<Uuid>,
@@ -1323,6 +1494,8 @@ async fn clear_session_dsl(
     let mut sessions = state.sessions.write().await;
     let session = sessions.get_mut(&session_id).ok_or(StatusCode::NOT_FOUND)?;
 
+    // Cancel any pending DSL (marks as CANCELLED, clears from session)
+    session.cancel_pending();
     session.pending_intents.clear();
     session.assembled_dsl.clear();
 
@@ -1337,6 +1510,228 @@ async fn clear_session_dsl(
         messages: session.messages.clone(),
         can_execute: false,
     }))
+}
+
+/// Request to set a binding in a session
+#[derive(Debug, Deserialize)]
+pub struct SetBindingRequest {
+    /// The binding name (without @)
+    pub name: String,
+    /// The UUID to bind
+    pub id: Uuid,
+    /// Entity type (e.g., "cbu", "entity", "case")
+    pub entity_type: String,
+    /// Human-readable display name
+    pub display_name: String,
+}
+
+/// Response from setting a binding
+#[derive(Debug, Serialize)]
+pub struct SetBindingResponse {
+    pub success: bool,
+    pub binding_name: String,
+    pub bindings: std::collections::HashMap<String, Uuid>,
+}
+
+/// POST /api/session/:id/bind - Set a binding in the session context
+///
+/// This allows the UI to register external entities (like a selected CBU)
+/// as available symbols for DSL generation and execution.
+async fn set_session_binding(
+    State(state): State<AgentState>,
+    Path(session_id): Path<Uuid>,
+    Json(req): Json<SetBindingRequest>,
+) -> Result<Json<SetBindingResponse>, StatusCode> {
+    eprintln!(
+        "[BIND-RUST] Received bind request for session {} - name={} id={} type={}",
+        session_id, req.name, req.id, req.entity_type
+    );
+
+    let mut sessions = state.sessions.write().await;
+    let session = sessions.get_mut(&session_id).ok_or_else(|| {
+        eprintln!("[BIND-RUST] Session {} NOT FOUND", session_id);
+        StatusCode::NOT_FOUND
+    })?;
+
+    // Set the typed binding (includes display name for LLM context)
+    let actual_name =
+        session
+            .context
+            .set_binding(&req.name, req.id, &req.entity_type, &req.display_name);
+
+    // Also set common aliases for CBU
+    if req.entity_type == "cbu" {
+        session.context.named_refs.insert("cbu".to_string(), req.id);
+        session
+            .context
+            .named_refs
+            .insert("cbu_id".to_string(), req.id);
+        session.context.set_active_cbu(req.id, &req.display_name);
+    }
+
+    eprintln!(
+        "[BIND-RUST] SUCCESS - Session {} - Set @{} = {} (type: {}, display: {})",
+        session_id, actual_name, req.id, req.entity_type, req.display_name
+    );
+    eprintln!(
+        "[BIND-RUST] named_refs now: {:?}",
+        session.context.named_refs
+    );
+
+    Ok(Json(SetBindingResponse {
+        success: true,
+        binding_name: actual_name,
+        bindings: session.context.named_refs.clone(),
+    }))
+}
+
+// ============================================================================
+// Entity Reference Resolution Handler
+// ============================================================================
+
+/// POST /api/dsl/resolve-ref - Update AST triplet with resolved primary key
+///
+/// Updates an EntityRef's resolved_key in the session AST without changing
+/// the DSL source text. The AST is the source of truth; source is rendered from it.
+///
+/// ## Request
+///
+/// ```json
+/// {
+///   "session_id": "uuid",
+///   "ref_id": { "statement_index": 2, "arg_key": "entity-id" },
+///   "resolved_key": "550e8400-..."
+/// }
+/// ```
+///
+/// ## Response
+///
+/// Returns the refreshed AST with resolution stats and can_execute flag.
+async fn resolve_entity_ref(
+    State(state): State<AgentState>,
+    Json(req): Json<ResolveRefRequest>,
+) -> Result<Json<ResolveRefResponse>, StatusCode> {
+    use crate::dsl_v2::ast::{count_entity_refs, AstNode, Statement};
+
+    let mut sessions = state.sessions.write().await;
+    let session = sessions
+        .get_mut(&req.session_id)
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    // Validate statement index
+    if req.ref_id.statement_index >= session.context.ast.len() {
+        return Ok(Json(ResolveRefResponse {
+            success: false,
+            ast: None,
+            resolution_stats: ResolutionStats {
+                total_refs: 0,
+                unresolved_count: 0,
+            },
+            can_execute: false,
+            error: Some(format!(
+                "Statement index {} out of range (AST has {} statements)",
+                req.ref_id.statement_index,
+                session.context.ast.len()
+            )),
+            code: Some("INVALID_REF_ID".to_string()),
+        }));
+    }
+
+    // Get the statement and find the argument
+    let stmt = &mut session.context.ast[req.ref_id.statement_index];
+
+    let update_result = match stmt {
+        Statement::VerbCall(vc) => {
+            // Find the argument by key
+            let arg = vc
+                .arguments
+                .iter_mut()
+                .find(|a| a.key == req.ref_id.arg_key);
+
+            match arg {
+                Some(arg) => {
+                    // Check if it's an EntityRef
+                    match &arg.value {
+                        AstNode::EntityRef {
+                            entity_type,
+                            search_column,
+                            value,
+                            resolved_key,
+                            span,
+                        } => {
+                            if resolved_key.is_some() {
+                                Err((
+                                    "EntityRef already has a resolved_key".to_string(),
+                                    "ALREADY_RESOLVED".to_string(),
+                                ))
+                            } else {
+                                // Update with resolved key
+                                arg.value = AstNode::EntityRef {
+                                    entity_type: entity_type.clone(),
+                                    search_column: search_column.clone(),
+                                    value: value.clone(),
+                                    resolved_key: Some(req.resolved_key.clone()),
+                                    span: *span,
+                                };
+                                Ok(())
+                            }
+                        }
+                        _ => Err((
+                            format!("Argument '{}' is not an EntityRef", req.ref_id.arg_key),
+                            "NOT_ENTITY_REF".to_string(),
+                        )),
+                    }
+                }
+                None => Err((
+                    format!("Argument '{}' not found in statement", req.ref_id.arg_key),
+                    "INVALID_REF_ID".to_string(),
+                )),
+            }
+        }
+        Statement::Comment(_) => Err((
+            "Cannot resolve ref in a comment statement".to_string(),
+            "INVALID_REF_ID".to_string(),
+        )),
+    };
+
+    // Handle update result
+    match update_result {
+        Ok(()) => {
+            // Calculate resolution stats
+            let program = session.context.as_program();
+            let stats = count_entity_refs(&program);
+
+            let can_execute = stats.is_fully_resolved();
+
+            // Update session state if ready to execute
+            if can_execute && !session.context.ast.is_empty() {
+                session.state = SessionState::ReadyToExecute;
+            }
+
+            Ok(Json(ResolveRefResponse {
+                success: true,
+                ast: Some(session.context.ast.clone()),
+                resolution_stats: ResolutionStats {
+                    total_refs: stats.total_refs,
+                    unresolved_count: stats.unresolved_count,
+                },
+                can_execute,
+                error: None,
+                code: None,
+            }))
+        }
+        Err((message, code)) => Ok(Json(ResolveRefResponse {
+            success: false,
+            ast: None,
+            resolution_stats: ResolutionStats {
+                total_refs: 0,
+                unresolved_count: 0,
+            },
+            can_execute: false,
+            error: Some(message),
+            code: Some(code),
+        })),
+    }
 }
 
 // ============================================================================

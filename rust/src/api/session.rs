@@ -37,6 +37,64 @@ pub enum SessionState {
     Closed,
 }
 
+/// Status of a DSL/AST pair in the pipeline
+/// This is the state machine for individual DSL fragments
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum DslStatus {
+    /// DSL parsed and AST valid, awaiting user confirmation
+    #[default]
+    Draft,
+    /// User confirmed, ready to execute
+    Ready,
+    /// Successfully executed against database
+    Executed,
+    /// User declined to run (logical delete)
+    Cancelled,
+    /// Execution attempted but failed
+    Failed,
+}
+
+impl DslStatus {
+    /// Can this DSL be executed?
+    pub fn is_runnable(&self) -> bool {
+        matches!(self, DslStatus::Draft | DslStatus::Ready)
+    }
+
+    /// Is this DSL in a terminal state?
+    pub fn is_terminal(&self) -> bool {
+        matches!(
+            self,
+            DslStatus::Executed | DslStatus::Cancelled | DslStatus::Failed
+        )
+    }
+
+    /// Should this DSL be persisted to database?
+    pub fn should_persist(&self) -> bool {
+        // Only persist executed DSL - drafts and cancelled stay in memory
+        matches!(self, DslStatus::Executed)
+    }
+}
+
+/// Pending DSL/AST pair in the session (not yet persisted to DB)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PendingDsl {
+    /// Unique ID for this pending DSL fragment
+    pub id: Uuid,
+    /// The DSL source code
+    pub source: String,
+    /// Parsed AST statements
+    pub ast: Vec<Statement>,
+    /// Current status
+    pub status: DslStatus,
+    /// When this was created
+    pub created_at: DateTime<Utc>,
+    /// Error message if status is Failed
+    pub error: Option<String>,
+    /// Bindings that would be created if executed
+    pub pending_bindings: HashMap<String, String>,
+}
+
 // ============================================================================
 // Session Types
 // ============================================================================
@@ -59,8 +117,13 @@ pub struct AgentSession {
     /// Current pending intents (before validation)
     pub pending_intents: Vec<VerbIntent>,
 
-    /// Validated and assembled DSL statements
+    /// Validated and assembled DSL statements (legacy - for backward compat)
     pub assembled_dsl: Vec<String>,
+
+    /// Current pending DSL/AST awaiting user confirmation (in-memory only)
+    /// This is cleared on execute, cancel, or new chat message
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pending: Option<PendingDsl>,
 
     /// Results from execution
     pub executed_results: Vec<ExecutionResult>,
@@ -81,12 +144,90 @@ impl AgentSession {
             messages: Vec::new(),
             pending_intents: Vec::new(),
             assembled_dsl: Vec::new(),
+            pending: None,
             executed_results: Vec::new(),
             context: SessionContext {
                 domain_hint,
                 ..Default::default()
             },
         }
+    }
+
+    /// Set pending DSL (parsed and ready for user confirmation)
+    pub fn set_pending_dsl(&mut self, source: String, ast: Vec<Statement>) {
+        let pending_bindings = ast
+            .iter()
+            .filter_map(|stmt| {
+                if let Statement::VerbCall(vc) = stmt {
+                    vc.binding.as_ref().map(|b| (b.clone(), vc.domain.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        self.pending = Some(PendingDsl {
+            id: Uuid::new_v4(),
+            source,
+            ast,
+            status: DslStatus::Draft,
+            created_at: Utc::now(),
+            error: None,
+            pending_bindings,
+        });
+        self.state = SessionState::ReadyToExecute;
+        self.updated_at = Utc::now();
+    }
+
+    /// Cancel pending DSL (user declined)
+    pub fn cancel_pending(&mut self) {
+        if let Some(ref mut pending) = self.pending {
+            pending.status = DslStatus::Cancelled;
+        }
+        // Clear pending - cancelled drafts don't persist
+        self.pending = None;
+        self.state = SessionState::Executed; // Ready for next command
+        self.updated_at = Utc::now();
+    }
+
+    /// Mark pending DSL as ready to execute (user confirmed)
+    pub fn confirm_pending(&mut self) {
+        if let Some(ref mut pending) = self.pending {
+            pending.status = DslStatus::Ready;
+        }
+        self.updated_at = Utc::now();
+    }
+
+    /// Mark pending DSL as executed (after successful execution)
+    pub fn mark_executed(&mut self) {
+        if let Some(ref mut pending) = self.pending {
+            pending.status = DslStatus::Executed;
+        }
+        self.state = SessionState::Executed;
+        self.updated_at = Utc::now();
+    }
+
+    /// Mark pending DSL as failed (execution error)
+    pub fn mark_failed(&mut self, error: String) {
+        if let Some(ref mut pending) = self.pending {
+            pending.status = DslStatus::Failed;
+            pending.error = Some(error);
+        }
+        self.state = SessionState::Executed; // Can try again
+        self.updated_at = Utc::now();
+    }
+
+    /// Get pending DSL if in runnable state
+    pub fn get_runnable_dsl(&self) -> Option<&PendingDsl> {
+        self.pending.as_ref().filter(|p| p.status.is_runnable())
+    }
+
+    /// Check if there's pending DSL awaiting confirmation
+    pub fn has_pending(&self) -> bool {
+        self.pending
+            .as_ref()
+            .map(|p| !p.status.is_terminal())
+            .unwrap_or(false)
     }
 
     /// Add a user message to the session
@@ -268,10 +409,37 @@ pub struct SessionContext {
     /// Each chat message can add/modify statements in this AST
     #[serde(default)]
     pub ast: Vec<Statement>,
+    /// Index from binding name to AST statement index
+    /// Allows lookup like: get_ast_by_key("cbu_id") → returns the Statement that created it
+    #[serde(default)]
+    pub ast_index: HashMap<String, usize>,
     /// The ACTIVE CBU for this session - used as implicit context for incremental operations
     /// When set, operations like cbu.add-product will auto-use this CBU ID
     #[serde(skip_serializing_if = "Option::is_none")]
     pub active_cbu: Option<BoundEntity>,
+    /// Primary domain keys - the main identifiers for this onboarding session
+    #[serde(default)]
+    pub primary_keys: PrimaryDomainKeys,
+}
+
+/// Primary domain keys tracked across the session
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PrimaryDomainKeys {
+    /// Onboarding request ID (if applicable)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub onboarding_request_id: Option<Uuid>,
+    /// Primary CBU being onboarded
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cbu_id: Option<Uuid>,
+    /// Primary KYC case for this onboarding
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kyc_case_id: Option<Uuid>,
+    /// Primary document collection (if applicable)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub document_batch_id: Option<Uuid>,
+    /// Primary service resource instance
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resource_instance_id: Option<Uuid>,
 }
 
 impl SessionContext {
@@ -375,12 +543,69 @@ impl SessionContext {
 
     /// Add statements to the AST
     pub fn add_statements(&mut self, statements: Vec<Statement>) {
-        self.ast.extend(statements);
+        for stmt in statements {
+            self.add_statement(stmt);
+        }
     }
 
-    /// Add a single statement to the AST
+    /// Add a single statement to the AST, indexing by binding name if present
     pub fn add_statement(&mut self, statement: Statement) {
+        let idx = self.ast.len();
+
+        // If statement has a binding (:as @name), index it
+        if let Statement::VerbCall(ref verb_call) = statement {
+            if let Some(ref binding_name) = verb_call.binding {
+                self.ast_index.insert(binding_name.to_string(), idx);
+
+                // Also update primary keys based on domain
+                let domain = &verb_call.domain;
+                if domain == "cbu" && self.primary_keys.cbu_id.is_none() {
+                    // Will be set when we get the UUID from execution
+                }
+                if domain == "kyc-case" && self.primary_keys.kyc_case_id.is_none() {
+                    // Will be set when we get the UUID from execution
+                }
+            }
+        }
+
         self.ast.push(statement);
+    }
+
+    /// Get AST statement by binding key (e.g., "cbu_id" → the cbu.ensure statement)
+    pub fn get_ast_by_key(&self, key: &str) -> Option<&Statement> {
+        self.ast_index.get(key).and_then(|&idx| self.ast.get(idx))
+    }
+
+    /// Get AST statement index by binding key
+    pub fn get_ast_index_by_key(&self, key: &str) -> Option<usize> {
+        self.ast_index.get(key).copied()
+    }
+
+    /// Update primary keys from execution result
+    pub fn update_primary_key(&mut self, domain: &str, binding: &str, id: Uuid) {
+        match domain {
+            "cbu" => {
+                if self.primary_keys.cbu_id.is_none() {
+                    self.primary_keys.cbu_id = Some(id);
+                }
+            }
+            "kyc-case" => {
+                if self.primary_keys.kyc_case_id.is_none() {
+                    self.primary_keys.kyc_case_id = Some(id);
+                }
+            }
+            "service-resource" => {
+                if self.primary_keys.resource_instance_id.is_none() {
+                    self.primary_keys.resource_instance_id = Some(id);
+                }
+            }
+            _ => {}
+        }
+        // Also index by the specific binding name
+        if let Some(idx) = self.ast_index.get(binding) {
+            // Already indexed when statement was added
+            let _ = idx;
+        }
     }
 
     /// Get the AST as a Program for compilation/execution
@@ -630,9 +855,10 @@ mod tests {
         assert_eq!(session.state, SessionState::PendingValidation);
 
         // Set assembled DSL -> ReadyToExecute
+        // NOTE: pending_intents are kept for execution-time ref resolution
         session.set_assembled_dsl(vec!["(cbu.ensure :cbu-name \"Test\")".to_string()]);
         assert_eq!(session.state, SessionState::ReadyToExecute);
-        assert!(session.pending_intents.is_empty());
+        assert_eq!(session.pending_intents.len(), 1); // Intents preserved
 
         // Record execution -> Executed
         session.record_execution(vec![ExecutionResult {

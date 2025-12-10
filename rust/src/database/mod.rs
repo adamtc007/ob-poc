@@ -7,10 +7,7 @@
 //! Database operations flow through dsl_v2::DslExecutor which generates SQL
 //! from verb definitions. Domain services provide specialized operations.
 
-use sqlx::Row;
-use sqlx::{postgres::PgPoolOptions, PgPool};
 use std::time::Duration;
-use tracing::{info, warn};
 
 pub mod attribute_values_service;
 pub mod cbu_entity_roles_service;
@@ -102,5 +99,3 @@ impl Default for DatabaseConfig {
         }
     }
 }
-
-

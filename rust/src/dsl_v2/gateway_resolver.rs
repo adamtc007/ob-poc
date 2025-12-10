@@ -234,6 +234,7 @@ impl RefResolver for GatewayRefResolver {
 }
 
 /// Map RefType to EntityGateway nickname
+/// NOTE: Nicknames are UPPERCASE to match entity_index.yaml nickname fields
 fn ref_type_to_nickname(ref_type: RefType) -> &'static str {
     match ref_type {
         RefType::DocumentType => "DOCUMENT_TYPE",
@@ -275,6 +276,10 @@ mod tests {
             ref_type_to_nickname(RefType::ScreeningType),
             "SCREENING_TYPE"
         );
+        assert_eq!(ref_type_to_nickname(RefType::Product), "PRODUCT");
+        assert_eq!(ref_type_to_nickname(RefType::Service), "SERVICE");
+        assert_eq!(ref_type_to_nickname(RefType::Currency), "CURRENCY");
+        assert_eq!(ref_type_to_nickname(RefType::ClientType), "CLIENT_TYPE");
     }
 
     #[test]

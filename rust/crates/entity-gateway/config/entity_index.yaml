@@ -57,10 +57,12 @@ entities:
   cbu:
     nickname: "CBU"
     source_table: '"ob-poc".cbus'
-    return_key: "name" # Return name for DSL source (resolved to UUID at execution)
+    return_key: "cbu_id" # Return UUID for UI binding (name available in label)
     display_template: "{name}"
     index_mode: trigram # CBU names need fuzzy search
     search_keys:
+      - name: "id"
+        column: "cbu_id"
       - name: "name"
         column: "name"
         default: true

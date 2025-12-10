@@ -1,0 +1,43 @@
+# Fund Onboarding Demo Scenario
+# Demonstrates creating a fund CBU with entities, roles, and KYC
+
+name: "Fund Onboarding"
+description: "Complete fund setup with entities, KYC case, and screenings"
+typing_speed_ms: 25
+pause_after_ms: 1500
+cleanup_after: true
+
+steps:
+  - prompt: "Create a Luxembourg hedge fund called Apex Capital"
+    expect_verbs:
+      - cbu.ensure
+    pause_after_ms: 2000
+
+  - prompt: "Add John Smith as the portfolio manager, born March 15, 1975"
+    expect_verbs:
+      - entity.create-proper-person
+      - cbu.assign-role
+
+  - prompt: "Sarah Chen is the compliance officer, born June 22, 1982"
+    expect_verbs:
+      - entity.create-proper-person
+      - cbu.assign-role
+
+  - prompt: "Create a KYC case for onboarding"
+    expect_verbs:
+      - kyc-case.create
+    auto_execute: true
+
+  - prompt: "Add workstreams for John and Sarah"
+    expect_verbs:
+      - entity-workstream.create
+
+  - prompt: "Run PEP and sanctions screening on both individuals"
+    expect_verbs:
+      - case-screening.run
+    auto_execute: true
+    pause_after_ms: 3000
+
+  - prompt: "Mark both screenings as clear with no matches"
+    expect_verbs:
+      - case-screening.complete

@@ -150,3 +150,43 @@ impl Default for SemanticContextStore {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_empty_store() {
+        let store = SemanticContextStore::new_empty();
+        assert!(!store.is_initialized());
+    }
+
+    #[tokio::test]
+    async fn test_initialize_empty_store() {
+        let mut store = SemanticContextStore::new_empty();
+        // Initialize should succeed even without DB
+        let result = store.initialize().await;
+        assert!(result.is_ok());
+        assert!(store.is_initialized());
+    }
+
+    #[tokio::test]
+    async fn test_find_similar_documents_uninitialized() {
+        let store = SemanticContextStore::new_empty();
+        // Should return empty vec when not initialized
+        let result = store.find_similar_documents("proper_person", 5).await;
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_cached_similarities() {
+        let store = SemanticContextStore::new_empty();
+        // Should return empty vec (cache table removed)
+        let result = store
+            .get_cached_similarities("entity", "proper_person", "document", 0.5)
+            .await;
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_empty());
+    }
+}

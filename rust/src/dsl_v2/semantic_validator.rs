@@ -138,6 +138,36 @@ impl SemanticValidator {
         // Step 2: Walk AST and validate, tracking resolved primary keys
         let mut diagnostics = DiagnosticBuilder::new();
         let mut symbols: HashMap<String, SymbolInfo> = HashMap::new();
+
+        // Pre-populate with known symbols from previous executions (session context)
+        tracing::debug!(
+            "[VALIDATOR] Pre-populating {} known_symbols: {:?}",
+            request.context.known_symbols.len(),
+            request.context.known_symbols.keys().collect::<Vec<_>>()
+        );
+        for (name, _uuid) in &request.context.known_symbols {
+            tracing::debug!("[VALIDATOR] Adding known symbol: @{}", name);
+            symbols.insert(
+                name.clone(),
+                SymbolInfo {
+                    // Default to Entity type for pre-existing symbols
+                    // The actual type doesn't matter much since we just need to pass validation
+                    ref_type: RefType::Entity,
+                    defined_at: SourceSpan {
+                        line: 0,
+                        column: 0,
+                        offset: 0,
+                        length: 0,
+                    },
+                    used: false,
+                },
+            );
+        }
+        tracing::debug!(
+            "[VALIDATOR] Symbol table after pre-population: {:?}",
+            symbols.keys().collect::<Vec<_>>()
+        );
+
         let mut validated_statements = Vec::new();
         // Track resolved primary keys: (statement_idx, arg_key) -> primary_key
         let mut resolved_keys: HashMap<(usize, String), String> = HashMap::new();
@@ -491,6 +521,28 @@ impl SemanticValidator {
                         used: false,
                     },
                 );
+
+                // Also add domain_id alias (e.g., cbu_id, entity_id) for convenience
+                // This allows LLM to use @cbu_id instead of remembering specific binding names
+                let alias = format!("{}_id", verb_call.domain);
+                tracing::debug!(
+                    "Registering binding '{}' and alias '{}' for verb '{}.{}'",
+                    binding_name,
+                    alias,
+                    verb_call.domain,
+                    verb_call.verb
+                );
+                if !symbols.contains_key(&alias) {
+                    symbols.insert(
+                        alias.clone(),
+                        SymbolInfo {
+                            ref_type: return_type,
+                            defined_at: binding_span,
+                            used: false,
+                        },
+                    );
+                    tracing::debug!("Added alias '{}' to symbols", alias);
+                }
             }
         }
 
@@ -686,19 +738,32 @@ impl SemanticValidator {
                     // UUID literal - check if it's an attribute or document ref based on context
                     let key_with_colon = format!(":{}", key);
                     if let Some(ref_type) = arg_to_ref_type(verb, &key_with_colon) {
-                        match self.resolver.resolve(ref_type, &uuid.to_string()).await {
-                            Ok(ResolveResult::Found { id, display }) => Some(ResolvedArg::Ref {
+                        // For entity types (CBU, Entity, Document), trust valid UUIDs
+                        // The executor will fail if they don't exist - no need for gateway lookup
+                        if matches!(ref_type, RefType::Cbu | RefType::Entity | RefType::Document) {
+                            Some(ResolvedArg::Ref {
                                 ref_type,
-                                id,
-                                display,
-                            }),
-                            _ => {
-                                diagnostics.error(
-                                    DiagnosticCode::InvalidValue,
-                                    src_span,
-                                    format!("UUID '{}' not found", uuid),
-                                );
-                                None
+                                id: *uuid,
+                                display: uuid.to_string(),
+                            })
+                        } else {
+                            // For reference data types, still validate via gateway
+                            match self.resolver.resolve(ref_type, &uuid.to_string()).await {
+                                Ok(ResolveResult::Found { id, display }) => {
+                                    Some(ResolvedArg::Ref {
+                                        ref_type,
+                                        id,
+                                        display,
+                                    })
+                                }
+                                _ => {
+                                    diagnostics.error(
+                                        DiagnosticCode::InvalidValue,
+                                        src_span,
+                                        format!("UUID '{}' not found", uuid),
+                                    );
+                                    None
+                                }
                             }
                         }
                     } else {

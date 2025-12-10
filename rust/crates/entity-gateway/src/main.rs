@@ -49,14 +49,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Configuration loaded"
     );
 
-    // Create index registry
-    let registry = Arc::new(IndexRegistry::new(config.entities.clone()));
+    // Create index registry - keyed by nickname field (uppercase), not YAML key
+    let configs_by_nickname: std::collections::HashMap<String, _> = config
+        .entities
+        .iter()
+        .map(|(_, cfg)| (cfg.nickname.clone(), cfg.clone()))
+        .collect();
+    let registry = Arc::new(IndexRegistry::new(configs_by_nickname));
 
-    // Create indexes for each entity
-    for (nickname, entity_config) in &config.entities {
-        tracing::info!(nickname = %nickname, "Creating index");
+    // Create indexes for each entity (using nickname from config)
+    for (_yaml_key, entity_config) in &config.entities {
+        tracing::info!(nickname = %entity_config.nickname, "Creating index");
         let index = TantivyIndex::new(entity_config.clone())?;
-        registry.register(nickname.clone(), Arc::new(index)).await;
+        registry
+            .register(entity_config.nickname.clone(), Arc::new(index))
+            .await;
     }
 
     // Initialize refresh pipeline

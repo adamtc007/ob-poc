@@ -4,10 +4,13 @@
 //! enabling HTTP access to intelligent DSL generation, entity creation,
 //! role management, CBU operations, and complete workflow orchestration.
 //!
+//! The server embeds the EntityGateway gRPC service for entity resolution,
+//! eliminating the need to run it as a separate process.
+//!
 //! ## Usage
 //!
 //! ```bash
-//! # Start the server
+//! # Start the server (EntityGateway starts automatically on port 50051)
 //! DATABASE_URL=postgresql://localhost/ob-poc \
 //! ANTHROPIC_API_KEY=your-key \
 //! cargo run --bin agentic_server --features server
@@ -30,10 +33,20 @@ use axum::routing::get;
 use axum::Router;
 use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
+
+use entity_gateway::{
+    config::StartupMode,
+    index::{IndexRegistry, TantivyIndex},
+    proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer,
+    refresh::{run_refresh_loop, RefreshPipeline},
+    server::EntityGatewayService,
+    GatewayConfig,
+};
 
 use ob_poc::api::{
     create_agent_router, create_attribute_router, create_dsl_viewer_router, create_entity_router,
@@ -71,6 +84,125 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     println!("Database connection established");
+
+    // =========================================================================
+    // Start embedded EntityGateway gRPC service
+    // =========================================================================
+    println!("Starting embedded EntityGateway...");
+
+    // Load EntityGateway configuration
+    let gateway_config_path = std::env::var("ENTITY_GATEWAY_CONFIG")
+        .unwrap_or_else(|_| "crates/entity-gateway/config/entity_index.yaml".to_string());
+
+    let gateway_config = match GatewayConfig::from_file(&gateway_config_path) {
+        Ok(cfg) => Some(cfg),
+        Err(e) => {
+            println!(
+                "Warning: Failed to load EntityGateway config from {}: {}",
+                gateway_config_path, e
+            );
+            println!("   Entity resolution features will not be available");
+            println!("   Create config or set ENTITY_GATEWAY_CONFIG env var");
+            None
+        }
+    };
+
+    if let Some(gateway_config) = gateway_config {
+        // Create index registry - keyed by nickname field (UPPERCASE), not YAML map key
+        // This matches what gateway_resolver.rs sends (e.g., "JURISDICTION" not "jurisdiction")
+        let configs_by_nickname: std::collections::HashMap<String, _> = gateway_config
+            .entities
+            .iter()
+            .map(|(_, cfg)| (cfg.nickname.clone(), cfg.clone()))
+            .collect();
+        let registry = Arc::new(IndexRegistry::new(configs_by_nickname));
+
+        // Create Tantivy indexes for each entity type (using nickname from config)
+        for (_yaml_key, entity_config) in &gateway_config.entities {
+            match TantivyIndex::new(entity_config.clone()) {
+                Ok(index) => {
+                    registry
+                        .register(entity_config.nickname.clone(), Arc::new(index))
+                        .await;
+                    println!("   Registered index: {}", entity_config.nickname);
+                }
+                Err(e) => {
+                    println!(
+                        "   Warning: Failed to create index for {}: {}",
+                        entity_config.nickname, e
+                    );
+                }
+            }
+        }
+
+        // Initialize and run refresh pipeline
+        let refresh_registry = registry.clone();
+        let refresh_config = gateway_config.clone();
+        tokio::spawn(async move {
+            // Initial refresh
+            match RefreshPipeline::new(refresh_config.clone()).await {
+                Ok(pipeline) => {
+                    match refresh_config.refresh.startup_mode {
+                        StartupMode::Sync => {
+                            println!("   Performing initial index refresh (sync)...");
+                            if let Err(e) = pipeline.refresh_all(&refresh_registry).await {
+                                println!("   Warning: Initial refresh failed: {}", e);
+                            } else {
+                                println!("   Initial refresh complete");
+                            }
+                        }
+                        StartupMode::Async => {
+                            println!("   Starting async initial refresh...");
+                            let reg = refresh_registry.clone();
+                            tokio::spawn(async move {
+                                if let Err(e) = pipeline.refresh_all(&reg).await {
+                                    tracing::error!("Async initial refresh failed: {}", e);
+                                }
+                            });
+                        }
+                    }
+
+                    // Start background refresh loop
+                    let loop_pipeline = match RefreshPipeline::new(refresh_config.clone()).await {
+                        Ok(p) => p,
+                        Err(e) => {
+                            tracing::error!("Failed to create refresh loop pipeline: {}", e);
+                            return;
+                        }
+                    };
+                    run_refresh_loop(
+                        loop_pipeline,
+                        refresh_registry,
+                        refresh_config.refresh.interval_secs,
+                    )
+                    .await;
+                }
+                Err(e) => {
+                    println!("   Warning: Failed to initialize refresh pipeline: {}", e);
+                }
+            }
+        });
+
+        // Start gRPC server in background
+        let grpc_service = EntityGatewayService::new(registry);
+        let grpc_addr: SocketAddr = std::env::var("ENTITY_GATEWAY_ADDR")
+            .unwrap_or_else(|_| "[::]:50051".to_string())
+            .parse()
+            .unwrap_or_else(|_| "[::]:50051".parse().unwrap());
+
+        tokio::spawn(async move {
+            println!("   EntityGateway gRPC listening on {}", grpc_addr);
+            if let Err(e) = tonic::transport::Server::builder()
+                .add_service(EntityGatewayServer::new(grpc_service))
+                .serve(grpc_addr)
+                .await
+            {
+                tracing::error!("EntityGateway gRPC server error: {}", e);
+            }
+        });
+
+        println!("EntityGateway started successfully");
+    }
 
     // Create routers and merge them
     let app = Router::new()
@@ -125,7 +257,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("    GET    http://localhost:3000/api/attributes/:cbu_id");
     println!("    GET    http://localhost:3000/api/attributes/document/:doc_id");
     println!("    GET    http://localhost:3000/api/attributes/health");
-    println!("\n  Entity Search:");
+    println!("\n  Entity Search (via embedded EntityGateway on :50051):");
+    println!("    GET    http://localhost:3000/api/entity/search?type=entity&q=<query>");
     println!("    GET    http://localhost:3000/api/entities/search?q=<query>&types=PERSON,COMPANY");
     println!("\n  DSL Viewer:");
     println!("    GET    http://localhost:3000/api/dsl/list                 - List DSL instances");

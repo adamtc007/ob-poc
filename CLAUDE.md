@@ -178,26 +178,55 @@ All entity lookup and resolution flows through the **EntityGateway** gRPC servic
 | Generic Executor | `rust/src/dsl_v2/generic_executor.rs` | Runtime entity lookup with SQL fallback |
 | Agent Routes | `rust/src/api/agent_routes.rs` | Tool-use entity lookup |
 
-### Go UI Proxy Pattern
+### Go Web UI (Gin Framework)
 
-The Go web UI (`go/cmd/web/main.go`) is purely a proxy to Rust APIs - no business logic or side doors:
+The Go web UI (`go/cmd/web/main.go`) uses the Gin framework and acts as a proxy to Rust APIs - no business logic or side doors.
+
+**Key patterns:**
 
 ```go
-// All routes proxy to Rust
-r.HandleFunc("/api/dsl/execute", proxyTo(agentURL + "/execute"))
-r.HandleFunc("/api/agent/chat", proxyTo(agentURL + "/api/session/{id}/chat"))
+// Route groups for organization
+api := r.Group("/api")
+{
+    agent := api.Group("/agent")
+    {
+        agent.POST("/session", handleAgentSession)
+        agent.POST("/chat", handleAgentChat)
+    }
+    dsl := api.Group("/dsl")
+    {
+        dsl.POST("/execute", handleDirectExecute)
+    }
+}
+
+// Proxy helper for JSON POST requests
+func proxyPostJSON(c *gin.Context, targetURL string) {
+    body, _ := io.ReadAll(c.Request.Body)
+    resp, _ := http.Post(targetURL, "application/json", bytes.NewReader(body))
+    respBody, _ := io.ReadAll(resp.Body)
+    c.Data(resp.StatusCode, "application/json", respBody)
+}
 ```
+
+**Route structure:**
+- `/` - Server-rendered HTML index page
+- `/health` - Health check (proxies to Rust)
+- `/api/agent/*` - Agent session endpoints (proxy to Rust :3000)
+- `/api/dsl/*` - DSL execution endpoints (proxy to Rust :3001)
+- `/api/cbus` - List CBUs
+- `/api/entity/search` - Entity search for finder
+- `/static/*` - Embedded static assets (JS, CSS)
 
 ## Code Statistics
 
-As of 2025-12-09:
+As of 2025-12-10:
 
 | Language | Files | Lines |
 |----------|-------|-------|
 | Rust | 264 | 198,458 |
-| Go | 6 | 1,443 |
+| Go | 10 | 2,307 |
 | YAML Config | 5 | 7,789 |
-| **Total** | **275** | **~207,690** |
+| **Total** | **279** | **~208,554** |
 
 ### YAML-Driven Configuration
 
@@ -261,6 +290,19 @@ ob-poc/
 │   └── tests/
 │       ├── db_integration.rs       # Database integration tests
 │       └── scenarios/              # DSL test scenarios (8 valid, 5 error)
+├── go/
+│   ├── cmd/
+│   │   ├── web/main.go             # Web UI proxy server
+│   │   ├── harness/main.go         # Test harness
+│   │   └── animate/main.go         # Animation demo CLI
+│   ├── internal/
+│   │   ├── rustclient/             # Rust API client types
+│   │   ├── harness/                # Test harness logic
+│   │   └── animate/                # Animation runner
+│   └── scenarios/                  # YAML demo scenarios
+│       ├── fund_onboarding.yaml    # Fund + KYC demo (7 steps)
+│       ├── custody_setup.yaml      # Custody setup demo (8 steps)
+│       └── quick_test.yaml         # Fast test scenario (2 steps)
 ├── docs/
 │   └── DSL_TEST_SCENARIOS.md       # Test scenario documentation
 ├── schema_export.sql               # Full DDL for database rebuild
@@ -762,6 +804,91 @@ dsl_cli execute -f program.dsl --format json | jq '.success'
 # Get created bindings
 dsl_cli execute -f program.dsl --format json | jq '.bindings'
 ```
+
+## Go Animation CLI (animate)
+
+The `animate` CLI runs scripted demo scenarios against the agentic DSL API. It's written in Go for compile-time safety and clean scripting.
+
+### Build
+
+```bash
+cd go/
+go build -o bin/animate ./cmd/animate
+```
+
+### Usage
+
+```bash
+# Run a scenario
+./bin/animate -f scenarios/fund_onboarding.yaml
+
+# Fast mode (2x speed)
+./bin/animate -f scenarios/fund_onboarding.yaml --speed 2.0
+
+# Interactive (pause between steps)
+./bin/animate -f scenarios/fund_onboarding.yaml -i
+
+# List available scenarios
+./bin/animate --list scenarios/
+
+# No color output (for CI/logs)
+./bin/animate -f scenarios/quick_test.yaml --no-color
+```
+
+### Options
+
+| Flag | Description |
+|------|-------------|
+| `-f <file>` | Scenario YAML file to run |
+| `--list <dir>` | List scenarios in directory |
+| `--agent-url` | Rust agent API URL (default: http://127.0.0.1:3000) |
+| `--speed` | Speed multiplier (1.0 = normal, 2.0 = 2x faster) |
+| `-i` | Interactive mode (pause between steps) |
+| `--diff` | Highlight new DSL statements (default: true) |
+| `--no-color` | Disable color output |
+| `--stop-on-error` | Stop if a step fails |
+
+### Scenario YAML Schema
+
+```yaml
+name: "Fund Onboarding"
+description: "Complete fund setup with entities and KYC"
+typing_speed_ms: 25      # Simulated typing delay (0 = instant)
+pause_after_ms: 1500     # Default pause between steps
+cleanup_after: true      # Delete created CBUs after run
+
+steps:
+  - prompt: "Create a Luxembourg hedge fund called Apex Capital"
+    expect_verbs:        # Validate these verbs appear in generated DSL
+      - cbu.ensure
+    pause_after_ms: 2000 # Override default pause
+
+  - prompt: "Add John Smith as the portfolio manager"
+    expect_verbs:
+      - entity.create-proper-person
+      - cbu.assign-role
+    auto_execute: true   # Execute DSL after this step
+
+  - prompt: "Run PEP screening on John"
+    expect_verbs:
+      - case-screening.run
+    wait_for_key: true   # Wait for keypress before continuing
+```
+
+### Available Scenarios
+
+| Scenario | Steps | Description |
+|----------|-------|-------------|
+| `fund_onboarding.yaml` | 7 | Fund + entities + KYC case + screenings |
+| `custody_setup.yaml` | 8 | Universe + SSIs + booking rules |
+| `quick_test.yaml` | 2 | Fast test for CI |
+
+### Use Cases
+
+1. **Demos**: Show realistic onboarding flows with typing animation
+2. **E2E Testing**: Validate agent generates correct verbs for prompts
+3. **Regression**: `expect_verbs` catches when model output changes
+4. **Training**: Run scenarios to show how natural language maps to DSL
 
 ## API Endpoints
 

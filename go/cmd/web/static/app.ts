@@ -100,6 +100,63 @@ document.addEventListener("DOMContentLoaded", () => {
     cbu: CbuData | null;
   }
 
+  // AST EntityRef node type (matches Rust AST)
+  interface AstEntityRef {
+    EntityRef: {
+      entity_type: string;
+      search_column: string | null;
+      value: string;
+      resolved_key: string | null;
+      span: { start: number; end: number };
+    };
+  }
+
+  // AST Argument type
+  interface AstArgument {
+    key: string;
+    value: unknown;
+    span: { start: number; end: number };
+  }
+
+  // AST VerbCall type
+  interface AstVerbCall {
+    VerbCall: {
+      domain: string;
+      verb: string;
+      arguments: AstArgument[];
+      binding: string | null;
+      span: { start: number; end: number };
+    };
+  }
+
+  // AST Statement type
+  type AstStatement = AstVerbCall | { Comment: string };
+
+  // RefId for resolve-ref API
+  interface RefId {
+    statement_index: number;
+    arg_key: string;
+  }
+
+  // Entity finder modal state
+  interface EntityFinderState {
+    visible: boolean;
+    refId: RefId | null;
+    entityType: string;
+    searchValue: string;
+    results: EntitySearchResult[];
+    loading: boolean;
+  }
+
+  let entityFinderState: EntityFinderState = {
+    visible: false,
+    refId: null,
+    entityType: "",
+    searchValue: "",
+    results: [],
+    loading: false,
+  };
+
   let debugState: DebugPanelState = {
     dslSource: "",
     ast: [],
@@ -187,6 +244,8 @@ document.addEventListener("DOMContentLoaded", () => {
     errors?: string[];
     error?: string;
     new_state?: string;
+    dsl_source?: string;
+    ast?: any[];
   }
 
   // ==================== DOM ELEMENTS ====================
@@ -433,11 +492,15 @@ document.addEventListener("DOMContentLoaded", () => {
       copyDslBtn.disabled = true;
     }
 
-    // Update AST panel
+    // Update AST panel with interactive EntityRefs
     if (debugState.ast && debugState.ast.length > 0) {
-      astCode.textContent = JSON.stringify(debugState.ast, null, 2);
+      astCode.innerHTML = renderInteractiveAst(
+        debugState.ast as AstStatement[],
+      );
       astCode.style.display = "block";
       astEmpty.style.display = "none";
+      // Attach click handlers to unresolved EntityRefs
+      attachEntityRefHandlers();
     } else {
       astCode.style.display = "none";
       astEmpty.style.display = "block";
@@ -452,6 +515,454 @@ document.addEventListener("DOMContentLoaded", () => {
       cbuTree.style.display = "none";
       cbuEmpty.style.display = "block";
     }
+  }
+
+  // ==================== INTERACTIVE AST RENDERING ====================
+
+  /**
+   * Render AST with clickable unresolved EntityRefs
+   * Unresolved refs (resolved_key: null) become clickable to open entity finder
+   */
+  function renderInteractiveAst(ast: AstStatement[]): string {
+    const lines: string[] = [];
+
+    ast.forEach((stmt, stmtIdx) => {
+      if ("VerbCall" in stmt) {
+        const vc = stmt.VerbCall;
+        lines.push(`<span class="ast-verb">(${vc.domain}.${vc.verb}</span>`);
+
+        vc.arguments.forEach((arg) => {
+          const argHtml = renderAstValue(arg.value, stmtIdx, arg.key);
+          lines.push(`  <span class="ast-key">:${arg.key}</span> ${argHtml}`);
+        });
+
+        if (vc.binding) {
+          lines.push(
+            `  <span class="ast-key">:as</span> <span class="ast-symbol">@${vc.binding}</span>`,
+          );
+        }
+
+        lines.push(`<span class="ast-verb">)</span>`);
+        lines.push(""); // blank line between statements
+      } else if ("Comment" in stmt) {
+        lines.push(
+          `<span class="ast-comment">;; ${escapeHtml(stmt.Comment)}</span>`,
+        );
+      }
+    });
+
+    return lines.join("\n");
+  }
+
+  /**
+   * Render an AST value node, making EntityRefs clickable if unresolved
+   */
+  function renderAstValue(
+    value: unknown,
+    stmtIdx: number,
+    argKey: string,
+  ): string {
+    if (value === null || value === undefined) {
+      return `<span class="ast-null">null</span>`;
+    }
+
+    if (typeof value === "string") {
+      return `<span class="ast-string">"${escapeHtml(value)}"</span>`;
+    }
+
+    if (typeof value === "number" || typeof value === "boolean") {
+      return `<span class="ast-literal">${value}</span>`;
+    }
+
+    if (typeof value === "object") {
+      // Check for EntityRef
+      if ("EntityRef" in (value as object)) {
+        const ref = (value as AstEntityRef).EntityRef;
+        return renderEntityRef(ref, stmtIdx, argKey);
+      }
+
+      // Check for SymbolRef
+      if ("SymbolRef" in (value as object)) {
+        const sym = (value as { SymbolRef: { name: string } }).SymbolRef;
+        return `<span class="ast-symbol">@${escapeHtml(sym.name)}</span>`;
+      }
+
+      // Check for Literal wrapper
+      if ("Literal" in (value as object)) {
+        const lit = (value as { Literal: unknown }).Literal;
+        return renderAstValue(lit, stmtIdx, argKey);
+      }
+
+      // Check for String wrapper
+      if ("String" in (value as object)) {
+        const str = (value as { String: string }).String;
+        return `<span class="ast-string">"${escapeHtml(str)}"</span>`;
+      }
+
+      // Check for Number wrapper
+      if ("Number" in (value as object)) {
+        const num = (value as { Number: number }).Number;
+        return `<span class="ast-literal">${num}</span>`;
+      }
+
+      // Check for Boolean wrapper
+      if ("Boolean" in (value as object)) {
+        const bool = (value as { Boolean: boolean }).Boolean;
+        return `<span class="ast-literal">${bool}</span>`;
+      }
+
+      // Fallback: JSON stringify
+      return `<span class="ast-object">${escapeHtml(JSON.stringify(value))}</span>`;
+    }
+
+    return `<span class="ast-unknown">${escapeHtml(String(value))}</span>`;
+  }
+
+  /**
+   * Render an EntityRef - clickable if unresolved
+   */
+  function renderEntityRef(
+    ref: AstEntityRef["EntityRef"],
+    stmtIdx: number,
+    argKey: string,
+  ): string {
+    const entityType = escapeHtml(ref.entity_type);
+    const value = escapeHtml(ref.value);
+    const resolved = ref.resolved_key;
+
+    if (resolved) {
+      // Resolved - show as green triplet
+      return (
+        `<span class="ast-entity-ref resolved" title="Resolved to ${escapeHtml(resolved)}">` +
+        `<span class="ref-type">${entityType}</span> ` +
+        `<span class="ref-value">"${value}"</span> ` +
+        `<span class="ref-key">${escapeHtml(resolved.substring(0, 8))}...</span>` +
+        `</span>`
+      );
+    } else {
+      // Unresolved - clickable
+      return (
+        `<span class="ast-entity-ref unresolved" ` +
+        `data-stmt-idx="${stmtIdx}" ` +
+        `data-arg-key="${escapeHtml(argKey)}" ` +
+        `data-entity-type="${entityType}" ` +
+        `data-search-value="${value}" ` +
+        `title="Click to resolve: ${entityType} '${value}'">` +
+        `<span class="ref-type">${entityType}</span> ` +
+        `<span class="ref-value">"${value}"</span> ` +
+        `<span class="ref-key unresolved-marker">⚠ unresolved</span>` +
+        `</span>`
+      );
+    }
+  }
+
+  /**
+   * Attach click handlers to unresolved EntityRefs in the AST panel
+   */
+  function attachEntityRefHandlers() {
+    const unresolvedRefs = astCode.querySelectorAll(
+      ".ast-entity-ref.unresolved",
+    );
+    unresolvedRefs.forEach((el) => {
+      el.addEventListener("click", (e) => {
+        e.preventDefault();
+        const target = e.currentTarget as HTMLElement;
+        const stmtIdx = parseInt(target.dataset.stmtIdx || "0", 10);
+        const argKey = target.dataset.argKey || "";
+        const entityType = target.dataset.entityType || "";
+        const searchValue = target.dataset.searchValue || "";
+
+        openEntityFinder(stmtIdx, argKey, entityType, searchValue);
+      });
+    });
+  }
+
+  // ==================== ENTITY FINDER MODAL ====================
+
+  /**
+   * Open the entity finder modal for a specific EntityRef
+   */
+  async function openEntityFinder(
+    stmtIdx: number,
+    argKey: string,
+    entityType: string,
+    searchValue: string,
+  ) {
+    entityFinderState = {
+      visible: true,
+      refId: { statement_index: stmtIdx, arg_key: argKey },
+      entityType,
+      searchValue,
+      results: [],
+      loading: true,
+    };
+
+    renderEntityFinderModal();
+
+    // Search for entities
+    try {
+      const results = await searchEntitiesForFinder(entityType, searchValue);
+      entityFinderState.results = results;
+      entityFinderState.loading = false;
+      renderEntityFinderModal();
+    } catch (e) {
+      console.error("Entity search failed:", e);
+      entityFinderState.loading = false;
+      entityFinderState.results = [];
+      renderEntityFinderModal();
+    }
+  }
+
+  /**
+   * Search entities using the /api/entity/search endpoint
+   */
+  async function searchEntitiesForFinder(
+    entityType: string,
+    query: string,
+  ): Promise<EntitySearchResult[]> {
+    try {
+      const resp = await fetch("/api/entity/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entity_type: entityType,
+          query: query,
+          limit: 10,
+        }),
+      });
+
+      if (!resp.ok) {
+        console.error("Entity search failed:", resp.status);
+        return [];
+      }
+
+      const data = await resp.json();
+      return data.results || [];
+    } catch (e) {
+      console.error("Entity search error:", e);
+      return [];
+    }
+  }
+
+  /**
+   * Close the entity finder modal
+   */
+  function closeEntityFinder() {
+    entityFinderState.visible = false;
+    entityFinderState.refId = null;
+    const modal = document.getElementById("entity-finder-modal");
+    if (modal) {
+      modal.remove();
+    }
+  }
+
+  /**
+   * Handle entity selection from the finder modal
+   */
+  async function selectEntityFromFinder(result: EntitySearchResult) {
+    if (!entityFinderState.refId || !sessionId) {
+      closeEntityFinder();
+      return;
+    }
+
+    // Call resolve-ref API
+    try {
+      const resp = await fetch("/api/dsl/resolve-ref", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: sessionId,
+          ref_id: entityFinderState.refId,
+          resolved_key: result.entity_id,
+        }),
+      });
+
+      if (!resp.ok) {
+        console.error("Resolve-ref failed:", resp.status);
+        addAssistantMessage({
+          text: `Failed to resolve entity reference: HTTP ${resp.status}`,
+        });
+        closeEntityFinder();
+        return;
+      }
+
+      const data = await resp.json();
+
+      if (data.success) {
+        // Update AST from response
+        if (data.ast) {
+          debugState.ast = data.ast;
+          updateDebugPanels();
+        }
+
+        // Show success message with resolution stats
+        const stats = data.resolution_stats;
+        const remaining = stats.unresolved_count;
+
+        if (data.can_execute) {
+          addAssistantMessage({
+            text: `Resolved "${entityFinderState.searchValue}" → ${result.name}. All references resolved - ready to execute!`,
+            status: { type: "valid", text: "✓ Ready to execute" },
+          });
+        } else {
+          addAssistantMessage({
+            text: `Resolved "${entityFinderState.searchValue}" → ${result.name}. ${remaining} unresolved reference(s) remaining.`,
+            status: { type: "warning", text: `${remaining} unresolved` },
+          });
+        }
+      } else {
+        addAssistantMessage({
+          text: `Failed to resolve: ${data.error || "Unknown error"}`,
+          status: { type: "error", text: data.code || "Error" },
+        });
+      }
+    } catch (e) {
+      console.error("Resolve-ref error:", e);
+      addAssistantMessage({
+        text: `Error resolving entity: ${(e as Error).message}`,
+      });
+    }
+
+    closeEntityFinder();
+  }
+
+  /**
+   * Render the entity finder modal
+   */
+  function renderEntityFinderModal() {
+    // Remove existing modal
+    let modal = document.getElementById("entity-finder-modal");
+    if (modal) {
+      modal.remove();
+    }
+
+    if (!entityFinderState.visible) {
+      return;
+    }
+
+    modal = document.createElement("div");
+    modal.id = "entity-finder-modal";
+    modal.className = "entity-finder-overlay";
+
+    const { entityType, searchValue, results, loading } = entityFinderState;
+
+    let resultsHtml = "";
+    if (loading) {
+      resultsHtml = `<div class="finder-loading"><span class="spinner"></span> Searching...</div>`;
+    } else if (results.length === 0) {
+      resultsHtml = `<div class="finder-empty">No matching entities found for "${escapeHtml(searchValue)}"</div>`;
+    } else {
+      resultsHtml = `<div class="finder-results">`;
+      results.forEach((r, idx) => {
+        const pct = Math.round(r.similarity * 100);
+        const typeDisplay =
+          r.entity_type_code?.replace(/_/g, " ") || r.entity_type;
+        const jurisdiction = r.jurisdiction ? ` (${r.jurisdiction})` : "";
+        resultsHtml += `
+          <div class="finder-result" data-result-idx="${idx}">
+            <div class="finder-result-main">
+              <span class="finder-result-name">${escapeHtml(r.name)}</span>
+              <span class="finder-result-jurisdiction">${escapeHtml(jurisdiction)}</span>
+            </div>
+            <div class="finder-result-meta">
+              <span class="finder-result-type">${escapeHtml(typeDisplay)}</span>
+              <span class="finder-result-score">${pct}%</span>
+            </div>
+          </div>
+        `;
+      });
+      resultsHtml += `</div>`;
+    }
+
+    modal.innerHTML = `
+      <div class="entity-finder-modal">
+        <div class="finder-header">
+          <h3>Resolve Entity Reference</h3>
+          <button class="finder-close" title="Close">&times;</button>
+        </div>
+        <div class="finder-info">
+          <span class="finder-type">${escapeHtml(entityType)}</span>
+          <span class="finder-search">"${escapeHtml(searchValue)}"</span>
+        </div>
+        <div class="finder-search-box">
+          <input type="text" id="finder-search-input" placeholder="Refine search..." value="${escapeHtml(searchValue)}">
+          <button id="finder-search-btn">Search</button>
+        </div>
+        ${resultsHtml}
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Attach event handlers
+    modal
+      .querySelector(".finder-close")
+      ?.addEventListener("click", closeEntityFinder);
+    modal
+      .querySelector(".entity-finder-overlay")
+      ?.addEventListener("click", (e) => {
+        if (e.target === modal) {
+          closeEntityFinder();
+        }
+      });
+
+    // Search button handler
+    modal
+      .querySelector("#finder-search-btn")
+      ?.addEventListener("click", async () => {
+        const input = document.getElementById(
+          "finder-search-input",
+        ) as HTMLInputElement;
+        if (input && input.value.trim()) {
+          entityFinderState.searchValue = input.value.trim();
+          entityFinderState.loading = true;
+          renderEntityFinderModal();
+
+          const results = await searchEntitiesForFinder(
+            entityFinderState.entityType,
+            entityFinderState.searchValue,
+          );
+          entityFinderState.results = results;
+          entityFinderState.loading = false;
+          renderEntityFinderModal();
+        }
+      });
+
+    // Enter key in search input
+    modal
+      .querySelector("#finder-search-input")
+      ?.addEventListener("keypress", (e) => {
+        if ((e as KeyboardEvent).key === "Enter") {
+          modal
+            ?.querySelector("#finder-search-btn")
+            ?.dispatchEvent(new Event("click"));
+        }
+      });
+
+    // Result click handlers
+    modal.querySelectorAll(".finder-result").forEach((el) => {
+      el.addEventListener("click", () => {
+        const idx = parseInt((el as HTMLElement).dataset.resultIdx || "0", 10);
+        const result = entityFinderState.results[idx];
+        if (result) {
+          selectEntityFromFinder(result);
+        }
+      });
+    });
+
+    // Focus search input
+    (
+      document.getElementById("finder-search-input") as HTMLInputElement
+    )?.focus();
+
+    // Escape key to close modal
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        closeEntityFinder();
+        document.removeEventListener("keydown", handleEscape);
+      }
+    };
+    document.addEventListener("keydown", handleEscape);
   }
 
   function updateDebugFromResponse(data: {
@@ -531,6 +1042,17 @@ document.addEventListener("DOMContentLoaded", () => {
         entity_type: e.entity_type as string,
         roles: (e.roles as string[]) || [],
       })),
+      services: (
+        (cbuData.services as Array<Record<string, unknown>>) || []
+      ).map((s) => ({
+        instance_id: (s.delivery_id as string) || "",
+        service_name: s.service as string,
+        resource_type: s.product as string,
+        status: s.status as string,
+      })),
+      documents: cbuData.documents as CbuDocument[] | undefined,
+      screenings: cbuData.screenings as CbuScreening[] | undefined,
+      kyc_cases: cbuData.kyc_cases as CbuKycCase[] | undefined,
       summary: cbuData.summary as CbuSummary | undefined,
     };
   }
@@ -610,6 +1132,23 @@ document.addEventListener("DOMContentLoaded", () => {
           `<span class="t-br">│</span> <span class="t-id">${counts.join(" · ")}</span>`,
         );
       }
+    }
+
+    // Products/Services section (at top, directly under CBU)
+    if (cbu.services && cbu.services.length > 0) {
+      lines.push(`<span class="t-br">│</span>`);
+      lines.push(
+        `<span class="t-br">├─</span> <span class="t-node">Products</span>`,
+      );
+      cbu.services.forEach((svc, idx) => {
+        const isLast = idx === cbu.services!.length - 1;
+        const branch = isLast ? "└" : "├";
+        const statusClass =
+          svc.status === "ACTIVE" ? "t-status-active" : "t-status-pending";
+        lines.push(
+          `<span class="t-br">│  ${branch}─</span> <span class="t-val">${esc(svc.service_name || "")}</span> <span class="t-type">(${esc(svc.resource_type || "")})</span> <span class="${statusClass}">${esc(svc.status)}</span>`,
+        );
+      });
     }
 
     // Group entities by role (only entities with roles)
@@ -718,38 +1257,42 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Fetch CBU data using cbu.show verb and update both context and debug panel
   async function fetchAndDisplayCbu(cbuId: string) {
+    console.log("[DEBUG] fetchAndDisplayCbu called with:", cbuId);
     try {
-      // Use cbu.show verb to get full CBU structure
-      const dsl = `(cbu.show :cbu-id "${cbuId}")`;
-      const resp = await fetch("/api/dsl/execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dsl }),
-      });
+      // Use graph endpoint for full CBU structure with sorted entities
+      const resp = await fetch(`/api/cbu/${cbuId}/graph`);
 
+      console.log("[DEBUG] graph response status:", resp.status);
       if (resp.ok) {
-        const data = await resp.json();
+        const graph = await resp.json();
+        console.log("[DEBUG] graph response:", graph);
 
-        if (data.success && data.results && data.results.length > 0) {
-          const cbuResult = data.results[0];
-          if (cbuResult.result) {
-            const cbuData = cbuResult.result;
+        // Find CBU node
+        const cbuNode = graph.nodes?.find(
+          (n: { node_type: string }) => n.node_type === "cbu",
+        );
 
-            // Update context
-            context.cbu = {
-              id: cbuId,
-              name: cbuData.name || "Unknown",
-              jurisdiction: cbuData.jurisdiction,
-              clientType: cbuData.client_type,
-            };
+        if (cbuNode) {
+          // Update context
+          context.cbu = {
+            id: cbuId,
+            name: cbuNode.label || "Unknown",
+            jurisdiction: cbuNode.jurisdiction,
+            clientType: cbuNode.data?.client_type,
+          };
 
-            // Update debug panel with full CBU data
-            debugState.cbu = mapCbuShowResult(cbuData, cbuId);
-            updateDebugPanels();
-          }
+          // Map graph to CbuData for debug panel
+          debugState.cbu = mapGraphToCbuData(graph, cbuId);
+          console.log("[DEBUG] debugState.cbu set to:", debugState.cbu);
+          updateDebugPanels();
+        } else {
+          console.log("[DEBUG] No CBU node found in graph");
         }
+      } else {
+        console.log("[DEBUG] graph request failed:", resp.status);
       }
     } catch (e) {
+      console.error("[DEBUG] fetchAndDisplayCbu error:", e);
       // Fallback - just use the ID
       context.cbu = {
         id: cbuId,
@@ -758,6 +1301,66 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     updateContextBar();
+  }
+
+  // Map graph response to CbuData interface
+  function mapGraphToCbuData(
+    graph: {
+      nodes: Array<{
+        id: string;
+        node_type: string;
+        label: string;
+        sublabel?: string;
+        roles?: string[];
+        role_priority?: number;
+        jurisdiction?: string;
+        data?: Record<string, unknown>;
+      }>;
+    },
+    cbuId: string,
+  ): CbuData {
+    const cbuNode = graph.nodes.find((n) => n.node_type === "cbu");
+    const entityNodes = graph.nodes
+      .filter((n) => n.node_type === "entity")
+      .sort((a, b) => (b.role_priority || 0) - (a.role_priority || 0)); // Sort by priority desc (ownership first)
+
+    // Get products, services, and resources from the graph
+    const productNodes = graph.nodes.filter((n) => n.node_type === "product");
+    const serviceNodes = graph.nodes.filter((n) => n.node_type === "service");
+    const resourceNodes = graph.nodes.filter((n) => n.node_type === "resource");
+
+    // Combine all service-layer nodes for display
+    const allServiceNodes = [
+      ...productNodes,
+      ...serviceNodes,
+      ...resourceNodes,
+    ];
+
+    return {
+      cbu_id: cbuId,
+      name: cbuNode?.label || "Unknown",
+      jurisdiction: cbuNode?.jurisdiction,
+      client_type: cbuNode?.data?.client_type as string | undefined,
+      entities: entityNodes.map((e) => ({
+        entity_id: e.id,
+        name: e.label,
+        entity_type: e.sublabel || "",
+        roles: e.roles || [],
+      })),
+      services: allServiceNodes.map((s) => ({
+        instance_id: s.id,
+        service_name: s.label,
+        resource_type: s.sublabel || s.node_type, // Use node_type as fallback
+        status: (s.data?.status as string) || "ACTIVE",
+      })),
+      summary: {
+        entity_count: entityNodes.length,
+        document_count: 0,
+        service_count: allServiceNodes.length,
+        screening_count: 0,
+        case_count: 0,
+      },
+    };
   }
 
   // ==================== UI HELPERS ====================
@@ -1167,10 +1770,16 @@ document.addEventListener("DOMContentLoaded", () => {
     addAssistantMessage({ text: "Executing..." });
 
     try {
-      const resp = await fetch("/api/dsl/execute", {
+      // Use session execute endpoint if we have a session (preserves bindings)
+      // Otherwise fall back to stateless execute
+      const url = sessionId ? `/api/agent/execute` : `/api/dsl/execute`;
+
+      const body = sessionId ? { session_id: sessionId, dsl } : { dsl };
+
+      const resp = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dsl }),
+        body: JSON.stringify(body),
       });
 
       const data: ExecuteResponse = await resp.json();
@@ -1179,6 +1788,19 @@ document.addEventListener("DOMContentLoaded", () => {
         if (data.bindings) {
           await updateContextFromBindings(data.bindings);
         }
+
+        // Update debug panels - use input dsl as source, response for AST
+        debugState.dslSource = dsl;
+        if (data.ast) {
+          debugState.ast = data.ast;
+        }
+        updateDebugPanels();
+
+        // Refresh CBU data if we have one in context (to show updated services, etc.)
+        if (context.cbu?.id) {
+          await fetchAndDisplayCbu(context.cbu.id);
+        }
+
         addExecutionResult(true, "Executed successfully!", data.bindings);
       } else {
         const errorMsg =
@@ -1404,4 +2026,305 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Initialize panels
   initPanels();
+
+  // ==================== CBU PICKER (Search Modal) ====================
+  const selectCbuBtn = document.getElementById(
+    "select-cbu-btn",
+  ) as HTMLButtonElement;
+
+  interface CbuFinderState {
+    visible: boolean;
+    searchValue: string;
+    results: Array<{
+      cbu_id: string;
+      name: string;
+      jurisdiction?: string;
+      client_type?: string;
+    }>;
+    loading: boolean;
+  }
+
+  let cbuFinderState: CbuFinderState = {
+    visible: false,
+    searchValue: "",
+    results: [],
+    loading: false,
+  };
+
+  /**
+   * Search CBUs using the completions API (fuzzy search via EntityGateway)
+   */
+  async function searchCbus(query: string): Promise<CbuFinderState["results"]> {
+    try {
+      const resp = await fetch("/api/agent/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entity_type: "cbu", query, limit: 10 }),
+      });
+
+      if (!resp.ok) {
+        console.error("CBU search failed:", resp.status);
+        return [];
+      }
+
+      const data = await resp.json();
+      // Map completion items to CBU format
+      return data.items.map((item: CompletionItem) => ({
+        cbu_id: item.value,
+        name: item.label,
+        jurisdiction: item.detail,
+      }));
+    } catch (e) {
+      console.error("CBU search error:", e);
+      return [];
+    }
+  }
+
+  /**
+   * Open the CBU finder modal
+   */
+  async function openCbuFinder() {
+    cbuFinderState = {
+      visible: true,
+      searchValue: "",
+      results: [],
+      loading: true,
+    };
+
+    renderCbuFinderModal();
+
+    // Load initial list (empty search returns all)
+    try {
+      const results = await searchCbus("");
+      cbuFinderState.results = results;
+      cbuFinderState.loading = false;
+      renderCbuFinderModal();
+    } catch (e) {
+      console.error("Failed to load CBUs:", e);
+      cbuFinderState.loading = false;
+      renderCbuFinderModal();
+    }
+  }
+
+  /**
+   * Close the CBU finder modal
+   */
+  function closeCbuFinder() {
+    cbuFinderState.visible = false;
+    const modal = document.getElementById("cbu-finder-modal");
+    if (modal) {
+      modal.remove();
+    }
+  }
+
+  /**
+   * Handle CBU selection from the finder modal
+   */
+  async function selectCbuFromFinder(cbu: CbuFinderState["results"][0]) {
+    closeCbuFinder();
+
+    // Ensure we have a session first
+    if (!sessionId) {
+      try {
+        const sessResp = await fetch("/api/agent/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+        const sessData = await sessResp.json();
+        if (sessData.session_id) {
+          sessionId = sessData.session_id;
+        }
+      } catch (e) {
+        console.error("Failed to create session:", e);
+      }
+    }
+
+    // Register the binding in the Rust session
+    if (sessionId) {
+      console.log(
+        "[DEBUG] Binding CBU to session:",
+        sessionId,
+        "cbu_id:",
+        cbu.cbu_id,
+      );
+      try {
+        const bindPayload = {
+          session_id: sessionId,
+          name: "cbu",
+          id: cbu.cbu_id,
+          entity_type: "cbu",
+          display_name: cbu.name,
+        };
+        console.log("[DEBUG] Bind payload:", JSON.stringify(bindPayload));
+        const bindResp = await fetch("/api/agent/bind", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(bindPayload),
+        });
+        console.log("[DEBUG] Bind response status:", bindResp.status);
+        if (!bindResp.ok) {
+          const errText = await bindResp.text();
+          console.error("Failed to bind CBU:", bindResp.status, errText);
+        } else {
+          const bindResult = await bindResp.json();
+          console.log("[DEBUG] Bind result:", bindResult);
+        }
+      } catch (e) {
+        console.error("Failed to bind CBU:", e);
+      }
+    } else {
+      console.warn("[DEBUG] No sessionId available for bind!");
+    }
+
+    // Fetch full CBU details and set as active context
+    await fetchAndDisplayCbu(cbu.cbu_id);
+
+    // Set up bindings for the selected CBU (local context)
+    context.bindings.set("cbu", cbu.cbu_id);
+    context.bindings.set("cbu_id", cbu.cbu_id);
+
+    // Update the button to show selected CBU
+    if (selectCbuBtn) {
+      selectCbuBtn.textContent = context.cbu?.name || cbu.name;
+      selectCbuBtn.classList.add("active-cbu");
+    }
+
+    // Show confirmation message in chat
+    addAssistantMessage({
+      text: `Selected CBU: "${context.cbu?.name || cbu.name}". You can now reference it as @cbu or @cbu_id in your commands.`,
+      status: { type: "valid", text: "CBU context set" },
+    });
+  }
+
+  /**
+   * Render the CBU finder modal
+   */
+  function renderCbuFinderModal() {
+    // Remove existing modal
+    let modal = document.getElementById("cbu-finder-modal");
+    if (modal) {
+      modal.remove();
+    }
+
+    if (!cbuFinderState.visible) {
+      return;
+    }
+
+    modal = document.createElement("div");
+    modal.id = "cbu-finder-modal";
+    modal.className = "entity-finder-overlay";
+
+    const { searchValue, results, loading } = cbuFinderState;
+
+    let resultsHtml = "";
+    if (loading) {
+      resultsHtml = `<div class="finder-loading"><span class="spinner"></span> Loading CBUs...</div>`;
+    } else if (results.length === 0) {
+      resultsHtml = `<div class="finder-empty">No CBUs found${searchValue ? ` matching "${escapeHtml(searchValue)}"` : ""}</div>`;
+    } else {
+      resultsHtml = `<div class="finder-results">`;
+      results.forEach((cbu, idx) => {
+        const jurisdiction = cbu.jurisdiction ? ` (${cbu.jurisdiction})` : "";
+        const clientType = cbu.client_type ? ` [${cbu.client_type}]` : "";
+        resultsHtml += `
+          <div class="finder-result" data-result-idx="${idx}">
+            <div class="finder-result-main">
+              <span class="finder-result-name">${escapeHtml(cbu.name)}</span>
+              <span class="finder-result-jurisdiction">${escapeHtml(jurisdiction)}</span>
+            </div>
+            <div class="finder-result-meta">
+              <span class="finder-result-type">${escapeHtml(clientType)}</span>
+            </div>
+          </div>
+        `;
+      });
+      resultsHtml += `</div>`;
+    }
+
+    modal.innerHTML = `
+      <div class="entity-finder-modal">
+        <div class="finder-header">
+          <h3>Select CBU</h3>
+          <button class="finder-close" title="Close">&times;</button>
+        </div>
+        <div class="finder-search-box">
+          <input type="text" id="cbu-finder-search" placeholder="Search CBUs..." value="${escapeHtml(searchValue)}">
+          <button id="cbu-finder-search-btn">Search</button>
+        </div>
+        ${resultsHtml}
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Attach event handlers
+    modal
+      .querySelector(".finder-close")
+      ?.addEventListener("click", closeCbuFinder);
+
+    // Click outside to close
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) {
+        closeCbuFinder();
+      }
+    });
+
+    // Search button handler
+    modal
+      .querySelector("#cbu-finder-search-btn")
+      ?.addEventListener("click", async () => {
+        const input = document.getElementById(
+          "cbu-finder-search",
+        ) as HTMLInputElement;
+        if (input) {
+          cbuFinderState.searchValue = input.value.trim();
+          cbuFinderState.loading = true;
+          renderCbuFinderModal();
+
+          const results = await searchCbus(cbuFinderState.searchValue);
+          cbuFinderState.results = results;
+          cbuFinderState.loading = false;
+          renderCbuFinderModal();
+        }
+      });
+
+    // Enter key in search input
+    modal
+      .querySelector("#cbu-finder-search")
+      ?.addEventListener("keypress", (e) => {
+        if ((e as KeyboardEvent).key === "Enter") {
+          modal
+            ?.querySelector("#cbu-finder-search-btn")
+            ?.dispatchEvent(new Event("click"));
+        }
+      });
+
+    // Result click handlers
+    modal.querySelectorAll(".finder-result").forEach((el) => {
+      el.addEventListener("click", () => {
+        const idx = parseInt((el as HTMLElement).dataset.resultIdx || "0", 10);
+        const cbu = cbuFinderState.results[idx];
+        if (cbu) {
+          selectCbuFromFinder(cbu);
+        }
+      });
+    });
+
+    // Focus search input
+    (document.getElementById("cbu-finder-search") as HTMLInputElement)?.focus();
+
+    // Escape key to close modal
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        closeCbuFinder();
+        document.removeEventListener("keydown", handleEscape);
+      }
+    };
+    document.addEventListener("keydown", handleEscape);
+  }
+
+  // Initialize CBU picker button
+  if (selectCbuBtn) {
+    selectCbuBtn.addEventListener("click", openCbuFinder);
+  }
 });

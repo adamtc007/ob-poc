@@ -24,7 +24,7 @@ use tantivy::schema::{
 };
 use tantivy::tokenizer::{LowerCaser, NgramTokenizer, TextAnalyzer};
 use tantivy::{Index, IndexReader, IndexWriter, Term};
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 
 use crate::config::{EntityConfig, IndexMode};
 use crate::index::traits::{
@@ -42,6 +42,8 @@ pub struct TantivyIndex {
     index: Index,
     /// Reader for searching (updated after refresh)
     reader: RwLock<Option<IndexReader>>,
+    /// Mutex to serialize write operations (Tantivy only allows one IndexWriter at a time)
+    write_lock: Mutex<()>,
     /// Schema definition
     #[allow(dead_code)]
     schema: Schema,
@@ -128,6 +130,7 @@ impl TantivyIndex {
             config,
             index,
             reader: RwLock::new(None),
+            write_lock: Mutex::new(()),
             schema,
             token_field,
             display_field,
@@ -297,6 +300,10 @@ impl SearchIndex for TantivyIndex {
             records = data.len(),
             "Refreshing index"
         );
+
+        // Acquire write lock to serialize refresh operations
+        // Tantivy only allows one IndexWriter at a time per index
+        let _write_guard = self.write_lock.lock().await;
 
         // Create a new writer
         let mut writer: IndexWriter = self

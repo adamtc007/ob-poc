@@ -323,6 +323,7 @@ pub fn format_feedback(errors: &[String]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn test_build_simple_statement() {
@@ -349,7 +350,8 @@ mod tests {
         assert!(dsl.contains("cbu.ensure"));
         assert!(dsl.contains(":name \"Test Fund\""));
         assert!(dsl.contains(":jurisdiction \"LU\""));
-        assert!(dsl.contains(":as @result_1"));
+        // Now uses semantic binding based on :name param
+        assert!(dsl.contains(":as @test_fund"));
     }
 
     #[test]

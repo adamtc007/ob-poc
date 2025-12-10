@@ -6,11 +6,12 @@ import (
 	"github.com/google/uuid"
 )
 
-// HealthResponse from /health (dsl_api)
+// HealthResponse from /health (dsl_api) and /api/agent/health (agent API)
 type HealthResponse struct {
-	Status    string `json:"status"`
-	Version   string `json:"version"`
-	VerbCount int    `json:"verb_count"`
+	Status      string `json:"status"`
+	Version     string `json:"version"`
+	VerbCount   int    `json:"verb_count"`
+	DomainCount int    `json:"domain_count,omitempty"` // Only in agent API response
 }
 
 // VerbsResponse from /verbs
@@ -200,14 +201,24 @@ type AssembledDsl struct {
 	IntentCount int      `json:"intent_count"`
 }
 
+// BoundEntity represents a bound entity in the session context
+type BoundEntity struct {
+	ID          uuid.UUID `json:"id"`
+	EntityType  string    `json:"entity_type"`
+	DisplayName string    `json:"display_name"`
+}
+
 // ChatResponse from POST /api/session/:id/chat
 type ChatResponse struct {
-	Message           string             `json:"message"`
-	Intents           []VerbIntent       `json:"intents"`
-	ValidationResults []IntentValidation `json:"validation_results"`
-	AssembledDsl      *AssembledDsl      `json:"assembled_dsl,omitempty"`
-	SessionState      SessionState       `json:"session_state"`
-	CanExecute        bool               `json:"can_execute"`
+	Message           string                  `json:"message"`
+	Intents           []VerbIntent            `json:"intents"`
+	ValidationResults []IntentValidation      `json:"validation_results"`
+	AssembledDsl      *AssembledDsl           `json:"assembled_dsl,omitempty"`
+	SessionState      SessionState            `json:"session_state"`
+	CanExecute        bool                    `json:"can_execute"`
+	DslSource         *string                 `json:"dsl_source,omitempty"`
+	Ast               []any                   `json:"ast,omitempty"` // AST statements (complex nested structure)
+	Bindings          map[string]*BoundEntity `json:"bindings,omitempty"`
 }
 
 // MessageRole represents who sent a message

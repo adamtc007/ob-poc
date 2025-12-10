@@ -87,6 +87,10 @@ pub struct ValidationContext {
 
     /// Additional key-value hints
     pub hints: HashMap<String, String>,
+
+    /// Pre-defined symbols from previous executions (e.g., @fund -> UUID)
+    /// These are treated as already-bound during validation
+    pub known_symbols: HashMap<String, Uuid>,
 }
 
 impl ValidationContext {
@@ -124,6 +128,12 @@ impl ValidationContext {
     /// Add client type filter
     pub fn with_client_type(mut self, client_type: ClientType) -> Self {
         self.client_type = Some(client_type);
+        self
+    }
+
+    /// Add pre-defined symbols from previous executions
+    pub fn with_known_symbols(mut self, symbols: HashMap<String, Uuid>) -> Self {
+        self.known_symbols = symbols;
         self
     }
 }

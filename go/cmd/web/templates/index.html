@@ -460,38 +460,244 @@
                 }
             }
 
+            /* Interactive AST styles */
+            .ast-verb {
+                color: #dcdcaa;
+            }
+            .ast-key {
+                color: #9cdcfe;
+            }
+            .ast-string {
+                color: #ce9178;
+            }
+            .ast-literal {
+                color: #b5cea8;
+            }
+            .ast-symbol {
+                color: #4ec9b0;
+            }
+            .ast-null {
+                color: #666;
+                font-style: italic;
+            }
+            .ast-comment {
+                color: #6a9955;
+                font-style: italic;
+            }
+            .ast-object {
+                color: #888;
+            }
+            .ast-unknown {
+                color: #f48771;
+            }
+
+            /* EntityRef styling */
+            .ast-entity-ref {
+                display: inline-block;
+                padding: 0.1rem 0.3rem;
+                border-radius: 3px;
+                font-size: 0.9em;
+            }
+            .ast-entity-ref.resolved {
+                background: rgba(78, 201, 176, 0.15);
+                border: 1px solid rgba(78, 201, 176, 0.3);
+            }
+            .ast-entity-ref.resolved .ref-type {
+                color: #4ec9b0;
+            }
+            .ast-entity-ref.resolved .ref-value {
+                color: #ce9178;
+            }
+            .ast-entity-ref.resolved .ref-key {
+                color: #6a9955;
+                font-size: 0.85em;
+            }
+            .ast-entity-ref.unresolved {
+                background: rgba(244, 135, 113, 0.15);
+                border: 1px solid rgba(244, 135, 113, 0.4);
+                cursor: pointer;
+                transition: all 0.15s ease;
+            }
+            .ast-entity-ref.unresolved:hover {
+                background: rgba(244, 135, 113, 0.25);
+                border-color: rgba(244, 135, 113, 0.6);
+                box-shadow: 0 0 8px rgba(244, 135, 113, 0.3);
+            }
+            .ast-entity-ref.unresolved .ref-type {
+                color: #dcdcaa;
+            }
+            .ast-entity-ref.unresolved .ref-value {
+                color: #ce9178;
+            }
+            .ast-entity-ref.unresolved .unresolved-marker {
+                color: #f48771;
+                font-weight: 600;
+            }
+
+            /* Entity Finder Modal */
+            .entity-finder-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.7);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 1000;
+            }
+            .entity-finder-modal {
+                background: #252526;
+                border: 1px solid #3c3c3c;
+                border-radius: 8px;
+                width: 90%;
+                max-width: 500px;
+                max-height: 80vh;
+                display: flex;
+                flex-direction: column;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            }
+            .finder-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0.75rem 1rem;
+                border-bottom: 1px solid #3c3c3c;
+            }
+            .finder-header h3 {
+                margin: 0;
+                font-size: 0.95rem;
+                color: #d4d4d4;
+            }
+            .finder-close {
+                background: none;
+                border: none;
+                color: #888;
+                font-size: 1.5rem;
+                cursor: pointer;
+                padding: 0;
+                line-height: 1;
+            }
+            .finder-close:hover {
+                color: #f48771;
+            }
+            .finder-info {
+                padding: 0.5rem 1rem;
+                background: #1e1e1e;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                font-size: 0.85rem;
+            }
+            .finder-type {
+                background: #264f78;
+                color: #9cdcfe;
+                padding: 0.15rem 0.4rem;
+                border-radius: 3px;
+                font-family: monospace;
+            }
+            .finder-search {
+                color: #ce9178;
+                font-family: monospace;
+            }
+            .finder-search-box {
+                display: flex;
+                gap: 0.5rem;
+                padding: 0.75rem 1rem;
+                border-bottom: 1px solid #3c3c3c;
+            }
+            .finder-search-box input {
+                flex: 1;
+                padding: 0.5rem 0.75rem;
+                border: 1px solid #3c3c3c;
+                border-radius: 4px;
+                background: #1e1e1e;
+                color: #d4d4d4;
+                font-size: 0.85rem;
+            }
+            .finder-search-box input:focus {
+                outline: none;
+                border-color: #007acc;
+            }
+            .finder-search-box button {
+                padding: 0.5rem 1rem;
+            }
+            .finder-results {
+                flex: 1;
+                overflow-y: auto;
+                max-height: 300px;
+            }
+            .finder-result {
+                padding: 0.75rem 1rem;
+                border-bottom: 1px solid #2d2d2d;
+                cursor: pointer;
+                transition: background 0.1s ease;
+            }
+            .finder-result:hover {
+                background: #264f78;
+            }
+            .finder-result:last-child {
+                border-bottom: none;
+            }
+            .finder-result-main {
+                display: flex;
+                align-items: baseline;
+                gap: 0.5rem;
+            }
+            .finder-result-name {
+                color: #d4d4d4;
+                font-weight: 500;
+            }
+            .finder-result-jurisdiction {
+                color: #888;
+                font-size: 0.8rem;
+            }
+            .finder-result-meta {
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+                margin-top: 0.25rem;
+            }
+            .finder-result-type {
+                color: #569cd6;
+                font-size: 0.75rem;
+                text-transform: capitalize;
+            }
+            .finder-result-score {
+                color: #4ec9b0;
+                font-size: 0.75rem;
+                font-weight: 500;
+            }
+            .finder-loading {
+                padding: 2rem;
+                text-align: center;
+                color: #888;
+            }
+            .finder-empty {
+                padding: 2rem;
+                text-align: center;
+                color: #666;
+                font-size: 0.85rem;
+            }
+
             /* Context bar (hidden for now, keeping for compatibility) */
             .context-bar {
                 display: none;
             }
 
-            /* CBU Picker */
-            .cbu-picker {
-                display: flex;
-                align-items: center;
-                gap: 0.25rem;
+            /* CBU Picker Button */
+            #select-cbu-btn {
+                min-width: 120px;
+                max-width: 200px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
             }
-            .cbu-picker select {
-                background: #2d2d2d;
-                color: #d4d4d4;
-                border: 1px solid #3c3c3c;
-                border-radius: 4px;
-                padding: 0.35rem 0.5rem;
-                font-size: 0.8rem;
-                min-width: 180px;
-                cursor: pointer;
-            }
-            .cbu-picker select:focus {
-                outline: none;
-                border-color: #007acc;
-            }
-            .cbu-picker select option {
-                background: #2d2d2d;
-                color: #d4d4d4;
-            }
-            .cbu-picker .active-cbu {
+            #select-cbu-btn.active-cbu {
                 border-color: #4ec9b0;
                 background: #1e3a1e;
+                color: #4ec9b0;
             }
         </style>
     </head>
@@ -499,18 +705,13 @@
         <div class="header">
             <h1>Enterprise Onboarding Agent</h1>
             <div class="header-actions">
-                <div class="cbu-picker">
-                    <select id="cbu-select">
-                        <option value="">-- Select CBU --</option>
-                    </select>
-                    <button
-                        class="secondary small"
-                        id="refresh-cbus-btn"
-                        title="Refresh CBU list"
-                    >
-                        ↻
-                    </button>
-                </div>
+                <button
+                    class="secondary small"
+                    id="select-cbu-btn"
+                    title="Search and select a CBU"
+                >
+                    Select CBU
+                </button>
                 <button class="secondary small" id="new-session-btn">
                     New Session
                 </button>
