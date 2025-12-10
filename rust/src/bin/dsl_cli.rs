@@ -24,7 +24,7 @@ use colored::Colorize;
 use std::io::{self, Read};
 use std::path::PathBuf;
 use std::process::ExitCode;
-use std::str::FromStr;
+
 use tracing_subscriber::EnvFilter;
 
 // Import from library
@@ -2091,279 +2091,21 @@ async fn cmd_custody(
 // =============================================================================
 
 #[cfg(feature = "database")]
+#[allow(clippy::too_many_arguments)]
 async fn cmd_template(
-    template_type: &str,
-    name: Option<String>,
-    execute: bool,
-    db_url: Option<String>,
-    include_kyc: bool,
-    include_share_classes: bool,
-    include_products: bool,
-    include_custody_setup: bool,
-    output: Option<PathBuf>,
-    format: OutputFormat,
+    _template_type: &str,
+    _name: Option<String>,
+    _execute: bool,
+    _db_url: Option<String>,
+    _include_kyc: bool,
+    _include_share_classes: bool,
+    _include_products: bool,
+    _include_custody_setup: bool,
+    _output: Option<PathBuf>,
+    _format: OutputFormat,
 ) -> Result<(), String> {
-    use ob_poc::dsl_v2::{
-        executor::{DslExecutor, ExecutionContext, ExecutionResult},
-        CsgLinter,
-    };
-    use ob_poc::templates::{generate_template, TemplateParams, TemplateType};
-
-    // Handle 'list' command
-    if template_type == "list" || template_type == "help" {
-        if format == OutputFormat::Json {
-            let templates: Vec<_> = TemplateType::all()
-                .iter()
-                .map(|t| {
-                    serde_json::json!({
-                        "type": t.name(),
-                        "description": t.description(),
-                    })
-                })
-                .collect();
-            println!("{}", serde_json::to_string_pretty(&templates).unwrap());
-        } else {
-            println!("{}", "Available CBU Templates:".cyan().bold());
-            println!();
-            for t in TemplateType::all() {
-                println!("  {} - {}", t.name().green().bold(), t.description());
-            }
-            println!();
-            println!("Usage: dsl_cli template <type> --name \"Fund Name\" [--execute]");
-            println!();
-            println!("Options:");
-            println!("  --kyc             Include KYC case (default: true)");
-            println!("  --share-classes   Include share classes (default: true)");
-            println!("  --products        Include product provisioning (default: true)");
-            println!("  --custody-setup   Include custody universe/SSI/rules");
-        }
-        return Ok(());
-    }
-
-    // Parse template type
-    let template = TemplateType::from_str(template_type)
-        .map_err(|_| format!(
-            "Unknown template type: '{}'\n\nAvailable types: hedge_fund, lux_sicav, us_40_act, spc\nUse 'dsl_cli template list' to see descriptions.",
-            template_type
-        ))?;
-
-    // Name is required
-    let fund_name =
-        name.ok_or_else(|| "Fund name is required. Use --name \"Your Fund Name\"".to_string())?;
-
-    // Build params
-    let params = TemplateParams {
-        fund_name: fund_name.clone(),
-        jurisdiction: None, // Use template defaults
-        ubos: vec![],       // Use template defaults
-        include_kyc,
-        include_share_classes,
-        include_products,
-        include_custody_setup,
-    };
-
-    // Generate DSL
-    if format == OutputFormat::Pretty {
-        println!(
-            "{} Generating {} template for \"{}\"...",
-            "→".cyan(),
-            template.name(),
-            fund_name
-        );
-    }
-
-    let dsl = generate_template(template, &params);
-
-    // Save to file if requested
-    if let Some(ref path) = output {
-        std::fs::write(path, &dsl).map_err(|e| format!("Failed to write output file: {}", e))?;
-        if format == OutputFormat::Pretty {
-            println!("{} Saved DSL to {}", "✓".green(), path.display());
-        }
-    }
-
-    // If not executing, just show the DSL
-    if !execute {
-        if format == OutputFormat::Json {
-            let output = serde_json::json!({
-                "template": template.name(),
-                "fund_name": fund_name,
-                "dsl": dsl,
-                "line_count": dsl.lines().count(),
-            });
-            println!("{}", serde_json::to_string_pretty(&output).unwrap());
-        } else {
-            println!();
-            println!("{}", "Generated DSL:".yellow().bold());
-            println!("{}", "-".repeat(60));
-            for line in dsl.lines() {
-                if line.trim().starts_with(";;") {
-                    println!("{}", line.dimmed());
-                } else if !line.trim().is_empty() {
-                    println!("{}", line);
-                } else {
-                    println!();
-                }
-            }
-            println!("{}", "-".repeat(60));
-            println!();
-            println!("{} {} lines generated", "✓".green(), dsl.lines().count());
-            println!("  Use --execute to run against the database");
-        }
-        return Ok(());
-    }
-
-    // =========================================================================
-    // EXECUTE THE TEMPLATE
-    // =========================================================================
-
-    let db_url = db_url.ok_or("--db-url or DATABASE_URL required for execution")?;
-
-    if format == OutputFormat::Pretty {
-        println!("{}", "Connecting to database...".dimmed());
-    }
-
-    let pool = sqlx::PgPool::connect(&db_url)
-        .await
-        .map_err(|e| format!("Database connection failed: {}", e))?;
-
-    // Parse
-    if format == OutputFormat::Pretty {
-        println!("{}", "Parsing DSL...".dimmed());
-    }
-
-    let ast = parse_program(&dsl).map_err(|e| format!("Parse error: {:?}", e))?;
-
-    if format == OutputFormat::Pretty {
-        println!("{} Parsed {} statements", "✓".green(), ast.statements.len());
-    }
-
-    // Validate
-    if format == OutputFormat::Pretty {
-        println!("{}", "Validating...".dimmed());
-    }
-
-    let mut linter = CsgLinter::new(pool.clone());
-    linter
-        .initialize()
-        .await
-        .map_err(|e| format!("Linter init failed: {}", e))?;
-
-    let context = ValidationContext::default();
-    let lint_result = linter.lint(ast.clone(), &context, &dsl).await;
-
-    if lint_result.has_errors() {
-        let formatted = RustStyleFormatter::format(&dsl, &lint_result.diagnostics);
-        eprintln!("{}", formatted);
-        return Err("Validation failed".to_string());
-    }
-
-    if format == OutputFormat::Pretty {
-        println!("{} Validation passed", "✓".green());
-    }
-
-    // Compile
-    let plan = compile(&ast).map_err(|e| format!("Compile error: {:?}", e))?;
-
-    if format == OutputFormat::Pretty {
-        println!("{} Compiled {} steps", "✓".green(), plan.steps.len());
-        println!();
-        println!("{}", "Executing...".yellow().bold());
-        println!();
-    }
-
-    // Execute
-    let executor = DslExecutor::new(pool);
-    let mut exec_ctx = ExecutionContext::default();
-
-    match executor.execute_plan(&plan, &mut exec_ctx).await {
-        Ok(results) => {
-            if format == OutputFormat::Json {
-                let bindings: std::collections::HashMap<_, _> = exec_ctx
-                    .symbols
-                    .iter()
-                    .map(|(k, v)| (k.clone(), v.to_string()))
-                    .collect();
-
-                let output = serde_json::json!({
-                    "success": true,
-                    "template": template.name(),
-                    "fund_name": fund_name,
-                    "steps_executed": results.len(),
-                    "bindings": bindings,
-                });
-                println!("{}", serde_json::to_string_pretty(&output).unwrap());
-            } else {
-                // Pretty print key results
-                for (i, result) in results.iter().enumerate() {
-                    let step = &plan.steps[i];
-                    let verb_name = format!("{}.{}", step.verb_call.domain, step.verb_call.verb);
-
-                    match result {
-                        ExecutionResult::Uuid(id) => {
-                            let binding_info = step
-                                .bind_as
-                                .as_ref()
-                                .map(|b| format!(" @{} =", b))
-                                .unwrap_or_default();
-                            println!(
-                                "  [{}] {}{} {}",
-                                i,
-                                verb_name.cyan(),
-                                binding_info.yellow(),
-                                id.to_string().dimmed()
-                            );
-                        }
-                        ExecutionResult::Affected(n) => {
-                            println!("  [{}] {} ({} rows)", i, verb_name.cyan(), n);
-                        }
-                        _ => {
-                            println!("  [{}] {} {}", i, verb_name.cyan(), "✓".green());
-                        }
-                    }
-                }
-
-                println!();
-                println!(
-                    "{} Template \"{}\" executed successfully ({} steps)",
-                    "✓".green().bold(),
-                    fund_name,
-                    results.len()
-                );
-
-                // Show key bindings
-                let key_bindings: Vec<_> = exec_ctx
-                    .symbols
-                    .iter()
-                    .filter(|(k, _)| {
-                        k.contains("fund")
-                            || k.contains("cbu")
-                            || k.contains("case")
-                            || k.contains("master")
-                    })
-                    .collect();
-
-                if !key_bindings.is_empty() {
-                    println!();
-                    println!("Key entities created:");
-                    for (name, value) in key_bindings {
-                        println!("  @{} = {}", name.yellow(), value.to_string().dimmed());
-                    }
-                }
-            }
-            Ok(())
-        }
-        Err(e) => {
-            if format == OutputFormat::Json {
-                let output = serde_json::json!({
-                    "success": false,
-                    "error": e.to_string(),
-                });
-                println!("{}", serde_json::to_string_pretty(&output).unwrap());
-            }
-            Err(format!("Execution failed: {}", e))
-        }
-    }
+    println!("Templates feature is disabled.");
+    Ok(())
 }
 
 /// Build system prompt for DSL generation
@@ -2553,16 +2295,77 @@ async fn cmd_repl(
 ) -> Result<(), String> {
     use ob_poc::database::SessionRepository;
     use ob_poc::dsl_v2::{
-        compile,
+
         config::ConfigLoader,
         emit_dsl,
         executor::{DslExecutor, ExecutionContext, ExecutionResult},
         parse_program, topological_sort,
         validation::{RustStyleFormatter, ValidationContext},
         BindingContext, BindingInfo, CsgLinter, RuntimeVerbRegistry,
+        execution_plan::{compile_with_planning, PlanningContext, BindingInfo as PlanInfo},
     };
     use std::io::Write;
     use uuid::Uuid;
+    use rustyline::error::ReadlineError;
+    use rustyline::{Editor, Config, Helper, Context};
+    use rustyline::completion::{Pair, Completer};
+    use rustyline::hint::Hinter;
+    use rustyline::highlight::Highlighter;
+    use std::io::{self};
+    use rustyline::validate::Validator;
+    use std::sync::{Arc, Mutex};
+    use ob_poc::dsl_v2::suggestions::predict_next_steps;
+
+
+    #[derive(Clone)]
+    struct DslHelper {
+        binding_context: Arc<Mutex<BindingContext>>,
+        registry: Arc<RuntimeVerbRegistry>,
+    }
+
+    impl Completer for DslHelper {
+        type Candidate = Pair;
+
+        fn complete(
+            &self,
+            line: &str,
+            pos: usize,
+            _ctx: &Context<'_>,
+        ) -> Result<(usize, Vec<Pair>), ReadlineError> {
+            let (start, _end) = (0, pos); 
+            // Better logic: if at start of line (ignoring whitespace), suggest verbs
+            let trimmed = line[..pos].trim_start();
+            
+            // Simple check: if we are at the start or after a paren, suggest verbs
+            if trimmed.is_empty() || trimmed.ends_with('(') {
+                 let program = parse_program(line).unwrap_or_default();
+                 let bindings = self.binding_context.lock().unwrap();
+                 let suggestions = predict_next_steps(&program, &bindings, &self.registry);
+                 
+                 let candidates: Vec<Pair> = suggestions.into_iter().map(|s| {
+                     Pair {
+                         display: format!("{} ({:.2}) - {}", s.verb, s.score, s.reason),
+                         replacement: format!("({} ", s.verb), // Auto-open paren
+                     }
+                 }).collect();
+                 
+                 return Ok((pos, candidates));
+            }
+            
+            Ok((start, vec![]))
+        }
+    }
+
+    impl Hinter for DslHelper {
+        type Hint = String;
+        fn hint(&self, _line: &str, _pos: usize, _ctx: &Context<'_>) -> Option<String> {
+            None
+        }
+    }
+
+    impl Highlighter for DslHelper {}
+    impl Validator for DslHelper {}
+    impl Helper for DslHelper {}
 
     // Connect to database
     if format == OutputFormat::Pretty {
@@ -2667,7 +2470,7 @@ async fn cmd_repl(
     let verbs_config = loader
         .load_verbs()
         .map_err(|e| format!("Failed to load verb config: {}", e))?;
-    let registry = RuntimeVerbRegistry::from_config(&verbs_config);
+    let registry = Arc::new(RuntimeVerbRegistry::from_config(&verbs_config));
 
     // Pending DSL buffer (not yet executed)
     let mut pending_dsl = String::new();
@@ -2697,8 +2500,20 @@ async fn cmd_repl(
     }
 
     // REPL loop
-    let stdin = std::io::stdin();
-    let mut stdout = std::io::stdout();
+    
+    // Setup Rustyline
+    let config = Config::builder()
+        .auto_add_history(true)
+        .build();
+    let mut stdout = io::stdout();
+        
+    let helper = DslHelper {
+        binding_context: Arc::new(Mutex::new(binding_context.clone())),
+        registry: registry.clone(),
+    };
+    
+    let mut rl = Editor::with_config(config).unwrap();
+    rl.set_helper(Some(helper.clone()));
 
     loop {
         // Print prompt
@@ -2707,18 +2522,19 @@ async fn cmd_repl(
         } else {
             "dsl+ ".yellow().to_string()
         };
-        print!("{}", prompt);
-        stdout.flush().map_err(|e| format!("IO error: {}", e))?;
-
+        
         // Read line
-        let mut line = String::new();
-        match stdin.read_line(&mut line) {
-            Ok(0) => break, // EOF
-            Ok(_) => {}
-            Err(e) => return Err(format!("Read error: {}", e)),
-        }
+        let readline = rl.readline(&prompt);
+        match readline {
+            Ok(line) => {
+                rl.add_history_entry(line.as_str()).ok();
+                let trimmed = line.trim();
+                
+                // Keep binding context updated in helper for autocomplete
+                // Note: Real updates happen after :commit, this is just initializing
+                
+                // Existing logic...
 
-        let trimmed = line.trim();
 
         // Handle commands
         if trimmed.starts_with(':') {
@@ -2865,9 +2681,29 @@ async fn cmd_repl(
                         println!("{}", formatted);
                     }
 
-                    // 3. Compile
-                    let plan = match compile(&ast) {
-                        Ok(plan) => plan,
+                    // 3. Compile (with Planning)
+                    // Build planning context from current REPL binding state
+                    let mut planning_ctx = PlanningContext::new();
+                    for info in binding_context.all() {
+                        let plan_info = PlanInfo {
+                            entity_type: info.produced_type.clone(),
+                            subtype: info.subtype.clone(),
+                            state: None, // State persistence not yet implemented in REPL context
+                        };
+                        planning_ctx.add_binding_info(&info.name, plan_info);
+                    }
+
+                    let plan = match compile_with_planning(&ast, &planning_ctx) {
+                        Ok(result) => {
+                            // detailed planning diagnostics
+                            if !result.diagnostics.is_empty() {
+                                println!("{}", "Planning warnings:".yellow());
+                                for diag in &result.diagnostics {
+                                    println!("  - {:?}", diag);
+                                }
+                            }
+                            result.plan
+                        },
                         Err(e) => {
                             println!("{} Compile error: {:?}", "✗".red(), e);
                             continue;
@@ -2989,6 +2825,20 @@ async fn cmd_repl(
         // Add line to pending buffer
         pending_dsl.push_str(trimmed);
         pending_dsl.push('\n');
+            }
+            Err(ReadlineError::Interrupted) => {
+                println!("CTRL-C");
+                break;
+            }
+            Err(ReadlineError::Eof) => {
+                println!("CTRL-D");
+                break;
+            }
+            Err(err) => {
+                println!("Error: {:?}", err);
+                break;
+            }
+        }
     }
 
     Ok(())

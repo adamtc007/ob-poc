@@ -51,6 +51,7 @@ impl OntologyService {
     ///
     /// This is useful for testing with custom configurations.
     /// Returns error if already initialized.
+    #[allow(clippy::result_large_err)]
     pub fn init_global(service: OntologyService) -> Result<(), OntologyService> {
         ONTOLOGY
             .set(Arc::new(service))

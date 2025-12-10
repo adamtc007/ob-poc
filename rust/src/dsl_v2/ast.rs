@@ -43,7 +43,7 @@ use uuid::Uuid;
 // =============================================================================
 
 /// A complete DSL program
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Program {
     pub statements: Vec<Statement>,
 }

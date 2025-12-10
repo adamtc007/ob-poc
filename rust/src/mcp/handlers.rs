@@ -886,7 +886,7 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
 
             "product" => {
                 // Return hardcoded product names from database
-                let products = vec![
+                let products = [
                     (
                         "Custody",
                         "Asset safekeeping, settlement, corporate actions",

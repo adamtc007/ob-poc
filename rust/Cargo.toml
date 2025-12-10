@@ -72,6 +72,7 @@ colored = { version = "2.1", optional = true }
 atty = { version = "0.2", optional = true }
 futures = "0.3"
 dotenvy = "0.15"
+rustyline = { version = "12.0", optional = true }
 
 # Serialization/Deserialization
 # serde is already included above
@@ -119,7 +120,7 @@ default = []
 
 database = ["dep:sqlx", "dep:bigdecimal", "dep:entity-gateway"]  # Only enable database functionality when needed
 server = ["database", "dep:axum", "dep:tower", "dep:tower-http"]  # REST API server with database
-cli = ["dep:clap", "dep:colored", "dep:atty"]  # CLI tool for DSL testing
+cli = ["dep:clap", "dep:colored", "dep:atty", "dep:rustyline"]  # CLI tool for DSL testing
 mcp = ["database"]  # MCP server for Claude integration
 
 

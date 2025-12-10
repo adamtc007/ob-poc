@@ -428,6 +428,8 @@ pub enum DiagnosticCode {
     UnusedBinding,
     /// Fuzzy match warning - similar entity exists
     FuzzyMatchWarning,
+    /// Hardcoded UUID usage warning
+    HardcodedUuid,
 }
 
 impl DiagnosticCode {
@@ -435,7 +437,8 @@ impl DiagnosticCode {
         match self {
             DiagnosticCode::DeprecatedVerb
             | DiagnosticCode::UnusedBinding
-            | DiagnosticCode::FuzzyMatchWarning => Severity::Warning,
+            | DiagnosticCode::FuzzyMatchWarning
+            | DiagnosticCode::HardcodedUuid => Severity::Warning,
             DiagnosticCode::InternalError => Severity::Error,
             // UnresolvedSymbol is an Error - blocks execution, but UI can show it differently
             // since it's "incomplete" rather than "invalid" (user just needs to add the definition)
@@ -484,6 +487,7 @@ impl DiagnosticCode {
             DiagnosticCode::DeprecatedVerb => "W001",
             DiagnosticCode::UnusedBinding => "W002",
             DiagnosticCode::FuzzyMatchWarning => "W003",
+            DiagnosticCode::HardcodedUuid => "W004",
         }
     }
 }

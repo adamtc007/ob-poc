@@ -18,7 +18,7 @@
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-use super::config::types::LookupConfig;
+use super::config::types::{LookupConfig, VerbConsumes, VerbProduces};
 use super::runtime_registry::{runtime_registry, RuntimeBehavior};
 
 // =============================================================================
@@ -58,9 +58,15 @@ pub struct UnifiedVerbDef {
     pub behavior: VerbBehavior,
     /// For custom ops, the handler ID
     pub custom_op_id: Option<String>,
+    pub produces: Option<VerbProduces>,
+    pub consumes: Vec<VerbConsumes>,
 }
 
 impl UnifiedVerbDef {
+    pub fn consumes(&self) -> &[VerbConsumes] {
+        &self.consumes
+    }
+
     /// Full verb name: "domain.verb"
     pub fn full_name(&self) -> String {
         format!("{}.{}", self.domain, self.verb)
@@ -154,6 +160,8 @@ impl UnifiedVerbRegistry {
                 args,
                 behavior,
                 custom_op_id,
+                produces: runtime_verb.produces.clone(),
+                consumes: runtime_verb.consumes.clone(),
             };
 
             verbs.insert(key.clone(), unified);

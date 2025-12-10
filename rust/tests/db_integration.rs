@@ -512,7 +512,7 @@ mod db_tests {
 
         // Add product (Custody has 11 services)
         let add_product_dsl = format!(
-            r#"(cbu.add-product :cbu-id "{}" :product "Custody")"#,
+            r#"(cbu.add-product :cbu-id "{}" :product "CUSTODY")"#,
             cbu_id
         );
         db.execute_dsl(&add_product_dsl).await?;
@@ -530,7 +530,7 @@ mod db_tests {
         );
         assert!(
             actual_deliveries >= 10,
-            "Custody product should have at least 10 services"
+            "CUSTODY product should have at least 10 services"
         );
 
         // Cleanup
@@ -556,7 +556,7 @@ mod db_tests {
 
         // Add product first time
         let add_product_dsl = format!(
-            r#"(cbu.add-product :cbu-id "{}" :product "Custody")"#,
+            r#"(cbu.add-product :cbu-id "{}" :product "CUSTODY")"#,
             cbu_id
         );
         db.execute_dsl(&add_product_dsl).await?;
@@ -619,7 +619,7 @@ mod db_tests {
         // Try to add product to non-existent CBU
         let fake_cbu_id = Uuid::new_v4();
         let dsl = format!(
-            r#"(cbu.add-product :cbu-id "{}" :product "Custody")"#,
+            r#"(cbu.add-product :cbu-id "{}" :product "CUSTODY")"#,
             fake_cbu_id
         );
         let result = db.execute_dsl(&dsl).await;
@@ -647,7 +647,7 @@ mod db_tests {
         let cbu_id = ctx.resolve("cbu").unwrap();
 
         let add_dsl = format!(
-            r#"(cbu.add-product :cbu-id "{}" :product "Custody")"#,
+            r#"(cbu.add-product :cbu-id "{}" :product "CUSTODY")"#,
             cbu_id
         );
         db.execute_dsl(&add_dsl).await?;

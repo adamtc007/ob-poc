@@ -258,6 +258,9 @@ impl CsgLinter {
         // Pass 6: Dataflow validation (produces/consumes)
         self.validate_dataflow(&ast, source, &mut diagnostics);
 
+        // Pass 7: Hardcoded UUID warnings
+        self.validate_hardcoded_uuids(&ast, source, &mut diagnostics);
+
         LintResult {
             ast,
             diagnostics,
@@ -641,6 +644,49 @@ impl CsgLinter {
     }
 
     // =========================================================================
+    // PASS 7: HARDCODED UUID VALIDATION
+    // =========================================================================
+
+    fn validate_hardcoded_uuids(
+        &self,
+        ast: &Program,
+        source: &str,
+        diagnostics: &mut Vec<Diagnostic>,
+    ) {
+        for stmt in &ast.statements {
+            if let Statement::VerbCall(vc) = stmt {
+                for arg in &vc.arguments {
+                    let is_uuid = match &arg.value {
+                        AstNode::Literal(crate::dsl_v2::ast::Literal::Uuid(_)) => true,
+                        AstNode::Literal(crate::dsl_v2::ast::Literal::String(s)) => {
+                            uuid::Uuid::parse_str(s).is_ok()
+                        }
+                        _ => false,
+                    };
+
+                    if is_uuid {
+                        // Special check: ignore if argument key is "cbu-id" or similar IF we are attaching
+                        // Actually, attaching to CBU in REPL via :cbu <id> doesn't use standard verb.
+                        // But (cbu.ensure) might optionally take an ID.
+                        // Generally, reusing an ID explicitly IS the anti-pattern, we prefer resolving by name or @ref.
+                        
+                        diagnostics.push(Diagnostic {
+                            severity: Severity::Warning,
+                            span: self.span_to_source_span(&arg.span, source),
+                            code: DiagnosticCode::HardcodedUuid,
+                            message: format!(
+                                "Hardcoded UUID found in argument '{}'. Prefer using @symbol reference if the entity is created in this session.",
+                                arg.key
+                            ),
+                            suggestions: vec![],
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
     // HELPER METHODS
     // =========================================================================
 
@@ -920,5 +966,27 @@ mod tests {
             test_infer_entity_type_from_verb("create-proper-person"),
             "PROPER_PERSON_NATURAL"
         );
+    }
+
+    #[tokio::test]
+    async fn test_hardcoded_uuid_warning() {
+        // Initialize linter (mock DB behavior)
+        #[cfg(feature = "database")]
+        let linter = super::CsgLinter::new_without_db();
+        #[cfg(not(feature = "database"))]
+        let mut linter = super::CsgLinter::new();
+        #[cfg(not(feature = "database"))]
+        linter.initialize().await.unwrap();
+
+        // Parse simple program with hardcoded UUID
+        let source = r#"(cbu.ensure :name "Test" :id "550e8400-e29b-41d4-a716-446655440000")"#;
+        let ast = crate::dsl_v2::parse_program(source).unwrap();
+        let context = crate::dsl_v2::validation::ValidationContext::default();
+        
+        let result = linter.lint(ast, &context, source).await;
+        
+        assert!(result.has_warnings(), "Should have warnings");
+        let warning = result.diagnostics.iter().find(|d| d.code == crate::dsl_v2::validation::DiagnosticCode::HardcodedUuid);
+        assert!(warning.is_some(), "Should have HardcodedUuid warning");
     }
 }

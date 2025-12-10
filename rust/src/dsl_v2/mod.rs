@@ -48,6 +48,7 @@ pub mod parser;
 pub mod ref_resolver;
 pub mod runtime_registry;
 pub mod semantic_context;
+pub mod suggestions;
 #[cfg(feature = "database")]
 pub mod semantic_validator;
 pub mod topo_sort;

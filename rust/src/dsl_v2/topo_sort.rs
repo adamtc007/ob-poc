@@ -87,7 +87,10 @@ pub fn topological_sort(
     // Map binding names to statement indices (for pending statements only)
     let mut binding_to_stmt: HashMap<String, usize> = HashMap::new();
 
-    // First pass: record what each statement produces
+    // Map PK values (UUID strings) to statement indices for implicit dependency tracking
+    let mut pk_to_stmt: HashMap<String, usize> = HashMap::new();
+
+    // First pass: record what each statement produces (bindings and implicit PKs)
     for (idx, stmt) in statements.iter().enumerate() {
         deps.insert(idx, HashSet::new());
 
@@ -95,10 +98,25 @@ pub fn topological_sort(
             if let Some(ref binding) = vc.binding {
                 binding_to_stmt.insert(binding.clone(), idx);
             }
+
+            // Heuristic for implicit PK production:
+            // If it's a creation verb (create-* or ensure), check for ID args
+            if vc.verb.starts_with("create") || vc.verb == "ensure" {
+                // Check for generic :id or domain-specific id (e.g. :cbu-id for cbu domain)
+                let domain_id_arg = format!("{}-id", vc.domain);
+                
+                for arg in &vc.arguments {
+                    if arg.key == "id" || arg.key == domain_id_arg {
+                        if let Some(val_str) = extract_literal_string_or_uuid(&arg.value) {
+                            pk_to_stmt.insert(val_str, idx);
+                        }
+                    }
+                }
+            }
         }
     }
 
-    // Second pass: record dependencies based on symbol references in arguments
+    // Second pass: record dependencies based on symbol references AND implicit keys
     for (idx, stmt) in statements.iter().enumerate() {
         if let Statement::VerbCall(vc) = stmt {
             // Check all arguments for symbol references
@@ -109,6 +127,16 @@ pub fn topological_sort(
                     executed_context,
                     idx,
                     &mut deps,
+                );
+
+                // Check for implicit key references (literals that match a produced PK)
+                // Only if NOT a creation verb (or if it is, ensure we don't depend on ourselves)
+                // Actually, even creators might depend on other entities (e.g. create-entity :cbu-id "...")
+                collect_implicit_refs(
+                    &arg.value,
+                    &pk_to_stmt,
+                    idx,
+                    &mut deps
                 );
             }
         }
@@ -229,6 +257,7 @@ pub fn topological_sort_with_lifecycle(
     // Build dependency graph with lifecycle edges
     let mut deps: HashMap<usize, HashSet<usize>> = HashMap::new();
     let mut binding_to_stmt: HashMap<String, usize> = HashMap::new();
+    let mut pk_to_stmt: HashMap<String, usize> = HashMap::new();
     let mut lifecycle_diagnostics: Vec<PlannerDiagnostic> = vec![];
 
     // Track which statement transitions each binding to which state
@@ -243,6 +272,18 @@ pub fn topological_sort_with_lifecycle(
             // Record binding production
             if let Some(ref binding) = vc.binding {
                 binding_to_stmt.insert(binding.clone(), idx);
+            }
+
+            // Heuristic for implicit PK production
+            if vc.verb.starts_with("create") || vc.verb == "ensure" {
+                let domain_id_arg = format!("{}-id", vc.domain);
+                for arg in &vc.arguments {
+                    if arg.key == "id" || arg.key == domain_id_arg {
+                        if let Some(val_str) = extract_literal_string_or_uuid(&arg.value) {
+                            pk_to_stmt.insert(val_str, idx);
+                        }
+                    }
+                }
             }
 
             // Look up verb config for lifecycle info
@@ -271,6 +312,14 @@ pub fn topological_sort_with_lifecycle(
                     executed_context,
                     idx,
                     &mut deps,
+                );
+
+                // Check for implicit key references (literals that match a produced PK)
+                collect_implicit_refs(
+                    &arg.value,
+                    &pk_to_stmt,
+                    idx,
+                    &mut deps
                 );
             }
 
@@ -533,6 +582,57 @@ fn collect_symbol_refs(
         }
         // Literals, EntityRefs, and Nested don't contain symbol references we need to track
         AstNode::Literal(_) | AstNode::EntityRef { .. } | AstNode::Nested(_) => {}
+    }
+}
+
+/// Extract string representation from a literal (String or UUID)
+fn extract_literal_string_or_uuid(node: &AstNode) -> Option<String> {
+    match node {
+        AstNode::Literal(Literal::String(s)) => Some(s.clone()),
+        AstNode::Literal(Literal::Uuid(u)) => Some(u.to_string()),
+        _ => None,
+    }
+}
+
+/// Collect implicit key references from an AST node
+fn collect_implicit_refs(
+    node: &AstNode,
+    pk_to_stmt: &HashMap<String, usize>,
+    current_idx: usize,
+    deps: &mut HashMap<usize, HashSet<usize>>,
+) {
+    match node {
+        AstNode::Literal(Literal::String(s)) => {
+            if let Some(&producer_idx) = pk_to_stmt.get(s) {
+                if producer_idx != current_idx {
+                    deps.get_mut(&current_idx).unwrap().insert(producer_idx);
+                }
+            }
+        }
+        AstNode::Literal(Literal::Uuid(u)) => {
+            let s = u.to_string();
+            if let Some(&producer_idx) = pk_to_stmt.get(&s) {
+                if producer_idx != current_idx {
+                    deps.get_mut(&current_idx).unwrap().insert(producer_idx);
+                }
+            }
+        }
+        AstNode::List { items, .. } => {
+            for item in items {
+                collect_implicit_refs(item, pk_to_stmt, current_idx, deps);
+            }
+        }
+        AstNode::Map { entries, .. } => {
+            for (_, v) in entries {
+                collect_implicit_refs(v, pk_to_stmt, current_idx, deps);
+            }
+        }
+        AstNode::Nested(vc) => {
+             for arg in &vc.arguments {
+                 collect_implicit_refs(&arg.value, pk_to_stmt, current_idx, deps);
+             }
+        }
+        _ => {}
     }
 }
 
