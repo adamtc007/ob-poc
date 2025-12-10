@@ -1517,6 +1517,109 @@ The KYC case management and UBO domains manage entity-level investigations, scre
 ;; Verify UBO
 (ubo.verify-ubo :ubo-id @ubo1 :verification-status "VERIFIED" :risk-rating "LOW")
 ```
+
+## CBU Entity Graph Model
+
+The CBU (Client Business Unit) is the root of a hierarchical graph connecting legal entities and natural persons.
+
+### Entity Categories
+
+| Category | Description | Examples |
+|----------|-------------|----------|
+| `SHELL` | Legal vehicles that can own/be owned | Limited Company, Partnership, Trust, SICAV |
+| `PERSON` | Natural persons (always leaf nodes) | Directors, UBOs, Signatories |
+
+**Column**: `entity_types.entity_category` (VARCHAR(20))
+
+### Graph Structure
+
+```
+CBU (virtual root)
+ │
+ ├── SHELL (e.g., Fund SICAV)
+ │    ├── SHELL (e.g., ManCo S.à r.l.)
+ │    │    └── PERSON (Director)
+ │    └── PERSON (Compliance Officer)
+ │
+ └── SHELL (e.g., General Partner LP)
+      └── PERSON (Managing Partner)
+```
+
+**Key rules:**
+- CBU is NOT an entity - it's a virtual grouping node
+- SHELLs can link to other SHELLs (ownership chains) and to PERSONs (officers/UBOs)
+- PERSONs are always leaf nodes (cannot own other entities in this model)
+
+### Connection Types
+
+| Table | From | To | Purpose |
+|-------|------|-----|---------|
+| `cbu_entity_roles` | CBU | Entity | Assigns functional roles within CBU context |
+| `ownership_relationships` | Entity | Entity | Ownership chains (SHELL→SHELL or SHELL→PERSON) |
+| `control_relationships` | Entity | Entity | Non-ownership control (board control, voting rights) |
+
+### Role Categories
+
+Roles describe an entity's **function** within a CBU, not ownership structure:
+
+| Category | Priority | Roles |
+|----------|----------|-------|
+| OWNERSHIP_CONTROL | 100 | BENEFICIAL_OWNER, SHAREHOLDER, PRINCIPAL, SETTLOR, PROTECTOR |
+| BOTH | 50 | DIRECTOR, AUTHORIZED_SIGNATORY, POWER_OF_ATTORNEY |
+| TRADING_EXECUTION | 10 | ASSET_OWNER, INVESTMENT_MANAGER, PORTFOLIO_MANAGER, TRADER |
+
+**View**: `v_cbu_entity_with_roles` sorts entities by role priority (ownership at top, trading at bottom).
+
+### Fund Ownership: Management Shares vs Investor Shares
+
+Funds use a **dual share class structure** to separate control from economic participation:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  MANAGEMENT SHARES (class_category: CORPORATE)                  │
+│  - Owned by: Fund sponsor/ManCo (e.g., BlackRock ManCo)        │
+│  - Purpose: Voting rights and control of fund vehicle          │
+│  - Economic value: Nominal (often €1 total)                    │
+│  - Tradeable: No - permanently held by sponsor                 │
+│  - Rights: Appoint directors, approve providers, amend docs    │
+└─────────────────────────────────────────────────────────────────┘
+                              vs
+┌─────────────────────────────────────────────────────────────────┐
+│  INVESTOR SHARES (class_category: FUND)                         │
+│  - Owned by: Retail and institutional investors                │
+│  - Purpose: Economic participation in fund returns             │
+│  - Economic value: Full NAV participation                      │
+│  - Tradeable: Yes - subscribed/redeemed daily/weekly           │
+│  - Rights: Limited voting (usually only on liquidation)        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**How this maps to data model:**
+
+```
+CBU: "Luxembourg Growth Fund"
+├── SHELL: "LuxGrowth SICAV" (the fund vehicle)
+│   └── share_classes:
+│       ├── "Management Shares" (class_category: CORPORATE)
+│       │   └── held by ManCo → gives ASSET_OWNER role
+│       └── "Class A EUR" (class_category: FUND)
+│           └── held by investors → tracked in holdings table
+│
+├── SHELL: "BlackRock Luxembourg ManCo S.à r.l."
+│   └── roles: MANAGEMENT_COMPANY, ASSET_OWNER
+│   └── holds: 100% of Management Shares
+│
+└── PERSON: "John Smith" (Director of SICAV)
+    └── roles: DIRECTOR
+```
+
+**Key insight:** The ManCo's 100% ownership of management shares is what justifies their `ASSET_OWNER` role in `cbu_entity_roles`. The role describes *function*, while the share holding describes the *legal basis* for that function.
+
+**Database columns:**
+- `share_classes.class_category`: `CORPORATE` (management/voting) vs `FUND` (investor/NAV)
+- `share_classes.entity_id`: FK to the issuing SHELL (SICAV/fund vehicle)
+- `holdings`: Tracks who owns which shares (ManCo owns management, investors own fund shares)
+
 ## Investor Registry DSL
 
 ## Threshold Decision Matrix
