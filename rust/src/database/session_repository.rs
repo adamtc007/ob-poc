@@ -110,6 +110,10 @@ pub enum SessionEventType {
     BindingAdded,
     DomainDetected,
     ErrorRecovered,
+    /// DSL parsed successfully, AST stored
+    Parsed,
+    /// DSL has unresolved refs, waiting for resolution
+    Resolving,
 }
 
 impl std::fmt::Display for SessionEventType {
@@ -127,6 +131,8 @@ impl std::fmt::Display for SessionEventType {
             Self::BindingAdded => write!(f, "binding_added"),
             Self::DomainDetected => write!(f, "domain_detected"),
             Self::ErrorRecovered => write!(f, "error_recovered"),
+            Self::Parsed => write!(f, "parsed"),
+            Self::Resolving => write!(f, "resolving"),
         }
     }
 }

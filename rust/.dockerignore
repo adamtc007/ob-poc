@@ -1,23 +1,7 @@
-# Build artifacts
 target/
-debug/
-*.pdb
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# macOS
-.DS_Store
-
-# Logs
+.git/
 *.log
-
-# Tests (not needed in production image)
+*.dump
+Cargo.lock.bak
 tests/
-
-# Development files
-.env
-.env.local
+*.md

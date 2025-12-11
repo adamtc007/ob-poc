@@ -1,0 +1,58 @@
+# Multi-stage build with database connection for sqlx macros
+FROM rust:1.84-bookworm AS builder
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    libpq-dev \
+    protobuf-compiler \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy workspace files
+COPY rust/Cargo.toml rust/Cargo.lock ./rust/
+COPY dsl_types ./dsl_types/
+
+# Copy source
+COPY rust/src ./rust/src
+COPY rust/crates ./rust/crates
+COPY rust/config ./rust/config
+
+# Build with SQLX_OFFLINE mode - requires .sqlx cache
+WORKDIR /build/rust
+COPY rust/.sqlx ./.sqlx
+
+# Set SQLX_OFFLINE to use cached query metadata
+ENV SQLX_OFFLINE=true
+RUN cargo build --release --features server --bin agentic_server
+
+# Runtime image
+FROM debian:bookworm-slim
+
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy binary from builder
+COPY --from=builder /build/rust/target/release/agentic_server /app/agentic_server
+
+# Copy config files
+COPY rust/config /app/config
+RUN mkdir -p /app/crates/entity-gateway
+COPY rust/crates/entity-gateway/config /app/crates/entity-gateway/config
+
+# Expose ports
+EXPOSE 3000 50051
+
+# Set environment variables
+ENV RUST_LOG=info
+ENV ENTITY_GATEWAY_CONFIG=/app/crates/entity-gateway/config/entity_index.yaml
+
+CMD ["/app/agentic_server"]

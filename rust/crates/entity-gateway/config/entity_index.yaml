@@ -85,9 +85,9 @@ entities:
     search_keys:
       - name: "name"
         column: "name"
-        default: true
       - name: "product_code"
         column: "product_code"
+        default: true # DSL uses product codes like FUND_ACCOUNTING
     shard:
       enabled: false # Small table, no sharding
 
@@ -318,14 +318,14 @@ entities:
     nickname: "MARKET"
     source_table: "custody.markets"
     return_key: "market_id"
-    display_template: "{market_name}"
+    display_template: "{name}"
     index_mode: exact
     search_keys:
       - name: "mic"
         column: "mic"
         default: true
       - name: "name"
-        column: "market_name"
+        column: "name"
     shard:
       enabled: false
 
@@ -405,10 +405,9 @@ entities:
   resource_type:
     nickname: "RESOURCE_TYPE"
     source_table: '"ob-poc".service_resource_types'
-    return_key: "resource_type_id"
+    return_key: "resource_id"
     display_template: "{name}"
     index_mode: exact
-    filter: "is_active = true"
     search_keys:
       - name: "name"
         column: "name"

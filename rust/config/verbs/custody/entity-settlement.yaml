@@ -10,36 +10,36 @@ domains:
           table: entity_settlement_identity
           schema: custody
           conflict_keys:
-          - entity_id
-          - primary_bic
+            - entity_id
+            - primary_bic
           returning: identity_id
         args:
-        - name: entity-id
-          type: uuid
-          required: true
-          maps_to: entity_id
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
-        - name: bic
-          type: string
-          required: true
-          maps_to: primary_bic
-        - name: lei
-          type: string
-          required: false
-          maps_to: lei
-        - name: alert-id
-          type: string
-          required: false
-          maps_to: alert_participant_id
-        - name: ctm-id
-          type: string
-          required: false
-          maps_to: ctm_participant_id
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: bic
+            type: string
+            required: true
+            maps_to: primary_bic
+          - name: lei
+            type: string
+            required: false
+            maps_to: lei
+          - name: alert-id
+            type: string
+            required: false
+            maps_to: alert_participant_id
+          - name: ctm-id
+            type: string
+            required: false
+            maps_to: ctm_participant_id
         returns:
           type: uuid
           name: identity_id
@@ -53,75 +53,89 @@ domains:
           schema: custody
           returning: entity_ssi_id
         args:
-        - name: entity-id
-          type: uuid
-          required: true
-          maps_to: entity_id
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
-        - name: instrument-class
-          type: lookup
-          required: false
-          maps_to: instrument_class_id
-          lookup:
-            table: instrument_classes
-            entity_type: instrument_class
-            schema: custody
-            code_column: code
-            id_column: class_id
-        - name: security-type
-          type: lookup
-          required: false
-          maps_to: security_type_id
-          lookup:
-            table: security_types
-            schema: custody
-            code_column: code
-            id_column: security_type_id
-        - name: market
-          type: lookup
-          required: false
-          maps_to: market_id
-          lookup:
-            table: markets
-            entity_type: market
-            schema: custody
-            code_column: mic
-            id_column: market_id
-        - name: currency
-          type: string
-          required: false
-          maps_to: currency
-        - name: counterparty-bic
-          type: string
-          required: true
-          maps_to: counterparty_bic
-        - name: safekeeping-account
-          type: string
-          required: false
-          maps_to: safekeeping_account
-        - name: source
-          type: string
-          required: false
-          maps_to: source
-          valid_values:
-          - ALERT
-          - MANUAL
-          - CTM
-          default: ALERT
-        - name: source-reference
-          type: string
-          required: false
-          maps_to: source_reference
-        - name: effective-date
-          type: date
-          required: true
-          maps_to: effective_date
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: instrument-class
+            type: lookup
+            required: false
+            maps_to: instrument_class_id
+            lookup:
+              table: instrument_classes
+              entity_type: instrument_class
+              schema: custody
+              code_column: code
+              id_column: class_id
+          - name: security-type
+            type: lookup
+            required: false
+            maps_to: security_type_id
+            lookup:
+              table: security_types
+              schema: custody
+              code_column: code
+              id_column: security_type_id
+          - name: market
+            type: lookup
+            required: false
+            maps_to: market_id
+            lookup:
+              table: markets
+              entity_type: market
+              schema: custody
+              code_column: mic
+              id_column: market_id
+          - name: currency
+            type: string
+            required: false
+            maps_to: currency
+          - name: counterparty-bic
+            type: string
+            required: true
+            maps_to: counterparty_bic
+          - name: safekeeping-account
+            type: string
+            required: false
+            maps_to: safekeeping_account
+          - name: source
+            type: string
+            required: false
+            maps_to: source
+            valid_values:
+              - ALERT
+              - MANUAL
+              - CTM
+            default: ALERT
+          - name: source-reference
+            type: string
+            required: false
+            maps_to: source_reference
+          - name: effective-date
+            type: date
+            required: true
+            maps_to: effective_date
         returns:
           type: uuid
           name: entity_ssi_id
           capture: true
+      remove-ssi:
+        description: Remove a counterparty SSI
+        behavior: crud
+        crud:
+          operation: delete
+          table: entity_ssi
+          schema: custody
+        args:
+          - name: ssi-id
+            type: uuid
+            required: true
+            maps_to: entity_ssi_id
+        returns:
+          type: affected

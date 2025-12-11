@@ -11,35 +11,35 @@ domains:
           schema: custody
           returning: isda_id
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          maps_to: cbu_id
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
-        - name: counterparty
-          type: uuid
-          required: true
-          maps_to: counterparty_entity_id
-        - name: agreement-date
-          type: date
-          required: true
-          maps_to: agreement_date
-        - name: governing-law
-          type: string
-          required: false
-          maps_to: governing_law
-          valid_values:
-          - NY
-          - ENGLISH
-        - name: effective-date
-          type: date
-          required: true
-          maps_to: effective_date
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: counterparty
+            type: uuid
+            required: true
+            maps_to: counterparty_entity_id
+          - name: agreement-date
+            type: date
+            required: true
+            maps_to: agreement_date
+          - name: governing-law
+            type: string
+            required: false
+            maps_to: governing_law
+            valid_values:
+              - NY
+              - ENGLISH
+          - name: effective-date
+            type: date
+            required: true
+            maps_to: effective_date
         returns:
           type: uuid
           name: isda_id
@@ -53,35 +53,35 @@ domains:
           schema: custody
           returning: coverage_id
         args:
-        - name: isda-id
-          type: uuid
-          required: true
-          maps_to: isda_id
-          lookup:
-            table: isda_agreements
-            entity_type: isda
-            schema: custody
-            search_key: isda_id
-            primary_key: isda_id
-        - name: instrument-class
-          type: lookup
-          required: true
-          maps_to: instrument_class_id
-          lookup:
-            table: instrument_classes
-            entity_type: instrument_class
-            schema: custody
-            code_column: code
-            id_column: class_id
-        - name: isda-taxonomy
-          type: lookup
-          required: false
-          maps_to: isda_taxonomy_id
-          lookup:
-            table: isda_product_taxonomy
-            schema: custody
-            code_column: taxonomy_code
-            id_column: taxonomy_id
+          - name: isda-id
+            type: uuid
+            required: true
+            maps_to: isda_id
+            lookup:
+              table: isda_agreements
+              entity_type: isda
+              schema: custody
+              search_key: isda_id
+              primary_key: isda_id
+          - name: instrument-class
+            type: lookup
+            required: true
+            maps_to: instrument_class_id
+            lookup:
+              table: instrument_classes
+              entity_type: instrument_class
+              schema: custody
+              code_column: code
+              id_column: class_id
+          - name: isda-taxonomy
+            type: lookup
+            required: false
+            maps_to: isda_taxonomy_id
+            lookup:
+              table: isda_product_taxonomy
+              schema: custody
+              code_column: taxonomy_code
+              id_column: taxonomy_id
         returns:
           type: uuid
           name: coverage_id
@@ -94,47 +94,75 @@ domains:
           schema: custody
           returning: csa_id
         args:
-        - name: isda-id
-          type: uuid
-          required: true
-          maps_to: isda_id
-          lookup:
-            table: isda_agreements
-            entity_type: isda
-            schema: custody
-            search_key: isda_id
-            primary_key: isda_id
-        - name: csa-type
-          type: string
-          required: true
-          maps_to: csa_type
-          valid_values:
-          - VM
-          - IM
-        - name: threshold
-          type: decimal
-          required: false
-          maps_to: threshold_amount
-        - name: threshold-currency
-          type: string
-          required: false
-          maps_to: threshold_currency
-        - name: mta
-          type: decimal
-          required: false
-          maps_to: minimum_transfer_amount
-        - name: collateral-ssi
-          type: uuid
-          required: false
-          maps_to: collateral_ssi_id
-        - name: effective-date
-          type: date
-          required: true
-          maps_to: effective_date
+          - name: isda-id
+            type: uuid
+            required: true
+            maps_to: isda_id
+            lookup:
+              table: isda_agreements
+              entity_type: isda
+              schema: custody
+              search_key: isda_id
+              primary_key: isda_id
+          - name: csa-type
+            type: string
+            required: true
+            maps_to: csa_type
+            valid_values:
+              - VM
+              - IM
+          - name: threshold
+            type: decimal
+            required: false
+            maps_to: threshold_amount
+          - name: threshold-currency
+            type: string
+            required: false
+            maps_to: threshold_currency
+          - name: mta
+            type: decimal
+            required: false
+            maps_to: minimum_transfer_amount
+          - name: collateral-ssi
+            type: uuid
+            required: false
+            maps_to: collateral_ssi_id
+          - name: effective-date
+            type: date
+            required: true
+            maps_to: effective_date
         returns:
           type: uuid
           name: csa_id
           capture: true
+      remove-coverage:
+        description: Remove instrument class coverage from ISDA
+        behavior: crud
+        crud:
+          operation: delete
+          table: isda_product_coverage
+          schema: custody
+        args:
+          - name: coverage-id
+            type: uuid
+            required: true
+            maps_to: coverage_id
+        returns:
+          type: affected
+      remove-csa:
+        description: Remove CSA from ISDA
+        behavior: crud
+        crud:
+          operation: delete
+          table: csa_agreements
+          schema: custody
+        args:
+          - name: csa-id
+            type: uuid
+            required: true
+            maps_to: csa_id
+        returns:
+          type: affected
       list:
         description: List ISDA agreements for CBU
         behavior: crud
@@ -144,18 +172,18 @@ domains:
           schema: custody
           fk_col: cbu_id
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
-        - name: counterparty
-          type: uuid
-          required: false
-          maps_to: counterparty_entity_id
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: counterparty
+            type: uuid
+            required: false
+            maps_to: counterparty_entity_id
         returns:
           type: record_set

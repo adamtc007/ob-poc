@@ -2,7 +2,7 @@
 name = "dsl_types"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.91"
+rust-version = "1.84"
 description = "Pure DSL data structures - Level 1 foundation types with zero dependencies"
 
 # CRITICAL: Level 1 crate - MUST have ZERO dependencies except std
@@ -21,4 +21,3 @@ thiserror = "1.0"
 
 # NO OTHER DEPENDENCIES ALLOWED
 # This crate must be the foundation that everything else builds on
-

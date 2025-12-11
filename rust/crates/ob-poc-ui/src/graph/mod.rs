@@ -56,6 +56,42 @@ pub enum ViewMode {
     KycUbo,
     /// Service Delivery view - shows products, services, and resource instances
     ServiceDelivery,
+    /// Custody view - shows markets, SSIs, and booking rules
+    Custody,
+    /// Products only view - simplified product overview
+    ProductsOnly,
+}
+
+impl ViewMode {
+    /// Get the API string representation
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ViewMode::KycUbo => "KYC_UBO",
+            ViewMode::ServiceDelivery => "SERVICE_DELIVERY",
+            ViewMode::Custody => "CUSTODY",
+            ViewMode::ProductsOnly => "PRODUCTS_ONLY",
+        }
+    }
+
+    /// Get display name for UI
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            ViewMode::KycUbo => "KYC / UBO",
+            ViewMode::ServiceDelivery => "Service Delivery",
+            ViewMode::Custody => "Custody",
+            ViewMode::ProductsOnly => "Products",
+        }
+    }
+
+    /// Get all available view modes
+    pub fn all() -> &'static [ViewMode] {
+        &[
+            ViewMode::KycUbo,
+            ViewMode::ServiceDelivery,
+            ViewMode::Custody,
+            ViewMode::ProductsOnly,
+        ]
+    }
 }
 
 use egui::{Color32, Rect, Sense, Vec2};
@@ -248,6 +284,26 @@ impl CbuGraphWidget {
                             .iter()
                             .any(|cat| cat == "TRADING_EXECUTION" || cat == "BOTH")
                     })
+                    .cloned()
+                    .collect()
+            }
+            ViewMode::Custody => {
+                // Include: CBU, entities with custody relationships, custody layer
+                // Markets, SSIs, booking rules
+                data.nodes
+                    .iter()
+                    .filter(|n| {
+                        // Include core and custody layers
+                        matches!(n.layer.as_str(), "core" | "custody")
+                    })
+                    .cloned()
+                    .collect()
+            }
+            ViewMode::ProductsOnly => {
+                // Simplified view: just CBU and products
+                data.nodes
+                    .iter()
+                    .filter(|n| n.node_type == "cbu" || n.node_type == "product")
                     .cloned()
                     .collect()
             }

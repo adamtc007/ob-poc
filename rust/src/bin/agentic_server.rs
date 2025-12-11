@@ -224,8 +224,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .layer(TraceLayer::new_for_http());
 
-    // Bind to address
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    // Bind to address (0.0.0.0 for Docker, configurable via SERVER_HOST)
+    let host: [u8; 4] = std::env::var("SERVER_HOST")
+        .unwrap_or_else(|_| "0.0.0.0".to_string())
+        .parse::<std::net::Ipv4Addr>()
+        .map(|ip| ip.octets())
+        .unwrap_or([0, 0, 0, 0]);
+    let port: u16 = std::env::var("SERVER_PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(3000);
+    let addr = SocketAddr::from((host, port));
     println!("\nServer running on http://{}", addr);
     println!("\nAvailable endpoints:");
     println!("  Web UI:");

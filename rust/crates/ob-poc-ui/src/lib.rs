@@ -1,4 +1,10 @@
-//! OB-POC UI - CBU Visualization
+//! OB-POC UI - CBU Visualization & Agent Interface
+//!
+//! 4-panel layout:
+//! - Graph (top-left): CBU entity visualization with drag/zoom
+//! - DSL (top-right): Generated DSL source
+//! - Chat (bottom-left): Agent chat interface
+//! - AST (bottom-right): Interactive AST with EntityRef resolution
 
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::type_complexity)]
@@ -7,9 +13,15 @@
 pub mod api;
 pub mod app;
 pub mod graph;
+pub mod modals;
+pub mod panels;
+pub mod state;
 
 pub use app::ObPocApp;
 pub use graph::CbuGraphWidget;
+pub use modals::{EntityFinderModal, EntityFinderResult};
+pub use panels::{AstPanel, ChatPanel, DslPanel};
+pub use state::{ChatMessage, PendingState, SessionContext};
 
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen::prelude::wasm_bindgen(start)]

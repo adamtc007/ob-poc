@@ -178,55 +178,45 @@ All entity lookup and resolution flows through the **EntityGateway** gRPC servic
 | Generic Executor | `rust/src/dsl_v2/generic_executor.rs` | Runtime entity lookup with SQL fallback |
 | Agent Routes | `rust/src/api/agent_routes.rs` | Tool-use entity lookup |
 
-### Go Web UI (Gin Framework)
+### Rust egui Web UI
 
-The Go web UI (`go/cmd/web/main.go`) uses the Gin framework and acts as a proxy to Rust APIs - no business logic or side doors.
+The web UI is built with egui/eframe and compiles to both native and WASM targets. It provides a 4-panel layout:
 
-**Key patterns:**
-
-```go
-// Route groups for organization
-api := r.Group("/api")
-{
-    agent := api.Group("/agent")
-    {
-        agent.POST("/session", handleAgentSession)
-        agent.POST("/chat", handleAgentChat)
-    }
-    dsl := api.Group("/dsl")
-    {
-        dsl.POST("/execute", handleDirectExecute)
-    }
-}
-
-// Proxy helper for JSON POST requests
-func proxyPostJSON(c *gin.Context, targetURL string) {
-    body, _ := io.ReadAll(c.Request.Body)
-    resp, _ := http.Post(targetURL, "application/json", bytes.NewReader(body))
-    respBody, _ := io.ReadAll(resp.Body)
-    c.Data(resp.StatusCode, "application/json", respBody)
-}
+```
+┌─────────────────┬─────────────────┐
+│  Graph (TL)     │  DSL Source (TR)│
+│                 │                 │
+├─────────────────┼─────────────────┤
+│  Chat (BL)      │  AST (BR)       │
+│                 │                 │
+└─────────────────┴─────────────────┘
 ```
 
-**Route structure:**
-- `/` - Server-rendered HTML index page
-- `/health` - Health check (proxies to Rust)
-- `/api/agent/*` - Agent session endpoints (proxy to Rust :3000)
-- `/api/dsl/*` - DSL execution endpoints (proxy to Rust :3001)
-- `/api/cbus` - List CBUs
-- `/api/entity/search` - Entity search for finder
-- `/static/*` - Embedded static assets (JS, CSS)
+**Key modules:**
+- `rust/crates/ob-poc-ui/src/app.rs` - Main application with 4-panel layout
+- `rust/crates/ob-poc-ui/src/panels/` - Chat, DSL, and AST panels
+- `rust/crates/ob-poc-ui/src/modals/` - Entity Finder and CBU Picker modals
+- `rust/crates/ob-poc-ui/src/graph/` - Interactive CBU graph with drag/zoom
+
+**Features:**
+- 4 view modes: KYC_UBO, SERVICE_DELIVERY, CUSTODY, PRODUCTS_ONLY
+- Vertical/Horizontal layout orientation
+- Node drag/resize with layout persistence
+- Entity Finder modal for resolving unresolved EntityRefs
+- CBU Picker modal for searching and selecting CBUs
 
 ## Code Statistics
 
-As of 2025-12-10:
+As of 2025-12-11:
 
 | Language | Files | Lines |
 |----------|-------|-------|
-| Rust | 264 | 198,458 |
-| Go | 10 | 2,307 |
-| YAML Config | 5 | 7,789 |
-| **Total** | **279** | **~208,554** |
+| Rust | 270+ | 200,000+ |
+| Go | 7 | ~1,500 |
+| YAML Config | 38 | 8,500+ |
+| **Total** | **315+** | **~210,000** |
+
+Note: Go code is now primarily for the animation CLI and test harness (go/cmd/animate, go/cmd/harness).
 
 ### YAML-Driven Configuration
 
@@ -234,12 +224,52 @@ The DSL system is entirely YAML-driven. Adding new verbs requires editing YAML, 
 
 ```
 config/
-├── verbs.yaml      # All verb definitions (1,500+ lines)
-│                   # - Domain definitions
-│                   # - Verb args with maps_to for DB columns
-│                   # - CRUD operations (insert, update, delete, etc.)
-│                   # - Plugin behaviors for custom ops
-└── csg_rules.yaml  # Context-sensitive grammar rules
+├── verbs/                    # Verb definitions (split into multiple files)
+│   ├── _meta.yaml           # Meta configuration
+│   ├── cbu.yaml             # CBU domain verbs
+│   ├── entity.yaml          # Entity domain verbs
+│   ├── delivery.yaml        # Delivery domain verbs
+│   ├── document.yaml        # Document domain verbs
+│   ├── product.yaml         # Product domain verbs
+│   ├── screening.yaml       # Screening domain verbs
+│   ├── service.yaml         # Service domain verbs
+│   ├── service-resource.yaml # Service resource verbs
+│   ├── ubo.yaml             # UBO domain verbs
+│   ├── custody/             # Custody-related domains
+│   │   ├── cbu-custody.yaml # CBU custody operations
+│   │   ├── entity-settlement.yaml
+│   │   └── isda.yaml        # ISDA/CSA agreements
+│   ├── kyc/                 # KYC case management
+│   │   ├── kyc-case.yaml
+│   │   ├── entity-workstream.yaml
+│   │   ├── case-screening.yaml
+│   │   ├── red-flag.yaml
+│   │   ├── doc-request.yaml
+│   │   └── case-event.yaml
+│   ├── observation/         # Evidence model
+│   │   ├── observation.yaml
+│   │   ├── allegation.yaml
+│   │   └── discrepancy.yaml
+│   ├── registry/            # Investor registry
+│   │   ├── share-class.yaml
+│   │   ├── holding.yaml
+│   │   └── movement.yaml
+│   ├── reference/           # Market reference data
+│   │   ├── market.yaml
+│   │   ├── instrument-class.yaml
+│   │   ├── security-type.yaml
+│   │   └── subcustodian.yaml
+│   └── refdata/             # Classification reference data
+│       ├── jurisdiction.yaml
+│       ├── currency.yaml
+│       ├── role.yaml
+│       ├── client-type.yaml
+│       ├── case-type.yaml
+│       ├── screening-type.yaml
+│       ├── risk-rating.yaml
+│       ├── settlement-type.yaml
+│       └── ssi-type.yaml
+└── csg_rules.yaml           # Context-sensitive grammar rules
 ```
 
 **Key YAML structures:**
@@ -315,9 +345,9 @@ The UI follows a **single pipeline** pattern. Server computes layout positions; 
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Go Web UI / WASM UI                           │
-│  SVG rendering with server-computed positions                   │
-│  go/cmd/web/ (Go) or rust/crates/ob-poc-ui/ (WASM)             │
+│                    Rust egui UI (WASM/Native)                    │
+│  Interactive graph with drag/zoom, server-computed positions    │
+│  rust/crates/ob-poc-ui/                                         │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -1809,8 +1839,8 @@ The `share-class`, `holding`, and `movement` domains implement a Clearstream-sty
 ## Database Schema Reference
 
 **Database**: `data_designer` on PostgreSQL 17  
-**Schemas**: `ob-poc` (77 tables), `custody` (17 tables), `kyc` (12 tables)  
-**Updated**: 2025-12-09
+**Schemas**: `ob-poc` (83 tables), `custody` (17 tables), `kyc` (12 tables), `public` (10 tables)  
+**Updated**: 2025-12-11
 
 ## Overview
 
@@ -1820,6 +1850,8 @@ This document describes the database schema used by the OB-POC KYC/AML onboardin
 - **Service Delivery**: Products, services, resource instances
 - **Custody & Settlement**: Three-layer model (Universe → SSI → Booking Rules)
 - **Investor Registry**: Fund share classes, holdings, and movements (Clearstream-style)
+- **Evidence & Proofs**: CBU evidence, UBO evidence, snapshots for audit trails
+- **Decision Support**: Case evaluation snapshots, red-flag scoring, decision thresholds
 - **Agentic DSL Generation**: The `rust/src/agentic/` module generates DSL that creates records in these tables
 
 ## Core Tables
@@ -2719,19 +2751,24 @@ Subscription, redemption, and transfer transactions.
 
 | Category | Tables | Examples |
 |----------|--------|----------|
-| Core | 5 | cbus, entities, entity_types, roles, cbu_entity_roles |
+| Core | 6 | cbus, entities, entity_types, roles, cbu_entity_roles, cbu_change_log |
 | Entity Extensions | 4 | entity_proper_persons, entity_limited_companies, entity_partnerships, entity_trusts |
-| Documents | 3 | document_catalog, document_types, document_attribute_mappings |
+| Documents | 4 | document_catalog, document_types, document_attribute_mappings, document_attribute_links |
 | Products/Services | 8 | products, services, service_delivery_map, cbu_resource_instances |
-| Reference Data | 4 | master_jurisdictions, currencies, roles, dictionary |
-| DSL/Execution | 6 | dsl_instances, dsl_instance_versions, dsl_execution_log, dsl_domains, dsl_examples |
+| Reference Data | 6 | master_jurisdictions, currencies, roles, dictionary, risk_bands, client_types |
+| DSL/Execution | 10 | dsl_instances, dsl_instance_versions, dsl_execution_log, dsl_domains, dsl_sessions |
 | Onboarding | 4 | onboarding_requests, onboarding_products, service_option_definitions, service_option_choices |
-| Attributes | 4 | attribute_registry, attribute_values_typed, attribute_dictionary, resource_attribute_requirements |
-| Other | 39 | Various support tables |
-| **ob-poc Total** | **77** | |
+| Attributes | 5 | attribute_registry, attribute_values_typed, attribute_dictionary, attribute_observations, client_allegations |
+| Evidence/Proofs | 4 | cbu_evidence, ubo_evidence, ubo_snapshots, ubo_snapshot_comparisons |
+| Decision Support | 3 | case_decision_thresholds, case_evaluation_snapshots, redflag_score_config |
+| UBO | 3 | ubo_registry, ownership_relationships, control_relationships |
+| Thresholds | 4 | threshold_factors, threshold_requirements, requirement_acceptable_docs, screening_requirements |
+| Other | 32 | Various support tables |
+| **ob-poc Total** | **83** | |
 | **Custody** | **17** | cbu_instrument_universe, cbu_ssi, ssi_booking_rules, isda_agreements, csa_agreements |
 | **KYC** | **12** | cases, entity_workstreams, red_flags, doc_requests, screenings, share_classes, holdings, movements |
-| **Grand Total** | **106** | |
+| **Public** | **10** | rules, rule_versions, business_attributes, derived_attributes, credentials_vault |
+| **Grand Total** | **122** | |
 
 ## Rebuilding the Schema
 
@@ -3503,10 +3540,113 @@ UBO ownership and control chain management
 | `ubo.update-ownership` | Update ownership percentage or end date |
 | `ubo.verify-ubo` | Mark a UBO as verified |
 
+### Reference Data Domains
+
+The following domains manage reference/master data used throughout the system.
+
+#### case-type
+
+KYC case type reference data (NEW_CLIENT, PERIODIC_REVIEW, etc.)
+
+| Verb | Description |
+|------|-------------|
+| `case-type.ensure` | Create or update a case type |
+| `case-type.read` | Read a case type by code |
+| `case-type.list` | List all case types |
+| `case-type.deactivate` | Deactivate a case type |
+
+#### client-type
+
+Client type reference data (FUND, CORPORATE, etc.)
+
+| Verb | Description |
+|------|-------------|
+| `client-type.ensure` | Create or update a client type |
+| `client-type.read` | Read a client type by code |
+| `client-type.list` | List all client types |
+| `client-type.deactivate` | Deactivate a client type |
+
+#### currency
+
+Currency reference data (USD, EUR, GBP, etc.)
+
+| Verb | Description |
+|------|-------------|
+| `currency.ensure` | Create or update a currency |
+| `currency.read` | Read a currency by ISO code |
+| `currency.list` | List all currencies |
+| `currency.deactivate` | Deactivate a currency |
+
+#### jurisdiction
+
+Jurisdiction reference data (US, GB, LU, etc.)
+
+| Verb | Description |
+|------|-------------|
+| `jurisdiction.ensure` | Create or update a jurisdiction |
+| `jurisdiction.read` | Read a jurisdiction by code |
+| `jurisdiction.list` | List all jurisdictions |
+| `jurisdiction.delete` | Delete a jurisdiction |
+
+#### risk-rating
+
+Risk rating reference data (LOW, MEDIUM, HIGH, etc.)
+
+| Verb | Description |
+|------|-------------|
+| `risk-rating.ensure` | Create or update a risk rating |
+| `risk-rating.read` | Read a risk rating by code |
+| `risk-rating.list` | List all risk ratings |
+| `risk-rating.deactivate` | Deactivate a risk rating |
+
+#### role
+
+Entity role reference data (DIRECTOR, UBO, SHAREHOLDER, etc.)
+
+| Verb | Description |
+|------|-------------|
+| `role.ensure` | Create or update a role |
+| `role.read` | Read a role by name |
+| `role.list` | List all roles |
+| `role.delete` | Delete a role |
+
+#### screening-type
+
+Screening type reference data (PEP, SANCTIONS, ADVERSE_MEDIA, etc.)
+
+| Verb | Description |
+|------|-------------|
+| `screening-type.ensure` | Create or update a screening type |
+| `screening-type.read` | Read a screening type by code |
+| `screening-type.list` | List all screening types |
+| `screening-type.deactivate` | Deactivate a screening type |
+
+#### settlement-type
+
+Settlement type reference data (DVP, FOP, RVP, etc.)
+
+| Verb | Description |
+|------|-------------|
+| `settlement-type.ensure` | Create or update a settlement type |
+| `settlement-type.read` | Read a settlement type by code |
+| `settlement-type.list` | List all settlement types |
+| `settlement-type.deactivate` | Deactivate a settlement type |
+
+#### ssi-type
+
+SSI type reference data (SECURITIES, CASH, COLLATERAL)
+
+| Verb | Description |
+|------|-------------|
+| `ssi-type.ensure` | Create or update an SSI type |
+| `ssi-type.read` | Read an SSI type by code |
+| `ssi-type.list` | List all SSI types |
+| `ssi-type.deactivate` | Deactivate an SSI type |
+
 
 ## Adding New Verbs
 
-To add a new verb, edit `rust/config/verbs.yaml`:
+To add a new verb, edit the appropriate file in `rust/config/verbs/`:
 
 ```yaml
 domains:
@@ -3531,3 +3671,52 @@ domains:
 ```
 
 No Rust code changes required for standard CRUD operations.
+
+## Agent Workflow (Conductor Mode)
+
+This repository uses a **conductor pattern** for agent interactions. The full contract is in `CONDUCTOR_MODE.md`. Key principles:
+
+### Operating Principles
+
+1. **Scope is explicit** - Only modify files mentioned or obviously related. ASK before touching others.
+
+2. **Plan → Confirm → Edit** - Before editing:
+   - Summarize what you've read in 3-7 bullets
+   - Propose a short numbered plan (3-6 steps)
+   - WAIT for explicit approval before changing code
+
+3. **Small, reviewable diffs** - Prefer many small coherent changes over one giant diff.
+
+### Editing Rules
+
+1. **Preserve invariants** - Do not change public types, DSL grammars, or DB schemas unless explicitly asked. State invariants before touching them.
+
+2. **Be explicit about uncertainty** - If unsure how something works, say so. Prefer tests/assertions/questions over silent guessing.
+
+3. **No surprise deletions** - List call sites, classify (runtime vs test-only), explain why safe. Propose and await confirmation.
+
+4. **Tests first** - For behavior changes, adjust or add tests first.
+
+### High-Risk Areas (Two-Pass Required)
+
+For these areas, always do a **read-only analysis pass** before proposing edits:
+
+- DSL → AST → execution → DB transitions
+- Call graph / dead code analysis  
+- UBO graph logic / ownership prongs
+- Anything coupling Rust + Go + SQL + JSON Schema
+
+**Pass 1 (read-only):** Read files, explain the pipeline, state invariants, identify what would break.
+
+**Pass 2 (tightly scoped edit):** Given that understanding, only change the specific seam.
+
+### When in Doubt
+
+If uncertain about DSL semantics, CBU/UBO/KYC domain rules, graph invariants, or cross-crate boundaries:
+
+1. Stop
+2. Explain the uncertainty
+3. Ask for clarification or propose options
+4. Wait for guidance
+
+Never silently "guess and commit" on complex domain logic.

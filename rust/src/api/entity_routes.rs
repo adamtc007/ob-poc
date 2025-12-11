@@ -113,11 +113,11 @@ async fn search_entities(
             )
         })?;
 
-    // Map common type aliases to gateway nicknames
+    // Map common type aliases to gateway nicknames (UPPERCASE)
     let nickname = normalize_entity_type(&query.entity_type);
 
     let request = SearchRequest {
-        nickname: nickname.to_string(),
+        nickname,
         values: vec![query.q.clone()],
         search_key: None,
         mode: SearchMode::Fuzzy as i32,
@@ -173,21 +173,21 @@ async fn search_entities(
     }))
 }
 
-/// Normalize entity type aliases to gateway nicknames
-fn normalize_entity_type(entity_type: &str) -> &str {
+/// Normalize entity type aliases to gateway nicknames (UPPERCASE)
+fn normalize_entity_type(entity_type: &str) -> String {
     match entity_type.to_lowercase().as_str() {
-        "cbu" | "client" => "cbu",
-        "entity" | "entities" => "entity",
-        "person" | "proper_person" | "individual" => "person",
-        "company" | "limited_company" | "legal_entity" => "legal_entity",
-        "product" | "products" => "product",
-        "service" | "services" => "service",
-        "role" | "roles" => "role",
-        "jurisdiction" | "jurisdictions" | "country" => "jurisdiction",
-        "currency" | "currencies" => "currency",
-        "document_type" | "doc_type" => "document_type",
-        "fund" => "fund",
-        _ => entity_type, // Pass through unknown types
+        "cbu" | "client" => "CBU".to_string(),
+        "entity" | "entities" => "ENTITY".to_string(),
+        "person" | "proper_person" | "individual" => "PERSON".to_string(),
+        "company" | "limited_company" | "legal_entity" => "LEGAL_ENTITY".to_string(),
+        "product" | "products" => "PRODUCT".to_string(),
+        "service" | "services" => "SERVICE".to_string(),
+        "role" | "roles" => "ROLE".to_string(),
+        "jurisdiction" | "jurisdictions" | "country" => "JURISDICTION".to_string(),
+        "currency" | "currencies" => "CURRENCY".to_string(),
+        "document_type" | "doc_type" => "DOCUMENT_TYPE".to_string(),
+        "fund" => "FUND".to_string(),
+        _ => entity_type.to_uppercase(), // Force uppercase for unknown types
     }
 }
 

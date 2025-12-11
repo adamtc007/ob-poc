@@ -296,7 +296,6 @@ config/dev.yaml
 
 # Go compiled binaries (specific paths)
 go/web-server
-go/cmd/web/webserver
 
 # WASM build artifacts
 rust/static/pkg/

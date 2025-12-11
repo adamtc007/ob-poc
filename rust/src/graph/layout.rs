@@ -11,7 +11,9 @@ pub enum ViewMode {
     /// KYC/UBO view: Entity hierarchy by role priority, ownership chains
     #[default]
     KycUbo,
-    /// Service Delivery view: Products → Services → Resources tree
+    /// Products Only view: CBU → Products (simple, clean view)
+    ProductsOnly,
+    /// Service Delivery view: Products → Services → Resources tree (detailed, for onboarding)
     ServiceDelivery,
     /// Custody view: Markets → Universe/SSI/Rules
     Custody,
@@ -20,6 +22,7 @@ pub enum ViewMode {
 impl ViewMode {
     pub fn parse(s: &str) -> Self {
         match s.to_uppercase().as_str() {
+            "PRODUCTS_ONLY" | "PRODUCTS" => ViewMode::ProductsOnly,
             "SERVICE_DELIVERY" | "SERVICES" => ViewMode::ServiceDelivery,
             "CUSTODY" => ViewMode::Custody,
             _ => ViewMode::KycUbo, // Default
@@ -29,6 +32,7 @@ impl ViewMode {
     pub fn as_str(&self) -> &'static str {
         match self {
             ViewMode::KycUbo => "KYC_UBO",
+            ViewMode::ProductsOnly => "PRODUCTS_ONLY",
             ViewMode::ServiceDelivery => "SERVICE_DELIVERY",
             ViewMode::Custody => "CUSTODY",
         }
@@ -132,25 +136,15 @@ impl LayoutEngine {
 
     /// Apply layout to the graph, computing x/y positions for all nodes
     pub fn layout(&self, graph: &mut CbuGraph) {
-        eprintln!(
-            "[LAYOUT] Applying {:?} layout ({:?}) to {} nodes",
-            self.view_mode,
-            self.orientation,
-            graph.nodes.len()
-        );
-
-        // Debug: show node types before layout
-        let mut type_counts: std::collections::HashMap<String, usize> =
-            std::collections::HashMap::new();
-        for node in &graph.nodes {
-            let key = format!("{:?}", node.node_type);
-            *type_counts.entry(key).or_insert(0) += 1;
-        }
-        eprintln!("[LAYOUT] Node types: {:?}", type_counts);
-
         match (self.view_mode, self.orientation) {
             (ViewMode::KycUbo, Orientation::Vertical) => self.layout_kyc_ubo_vertical(graph),
             (ViewMode::KycUbo, Orientation::Horizontal) => self.layout_kyc_ubo_horizontal(graph),
+            (ViewMode::ProductsOnly, Orientation::Vertical) => {
+                self.layout_products_only_vertical(graph)
+            }
+            (ViewMode::ProductsOnly, Orientation::Horizontal) => {
+                self.layout_products_only_horizontal(graph)
+            }
             (ViewMode::ServiceDelivery, Orientation::Vertical) => {
                 self.layout_service_delivery_vertical(graph)
             }
@@ -159,16 +153,6 @@ impl LayoutEngine {
             }
             (ViewMode::Custody, _) => self.layout_custody(graph), // Custody is always vertical for now
         }
-
-        // Debug: show tier distribution after layout
-        let mut tier_counts: std::collections::HashMap<i32, usize> =
-            std::collections::HashMap::new();
-        for node in &graph.nodes {
-            if let Some(tier) = node.layout_tier {
-                *tier_counts.entry(tier).or_insert(0) += 1;
-            }
-        }
-        eprintln!("[LAYOUT] Tier distribution: {:?}", tier_counts);
     }
 
     /// KYC/UBO layout (VERTICAL - top to bottom): Hierarchical by role priority with SHELL/PERSON split
@@ -202,11 +186,6 @@ impl LayoutEngine {
                     let priority = node.role_priority.unwrap_or(0);
                     let is_shell = node.entity_category.as_deref() == Some("SHELL");
 
-                    eprintln!(
-                        "[LAYOUT-KYC] Entity '{}': priority={}, category={:?}, is_shell={}",
-                        node.label, priority, node.entity_category, is_shell
-                    );
-
                     if priority >= 100 {
                         // OWNERSHIP_CONTROL
                         if is_shell {
@@ -238,10 +217,6 @@ impl LayoutEngine {
             }
         }
 
-        eprintln!("[LAYOUT-KYC] Tier counts: tier_0(CBU)={}, tier_1(Product)={}, tier_2_shell={}, tier_2_person={}, tier_3_shell={}, tier_3_person={}, tier_4_shell={}, tier_4_person={}, other={}",
-            tier_0.len(), tier_1.len(), tier_2_shell.len(), tier_2_person.len(),
-            tier_3_shell.len(), tier_3_person.len(), tier_4_shell.len(), tier_4_person.len(), other.len());
-
         // Layout each tier
         self.layout_tier_centered(&mut graph.nodes, &tier_0, 0, center_x);
         self.layout_tier_centered(&mut graph.nodes, &tier_1, 1, center_x + 200.0);
@@ -263,6 +238,52 @@ impl LayoutEngine {
 
         // Other nodes (KYC, documents) - place at bottom
         self.layout_tier_centered(&mut graph.nodes, &other, 5, center_x);
+    }
+
+    /// Products Only layout (VERTICAL): Simple CBU → Products view
+    /// Suppresses services and resources for a cleaner view
+    fn layout_products_only_vertical(&self, graph: &mut CbuGraph) {
+        let center_x = self.config.canvas_width / 2.0;
+
+        let mut tier_0: Vec<usize> = Vec::new(); // CBU
+        let mut tier_1: Vec<usize> = Vec::new(); // Products
+        let mut tier_2: Vec<usize> = Vec::new(); // Entities (optional context)
+
+        for (idx, node) in graph.nodes.iter().enumerate() {
+            match node.node_type {
+                NodeType::Cbu => tier_0.push(idx),
+                NodeType::Product => tier_1.push(idx),
+                NodeType::Entity => tier_2.push(idx),
+                // Skip services, resources, and other nodes entirely
+                _ => {}
+            }
+        }
+
+        self.layout_tier_centered(&mut graph.nodes, &tier_0, 0, center_x);
+        self.layout_tier_centered(&mut graph.nodes, &tier_1, 1, center_x);
+        self.layout_tier_centered(&mut graph.nodes, &tier_2, 2, center_x);
+    }
+
+    /// Products Only layout (HORIZONTAL): Simple CBU → Products view
+    fn layout_products_only_horizontal(&self, graph: &mut CbuGraph) {
+        let center_y = 300.0;
+
+        let mut tier_0: Vec<usize> = Vec::new(); // CBU
+        let mut tier_1: Vec<usize> = Vec::new(); // Products
+        let mut tier_2: Vec<usize> = Vec::new(); // Entities
+
+        for (idx, node) in graph.nodes.iter().enumerate() {
+            match node.node_type {
+                NodeType::Cbu => tier_0.push(idx),
+                NodeType::Product => tier_1.push(idx),
+                NodeType::Entity => tier_2.push(idx),
+                _ => {}
+            }
+        }
+
+        self.layout_tier_horizontal_centered(&mut graph.nodes, &tier_0, 0, center_y);
+        self.layout_tier_horizontal_centered(&mut graph.nodes, &tier_1, 1, center_y);
+        self.layout_tier_horizontal_centered(&mut graph.nodes, &tier_2, 2, center_y);
     }
 
     /// Service Delivery layout (VERTICAL): Tree from CBU → Products → Services → Resources

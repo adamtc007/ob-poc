@@ -94,6 +94,20 @@ domains:
               primary_key: cbu_id
         returns:
           type: record_set
+      remove-universe:
+        description: Remove an entry from CBU's trading universe
+        behavior: crud
+        crud:
+          operation: delete
+          table: cbu_instrument_universe
+          schema: custody
+        args:
+          - name: universe-id
+            type: uuid
+            required: true
+            maps_to: universe_id
+        returns:
+          type: affected
       create-ssi:
         description: Create a Standing Settlement Instruction (pure account data)
         behavior: crud
@@ -363,6 +377,20 @@ domains:
             maps_to: is_active
         returns:
           type: record_set
+      remove-booking-rule:
+        description: Remove a booking rule
+        behavior: crud
+        crud:
+          operation: delete
+          table: ssi_booking_rules
+          schema: custody
+        args:
+          - name: rule-id
+            type: uuid
+            required: true
+            maps_to: rule_id
+        returns:
+          type: affected
       update-rule-priority:
         description: Update booking rule priority
         behavior: crud
@@ -553,6 +581,20 @@ domains:
               primary_key: ssi_id
         returns:
           type: record_set
+      remove-agent-override:
+        description: Remove an agent override from SSI settlement chain
+        behavior: crud
+        crud:
+          operation: delete
+          table: cbu_ssi_agent_override
+          schema: custody
+        args:
+          - name: override-id
+            type: uuid
+            required: true
+            maps_to: override_id
+        returns:
+          type: affected
       setup-ssi:
         description: Bulk import SSIs from SSI_ONBOARDING document
         behavior: plugin

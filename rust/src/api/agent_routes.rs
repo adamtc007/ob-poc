@@ -198,6 +198,8 @@ pub struct ResolutionStats {
 pub struct ResolveRefResponse {
     /// Whether the update succeeded
     pub success: bool,
+    /// DSL source re-rendered from updated AST (DSL + AST are a tuple pair)
+    pub dsl_source: Option<String>,
     /// Full refreshed AST with updated triplet
     pub ast: Option<Vec<crate::dsl_v2::ast::Statement>>,
     /// Resolution statistics
@@ -294,7 +296,8 @@ pub fn create_agent_router(pool: PgPool) -> Router {
         .route("/api/session/:id/execute", post(execute_session_dsl))
         .route("/api/session/:id/clear", post(clear_session_dsl))
         .route("/api/session/:id/bind", post(set_session_binding))
-        // Entity reference resolution
+        // DSL parsing and entity reference resolution
+        .route("/api/dsl/parse", post(parse_dsl))
         .route("/api/dsl/resolve-ref", post(resolve_entity_ref))
         // Vocabulary and metadata
         .route("/api/agent/generate", post(generate_dsl))
@@ -1586,6 +1589,327 @@ async fn set_session_binding(
 }
 
 // ============================================================================
+// Auto-Resolution Helper
+// ============================================================================
+
+/// Auto-resolve EntityRefs with exact matches (100% confidence) via EntityGateway.
+///
+/// For each unresolved EntityRef, searches the gateway. If an exact match is found
+/// (value matches token exactly, case-insensitive for lookup tables), the resolved_key
+/// is set automatically without requiring user interaction.
+async fn auto_resolve_entity_refs(
+    program: crate::dsl_v2::ast::Program,
+) -> crate::dsl_v2::ast::Program {
+    use crate::dsl_v2::ast::{
+        find_unresolved_ref_locations, Argument, AstNode, Program, Statement, VerbCall,
+    };
+    use entity_gateway::proto::ob::gateway::v1::{SearchMode, SearchRequest};
+
+    // Find all unresolved refs
+    let unresolved = find_unresolved_ref_locations(&program);
+    if unresolved.is_empty() {
+        return program;
+    }
+
+    // Connect to EntityGateway
+    let addr = crate::dsl_v2::gateway_resolver::gateway_addr();
+    let mut client = match entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient::connect(addr.clone()).await {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!("Auto-resolve: Failed to connect to EntityGateway: {}", e);
+            return program;
+        }
+    };
+
+    // Build resolution map: (stmt_idx, arg_key) -> resolved_key
+    let mut resolutions: std::collections::HashMap<(usize, String), String> =
+        std::collections::HashMap::new();
+
+    for loc in &unresolved {
+        // Map entity_type to gateway nickname (uppercase)
+        let nickname = loc.entity_type.to_uppercase();
+
+        let search_request = SearchRequest {
+            nickname: nickname.clone(),
+            values: vec![loc.search_text.clone()],
+            search_key: None,
+            mode: SearchMode::Exact as i32, // Exact mode for precise matching
+            limit: Some(1),
+        };
+
+        if let Ok(response) = client.search(search_request).await {
+            let inner = response.into_inner();
+            if let Some(m) = inner.matches.first() {
+                // Check for exact match: search_text matches token (case-insensitive for lookup tables)
+                let is_exact = m.token.eq_ignore_ascii_case(&loc.search_text)
+                    || m.display
+                        .to_uppercase()
+                        .contains(&loc.search_text.to_uppercase());
+
+                if is_exact {
+                    tracing::debug!(
+                        "Auto-resolved: {} '{}' -> '{}'",
+                        loc.entity_type,
+                        loc.search_text,
+                        m.token
+                    );
+                    resolutions.insert((loc.statement_index, loc.arg_key.clone()), m.token.clone());
+                }
+            }
+        }
+    }
+
+    if resolutions.is_empty() {
+        return program;
+    }
+
+    // Apply resolutions to AST
+    let resolved_statements: Vec<Statement> = program
+        .statements
+        .into_iter()
+        .enumerate()
+        .map(|(stmt_idx, stmt)| {
+            if let Statement::VerbCall(vc) = stmt {
+                let resolved_args: Vec<Argument> = vc
+                    .arguments
+                    .into_iter()
+                    .map(|arg| {
+                        if let Some(resolved_key) = resolutions.get(&(stmt_idx, arg.key.clone())) {
+                            // Update the EntityRef with resolved_key
+                            if let AstNode::EntityRef {
+                                entity_type,
+                                search_column,
+                                value,
+                                span,
+                                ..
+                            } = arg.value
+                            {
+                                return Argument {
+                                    key: arg.key,
+                                    value: AstNode::EntityRef {
+                                        entity_type,
+                                        search_column,
+                                        value,
+                                        resolved_key: Some(resolved_key.clone()),
+                                        span,
+                                    },
+                                    span: arg.span,
+                                };
+                            }
+                        }
+                        arg
+                    })
+                    .collect();
+
+                Statement::VerbCall(VerbCall {
+                    domain: vc.domain,
+                    verb: vc.verb,
+                    arguments: resolved_args,
+                    binding: vc.binding,
+                    span: vc.span,
+                })
+            } else {
+                stmt
+            }
+        })
+        .collect();
+
+    Program {
+        statements: resolved_statements,
+    }
+}
+
+// ============================================================================
+// DSL Parse Handler
+// ============================================================================
+
+/// Request to parse DSL source into AST
+#[derive(Debug, Deserialize)]
+pub struct ParseDslRequest {
+    /// DSL source text to parse
+    pub dsl: String,
+    /// Optional session ID to store the parsed AST
+    pub session_id: Option<Uuid>,
+}
+
+/// A missing required argument
+#[derive(Debug, Clone, Serialize)]
+pub struct MissingArg {
+    /// Statement index (0-based)
+    pub statement_index: usize,
+    /// Argument name (e.g., "name", "jurisdiction")
+    pub arg_name: String,
+    /// Verb that requires this arg
+    pub verb: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ParseDslResponse {
+    /// Whether parsing succeeded
+    pub success: bool,
+    /// Pipeline stage reached
+    pub stage: PipelineStage,
+    /// DSL source (echoed back)
+    pub dsl_source: String,
+    /// Parsed AST (if parse succeeded)
+    pub ast: Option<Vec<crate::dsl_v2::ast::Statement>>,
+    /// Unresolved EntityRefs requiring resolution
+    pub unresolved_refs: Vec<UnresolvedRef>,
+    /// Missing required arguments (from CSG validation)
+    pub missing_args: Vec<MissingArg>,
+    /// Validation errors (non-missing-arg errors)
+    pub validation_errors: Vec<String>,
+    /// Parse error (if failed)
+    pub error: Option<String>,
+}
+
+/// POST /api/dsl/parse - Parse DSL source into AST
+///
+/// Parses DSL source text and returns the AST with any unresolved EntityRefs.
+/// DSL + AST are persisted as a tuple pair. If there are unresolved refs,
+/// the UI should prompt the user to resolve them before execution.
+///
+/// ## Request
+/// ```json
+/// {
+///   "dsl": "(cbu.assign-role :cbu-id \"Apex\" :entity-id \"John Smith\" :role \"DIRECTOR\")",
+///   "session_id": "optional-uuid"
+/// }
+/// ```
+///
+/// ## Response
+/// Returns AST with unresolved_refs array for UI to show resolution popups.
+async fn parse_dsl(
+    State(state): State<AgentState>,
+    Json(req): Json<ParseDslRequest>,
+) -> Json<ParseDslResponse> {
+    use crate::dsl_v2::ast::find_unresolved_ref_locations;
+    use crate::dsl_v2::validation::{Severity, ValidationContext, ValidationRequest};
+    use crate::dsl_v2::{enrich_program, runtime_registry};
+
+    // Parse the DSL (raw AST with literals only)
+    let raw_program = match parse_program(&req.dsl) {
+        Ok(p) => p,
+        Err(e) => {
+            return Json(ParseDslResponse {
+                success: false,
+                stage: PipelineStage::Draft,
+                dsl_source: req.dsl,
+                ast: None,
+                unresolved_refs: vec![],
+                missing_args: vec![],
+                validation_errors: vec![],
+                error: Some(format!("Parse error: {}", e)),
+            });
+        }
+    };
+
+    // Enrich: convert string literals to EntityRefs based on YAML verb config
+    let registry = runtime_registry();
+    let enrichment_result = enrich_program(raw_program, &registry);
+    let mut program = enrichment_result.program;
+
+    // Auto-resolve EntityRefs with exact matches via EntityGateway
+    // This handles cases like :product "CUSTODY" where the value matches exactly
+    program = auto_resolve_entity_refs(program).await;
+
+    // Run semantic validation with CSG linter to find missing required args
+    let mut missing_args: Vec<MissingArg> = vec![];
+    let mut validation_errors: Vec<String> = vec![];
+
+    // Try to initialize validator and run CSG validation
+    let validator_result = async {
+        let v = SemanticValidator::new(state.pool.clone()).await?;
+        v.with_csg_linter().await
+    }
+    .await;
+
+    if let Ok(mut validator) = validator_result {
+        let request = ValidationRequest {
+            source: req.dsl.clone(),
+            context: ValidationContext::default(),
+        };
+        if let crate::dsl_v2::validation::ValidationResult::Err(diagnostics) =
+            validator.validate(&request).await
+        {
+            for (idx, diag) in diagnostics.iter().enumerate() {
+                if diag.severity != Severity::Error {
+                    continue;
+                }
+                let msg = format!("[{}] {}", diag.code.as_str(), diag.message);
+                // Pattern: "[E020] missing required argument 'name' for verb 'cbu.create'"
+                if diag.code.as_str() == "E020" {
+                    // Parse: "missing required argument 'name' for verb 'cbu.create'"
+                    // Find first quoted string (arg name) and last quoted string (verb)
+                    let parts: Vec<&str> = diag.message.split('\'').collect();
+                    if parts.len() >= 4 {
+                        // parts: ["missing required argument ", "name", " for verb ", "cbu.create", ""]
+                        let arg_name = parts[1].to_string();
+                        let verb = parts[3].to_string();
+                        missing_args.push(MissingArg {
+                            statement_index: idx,
+                            arg_name,
+                            verb,
+                        });
+                        continue;
+                    }
+                }
+                // Other validation errors
+                validation_errors.push(msg);
+            }
+        }
+    }
+
+    // Find unresolved EntityRefs (those with resolved_key: None)
+    let unresolved_locations = find_unresolved_ref_locations(&program);
+    let unresolved_refs: Vec<UnresolvedRef> = unresolved_locations
+        .into_iter()
+        .map(|loc| UnresolvedRef {
+            statement_index: loc.statement_index,
+            arg_key: loc.arg_key,
+            entity_type: loc.entity_type,
+            search_text: loc.search_text,
+        })
+        .collect();
+
+    // Determine stage based on what's needed
+    let stage = if !missing_args.is_empty() {
+        PipelineStage::Draft // Still need required args
+    } else if !unresolved_refs.is_empty() {
+        PipelineStage::Resolving // Have all args, need to resolve refs
+    } else if !validation_errors.is_empty() {
+        PipelineStage::Draft // Other validation errors
+    } else {
+        PipelineStage::Resolved // Ready to execute
+    };
+
+    // If session_id provided, store AST in in-memory session only.
+    // Database persistence happens at execution time when we have a CBU context.
+    if let Some(session_id) = req.session_id {
+        let mut sessions = state.sessions.write().await;
+        if let Some(session) = sessions.get_mut(&session_id) {
+            session.context.ast = program.statements.clone();
+            if stage == PipelineStage::Resolved {
+                session.state = SessionState::ReadyToExecute;
+            } else {
+                session.state = SessionState::PendingValidation;
+            }
+        }
+    }
+
+    Json(ParseDslResponse {
+        success: true,
+        stage,
+        dsl_source: req.dsl,
+        ast: Some(program.statements),
+        unresolved_refs,
+        missing_args,
+        validation_errors,
+        error: None,
+    })
+}
+
+// ============================================================================
 // Entity Reference Resolution Handler
 // ============================================================================
 
@@ -1622,6 +1946,7 @@ async fn resolve_entity_ref(
     if req.ref_id.statement_index >= session.context.ast.len() {
         return Ok(Json(ResolveRefResponse {
             success: false,
+            dsl_source: None,
             ast: None,
             resolution_stats: ResolutionStats {
                 total_refs: 0,
@@ -1708,8 +2033,12 @@ async fn resolve_entity_ref(
                 session.state = SessionState::ReadyToExecute;
             }
 
+            // Re-render DSL from updated AST (DSL + AST are a tuple pair)
+            let dsl_source = session.context.to_dsl_source();
+
             Ok(Json(ResolveRefResponse {
                 success: true,
+                dsl_source: Some(dsl_source),
                 ast: Some(session.context.ast.clone()),
                 resolution_stats: ResolutionStats {
                     total_refs: stats.total_refs,
@@ -1722,6 +2051,7 @@ async fn resolve_entity_ref(
         }
         Err((message, code)) => Ok(Json(ResolveRefResponse {
             success: false,
+            dsl_source: None,
             ast: None,
             resolution_stats: ResolutionStats {
                 total_refs: 0,
@@ -2869,7 +3199,7 @@ pub struct DirectExecuteRequest {
 }
 
 /// Primary key returned from DSL execution - derived from verb's `produces` metadata
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrimaryKey {
     /// The entity type produced (from verb YAML `produces.type`: cbu, entity, case, workstream, etc.)
     pub entity_type: String,
@@ -2883,16 +3213,57 @@ pub struct PrimaryKey {
     pub name: Option<String>,
 }
 
-/// Response from direct DSL execution
-#[derive(Debug, Serialize)]
+/// Pipeline stage indicating where processing stopped
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum PipelineStage {
+    /// DSL source received but parse failed
+    Draft,
+    /// Parse succeeded - AST exists, tokens valid
+    /// May have unresolved EntityRefs
+    Parsed,
+    /// AST has unresolved EntityRefs requiring user/agent resolution
+    /// UI should show search popup for each unresolved ref
+    Resolving,
+    /// All EntityRefs resolved - ready for lint
+    Resolved,
+    /// CSG linter passed - dataflow valid
+    Linted,
+    /// Compile succeeded - execution plan ready
+    Compiled,
+    /// Execute succeeded - DB mutations committed
+    Executed,
+}
+
+/// An unresolved EntityRef that needs user/agent resolution
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UnresolvedRef {
+    /// Statement index in AST (0-based)
+    pub statement_index: usize,
+    /// Argument key containing the EntityRef
+    pub arg_key: String,
+    /// Entity type for search (e.g., "cbu", "entity", "product")
+    pub entity_type: String,
+    /// The search text entered by user
+    pub search_text: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DirectExecuteResponse {
     pub success: bool,
+    /// Pipeline stage reached (determines what data is available)
+    pub stage: PipelineStage,
     pub results: Vec<ExecutionResult>,
     pub bindings: std::collections::HashMap<String, Uuid>,
     pub errors: Vec<String>,
-    /// The resolved AST with EntityRefs containing resolved_key UUIDs
+    /// The AST - available once stage >= Parsed
+    /// DSL source + AST are a tuple pair, persisted together
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ast: Option<Vec<crate::dsl_v2::ast::Statement>>,
+    /// Unresolved EntityRefs requiring user/agent resolution
+    /// UI should show search popup for each; use /api/dsl/resolve-ref to update
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub unresolved_refs: Vec<UnresolvedRef>,
     /// Primary key(s) created/updated by this execution
     /// Each domain returns its primary entity type PK
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -2935,16 +3306,18 @@ async fn direct_execute_dsl(
 ) -> Json<DirectExecuteResponse> {
     use crate::dsl_v2::validation::{Severity, ValidationContext, ValidationRequest};
 
-    // Parse
+    // Parse - if this fails, we're in Draft stage (no AST)
     let program = match parse_program(&req.dsl) {
         Ok(p) => p,
         Err(e) => {
             return Json(DirectExecuteResponse {
                 success: false,
+                stage: PipelineStage::Draft,
                 results: vec![],
                 bindings: std::collections::HashMap::new(),
                 errors: vec![format!("Parse error: {}", e)],
                 ast: None,
+                unresolved_refs: vec![],
                 primary_keys: vec![],
                 reordered: false,
                 synthetic_steps: vec![],
@@ -2974,16 +3347,19 @@ async fn direct_execute_dsl(
                 .map(|d| format!("[{}] {}", d.code.as_str(), d.message))
                 .collect();
             if !errors.is_empty() {
+                // Parsed but lint failed - AST exists, stage is Parsed
                 return Json(DirectExecuteResponse {
                     success: false,
+                    stage: PipelineStage::Parsed,
                     results: vec![],
                     bindings: std::collections::HashMap::new(),
                     errors,
-                    ast: None,
+                    ast: Some(program.statements.clone()),
                     primary_keys: vec![],
                     reordered: false,
                     synthetic_steps: vec![],
                     planner_diagnostics: vec![],
+                    unresolved_refs: vec![],
                 });
             }
         }
@@ -3101,16 +3477,19 @@ async fn direct_execute_dsl(
                 result.plan
             }
             Err(e) => {
+                // Linted but compile failed - stage is Linted
                 return Json(DirectExecuteResponse {
                     success: false,
+                    stage: PipelineStage::Linted,
                     results: vec![],
                     bindings: std::collections::HashMap::new(),
                     errors: vec![format!("Compile error: {}", e)],
-                    ast: None,
+                    ast: Some(program.statements.clone()),
                     primary_keys: vec![],
                     reordered: false,
                     synthetic_steps: vec![],
                     planner_diagnostics: vec![],
+                    unresolved_refs: vec![],
                 });
             }
         }
@@ -3119,16 +3498,19 @@ async fn direct_execute_dsl(
         match compile(&program) {
             Ok(p) => p,
             Err(e) => {
+                // Linted but compile failed - stage is Linted
                 return Json(DirectExecuteResponse {
                     success: false,
+                    stage: PipelineStage::Linted,
                     results: vec![],
                     bindings: std::collections::HashMap::new(),
                     errors: vec![format!("Compile error: {}", e)],
-                    ast: None,
+                    ast: Some(program.statements.clone()),
                     primary_keys: vec![],
                     reordered: false,
                     synthetic_steps: vec![],
                     planner_diagnostics: vec![],
+                    unresolved_refs: vec![],
                 });
             }
         }
@@ -3238,8 +3620,10 @@ async fn direct_execute_dsl(
                 }
             }
 
+            // Full pipeline complete - stage is Executed
             Json(DirectExecuteResponse {
                 success: true,
+                stage: PipelineStage::Executed,
                 results,
                 bindings,
                 errors: vec![],
@@ -3248,19 +3632,25 @@ async fn direct_execute_dsl(
                 reordered,
                 synthetic_steps,
                 planner_diagnostics,
+                unresolved_refs: vec![],
             })
         }
-        Err(e) => Json(DirectExecuteResponse {
-            success: false,
-            results: vec![],
-            bindings: ctx.symbols.clone(),
-            errors: vec![e.to_string()],
-            ast: None,
-            primary_keys: vec![],
-            reordered,
-            synthetic_steps,
-            planner_diagnostics,
-        }),
+        Err(e) => {
+            // Compiled but execute failed - stage is Compiled
+            Json(DirectExecuteResponse {
+                success: false,
+                stage: PipelineStage::Compiled,
+                results: vec![],
+                bindings: ctx.symbols.clone(),
+                errors: vec![e.to_string()],
+                ast: Some(program.statements.clone()),
+                primary_keys: vec![],
+                reordered,
+                synthetic_steps,
+                planner_diagnostics,
+                unresolved_refs: vec![],
+            })
+        }
     }
 }
 

@@ -26,7 +26,7 @@ use tantivy::tokenizer::{LowerCaser, NgramTokenizer, TextAnalyzer};
 use tantivy::{Index, IndexReader, IndexWriter, Term};
 use tokio::sync::{Mutex, RwLock};
 
-use crate::config::{EntityConfig, IndexMode};
+use crate::config::{EntityConfig, IndexMode, SearchKeyConfig, ShardConfig};
 use crate::index::traits::{
     IndexError, IndexRecord, MatchMode, SearchIndex, SearchMatch, SearchQuery,
 };
@@ -71,12 +71,20 @@ impl TantivyIndex {
         let display_opts = TextOptions::default().set_stored();
         let display_field = schema_builder.add_text_field("display", display_opts);
 
-        // Standard text options for exact/prefix word matching
-        let exact_indexing = TextFieldIndexing::default()
+        // Standard text options for word-based matching (used in Trigram mode fallback)
+        let word_indexing = TextFieldIndexing::default()
             .set_tokenizer("default")
             .set_index_option(IndexRecordOption::WithFreqsAndPositions);
-        let exact_opts = TextOptions::default()
-            .set_indexing_options(exact_indexing.clone())
+        let word_opts = TextOptions::default()
+            .set_indexing_options(word_indexing.clone())
+            .set_stored();
+
+        // Raw text options for exact code matching (preserves underscores, no tokenization)
+        let raw_indexing = TextFieldIndexing::default()
+            .set_tokenizer("raw")
+            .set_index_option(IndexRecordOption::WithFreqsAndPositions);
+        let raw_opts = TextOptions::default()
+            .set_indexing_options(raw_indexing)
             .set_stored();
 
         // Ngram text options for substring matching (only used in trigram mode)
@@ -93,20 +101,19 @@ impl TantivyIndex {
         for key in &config.search_keys {
             match config.index_mode {
                 IndexMode::Trigram => {
-                    // Trigram mode: ngram field for fuzzy + exact field for fallback
+                    // Trigram mode: ngram field for fuzzy + word field for fallback
                     let ngram_field = schema_builder.add_text_field(&key.name, ngram_opts.clone());
                     search_fields.insert(key.name.clone(), ngram_field);
 
                     let exact_name = format!("{}_exact", key.name);
-                    let exact_field =
-                        schema_builder.add_text_field(&exact_name, exact_opts.clone());
+                    let exact_field = schema_builder.add_text_field(&exact_name, word_opts.clone());
                     exact_fields.insert(key.name.clone(), exact_field);
                 }
                 IndexMode::Exact => {
-                    // Exact mode: only standard word tokenization
-                    let exact_field = schema_builder.add_text_field(&key.name, exact_opts.clone());
-                    search_fields.insert(key.name.clone(), exact_field);
-                    exact_fields.insert(key.name.clone(), exact_field);
+                    // Exact mode: raw tokenization (preserves underscores in codes like FUND_ACCOUNTING)
+                    let raw_field = schema_builder.add_text_field(&key.name, raw_opts.clone());
+                    search_fields.insert(key.name.clone(), raw_field);
+                    exact_fields.insert(key.name.clone(), raw_field);
                 }
             }
         }
@@ -149,22 +156,25 @@ impl TantivyIndex {
     /// - Single token: ngram lookup via QueryParser (applies ngram tokenizer)
     /// - Multiple tokens: boolean AND of ngram lookups
     /// - Typo tolerance via fuzzy term query fallback for short inputs
+    ///
+    /// Note: `input` should already be normalized (uppercase for exact mode, lowercase for trigram mode)
     fn build_fuzzy_query(
         &self,
         search_field: Field,
         exact_field: Field,
         input: &str,
     ) -> Box<dyn Query> {
-        let input_lower = input.to_lowercase().trim().to_string();
+        // Input is already normalized by caller - don't change case here
+        let input_trimmed = input.trim().to_string();
 
-        if input_lower.is_empty() {
+        if input_trimmed.is_empty() {
             // Empty query - match nothing
             return Box::new(BooleanQuery::new(vec![]));
         }
 
         // For short inputs (< 3 chars total), use fuzzy prefix on exact field
-        if input_lower.len() < 3 {
-            let term = Term::from_field_text(exact_field, &input_lower);
+        if input_trimmed.len() < 3 {
+            let term = Term::from_field_text(exact_field, &input_trimmed);
             return Box::new(FuzzyTermQuery::new_prefix(term, 1, true));
         }
 
@@ -173,11 +183,11 @@ impl TantivyIndex {
         let mut query_parser = QueryParser::for_index(&self.index, vec![search_field]);
         query_parser.set_conjunction_by_default(); // AND semantics for multiple tokens
 
-        match query_parser.parse_query(&input_lower) {
+        match query_parser.parse_query(&input_trimmed) {
             Ok(query) => query,
             Err(e) => {
                 tracing::warn!(error = %e, "Query parse failed, falling back to exact match");
-                let term = Term::from_field_text(exact_field, &input_lower);
+                let term = Term::from_field_text(exact_field, &input_trimmed);
                 Box::new(TermQuery::new(term, Default::default()))
             }
         }
@@ -187,13 +197,25 @@ impl TantivyIndex {
 #[async_trait]
 impl SearchIndex for TantivyIndex {
     async fn search(&self, query: &SearchQuery) -> Vec<SearchMatch> {
+        tracing::debug!(
+            nickname = %self.config.nickname,
+            search_key = %query.search_key,
+            values = ?query.values,
+            mode = ?query.mode,
+            "Starting search"
+        );
+
         let reader_guard = self.reader.read().await;
         let reader = match reader_guard.as_ref() {
             Some(r) => r,
-            None => return vec![],
+            None => {
+                tracing::warn!(nickname = %self.config.nickname, "No reader available");
+                return vec![];
+            }
         };
 
         let searcher = reader.searcher();
+        tracing::debug!(nickname = %self.config.nickname, num_docs = searcher.num_docs(), "Searcher ready");
 
         // Get the search fields
         let search_field = match self.search_fields.get(&query.search_key) {
@@ -202,6 +224,7 @@ impl SearchIndex for TantivyIndex {
                 tracing::warn!(
                     search_key = %query.search_key,
                     nickname = %self.config.nickname,
+                    available_keys = ?self.search_fields.keys().collect::<Vec<_>>(),
                     "Unknown search key"
                 );
                 return vec![];
@@ -217,21 +240,42 @@ impl SearchIndex for TantivyIndex {
         let mut results = Vec::new();
         let mut seen_tokens = std::collections::HashSet::new();
 
+        // Determine if this is IndexMode::Exact (same field for search and exact)
+        // or IndexMode::Trigram (separate fields)
+        let is_exact_index_mode = exact_field == search_field;
+
         for input in &query.values {
-            let input_lower = input.to_lowercase();
+            // IndexMode::Exact (lookup tables): uppercase - codes like DIRECTOR, US, FUND
+            // IndexMode::Trigram (entity tables): preserve case for names like "John Smith"
+            let input_normalized = if is_exact_index_mode {
+                input.to_uppercase()
+            } else {
+                input.to_string() // preserve original case
+            };
 
             let tantivy_query: Box<dyn Query> = match query.mode {
-                MatchMode::Fuzzy => self.build_fuzzy_query(search_field, exact_field, &input_lower),
+                MatchMode::Fuzzy => {
+                    self.build_fuzzy_query(search_field, exact_field, &input_normalized)
+                }
                 MatchMode::Exact => {
-                    // For exact mode, use prefix query to allow incremental search
-                    // e.g., "D" matches "DIRECTOR", "DIR" matches "DIRECTOR"
-                    if input_lower.is_empty() {
-                        // Empty query - match all (return all values for this field)
+                    if input_normalized.is_empty() {
+                        // Empty query - match all
                         Box::new(tantivy::query::AllQuery)
+                    } else if is_exact_index_mode {
+                        // IndexMode::Exact: raw tokenizer, full string match
+                        let term = Term::from_field_text(exact_field, &input_normalized);
+                        Box::new(TermQuery::new(term, Default::default()))
                     } else {
-                        // Use fuzzy prefix for typo tolerance on short inputs
-                        let term = Term::from_field_text(exact_field, &input_lower);
-                        Box::new(FuzzyTermQuery::new_prefix(term, 1, true))
+                        // IndexMode::Trigram: word tokenizer, use QueryParser for word matching
+                        let mut query_parser =
+                            QueryParser::for_index(&self.index, vec![exact_field]);
+                        match query_parser.parse_query(&input_normalized) {
+                            Ok(q) => q,
+                            Err(_) => {
+                                let term = Term::from_field_text(exact_field, &input_normalized);
+                                Box::new(TermQuery::new(term, Default::default()))
+                            }
+                        }
                     }
                 }
             };
@@ -322,15 +366,26 @@ impl SearchIndex for TantivyIndex {
             doc.add_text(self.token_field, &record.token);
             doc.add_text(self.display_field, &record.display);
 
-            // Add search values to both ngram and exact fields
+            // Add search values to fields
+            // IndexMode::Exact (lookup tables): store uppercase - codes like DIRECTOR, US
+            // IndexMode::Trigram (entity tables): preserve original case for names
             for (key, value) in &record.search_values {
-                let value_lower = value.to_lowercase();
+                let is_exact_mode = self.exact_fields.get(key) == self.search_fields.get(key);
+                let indexed_value = if is_exact_mode {
+                    value.to_uppercase()
+                } else {
+                    value.to_string() // preserve original case
+                };
 
                 if let Some(field) = self.search_fields.get(key) {
-                    doc.add_text(*field, &value_lower);
+                    doc.add_text(*field, &indexed_value);
                 }
-                if let Some(field) = self.exact_fields.get(key) {
-                    doc.add_text(*field, &value_lower);
+
+                // For Trigram mode, also add to separate exact_field
+                if !is_exact_mode {
+                    if let Some(field) = self.exact_fields.get(key) {
+                        doc.add_text(*field, &indexed_value);
+                    }
                 }
             }
 
@@ -591,4 +646,72 @@ mod tests {
             avg_ms
         );
     }
+}
+
+#[tokio::test]
+async fn test_exact_search_with_underscore() {
+    // Simulate PRODUCT config with exact mode - product_code is default
+    let config = EntityConfig {
+        nickname: "PRODUCT".to_string(),
+        source_table: "products".to_string(),
+        return_key: "product_code".to_string(),
+        display_template: Some("{name} ({product_code})".to_string()),
+        index_mode: crate::config::IndexMode::Exact,
+        filter: None,
+        search_keys: vec![
+            SearchKeyConfig {
+                name: "name".to_string(),
+                column: "name".to_string(),
+                default: false,
+            },
+            SearchKeyConfig {
+                name: "product_code".to_string(),
+                column: "product_code".to_string(),
+                default: true, // DSL uses product codes like FUND_ACCOUNTING
+            },
+        ],
+        shard: ShardConfig {
+            enabled: false,
+            prefix_len: 0,
+        },
+    };
+
+    let index = TantivyIndex::new(config).unwrap();
+
+    // Index products with underscores
+    let records = vec![
+        IndexRecord {
+            token: "CUSTODY".to_string(),
+            display: "Custody (CUSTODY)".to_string(),
+            search_values: HashMap::from([
+                ("name".to_string(), "Custody".to_string()),
+                ("product_code".to_string(), "CUSTODY".to_string()),
+            ]),
+        },
+        IndexRecord {
+            token: "FUND_ACCOUNTING".to_string(),
+            display: "Fund Accounting (FUND_ACCOUNTING)".to_string(),
+            search_values: HashMap::from([
+                ("name".to_string(), "Fund Accounting".to_string()),
+                ("product_code".to_string(), "FUND_ACCOUNTING".to_string()),
+            ]),
+        },
+    ];
+
+    index.refresh(records).await.unwrap();
+
+    // Test exact search for FUND_ACCOUNTING on product_code (default field)
+    let query = SearchQuery {
+        values: vec!["FUND_ACCOUNTING".to_string()],
+        search_key: "product_code".to_string(),
+        mode: MatchMode::Exact,
+        limit: 10,
+    };
+
+    let results = index.search(&query).await;
+    assert!(
+        !results.is_empty(),
+        "Should find FUND_ACCOUNTING by product_code"
+    );
+    assert_eq!(results[0].token, "FUND_ACCOUNTING");
 }

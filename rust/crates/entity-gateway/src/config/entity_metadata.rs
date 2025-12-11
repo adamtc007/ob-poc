@@ -180,7 +180,7 @@ entities:
       prefix_len: 1
 "#;
 
-        let config = GatewayConfig::from_str(yaml).unwrap();
+        let config = GatewayConfig::from_yaml(yaml).unwrap();
         assert_eq!(config.refresh.interval_secs, 300);
         assert!(matches!(config.refresh.startup_mode, StartupMode::Async));
 

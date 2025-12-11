@@ -27,14 +27,14 @@ impl IndexRegistry {
         }
     }
 
-    /// Get an index by nickname
+    /// Get an index by nickname (expects UPPERCASE)
     ///
     /// Returns None if the nickname is not registered.
     pub async fn get(&self, nickname: &str) -> Option<Arc<dyn SearchIndex>> {
         self.indexes.read().await.get(nickname).cloned()
     }
 
-    /// Get the configuration for an entity by nickname
+    /// Get the configuration for an entity by nickname (expects UPPERCASE)
     pub fn get_config(&self, nickname: &str) -> Option<&EntityConfig> {
         self.configs.get(nickname)
     }

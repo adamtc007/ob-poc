@@ -711,6 +711,61 @@ pub fn count_entity_refs(program: &Program) -> EntityRefStats {
     }
 }
 
+/// Location of an unresolved EntityRef in the AST
+#[derive(Debug, Clone)]
+pub struct UnresolvedRefLocation {
+    /// Statement index in AST (0-based)
+    pub statement_index: usize,
+    /// Argument key containing the EntityRef
+    pub arg_key: String,
+    /// Entity type for search (e.g., "cbu", "entity", "product")
+    pub entity_type: String,
+    /// The search text entered by user
+    pub search_text: String,
+}
+
+/// Extract locations of all unresolved EntityRefs in the AST
+///
+/// Returns a list of (statement_index, arg_key, entity_type, search_text) for each
+/// unresolved EntityRef, which the UI uses to show resolution popups.
+///
+/// # Example
+/// ```ignore
+/// let unresolved = find_unresolved_ref_locations(&program);
+/// for loc in unresolved {
+///     println!("Statement {}, arg '{}': resolve '{}' as {}",
+///         loc.statement_index, loc.arg_key, loc.search_text, loc.entity_type);
+/// }
+/// ```
+pub fn find_unresolved_ref_locations(program: &Program) -> Vec<UnresolvedRefLocation> {
+    let mut results = Vec::new();
+
+    for (stmt_idx, stmt) in program.statements.iter().enumerate() {
+        if let Statement::VerbCall(vc) = stmt {
+            for arg in &vc.arguments {
+                if let AstNode::EntityRef {
+                    entity_type,
+                    value,
+                    resolved_key,
+                    ..
+                } = &arg.value
+                {
+                    if resolved_key.is_none() {
+                        results.push(UnresolvedRefLocation {
+                            statement_index: stmt_idx,
+                            arg_key: arg.key.clone(),
+                            entity_type: entity_type.clone(),
+                            search_text: value.clone(),
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    results
+}
+
 // =============================================================================
 // TESTS
 // =============================================================================

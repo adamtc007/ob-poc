@@ -1,78 +1,40 @@
 services:
-  # PostgreSQL database
-  postgres:
-    image: pgvector/pgvector:pg17
-    container_name: ob-poc-postgres
-    environment:
-      POSTGRES_DB: data_designer
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    volumes:
-      # Persist data between container restarts
-      - postgres_data:/var/lib/postgresql/data
-      # Optional: mount init scripts
-      - ./schema_export.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d data_designer"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
+  # Uncomment 'db' service if you want a separate Docker Postgres instance
+  # db:
+  #   image: pgvector/pgvector:pg17
+  #   container_name: ob-poc-db
+  #   environment:
+  #     POSTGRES_DB: data_designer
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: postgres
+  #   ports:
+  #     - "5433:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #     - ./init_docker.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U postgres -d data_designer"]
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 5
 
-  # Rust agentic server
-  rust-server:
+  api:
     build:
-      context: ./rust
-      dockerfile: Dockerfile
-    container_name: ob-poc-rust-server
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: ob-poc-api
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/data_designer
+      # Connect to host's local Postgres (same data as native Rust testing)
+      # host.docker.internal resolves to the host machine from inside Docker
+      DATABASE_URL: postgresql://localhost@host.docker.internal:5432/data_designer
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       RUST_LOG: info
     ports:
-      - "3000:3000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/agent/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+      - "3001:3000"
+      - "50052:50051"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
-  # Go web UI
-  go-ui:
-    build:
-      context: ./go
-      dockerfile: Dockerfile
-    container_name: ob-poc-go-ui
-    # Pass URLs for Rust server (internal Docker network)
-    command:
-      [
-        "/app/web",
-        "-addr",
-        ":8181",
-        "-rust-url",
-        "http://rust-server:3001",
-        "-agent-url",
-        "http://rust-server:3000",
-      ]
-    ports:
-      - "8181:8181"
-    depends_on:
-      rust-server:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8181/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-    restart: unless-stopped
-
-volumes:
-  # Named volume for PostgreSQL data persistence
-  postgres_data:
-    driver: local
+# volumes:
+#   postgres_data:

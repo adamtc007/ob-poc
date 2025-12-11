@@ -444,6 +444,39 @@ domains:
           type: affected
           description: Number of service delivery entries created
 
+      remove-product:
+        description: Remove a product from a CBU (deletes service_delivery_map entries)
+        behavior: crud
+        crud:
+          operation: delete
+          table: service_delivery_map
+          schema: ob-poc
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: product
+            type: string
+            required: true
+            description: Product code (e.g., CUSTODY, FUND_ACCOUNTING)
+            lookup:
+              table: products
+              entity_type: product
+              schema: ob-poc
+              search_key: product_code
+              primary_key: product_id
+            maps_to: product_id
+        returns:
+          type: affected
+          description: Number of service delivery entries removed
+
       decide:
         description: Record KYC/AML decision for CBU collective state (entities, UBOs, documents)
         behavior: plugin

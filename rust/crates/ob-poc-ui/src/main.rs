@@ -4,10 +4,12 @@
 #![allow(dead_code)]
 #![allow(clippy::collapsible_if)]
 
-mod agent_panel;
 mod api;
 mod app;
 mod graph;
+mod modals;
+mod panels;
+mod state;
 
 use app::ObPocApp;
 

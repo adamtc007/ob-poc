@@ -2,7 +2,7 @@
 name = "ob-poc"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.91"
+rust-version = "1.84"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 # All deprecated binaries removed - agentic CRUD examples are the master
@@ -116,7 +116,7 @@ required-features = ["server"]
 
 # Features for conditional compilation
 [features]
-default = []
+default = ["server"]  # Enable for sqlx prepare; use --no-default-features to disable
 
 database = ["dep:sqlx", "dep:bigdecimal", "dep:entity-gateway"]  # Only enable database functionality when needed
 server = ["database", "dep:axum", "dep:tower", "dep:tower-http"]  # REST API server with database
@@ -137,4 +137,5 @@ members = [
     "crates/dsl-lsp",
     "crates/ob-poc-ui",
     "crates/entity-gateway",
+    "xtask",
 ]
