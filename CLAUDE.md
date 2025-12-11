@@ -205,6 +205,16 @@ The web UI is built with egui/eframe and compiles to both native and WASM target
 - Entity Finder modal for resolving unresolved EntityRefs
 - CBU Picker modal for searching and selecting CBUs
 
+**Architecture patterns** are documented in `EGUI_ARCHITECTURE_PATTERN.MD`. Key rules:
+
+1. **Central AppState** - All persistent UI state lives in `ObPocApp` struct, not local variables
+2. **No flag soup** - Use enums for mutually exclusive modes instead of boolean flags
+3. **Event-driven updates** - Panel actions return action enums (e.g., `ChatPanelAction`, `EntityFinderResult`)
+4. **Pure UI functions** - Panels take `&mut Ui` + state, return actions
+5. **Form state on AppState** - Forms like `ChatPanel.input` persist in struct fields
+
+When modifying egui code, agents MUST follow these patterns to avoid UI glitches.
+
 ## Code Statistics
 
 As of 2025-12-11:
