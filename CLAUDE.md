@@ -225,6 +225,76 @@ The web UI is built with egui/eframe and compiles to both native and WASM target
 
 When modifying egui code, agents MUST follow these patterns to avoid UI glitches.
 
+## Shared Types Crate (ob-poc-types)
+
+The `ob-poc-types` crate is the **single source of truth** for all API types crossing HTTP boundaries.
+
+### Type Boundaries
+
+```
+┌──────────────────┐         ┌──────────────────┐
+│  Rust Server     │  JSON   │  TypeScript      │
+│  (Axum)          │ ◄─────► │  (HTML panels)   │
+└──────────────────┘         └──────────────────┘
+         │
+         │ JSON
+         ▼
+┌──────────────────┐
+│  Rust WASM       │
+│  (Graph)         │
+└──────────────────┘
+
+Plus: TS ◄──CustomEvent──► WASM (just entity IDs)
+```
+
+### Rules
+
+1. **All API types live in `ob-poc-types`** - No inline struct definitions in handlers
+2. **Use `#[derive(TS)]`** for TypeScript generation via ts-rs
+3. **Tagged enums only**: `#[serde(tag = "type")]` for TypeScript discriminated unions
+4. **UUIDs as Strings** in API types for TypeScript compatibility
+5. **CustomEvent payloads**: Keep simple - just IDs as strings
+
+### Workflow
+
+1. Edit types in `rust/crates/ob-poc-types/src/lib.rs`
+2. Run `cargo test --package ob-poc-types export_bindings` to regenerate TypeScript
+3. Copy bindings: `cp rust/crates/ob-poc-types/bindings/*.ts rust/crates/ob-poc-web/static/ts/generated/`
+4. Fix lint: `cd rust/crates/ob-poc-web/static && npx eslint ts/generated/*.ts --fix`
+
+### Key Types
+
+| Type | Boundary | Usage |
+|------|----------|-------|
+| `CreateSessionRequest/Response` | Server↔TS | Session creation |
+| `ChatRequest/Response` | Server↔TS | Chat messages |
+| `ChatStreamEvent` | Server→TS (SSE) | Streaming chat events |
+| `ExecuteRequest/Response` | Server↔TS | DSL execution |
+| `CbuGraphResponse` | Server↔WASM | Graph data |
+| `LoadCbuEvent`, `EntitySelectedEvent` | TS↔WASM | CustomEvent payloads |
+
+### Example: Adding a New API Type
+
+```rust
+// In ob-poc-types/src/lib.rs
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct MyNewRequest {
+    pub id: String,  // UUID as string for TS
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub optional_field: Option<String>,
+}
+
+// Tagged enum for TypeScript discrimination
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[ts(export)]
+pub enum MyEvent {
+    Success { data: String },
+    Error { message: String },
+}
+```
+
 ## Code Statistics
 
 As of 2025-12-11:
@@ -1100,6 +1170,9 @@ args:
 | subcustodian | Subcustodian network relationships |
 | isda | ISDA master agreements and product coverage |
 | entity-settlement | Entity BIC/LEI settlement identity |
+| fund | Fund structure operations (umbrella, subfund, share class, master-feeder, FoF) |
+| control | Control relationships distinct from ownership (voting, board, veto) |
+| delegation | Service provider delegation chains (ManCo to sub-advisor) |
 
 ## KYC Case Management DSL
 
@@ -1870,6 +1943,8 @@ This document describes the database schema used by the OB-POC KYC/AML onboardin
 - **Service Delivery**: Products, services, resource instances
 - **Custody & Settlement**: Three-layer model (Universe → SSI → Booking Rules)
 - **Investor Registry**: Fund share classes, holdings, and movements (Clearstream-style)
+- **Fund Structure**: Umbrella funds, sub-funds, share classes, master-feeder, FoF investments
+- **Control & Delegation**: Control relationships (separate from ownership), service provider delegation chains
 - **Evidence & Proofs**: CBU evidence, UBO evidence, snapshots for audit trails
 - **Decision Support**: Case evaluation snapshots, red-flag scoring, decision thresholds
 - **Agentic DSL Generation**: The `rust/src/agentic/` module generates DSL that creates records in these tables
@@ -1994,6 +2069,111 @@ Defines available entity types and their extension tables.
 | governing_law | varchar(100) | | | |
 | created_at | timestamptz | | now() | |
 | updated_at | timestamptz | | now() | |
+
+### entity_funds (Fund Entities)
+
+Extension table for umbrella funds, sub-funds, standalone funds, master and feeder funds.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| entity_id | uuid | PK, FK to entities |
+| lei | varchar(20) | Legal Entity Identifier |
+| isin_base | varchar(12) | Base ISIN |
+| fund_structure_type | text | SICAV, ICAV, OEIC, VCC, UNIT_TRUST, FCP |
+| fund_type | text | UCITS, AIF, HEDGE_FUND, PRIVATE_EQUITY |
+| regulatory_status | text | UCITS, AIF, RAIF, PART_II, UNREGULATED |
+| parent_fund_id | uuid | FK to entities (umbrella for subfund) |
+| master_fund_id | uuid | FK to entities (master for feeder) |
+| jurisdiction | varchar(10) | Domicile |
+| base_currency | varchar(3) | |
+| investment_objective | text | |
+
+### entity_share_classes (Share Classes)
+
+| Column | Type | Description |
+|--------|------|-------------|
+| entity_id | uuid | PK, FK to entities |
+| parent_fund_id | uuid | FK to entities (sub-fund) |
+| isin | varchar(12) | ISIN (unique) |
+| share_class_type | text | INSTITUTIONAL, RETAIL, SEED, FOUNDER, CLEAN |
+| distribution_type | text | ACC (accumulating), DIST (distributing), FLEX |
+| currency | varchar(3) | |
+| is_hedged | boolean | |
+| management_fee_bps | integer | Management fee in basis points |
+| minimum_investment | decimal | |
+
+### entity_manco (Management Companies)
+
+| Column | Type | Description |
+|--------|------|-------------|
+| entity_id | uuid | PK, FK to entities |
+| lei | varchar(20) | Legal Entity Identifier |
+| manco_type | text | UCITS_MANCO, AIFM, DUAL_AUTHORIZED |
+| authorized_jurisdiction | varchar(10) | |
+| can_manage_ucits | boolean | |
+| can_manage_aif | boolean | |
+| passported_jurisdictions | text[] | Array of jurisdiction codes |
+
+## Fund Structure Tables
+
+### fund_structure
+
+Structural containment relationships (umbrella→subfund, subfund→shareclass, master→feeder).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| structure_id | uuid | Primary key |
+| parent_entity_id | uuid | FK to entities |
+| child_entity_id | uuid | FK to entities |
+| relationship_type | text | CONTAINS, MASTER_FEEDER |
+| effective_from | date | |
+| effective_to | date | NULL = current |
+
+### fund_investments
+
+Fund-of-Funds investment relationships.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| investment_id | uuid | Primary key |
+| investor_entity_id | uuid | The FoF |
+| investee_entity_id | uuid | Underlying fund |
+| percentage_of_investor_nav | decimal | % of FoF NAV |
+| percentage_of_investee_aum | decimal | % of underlying AUM |
+| investment_type | text | DIRECT, VIA_SHARE_CLASS, SIDE_POCKET |
+| investment_date | date | |
+| redemption_date | date | NULL = still invested |
+
+### control_relationships
+
+Control relationships separate from ownership (voting rights, board control, veto powers).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| control_id | uuid | Primary key |
+| controller_entity_id | uuid | Who controls |
+| controlled_entity_id | uuid | Who is controlled |
+| control_type | text | VOTING_RIGHTS, BOARD_APPOINTMENT, VETO_POWER, MANAGEMENT_CONTROL, RESERVED_MATTERS |
+| control_percentage | decimal | May differ from ownership % |
+| control_description | text | |
+| evidence_doc_id | uuid | FK to document_catalog |
+| effective_from | date | |
+| effective_to | date | |
+
+### delegation_relationships
+
+Service provider delegation chains (ManCo to sub-advisor, administrator to sub-contractor).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| delegation_id | uuid | Primary key |
+| delegator_entity_id | uuid | Who delegates |
+| delegate_entity_id | uuid | Who receives delegation |
+| delegation_scope | text | INVESTMENT_MANAGEMENT, RISK_MANAGEMENT, PORTFOLIO_ADMINISTRATION, DISTRIBUTION, TRANSFER_AGENCY |
+| applies_to_cbu_id | uuid | FK to cbus (optional - may be firm-wide) |
+| contract_doc_id | uuid | FK to document_catalog |
+| effective_from | date | |
+| effective_to | date | |
 
 ## Role Management
 

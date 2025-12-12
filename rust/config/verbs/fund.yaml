@@ -1,0 +1,796 @@
+domains:
+  fund:
+    description: Fund structure operations - umbrellas, sub-funds, share classes, master-feeder
+    verbs:
+      # =========================================================================
+      # FUND CREATION VERBS
+      # =========================================================================
+      
+      create-umbrella:
+        description: Create an umbrella fund structure (SICAV, ICAV, OEIC, etc.)
+        behavior: crud
+        produces:
+          type: entity
+          subtype: fund_umbrella
+          resolved: false
+        crud:
+          operation: entity_create
+          base_table: entities
+          schema: ob-poc
+          extension_table: entity_funds
+          type_code: fund_umbrella
+          returning: entity_id
+        args:
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+            description: Legal name of the umbrella fund
+          - name: cbu-id
+            type: uuid
+            required: false
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: jurisdiction
+            type: string
+            required: true
+            maps_to: jurisdiction
+            lookup:
+              table: master_jurisdictions
+              entity_type: jurisdiction
+              schema: ob-poc
+              search_key: jurisdiction_code
+              primary_key: jurisdiction_code
+          - name: fund-structure-type
+            type: string
+            required: true
+            maps_to: fund_structure_type
+            description: Legal structure type
+            validation:
+              enum:
+                - SICAV          # Luxembourg
+                - ICAV           # Ireland
+                - OEIC           # UK
+                - VCC            # Singapore
+                - UNIT_TRUST     # Various
+                - FCP            # Luxembourg/France
+                - OTHER
+          - name: regulatory-status
+            type: string
+            required: true
+            maps_to: regulatory_status
+            validation:
+              enum:
+                - UCITS
+                - AIF
+                - RAIF
+                - PART_II
+                - UNREGULATED
+          - name: registration-number
+            type: string
+            required: false
+            maps_to: registration_number
+          - name: incorporation-date
+            type: date
+            required: false
+            maps_to: incorporation_date
+          - name: financial-year-end
+            type: string
+            required: false
+            maps_to: financial_year_end
+            description: "Month-day format, e.g., 12-31"
+        returns:
+          type: uuid
+          name: entity_id
+          capture: true
+
+      create-subfund:
+        description: Create a sub-fund/compartment within an umbrella
+        behavior: crud
+        produces:
+          type: entity
+          subtype: fund_subfund
+          resolved: false
+        crud:
+          operation: entity_create
+          base_table: entities
+          schema: ob-poc
+          extension_table: entity_funds
+          type_code: fund_subfund
+          returning: entity_id
+        args:
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+            description: Sub-fund name
+          - name: umbrella-id
+            type: uuid
+            required: true
+            maps_to: parent_fund_id
+            description: Parent umbrella fund
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: cbu-id
+            type: uuid
+            required: false
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: investment-objective
+            type: string
+            required: false
+            maps_to: investment_objective
+          - name: base-currency
+            type: string
+            required: true
+            maps_to: base_currency
+          - name: launch-date
+            type: date
+            required: false
+            maps_to: launch_date
+          - name: isin-base
+            type: string
+            required: false
+            maps_to: isin_base
+            description: Base ISIN (share classes will have variants)
+        returns:
+          type: uuid
+          name: entity_id
+          capture: true
+
+      create-share-class:
+        description: Create a share class within a sub-fund
+        behavior: crud
+        produces:
+          type: entity
+          subtype: fund_share_class
+          resolved: false
+        crud:
+          operation: entity_create
+          base_table: entities
+          schema: ob-poc
+          extension_table: entity_share_classes
+          type_code: fund_share_class
+          returning: entity_id
+        args:
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+            description: "Share class designation (e.g., I ACC EUR)"
+          - name: subfund-id
+            type: uuid
+            required: true
+            maps_to: parent_fund_id
+            description: Parent sub-fund
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: share-class-type
+            type: string
+            required: true
+            maps_to: share_class_type
+            validation:
+              enum:
+                - INSTITUTIONAL
+                - RETAIL
+                - SEED
+                - FOUNDER
+                - CLEAN          # No trailer fees
+          - name: distribution-type
+            type: string
+            required: true
+            maps_to: distribution_type
+            validation:
+              enum:
+                - ACC            # Accumulating
+                - DIST           # Distributing
+                - FLEX           # Flexible
+          - name: currency
+            type: string
+            required: true
+            maps_to: currency
+          - name: hedged
+            type: boolean
+            required: false
+            maps_to: is_hedged
+            default: false
+          - name: isin
+            type: string
+            required: false
+            maps_to: isin
+          - name: minimum-investment
+            type: decimal
+            required: false
+            maps_to: minimum_investment
+          - name: management-fee-bps
+            type: integer
+            required: false
+            maps_to: management_fee_bps
+            description: Management fee in basis points
+        returns:
+          type: uuid
+          name: entity_id
+          capture: true
+
+      create-standalone:
+        description: Create a standalone fund (not part of umbrella structure)
+        behavior: crud
+        produces:
+          type: entity
+          subtype: fund_standalone
+          resolved: false
+        crud:
+          operation: entity_create
+          base_table: entities
+          schema: ob-poc
+          extension_table: entity_funds
+          type_code: fund_standalone
+          returning: entity_id
+        args:
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+          - name: cbu-id
+            type: uuid
+            required: false
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: jurisdiction
+            type: string
+            required: true
+            maps_to: jurisdiction
+          - name: fund-type
+            type: string
+            required: true
+            maps_to: fund_type
+            validation:
+              enum:
+                - HEDGE_FUND
+                - PRIVATE_EQUITY
+                - REAL_ESTATE
+                - INFRASTRUCTURE
+                - CREDIT
+                - MULTI_STRATEGY
+          - name: regulatory-status
+            type: string
+            required: true
+            maps_to: regulatory_status
+          - name: base-currency
+            type: string
+            required: true
+            maps_to: base_currency
+        returns:
+          type: uuid
+          name: entity_id
+          capture: true
+
+      # =========================================================================
+      # MASTER-FEEDER STRUCTURE
+      # =========================================================================
+
+      create-master:
+        description: Create a master fund (for master-feeder structures)
+        behavior: crud
+        produces:
+          type: entity
+          subtype: fund_master
+          resolved: false
+        crud:
+          operation: entity_create
+          base_table: entities
+          schema: ob-poc
+          extension_table: entity_funds
+          type_code: fund_master
+          returning: entity_id
+        args:
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+          - name: cbu-id
+            type: uuid
+            required: false
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: jurisdiction
+            type: string
+            required: true
+            maps_to: jurisdiction
+          - name: base-currency
+            type: string
+            required: true
+            maps_to: base_currency
+        returns:
+          type: uuid
+          name: entity_id
+          capture: true
+
+      create-feeder:
+        description: Create a feeder fund linked to a master
+        behavior: crud
+        produces:
+          type: entity
+          subtype: fund_feeder
+          resolved: false
+        crud:
+          operation: entity_create
+          base_table: entities
+          schema: ob-poc
+          extension_table: entity_funds
+          type_code: fund_feeder
+          returning: entity_id
+        args:
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+          - name: master-id
+            type: uuid
+            required: true
+            maps_to: master_fund_id
+            description: The master fund this feeder invests into
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: cbu-id
+            type: uuid
+            required: false
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: jurisdiction
+            type: string
+            required: true
+            maps_to: jurisdiction
+            description: Feeder domicile (often different from master)
+          - name: investor-type
+            type: string
+            required: false
+            maps_to: investor_type
+            description: Target investor base for this feeder
+            validation:
+              enum:
+                - US_TAXABLE
+                - US_TAX_EXEMPT
+                - NON_US
+                - INSTITUTIONAL
+                - RETAIL
+        returns:
+          type: uuid
+          name: entity_id
+          capture: true
+
+      link-feeder:
+        description: Link an existing feeder fund to a master fund
+        behavior: crud
+        crud:
+          operation: insert
+          table: fund_structure
+          schema: ob-poc
+          returning: structure_id
+        args:
+          - name: feeder-id
+            type: uuid
+            required: true
+            maps_to: child_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: master-id
+            type: uuid
+            required: true
+            maps_to: parent_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: effective-from
+            type: date
+            required: false
+            maps_to: effective_from
+        returns:
+          type: uuid
+          name: structure_id
+
+      # =========================================================================
+      # FUND STRUCTURE OPERATIONS
+      # =========================================================================
+
+      add-to-umbrella:
+        description: Add an existing sub-fund to an umbrella (if created separately)
+        behavior: crud
+        crud:
+          operation: insert
+          table: fund_structure
+          schema: ob-poc
+          returning: structure_id
+        args:
+          - name: umbrella-id
+            type: uuid
+            required: true
+            maps_to: parent_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: subfund-id
+            type: uuid
+            required: true
+            maps_to: child_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: effective-from
+            type: date
+            required: false
+            maps_to: effective_from
+        returns:
+          type: uuid
+          name: structure_id
+
+      add-share-class:
+        description: Add a share class to a sub-fund (structural link)
+        behavior: crud
+        crud:
+          operation: insert
+          table: fund_structure
+          schema: ob-poc
+          returning: structure_id
+        args:
+          - name: subfund-id
+            type: uuid
+            required: true
+            maps_to: parent_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: share-class-id
+            type: uuid
+            required: true
+            maps_to: child_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: effective-from
+            type: date
+            required: false
+            maps_to: effective_from
+        returns:
+          type: uuid
+          name: structure_id
+
+      list-subfunds:
+        description: List all sub-funds within an umbrella
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: fund_structure
+          schema: ob-poc
+          fk_col: parent_entity_id
+        args:
+          - name: umbrella-id
+            type: uuid
+            required: true
+            maps_to: parent_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record_set
+
+      list-share-classes:
+        description: List all share classes for a sub-fund
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: fund_structure
+          schema: ob-poc
+          fk_col: parent_entity_id
+        args:
+          - name: subfund-id
+            type: uuid
+            required: true
+            maps_to: parent_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record_set
+
+      list-feeders:
+        description: List all feeder funds for a master
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: fund_structure
+          schema: ob-poc
+          fk_col: parent_entity_id
+        args:
+          - name: master-id
+            type: uuid
+            required: true
+            maps_to: parent_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record_set
+
+      # =========================================================================
+      # FUND-OF-FUNDS INVESTMENT LINKS
+      # =========================================================================
+
+      add-investment:
+        description: Record a fund's investment in another fund (Fund-of-Funds)
+        behavior: crud
+        crud:
+          operation: insert
+          table: fund_investments
+          schema: ob-poc
+          returning: investment_id
+        args:
+          - name: investor-fund-id
+            type: uuid
+            required: true
+            maps_to: investor_entity_id
+            description: The Fund-of-Funds making the investment
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: investee-fund-id
+            type: uuid
+            required: true
+            maps_to: investee_entity_id
+            description: The underlying fund being invested in
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: percentage-of-nav
+            type: decimal
+            required: true
+            maps_to: percentage_of_investor_nav
+            description: "% of investor fund's NAV allocated to this investment"
+          - name: percentage-of-investee
+            type: decimal
+            required: false
+            maps_to: percentage_of_investee_aum
+            description: "% of investee fund's AUM held by this investor"
+          - name: investment-date
+            type: date
+            required: false
+            maps_to: investment_date
+          - name: investment-type
+            type: string
+            required: false
+            maps_to: investment_type
+            validation:
+              enum:
+                - DIRECT
+                - VIA_SHARE_CLASS
+                - SIDE_POCKET
+        returns:
+          type: uuid
+          name: investment_id
+
+      update-investment:
+        description: Update investment allocation percentage
+        behavior: crud
+        crud:
+          operation: update
+          table: fund_investments
+          schema: ob-poc
+          key: investment_id
+        args:
+          - name: investment-id
+            type: uuid
+            required: true
+            maps_to: investment_id
+          - name: percentage-of-nav
+            type: decimal
+            required: false
+            maps_to: percentage_of_investor_nav
+          - name: percentage-of-investee
+            type: decimal
+            required: false
+            maps_to: percentage_of_investee_aum
+        returns:
+          type: affected
+
+      end-investment:
+        description: End/redeem a fund investment
+        behavior: crud
+        crud:
+          operation: update
+          table: fund_investments
+          schema: ob-poc
+          key: investment_id
+        args:
+          - name: investment-id
+            type: uuid
+            required: true
+            maps_to: investment_id
+          - name: redemption-date
+            type: date
+            required: true
+            maps_to: redemption_date
+        returns:
+          type: affected
+
+      list-investments:
+        description: List all investments made by a fund (what does this FoF hold)
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: fund_investments
+          schema: ob-poc
+          fk_col: investor_entity_id
+        args:
+          - name: fund-id
+            type: uuid
+            required: true
+            maps_to: investor_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record_set
+
+      list-investors:
+        description: List all fund investors in a fund (who holds this fund)
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: fund_investments
+          schema: ob-poc
+          fk_col: investee_entity_id
+        args:
+          - name: fund-id
+            type: uuid
+            required: true
+            maps_to: investee_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record_set
+
+      # =========================================================================
+      # FUND VISUALIZATION
+      # =========================================================================
+
+      show-structure:
+        description: Show complete fund structure (umbrella → subfunds → share classes)
+        behavior: plugin
+        plugin:
+          handler: FundShowStructureOp
+        args:
+          - name: fund-id
+            type: uuid
+            required: true
+            description: Any fund entity (will traverse up/down to show full structure)
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: include-service-providers
+            type: boolean
+            required: false
+            default: true
+          - name: include-investments
+            type: boolean
+            required: false
+            default: false
+            description: Include FoF investment links
+        returns:
+          type: record
+          description: Hierarchical fund structure
+
+      calculate-lookthrough:
+        description: Calculate look-through ownership from FoF to underlying entities
+        behavior: plugin
+        plugin:
+          handler: FundLookthroughOp
+        args:
+          - name: fund-id
+            type: uuid
+            required: true
+            description: The Fund-of-Funds to calculate from
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: target-entity-id
+            type: uuid
+            required: false
+            description: Optional - calculate ownership of specific entity
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: threshold
+            type: decimal
+            required: false
+            default: 0.0
+            description: Minimum % to include in results
+          - name: max-depth
+            type: integer
+            required: false
+            default: 10
+            description: Maximum chain depth to traverse
+        returns:
+          type: record_set
+          description: All entities with effective ownership percentages

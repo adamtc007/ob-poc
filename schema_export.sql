@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict M4eG80wNaLUuyb3iaLqTMPqs8PQjS65k9I8HovPC2LsonB2Kzliag0E6SbLFtTz
+\restrict z9WTwKzFnBwXvSLradHkEKWMXwo5nzbfUdglEpcJwjYQtysqKHHZwX3I3mWEIQL
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -3302,11 +3302,34 @@ CREATE TABLE "ob-poc".client_types (
     name character varying(100) NOT NULL,
     description text,
     is_active boolean DEFAULT true,
-    display_order integer DEFAULT 0
+    display_order integer DEFAULT 0,
+    CONSTRAINT client_type_code_uppercase CHECK (((code)::text = upper((code)::text)))
 );
 
 
 ALTER TABLE "ob-poc".client_types OWNER TO adamtc007;
+
+--
+-- Name: control_relationships; Type: TABLE; Schema: ob-poc; Owner: adamtc007
+--
+
+CREATE TABLE "ob-poc".control_relationships (
+    control_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    controller_entity_id uuid NOT NULL,
+    controlled_entity_id uuid NOT NULL,
+    control_type text NOT NULL,
+    control_percentage numeric(5,2),
+    control_description text,
+    evidence_doc_id uuid,
+    effective_from date DEFAULT CURRENT_DATE NOT NULL,
+    effective_to date,
+    is_active boolean DEFAULT true,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+ALTER TABLE "ob-poc".control_relationships OWNER TO adamtc007;
 
 --
 -- Name: crud_operations; Type: TABLE; Schema: ob-poc; Owner: adamtc007
@@ -3407,11 +3430,35 @@ CREATE TABLE "ob-poc".currencies (
     symbol character varying(10),
     decimal_places integer DEFAULT 2,
     is_active boolean DEFAULT true,
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT currency_code_uppercase CHECK (((iso_code)::text = upper((iso_code)::text)))
 );
 
 
 ALTER TABLE "ob-poc".currencies OWNER TO adamtc007;
+
+--
+-- Name: delegation_relationships; Type: TABLE; Schema: ob-poc; Owner: adamtc007
+--
+
+CREATE TABLE "ob-poc".delegation_relationships (
+    delegation_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    delegator_entity_id uuid NOT NULL,
+    delegate_entity_id uuid NOT NULL,
+    delegation_scope text NOT NULL,
+    delegation_description text,
+    applies_to_cbu_id uuid,
+    regulatory_notification_date date,
+    regulatory_approval_required boolean DEFAULT false,
+    regulatory_approval_date date,
+    contract_doc_id uuid,
+    effective_from date NOT NULL,
+    effective_to date,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+ALTER TABLE "ob-poc".delegation_relationships OWNER TO adamtc007;
 
 --
 -- Name: dictionary; Type: TABLE; Schema: ob-poc; Owner: adamtc007
@@ -3571,7 +3618,8 @@ CREATE TABLE "ob-poc".document_types (
     semantic_context jsonb DEFAULT '{}'::jsonb,
     embedding public.vector(768),
     embedding_model character varying(100),
-    embedding_updated_at timestamp with time zone
+    embedding_updated_at timestamp with time zone,
+    CONSTRAINT document_type_code_uppercase CHECK (((type_code)::text = upper((type_code)::text)))
 );
 
 
@@ -3977,7 +4025,7 @@ CREATE TABLE "ob-poc".dsl_session_events (
     error_message text,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     occurred_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT dsl_session_events_event_type_check CHECK (((event_type)::text = ANY ((ARRAY['created'::character varying, 'execute_started'::character varying, 'execute_success'::character varying, 'execute_failed'::character varying, 'validation_error'::character varying, 'timeout'::character varying, 'aborted'::character varying, 'expired'::character varying, 'completed'::character varying, 'binding_added'::character varying, 'domain_detected'::character varying, 'error_recovered'::character varying])::text[])))
+    CONSTRAINT dsl_session_events_event_type_check CHECK (((event_type)::text = ANY (ARRAY['created'::text, 'execute_started'::text, 'execute_success'::text, 'execute_failed'::text, 'validation_error'::text, 'timeout'::text, 'aborted'::text, 'expired'::text, 'completed'::text, 'binding_added'::text, 'domain_detected'::text, 'error_recovered'::text, 'parsed'::text, 'resolving'::text])))
 );
 
 
@@ -4092,6 +4140,36 @@ COMMENT ON TABLE "ob-poc".entity_crud_rules IS 'Entity-specific validation rules
 
 
 --
+-- Name: entity_funds; Type: TABLE; Schema: ob-poc; Owner: adamtc007
+--
+
+CREATE TABLE "ob-poc".entity_funds (
+    entity_id uuid NOT NULL,
+    lei character varying(20),
+    isin_base character varying(12),
+    registration_number character varying(100),
+    fund_structure_type text,
+    fund_type text,
+    regulatory_status text,
+    parent_fund_id uuid,
+    master_fund_id uuid,
+    jurisdiction character varying(10),
+    regulator character varying(100),
+    authorization_date date,
+    investment_objective text,
+    base_currency character varying(3),
+    incorporation_date date,
+    launch_date date,
+    financial_year_end character varying(5),
+    investor_type text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+ALTER TABLE "ob-poc".entity_funds OWNER TO adamtc007;
+
+--
 -- Name: entity_limited_companies; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
@@ -4110,6 +4188,29 @@ CREATE TABLE "ob-poc".entity_limited_companies (
 
 
 ALTER TABLE "ob-poc".entity_limited_companies OWNER TO adamtc007;
+
+--
+-- Name: entity_manco; Type: TABLE; Schema: ob-poc; Owner: adamtc007
+--
+
+CREATE TABLE "ob-poc".entity_manco (
+    entity_id uuid NOT NULL,
+    lei character varying(20),
+    regulatory_reference character varying(100),
+    manco_type text NOT NULL,
+    authorized_jurisdiction character varying(10) NOT NULL,
+    regulator character varying(100),
+    authorization_date date,
+    can_manage_ucits boolean DEFAULT false,
+    can_manage_aif boolean DEFAULT false,
+    passported_jurisdictions text[],
+    regulatory_capital_eur numeric(15,2),
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+ALTER TABLE "ob-poc".entity_manco OWNER TO adamtc007;
 
 --
 -- Name: entity_partnerships; Type: TABLE; Schema: ob-poc; Owner: adamtc007
@@ -4220,6 +4321,32 @@ UNION ALL
 ALTER VIEW "ob-poc".entity_search_view OWNER TO adamtc007;
 
 --
+-- Name: entity_share_classes; Type: TABLE; Schema: ob-poc; Owner: adamtc007
+--
+
+CREATE TABLE "ob-poc".entity_share_classes (
+    entity_id uuid NOT NULL,
+    parent_fund_id uuid NOT NULL,
+    isin character varying(12),
+    share_class_code character varying(20),
+    share_class_type text NOT NULL,
+    distribution_type text NOT NULL,
+    currency character varying(3) NOT NULL,
+    is_hedged boolean DEFAULT false,
+    management_fee_bps integer,
+    performance_fee_pct numeric(5,2),
+    minimum_investment numeric(18,2),
+    launch_date date,
+    soft_close_date date,
+    hard_close_date date,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+ALTER TABLE "ob-poc".entity_share_classes OWNER TO adamtc007;
+
+--
 -- Name: entity_types; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
@@ -4236,7 +4363,8 @@ CREATE TABLE "ob-poc".entity_types (
     type_hierarchy_path text[],
     embedding public.vector(768),
     embedding_model character varying(100),
-    embedding_updated_at timestamp with time zone
+    embedding_updated_at timestamp with time zone,
+    entity_category character varying(20)
 );
 
 
@@ -4293,6 +4421,44 @@ COMMENT ON COLUMN "ob-poc".entity_validation_rules.validation_rule IS 'JSON obje
 
 
 --
+-- Name: fund_investments; Type: TABLE; Schema: ob-poc; Owner: adamtc007
+--
+
+CREATE TABLE "ob-poc".fund_investments (
+    investment_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    investor_entity_id uuid NOT NULL,
+    investee_entity_id uuid NOT NULL,
+    percentage_of_investor_nav numeric(5,2) NOT NULL,
+    percentage_of_investee_aum numeric(5,2),
+    investment_type text DEFAULT 'DIRECT'::text,
+    investment_date date,
+    redemption_date date,
+    valuation_date date,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+ALTER TABLE "ob-poc".fund_investments OWNER TO adamtc007;
+
+--
+-- Name: fund_structure; Type: TABLE; Schema: ob-poc; Owner: adamtc007
+--
+
+CREATE TABLE "ob-poc".fund_structure (
+    structure_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    parent_entity_id uuid NOT NULL,
+    child_entity_id uuid NOT NULL,
+    relationship_type text DEFAULT 'CONTAINS'::text NOT NULL,
+    effective_from date DEFAULT CURRENT_DATE NOT NULL,
+    effective_to date,
+    created_at timestamp with time zone DEFAULT now(),
+    created_by character varying(100)
+);
+
+
+ALTER TABLE "ob-poc".fund_structure OWNER TO adamtc007;
+
+--
 -- Name: master_jurisdictions; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
@@ -4306,7 +4472,8 @@ CREATE TABLE "ob-poc".master_jurisdictions (
     offshore_jurisdiction boolean DEFAULT false,
     regulatory_authority character varying(300),
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT jurisdiction_code_uppercase CHECK (((jurisdiction_code)::text = upper((jurisdiction_code)::text)))
 );
 
 
@@ -4683,7 +4850,8 @@ CREATE TABLE "ob-poc".roles (
     description text,
     created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
     updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
-    role_category character varying(30)
+    role_category character varying(30),
+    CONSTRAINT role_name_uppercase CHECK (((name)::text = upper((name)::text)))
 );
 
 
@@ -5377,40 +5545,14 @@ CREATE VIEW "ob-poc".v_cbu_entity_with_roles AS
             cer.entity_id,
             e.name AS entity_name,
             et.type_code AS entity_type,
+            et.entity_category,
             COALESCE(lc.jurisdiction, p.jurisdiction, t.jurisdiction, pp.nationality) AS jurisdiction,
             r.name AS role_name,
             r.role_category,
-                CASE r.name
-                    WHEN 'ULTIMATE_BENEFICIAL_OWNER'::text THEN 100
-                    WHEN 'BENEFICIAL_OWNER'::text THEN 95
-                    WHEN 'SHAREHOLDER'::text THEN 90
-                    WHEN 'LIMITED_PARTNER'::text THEN 85
-                    WHEN 'GENERAL_PARTNER'::text THEN 84
-                    WHEN 'PRINCIPAL'::text THEN 80
-                    WHEN 'MASTER_FUND'::text THEN 79
-                    WHEN 'FEEDER_FUND'::text THEN 78
-                    WHEN 'ASSET_OWNER'::text THEN 77
-                    WHEN 'MANAGEMENT_COMPANY'::text THEN 75
-                    WHEN 'INVESTMENT_MANAGER'::text THEN 74
-                    WHEN 'INVESTMENT_ADVISOR'::text THEN 73
-                    WHEN 'SPONSOR'::text THEN 72
-                    WHEN 'SETTLOR'::text THEN 71
-                    WHEN 'TRUSTEE'::text THEN 70
-                    WHEN 'PROTECTOR'::text THEN 68
-                    WHEN 'DIRECTOR'::text THEN 67
-                    WHEN 'CONDUCTING_OFFICER'::text THEN 66
-                    WHEN 'OFFICER'::text THEN 65
-                    WHEN 'COMPANY_SECRETARY'::text THEN 60
-                    WHEN 'AUTHORIZED_SIGNATORY'::text THEN 55
-                    WHEN 'DEPOSITARY'::text THEN 50
-                    WHEN 'CUSTODIAN'::text THEN 49
-                    WHEN 'ADMINISTRATOR'::text THEN 45
-                    WHEN 'TRANSFER_AGENT'::text THEN 43
-                    WHEN 'PRIME_BROKER'::text THEN 42
-                    WHEN 'AUDITOR'::text THEN 40
-                    WHEN 'LEGAL_COUNSEL'::text THEN 35
-                    WHEN 'BENEFICIARY'::text THEN 30
-                    WHEN 'SERVICE_PROVIDER'::text THEN 20
+                CASE r.role_category
+                    WHEN 'OWNERSHIP_CONTROL'::text THEN 100
+                    WHEN 'BOTH'::text THEN 50
+                    WHEN 'TRADING_EXECUTION'::text THEN 10
                     ELSE 5
                 END AS role_priority
            FROM ((((((("ob-poc".cbu_entity_roles cer
@@ -5426,13 +5568,14 @@ CREATE VIEW "ob-poc".v_cbu_entity_with_roles AS
     entity_id,
     entity_name,
     entity_type,
+    entity_category,
     jurisdiction,
     array_agg(role_name ORDER BY role_priority DESC) AS roles,
     array_agg(DISTINCT role_category) AS role_categories,
     (array_agg(role_name ORDER BY role_priority DESC))[1] AS primary_role,
     max(role_priority) AS max_role_priority
    FROM role_priorities
-  GROUP BY cbu_id, entity_id, entity_name, entity_type, jurisdiction;
+  GROUP BY cbu_id, entity_id, entity_name, entity_type, entity_category, jurisdiction;
 
 
 ALTER VIEW "ob-poc".v_cbu_entity_with_roles OWNER TO adamtc007;
@@ -6829,6 +6972,22 @@ ALTER TABLE ONLY "ob-poc".client_types
 
 
 --
+-- Name: control_relationships control_relationships_controller_entity_id_controlled_entit_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".control_relationships
+    ADD CONSTRAINT control_relationships_controller_entity_id_controlled_entit_key UNIQUE (controller_entity_id, controlled_entity_id, control_type, effective_from);
+
+
+--
+-- Name: control_relationships control_relationships_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".control_relationships
+    ADD CONSTRAINT control_relationships_pkey PRIMARY KEY (control_id);
+
+
+--
 -- Name: crud_operations crud_operations_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
@@ -6866,6 +7025,14 @@ ALTER TABLE ONLY "ob-poc".currencies
 
 ALTER TABLE ONLY "ob-poc".currencies
     ADD CONSTRAINT currencies_pkey PRIMARY KEY (currency_id);
+
+
+--
+-- Name: delegation_relationships delegation_relationships_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".delegation_relationships
+    ADD CONSTRAINT delegation_relationships_pkey PRIMARY KEY (delegation_id);
 
 
 --
@@ -7101,11 +7268,27 @@ ALTER TABLE ONLY "ob-poc".entity_crud_rules
 
 
 --
+-- Name: entity_funds entity_funds_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".entity_funds
+    ADD CONSTRAINT entity_funds_pkey PRIMARY KEY (entity_id);
+
+
+--
 -- Name: entity_limited_companies entity_limited_companies_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_limited_companies
     ADD CONSTRAINT entity_limited_companies_pkey PRIMARY KEY (limited_company_id);
+
+
+--
+-- Name: entity_manco entity_manco_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".entity_manco
+    ADD CONSTRAINT entity_manco_pkey PRIMARY KEY (entity_id);
 
 
 --
@@ -7122,6 +7305,22 @@ ALTER TABLE ONLY "ob-poc".entity_partnerships
 
 ALTER TABLE ONLY "ob-poc".entity_proper_persons
     ADD CONSTRAINT entity_proper_persons_pkey PRIMARY KEY (proper_person_id);
+
+
+--
+-- Name: entity_share_classes entity_share_classes_isin_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".entity_share_classes
+    ADD CONSTRAINT entity_share_classes_isin_key UNIQUE (isin);
+
+
+--
+-- Name: entity_share_classes entity_share_classes_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".entity_share_classes
+    ADD CONSTRAINT entity_share_classes_pkey PRIMARY KEY (entity_id);
 
 
 --
@@ -7154,6 +7353,38 @@ ALTER TABLE ONLY "ob-poc".entity_types
 
 ALTER TABLE ONLY "ob-poc".entity_validation_rules
     ADD CONSTRAINT entity_validation_rules_pkey PRIMARY KEY (rule_id);
+
+
+--
+-- Name: fund_investments fund_investments_investor_entity_id_investee_entity_id_inve_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".fund_investments
+    ADD CONSTRAINT fund_investments_investor_entity_id_investee_entity_id_inve_key UNIQUE (investor_entity_id, investee_entity_id, investment_date);
+
+
+--
+-- Name: fund_investments fund_investments_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".fund_investments
+    ADD CONSTRAINT fund_investments_pkey PRIMARY KEY (investment_id);
+
+
+--
+-- Name: fund_structure fund_structure_parent_entity_id_child_entity_id_relationshi_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".fund_structure
+    ADD CONSTRAINT fund_structure_parent_entity_id_child_entity_id_relationshi_key UNIQUE (parent_entity_id, child_entity_id, relationship_type, effective_from);
+
+
+--
+-- Name: fund_structure fund_structure_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".fund_structure
+    ADD CONSTRAINT fund_structure_pkey PRIMARY KEY (structure_id);
 
 
 --
@@ -8313,6 +8544,20 @@ CREATE INDEX idx_companies_reg_number ON "ob-poc".entity_limited_companies USING
 
 
 --
+-- Name: idx_control_controlled; Type: INDEX; Schema: ob-poc; Owner: adamtc007
+--
+
+CREATE INDEX idx_control_controlled ON "ob-poc".control_relationships USING btree (controlled_entity_id);
+
+
+--
+-- Name: idx_control_controller; Type: INDEX; Schema: ob-poc; Owner: adamtc007
+--
+
+CREATE INDEX idx_control_controller ON "ob-poc".control_relationships USING btree (controller_entity_id);
+
+
+--
 -- Name: idx_cri_cbu; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
@@ -8464,6 +8709,27 @@ CREATE INDEX idx_dam_document_type_attribute ON "ob-poc".document_attribute_mapp
 --
 
 CREATE INDEX idx_dam_document_type_id ON "ob-poc".document_attribute_mappings USING btree (document_type_id);
+
+
+--
+-- Name: idx_delegation_cbu; Type: INDEX; Schema: ob-poc; Owner: adamtc007
+--
+
+CREATE INDEX idx_delegation_cbu ON "ob-poc".delegation_relationships USING btree (applies_to_cbu_id);
+
+
+--
+-- Name: idx_delegation_delegate; Type: INDEX; Schema: ob-poc; Owner: adamtc007
+--
+
+CREATE INDEX idx_delegation_delegate ON "ob-poc".delegation_relationships USING btree (delegate_entity_id);
+
+
+--
+-- Name: idx_delegation_delegator; Type: INDEX; Schema: ob-poc; Owner: adamtc007
+--
+
+CREATE INDEX idx_delegation_delegator ON "ob-poc".delegation_relationships USING btree (delegator_entity_id);
 
 
 --
@@ -8845,6 +9111,27 @@ CREATE INDEX idx_entity_crud_rules_table ON "ob-poc".entity_crud_rules USING btr
 
 
 --
+-- Name: idx_entity_funds_jurisdiction; Type: INDEX; Schema: ob-poc; Owner: adamtc007
+--
+
+CREATE INDEX idx_entity_funds_jurisdiction ON "ob-poc".entity_funds USING btree (jurisdiction);
+
+
+--
+-- Name: idx_entity_funds_master; Type: INDEX; Schema: ob-poc; Owner: adamtc007
+--
+
+CREATE INDEX idx_entity_funds_master ON "ob-poc".entity_funds USING btree (master_fund_id);
+
+
+--
+-- Name: idx_entity_funds_parent; Type: INDEX; Schema: ob-poc; Owner: adamtc007
+--
+
+CREATE INDEX idx_entity_funds_parent ON "ob-poc".entity_funds USING btree (parent_fund_id);
+
+
+--
 -- Name: idx_entity_types_embedding; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
@@ -8912,6 +9199,34 @@ CREATE INDEX idx_entity_validation_field ON "ob-poc".entity_validation_rules USI
 --
 
 CREATE INDEX idx_entity_validation_type ON "ob-poc".entity_validation_rules USING btree (entity_type);
+
+
+--
+-- Name: idx_fund_investments_investee; Type: INDEX; Schema: ob-poc; Owner: adamtc007
+--
+
+CREATE INDEX idx_fund_investments_investee ON "ob-poc".fund_investments USING btree (investee_entity_id);
+
+
+--
+-- Name: idx_fund_investments_investor; Type: INDEX; Schema: ob-poc; Owner: adamtc007
+--
+
+CREATE INDEX idx_fund_investments_investor ON "ob-poc".fund_investments USING btree (investor_entity_id);
+
+
+--
+-- Name: idx_fund_structure_child; Type: INDEX; Schema: ob-poc; Owner: adamtc007
+--
+
+CREATE INDEX idx_fund_structure_child ON "ob-poc".fund_structure USING btree (child_entity_id);
+
+
+--
+-- Name: idx_fund_structure_parent; Type: INDEX; Schema: ob-poc; Owner: adamtc007
+--
+
+CREATE INDEX idx_fund_structure_parent ON "ob-poc".fund_structure USING btree (parent_entity_id);
 
 
 --
@@ -9332,6 +9647,13 @@ CREATE INDEX idx_services_name ON "ob-poc".services USING btree (name);
 --
 
 CREATE INDEX idx_services_service_code ON "ob-poc".services USING btree (service_code);
+
+
+--
+-- Name: idx_share_classes_parent; Type: INDEX; Schema: ob-poc; Owner: adamtc007
+--
+
+CREATE INDEX idx_share_classes_parent ON "ob-poc".entity_share_classes USING btree (parent_fund_id);
 
 
 --
@@ -10446,11 +10768,67 @@ ALTER TABLE ONLY "ob-poc".client_allegations
 
 
 --
+-- Name: control_relationships control_relationships_controlled_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".control_relationships
+    ADD CONSTRAINT control_relationships_controlled_entity_id_fkey FOREIGN KEY (controlled_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: control_relationships control_relationships_controller_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".control_relationships
+    ADD CONSTRAINT control_relationships_controller_entity_id_fkey FOREIGN KEY (controller_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: control_relationships control_relationships_evidence_doc_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".control_relationships
+    ADD CONSTRAINT control_relationships_evidence_doc_id_fkey FOREIGN KEY (evidence_doc_id) REFERENCES "ob-poc".document_catalog(doc_id);
+
+
+--
 -- Name: crud_operations crud_operations_parent_operation_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".crud_operations
     ADD CONSTRAINT crud_operations_parent_operation_id_fkey FOREIGN KEY (parent_operation_id) REFERENCES "ob-poc".crud_operations(operation_id);
+
+
+--
+-- Name: delegation_relationships delegation_relationships_applies_to_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".delegation_relationships
+    ADD CONSTRAINT delegation_relationships_applies_to_cbu_id_fkey FOREIGN KEY (applies_to_cbu_id) REFERENCES "ob-poc".cbus(cbu_id);
+
+
+--
+-- Name: delegation_relationships delegation_relationships_contract_doc_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".delegation_relationships
+    ADD CONSTRAINT delegation_relationships_contract_doc_id_fkey FOREIGN KEY (contract_doc_id) REFERENCES "ob-poc".document_catalog(doc_id);
+
+
+--
+-- Name: delegation_relationships delegation_relationships_delegate_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".delegation_relationships
+    ADD CONSTRAINT delegation_relationships_delegate_entity_id_fkey FOREIGN KEY (delegate_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: delegation_relationships delegation_relationships_delegator_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".delegation_relationships
+    ADD CONSTRAINT delegation_relationships_delegator_entity_id_fkey FOREIGN KEY (delegator_entity_id) REFERENCES "ob-poc".entities(entity_id);
 
 
 --
@@ -10598,11 +10976,43 @@ ALTER TABLE ONLY "ob-poc".entities
 
 
 --
+-- Name: entity_funds entity_funds_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".entity_funds
+    ADD CONSTRAINT entity_funds_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
+
+
+--
+-- Name: entity_funds entity_funds_master_fund_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".entity_funds
+    ADD CONSTRAINT entity_funds_master_fund_id_fkey FOREIGN KEY (master_fund_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: entity_funds entity_funds_parent_fund_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".entity_funds
+    ADD CONSTRAINT entity_funds_parent_fund_id_fkey FOREIGN KEY (parent_fund_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
 -- Name: entity_limited_companies entity_limited_companies_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_limited_companies
     ADD CONSTRAINT entity_limited_companies_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
+
+
+--
+-- Name: entity_manco entity_manco_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".entity_manco
+    ADD CONSTRAINT entity_manco_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
 
 
 --
@@ -10619,6 +11029,22 @@ ALTER TABLE ONLY "ob-poc".entity_partnerships
 
 ALTER TABLE ONLY "ob-poc".entity_proper_persons
     ADD CONSTRAINT entity_proper_persons_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
+
+
+--
+-- Name: entity_share_classes entity_share_classes_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".entity_share_classes
+    ADD CONSTRAINT entity_share_classes_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
+
+
+--
+-- Name: entity_share_classes entity_share_classes_parent_fund_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".entity_share_classes
+    ADD CONSTRAINT entity_share_classes_parent_fund_id_fkey FOREIGN KEY (parent_fund_id) REFERENCES "ob-poc".entities(entity_id);
 
 
 --
@@ -10747,6 +11173,38 @@ ALTER TABLE ONLY "ob-poc".ubo_registry
 
 ALTER TABLE ONLY "ob-poc".ubo_registry
     ADD CONSTRAINT fk_ubo_registry_ubo_proper_person_id FOREIGN KEY (ubo_proper_person_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
+
+
+--
+-- Name: fund_investments fund_investments_investee_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".fund_investments
+    ADD CONSTRAINT fund_investments_investee_entity_id_fkey FOREIGN KEY (investee_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: fund_investments fund_investments_investor_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".fund_investments
+    ADD CONSTRAINT fund_investments_investor_entity_id_fkey FOREIGN KEY (investor_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: fund_structure fund_structure_child_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".fund_structure
+    ADD CONSTRAINT fund_structure_child_entity_id_fkey FOREIGN KEY (child_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: fund_structure fund_structure_parent_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
+--
+
+ALTER TABLE ONLY "ob-poc".fund_structure
+    ADD CONSTRAINT fund_structure_parent_entity_id_fkey FOREIGN KEY (parent_entity_id) REFERENCES "ob-poc".entities(entity_id);
 
 
 --
@@ -11505,5 +11963,5 @@ GRANT SELECT,INSERT,UPDATE ON TABLE "ob-poc".ubo_snapshots TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict M4eG80wNaLUuyb3iaLqTMPqs8PQjS65k9I8HovPC2LsonB2Kzliag0E6SbLFtTz
+\unrestrict z9WTwKzFnBwXvSLradHkEKWMXwo5nzbfUdglEpcJwjYQtysqKHHZwX3I3mWEIQL
 
