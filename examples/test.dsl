@@ -2,7 +2,7 @@
 ;; Open this in Zed to test completions, hover, diagnostics
 
 ;; Create a CBU (Client Business Unit)
-(cbu.create  :name "Aviva test sicav" :jurisdiction LU :client-type FUND :as @fund)
+(cbu.create :name "Aviva test sicav" :jurisdiction "LU" :client-type "FUND" :as @fund)
 ;;(cbu.add-product :cbu-id @fund :product "Fund accounting")
 ;; Create entities
 ;;(entity.create-proper-person :first-name "John" :last-name "Smith" :date-of-birth "1980-01-15" :as @john)

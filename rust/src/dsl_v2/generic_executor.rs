@@ -176,6 +176,7 @@ impl GenericCrudExecutor {
             CrudOperation::ListParties => self.execute_list_parties(verb, crud, args).await,
             CrudOperation::SelectWithJoin => self.execute_select_with_join(verb, crud, args).await,
             CrudOperation::EntityCreate => self.execute_entity_create(verb, crud, args).await,
+            CrudOperation::EntityUpsert => self.execute_entity_upsert(verb, crud, args).await,
         };
 
         eprintln!(
@@ -229,8 +230,21 @@ impl GenericCrudExecutor {
                     columns.push(format!("\"{}\"", col));
                     placeholders.push(format!("${}", idx));
 
-                    // Handle lookup args specially - resolve code to UUID
-                    if arg_def.arg_type == ArgType::Lookup && arg_def.lookup.is_some() {
+                    // Handle lookup args specially - resolve name/code to UUID
+                    // Only applies to ArgType::Uuid with lookup config (not string lookups like jurisdiction)
+                    if arg_def.lookup.is_some() && arg_def.arg_type == ArgType::Uuid {
+                        let code = value.as_str().ok_or_else(|| {
+                            anyhow!("Expected string for lookup {}", arg_def.name)
+                        })?;
+                        // Check if value is already a UUID (resolved) or needs lookup
+                        if let Ok(uuid) = Uuid::parse_str(code) {
+                            bind_values.push(SqlValue::Uuid(uuid));
+                        } else {
+                            let uuid = self.resolve_lookup(arg_def, code).await?;
+                            bind_values.push(SqlValue::Uuid(uuid));
+                        }
+                    } else if arg_def.arg_type == ArgType::Lookup && arg_def.lookup.is_some() {
+                        // Legacy ArgType::Lookup - resolve to UUID
                         let code = value.as_str().ok_or_else(|| {
                             anyhow!("Expected string for lookup {}", arg_def.name)
                         })?;
@@ -417,8 +431,19 @@ impl GenericCrudExecutor {
             if let Some(value) = args.get(&arg_def.name) {
                 if let Some(col) = &arg_def.maps_to {
                     if col == key_col {
-                        // Handle lookup args specially - resolve code to UUID
-                        if arg_def.arg_type == ArgType::Lookup && arg_def.lookup.is_some() {
+                        // Handle lookup args specially - resolve name/code to UUID
+                        if arg_def.lookup.is_some() && arg_def.arg_type == ArgType::Uuid {
+                            let code = value.as_str().ok_or_else(|| {
+                                anyhow!("Expected string for lookup {}", arg_def.name)
+                            })?;
+                            // Check if value is already a UUID (resolved) or needs lookup
+                            if let Ok(uuid) = Uuid::parse_str(code) {
+                                key_value = Some(SqlValue::Uuid(uuid));
+                            } else {
+                                let uuid = self.resolve_lookup(arg_def, code).await?;
+                                key_value = Some(SqlValue::Uuid(uuid));
+                            }
+                        } else if arg_def.arg_type == ArgType::Lookup && arg_def.lookup.is_some() {
                             let code = value.as_str().ok_or_else(|| {
                                 anyhow!("Expected string for lookup {}", arg_def.name)
                             })?;
@@ -429,8 +454,19 @@ impl GenericCrudExecutor {
                         }
                     } else {
                         sets.push(format!("\"{}\" = ${}", col, idx));
-                        // Handle lookup args specially - resolve code to UUID
-                        if arg_def.arg_type == ArgType::Lookup && arg_def.lookup.is_some() {
+                        // Handle lookup args specially - resolve name/code to UUID
+                        if arg_def.lookup.is_some() && arg_def.arg_type == ArgType::Uuid {
+                            let code = value.as_str().ok_or_else(|| {
+                                anyhow!("Expected string for lookup {}", arg_def.name)
+                            })?;
+                            // Check if value is already a UUID (resolved) or needs lookup
+                            if let Ok(uuid) = Uuid::parse_str(code) {
+                                bind_values.push(SqlValue::Uuid(uuid));
+                            } else {
+                                let uuid = self.resolve_lookup(arg_def, code).await?;
+                                bind_values.push(SqlValue::Uuid(uuid));
+                            }
+                        } else if arg_def.arg_type == ArgType::Lookup && arg_def.lookup.is_some() {
                             let code = value.as_str().ok_or_else(|| {
                                 anyhow!("Expected string for lookup {}", arg_def.name)
                             })?;
@@ -579,8 +615,19 @@ impl GenericCrudExecutor {
                         updates.push(format!("\"{}\" = EXCLUDED.\"{}\"", col, col));
                     }
 
-                    // Handle lookup args specially - resolve code to UUID
-                    if arg_def.arg_type == ArgType::Lookup && arg_def.lookup.is_some() {
+                    // Handle lookup args specially - resolve name/code to UUID
+                    if arg_def.lookup.is_some() && arg_def.arg_type == ArgType::Uuid {
+                        let code = value.as_str().ok_or_else(|| {
+                            anyhow!("Expected string for lookup {}", arg_def.name)
+                        })?;
+                        // Check if value is already a UUID (resolved) or needs lookup
+                        if let Ok(uuid) = Uuid::parse_str(code) {
+                            bind_values.push(SqlValue::Uuid(uuid));
+                        } else {
+                            let uuid = self.resolve_lookup(arg_def, code).await?;
+                            bind_values.push(SqlValue::Uuid(uuid));
+                        }
+                    } else if arg_def.arg_type == ArgType::Lookup && arg_def.lookup.is_some() {
                         let code = value.as_str().ok_or_else(|| {
                             anyhow!("Expected string for lookup {}", arg_def.name)
                         })?;
@@ -1285,7 +1332,30 @@ impl GenericCrudExecutor {
                     }
                     columns.push(format!("\"{}\"", col));
                     placeholders.push(format!("${}", idx));
-                    bind_values.push(self.json_to_sql_value(value, arg_def)?);
+
+                    // Handle lookup args specially - resolve name/code to UUID
+                    // Only applies to ArgType::Uuid with lookup config (not string lookups like jurisdiction)
+                    if arg_def.lookup.is_some() && arg_def.arg_type == ArgType::Uuid {
+                        let code = value.as_str().ok_or_else(|| {
+                            anyhow!("Expected string for lookup {}", arg_def.name)
+                        })?;
+                        // Check if value is already a UUID (resolved) or needs lookup
+                        if let Ok(uuid) = Uuid::parse_str(code) {
+                            bind_values.push(SqlValue::Uuid(uuid));
+                        } else {
+                            let uuid = self.resolve_lookup(arg_def, code).await?;
+                            bind_values.push(SqlValue::Uuid(uuid));
+                        }
+                    } else if arg_def.arg_type == ArgType::Lookup && arg_def.lookup.is_some() {
+                        // Legacy ArgType::Lookup - resolve to UUID
+                        let code = value.as_str().ok_or_else(|| {
+                            anyhow!("Expected string for lookup {}", arg_def.name)
+                        })?;
+                        let uuid = self.resolve_lookup(arg_def, code).await?;
+                        bind_values.push(SqlValue::Uuid(uuid));
+                    } else {
+                        bind_values.push(self.json_to_sql_value(value, arg_def)?);
+                    }
                     idx += 1;
                 }
             }
@@ -1304,6 +1374,196 @@ impl GenericCrudExecutor {
         self.execute_non_query(&ext_sql, &bind_values).await?;
 
         // Return entity_id (the master table ID)
+        Ok(GenericExecutionResult::Uuid(entity_id))
+    }
+
+    // =========================================================================
+    // ENTITY UPSERT (Class Table Inheritance with ON CONFLICT)
+    // =========================================================================
+
+    /// Execute entity upsert - creates or updates an entity using name as conflict key
+    ///
+    /// Uses ON CONFLICT on entities.name to make entity creation idempotent.
+    /// If entity exists, updates the extension table fields.
+    async fn execute_entity_upsert(
+        &self,
+        verb: &RuntimeVerb,
+        crud: &RuntimeCrudConfig,
+        args: &HashMap<String, JsonValue>,
+    ) -> Result<GenericExecutionResult> {
+        // Use explicit type_code from YAML config if present,
+        // otherwise derive from verb name (e.g., "ensure-limited-company" -> "LIMITED_COMPANY")
+        let type_code = if let Some(tc) = &crud.type_code {
+            tc.clone()
+        } else {
+            verb.verb
+                .strip_prefix("ensure-")
+                .map(|s| s.to_uppercase().replace('-', "_"))
+                .ok_or_else(|| anyhow!("Invalid entity ensure verb name: {}", verb.verb))?
+        };
+
+        // Look up entity_type_id and table_name
+        let type_sql = format!(
+            r#"SELECT entity_type_id, table_name FROM "{}".entity_types
+               WHERE type_code = $1 OR type_code LIKE $1 || '_%'
+               ORDER BY CASE WHEN type_code = $1 THEN 0 ELSE 1 END
+               LIMIT 1"#,
+            crud.schema
+        );
+
+        let type_row = sqlx::query(&type_sql)
+            .bind(&type_code)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| anyhow!("Entity type not found for '{}': {}", type_code, e))?;
+
+        let entity_type_id: Uuid = type_row.try_get("entity_type_id")?;
+        let extension_table: String = crud
+            .extension_table
+            .clone()
+            .unwrap_or_else(|| type_row.try_get("table_name").unwrap_or_default());
+
+        // Get entity name - for proper_persons, constructed from first/last name
+        let entity_name = if type_code == "PROPER_PERSON" {
+            let first = args
+                .get("first-name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let last = args.get("last-name").and_then(|v| v.as_str()).unwrap_or("");
+            format!("{} {}", first, last).trim().to_string()
+        } else {
+            args.get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Unknown")
+                .to_string()
+        };
+
+        // UPSERT into entities base table using name + entity_type_id as conflict key
+        // Returns the entity_id whether inserted or existing
+        let base_sql = format!(
+            r#"INSERT INTO "{}".entities (entity_id, entity_type_id, name)
+               VALUES (gen_random_uuid(), $1, $2)
+               ON CONFLICT (entity_type_id, name) DO UPDATE SET updated_at = now()
+               RETURNING entity_id"#,
+            crud.schema
+        );
+
+        let row = sqlx::query(&base_sql)
+            .bind(entity_type_id)
+            .bind(&entity_name)
+            .fetch_one(&self.pool)
+            .await?;
+
+        let entity_id: Uuid = row.try_get("entity_id")?;
+
+        // Build extension table columns and values
+        let ext_pk_col = self.infer_pk_column(&extension_table);
+        let uses_shared_pk = ext_pk_col == "entity_id";
+
+        let (mut columns, mut placeholders, mut bind_values, mut idx) = if uses_shared_pk {
+            (
+                vec!["\"entity_id\"".to_string()],
+                vec!["$1".to_string()],
+                vec![SqlValue::Uuid(entity_id)],
+                2,
+            )
+        } else {
+            (
+                vec![format!("\"{}\"", ext_pk_col), "\"entity_id\"".to_string()],
+                vec!["$1".to_string(), "$2".to_string()],
+                vec![SqlValue::Uuid(Uuid::new_v4()), SqlValue::Uuid(entity_id)],
+                3,
+            )
+        };
+
+        // Track update columns for ON CONFLICT DO UPDATE
+        let mut update_cols: Vec<String> = Vec::new();
+
+        // Add extension table columns
+        let base_table_cols = ["name", "external_id"];
+        for arg_def in &verb.args {
+            if let Some(value) = args.get(&arg_def.name) {
+                if arg_def.name == "entity-type" || arg_def.name == "entity-id" {
+                    continue;
+                }
+                if let Some(col) = &arg_def.maps_to {
+                    if col == ext_pk_col
+                        || col == "entity_id"
+                        || base_table_cols.contains(&col.as_str())
+                    {
+                        continue;
+                    }
+                    columns.push(format!("\"{}\"", col));
+                    placeholders.push(format!("${}", idx));
+                    update_cols.push(format!("\"{}\" = EXCLUDED.\"{}\"", col, col));
+
+                    // Handle lookup args specially
+                    if arg_def.lookup.is_some() && arg_def.arg_type == ArgType::Uuid {
+                        let code = value.as_str().ok_or_else(|| {
+                            anyhow!("Expected string for lookup {}", arg_def.name)
+                        })?;
+                        if let Ok(uuid) = Uuid::parse_str(code) {
+                            bind_values.push(SqlValue::Uuid(uuid));
+                        } else {
+                            let uuid = self.resolve_lookup(arg_def, code).await?;
+                            bind_values.push(SqlValue::Uuid(uuid));
+                        }
+                    } else if arg_def.arg_type == ArgType::Lookup && arg_def.lookup.is_some() {
+                        let code = value.as_str().ok_or_else(|| {
+                            anyhow!("Expected string for lookup {}", arg_def.name)
+                        })?;
+                        let uuid = self.resolve_lookup(arg_def, code).await?;
+                        bind_values.push(SqlValue::Uuid(uuid));
+                    } else {
+                        bind_values.push(self.json_to_sql_value(value, arg_def)?);
+                    }
+                    idx += 1;
+                }
+            }
+        }
+
+        // Build UPSERT for extension table
+        // Conflict key priority:
+        // 1. ISIN if present (for share classes with unique ISIN constraint)
+        // 2. entity_id for shared PK tables
+        // 3. The extension table's own PK for separate PK tables
+        let has_isin = columns.iter().any(|c| c == "\"isin\"");
+        let conflict_col = if has_isin {
+            "isin"
+        } else if uses_shared_pk {
+            "entity_id"
+        } else {
+            ext_pk_col
+        };
+
+        let ext_sql = if update_cols.is_empty() {
+            // No updateable columns - just DO NOTHING on conflict
+            format!(
+                r#"INSERT INTO "{}"."{}" ({}) VALUES ({})
+                   ON CONFLICT ("{}") DO NOTHING"#,
+                crud.schema,
+                extension_table,
+                columns.join(", "),
+                placeholders.join(", "),
+                conflict_col
+            )
+        } else {
+            format!(
+                r#"INSERT INTO "{}"."{}" ({}) VALUES ({})
+                   ON CONFLICT ("{}") DO UPDATE SET {}"#,
+                crud.schema,
+                extension_table,
+                columns.join(", "),
+                placeholders.join(", "),
+                conflict_col,
+                update_cols.join(", ")
+            )
+        };
+
+        debug!("ENTITY_UPSERT extension SQL: {}", ext_sql);
+
+        self.execute_non_query(&ext_sql, &bind_values).await?;
+
         Ok(GenericExecutionResult::Uuid(entity_id))
     }
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict SVZs6sKYbuax8zXC3qlOidG8Ch1miergV0crHgbuORz30fFuWiCEm9A8YnfkGha
+\restrict RFNAqAKSW3IO4JUJ70Hs1v5GjwSzS3lbDwepKOsrfsiiQr2YuufGcrr9ie55gUG
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -2536,6 +2536,7 @@ CREATE TABLE kyc.share_classes (
     hurdle_rate numeric(5,2),
     entity_id uuid,
     class_category character varying(20) DEFAULT 'FUND'::character varying,
+    issuer_entity_id uuid,
     CONSTRAINT chk_class_category CHECK (((class_category)::text = ANY ((ARRAY['CORPORATE'::character varying, 'FUND'::character varying])::text[])))
 );
 
@@ -2600,7 +2601,7 @@ COMMENT ON COLUMN kyc.share_classes.hurdle_rate IS 'Hurdle rate for performance 
 -- Name: COLUMN share_classes.entity_id; Type: COMMENT; Schema: kyc; Owner: -
 --
 
-COMMENT ON COLUMN kyc.share_classes.entity_id IS 'The legal entity that issues this share class';
+COMMENT ON COLUMN kyc.share_classes.entity_id IS 'The share class entity itself (optional - links to entity ontology)';
 
 
 --
@@ -2608,6 +2609,13 @@ COMMENT ON COLUMN kyc.share_classes.entity_id IS 'The legal entity that issues t
 --
 
 COMMENT ON COLUMN kyc.share_classes.class_category IS 'CORPORATE = company ownership shares, FUND = investment fund shares';
+
+
+--
+-- Name: COLUMN share_classes.issuer_entity_id; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.share_classes.issuer_entity_id IS 'The sub-fund/fund entity that issues these shares';
 
 
 --
@@ -8770,6 +8778,13 @@ CREATE INDEX idx_entities_type ON "ob-poc".entities USING btree (entity_type_id)
 
 
 --
+-- Name: idx_entities_type_name; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_entities_type_name ON "ob-poc".entities USING btree (entity_type_id, name);
+
+
+--
 -- Name: idx_entity_crud_rules_active; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -10239,6 +10254,14 @@ ALTER TABLE ONLY kyc.share_classes
 
 
 --
+-- Name: share_classes share_classes_issuer_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.share_classes
+    ADD CONSTRAINT share_classes_issuer_entity_id_fkey FOREIGN KEY (issuer_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
 -- Name: attribute_observations attribute_observations_attribute_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -11359,296 +11382,8 @@ ALTER TABLE ONLY public.rules
 
 
 --
--- Name: SCHEMA "ob-poc"; Type: ACL; Schema: -; Owner: -
---
-
-GRANT USAGE ON SCHEMA "ob-poc" TO PUBLIC;
-
-
---
--- Name: SCHEMA public; Type: ACL; Schema: -; Owner: -
---
-
-REVOKE USAGE ON SCHEMA public FROM PUBLIC;
-GRANT ALL ON SCHEMA public TO PUBLIC;
-
-
---
--- Name: TABLE doc_request_acceptable_types; Type: ACL; Schema: kyc; Owner: -
---
-
-GRANT SELECT,INSERT,UPDATE ON TABLE kyc.doc_request_acceptable_types TO PUBLIC;
-
-
---
--- Name: TABLE case_decision_thresholds; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,UPDATE ON TABLE "ob-poc".case_decision_thresholds TO PUBLIC;
-
-
---
--- Name: TABLE case_evaluation_snapshots; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,UPDATE ON TABLE "ob-poc".case_evaluation_snapshots TO PUBLIC;
-
-
---
--- Name: TABLE cbu_entity_roles; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".cbu_entity_roles TO PUBLIC;
-
-
---
--- Name: TABLE cbus; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".cbus TO PUBLIC;
-
-
---
--- Name: TABLE crud_operations; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".crud_operations TO PUBLIC;
-
-
---
--- Name: TABLE dictionary; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".dictionary TO PUBLIC;
-
-
---
--- Name: TABLE document_catalog; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".document_catalog TO PUBLIC;
-
-
---
--- Name: TABLE document_types; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".document_types TO PUBLIC;
-
-
---
--- Name: TABLE dsl_domains; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".dsl_domains TO PUBLIC;
-
-
---
--- Name: TABLE dsl_examples; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".dsl_examples TO PUBLIC;
-
-
---
--- Name: TABLE dsl_execution_log; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".dsl_execution_log TO PUBLIC;
-
-
---
--- Name: TABLE dsl_versions; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".dsl_versions TO PUBLIC;
-
-
---
--- Name: TABLE dsl_execution_summary; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".dsl_execution_summary TO PUBLIC;
-
-
---
--- Name: TABLE dsl_instances; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".dsl_instances TO PUBLIC;
-
-
---
--- Name: SEQUENCE dsl_instances_id_seq; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,USAGE ON SEQUENCE "ob-poc".dsl_instances_id_seq TO PUBLIC;
-
-
---
--- Name: TABLE dsl_ob; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".dsl_ob TO PUBLIC;
-
-
---
--- Name: TABLE entities; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".entities TO PUBLIC;
-
-
---
--- Name: TABLE entity_crud_rules; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".entity_crud_rules TO PUBLIC;
-
-
---
--- Name: TABLE entity_limited_companies; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".entity_limited_companies TO PUBLIC;
-
-
---
--- Name: TABLE entity_partnerships; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".entity_partnerships TO PUBLIC;
-
-
---
--- Name: TABLE entity_proper_persons; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".entity_proper_persons TO PUBLIC;
-
-
---
--- Name: TABLE entity_trusts; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".entity_trusts TO PUBLIC;
-
-
---
--- Name: TABLE entity_types; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".entity_types TO PUBLIC;
-
-
---
--- Name: TABLE entity_validation_rules; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".entity_validation_rules TO PUBLIC;
-
-
---
--- Name: TABLE master_jurisdictions; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".master_jurisdictions TO PUBLIC;
-
-
---
--- Name: TABLE master_entity_xref; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".master_entity_xref TO PUBLIC;
-
-
---
--- Name: TABLE product_services; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".product_services TO PUBLIC;
-
-
---
--- Name: TABLE products; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".products TO PUBLIC;
-
-
---
--- Name: TABLE redflag_score_config; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,UPDATE ON TABLE "ob-poc".redflag_score_config TO PUBLIC;
-
-
---
--- Name: TABLE roles; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".roles TO PUBLIC;
-
-
---
--- Name: TABLE schema_changes; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".schema_changes TO PUBLIC;
-
-
---
--- Name: TABLE service_resource_types; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".service_resource_types TO PUBLIC;
-
-
---
--- Name: TABLE services; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".services TO PUBLIC;
-
-
---
--- Name: TABLE trust_parties; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".trust_parties TO PUBLIC;
-
-
---
--- Name: TABLE ubo_evidence; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".ubo_evidence TO PUBLIC;
-
-
---
--- Name: TABLE ubo_registry; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".ubo_registry TO PUBLIC;
-
-
---
--- Name: TABLE ubo_snapshot_comparisons; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,UPDATE ON TABLE "ob-poc".ubo_snapshot_comparisons TO PUBLIC;
-
-
---
--- Name: TABLE ubo_snapshots; Type: ACL; Schema: ob-poc; Owner: -
---
-
-GRANT SELECT,INSERT,UPDATE ON TABLE "ob-poc".ubo_snapshots TO PUBLIC;
-
-
---
 -- PostgreSQL database dump complete
 --
 
-\unrestrict SVZs6sKYbuax8zXC3qlOidG8Ch1miergV0crHgbuORz30fFuWiCEm9A8YnfkGha
+\unrestrict RFNAqAKSW3IO4JUJ70Hs1v5GjwSzS3lbDwepKOsrfsiiQr2YuufGcrr9ie55gUG
 

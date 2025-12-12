@@ -424,16 +424,25 @@ impl DslExecutor {
         Ok(results)
     }
 
-    /// Convenience method: parse, compile, and execute DSL source
+    /// Convenience method: parse, enrich, compile, and execute DSL source
     ///
     /// This is the all-in-one method for executing DSL strings.
+    /// Includes enrichment pass to convert string literals to EntityRefs.
     pub async fn execute_dsl(
         &self,
         source: &str,
         ctx: &mut ExecutionContext,
     ) -> Result<Vec<ExecutionResult>> {
-        let program =
+        let raw_program =
             super::parser::parse_program(source).map_err(|e| anyhow!("Parse error: {}", e))?;
+
+        // Enrich: convert string literals to EntityRefs based on YAML verb config
+        let registry = super::runtime_registry();
+        let enrichment_result = super::enrich_program(raw_program, registry);
+        let program = enrichment_result.program;
+
+        // Note: EntityRef resolution happens during execution via GenericCrudExecutor
+        // which calls resolve_lookup for args with lookup config
 
         let plan = super::execution_plan::compile(&program)
             .map_err(|e| anyhow!("Compile error: {}", e))?;

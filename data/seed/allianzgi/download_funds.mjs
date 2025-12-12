@@ -3,13 +3,13 @@
  * ============================================================================
  * Playwright script to download "Download All" CSV exports from AllianzGI's
  * regulatory fund explorer pages.
- * 
+ *
  * Usage:
  *   npm init -y
  *   npm i -D playwright
  *   npx playwright install chromium
  *   node download_funds.mjs
- * 
+ *
  * Output: ./out/*.csv (or xlsx depending on what AllianzGI exports)
  * ============================================================================
  */
@@ -24,43 +24,43 @@ await fs.mkdir(OUT_DIR, { recursive: true });
 // AllianzGI regulatory fund list pages with "Download All" capability
 const SOURCES = [
   // Luxembourg (use "facilities-services" variant - less geo-redirect issues)
-  { 
-    code: "LU", 
-    manco_code: "AGI_LUX", 
+  {
+    code: "LU",
+    manco_code: "AGI_LUX",
     url: "https://regulatory.allianzgi.com/en-gb/facilities-services/luxemburg-en/funds/mutual-funds",
-    expected_funds: "~206 funds / ~1972 share classes"
+    expected_funds: "~206 funds / ~1972 share classes",
   },
 
   // United Kingdom
-  { 
-    code: "GB", 
-    manco_code: "AGI_UK", 
+  {
+    code: "GB",
+    manco_code: "AGI_UK",
     url: "https://regulatory.allianzgi.com/en-gb/b2c/united-kingdom-en/funds/mutual-funds",
-    expected_funds: "~70 funds / ~242 share classes"
+    expected_funds: "~70 funds / ~242 share classes",
   },
 
   // Ireland
-  { 
-    code: "IE", 
-    manco_code: "AGI_IE", 
+  {
+    code: "IE",
+    manco_code: "AGI_IE",
     url: "https://regulatory.allianzgi.com/en-ie/b2c/ireland-en/funds/mutual-funds",
-    expected_funds: "~50 funds / ~780 share classes"
+    expected_funds: "~50 funds / ~780 share classes",
   },
 
   // Germany
-  { 
-    code: "DE", 
-    manco_code: "AGI_DE", 
+  {
+    code: "DE",
+    manco_code: "AGI_DE",
     url: "https://regulatory.allianzgi.com/de-de/b2c/deutschland-de/funds/mutual-funds",
-    expected_funds: "German-domiciled funds"
+    expected_funds: "German-domiciled funds",
   },
 
   // Switzerland (German language)
-  { 
-    code: "CH", 
-    manco_code: "AGI_CH", 
+  {
+    code: "CH",
+    manco_code: "AGI_CH",
     url: "https://regulatory.allianzgi.com/de-ch/b2c/schweiz-de/funds/mutual-funds",
-    expected_funds: "Swiss-registered funds"
+    expected_funds: "Swiss-registered funds",
   },
 ];
 
@@ -92,8 +92,11 @@ async function acceptGating(page) {
     }
   }
   // Click any confirm/accept buttons
-  await clickIfVisible(page, /Confirm|Bestätigen|Accept|OK|Continue|Fortsetzen/i);
-  
+  await clickIfVisible(
+    page,
+    /Confirm|Bestätigen|Accept|OK|Continue|Fortsetzen/i,
+  );
+
   // Wait a moment for any animations/redirects
   await page.waitForTimeout(1000);
 }
@@ -105,7 +108,9 @@ async function waitForFundTable(page) {
   // Most AllianzGI pages load the fund table with a small delay
   // Look for common table indicators
   try {
-    await page.waitForSelector('table, [class*="fund"], [class*="list"]', { timeout: 10000 });
+    await page.waitForSelector('table, [class*="fund"], [class*="list"]', {
+      timeout: 10000,
+    });
     await page.waitForTimeout(2000); // Let the full list populate
   } catch (e) {
     console.log("  Warning: Could not detect fund table - proceeding anyway");
@@ -116,9 +121,9 @@ async function waitForFundTable(page) {
 console.log("AllianzGI Fund Data Downloader");
 console.log("==============================\n");
 
-const browser = await chromium.launch({ 
-  headless: true,
-  // Use headless: false for debugging to see what's happening
+const browser = await chromium.launch({
+  headless: false, // Run visible so user can manually accept popups
+  slowMo: 100, // Slow down actions for visibility
 });
 
 const results = [];
@@ -127,48 +132,79 @@ for (const src of SOURCES) {
   console.log(`[${src.code}] Downloading from ${src.manco_code}...`);
   console.log(`    URL: ${src.url}`);
   console.log(`    Expected: ${src.expected_funds}`);
-  
+
   const page = await browser.newPage();
-  
+
   try {
     await page.goto(src.url, { waitUntil: "domcontentloaded", timeout: 30000 });
-    
+
     // Handle investor type gating/consent
     await acceptGating(page);
-    
+
+    // Give user time to manually handle any popups (15 seconds)
+    console.log(`    ⏳ Waiting 15s for manual popup handling...`);
+    await page.waitForTimeout(15000);
+
+    // Scroll down to make Download All visible
+    await page.evaluate(() =>
+      window.scrollTo(0, document.body.scrollHeight / 2),
+    );
+    await page.waitForTimeout(1000);
+
     // Wait for fund table to load
     await waitForFundTable(page);
-    
+
     // Look for and click "Download All" button
-    const downloadButton = page.getByText(/Download All/i);
-    
-    if (await downloadButton.count() === 0) {
+    const downloadButton = page.getByText(/Download All/i).first();
+
+    if ((await downloadButton.count()) === 0) {
       console.log(`    ⚠️  No "Download All" button found - skipping`);
       results.push({ ...src, status: "NO_BUTTON" });
       await page.close();
       continue;
     }
-    
-    // Trigger download
+
+    // Use JavaScript to find and click the download link directly
+    console.log(`    🖱️  Clicking Download All via JavaScript...`);
+
+    // Trigger download using evaluate to click the element directly
     const [download] = await Promise.all([
       page.waitForEvent("download", { timeout: 30000 }),
-      downloadButton.click({ timeout: 10000 }),
+      page.evaluate(() => {
+        // Find all links/buttons containing "Download All"
+        const elements = [...document.querySelectorAll("a, button, span")];
+        const downloadEl = elements.find(
+          (el) => el.textContent && el.textContent.includes("Download All"),
+        );
+        if (downloadEl) {
+          // Find the actual clickable parent (usually an <a> tag)
+          const clickable =
+            downloadEl.closest("a") ||
+            downloadEl.closest("button") ||
+            downloadEl;
+          clickable.click();
+          return true;
+        }
+        return false;
+      }),
     ]);
-    
+
     // Save the file
     const suggested = download.suggestedFilename();
-    const outName = `${src.code}__${src.manco_code}__${suggested}`.replace(/[^\w.\-]+/g, "_");
+    const outName = `${src.code}__${src.manco_code}__${suggested}`.replace(
+      /[^\w.\-]+/g,
+      "_",
+    );
     const outPath = path.join(OUT_DIR, outName);
     await download.saveAs(outPath);
-    
+
     console.log(`    ✅ Saved: ${outPath}`);
     results.push({ ...src, status: "SUCCESS", file: outPath });
-    
   } catch (error) {
     console.log(`    ❌ Error: ${error.message}`);
     results.push({ ...src, status: "ERROR", error: error.message });
   }
-  
+
   await page.close();
 }
 

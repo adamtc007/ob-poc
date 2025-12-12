@@ -343,6 +343,7 @@ mod tests {
                 m
             },
             refs: HashMap::new(),
+            lookups: None,
             sequence: None,
         };
 
@@ -373,6 +374,7 @@ mod tests {
                 m.insert("entity-id".to_string(), "@person".to_string());
                 m
             },
+            lookups: None,
             sequence: None,
         };
 
@@ -393,6 +395,7 @@ mod tests {
                     m
                 },
                 refs: HashMap::new(),
+                lookups: None,
                 sequence: None,
             },
             VerbIntent {
@@ -410,6 +413,7 @@ mod tests {
                     m.insert("cbu-id".to_string(), "@result_1".to_string());
                     m
                 },
+                lookups: None,
                 sequence: None,
             },
         ];

@@ -211,6 +211,7 @@ pub enum CrudOperation {
     ListParties,
     SelectWithJoin,
     EntityCreate,
+    EntityUpsert,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

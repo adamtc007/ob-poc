@@ -598,10 +598,12 @@ mod tests {
                     join_table: None,
                     join_col: None,
                     base_table: None,
+                    extension_table: None,
                     order_by: None,
                     set_values: None,
                     extension_table_column: None,
                     type_id_column: None,
+                    type_code: None,
                 }),
                 args: vec![ArgConfig {
                     name: "name".to_string(),

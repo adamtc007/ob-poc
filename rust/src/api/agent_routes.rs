@@ -2948,9 +2948,10 @@ async fn direct_execute_dsl(
     Json(req): Json<DirectExecuteRequest>,
 ) -> Json<DirectExecuteResponse> {
     use crate::dsl_v2::validation::{Severity, ValidationContext, ValidationRequest};
+    use crate::dsl_v2::{enrich_program, runtime_registry};
 
     // Parse - if this fails, we're in Draft stage (no AST)
-    let program = match parse_program(&req.dsl) {
+    let raw_program = match parse_program(&req.dsl) {
         Ok(p) => p,
         Err(e) => {
             return Json(DirectExecuteResponse {
@@ -2968,6 +2969,15 @@ async fn direct_execute_dsl(
             });
         }
     };
+
+    // Enrich: convert string literals to EntityRefs based on YAML verb config
+    let registry = runtime_registry();
+    let enrichment_result = enrich_program(raw_program, registry);
+    let mut program = enrichment_result.program;
+
+    // Auto-resolve EntityRefs with exact matches via EntityGateway
+    // This handles cases like :jurisdiction "LU" or :umbrella-id "Fund Name"
+    program = auto_resolve_entity_refs(program).await;
 
     // Validate with CSG linter (includes dataflow validation)
     let validator_result = async {

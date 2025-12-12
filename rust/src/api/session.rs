@@ -960,6 +960,7 @@ mod tests {
             verb: "cbu.ensure".to_string(),
             params: Default::default(),
             refs: Default::default(),
+            lookups: None,
             sequence: None,
         }]);
         assert_eq!(session.state, SessionState::PendingValidation);

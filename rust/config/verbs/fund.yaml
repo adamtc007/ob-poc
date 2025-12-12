@@ -5,7 +5,7 @@ domains:
       # =========================================================================
       # FUND CREATION VERBS
       # =========================================================================
-      
+
       create-umbrella:
         description: Create an umbrella fund structure (SICAV, ICAV, OEIC, etc.)
         behavior: crud
@@ -52,12 +52,12 @@ domains:
             description: Legal structure type
             validation:
               enum:
-                - SICAV          # Luxembourg
-                - ICAV           # Ireland
-                - OEIC           # UK
-                - VCC            # Singapore
-                - UNIT_TRUST     # Various
-                - FCP            # Luxembourg/France
+                - SICAV # Luxembourg
+                - ICAV # Ireland
+                - OEIC # UK
+                - VCC # Singapore
+                - UNIT_TRUST # Various
+                - FCP # Luxembourg/France
                 - OTHER
           - name: regulatory-status
             type: string
@@ -191,16 +191,16 @@ domains:
                 - RETAIL
                 - SEED
                 - FOUNDER
-                - CLEAN          # No trailer fees
+                - CLEAN # No trailer fees
           - name: distribution-type
             type: string
             required: true
             maps_to: distribution_type
             validation:
               enum:
-                - ACC            # Accumulating
-                - DIST           # Distributing
-                - FLEX           # Flexible
+                - ACC # Accumulating
+                - DIST # Distributing
+                - FLEX # Flexible
           - name: currency
             type: string
             required: true
@@ -280,6 +280,189 @@ domains:
             type: string
             required: true
             maps_to: base_currency
+        returns:
+          type: uuid
+          name: entity_id
+          capture: true
+
+      # =========================================================================
+      # ENSURE (UPSERT) VERBS - Idempotent fund creation
+      # =========================================================================
+
+      ensure-umbrella:
+        description: Create or update an umbrella fund (idempotent by name)
+        behavior: crud
+        produces:
+          type: entity
+          subtype: fund_umbrella
+          resolved: false
+        crud:
+          operation: entity_upsert
+          base_table: entities
+          schema: ob-poc
+          extension_table: entity_funds
+          type_code: fund_umbrella
+          returning: entity_id
+        args:
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+          - name: cbu-id
+            type: uuid
+            required: false
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: jurisdiction
+            type: string
+            required: true
+            maps_to: jurisdiction
+          - name: fund-structure-type
+            type: string
+            required: true
+            maps_to: fund_structure_type
+          - name: regulatory-status
+            type: string
+            required: true
+            maps_to: regulatory_status
+          - name: registration-number
+            type: string
+            required: false
+            maps_to: registration_number
+          - name: incorporation-date
+            type: date
+            required: false
+            maps_to: incorporation_date
+          - name: financial-year-end
+            type: string
+            required: false
+            maps_to: financial_year_end
+        returns:
+          type: uuid
+          name: entity_id
+          capture: true
+
+      ensure-subfund:
+        description: Create or update a sub-fund (idempotent by name)
+        behavior: crud
+        produces:
+          type: entity
+          subtype: fund_subfund
+          resolved: false
+        crud:
+          operation: entity_upsert
+          base_table: entities
+          schema: ob-poc
+          extension_table: entity_funds
+          type_code: fund_subfund
+          returning: entity_id
+        args:
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+          - name: umbrella-id
+            type: uuid
+            required: true
+            maps_to: parent_fund_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: cbu-id
+            type: uuid
+            required: false
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: investment-objective
+            type: string
+            required: false
+            maps_to: investment_objective
+          - name: base-currency
+            type: string
+            required: true
+            maps_to: base_currency
+          - name: launch-date
+            type: date
+            required: false
+            maps_to: launch_date
+          - name: isin-base
+            type: string
+            required: false
+            maps_to: isin_base
+        returns:
+          type: uuid
+          name: entity_id
+          capture: true
+
+      ensure-share-class:
+        description: Create or update a share class (idempotent by name)
+        behavior: crud
+        produces:
+          type: entity
+          subtype: fund_share_class
+          resolved: false
+        crud:
+          operation: entity_upsert
+          base_table: entities
+          schema: ob-poc
+          extension_table: entity_share_classes
+          type_code: fund_share_class
+          returning: entity_id
+        args:
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+          - name: subfund-id
+            type: uuid
+            required: true
+            maps_to: parent_fund_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: share-class-type
+            type: string
+            required: true
+            maps_to: share_class_type
+          - name: distribution-type
+            type: string
+            required: true
+            maps_to: distribution_type
+          - name: currency
+            type: string
+            required: true
+            maps_to: currency
+          - name: hedged
+            type: boolean
+            required: false
+            maps_to: is_hedged
+            default: false
+          - name: isin
+            type: string
+            required: false
+            maps_to: isin
+          - name: minimum-investment
+            type: decimal
+            required: false
+            maps_to: minimum_investment
+          - name: management-fee-bps
+            type: integer
+            required: false
+            maps_to: management_fee_bps
         returns:
           type: uuid
           name: entity_id

@@ -81,7 +81,7 @@ The pipeline is split into fast local stages (parse, enrich) and slower network 
 ┌─────────────────────────────────────────────────────────────────┐
 │        Stage 5: GenericCrudExecutor (YAML-driven)                │
 │  - Reads verb config from config/verbs/*.yaml                   │
-│  - All 13 CRUD operations driven by YAML config                 │
+│  - All 14 CRUD operations driven by YAML config                 │
 │  - Custom ops via plugin pattern                                │
 │  rust/src/dsl_v2/generic_executor.rs                            │
 └─────────────────────────────────────────────────────────────────┘
@@ -390,7 +390,7 @@ ob-poc/
 │   │   │   │   └── loader.rs       # ConfigLoader (from env or path)
 │   │   │   ├── runtime_registry.rs # RuntimeVerbRegistry (loads from YAML)
 │   │   │   ├── verb_registry.rs    # UnifiedVerbRegistry (wraps runtime)
-│   │   │   ├── generic_executor.rs # GenericCrudExecutor (13 CRUD ops)
+│   │   │   ├── generic_executor.rs # GenericCrudExecutor (14 CRUD ops)
 │   │   │   ├── executor.rs         # DslExecutor (orchestrates execution)
 │   │   │   ├── csg_linter.rs       # Context-sensitive validation
 │   │   │   ├── execution_plan.rs   # AST → ExecutionPlan compiler
@@ -3489,6 +3489,10 @@ Entity management operations
 | `entity.create-partnership-limited` | Create a limited partnership entity |
 | `entity.create-proper-person` | Create a natural person entity |
 | `entity.create-trust-discretionary` | Create a discretionary trust entity |
+| `entity.ensure-limited-company` | Create or update a limited company (idempotent by name) |
+| `entity.ensure-partnership-limited` | Create or update a limited partnership (idempotent by name) |
+| `entity.ensure-proper-person` | Create or update a natural person (idempotent by name) |
+| `entity.ensure-trust-discretionary` | Create or update a discretionary trust (idempotent by name) |
 | `entity.delete` | Delete an entity (cascades to type extension) |
 | `entity.list` | List entities with optional filters |
 | `entity.read` | Read an entity by ID |
@@ -3517,6 +3521,16 @@ Per-entity workstream within a KYC case
 | `entity-workstream.set-enhanced-dd` | Flag workstream for enhanced due diligence |
 | `entity-workstream.set-ubo` | Mark workstream entity as UBO |
 | `entity-workstream.update-status` | Update workstream status |
+
+### fund
+
+Fund structure operations (umbrella, sub-fund, share class hierarchy)
+
+| Verb | Description |
+|------|-------------|
+| `fund.ensure-umbrella` | Create or update an umbrella fund (idempotent by name) |
+| `fund.ensure-subfund` | Create or update a sub-fund/compartment (idempotent by name) |
+| `fund.ensure-share-class` | Create or update a share class (idempotent by ISIN) |
 
 ### holding
 
@@ -3863,7 +3877,7 @@ domains:
         description: "What this verb does"
         behavior: crud
         crud:
-          operation: insert  # insert, update, delete, upsert, select, etc.
+          operation: insert  # insert, update, delete, upsert, select, entity_create, entity_upsert, etc.
           table: my_table
           schema: ob-poc
           returning: my_id
