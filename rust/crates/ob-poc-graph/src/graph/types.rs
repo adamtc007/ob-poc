@@ -1,0 +1,600 @@
+//! Core types for CBU Entity Graph visualization
+//!
+//! These types mirror the server-side graph types but are optimized for UI rendering.
+
+#![allow(dead_code)]
+
+use egui::{Color32, Pos2, Vec2};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use uuid::Uuid;
+
+// =============================================================================
+// CBU CATEGORY & TEMPLATES
+// =============================================================================
+
+/// CBU category determines which layout template to use
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Deserialize, Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum CbuCategory {
+    #[default]
+    FundMandate,
+    CorporateGroup,
+    InstitutionalAccount,
+    RetailClient,
+    FamilyTrust,
+    InternalTest,
+    CorrespondentBank,
+}
+
+impl CbuCategory {
+    pub fn from_str(s: &str) -> Self {
+        match s.to_uppercase().as_str() {
+            "FUND_MANDATE" => Self::FundMandate,
+            "CORPORATE_GROUP" => Self::CorporateGroup,
+            "INSTITUTIONAL_ACCOUNT" => Self::InstitutionalAccount,
+            "RETAIL_CLIENT" => Self::RetailClient,
+            "FAMILY_TRUST" => Self::FamilyTrust,
+            "INTERNAL_TEST" => Self::InternalTest,
+            "CORRESPONDENT_BANK" => Self::CorrespondentBank,
+            _ => Self::CorporateGroup, // fallback
+        }
+    }
+}
+
+// =============================================================================
+// ROLE TYPES
+// =============================================================================
+
+/// Primary role determines slot assignment in templates
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum PrimaryRole {
+    // Highest priority - ownership/control (KYC view)
+    UltimateBeneficialOwner,
+    BeneficialOwner,
+    Shareholder,
+    GeneralPartner,
+    LimitedPartner,
+    // Governance (KYC view)
+    Director,
+    Officer,
+    ConductingOfficer,
+    ChiefComplianceOfficer,
+    Trustee,
+    Protector,
+    Beneficiary,
+    Settlor,
+    // Fund structure - trading entities (Service Delivery view)
+    Principal,
+    AssetOwner,
+    MasterFund,
+    FeederFund,
+    SegregatedPortfolio,
+    ManagementCompany,
+    InvestmentManager,
+    InvestmentAdvisor,
+    Sponsor,
+    // Service providers (Service Delivery view)
+    Administrator,
+    Custodian,
+    Depositary,
+    TransferAgent,
+    Distributor,
+    PrimeBroker,
+    Auditor,
+    LegalCounsel,
+    // Other
+    AuthorizedSignatory,
+    ContactPerson,
+    CommercialClient,
+    Unknown,
+}
+
+impl PrimaryRole {
+    pub fn from_str(s: &str) -> Self {
+        match s.to_uppercase().replace('-', "_").as_str() {
+            // Ownership/Control
+            "ULTIMATE_BENEFICIAL_OWNER" | "UBO" => Self::UltimateBeneficialOwner,
+            "BENEFICIAL_OWNER" => Self::BeneficialOwner,
+            "SHAREHOLDER" => Self::Shareholder,
+            "GENERAL_PARTNER" | "GP" => Self::GeneralPartner,
+            "LIMITED_PARTNER" | "LP" => Self::LimitedPartner,
+            // Governance
+            "DIRECTOR" => Self::Director,
+            "OFFICER" => Self::Officer,
+            "CONDUCTING_OFFICER" => Self::ConductingOfficer,
+            "CHIEF_COMPLIANCE_OFFICER" | "CCO" => Self::ChiefComplianceOfficer,
+            "TRUSTEE" => Self::Trustee,
+            "PROTECTOR" => Self::Protector,
+            "BENEFICIARY" => Self::Beneficiary,
+            "SETTLOR" => Self::Settlor,
+            // Fund structure
+            "PRINCIPAL" => Self::Principal,
+            "ASSET_OWNER" => Self::AssetOwner,
+            "MASTER_FUND" => Self::MasterFund,
+            "FEEDER_FUND" => Self::FeederFund,
+            "SEGREGATED_PORTFOLIO" => Self::SegregatedPortfolio,
+            "MANAGEMENT_COMPANY" | "MANCO" => Self::ManagementCompany,
+            "INVESTMENT_MANAGER" => Self::InvestmentManager,
+            "INVESTMENT_ADVISOR" => Self::InvestmentAdvisor,
+            "SPONSOR" => Self::Sponsor,
+            // Service providers
+            "ADMINISTRATOR" => Self::Administrator,
+            "CUSTODIAN" => Self::Custodian,
+            "DEPOSITARY" => Self::Depositary,
+            "TRANSFER_AGENT" => Self::TransferAgent,
+            "DISTRIBUTOR" => Self::Distributor,
+            "PRIME_BROKER" => Self::PrimeBroker,
+            "AUDITOR" => Self::Auditor,
+            "LEGAL_COUNSEL" => Self::LegalCounsel,
+            // Other
+            "AUTHORIZED_SIGNATORY" => Self::AuthorizedSignatory,
+            "CONTACT_PERSON" => Self::ContactPerson,
+            "COMMERCIAL_CLIENT" => Self::CommercialClient,
+            _ => Self::Unknown,
+        }
+    }
+
+    /// Priority for layout ordering (higher = more important = placed first)
+    pub fn priority(&self) -> i32 {
+        match self {
+            // Ownership/control - highest priority
+            Self::UltimateBeneficialOwner => 100,
+            Self::BeneficialOwner => 95,
+            Self::Shareholder => 90,
+            Self::GeneralPartner => 88,
+            Self::LimitedPartner => 85,
+            // Governance
+            Self::Director => 70,
+            Self::Officer => 65,
+            Self::ConductingOfficer => 64,
+            Self::ChiefComplianceOfficer => 63,
+            Self::Trustee => 55,
+            Self::Protector => 50,
+            Self::Beneficiary => 45,
+            Self::Settlor => 40,
+            // Fund structure - trading entities
+            Self::Principal => 80,
+            Self::AssetOwner => 78,
+            Self::MasterFund => 76,
+            Self::FeederFund => 74,
+            Self::SegregatedPortfolio => 72,
+            Self::ManagementCompany => 75,
+            Self::InvestmentManager => 73,
+            Self::InvestmentAdvisor => 71,
+            Self::Sponsor => 69,
+            Self::CommercialClient => 77,
+            // Service providers
+            Self::Administrator => 50,
+            Self::Custodian => 48,
+            Self::Depositary => 47,
+            Self::TransferAgent => 46,
+            Self::Distributor => 45,
+            Self::PrimeBroker => 44,
+            Self::Auditor => 42,
+            Self::LegalCounsel => 40,
+            // Other
+            Self::AuthorizedSignatory => 30,
+            Self::ContactPerson => 20,
+            Self::Unknown => 0,
+        }
+    }
+}
+
+// =============================================================================
+// ENTITY TYPES
+// =============================================================================
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EntityType {
+    #[default]
+    Unknown,
+    // Entity types
+    ProperPerson,
+    LimitedCompany,
+    Partnership,
+    Trust,
+    Fund,
+    // Service layer types
+    Product,
+    Service,
+    Resource,
+}
+
+impl EntityType {
+    pub fn from_str(s: &str) -> Self {
+        let lower = s.to_lowercase();
+        if lower.contains("person") {
+            Self::ProperPerson
+        } else if lower.contains("company") || lower.contains("limited") {
+            Self::LimitedCompany
+        } else if lower.contains("partner") {
+            Self::Partnership
+        } else if lower.contains("trust") {
+            Self::Trust
+        } else if lower.contains("fund") {
+            Self::Fund
+        } else if lower == "product" {
+            Self::Product
+        } else if lower == "service" {
+            Self::Service
+        } else if lower == "resource" {
+            Self::Resource
+        } else {
+            Self::Unknown
+        }
+    }
+}
+
+// =============================================================================
+// GRAPH DATA (from server)
+// =============================================================================
+
+/// Graph data received from server API
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct CbuGraphData {
+    pub cbu_id: Uuid,
+    pub label: String,
+    pub cbu_category: Option<String>,
+    pub jurisdiction: Option<String>,
+    pub nodes: Vec<GraphNodeData>,
+    pub edges: Vec<GraphEdgeData>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct GraphNodeData {
+    pub id: String,
+    pub node_type: String,
+    pub layer: String,
+    pub label: String,
+    pub sublabel: Option<String>,
+    pub status: String,
+    #[serde(default)]
+    pub roles: Vec<String>,
+    /// Role categories: OWNERSHIP_CONTROL, TRADING_EXECUTION, BOTH
+    #[serde(default)]
+    pub role_categories: Vec<String>,
+    pub primary_role: Option<String>,
+    pub jurisdiction: Option<String>,
+    pub role_priority: Option<i32>,
+    #[serde(default)]
+    pub data: serde_json::Value,
+    /// Server-computed x position (optional, client may recompute)
+    #[serde(default)]
+    pub x: Option<f64>,
+    /// Server-computed y position (optional, client may recompute)
+    #[serde(default)]
+    pub y: Option<f64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct GraphEdgeData {
+    pub id: String,
+    pub source: String,
+    pub target: String,
+    pub edge_type: String,
+    pub label: Option<String>,
+}
+
+// =============================================================================
+// UI GRAPH TYPES (computed for rendering)
+// =============================================================================
+
+/// A node positioned for rendering
+#[derive(Debug, Clone)]
+pub struct LayoutNode {
+    pub id: String,
+    pub entity_type: EntityType,
+    pub primary_role: PrimaryRole,
+    pub all_roles: Vec<String>,
+    pub label: String,
+    pub sublabel: Option<String>,
+    pub jurisdiction: Option<String>,
+
+    /// Base position from template layout
+    pub base_position: Pos2,
+    /// User offset from base position
+    pub offset: Vec2,
+    /// Computed position in graph coordinates (base_position + offset)
+    pub position: Pos2,
+    /// Base size from template
+    pub base_size: Vec2,
+    /// User size override
+    pub size_override: Option<Vec2>,
+    /// Current size (size_override or base_size)
+    pub size: Vec2,
+    /// Is this node in the current focus set?
+    pub in_focus: bool,
+    /// Is this the CBU root node?
+    pub is_cbu_root: bool,
+    /// Visual style
+    pub style: NodeStyle,
+}
+
+#[derive(Debug, Clone)]
+pub struct NodeStyle {
+    pub fill_color: Color32,
+    pub border_color: Color32,
+    pub text_color: Color32,
+    pub border_width: f32,
+}
+
+impl Default for NodeStyle {
+    fn default() -> Self {
+        Self {
+            fill_color: Color32::from_rgb(55, 65, 81),
+            border_color: Color32::from_rgb(107, 114, 128),
+            text_color: Color32::WHITE,
+            border_width: 2.0,
+        }
+    }
+}
+
+/// An edge positioned for rendering
+#[derive(Debug, Clone)]
+pub struct LayoutEdge {
+    pub id: String,
+    pub source_id: String,
+    pub target_id: String,
+    pub edge_type: EdgeType,
+    pub label: Option<String>,
+
+    /// Control points for bezier curve (if needed for hop-over)
+    pub control_points: Vec<Pos2>,
+    /// Is this edge in the current focus set?
+    pub in_focus: bool,
+    /// Visual style
+    pub style: EdgeStyle,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EdgeType {
+    HasRole,
+    Owns,
+    Controls,
+    Other,
+}
+
+impl EdgeType {
+    pub fn from_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "has_role" | "hasrole" => Self::HasRole,
+            "owns" => Self::Owns,
+            "controls" => Self::Controls,
+            _ => Self::Other,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EdgeStyle {
+    pub color: Color32,
+    pub width: f32,
+    pub dashed: bool,
+}
+
+impl Default for EdgeStyle {
+    fn default() -> Self {
+        Self {
+            color: Color32::from_rgb(107, 114, 128),
+            width: 1.5,
+            dashed: false,
+        }
+    }
+}
+
+// =============================================================================
+// INVESTOR GROUP (collapsed investors)
+// =============================================================================
+
+/// Collapsed group of investors for a share class
+#[derive(Debug, Clone)]
+pub struct InvestorGroup {
+    pub share_class_id: String,
+    pub share_class_name: String,
+    pub investor_count: usize,
+    pub investors: Vec<InvestorSummary>,
+    pub position: Pos2,
+    pub expanded: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct InvestorSummary {
+    pub entity_id: String,
+    pub name: String,
+    pub jurisdiction: Option<String>,
+    pub holding_units: Option<f64>,
+}
+
+// =============================================================================
+// LAYOUT GRAPH (complete positioned graph)
+// =============================================================================
+
+/// Complete layout-computed graph ready for rendering
+#[derive(Debug, Clone)]
+pub struct LayoutGraph {
+    pub cbu_id: Uuid,
+    pub cbu_category: CbuCategory,
+    pub jurisdiction: Option<String>,
+
+    /// All positioned nodes
+    pub nodes: HashMap<String, LayoutNode>,
+    /// All positioned edges
+    pub edges: Vec<LayoutEdge>,
+    /// Collapsed investor groups
+    pub investor_groups: Vec<InvestorGroup>,
+
+    /// Bounding box of all nodes (for camera fitting)
+    pub bounds: egui::Rect,
+}
+
+impl Default for LayoutGraph {
+    fn default() -> Self {
+        Self {
+            cbu_id: Uuid::nil(),
+            cbu_category: CbuCategory::default(),
+            jurisdiction: None,
+            nodes: HashMap::new(),
+            edges: Vec::new(),
+            investor_groups: Vec::new(),
+            bounds: egui::Rect::NOTHING,
+        }
+    }
+}
+
+impl LayoutGraph {
+    pub fn new(cbu_id: Uuid) -> Self {
+        Self {
+            cbu_id,
+            cbu_category: CbuCategory::default(),
+            jurisdiction: None,
+            nodes: HashMap::new(),
+            edges: Vec::new(),
+            investor_groups: Vec::new(),
+            bounds: egui::Rect::NOTHING,
+        }
+    }
+
+    /// Get node by ID
+    pub fn get_node(&self, id: &str) -> Option<&LayoutNode> {
+        self.nodes.get(id)
+    }
+
+    /// Get mutable node by ID
+    pub fn get_node_mut(&mut self, id: &str) -> Option<&mut LayoutNode> {
+        self.nodes.get_mut(id)
+    }
+
+    /// Recompute bounds from all nodes
+    pub fn recompute_bounds(&mut self) {
+        if self.nodes.is_empty() {
+            self.bounds = egui::Rect::NOTHING;
+            return;
+        }
+
+        let mut min_x = f32::MAX;
+        let mut min_y = f32::MAX;
+        let mut max_x = f32::MIN;
+        let mut max_y = f32::MIN;
+
+        for node in self.nodes.values() {
+            let half_size = node.size / 2.0;
+            min_x = min_x.min(node.position.x - half_size.x);
+            min_y = min_y.min(node.position.y - half_size.y);
+            max_x = max_x.max(node.position.x + half_size.x);
+            max_y = max_y.max(node.position.y + half_size.y);
+        }
+
+        self.bounds = egui::Rect::from_min_max(Pos2::new(min_x, min_y), Pos2::new(max_x, max_y));
+    }
+}
+
+// =============================================================================
+// VIEW MODE - re-exported from graph_view
+// =============================================================================
+
+// ViewMode is defined in graph_view.rs and re-exported through mod.rs
+
+// =============================================================================
+// LAYOUT OVERRIDES
+// =============================================================================
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct NodeOffset {
+    pub node_id: String,
+    pub dx: f32,
+    pub dy: f32,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct NodeSizeOverride {
+    pub node_id: String,
+    pub w: f32,
+    pub h: f32,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, Default)]
+pub struct LayoutOverride {
+    #[serde(default)]
+    pub positions: Vec<NodeOffset>,
+    #[serde(default)]
+    pub sizes: Vec<NodeSizeOverride>,
+}
+
+impl LayoutGraph {
+    /// Apply position/size overrides (offsets relative to template positions)
+    pub fn apply_overrides(&mut self, overrides: &LayoutOverride) -> usize {
+        let mut applied = 0;
+        for off in &overrides.positions {
+            if let Some(node) = self.nodes.get_mut(&off.node_id) {
+                node.offset = Vec2::new(off.dx, off.dy);
+                node.position = node.base_position + node.offset;
+                applied += 1;
+            }
+        }
+        for sz in &overrides.sizes {
+            if let Some(node) = self.nodes.get_mut(&sz.node_id) {
+                let new_size = Vec2::new(sz.w, sz.h);
+                node.size_override = Some(new_size);
+                node.size = new_size;
+                applied += 1;
+            }
+        }
+        if applied > 0 {
+            self.recompute_bounds();
+        }
+        applied
+    }
+}
+
+// =============================================================================
+// CONVERSION FROM SHARED API TYPES
+// =============================================================================
+
+impl From<ob_poc_types::CbuGraphResponse> for CbuGraphData {
+    fn from(resp: ob_poc_types::CbuGraphResponse) -> Self {
+        Self {
+            cbu_id: resp.cbu_id.parse().unwrap_or_default(),
+            label: resp.label,
+            cbu_category: resp.cbu_category,
+            jurisdiction: resp.jurisdiction,
+            nodes: resp.nodes.into_iter().map(|n| n.into()).collect(),
+            edges: resp.edges.into_iter().map(|e| e.into()).collect(),
+        }
+    }
+}
+
+impl From<ob_poc_types::GraphNode> for GraphNodeData {
+    fn from(node: ob_poc_types::GraphNode) -> Self {
+        Self {
+            id: node.id,
+            node_type: node.node_type,
+            layer: node.layer,
+            label: node.label,
+            sublabel: node.sublabel,
+            status: node.status,
+            roles: node.roles,
+            role_categories: node.role_categories,
+            primary_role: node.primary_role,
+            jurisdiction: node.jurisdiction,
+            role_priority: node.role_priority,
+            data: node.data.unwrap_or_default(),
+            x: node.x,
+            y: node.y,
+        }
+    }
+}
+
+impl From<ob_poc_types::GraphEdge> for GraphEdgeData {
+    fn from(edge: ob_poc_types::GraphEdge) -> Self {
+        Self {
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+            edge_type: edge.edge_type,
+            label: edge.label,
+        }
+    }
+}

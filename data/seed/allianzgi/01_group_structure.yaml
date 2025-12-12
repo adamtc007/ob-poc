@@ -1,0 +1,250 @@
+# AllianzGI Group Structure Seed Data
+# ============================================================================
+# Source: Allianz List of constituent entities (31 Dec 2024)
+# Source: AllianzGI public disclosures and regulatory filings
+# ============================================================================
+
+version: "1.0"
+source: "Allianz List of constituent entities as at 31 Dec 2024"
+
+# ----------------------------------------------------------------------------
+# Top-level CBU for the AllianzGI group
+# ----------------------------------------------------------------------------
+cbu:
+  code: ALLIANZGI_GROUP
+  name: "Allianz Global Investors (Group)"
+  jurisdiction: DE
+  client_type: ASSET_MANAGER
+  category: FUND_MANDATE
+  description: "AllianzGI global asset management group - parent CBU for all regional ManCos"
+
+# ----------------------------------------------------------------------------
+# Management Companies (ManCos) - Legal Entities
+# ----------------------------------------------------------------------------
+# These are regulatory-authorized entities that manage funds
+# Note: US business transferred to Voya IM (July 2022) - excluded
+# ----------------------------------------------------------------------------
+mancos:
+
+  # Germany - HQ
+  - manco_code: AGI_DE
+    legal_entity: "Allianz Global Investors GmbH"
+    jurisdiction: DE
+    manco_type: UCITS_MANCO  # Also AIFM dual-authorized
+    registration_number: "HRB 9340"  # Frankfurt
+    lei: "529900CQDWC7GKHXKD42"
+    authorized_jurisdiction: DE
+    passported_jurisdictions:
+      - LU
+      - IE
+      - GB
+      - FR
+      - NL
+      - AT
+      - CH
+    address:
+      street: "Bockenheimer Landstraße 42-44"
+      city: "Frankfurt am Main"
+      postal_code: "60323"
+      country: DE
+    regulator: BaFin
+    notes: "Global HQ - primary ManCo for Luxembourg SICAV/FCP structures"
+
+  # Luxembourg Branch
+  - manco_code: AGI_LUX
+    legal_entity: "Allianz Global Investors GmbH - Luxembourg Branch"
+    jurisdiction: LU
+    manco_type: BRANCH
+    parent_manco: AGI_DE
+    registration_number: "B 34 096"
+    authorized_jurisdiction: LU
+    address:
+      street: "6A, route de Trèves"
+      city: "Senningerberg"
+      postal_code: "L-2633"
+      country: LU
+    regulator: CSSF
+    notes: "Luxembourg branch for local fund administration"
+
+  # United Kingdom
+  - manco_code: AGI_UK
+    legal_entity: "Allianz Global Investors UK Limited"
+    jurisdiction: GB
+    manco_type: UCITS_MANCO
+    registration_number: "01287830"  # Companies House
+    fca_reference: "121234"
+    authorized_jurisdiction: GB
+    address:
+      street: "199 Bishopsgate"
+      city: "London"
+      postal_code: "EC2M 3TY"
+      country: GB
+    regulator: FCA
+    notes: "UK OEIC fund management"
+
+  # Ireland
+  - manco_code: AGI_IE
+    legal_entity: "Allianz Global Investors Ireland Limited"
+    jurisdiction: IE
+    manco_type: DUAL_AUTHORIZED  # UCITS + AIFM
+    registration_number: "189487"
+    authorized_jurisdiction: IE
+    address:
+      street: "70 Sir John Rogerson's Quay"
+      city: "Dublin"
+      postal_code: "D02 R296"
+      country: IE
+    regulator: CBI
+    notes: "Irish ICAV management + passported UCITS"
+
+  # Switzerland
+  - manco_code: AGI_CH
+    legal_entity: "Allianz Global Investors (Schweiz) AG"
+    jurisdiction: CH
+    manco_type: SWISS_AFM  # Asset Fund Manager
+    registration_number: "CH-020.3.924.119-2"
+    authorized_jurisdiction: CH
+    address:
+      street: "Gottfried-Keller-Strasse 5"
+      city: "Zürich"
+      postal_code: "8001"
+      country: CH
+    regulator: FINMA
+    notes: "Swiss-domiciled fund management"
+
+  # Hong Kong (APAC HQ)
+  - manco_code: AGI_AP_HK
+    legal_entity: "Allianz Global Investors Asia Pacific Limited"
+    jurisdiction: HK
+    manco_type: TYPE_9  # SFC Type 9 license
+    registration_number: "38526"
+    authorized_jurisdiction: HK
+    address:
+      street: "27/F, ICBC Tower, 3 Garden Road"
+      city: "Central, Hong Kong"
+      postal_code: ""
+      country: HK
+    regulator: SFC
+    notes: "APAC regional hub"
+
+  # Singapore
+  - manco_code: AGI_SG
+    legal_entity: "Allianz Global Investors Singapore Limited"
+    jurisdiction: SG
+    manco_type: CMS_LICENSE  # Capital Markets Services
+    registration_number: "199907169Z"
+    authorized_jurisdiction: SG
+    address:
+      street: "3 Temasek Avenue, #22-02 Centennial Tower"
+      city: "Singapore"
+      postal_code: "039190"
+      country: SG
+    regulator: MAS
+    notes: "Singapore fund management"
+
+  # Japan
+  - manco_code: AGI_JP
+    legal_entity: "Allianz Global Investors Japan Co., Ltd."
+    jurisdiction: JP
+    manco_type: KANTO_IMA  # Investment Management Association
+    registration_number: "関東財務局長（金商）第424号"
+    authorized_jurisdiction: JP
+    address:
+      street: "Marunouchi Trust Tower Main, 1-8-3 Marunouchi"
+      city: "Chiyoda-ku, Tokyo"
+      postal_code: "100-0005"
+      country: JP
+    regulator: JFSA
+    notes: "Japan fund management"
+
+  # Taiwan
+  - manco_code: AGI_TW
+    legal_entity: "Allianz Global Investors Taiwan Ltd."
+    jurisdiction: TW
+    manco_type: SITE  # Securities Investment Trust Enterprise
+    registration_number: "83813808"
+    authorized_jurisdiction: TW
+    address:
+      street: "5F, No. 101, Section 2, Dunhua South Road"
+      city: "Taipei"
+      postal_code: "106"
+      country: TW
+    regulator: FSC
+    notes: "Taiwan onshore fund management"
+
+  # China
+  - manco_code: AGI_CN_FMC
+    legal_entity: "Allianz Global Investors Fund Management Co., Ltd."
+    jurisdiction: CN
+    manco_type: JV_FMC  # Joint Venture Fund Management Company
+    registration_number: "91310000MA1FR5WA78"
+    authorized_jurisdiction: CN
+    address:
+      street: "Level 25, Tower II, Jing An Kerry Centre"
+      city: "Shanghai"
+      postal_code: "200040"
+      country: CN
+    regulator: CSRC
+    notes: "China JV fund management"
+
+  # Indonesia
+  - manco_code: AGI_ID
+    legal_entity: "PT Allianz Global Investors Asset Management Indonesia"
+    jurisdiction: ID
+    manco_type: INVESTMENT_MANAGER
+    registration_number: "KEP-46/PM/MI/2017"
+    authorized_jurisdiction: ID
+    address:
+      street: "World Trade Center II, 17th Floor"
+      city: "Jakarta"
+      postal_code: "12190"
+      country: ID
+    regulator: OJK
+    notes: "Indonesia asset management"
+
+# ----------------------------------------------------------------------------
+# Key Service Providers (Depositary, Administrator, etc.)
+# These are third parties, not AllianzGI entities
+# ----------------------------------------------------------------------------
+service_providers:
+
+  - code: STATE_STREET_LU
+    legal_entity: "State Street Bank International GmbH, Luxembourg Branch"
+    jurisdiction: LU
+    role: DEPOSITARY
+    registration_number: "B 148 186"
+    notes: "Depositary for Luxembourg SICAV/FCP structures"
+
+  - code: STATE_STREET_IE
+    legal_entity: "State Street Custodial Services (Ireland) Limited"
+    jurisdiction: IE
+    role: DEPOSITARY
+    registration_number: "49449"
+    notes: "Depositary for Irish ICAV structures"
+
+  - code: BNY_DEPOSITARY_LU
+    legal_entity: "The Bank of New York Mellon SA/NV, Luxembourg Branch"
+    jurisdiction: LU
+    role: DEPOSITARY
+    registration_number: "B 105 087"
+    notes: "Alternative depositary for Luxembourg funds"
+
+  - code: PWC_LU
+    legal_entity: "PricewaterhouseCoopers, Société coopérative"
+    jurisdiction: LU
+    role: AUDITOR
+    notes: "Statutory auditor for Luxembourg SICAV"
+
+  - code: KPMG_IE
+    legal_entity: "KPMG"
+    jurisdiction: IE
+    role: AUDITOR
+    notes: "Statutory auditor for Irish ICAV"
+
+# ----------------------------------------------------------------------------
+# Notes on US Business
+# ----------------------------------------------------------------------------
+# The US investment management business was transferred to Voya Investment
+# Management on 25 July 2022. AllianzGI US entities are not included here.
+# If you need Voya coverage, create a separate seed file.
+# ----------------------------------------------------------------------------

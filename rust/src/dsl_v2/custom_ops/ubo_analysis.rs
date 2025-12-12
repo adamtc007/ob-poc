@@ -263,14 +263,16 @@ impl CustomOperation for UboTraceChainsOp {
             .parse()
             .unwrap_or_else(|_| "25.0".parse().unwrap());
 
-        // Call the SQL function
+        // Call the SQL function - includes both ownership AND control relationships
+        // Control relationships are UBO extensions per regulatory guidance
         let chains = sqlx::query!(
             r#"SELECT chain_id, ubo_person_id, ubo_name,
                       path_entities, path_names, ownership_percentages,
-                      effective_ownership, chain_depth, is_complete
+                      effective_ownership, chain_depth, is_complete,
+                      relationship_types, has_control_path
                FROM "ob-poc".compute_ownership_chains($1, $2, 10)
-               WHERE effective_ownership >= $3
-               ORDER BY effective_ownership DESC"#,
+               WHERE effective_ownership >= $3 OR has_control_path = true
+               ORDER BY effective_ownership DESC NULLS LAST"#,
             cbu_id,
             target_entity_id,
             threshold_bd
@@ -290,8 +292,31 @@ impl CustomOperation for UboTraceChainsOp {
                     "ownership_percentages": c.ownership_percentages,
                     "effective_ownership": c.effective_ownership,
                     "chain_depth": c.chain_depth,
-                    "is_complete": c.is_complete
+                    "is_complete": c.is_complete,
+                    "relationship_types": c.relationship_types,
+                    "has_control_path": c.has_control_path,
+                    "ubo_type": if c.has_control_path == Some(true) && c.effective_ownership.is_none() {
+                        "CONTROL"
+                    } else if c.has_control_path == Some(true) {
+                        "OWNERSHIP_AND_CONTROL"
+                    } else {
+                        "OWNERSHIP"
+                    }
                 })
+            })
+            .collect();
+
+        // Separate ownership-based and control-based chains
+        let ownership_chains: Vec<&serde_json::Value> = chain_list
+            .iter()
+            .filter(|c| c.get("ubo_type").and_then(|v| v.as_str()) != Some("CONTROL"))
+            .collect();
+
+        let control_chains: Vec<&serde_json::Value> = chain_list
+            .iter()
+            .filter(|c| {
+                let ubo_type = c.get("ubo_type").and_then(|v| v.as_str());
+                ubo_type == Some("CONTROL") || ubo_type == Some("OWNERSHIP_AND_CONTROL")
             })
             .collect();
 
@@ -300,7 +325,10 @@ impl CustomOperation for UboTraceChainsOp {
             "target_entity_id": target_entity_id,
             "threshold": threshold,
             "chain_count": chain_list.len(),
-            "chains": chain_list
+            "chains": chain_list,
+            "ownership_chain_count": ownership_chains.len(),
+            "control_chain_count": control_chains.len(),
+            "includes_control_relationships": true
         });
 
         Ok(ExecutionResult::Record(result))
@@ -381,7 +409,9 @@ impl CustomOperation for UboInferChainOp {
             .map(|i| i as i32)
             .unwrap_or(10);
 
-        // Recursive CTE to trace upward (cbu_id not used in query but kept for context)
+        // Recursive CTE to trace upward via BOTH ownership AND control relationships
+        // Control relationships are UBO extensions per regulatory guidance
+        // Use a single recursive term with UNION of ownership and control in the recursive part
         let _ = cbu_id; // Acknowledge cbu_id even though not used in this particular query
         let chain = sqlx::query!(
             r#"WITH RECURSIVE upward_chain AS (
@@ -392,30 +422,62 @@ impl CustomOperation for UboInferChainOp {
                     et.type_code::text as entity_type,
                     ARRAY[$1::uuid] as path,
                     ARRAY[e.name::text] as names,
-                    1 as depth
+                    1 as depth,
+                    'START'::text as relationship_type,
+                    NULL::numeric as ownership_pct
                 FROM "ob-poc".entities e
                 JOIN "ob-poc".entity_types et ON et.entity_type_id = e.entity_type_id
                 WHERE e.entity_id = $1
 
                 UNION ALL
 
-                -- Recursive: find owners
+                -- Recursive: find owners and controllers combined
                 SELECT
-                    orel.owner_entity_id,
-                    e.name::text,
-                    et.type_code::text,
-                    uc.path || orel.owner_entity_id,
-                    uc.names || e.name::text,
-                    uc.depth + 1
+                    combined.parent_entity_id,
+                    combined.entity_name,
+                    combined.entity_type,
+                    uc.path || combined.parent_entity_id,
+                    uc.names || combined.entity_name,
+                    uc.depth + 1,
+                    combined.rel_type,
+                    combined.ownership_pct
                 FROM upward_chain uc
-                JOIN "ob-poc".ownership_relationships orel ON orel.owned_entity_id = uc.entity_id
-                JOIN "ob-poc".entities e ON e.entity_id = orel.owner_entity_id
-                JOIN "ob-poc".entity_types et ON et.entity_type_id = e.entity_type_id
+                CROSS JOIN LATERAL (
+                    -- Ownership relationships
+                    SELECT
+                        orel.owner_entity_id as parent_entity_id,
+                        e.name::text as entity_name,
+                        et.type_code::text as entity_type,
+                        'OWNERSHIP'::text as rel_type,
+                        orel.ownership_percent as ownership_pct
+                    FROM "ob-poc".ownership_relationships orel
+                    JOIN "ob-poc".entities e ON e.entity_id = orel.owner_entity_id
+                    JOIN "ob-poc".entity_types et ON et.entity_type_id = e.entity_type_id
+                    WHERE orel.owned_entity_id = uc.entity_id
+                    AND NOT orel.owner_entity_id = ANY(uc.path)
+                    AND (orel.effective_to IS NULL OR orel.effective_to > CURRENT_DATE)
+
+                    UNION ALL
+
+                    -- Control relationships
+                    SELECT
+                        crel.controller_entity_id as parent_entity_id,
+                        e.name::text as entity_name,
+                        et.type_code::text as entity_type,
+                        crel.control_type::text as rel_type,
+                        NULL::numeric as ownership_pct
+                    FROM "ob-poc".control_relationships crel
+                    JOIN "ob-poc".entities e ON e.entity_id = crel.controller_entity_id
+                    JOIN "ob-poc".entity_types et ON et.entity_type_id = e.entity_type_id
+                    WHERE crel.controlled_entity_id = uc.entity_id
+                    AND NOT crel.controller_entity_id = ANY(uc.path)
+                    AND crel.is_active = true
+                    AND (crel.effective_to IS NULL OR crel.effective_to > CURRENT_DATE)
+                ) combined
                 WHERE uc.depth < $2
-                AND NOT orel.owner_entity_id = ANY(uc.path)
-                AND (orel.effective_to IS NULL OR orel.effective_to > CURRENT_DATE)
             )
-            SELECT entity_id, entity_name, entity_type, path, names, depth
+            SELECT entity_id, entity_name, entity_type, path, names, depth,
+                   relationship_type as "relationship_type!", ownership_pct
             FROM upward_chain
             ORDER BY depth"#,
             start_entity_id,
@@ -432,12 +494,15 @@ impl CustomOperation for UboInferChainOp {
                     "entity_name": c.entity_name,
                     "entity_type": c.entity_type,
                     "depth": c.depth,
-                    "is_person": c.entity_type.as_ref().map(|t| t == "proper_person").unwrap_or(false)
+                    "relationship_type": c.relationship_type,
+                    "ownership_pct": c.ownership_pct,
+                    "is_person": c.entity_type.as_ref().map(|t| t == "proper_person").unwrap_or(false),
+                    "is_control": c.relationship_type != "START" && c.relationship_type != "OWNERSHIP"
                 })
             })
             .collect();
 
-        // Find terminal nodes (persons or entities with no further ownership)
+        // Find terminal nodes (persons or entities with no further ownership/control)
         let terminals: Vec<&serde_json::Value> = chain_steps
             .iter()
             .filter(|c| {
@@ -447,13 +512,28 @@ impl CustomOperation for UboInferChainOp {
             })
             .collect();
 
+        // Separate ownership-based and control-based UBOs
+        let control_ubos: Vec<&serde_json::Value> = chain_steps
+            .iter()
+            .filter(|c| {
+                c.get("is_person")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false)
+                    && c.get("is_control")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false)
+            })
+            .collect();
+
         let result = json!({
             "cbu_id": cbu_id,
             "start_entity_id": start_entity_id,
             "max_depth": max_depth,
             "chain_length": chain_steps.len(),
             "chain": chain_steps,
-            "terminal_ubos": terminals
+            "terminal_ubos": terminals,
+            "control_ubos": control_ubos,
+            "includes_control_relationships": true
         });
 
         Ok(ExecutionResult::Record(result))

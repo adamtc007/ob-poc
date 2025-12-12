@@ -1592,6 +1592,8 @@ The KYC case management and UBO domains manage entity-level investigations, scre
 
 ### UBO Verbs
 
+**Note:** UBO chain tracing operations (`ubo.trace-chains`, `ubo.infer-chain`) now include **control relationships** alongside ownership relationships. This aligns with AML/KYC regulatory guidance where a person may be a beneficial owner through control (voting rights, board control, veto powers) even without direct ownership percentage.
+
 | Verb | Description |
 |------|-------------|
 | `ubo.add-ownership` | Add ownership relationship |
@@ -1604,12 +1606,17 @@ The KYC case management and UBO domains manage entity-level investigations, scre
 | `ubo.list-ubos` | List UBOs for CBU |
 | `ubo.list-by-subject` | List UBOs for subject entity |
 | `ubo.discover-owner` | Discover potential UBOs from documents, registry, or screening |
-| `ubo.trace-chains` | Trace all ownership chains to natural persons |
-| `ubo.infer-chain` | Trace ownership chain upward from starting entity |
+| `ubo.trace-chains` | Trace all ownership AND control chains to natural persons |
+| `ubo.infer-chain` | Trace ownership/control chain upward from starting entity |
 | `ubo.check-completeness` | Validate UBO determination completeness |
 | `ubo.supersede-ubo` | Supersede UBO record with newer determination |
 | `ubo.snapshot-cbu` | Capture point-in-time UBO state snapshot |
 | `ubo.compare-snapshot` | Compare two UBO snapshots for changes |
+
+**Chain output includes:**
+- `relationship_types`: Array showing each hop type (OWNERSHIP, VOTING_RIGHTS, BOARD_APPOINTMENT, etc.)
+- `has_control_path`: Boolean indicating if chain includes control relationships
+- `ubo_type`: OWNERSHIP, CONTROL, or OWNERSHIP_AND_CONTROL
 
 ### Example: Full KYC Case Flow
 

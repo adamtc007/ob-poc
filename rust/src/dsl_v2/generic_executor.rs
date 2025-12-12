@@ -140,6 +140,11 @@ impl GenericCrudExecutor {
         verb: &RuntimeVerb,
         args: &HashMap<String, JsonValue>,
     ) -> Result<GenericExecutionResult> {
+        eprintln!(
+            "DBG GenericCrudExecutor::execute ENTER {}.{}",
+            verb.domain, verb.verb
+        );
+
         let crud = match &verb.behavior {
             RuntimeBehavior::Crud(crud) => crud,
             RuntimeBehavior::Plugin(handler) => {
@@ -152,12 +157,12 @@ impl GenericCrudExecutor {
             }
         };
 
-        debug!(
-            "GenericCrudExecutor: executing {}.{} with operation {:?}",
-            verb.domain, verb.verb, crud.operation
+        eprintln!(
+            "DBG GenericCrudExecutor: operation={:?} table={}.{}",
+            crud.operation, crud.schema, crud.table
         );
 
-        match crud.operation {
+        let result = match crud.operation {
             CrudOperation::Insert => self.execute_insert(verb, crud, args).await,
             CrudOperation::Select => self.execute_select(verb, crud, args).await,
             CrudOperation::Update => self.execute_update(verb, crud, args).await,
@@ -171,7 +176,13 @@ impl GenericCrudExecutor {
             CrudOperation::ListParties => self.execute_list_parties(verb, crud, args).await,
             CrudOperation::SelectWithJoin => self.execute_select_with_join(verb, crud, args).await,
             CrudOperation::EntityCreate => self.execute_entity_create(verb, crud, args).await,
-        }
+        };
+
+        eprintln!(
+            "DBG GenericCrudExecutor::execute EXIT result={:?}",
+            result.is_ok()
+        );
+        result
     }
 
     // =========================================================================
@@ -1370,14 +1381,20 @@ impl GenericCrudExecutor {
 
     /// Execute query returning single row
     async fn execute_with_bindings(&self, sql: &str, values: &[SqlValue]) -> Result<PgRow> {
-        tracing::trace!(sql = %sql, bind_count = values.len(), "executing SQL (single row)");
-        tracing::trace!(bindings = ?values, "SQL bind values");
+        eprintln!(
+            "DBG execute_with_bindings: sql_len={} binds={}",
+            sql.len(),
+            values.len()
+        );
+        eprintln!("DBG SQL: {}", &sql[..sql.len().min(200)]);
 
         let mut query = sqlx::query(sql);
         for val in values {
             query = Self::bind_sql_value(query, val);
         }
+        eprintln!("DBG execute_with_bindings: calling fetch_one...");
         let row = query.fetch_one(&self.pool).await?;
+        eprintln!("DBG execute_with_bindings: fetch_one returned OK");
         Ok(row)
     }
 

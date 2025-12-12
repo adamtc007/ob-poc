@@ -28,8 +28,6 @@
 //! curl http://localhost:3000/api/agent/health
 //! ```
 
-use axum::response::Html;
-use axum::routing::get;
 use axum::Router;
 use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
@@ -205,11 +203,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Create routers and merge them
+    // Serve trunk-built WASM app from dist/ folder
+    // trunk builds to dist/ with hashed filenames and generates index.html
+    let wasm_dist_path =
+        std::env::var("WASM_DIST_PATH").unwrap_or_else(|_| "crates/ob-poc-ui/dist".to_string());
+
     let app = Router::new()
-        // Serve index.html at root - redirect to WASM app
-        .route("/", get(serve_index))
-        // Serve static files for WASM app
-        .nest_service("/pkg", ServeDir::new("crates/ob-poc-ui/pkg"))
+        // Serve trunk-built static files (index.html, *.js, *.wasm)
+        .nest_service(
+            "/",
+            ServeDir::new(&wasm_dist_path).append_index_html_on_directories(true),
+        )
         // API routes
         .merge(create_graph_router(pool.clone()))
         .merge(create_agent_router(pool.clone()))
@@ -287,56 +291,5 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Serve the index.html for the WASM app
-async fn serve_index() -> Html<&'static str> {
-    Html(INDEX_HTML)
-}
-
-const INDEX_HTML: &str = r#"<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OB-POC Visualization</title>
-    <style>
-        html, body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background: #1a1a2e;
-        }
-
-        #ob_poc_canvas {
-            width: 100%;
-            height: 100%;
-        }
-
-        .loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #e94560;
-            font-family: system-ui, -apple-system, sans-serif;
-            font-size: 18px;
-        }
-    </style>
-</head>
-<body>
-    <div class="loading" id="loading">Loading WASM app...</div>
-    <canvas id="ob_poc_canvas"></canvas>
-    <script type="module">
-        // Cache bust: v2
-        import init from './pkg/ob_poc_ui.js?v=2';
-
-        init().then(() => {
-            document.getElementById('loading').style.display = 'none';
-        }).catch(err => {
-            document.getElementById('loading').textContent = 'Failed to load: ' + err;
-            console.error(err);
-        });
-    </script>
-</body>
-</html>"#;
+// Note: index.html is now served from trunk's dist/ folder
+// trunk builds generate proper index.html with hashed asset references

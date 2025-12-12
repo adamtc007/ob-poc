@@ -5,6 +5,10 @@ edition = "2021"
 description = "Language Server Protocol implementation for the Onboarding DSL"
 authors = ["OB-POC Team"]
 
+[lib]
+name = "dsl_lsp"
+path = "src/lib.rs"
+
 [[bin]]
 name = "dsl-lsp"
 path = "src/main.rs"
@@ -34,6 +38,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Regex for pattern matching
 regex = "1"
+
+# UUID
+uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
 tokio-test = "0.4"

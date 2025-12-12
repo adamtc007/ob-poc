@@ -26,7 +26,7 @@ use tantivy::tokenizer::{LowerCaser, NgramTokenizer, TextAnalyzer};
 use tantivy::{Index, IndexReader, IndexWriter, Term};
 use tokio::sync::{Mutex, RwLock};
 
-use crate::config::{EntityConfig, IndexMode, SearchKeyConfig, ShardConfig};
+use crate::config::{EntityConfig, IndexMode};
 use crate::index::traits::{
     IndexError, IndexRecord, MatchMode, SearchIndex, SearchMatch, SearchQuery,
 };
@@ -267,7 +267,7 @@ impl SearchIndex for TantivyIndex {
                         Box::new(TermQuery::new(term, Default::default()))
                     } else {
                         // IndexMode::Trigram: word tokenizer, use QueryParser for word matching
-                        let mut query_parser =
+                        let query_parser =
                             QueryParser::for_index(&self.index, vec![exact_field]);
                         match query_parser.parse_query(&input_normalized) {
                             Ok(q) => q,

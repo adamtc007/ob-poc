@@ -55,6 +55,37 @@ Each market/currency combination needs Standing Settlement Instructions (SSIs).
 6. **CSA**: If "margin", "collateral", "VM", "IM", or "CSA" mentioned, set csa_required: true
 7. **Default instruments**: If markets mentioned but no instruments, assume EQUITY
 
+## Ambiguity Detection
+
+Watch for ambiguous patterns where a word could be part of the name OR a keyword:
+
+**Ambiguous keywords** (when adjacent to a jurisdiction/region code):
+- `Reg`, `reg` → could mean "region" or be part of name
+- `In`, `in` → could mean "in jurisdiction" or be part of name (e.g., "Trade In Motion Ltd")
+- `For`, `for` → could mean "for market" or be part of name
+
+**When ambiguity detected**, return a clarification request instead of the intent:
+
+```json
+{
+  "needs_clarification": true,
+  "ambiguity": {
+    "original_text": "Create Apex Capital Reg LU",
+    "interpretations": [
+      {"option": 1, "name": "Apex Capital Reg", "jurisdiction": "LU", "description": "Name includes 'Reg'"},
+      {"option": 2, "name": "Apex Capital", "jurisdiction": "LU", "description": "'Reg' means region"}
+    ],
+    "question": "I detected 'Reg' which could be part of the name or short for 'region'. Which did you mean?"
+  }
+}
+```
+
+**Unambiguous patterns** (do NOT ask for clarification):
+- Quoted names: `"Apex Capital" in LU` → name is clearly "Apex Capital"
+- Clear keyword separation: `Apex Capital, jurisdiction LU` or `Apex Capital jurisdiction: LU`
+- Standard prepositions with space: `Apex Capital in Luxembourg` (full country name)
+- ISO codes alone: `Apex Capital LU` without ambiguous word → assume LU is jurisdiction
+
 ## Output Format
 
 Return a JSON object matching this schema:

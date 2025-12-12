@@ -22,6 +22,9 @@ pub mod session;
 pub mod dsl_session_file;
 
 #[cfg(feature = "server")]
+pub mod agent_service;
+
+#[cfg(feature = "server")]
 pub mod entity_routes;
 
 #[cfg(feature = "server")]
@@ -50,3 +53,6 @@ pub use session::{create_session_store, SessionStore};
 
 #[cfg(feature = "server")]
 pub use intent::{AssembledDsl, IntentSequence, VerbIntent};
+
+#[cfg(feature = "server")]
+pub use agent_service::{AgentChatRequest, AgentChatResponse, AgentCommand, AgentService};

@@ -263,10 +263,11 @@ impl IntentExtractor {
     }
 
     /// Extract structured intent from natural language
+    /// Returns IntentResult which is either Clear(intent) or NeedsClarification(request)
     pub async fn extract(
         &self,
         user_request: &str,
-    ) -> Result<crate::agentic::intent::OnboardingIntent> {
+    ) -> Result<crate::agentic::intent::IntentResult> {
         let system_prompt = include_str!("prompts/intent_extraction_system.md");
         let user_prompt = format!(
             "Extract the onboarding intent from this request:\n\n{}",
@@ -276,9 +277,9 @@ impl IntentExtractor {
         // Use chat_json for structured output
         let response = self.client.chat_json(system_prompt, &user_prompt).await?;
 
-        // Parse JSON response
+        // Parse JSON response - IntentResult uses untagged enum so serde picks the right variant
         let clean_json = Self::extract_json(&response)?;
-        let intent: crate::agentic::intent::OnboardingIntent = serde_json::from_str(&clean_json)
+        let result: crate::agentic::intent::IntentResult = serde_json::from_str(&clean_json)
             .map_err(|e| {
                 anyhow!(
                     "Failed to parse intent JSON: {}\n\nJSON was:\n{}",
@@ -287,7 +288,47 @@ impl IntentExtractor {
                 )
             })?;
 
-        Ok(intent)
+        Ok(result)
+    }
+
+    /// Extract intent, resolving clarification with user's choice
+    /// `choice` is the user's response (e.g., "1", "2", or a typed name)
+    pub async fn extract_with_clarification(
+        &self,
+        original_request: &str,
+        clarification: &crate::agentic::intent::ClarificationRequest,
+        user_choice: &str,
+    ) -> Result<crate::agentic::intent::IntentResult> {
+        // Build a clarified prompt incorporating the user's choice
+        let system_prompt = include_str!("prompts/intent_extraction_system.md");
+
+        let user_prompt = format!(
+            r#"The user was asked to clarify an ambiguous request.
+
+Original request: {}
+
+Ambiguity: {}
+
+User's choice: {}
+
+Now extract the intent based on their clarification. If they chose option 1, use interpretation 1. If they chose option 2, use interpretation 2. If they typed a name, use that as the client name.
+
+Return the structured intent JSON (not a clarification request)."#,
+            original_request, clarification.ambiguity.question, user_choice
+        );
+
+        let response = self.client.chat_json(system_prompt, &user_prompt).await?;
+        let clean_json = Self::extract_json(&response)?;
+        let result: crate::agentic::intent::IntentResult = serde_json::from_str(&clean_json)
+            .map_err(|e| {
+                anyhow!(
+                    "Failed to parse clarified intent: {}\n\nJSON: {}",
+                    e,
+                    clean_json
+                )
+            })?;
+
+        Ok(result)
     }
 
     fn extract_json(text: &str) -> Result<String> {

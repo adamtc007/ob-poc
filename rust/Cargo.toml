@@ -135,7 +135,9 @@ mcp = ["database"]  # MCP server for Claude integration
 members = [
     ".",
     "crates/dsl-lsp",
-    "crates/ob-poc-ui",
+    "crates/ob-poc-graph",
+    "crates/ob-poc-web",
+    "crates/ob-poc-types",
     "crates/entity-gateway",
     "xtask",
 ]

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>OB-POC - KYC/AML Onboarding</title>
+        <link rel="stylesheet" href="/static/styles/main.css" />
+    </head>
+    <body>
+        <div id="app-container">
+            <!-- Left Column: 3 stacked panels (Chat, DSL, AST) -->
+            <div id="left-column">
+                <!-- Top: Chat Panel -->
+                <div id="chat-panel" class="panel">
+                    <div class="panel-header">
+                        <span class="panel-title">Agent Chat</span>
+                        <span id="session-status" class="status-badge"
+                            >new</span
+                        >
+                    </div>
+                    <div id="chat-messages"></div>
+                    <div id="chat-input-area">
+                        <textarea
+                            id="chat-input"
+                            placeholder="Describe your onboarding scenario... (Enter to send)"
+                            rows="2"
+                        ></textarea>
+                    </div>
+                </div>
+
+                <!-- Middle: DSL Panel -->
+                <div id="dsl-panel" class="panel">
+                    <div class="panel-header">
+                        <span class="panel-title">DSL Source</span>
+                        <span id="dsl-status" class="status-badge">empty</span>
+                    </div>
+                    <div id="dsl-content">
+                        <pre><code id="dsl-source" class="language-clojure">; DSL will appear here after chat</code></pre>
+                    </div>
+                </div>
+
+                <!-- Bottom: AST Panel -->
+                <div id="ast-panel" class="panel">
+                    <div class="panel-header">
+                        <span class="panel-title">AST</span>
+                        <button id="ast-expand-all" class="btn btn-small">
+                            Expand All
+                        </button>
+                        <button id="ast-collapse-all" class="btn btn-small">
+                            Collapse All
+                        </button>
+                    </div>
+                    <div id="ast-tree"></div>
+                </div>
+            </div>
+
+            <!-- Right Column: Full-height CBU Graph (WASM/egui) -->
+            <div id="cbu-panel" class="panel">
+                <div class="panel-header">
+                    <span class="panel-title">CBU Graph</span>
+                    <select id="cbu-selector" class="cbu-dropdown">
+                        <option value="">Select a CBU...</option>
+                    </select>
+                    <select id="view-mode" class="view-dropdown">
+                        <option value="KYC_UBO">KYC / UBO</option>
+                        <option value="SERVICE_DELIVERY">
+                            Service Delivery
+                        </option>
+                        <option value="CUSTODY">Custody</option>
+                    </select>
+                </div>
+                <div id="graph-container">
+                    <canvas id="egui-canvas"></canvas>
+                    <div id="graph-loading" class="loading-overlay">
+                        <span>Loading graph...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- WASM for graph visualization -->
+        <script type="module">
+            import init, { start_graph } from "/static/wasm/ob_poc_graph.js";
+
+            try {
+                await init();
+                start_graph("egui-canvas");
+                document.getElementById("graph-loading").style.display = "none";
+            } catch (e) {
+                console.error("Failed to load WASM graph:", e);
+                document.getElementById("graph-loading").innerHTML =
+                    `<span>WASM error: ${e.message || e}</span>`;
+            }
+        </script>
+
+        <!-- TypeScript panels -->
+        <script type="module" src="/static/js/app.js"></script>
+    </body>
+</html>

@@ -823,6 +823,116 @@ pub struct ExecuteResponse {
 }
 
 // ============================================================================
+// Disambiguation Types
+// ============================================================================
+
+/// Disambiguation request - sent when entity references are ambiguous
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DisambiguationRequest {
+    /// Unique ID for this disambiguation request
+    pub request_id: Uuid,
+    /// The ambiguous items that need resolution
+    pub items: Vec<DisambiguationItem>,
+    /// Human-readable prompt for the user
+    pub prompt: String,
+    /// Original intents that need disambiguation (preserved for re-processing)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub original_intents: Option<Vec<VerbIntent>>,
+}
+
+/// A single ambiguous item needing resolution
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum DisambiguationItem {
+    /// Multiple entities match a search term
+    EntityMatch {
+        /// Parameter name (e.g., "entity-id")
+        param: String,
+        /// Original search text (e.g., "John Smith")
+        search_text: String,
+        /// Matching entities to choose from
+        matches: Vec<EntityMatchOption>,
+    },
+    /// Ambiguous interpretation (e.g., "UK" = name part or jurisdiction?)
+    InterpretationChoice {
+        /// The ambiguous text
+        text: String,
+        /// Possible interpretations
+        options: Vec<Interpretation>,
+    },
+}
+
+/// A matching entity for disambiguation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntityMatchOption {
+    /// Entity UUID
+    pub entity_id: Uuid,
+    /// Display name
+    pub name: String,
+    /// Entity type (e.g., "proper_person", "limited_company")
+    pub entity_type: String,
+    /// Jurisdiction code
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub jurisdiction: Option<String>,
+    /// Additional context (roles, etc.)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context: Option<String>,
+    /// Match score (0.0 - 1.0)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub score: Option<f32>,
+}
+
+/// A possible interpretation of ambiguous text
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Interpretation {
+    /// Interpretation ID
+    pub id: String,
+    /// Human-readable label
+    pub label: String,
+    /// What this interpretation means
+    pub description: String,
+    /// How this affects the generated DSL
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub effect: Option<String>,
+}
+
+/// User's disambiguation response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DisambiguationResponse {
+    /// The request ID being responded to
+    pub request_id: Uuid,
+    /// Selected resolutions
+    pub selections: Vec<DisambiguationSelection>,
+}
+
+/// A single disambiguation selection
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum DisambiguationSelection {
+    /// Selected entity for an EntityMatch
+    Entity { param: String, entity_id: Uuid },
+    /// Selected interpretation for an InterpretationChoice
+    Interpretation {
+        text: String,
+        interpretation_id: String,
+    },
+}
+
+/// Chat response status - indicates whether response is ready or needs disambiguation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum ChatResponseStatus {
+    /// DSL is ready (no ambiguity or already resolved)
+    Ready,
+    /// Needs user disambiguation before generating DSL
+    NeedsDisambiguation {
+        disambiguation: DisambiguationRequest,
+    },
+    /// Error occurred
+    Error { message: String },
+}
+
+// ============================================================================
 // Tests
 // ============================================================================
 

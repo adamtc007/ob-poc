@@ -5,7 +5,10 @@ use tower_lsp::lsp_types::*;
 use crate::analysis::{detect_completion_context, CompletionContext, DocumentState, SymbolTable};
 use crate::entity_client::EntityLookupClient;
 
-use ob_poc::dsl_v2::{find_unified_verb, registry, suggestions::predict_next_steps, parse_program, BindingContext, BindingInfo};
+use ob_poc::dsl_v2::{
+    find_unified_verb, parse_program, registry, runtime_registry, suggestions::predict_next_steps,
+    BindingContext, BindingInfo,
+};
 
 /// Generate completions based on cursor position.
 pub async fn get_completions(
@@ -58,12 +61,12 @@ pub async fn get_completions(
             // We need to build a partial BindingContext from the document
             // This is "best effort" using what we can parse
             let program = parse_program(&doc.text).unwrap_or_default();
-            
+
             // Reconstruct bindings from symbol table
             let mut context = BindingContext::new();
             for (name, info) in symbols.all() {
                 context.insert(BindingInfo {
-                    name: name.clone(),
+                    name: name.to_string(),
                     produced_type: info.id_type.clone(),
                     subtype: None,
                     entity_pk: uuid::Uuid::nil(), // dummy
@@ -72,23 +75,29 @@ pub async fn get_completions(
                 });
             }
 
-            let registry = registry();
-            let suggestions = predict_next_steps(&program, &context, registry);
-            
-            suggestions.into_iter().map(|s| {
-                CompletionItem {
-                    label: s.verb.clone(),
-                    kind: Some(CompletionItemKind::FUNCTION),
-                    detail: Some(format!("Score: {:.2}", s.score)),
-                    documentation: Some(Documentation::String(s.reason)),
-                    insert_text: Some(format!("({} ", s.verb)), 
-                    insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
-                    // High score = low sort text (000, 001, etc)
-                    sort_text: Some(format!("{:03}-{:.2}", 100 - (s.score * 100.0) as u32, s.score)),
-                    ..Default::default()
-                }
-            }).collect()
-        },
+            let suggestions = predict_next_steps(&program, &context, runtime_registry());
+
+            suggestions
+                .into_iter()
+                .map(|s| {
+                    CompletionItem {
+                        label: s.verb.clone(),
+                        kind: Some(CompletionItemKind::FUNCTION),
+                        detail: Some(format!("Score: {:.2}", s.score)),
+                        documentation: Some(Documentation::String(s.reason)),
+                        insert_text: Some(format!("({} ", s.verb)),
+                        insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
+                        // High score = low sort text (000, 001, etc)
+                        sort_text: Some(format!(
+                            "{:03}-{:.2}",
+                            100 - (s.score * 100.0) as u32,
+                            s.score
+                        )),
+                        ..Default::default()
+                    }
+                })
+                .collect()
+        }
     }
 }
 

@@ -23,6 +23,12 @@ pub struct VerbIntent {
     #[serde(default)]
     pub refs: HashMap<String, String>,
 
+    /// Entity lookups needing resolution (optional)
+    /// Key is param name, value contains search_text and entity_type
+    /// e.g., {"entity-id": {"search_text": "John Smith", "entity_type": "person"}}
+    #[serde(default)]
+    pub lookups: Option<HashMap<String, serde_json::Value>>,
+
     /// Optional ordering hint for complex sequences
     #[serde(default)]
     pub sequence: Option<u32>,

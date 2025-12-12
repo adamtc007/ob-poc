@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::agentic::feedback::{FeedbackLoop, ValidatedDsl};
 use crate::agentic::generator::IntentExtractor;
-use crate::agentic::intent::OnboardingIntent;
+use crate::agentic::intent::{ClarificationRequest, IntentResult, OnboardingIntent};
 use crate::agentic::planner::{OnboardingPlan, RequirementPlanner};
 
 /// Agent orchestrator for DSL generation
@@ -85,9 +85,20 @@ impl AgentOrchestrator {
     }
 
     /// Generate DSL from natural language
+    /// Returns Err if clarification is needed - use extract_intent first to check
     pub async fn generate(&self, request: &str, execute: bool) -> Result<GenerationResult> {
         // Phase 1: Extract intent
-        let intent = self.intent_extractor.extract(request).await?;
+        let intent_result = self.intent_extractor.extract(request).await?;
+
+        let intent = match intent_result {
+            IntentResult::Clear(intent) => intent,
+            IntentResult::NeedsClarification(clarification) => {
+                return Err(anyhow!(
+                    "Clarification needed: {}",
+                    clarification.ambiguity.question
+                ));
+            }
+        };
 
         // Phase 2: Plan (deterministic)
         let plan = RequirementPlanner::plan(&intent);
@@ -124,8 +135,61 @@ impl AgentOrchestrator {
     }
 
     /// Extract intent only (for debugging/inspection)
-    pub async fn extract_intent(&self, request: &str) -> Result<OnboardingIntent> {
+    /// Returns IntentResult which may need clarification
+    pub async fn extract_intent(&self, request: &str) -> Result<IntentResult> {
         self.intent_extractor.extract(request).await
+    }
+
+    /// Continue extraction after user provides clarification
+    pub async fn extract_with_clarification(
+        &self,
+        original_request: &str,
+        clarification: &ClarificationRequest,
+        user_choice: &str,
+    ) -> Result<IntentResult> {
+        self.intent_extractor
+            .extract_with_clarification(original_request, clarification, user_choice)
+            .await
+    }
+
+    /// Generate DSL from a pre-extracted intent (skips intent extraction)
+    pub async fn generate_from_intent(
+        &self,
+        intent: OnboardingIntent,
+        execute: bool,
+    ) -> Result<GenerationResult> {
+        // Phase 2: Plan (deterministic)
+        let plan = RequirementPlanner::plan(&intent);
+
+        // Phase 3-4: Generate and validate DSL (with retry)
+        let dsl = self.feedback_loop.generate_valid_dsl(&plan).await?;
+
+        // Phase 5: Execute if requested
+        let execution = if execute {
+            #[cfg(feature = "database")]
+            {
+                if let Some(ref executor) = self.executor {
+                    Some(self.execute_dsl(executor, &dsl.source).await?)
+                } else {
+                    return Err(anyhow!("Execution requested but no database connection"));
+                }
+            }
+            #[cfg(not(feature = "database"))]
+            {
+                return Err(anyhow!(
+                    "Execution requested but database feature not enabled"
+                ));
+            }
+        } else {
+            None
+        };
+
+        Ok(GenerationResult {
+            intent,
+            plan,
+            dsl,
+            execution,
+        })
     }
 
     /// Plan from intent (for debugging/inspection)

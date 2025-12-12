@@ -262,6 +262,8 @@ pub struct AgentState {
     pub sessions: SessionStore,
     pub generation_log: Arc<GenerationLogRepository>,
     pub session_repo: Arc<crate::database::SessionRepository>,
+    /// Centralized agent service for chat/disambiguation
+    pub agent_service: Arc<crate::api::agent_service::AgentService>,
 }
 
 impl AgentState {
@@ -270,12 +272,16 @@ impl AgentState {
         let sessions = create_session_store();
         let generation_log = Arc::new(GenerationLogRepository::new(pool.clone()));
         let session_repo = Arc::new(crate::database::SessionRepository::new(pool.clone()));
+        let agent_service = Arc::new(crate::api::agent_service::AgentService::with_pool(
+            pool.clone(),
+        ));
         Self {
             pool,
             dsl_v2_executor,
             sessions,
             generation_log,
             session_repo,
+            agent_service,
         }
     }
 }
@@ -399,73 +405,32 @@ async fn delete_session(
 /// 5. Write valid DSL to session file
 ///
 /// Supports both Anthropic and OpenAI backends via AGENT_BACKEND env var.
+///
+/// This handler delegates to AgentService for the core chat logic:
+/// - Intent extraction via LLM
+/// - Entity resolution via EntityGateway
+/// - DSL generation with validation/retry loop
 async fn chat_session(
     State(state): State<AgentState>,
     Path(session_id): Path<Uuid>,
     Json(req): Json<ChatRequest>,
 ) -> Result<Json<ChatResponse>, StatusCode> {
-    use crate::agentic::llm_client::ToolDefinition;
-    use crate::api::dsl_builder::{build_dsl_program, validate_intent};
-    use crate::api::dsl_session_file::DslSessionFileManager;
-    use crate::api::intent::{IntentValidation, VerbIntent};
-    use crate::dsl_v2::semantic_validator::SemanticValidator;
-    use crate::dsl_v2::validation::ValidationContext;
+    use crate::api::agent_service::AgentChatRequest;
 
-    const MAX_RETRIES: usize = 3;
-
-    // Initialize file-based session storage
-    let file_manager = DslSessionFileManager::new();
-
-    // Ensure session file exists (create if needed)
-    if !file_manager.session_exists(session_id).await {
-        let domain_hint = {
-            let sessions = state.sessions.read().await;
-            sessions
-                .get(&session_id)
-                .and_then(|s| s.context.domain_hint.clone())
-        };
-        if let Err(e) = file_manager.create_session(session_id, domain_hint).await {
-            tracing::error!("Failed to create session file: {}", e);
-        }
-    }
-
-    // Store the user message and get session context (available bindings with type info)
-    let (session_bindings_for_llm, session_named_refs): (
-        Vec<String>,
-        std::collections::HashMap<String, uuid::Uuid>,
-    ) = {
-        let mut sessions = state.sessions.write().await;
-        let session = sessions.get_mut(&session_id).ok_or(StatusCode::NOT_FOUND)?;
-        session.add_user_message(req.message.clone());
-        // Get typed bindings formatted for LLM context
-        let bindings = session.context.bindings_for_llm();
-        tracing::debug!("[CHAT] Session {} - START chat_session_handler", session_id);
-        tracing::debug!(
-            "[CHAT] Session {} - named_refs keys: {:?}",
-            session_id,
-            session.context.named_refs.keys().collect::<Vec<_>>()
-        );
-        tracing::debug!(
-            "[CHAT] Session {} - named_refs values: {:?}",
-            session_id,
-            session.context.named_refs
-        );
-        tracing::debug!(
-            "[CHAT] Session {} - bindings_for_llm: {:?}",
-            session_id,
-            bindings
-        );
-        (bindings, session.context.named_refs.clone())
+    // Get session (create if needed)
+    let mut session = {
+        let sessions = state.sessions.read().await;
+        sessions
+            .get(&session_id)
+            .cloned()
+            .ok_or(StatusCode::NOT_FOUND)?
     };
 
     // Create LLM client (uses AGENT_BACKEND env var to select provider)
     let llm_client = match crate::agentic::create_llm_client() {
         Ok(client) => client,
         Err(e) => {
-            let mut sessions = state.sessions.write().await;
-            let session = sessions.get_mut(&session_id).ok_or(StatusCode::NOT_FOUND)?;
             let error_msg = format!("Error: LLM client initialization failed: {}", e);
-            session.add_agent_message(error_msg.clone(), None, None);
             return Ok(Json(ChatResponse {
                 message: error_msg,
                 intents: vec![],
@@ -486,387 +451,55 @@ async fn chat_session(
         llm_client.model_name()
     );
 
-    // Build system prompt for intent extraction
-    let vocab = build_vocab_prompt(None);
-    let system_prompt = build_intent_extraction_prompt(&vocab);
-
-    // Build context about available bindings from previous executions
-    // This is appended to the user message so it works with any LLM provider
-    // Format: @binding_name (TYPE: Display Name) so LLM knows what each binding represents
-    let bindings_context = if !session_bindings_for_llm.is_empty() {
-        format!(
-            "\n\n[SESSION CONTEXT: Available references from previous commands: {}. Use these exact @names in the refs field when referring to these entities.]",
-            session_bindings_for_llm.join(", ")
-        )
-    } else {
-        String::new()
+    // Build request for AgentService
+    let agent_request = AgentChatRequest {
+        message: req.message.clone(),
+        cbu_id: None,
+        disambiguation_response: None,
     };
 
-    // Define the tool for structured intent extraction
-    let tool = ToolDefinition {
-        name: "generate_dsl_intents".to_string(),
-        description: "Generate structured DSL intents from user request. Each intent represents a single DSL verb call.".to_string(),
-        parameters: serde_json::json!({
-            "type": "object",
-            "properties": {
-                "intents": {
-                    "type": "array",
-                    "description": "List of DSL verb intents",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "verb": {
-                                "type": "string",
-                                "description": "The DSL verb, e.g., 'cbu.ensure', 'entity.create-proper-person'"
-                            },
-                            "params": {
-                                "type": "object",
-                                "description": "Parameters with literal values",
-                                "additionalProperties": true
-                            },
-                            "refs": {
-                                "type": "object",
-                                "description": "References to previous results, e.g., {\"cbu-id\": \"@result_1\"}",
-                                "additionalProperties": {"type": "string"}
-                            }
-                        },
-                        "required": ["verb", "params"]
-                    }
-                },
-                "explanation": {
-                    "type": "string",
-                    "description": "Brief explanation of what the DSL will do"
-                }
-            },
-            "required": ["intents", "explanation"]
-        }),
-    };
+    // Delegate to centralized AgentService
+    let response = state
+        .agent_service
+        .process_chat(&mut session, &agent_request, llm_client)
+        .await
+        .map_err(|e| {
+            tracing::error!("AgentService error: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
-    let mut feedback_context = String::new();
-    let mut final_dsl: Option<String> = None;
-    let mut final_explanation = String::new();
-    let mut all_intents: Vec<VerbIntent> = Vec::new();
-    let mut validation_results: Vec<IntentValidation> = Vec::new();
-
-    // Retry loop with linter feedback
-    for attempt in 0..MAX_RETRIES {
-        // Build message with session context and optional feedback from previous attempt
-        let user_message = if feedback_context.is_empty() {
-            format!("{}{}", req.message, bindings_context)
-        } else {
-            format!(
-                "{}{}\n\n[LINTER FEEDBACK - Please fix these issues]\n{}",
-                req.message, bindings_context, feedback_context
-            )
-        };
-
-        // Call LLM with tool use for structured intent extraction
-        let tool_result = llm_client
-            .chat_with_tool(&system_prompt, &user_message, &tool)
-            .await;
-
-        // Parse response
-        let (intents, explanation) = match tool_result {
-            Ok(result) => {
-                // Extract intents and explanation from tool result
-                let intents_json = &result.arguments["intents"];
-                let explanation = result.arguments["explanation"]
-                    .as_str()
-                    .unwrap_or("")
-                    .to_string();
-
-                // Parse intents
-                let intents: Vec<VerbIntent> =
-                    serde_json::from_value(intents_json.clone()).unwrap_or_default();
-
-                (intents, explanation)
-            }
-            Err(e) => {
-                tracing::error!("LLM API error (attempt {}): {}", attempt + 1, e);
-                if attempt == MAX_RETRIES - 1 {
-                    return Err(StatusCode::BAD_GATEWAY);
-                }
-                (Vec::new(), String::new())
-            }
-        };
-
-        if intents.is_empty() {
-            // No intents extracted - try one more time or give up
-            if attempt < MAX_RETRIES - 1 {
-                feedback_context = "Could not extract any DSL intents. Please try again with clearer verb and parameter names.".to_string();
-                continue;
-            }
-            break;
-        }
-
-        // Validate intents against registry (uses same registry as LSP)
-        validation_results.clear();
-        let mut has_errors = false;
-        let mut error_feedback = Vec::new();
-
-        for intent in &intents {
-            let validation = validate_intent(intent);
-            if !validation.valid {
-                has_errors = true;
-                for err in &validation.errors {
-                    error_feedback.push(format!(
-                        "Verb '{}': {} {}",
-                        intent.verb,
-                        err.message,
-                        err.param
-                            .as_deref()
-                            .map(|p| format!("(param: {})", p))
-                            .unwrap_or_default()
-                    ));
-                }
-            }
-            validation_results.push(validation);
-        }
-
-        // Build DSL from intents (deterministic - no LLM involved)
-        let dsl = build_dsl_program(&intents);
-        tracing::debug!("[CHAT] Built DSL from intents: {}", dsl);
-
-        // Run SemanticValidator with EntityGateway (same pipeline as Zed/LSP)
-        // This validates embedded data values (products, roles, jurisdictions, etc.)
-        // NOTE: EntityGateway errors (missing entity types) are logged as warnings, not errors
-        // to avoid breaking generation when the gateway is misconfigured
-        tracing::debug!(
-            "[CHAT] Validating with known_symbols: {:?}",
-            session_named_refs.keys().collect::<Vec<_>>()
-        );
-        let validator_result = async {
-            let v = SemanticValidator::new(state.pool.clone()).await?;
-            v.with_csg_linter().await
-        }
-        .await;
-
-        match validator_result {
-            Ok(mut validator) => {
-                let request = crate::dsl_v2::validation::ValidationRequest {
-                    source: dsl.clone(),
-                    context: ValidationContext::default()
-                        .with_known_symbols(session_named_refs.clone()),
-                };
-                tracing::debug!(
-                    "[CHAT] ValidationRequest known_symbols: {:?}",
-                    request.context.known_symbols.keys().collect::<Vec<_>>()
-                );
-                match validator.validate(&request).await {
-                    crate::dsl_v2::validation::ValidationResult::Err(diagnostics) => {
-                        for diag in diagnostics {
-                            // Skip EntityGateway connection/config errors - these shouldn't block generation
-                            if diag.message.contains("EntityGateway")
-                                || diag.message.contains("Unknown entity type")
-                            {
-                                tracing::warn!(
-                                    "EntityGateway validation skipped: {}",
-                                    diag.message
-                                );
-                                continue;
-                            }
-                            if diag.severity == crate::dsl_v2::validation::Severity::Error {
-                                has_errors = true;
-                                error_feedback.push(format!("Validation: {}", diag.message));
-                            }
-                        }
-                    }
-                    crate::dsl_v2::validation::ValidationResult::Ok(_) => {
-                        // Validation passed
-                    }
-                }
-            }
-            Err(e) => {
-                // EntityGateway not available - log warning but don't fail
-                tracing::warn!("EntityGateway validation unavailable: {}", e);
-            }
-        }
-
-        // If no errors, we're done
-        if !has_errors {
-            tracing::info!(
-                "Validation passed on attempt {}, DSL: {}",
-                attempt + 1,
-                &dsl[..dsl.len().min(200)]
-            );
-            final_dsl = Some(dsl);
-            final_explanation = explanation;
-            all_intents = intents;
-            break;
-        } else {
-            tracing::warn!(
-                "Validation failed on attempt {}: {:?}",
-                attempt + 1,
-                error_feedback
-            );
-        }
-
-        // Build feedback for next attempt
-        if attempt < MAX_RETRIES - 1 {
-            feedback_context = error_feedback.join("\n");
-        } else {
-            // Last attempt - return what we have with errors
-            final_dsl = Some(dsl);
-            final_explanation = format!(
-                "{}\n\nNote: DSL has validation issues:\n{}",
-                explanation,
-                error_feedback.join("\n")
-            );
-            all_intents = intents;
-        }
+    // Persist session changes back
+    {
+        let mut sessions = state.sessions.write().await;
+        sessions.insert(session_id, session.clone());
     }
 
-    // Update session with results
-    let mut sessions = state.sessions.write().await;
-    let session = sessions.get_mut(&session_id).ok_or(StatusCode::NOT_FOUND)?;
+    // Build assembled DSL for response
+    let assembled = response
+        .dsl_source
+        .as_ref()
+        .map(|dsl| crate::api::intent::AssembledDsl {
+            statements: vec![dsl.clone()],
+            combined: dsl.clone(),
+            intent_count: response.intents.len(),
+        });
 
-    let (response_msg, can_execute, assembled) = match final_dsl {
-        Some(ref dsl) => {
-            let has_errors = validation_results.iter().any(|v| !v.valid);
-
-            // Parse DSL to get AST for pending state
-            let ast = match crate::dsl_v2::parse_program(dsl) {
-                Ok(program) => program.statements,
-                Err(_) => Vec::new(),
-            };
-
-            // Set pending DSL with DRAFT status (awaiting user confirmation)
-            // This replaces any previous pending DSL
-            session.set_pending_dsl(dsl.clone(), ast);
-
-            // Also keep legacy assembled_dsl for backward compat
-            session.assembled_dsl = vec![dsl.clone()];
-
-            if has_errors {
-                session.state = SessionState::PendingValidation;
-            }
-            // else state is already ReadyToExecute from set_pending_dsl
-
-            // NOTE: Don't add to session.context.ast here - only add after successful execution
-            // The context.ast accumulates only executed statements, not proposed ones
-
-            let msg = if final_explanation.is_empty() {
-                "DSL generated successfully.".to_string()
-            } else {
-                final_explanation.clone()
-            };
-
-            session.add_agent_message(msg.clone(), None, Some(dsl.clone()));
-
-            // NOTE: Don't write to session file or DB here - only write after successful execution
-            // Pending DSL stays in memory until EXECUTED status
-
-            (
-                msg,
-                !has_errors,
-                Some(crate::api::intent::AssembledDsl {
-                    statements: vec![dsl.clone()],
-                    combined: dsl.clone(),
-                    intent_count: all_intents.len(),
-                }),
-            )
-        }
-        None => {
-            let msg =
-                "Could not generate valid DSL. Please try rephrasing your request.".to_string();
-            session.add_agent_message(msg.clone(), None, None);
-            (msg, false, None)
-        }
-    };
-
-    // Get AST and bindings for UI
-    let dsl_source = if session.context.ast.is_empty() {
-        None
-    } else {
-        Some(session.context.to_dsl_source())
-    };
-    let ast = if session.context.ast.is_empty() {
-        None
-    } else {
-        Some(session.context.ast.clone())
-    };
-    let bindings = if session.context.bindings.is_empty() {
-        None
-    } else {
-        Some(session.context.bindings.clone())
-    };
-
+    // Return response (ChatResponse is compatible with AgentChatResponse)
     Ok(Json(ChatResponse {
-        message: response_msg,
-        intents: all_intents,
+        message: response.message,
+        intents: response.intents,
         assembled_dsl: assembled,
-        validation_results,
-        session_state: session.state.clone(),
-        can_execute,
-        dsl_source,
-        ast,
-        bindings,
+        validation_results: response.validation_results,
+        session_state: response.session_state,
+        can_execute: response.can_execute,
+        dsl_source: response.dsl_source,
+        ast: response.ast,
+        bindings: if session.context.bindings.is_empty() {
+            None
+        } else {
+            Some(session.context.bindings.clone())
+        },
     }))
-}
-
-/// Build system prompt for intent extraction (tool-based)
-fn build_intent_extraction_prompt(vocab: &str) -> String {
-    format!(
-        r#"You are a DSL intent extraction assistant. Your job is to convert natural language requests into structured DSL intents.
-
-IMPORTANT: You MUST use the generate_dsl_intents tool to return your response. Do NOT return plain text.
-
-## Available DSL Verbs
-
-{}
-
-## Intent Structure
-
-Each intent represents a single DSL verb call with:
-- verb: The verb name (e.g., "cbu.ensure", "entity.create-proper-person")
-- params: Literal parameter values (e.g., {{"name": "Acme Corp", "jurisdiction": "LU"}})
-- refs: References to previous results (e.g., {{"cbu-id": "@result_1"}})
-
-## Rules
-
-1. Use exact verb names from the vocabulary
-2. Use exact parameter names (with hyphens, e.g., "client-type" not "clientType")
-3. For sequences, use @result_N references where N is the sequence number
-4. Common client types: "fund", "corporate", "individual"
-5. Use ISO codes for jurisdictions: "LU", "US", "GB", "IE", etc.
-
-## Product Codes (MUST use exact uppercase codes)
-
-| User Says | Product Code |
-|-----------|--------------|
-| custody, safekeeping | CUSTODY |
-| fund accounting, fund admin, NAV | FUND_ACCOUNTING |
-| transfer agency, TA, investor registry | TRANSFER_AGENCY |
-| middle office, trade capture | MIDDLE_OFFICE |
-| collateral, margin | COLLATERAL_MGMT |
-| FX, foreign exchange | MARKETS_FX |
-| alternatives, alts, hedge fund admin | ALTS |
-
-IMPORTANT: Always use the UPPERCASE product codes, never the display names.
-
-## Examples
-
-User: "Create a fund called Test Fund in Luxembourg"
-Intent: {{
-  "verb": "cbu.ensure",
-  "params": {{"name": "Test Fund", "jurisdiction": "LU", "client-type": "fund"}},
-  "refs": {{}}
-}}
-
-User: "Add custody product to the fund"
-Intent: {{
-  "verb": "cbu.add-product",
-  "params": {{"product": "CUSTODY"}},
-  "refs": {{"cbu-id": "@result_1"}}
-}}
-
-User: "Add fund accounting and transfer agency"
-Intents: [
-  {{"verb": "cbu.add-product", "params": {{"product": "FUND_ACCOUNTING"}}, "refs": {{"cbu-id": "@result_1"}}}},
-  {{"verb": "cbu.add-product", "params": {{"product": "TRANSFER_AGENCY"}}, "refs": {{"cbu-id": "@result_1"}}}}
-]"#,
-        vocab
-    )
 }
 
 /// POST /api/session/:id/execute - Execute DSL
@@ -901,9 +534,17 @@ async fn execute_session_dsl(
     };
 
     // Get DSL to execute - either from request or pending in session
-    let dsl = if let Some(req) = req {
-        req.dsl
+    let dsl = if let Some(ref req) = req {
+        if let Some(ref dsl_str) = req.dsl {
+            dsl_str.clone()
+        } else {
+            // Request provided but dsl is None - use session's assembled_dsl
+            let sessions = state.sessions.read().await;
+            let session = sessions.get(&session_id).ok_or(StatusCode::NOT_FOUND)?;
+            session.assembled_dsl.join("\n")
+        }
     } else {
+        // No request body (null) - use session's assembled_dsl
         let sessions = state.sessions.read().await;
         let session = sessions.get(&session_id).ok_or(StatusCode::NOT_FOUND)?;
         session.assembled_dsl.join("\n")
@@ -1806,7 +1447,7 @@ async fn parse_dsl(
 
     // Enrich: convert string literals to EntityRefs based on YAML verb config
     let registry = runtime_registry();
-    let enrichment_result = enrich_program(raw_program, &registry);
+    let enrichment_result = enrich_program(raw_program, registry);
     let mut program = enrichment_result.program;
 
     // Auto-resolve EntityRefs with exact matches via EntityGateway
@@ -3183,7 +2824,9 @@ fn get_domain_description(domain: &str) -> String {
 
 #[derive(Debug, Deserialize)]
 pub struct ExecuteDslRequest {
-    pub dsl: String,
+    /// DSL source to execute. If None/missing, uses session's assembled_dsl.
+    #[serde(default)]
+    pub dsl: Option<String>,
 }
 
 // ============================================================================

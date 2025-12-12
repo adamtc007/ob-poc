@@ -6,6 +6,72 @@ use serde::{Deserialize, Serialize};
 
 use crate::agentic::patterns::OnboardingPattern;
 
+/// Result of intent extraction - either clear intent or needs clarification
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum IntentResult {
+    /// Ambiguous input - needs user clarification before proceeding
+    NeedsClarification(ClarificationRequest),
+    /// Clear intent - ready for DSL generation
+    Clear(OnboardingIntent),
+}
+
+/// Request for user clarification when input is ambiguous
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClarificationRequest {
+    /// Flag indicating this needs clarification
+    pub needs_clarification: bool,
+    /// Details about the ambiguity
+    pub ambiguity: AmbiguityDetails,
+}
+
+/// Details about an ambiguous input
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AmbiguityDetails {
+    /// Original user text
+    pub original_text: String,
+    /// Possible interpretations
+    pub interpretations: Vec<Interpretation>,
+    /// Question to ask the user
+    pub question: String,
+}
+
+/// One possible interpretation of ambiguous input
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Interpretation {
+    /// Option number (1, 2, etc.)
+    pub option: u8,
+    /// Extracted name under this interpretation
+    pub name: String,
+    /// Extracted jurisdiction under this interpretation
+    pub jurisdiction: Option<String>,
+    /// Human-readable description
+    pub description: String,
+}
+
+impl IntentResult {
+    /// Check if this result needs clarification
+    pub fn needs_clarification(&self) -> bool {
+        matches!(self, IntentResult::NeedsClarification(_))
+    }
+
+    /// Get the clarification request if present
+    pub fn as_clarification(&self) -> Option<&ClarificationRequest> {
+        match self {
+            IntentResult::NeedsClarification(c) => Some(c),
+            _ => None,
+        }
+    }
+
+    /// Get the intent if clear
+    pub fn as_intent(&self) -> Option<&OnboardingIntent> {
+        match self {
+            IntentResult::Clear(i) => Some(i),
+            _ => None,
+        }
+    }
+}
+
 /// Structured representation of user's onboarding request
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OnboardingIntent {

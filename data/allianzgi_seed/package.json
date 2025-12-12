@@ -1,0 +1,8 @@
+{
+  "name": "allianzgi_seed",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "playwright": "^1.57.0"
+  }
+}

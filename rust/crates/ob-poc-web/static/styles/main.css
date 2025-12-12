@@ -1,0 +1,403 @@
+/* OB-POC Hybrid UI Styles */
+
+:root {
+    --bg-primary: #1e1e1e;
+    --bg-secondary: #252526;
+    --bg-tertiary: #2d2d30;
+    --border-color: #3c3c3c;
+    --text-primary: #d4d4d4;
+    --text-secondary: #858585;
+    --text-muted: #6e6e6e;
+    --accent-blue: #569cd6;
+    --accent-green: #4ec9b0;
+    --accent-orange: #ce9178;
+    --accent-purple: #c586c0;
+    --accent-yellow: #dcdcaa;
+    --success: #4caf50;
+    --warning: #ff9800;
+    --error: #f44336;
+    --panel-gap: 4px;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* 2-Column Layout: Left stacked panels, Right full-height graph */
+#app-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr;
+    height: 100vh;
+    gap: var(--panel-gap);
+    padding: var(--panel-gap);
+    background: var(--bg-primary);
+}
+
+/* Left column: 3 stacked panels (Chat 50%, DSL 25%, AST 25%) */
+#left-column {
+    display: flex;
+    flex-direction: column;
+    gap: var(--panel-gap);
+    min-height: 0;
+}
+
+#left-column .panel {
+    min-height: 0;
+}
+
+#chat-panel {
+    flex: 2;
+}
+
+#dsl-panel,
+#ast-panel {
+    flex: 1;
+}
+
+/* Panel Base */
+.panel {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+    min-height: 36px;
+}
+
+.panel-title {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+/* Panel Positions */
+/* CBU panel takes full height of right column */
+#cbu-panel {
+    height: 100%;
+}
+
+/* Status Badge */
+.status-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    margin-left: auto;
+}
+
+.status-badge.ready {
+    background: var(--success);
+    color: #fff;
+}
+.status-badge.pending {
+    background: var(--warning);
+    color: #000;
+}
+.status-badge.error {
+    background: var(--error);
+    color: #fff;
+}
+.status-badge.executed {
+    background: var(--accent-blue);
+    color: #fff;
+}
+
+/* Buttons */
+.btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background: var(--accent-blue);
+    color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: #4a8abf;
+}
+
+.btn-success {
+    background: var(--success);
+    color: #fff;
+}
+
+.btn-success:hover:not(:disabled) {
+    background: #3d8b40;
+}
+
+.btn-secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: var(--border-color);
+}
+
+.btn-small {
+    padding: 4px 8px;
+    font-size: 11px;
+}
+
+/* Dropdowns */
+select {
+    padding: 4px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 12px;
+}
+
+/* CBU Panel */
+#graph-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+
+#egui-canvas {
+    width: 100%;
+    height: 100%;
+}
+
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.5);
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.cbu-dropdown,
+.view-dropdown {
+    max-width: 150px;
+}
+
+/* Chat Panel */
+#chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+.chat-message {
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    max-width: 85%;
+}
+
+.chat-message.user {
+    background: var(--accent-blue);
+    color: #fff;
+    margin-left: auto;
+    border-bottom-right-radius: 2px;
+}
+
+.chat-message.assistant {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-bottom-left-radius: 2px;
+}
+
+.chat-message.system {
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 12px;
+    text-align: center;
+    max-width: 100%;
+}
+
+.chat-message.action-prompt {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.action-buttons .btn {
+    flex: 0 0 auto;
+}
+
+#chat-input-area {
+    padding: 12px;
+    border-top: 1px solid var(--border-color);
+}
+
+#chat-input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 13px;
+    resize: none;
+    margin-bottom: 8px;
+}
+
+#chat-input:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+}
+
+.chat-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* DSL Panel */
+#dsl-content {
+    flex: 1;
+    overflow: auto;
+    padding: 12px;
+}
+
+#dsl-source {
+    font-family: "Fira Code", "Consolas", monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    color: var(--text-primary);
+}
+
+/* DSL Syntax Highlighting */
+.dsl-keyword {
+    color: var(--accent-purple);
+}
+.dsl-verb {
+    color: var(--accent-yellow);
+}
+.dsl-string {
+    color: var(--accent-orange);
+}
+.dsl-symbol {
+    color: var(--accent-green);
+}
+.dsl-comment {
+    color: var(--text-muted);
+    font-style: italic;
+}
+.dsl-bracket {
+    color: var(--text-secondary);
+}
+
+/* AST Panel */
+#ast-tree {
+    flex: 1;
+    overflow: auto;
+    padding: 12px;
+    font-family: "Fira Code", "Consolas", monospace;
+    font-size: 12px;
+}
+
+.ast-node {
+    padding: 2px 0;
+    cursor: pointer;
+}
+
+.ast-node:hover {
+    background: var(--bg-tertiary);
+}
+
+.ast-node.selected {
+    background: rgba(86, 156, 214, 0.2);
+}
+
+.ast-node.unresolved {
+    border-left: 2px solid var(--warning);
+    padding-left: 8px;
+}
+
+.ast-toggle {
+    display: inline-block;
+    width: 16px;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.ast-type {
+    color: var(--accent-purple);
+    margin-right: 4px;
+}
+
+.ast-name {
+    color: var(--accent-yellow);
+}
+
+.ast-value {
+    color: var(--accent-orange);
+}
+
+.ast-children {
+    margin-left: 16px;
+}
+
+.ast-children.collapsed {
+    display: none;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
