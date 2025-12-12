@@ -1,0 +1,374 @@
+# AllianzGI Luxembourg SICAV Fund Structure - Sample
+# ============================================================================
+# This is a representative sample of the Luxembourg fund structure.
+# Run the Playwright script (download_funds.mjs) to get the full ~2000 share classes.
+# ============================================================================
+
+version: "1.0"
+source: "AllianzGI regulatory.allianzgi.com - Luxembourg fund list"
+last_updated: "2025-01-01"
+
+# ----------------------------------------------------------------------------
+# Main Luxembourg SICAV Umbrella
+# ----------------------------------------------------------------------------
+umbrellas:
+
+  - umbrella_code: AGI_FUND_SICAV
+    legal_name: "Allianz Global Investors Fund"
+    short_name: "AGI Fund"
+    jurisdiction: LU
+    fund_structure_type: SICAV
+    regulatory_status: UCITS
+    registration_number: "B 71 182"
+    lei: "DUMMY_LEI_PLACEHOLDER"  # Replace with actual
+    manco_code: AGI_DE  # Allianz Global Investors GmbH
+    depositary_code: STATE_STREET_LU
+    auditor_code: PWC_LU
+    incorporation_date: "1999-08-02"
+    financial_year_end: "09-30"
+    registered_address:
+      street: "6A, route de Trèves"
+      city: "Senningerberg"
+      postal_code: "L-2633"
+      country: LU
+    notes: "Primary Luxembourg SICAV umbrella - contains 200+ sub-funds"
+
+  - umbrella_code: AGI_PREMIUM_SICAV
+    legal_name: "Allianz Global Investors Fund II"
+    short_name: "AGI Fund II"
+    jurisdiction: LU
+    fund_structure_type: SICAV
+    regulatory_status: UCITS
+    registration_number: "B 71 196"
+    manco_code: AGI_DE
+    depositary_code: STATE_STREET_LU
+    auditor_code: PWC_LU
+    incorporation_date: "1999-08-02"
+    financial_year_end: "09-30"
+    notes: "Secondary Luxembourg SICAV umbrella"
+
+# ----------------------------------------------------------------------------
+# Sub-Funds (Compartments) - Representative Sample
+# ----------------------------------------------------------------------------
+subfunds:
+
+  # Equity - Global AI
+  - subfund_code: AGI_AI_EQUITY
+    umbrella_code: AGI_FUND_SICAV
+    legal_name: "Allianz Global Artificial Intelligence"
+    short_name: "Global AI"
+    base_currency: USD
+    investment_objective: "Long-term capital growth by investing in global AI/tech companies"
+    asset_class: EQUITY
+    geographic_focus: GLOBAL
+    sfdr_category: ARTICLE_8
+    launch_date: "2017-06-01"
+    isin_base: "LU16032"  # Share class ISINs derived from this
+    benchmark: "MSCI AC World Information Technology"
+    
+  # Equity - Emerging Markets
+  - subfund_code: AGI_EM_EQUITY
+    umbrella_code: AGI_FUND_SICAV
+    legal_name: "Allianz Emerging Markets Equity"
+    short_name: "EM Equity"
+    base_currency: USD
+    investment_objective: "Long-term capital growth through EM equity exposure"
+    asset_class: EQUITY
+    geographic_focus: EMERGING_MARKETS
+    sfdr_category: ARTICLE_8
+    launch_date: "2006-03-15"
+    benchmark: "MSCI Emerging Markets"
+
+  # Equity - Europe
+  - subfund_code: AGI_EUR_EQUITY
+    umbrella_code: AGI_FUND_SICAV
+    legal_name: "Allianz Europe Equity Growth"
+    short_name: "Europe Equity Growth"
+    base_currency: EUR
+    investment_objective: "Long-term capital growth through European equity exposure"
+    asset_class: EQUITY
+    geographic_focus: EUROPE
+    sfdr_category: ARTICLE_8
+    launch_date: "2001-05-20"
+    benchmark: "MSCI Europe Growth"
+
+  # Fixed Income - Global
+  - subfund_code: AGI_GLOBAL_BOND
+    umbrella_code: AGI_FUND_SICAV
+    legal_name: "Allianz Global Fixed Income"
+    short_name: "Global Bond"
+    base_currency: EUR
+    investment_objective: "Income and capital preservation through global fixed income"
+    asset_class: FIXED_INCOME
+    geographic_focus: GLOBAL
+    sfdr_category: ARTICLE_6
+    launch_date: "2002-01-10"
+    benchmark: "Bloomberg Global Aggregate"
+
+  # Fixed Income - EM Debt
+  - subfund_code: AGI_EM_BOND
+    umbrella_code: AGI_FUND_SICAV
+    legal_name: "Allianz Emerging Markets Bond"
+    short_name: "EM Bond"
+    base_currency: USD
+    investment_objective: "Income through EM sovereign and corporate debt"
+    asset_class: FIXED_INCOME
+    geographic_focus: EMERGING_MARKETS
+    sfdr_category: ARTICLE_6
+    launch_date: "2005-09-01"
+    benchmark: "JP Morgan EMBI Global Diversified"
+
+  # Multi-Asset
+  - subfund_code: AGI_INCOME_GROWTH
+    umbrella_code: AGI_FUND_SICAV
+    legal_name: "Allianz Income and Growth"
+    short_name: "Income & Growth"
+    base_currency: USD
+    investment_objective: "Income and growth through multi-asset allocation"
+    asset_class: MULTI_ASSET
+    geographic_focus: GLOBAL
+    sfdr_category: ARTICLE_6
+    launch_date: "2007-11-15"
+    benchmark: "50% MSCI World / 50% Bloomberg Global Agg"
+
+  # Thematic - Food Security
+  - subfund_code: AGI_FOOD_SEC
+    umbrella_code: AGI_FUND_SICAV
+    legal_name: "Allianz Food Security"
+    short_name: "Food Security"
+    base_currency: EUR
+    investment_objective: "Long-term growth through food security value chain"
+    asset_class: EQUITY
+    geographic_focus: GLOBAL
+    sfdr_category: ARTICLE_9
+    launch_date: "2019-07-01"
+    benchmark: "MSCI ACWI"
+
+  # Thematic - Global Sustainability
+  - subfund_code: AGI_GLOBAL_SUST
+    umbrella_code: AGI_FUND_SICAV
+    legal_name: "Allianz Global Sustainability"
+    short_name: "Global Sustainability"
+    base_currency: EUR
+    investment_objective: "Long-term growth through sustainable global equity"
+    asset_class: EQUITY
+    geographic_focus: GLOBAL
+    sfdr_category: ARTICLE_9
+    launch_date: "2015-03-01"
+    benchmark: "MSCI World SRI"
+
+# ----------------------------------------------------------------------------
+# Share Classes - Representative Sample
+# Pattern: {SubFund} - {Type} {Dist/Acc} {Currency} {Hedged?}
+# ----------------------------------------------------------------------------
+share_classes:
+
+  # AGI Global AI - Multiple share classes
+  - share_class_code: AGI_AI_A_EUR
+    subfund_code: AGI_AI_EQUITY
+    legal_name: "Allianz Global Artificial Intelligence - A - EUR"
+    isin: "LU1603246700"
+    share_class_type: RETAIL
+    distribution_type: ACC
+    currency: EUR
+    is_hedged: false
+    management_fee_bps: 180
+    minimum_investment: 0
+    ter: 2.05
+    launch_date: "2017-06-01"
+
+  - share_class_code: AGI_AI_AT_EUR
+    subfund_code: AGI_AI_EQUITY
+    legal_name: "Allianz Global Artificial Intelligence - AT - EUR"
+    isin: "LU1548497772"
+    share_class_type: RETAIL
+    distribution_type: ACC
+    currency: EUR
+    is_hedged: false
+    management_fee_bps: 210
+    minimum_investment: 0
+    ter: 2.35
+    launch_date: "2017-06-01"
+
+  - share_class_code: AGI_AI_IT_USD
+    subfund_code: AGI_AI_EQUITY
+    legal_name: "Allianz Global Artificial Intelligence - IT - USD"
+    isin: "LU1548498150"
+    share_class_type: INSTITUTIONAL
+    distribution_type: ACC
+    currency: USD
+    is_hedged: false
+    management_fee_bps: 90
+    minimum_investment: 10000000
+    ter: 1.00
+    launch_date: "2017-06-01"
+
+  - share_class_code: AGI_AI_WT_USD
+    subfund_code: AGI_AI_EQUITY
+    legal_name: "Allianz Global Artificial Intelligence - WT - USD"
+    isin: "LU1548498317"
+    share_class_type: INSTITUTIONAL
+    distribution_type: ACC
+    currency: USD
+    is_hedged: false
+    management_fee_bps: 75
+    minimum_investment: 100000000
+    ter: 0.85
+    launch_date: "2017-06-01"
+
+  - share_class_code: AGI_AI_H2_EUR
+    subfund_code: AGI_AI_EQUITY
+    legal_name: "Allianz Global Artificial Intelligence - AT (H2-EUR) - EUR"
+    isin: "LU1622405166"
+    share_class_type: RETAIL
+    distribution_type: ACC
+    currency: EUR
+    is_hedged: true
+    management_fee_bps: 210
+    minimum_investment: 0
+    ter: 2.40
+    launch_date: "2017-09-01"
+
+  - share_class_code: AGI_AI_H2_SGD
+    subfund_code: AGI_AI_EQUITY
+    legal_name: "Allianz Global Artificial Intelligence - AT (H2-SGD) - SGD"
+    isin: "LU1917753581"
+    share_class_type: RETAIL
+    distribution_type: ACC
+    currency: SGD
+    is_hedged: true
+    management_fee_bps: 210
+    minimum_investment: 0
+    ter: 2.40
+    launch_date: "2019-01-15"
+
+  # AGI EM Equity - Sample share classes
+  - share_class_code: AGI_EM_A_EUR
+    subfund_code: AGI_EM_EQUITY
+    legal_name: "Allianz Emerging Markets Equity - A - EUR"
+    isin: "LU0256863811"
+    share_class_type: RETAIL
+    distribution_type: ACC
+    currency: EUR
+    is_hedged: false
+    management_fee_bps: 175
+    minimum_investment: 0
+    ter: 2.00
+    launch_date: "2006-03-15"
+
+  - share_class_code: AGI_EM_IT_USD
+    subfund_code: AGI_EM_EQUITY
+    legal_name: "Allianz Emerging Markets Equity - IT - USD"
+    isin: "LU0256864207"
+    share_class_type: INSTITUTIONAL
+    distribution_type: ACC
+    currency: USD
+    is_hedged: false
+    management_fee_bps: 85
+    minimum_investment: 10000000
+    ter: 1.00
+    launch_date: "2006-03-15"
+
+  # AGI Global Sustainability - Sample share classes
+  - share_class_code: AGI_SUST_A_EUR
+    subfund_code: AGI_GLOBAL_SUST
+    legal_name: "Allianz Global Sustainability - A - EUR"
+    isin: "LU0158827955"
+    share_class_type: RETAIL
+    distribution_type: ACC
+    currency: EUR
+    is_hedged: false
+    management_fee_bps: 150
+    minimum_investment: 0
+    ter: 1.80
+    launch_date: "2015-03-01"
+
+  - share_class_code: AGI_SUST_IT_EUR
+    subfund_code: AGI_GLOBAL_SUST
+    legal_name: "Allianz Global Sustainability - IT - EUR"
+    isin: "LU0908560596"
+    share_class_type: INSTITUTIONAL
+    distribution_type: ACC
+    currency: EUR
+    is_hedged: false
+    management_fee_bps: 75
+    minimum_investment: 10000000
+    ter: 0.90
+    launch_date: "2015-03-01"
+
+  # AGI Food Security - Sample share classes
+  - share_class_code: AGI_FOOD_A_EUR
+    subfund_code: AGI_FOOD_SEC
+    legal_name: "Allianz Food Security - A - EUR"
+    isin: "LU2021029245"
+    share_class_type: RETAIL
+    distribution_type: ACC
+    currency: EUR
+    is_hedged: false
+    management_fee_bps: 160
+    minimum_investment: 0
+    ter: 1.95
+    launch_date: "2019-07-01"
+
+  - share_class_code: AGI_FOOD_IT_EUR
+    subfund_code: AGI_FOOD_SEC
+    legal_name: "Allianz Food Security - IT - EUR"
+    isin: "LU2021029591"
+    share_class_type: INSTITUTIONAL
+    distribution_type: ACC
+    currency: EUR
+    is_hedged: false
+    management_fee_bps: 80
+    minimum_investment: 10000000
+    ter: 0.95
+    launch_date: "2019-07-01"
+
+  # AGI Global Bond - Sample share classes
+  - share_class_code: AGI_BOND_A_EUR
+    subfund_code: AGI_GLOBAL_BOND
+    legal_name: "Allianz Global Fixed Income - A - EUR"
+    isin: "LU0189894933"
+    share_class_type: RETAIL
+    distribution_type: ACC
+    currency: EUR
+    is_hedged: false
+    management_fee_bps: 90
+    minimum_investment: 0
+    ter: 1.15
+    launch_date: "2002-01-10"
+
+  - share_class_code: AGI_BOND_IT_EUR
+    subfund_code: AGI_GLOBAL_BOND
+    legal_name: "Allianz Global Fixed Income - IT - EUR"
+    isin: "LU0189895237"
+    share_class_type: INSTITUTIONAL
+    distribution_type: ACC
+    currency: EUR
+    is_hedged: false
+    management_fee_bps: 45
+    minimum_investment: 10000000
+    ter: 0.55
+    launch_date: "2002-01-10"
+
+  - share_class_code: AGI_BOND_ADM_EUR
+    subfund_code: AGI_GLOBAL_BOND
+    legal_name: "Allianz Global Fixed Income - ADM - EUR"
+    isin: "LU0189895666"
+    share_class_type: RETAIL
+    distribution_type: DIST
+    currency: EUR
+    is_hedged: false
+    management_fee_bps: 90
+    minimum_investment: 0
+    ter: 1.15
+    distribution_frequency: MONTHLY
+    launch_date: "2002-01-10"
+
+# ----------------------------------------------------------------------------
+# Metadata
+# ----------------------------------------------------------------------------
+stats:
+  umbrellas: 2
+  subfunds: 8
+  share_classes: 16
+  note: "This is a representative sample. Full Luxembourg list has ~206 sub-funds and ~1972 share classes."

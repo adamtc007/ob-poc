@@ -1176,12 +1176,16 @@ impl GenericCrudExecutor {
         crud: &RuntimeCrudConfig,
         args: &HashMap<String, JsonValue>,
     ) -> Result<GenericExecutionResult> {
-        // Extract type code from verb name (e.g., "create-limited-company" -> "LIMITED_COMPANY")
-        let type_code = verb
-            .verb
-            .strip_prefix("create-")
-            .map(|s| s.to_uppercase().replace('-', "_"))
-            .ok_or_else(|| anyhow!("Invalid entity create verb name: {}", verb.verb))?;
+        // Use explicit type_code from YAML config if present,
+        // otherwise derive from verb name (e.g., "create-limited-company" -> "LIMITED_COMPANY")
+        let type_code = if let Some(tc) = &crud.type_code {
+            tc.clone()
+        } else {
+            verb.verb
+                .strip_prefix("create-")
+                .map(|s| s.to_uppercase().replace('-', "_"))
+                .ok_or_else(|| anyhow!("Invalid entity create verb name: {}", verb.verb))?
+        };
 
         // Look up entity_type_id and table_name
         // First try exact match, then try prefix match for shortened verb names
@@ -1201,7 +1205,11 @@ impl GenericCrudExecutor {
             .map_err(|e| anyhow!("Entity type not found for '{}': {}", type_code, e))?;
 
         let entity_type_id: Uuid = type_row.try_get("entity_type_id")?;
-        let extension_table: String = type_row.try_get("table_name")?;
+        // Use explicit extension_table from config if present, otherwise from entity_types table
+        let extension_table: String = crud
+            .extension_table
+            .clone()
+            .unwrap_or_else(|| type_row.try_get("table_name").unwrap_or_default());
 
         // Generate entity_id
         let entity_id = Uuid::new_v4();
@@ -1235,16 +1243,32 @@ impl GenericCrudExecutor {
             .await?;
 
         // INSERT into extension table
+        // Some tables use entity_id as their PK (shared key pattern), others have separate PK
         let ext_pk_col = self.infer_pk_column(&extension_table);
-        let ext_pk_id = Uuid::new_v4();
+        let uses_shared_pk = ext_pk_col == "entity_id";
 
-        let mut columns = vec![format!("\"{}\"", ext_pk_col), "\"entity_id\"".to_string()];
-        let mut placeholders = vec!["$1".to_string(), "$2".to_string()];
-        let mut bind_values: Vec<SqlValue> =
-            vec![SqlValue::Uuid(ext_pk_id), SqlValue::Uuid(entity_id)];
-        let mut idx = 3;
+        let (mut columns, mut placeholders, mut bind_values, mut idx) = if uses_shared_pk {
+            // Shared primary key pattern: entity_id is the only PK
+            (
+                vec!["\"entity_id\"".to_string()],
+                vec!["$1".to_string()],
+                vec![SqlValue::Uuid(entity_id)],
+                2,
+            )
+        } else {
+            // Separate PK pattern: table has its own PK plus entity_id FK
+            let ext_pk_id = Uuid::new_v4();
+            (
+                vec![format!("\"{}\"", ext_pk_col), "\"entity_id\"".to_string()],
+                vec!["$1".to_string(), "$2".to_string()],
+                vec![SqlValue::Uuid(ext_pk_id), SqlValue::Uuid(entity_id)],
+                3,
+            )
+        };
 
         // Add extension table columns
+        // Skip columns that belong to the base entities table
+        let base_table_cols = ["name", "external_id"];
         for arg_def in &verb.args {
             if let Some(value) = args.get(&arg_def.name) {
                 // Skip special keys
@@ -1252,7 +1276,11 @@ impl GenericCrudExecutor {
                     continue;
                 }
                 if let Some(col) = &arg_def.maps_to {
-                    if col == ext_pk_col || col == "entity_id" {
+                    // Skip columns that are PK, entity_id FK, or base table columns
+                    if col == ext_pk_col
+                        || col == "entity_id"
+                        || base_table_cols.contains(&col.as_str())
+                    {
                         continue;
                     }
                     columns.push(format!("\"{}\"", col));
@@ -1302,6 +1330,9 @@ impl GenericCrudExecutor {
             "entity_limited_companies" => "limited_company_id",
             "entity_partnerships" => "partnership_id",
             "entity_trusts" => "trust_id",
+            // Fund ontology tables use shared PK pattern (entity_id is both PK and FK)
+            "entity_funds" => "entity_id",
+            "entity_share_classes" => "entity_id",
             _ => "id",
         }
     }

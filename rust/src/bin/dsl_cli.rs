@@ -1861,10 +1861,26 @@ async fn cmd_custody(
         println!("{}", "Extracting intent from natural language...".dimmed());
     }
 
-    let intent = orchestrator
+    let intent_result = orchestrator
         .extract_intent(&prompt)
         .await
         .map_err(|e| format!("Intent extraction failed: {}", e))?;
+
+    // Handle the IntentResult enum
+    let intent = match intent_result {
+        ob_poc::agentic::intent::IntentResult::Clear(i) => i,
+        ob_poc::agentic::intent::IntentResult::NeedsClarification(c) => {
+            return Err(format!(
+                "Clarification needed: {}\nOptions: {:?}",
+                c.ambiguity.question,
+                c.ambiguity
+                    .interpretations
+                    .iter()
+                    .map(|i| format!("{}: {}", i.option, i.description))
+                    .collect::<Vec<_>>()
+            ));
+        }
+    };
 
     if format == OutputFormat::Pretty {
         println!("{} Extracted intent:", "✓".green());
@@ -2294,28 +2310,26 @@ async fn cmd_repl(
     format: OutputFormat,
 ) -> Result<(), String> {
     use ob_poc::database::SessionRepository;
+    use ob_poc::dsl_v2::suggestions::predict_next_steps;
     use ob_poc::dsl_v2::{
-
         config::ConfigLoader,
         emit_dsl,
+        execution_plan::{compile_with_planning, BindingInfo as PlanInfo, PlanningContext},
         executor::{DslExecutor, ExecutionContext, ExecutionResult},
         parse_program, topological_sort,
         validation::{RustStyleFormatter, ValidationContext},
         BindingContext, BindingInfo, CsgLinter, RuntimeVerbRegistry,
-        execution_plan::{compile_with_planning, PlanningContext, BindingInfo as PlanInfo},
     };
-    use std::io::Write;
-    use uuid::Uuid;
+    use rustyline::completion::{Completer, Pair};
     use rustyline::error::ReadlineError;
-    use rustyline::{Editor, Config, Helper, Context};
-    use rustyline::completion::{Pair, Completer};
-    use rustyline::hint::Hinter;
     use rustyline::highlight::Highlighter;
-    use std::io::{self};
+    use rustyline::hint::Hinter;
     use rustyline::validate::Validator;
+    use rustyline::{Config, Context, Editor, Helper};
+    use std::io::Write;
+    use std::io::{self};
     use std::sync::{Arc, Mutex};
-    use ob_poc::dsl_v2::suggestions::predict_next_steps;
-
+    use uuid::Uuid;
 
     #[derive(Clone)]
     struct DslHelper {
@@ -2332,26 +2346,29 @@ async fn cmd_repl(
             pos: usize,
             _ctx: &Context<'_>,
         ) -> Result<(usize, Vec<Pair>), ReadlineError> {
-            let (start, _end) = (0, pos); 
+            let (start, _end) = (0, pos);
             // Better logic: if at start of line (ignoring whitespace), suggest verbs
             let trimmed = line[..pos].trim_start();
-            
+
             // Simple check: if we are at the start or after a paren, suggest verbs
             if trimmed.is_empty() || trimmed.ends_with('(') {
-                 let program = parse_program(line).unwrap_or_default();
-                 let bindings = self.binding_context.lock().unwrap();
-                 let suggestions = predict_next_steps(&program, &bindings, &self.registry);
-                 
-                 let candidates: Vec<Pair> = suggestions.into_iter().map(|s| {
-                     Pair {
-                         display: format!("{} ({:.2}) - {}", s.verb, s.score, s.reason),
-                         replacement: format!("({} ", s.verb), // Auto-open paren
-                     }
-                 }).collect();
-                 
-                 return Ok((pos, candidates));
+                let program = parse_program(line).unwrap_or_default();
+                let bindings = self.binding_context.lock().unwrap();
+                let suggestions = predict_next_steps(&program, &bindings, &self.registry);
+
+                let candidates: Vec<Pair> = suggestions
+                    .into_iter()
+                    .map(|s| {
+                        Pair {
+                            display: format!("{} ({:.2}) - {}", s.verb, s.score, s.reason),
+                            replacement: format!("({} ", s.verb), // Auto-open paren
+                        }
+                    })
+                    .collect();
+
+                return Ok((pos, candidates));
             }
-            
+
             Ok((start, vec![]))
         }
     }
@@ -2500,18 +2517,16 @@ async fn cmd_repl(
     }
 
     // REPL loop
-    
+
     // Setup Rustyline
-    let config = Config::builder()
-        .auto_add_history(true)
-        .build();
+    let config = Config::builder().auto_add_history(true).build();
     let mut stdout = io::stdout();
-        
+
     let helper = DslHelper {
         binding_context: Arc::new(Mutex::new(binding_context.clone())),
         registry: registry.clone(),
     };
-    
+
     let mut rl = Editor::with_config(config).unwrap();
     rl.set_helper(Some(helper.clone()));
 
@@ -2522,309 +2537,330 @@ async fn cmd_repl(
         } else {
             "dsl+ ".yellow().to_string()
         };
-        
+
         // Read line
         let readline = rl.readline(&prompt);
         match readline {
             Ok(line) => {
                 rl.add_history_entry(line.as_str()).ok();
                 let trimmed = line.trim();
-                
+
                 // Keep binding context updated in helper for autocomplete
                 // Note: Real updates happen after :commit, this is just initializing
-                
+
                 // Existing logic...
 
-
-        // Handle commands
-        if trimmed.starts_with(':') {
-            match trimmed {
-                ":quit" | ":q" | ":exit" => {
-                    if !pending_dsl.is_empty() {
-                        println!(
-                            "{} Warning: {} lines of pending DSL will be discarded",
-                            "!".yellow(),
-                            pending_dsl.lines().count()
-                        );
-                    }
-                    println!("{}", "Goodbye!".cyan());
-                    break;
-                }
-
-                ":help" | ":h" | ":?" => {
-                    println!();
-                    println!("{}:", "Commands".yellow());
-                    println!("  :commit    - Execute pending DSL statements");
-                    println!("  :rollback  - Discard pending DSL without executing");
-                    println!("  :pending   - Show pending DSL buffer");
-                    println!("  :bindings  - Show all available symbol bindings");
-                    println!("  :reorder   - Topologically sort pending DSL by dependencies");
-                    println!("  :clear     - Clear screen");
-                    println!("  :quit      - Exit REPL");
-                    println!();
-                }
-
-                ":pending" | ":p" => {
-                    if pending_dsl.is_empty() {
-                        println!("{}", "(no pending DSL)".dimmed());
-                    } else {
-                        println!();
-                        println!("{}:", "Pending DSL".yellow());
-                        for line in pending_dsl.lines() {
-                            println!("  {}", line.cyan());
+                // Handle commands
+                if trimmed.starts_with(':') {
+                    match trimmed {
+                        ":quit" | ":q" | ":exit" => {
+                            if !pending_dsl.is_empty() {
+                                println!(
+                                    "{} Warning: {} lines of pending DSL will be discarded",
+                                    "!".yellow(),
+                                    pending_dsl.lines().count()
+                                );
+                            }
+                            println!("{}", "Goodbye!".cyan());
+                            break;
                         }
-                        println!();
-                    }
-                }
 
-                ":bindings" | ":b" => {
-                    if exec_ctx.symbols.is_empty() {
-                        println!("{}", "(no bindings)".dimmed());
-                    } else {
-                        println!();
-                        println!("{}:", "Bindings".yellow());
-                        for (name, uuid) in &exec_ctx.symbols {
-                            println!("  @{} = {}", name.cyan(), uuid.to_string().dimmed());
+                        ":help" | ":h" | ":?" => {
+                            println!();
+                            println!("{}:", "Commands".yellow());
+                            println!("  :commit    - Execute pending DSL statements");
+                            println!("  :rollback  - Discard pending DSL without executing");
+                            println!("  :pending   - Show pending DSL buffer");
+                            println!("  :bindings  - Show all available symbol bindings");
+                            println!(
+                                "  :reorder   - Topologically sort pending DSL by dependencies"
+                            );
+                            println!("  :clear     - Clear screen");
+                            println!("  :quit      - Exit REPL");
+                            println!();
                         }
-                        println!();
-                    }
-                }
 
-                ":rollback" | ":r" => {
-                    if pending_dsl.is_empty() {
-                        println!("{}", "(nothing to rollback)".dimmed());
-                    } else {
-                        let count = pending_dsl.lines().count();
-                        pending_dsl.clear();
-                        println!("{} Discarded {} lines", "✓".green(), count);
-                    }
-                }
+                        ":pending" | ":p" => {
+                            if pending_dsl.is_empty() {
+                                println!("{}", "(no pending DSL)".dimmed());
+                            } else {
+                                println!();
+                                println!("{}:", "Pending DSL".yellow());
+                                for line in pending_dsl.lines() {
+                                    println!("  {}", line.cyan());
+                                }
+                                println!();
+                            }
+                        }
 
-                ":reorder" => {
-                    if pending_dsl.is_empty() {
-                        println!("{}", "(nothing to reorder)".dimmed());
-                    } else {
-                        // Parse pending DSL
-                        match parse_program(&pending_dsl) {
-                            Ok(ast) => {
-                                // Perform topological sort
-                                match topological_sort(&ast, &binding_context, &registry) {
-                                    Ok(result) => {
-                                        if !result.reordered {
-                                            println!("{} Already in correct order", "✓".green());
-                                        } else {
-                                            // Emit reordered DSL
-                                            let reordered = emit_dsl(&result.program);
-                                            pending_dsl = reordered;
-                                            println!(
-                                                "{} Reordered {} statements",
-                                                "✓".green(),
-                                                result.program.statements.len()
-                                            );
-                                            println!();
-                                            println!("{}:", "Reordered DSL".yellow());
-                                            for line in pending_dsl.lines() {
-                                                println!("  {}", line.cyan());
+                        ":bindings" | ":b" => {
+                            if exec_ctx.symbols.is_empty() {
+                                println!("{}", "(no bindings)".dimmed());
+                            } else {
+                                println!();
+                                println!("{}:", "Bindings".yellow());
+                                for (name, uuid) in &exec_ctx.symbols {
+                                    println!("  @{} = {}", name.cyan(), uuid.to_string().dimmed());
+                                }
+                                println!();
+                            }
+                        }
+
+                        ":rollback" | ":r" => {
+                            if pending_dsl.is_empty() {
+                                println!("{}", "(nothing to rollback)".dimmed());
+                            } else {
+                                let count = pending_dsl.lines().count();
+                                pending_dsl.clear();
+                                println!("{} Discarded {} lines", "✓".green(), count);
+                            }
+                        }
+
+                        ":reorder" => {
+                            if pending_dsl.is_empty() {
+                                println!("{}", "(nothing to reorder)".dimmed());
+                            } else {
+                                // Parse pending DSL
+                                match parse_program(&pending_dsl) {
+                                    Ok(ast) => {
+                                        // Perform topological sort
+                                        match topological_sort(&ast, &binding_context, &registry) {
+                                            Ok(result) => {
+                                                if !result.reordered {
+                                                    println!(
+                                                        "{} Already in correct order",
+                                                        "✓".green()
+                                                    );
+                                                } else {
+                                                    // Emit reordered DSL
+                                                    let reordered = emit_dsl(&result.program);
+                                                    pending_dsl = reordered;
+                                                    println!(
+                                                        "{} Reordered {} statements",
+                                                        "✓".green(),
+                                                        result.program.statements.len()
+                                                    );
+                                                    println!();
+                                                    println!("{}:", "Reordered DSL".yellow());
+                                                    for line in pending_dsl.lines() {
+                                                        println!("  {}", line.cyan());
+                                                    }
+                                                    println!();
+                                                }
                                             }
-                                            println!();
+                                            Err(e) => {
+                                                println!("{} Reorder failed: {:?}", "✗".red(), e);
+                                            }
                                         }
                                     }
                                     Err(e) => {
-                                        println!("{} Reorder failed: {:?}", "✗".red(), e);
+                                        println!("{} Parse error: {:?}", "✗".red(), e);
                                     }
                                 }
+                            }
+                        }
+
+                        ":commit" | ":c" => {
+                            if pending_dsl.is_empty() {
+                                println!("{}", "(nothing to commit)".dimmed());
+                                continue;
+                            }
+
+                            println!();
+                            println!("{}", "Validating and executing...".dimmed());
+
+                            // 1. Parse
+                            let ast = match parse_program(&pending_dsl) {
+                                Ok(ast) => ast,
+                                Err(e) => {
+                                    println!("{} Parse error: {:?}", "✗".red(), e);
+                                    continue;
+                                }
+                            };
+
+                            // 2. CSG Lint
+                            // Note: CSG linter builds its own binding context from the AST.
+                            // Pre-existing bindings from previous executions are tracked in
+                            // binding_context for topological sort, but linter validates
+                            // self-contained DSL programs.
+                            let context = ValidationContext::default();
+                            let lint_result =
+                                linter.lint(ast.clone(), &context, &pending_dsl).await;
+
+                            if lint_result.has_errors() {
+                                let formatted = RustStyleFormatter::format(
+                                    &pending_dsl,
+                                    &lint_result.diagnostics,
+                                );
+                                println!("{}", formatted);
+                                println!("{} Validation failed - not executed", "✗".red());
+                                continue;
+                            }
+
+                            if lint_result.has_warnings() {
+                                let formatted = RustStyleFormatter::format(
+                                    &pending_dsl,
+                                    &lint_result.diagnostics,
+                                );
+                                println!("{}", formatted);
+                            }
+
+                            // 3. Compile (with Planning)
+                            // Build planning context from current REPL binding state
+                            let mut planning_ctx = PlanningContext::new();
+                            for info in binding_context.all() {
+                                let plan_info = PlanInfo {
+                                    entity_type: info.produced_type.clone(),
+                                    subtype: info.subtype.clone(),
+                                    state: None, // State persistence not yet implemented in REPL context
+                                };
+                                planning_ctx.add_binding_info(&info.name, plan_info);
+                            }
+
+                            let plan = match compile_with_planning(&ast, &planning_ctx) {
+                                Ok(result) => {
+                                    // detailed planning diagnostics
+                                    if !result.diagnostics.is_empty() {
+                                        println!("{}", "Planning warnings:".yellow());
+                                        for diag in &result.diagnostics {
+                                            println!("  - {:?}", diag);
+                                        }
+                                    }
+                                    result.plan
+                                }
+                                Err(e) => {
+                                    println!("{} Compile error: {:?}", "✗".red(), e);
+                                    continue;
+                                }
+                            };
+
+                            // 4. Execute
+                            match executor.execute_plan(&plan, &mut exec_ctx).await {
+                                Ok(results) => {
+                                    println!();
+                                    for (i, result) in results.iter().enumerate() {
+                                        let step = &plan.steps[i];
+                                        let verb_name = format!(
+                                            "{}.{}",
+                                            step.verb_call.domain, step.verb_call.verb
+                                        );
+
+                                        match result {
+                                            ExecutionResult::Uuid(id) => {
+                                                let binding_info = step
+                                                    .bind_as
+                                                    .as_ref()
+                                                    .map(|b| format!(" @{} =", b))
+                                                    .unwrap_or_default();
+                                                println!(
+                                                    "  [{}] {}{} {}",
+                                                    i,
+                                                    verb_name.cyan(),
+                                                    binding_info.yellow(),
+                                                    id.to_string().dimmed()
+                                                );
+
+                                                // Update binding context
+                                                if let Some(ref binding) = step.bind_as {
+                                                    binding_context.insert(BindingInfo {
+                                                        name: binding.clone(),
+                                                        produced_type: "entity".to_string(),
+                                                        subtype: None,
+                                                        entity_pk: *id,
+                                                        resolved: false,
+                                                        source_sheet_id: None,
+                                                    });
+                                                }
+                                            }
+                                            ExecutionResult::Affected(n) => {
+                                                println!(
+                                                    "  [{}] {} ({} rows)",
+                                                    i,
+                                                    verb_name.cyan(),
+                                                    n
+                                                );
+                                            }
+                                            _ => {
+                                                println!(
+                                                    "  [{}] {} {}",
+                                                    i,
+                                                    verb_name.cyan(),
+                                                    "✓".green()
+                                                );
+                                            }
+                                        }
+                                    }
+
+                                    println!();
+                                    println!(
+                                        "{} Executed {} step(s) successfully",
+                                        "✓".green().bold(),
+                                        results.len()
+                                    );
+
+                                    // Clear pending buffer
+                                    pending_dsl.clear();
+                                }
+                                Err(e) => {
+                                    println!("{} Execution failed: {}", "✗".red(), e);
+                                }
+                            }
+                        }
+
+                        ":clear" => {
+                            print!("\x1B[2J\x1B[1;1H"); // ANSI clear screen
+                            stdout.flush().map_err(|e| format!("IO error: {}", e))?;
+                        }
+
+                        cmd if cmd.starts_with(":cbu ") => {
+                            let id_str = cmd.strip_prefix(":cbu ").unwrap().trim();
+                            match Uuid::parse_str(id_str) {
+                                Ok(new_cbu) => {
+                                    println!("{} Switching to CBU {}...", "→".cyan(), new_cbu);
+                                    // This would require reloading state - simplified for now
+                                    println!(
+                                        "{} CBU switch not yet implemented in active session",
+                                        "!".yellow()
+                                    );
+                                    println!("  Restart REPL with: dsl_cli repl --cbu {}", id_str);
+                                }
+                                Err(e) => {
+                                    println!("{} Invalid UUID: {}", "✗".red(), e);
+                                }
+                            }
+                        }
+
+                        _ => {
+                            println!("{} Unknown command: {}", "?".yellow(), trimmed);
+                            println!("  Type :help for available commands");
+                        }
+                    }
+                    continue;
+                }
+
+                // Empty line - validate pending DSL inline
+                if trimmed.is_empty() {
+                    if !pending_dsl.is_empty() {
+                        // Quick validation feedback
+                        match parse_program(&pending_dsl) {
+                            Ok(ast) => {
+                                println!(
+                                    "{} {} statement(s) parsed - use :commit to execute",
+                                    "✓".green(),
+                                    ast.statements.len()
+                                );
                             }
                             Err(e) => {
                                 println!("{} Parse error: {:?}", "✗".red(), e);
                             }
                         }
                     }
+                    continue;
                 }
 
-                ":commit" | ":c" => {
-                    if pending_dsl.is_empty() {
-                        println!("{}", "(nothing to commit)".dimmed());
-                        continue;
-                    }
-
-                    println!();
-                    println!("{}", "Validating and executing...".dimmed());
-
-                    // 1. Parse
-                    let ast = match parse_program(&pending_dsl) {
-                        Ok(ast) => ast,
-                        Err(e) => {
-                            println!("{} Parse error: {:?}", "✗".red(), e);
-                            continue;
-                        }
-                    };
-
-                    // 2. CSG Lint
-                    // Note: CSG linter builds its own binding context from the AST.
-                    // Pre-existing bindings from previous executions are tracked in
-                    // binding_context for topological sort, but linter validates
-                    // self-contained DSL programs.
-                    let context = ValidationContext::default();
-                    let lint_result = linter.lint(ast.clone(), &context, &pending_dsl).await;
-
-                    if lint_result.has_errors() {
-                        let formatted =
-                            RustStyleFormatter::format(&pending_dsl, &lint_result.diagnostics);
-                        println!("{}", formatted);
-                        println!("{} Validation failed - not executed", "✗".red());
-                        continue;
-                    }
-
-                    if lint_result.has_warnings() {
-                        let formatted =
-                            RustStyleFormatter::format(&pending_dsl, &lint_result.diagnostics);
-                        println!("{}", formatted);
-                    }
-
-                    // 3. Compile (with Planning)
-                    // Build planning context from current REPL binding state
-                    let mut planning_ctx = PlanningContext::new();
-                    for info in binding_context.all() {
-                        let plan_info = PlanInfo {
-                            entity_type: info.produced_type.clone(),
-                            subtype: info.subtype.clone(),
-                            state: None, // State persistence not yet implemented in REPL context
-                        };
-                        planning_ctx.add_binding_info(&info.name, plan_info);
-                    }
-
-                    let plan = match compile_with_planning(&ast, &planning_ctx) {
-                        Ok(result) => {
-                            // detailed planning diagnostics
-                            if !result.diagnostics.is_empty() {
-                                println!("{}", "Planning warnings:".yellow());
-                                for diag in &result.diagnostics {
-                                    println!("  - {:?}", diag);
-                                }
-                            }
-                            result.plan
-                        },
-                        Err(e) => {
-                            println!("{} Compile error: {:?}", "✗".red(), e);
-                            continue;
-                        }
-                    };
-
-                    // 4. Execute
-                    match executor.execute_plan(&plan, &mut exec_ctx).await {
-                        Ok(results) => {
-                            println!();
-                            for (i, result) in results.iter().enumerate() {
-                                let step = &plan.steps[i];
-                                let verb_name =
-                                    format!("{}.{}", step.verb_call.domain, step.verb_call.verb);
-
-                                match result {
-                                    ExecutionResult::Uuid(id) => {
-                                        let binding_info = step
-                                            .bind_as
-                                            .as_ref()
-                                            .map(|b| format!(" @{} =", b))
-                                            .unwrap_or_default();
-                                        println!(
-                                            "  [{}] {}{} {}",
-                                            i,
-                                            verb_name.cyan(),
-                                            binding_info.yellow(),
-                                            id.to_string().dimmed()
-                                        );
-
-                                        // Update binding context
-                                        if let Some(ref binding) = step.bind_as {
-                                            binding_context.insert(BindingInfo {
-                                                name: binding.clone(),
-                                                produced_type: "entity".to_string(),
-                                                subtype: None,
-                                                entity_pk: *id,
-                                                resolved: false,
-                                                source_sheet_id: None,
-                                            });
-                                        }
-                                    }
-                                    ExecutionResult::Affected(n) => {
-                                        println!("  [{}] {} ({} rows)", i, verb_name.cyan(), n);
-                                    }
-                                    _ => {
-                                        println!("  [{}] {} {}", i, verb_name.cyan(), "✓".green());
-                                    }
-                                }
-                            }
-
-                            println!();
-                            println!(
-                                "{} Executed {} step(s) successfully",
-                                "✓".green().bold(),
-                                results.len()
-                            );
-
-                            // Clear pending buffer
-                            pending_dsl.clear();
-                        }
-                        Err(e) => {
-                            println!("{} Execution failed: {}", "✗".red(), e);
-                        }
-                    }
-                }
-
-                ":clear" => {
-                    print!("\x1B[2J\x1B[1;1H"); // ANSI clear screen
-                    stdout.flush().map_err(|e| format!("IO error: {}", e))?;
-                }
-
-                cmd if cmd.starts_with(":cbu ") => {
-                    let id_str = cmd.strip_prefix(":cbu ").unwrap().trim();
-                    match Uuid::parse_str(id_str) {
-                        Ok(new_cbu) => {
-                            println!("{} Switching to CBU {}...", "→".cyan(), new_cbu);
-                            // This would require reloading state - simplified for now
-                            println!(
-                                "{} CBU switch not yet implemented in active session",
-                                "!".yellow()
-                            );
-                            println!("  Restart REPL with: dsl_cli repl --cbu {}", id_str);
-                        }
-                        Err(e) => {
-                            println!("{} Invalid UUID: {}", "✗".red(), e);
-                        }
-                    }
-                }
-
-                _ => {
-                    println!("{} Unknown command: {}", "?".yellow(), trimmed);
-                    println!("  Type :help for available commands");
-                }
-            }
-            continue;
-        }
-
-        // Empty line - validate pending DSL inline
-        if trimmed.is_empty() {
-            if !pending_dsl.is_empty() {
-                // Quick validation feedback
-                match parse_program(&pending_dsl) {
-                    Ok(ast) => {
-                        println!(
-                            "{} {} statement(s) parsed - use :commit to execute",
-                            "✓".green(),
-                            ast.statements.len()
-                        );
-                    }
-                    Err(e) => {
-                        println!("{} Parse error: {:?}", "✗".red(), e);
-                    }
-                }
-            }
-            continue;
-        }
-
-        // Add line to pending buffer
-        pending_dsl.push_str(trimmed);
-        pending_dsl.push('\n');
+                // Add line to pending buffer
+                pending_dsl.push_str(trimmed);
+                pending_dsl.push('\n');
             }
             Err(ReadlineError::Interrupted) => {
                 println!("CTRL-C");

@@ -67,6 +67,10 @@ pub struct RuntimeCrudConfig {
     pub join_col: Option<String>,
     // Entity create config
     pub base_table: Option<String>,
+    pub extension_table: Option<String>,
+    /// Explicit type_code for entity_create (e.g., "fund_umbrella")
+    /// If not set, derived from verb name
+    pub type_code: Option<String>,
     // List operations
     pub order_by: Option<String>,
     // Update with fixed values
@@ -223,6 +227,12 @@ impl RuntimeVerbRegistry {
                     join_table: None,
                     join_col: None,
                     base_table: Some("entities".to_string()),
+                    extension_table: dynamic
+                        .crud
+                        .as_ref()
+                        .and_then(|c| c.extension_table.clone()),
+                    // For dynamic verbs, type_code comes from the database row
+                    type_code: Some(type_code.clone()),
                     extension_table_column: dynamic
                         .crud
                         .as_ref()
@@ -287,6 +297,8 @@ impl RuntimeVerbRegistry {
                     join_table: crud.join_table.clone(),
                     join_col: crud.join_col.clone(),
                     base_table: crud.base_table.clone(),
+                    extension_table: crud.extension_table.clone(),
+                    type_code: crud.type_code.clone(),
                     order_by: crud.order_by.clone(),
                     set_values: crud.set_values.clone(),
                     extension_table_column: crud.extension_table_column.clone(),
@@ -324,6 +336,8 @@ impl RuntimeVerbRegistry {
                     join_table: None,
                     join_col: None,
                     base_table: None,
+                    extension_table: None,
+                    type_code: None,
                     order_by: None,
                     set_values: None,
                     extension_table_column: None,

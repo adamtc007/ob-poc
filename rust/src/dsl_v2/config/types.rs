@@ -178,9 +178,15 @@ pub struct CrudConfig {
     #[serde(default)]
     pub base_table: Option<String>,
     #[serde(default)]
+    pub extension_table: Option<String>,
+    #[serde(default)]
     pub extension_table_column: Option<String>,
     #[serde(default)]
     pub type_id_column: Option<String>,
+    /// Explicit type_code for entity_create operations (e.g., "fund_umbrella")
+    /// If not set, derived from verb name (e.g., "create-umbrella" → "UMBRELLA")
+    #[serde(default)]
+    pub type_code: Option<String>,
     // For list operations
     #[serde(default)]
     pub order_by: Option<String>,
