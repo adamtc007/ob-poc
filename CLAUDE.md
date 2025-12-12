@@ -194,6 +194,7 @@ The web UI is built with egui/eframe and compiles to both native and WASM target
 
 **Key modules:**
 - `rust/crates/ob-poc-ui/src/app.rs` - Main application with 4-panel layout
+- `rust/crates/ob-poc-ui/src/state/` - Centralized state management
 - `rust/crates/ob-poc-ui/src/panels/` - Chat, DSL, and AST panels
 - `rust/crates/ob-poc-ui/src/modals/` - Entity Finder and CBU Picker modals
 - `rust/crates/ob-poc-ui/src/graph/` - Interactive CBU graph with drag/zoom
@@ -205,13 +206,22 @@ The web UI is built with egui/eframe and compiles to both native and WASM target
 - Entity Finder modal for resolving unresolved EntityRefs
 - CBU Picker modal for searching and selecting CBUs
 
-**Architecture patterns** are documented in `EGUI_ARCHITECTURE_PATTERN.MD`. Key rules:
+**Architecture patterns** are documented in `EGUI_ARCHITECTURE_PATTERN.MD`. Key patterns:
 
-1. **Central AppState** - All persistent UI state lives in `ObPocApp` struct, not local variables
-2. **No flag soup** - Use enums for mutually exclusive modes instead of boolean flags
-3. **Event-driven updates** - Panel actions return action enums (e.g., `ChatPanelAction`, `EntityFinderResult`)
-4. **Pure UI functions** - Panels take `&mut Ui` + state, return actions
-5. **Form state on AppState** - Forms like `ChatPanel.input` persist in struct fields
+1. **DomainState/UiState split** - Business data (CBUs, sessions, DSL) separate from interaction state (modals, view settings)
+2. **Event/Command pattern** - UI emits `AppEvent` → `handle_event()` mutates state → emits `AppCommand` → `execute_commands()` does IO
+3. **TaskStatus enum** - Background task lifecycle: `Idle`, `InProgress`, `Finished(Result<T, E>)`
+4. **Modal enum** - Single enum for all overlay states with embedded data (no flag soup)
+5. **Pure UI functions** - Panels take `&mut Ui` + state, return action enums
+6. **IO isolation** - Only `execute_commands()` performs network/clipboard operations
+
+**State types** (`rust/crates/ob-poc-ui/src/state/app_state.rs`):
+- `DomainState` - Session, CBUs, messages, DSL source, AST, pending operations
+- `UiState` - View mode, orientation, active modal, loading/error states
+- `AppEvent` - User intent (SelectCbu, SendMessage, OpenModal, etc.)
+- `AppCommand` - IO operations (LoadCbuList, SendChatMessage, CopyToClipboard, etc.)
+- `TaskStatus<T, E>` - Async operation lifecycle with `take_result()` for one-shot consumption
+- `BackgroundTasks` - Tracks status of all async operations (graph, layout, chat, etc.)
 
 When modifying egui code, agents MUST follow these patterns to avoid UI glitches.
 
