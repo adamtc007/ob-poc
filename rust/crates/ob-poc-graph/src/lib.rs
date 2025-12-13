@@ -79,8 +79,27 @@ impl GraphApp {
 
             // Spawn async fetch
             wasm_bindgen_futures::spawn_local(async move {
+                web_sys::console::log_1(
+                    &format!(
+                        "Fetching graph for CBU: {} view_mode: {:?}",
+                        cbu_id, view_mode
+                    )
+                    .into(),
+                );
+
                 let api = api::ApiClient::new("");
                 let result = api.get_cbu_graph(cbu_id, view_mode).await;
+
+                web_sys::console::log_1(
+                    &format!(
+                        "API result: {:?}",
+                        result
+                            .as_ref()
+                            .map(|r| r.nodes.len())
+                            .map_err(|e| e.clone())
+                    )
+                    .into(),
+                );
 
                 if let Ok(mut state) = async_state.lock() {
                     state.loading = false;
@@ -88,10 +107,26 @@ impl GraphApp {
                         Ok(response) => {
                             // Use From impl to convert CbuGraphResponse to CbuGraphData
                             let node_count = response.nodes.len();
+                            let edge_count = response.edges.len();
                             let graph_data: CbuGraphData = response.into();
+
+                            web_sys::console::log_1(
+                                &format!(
+                                    "Graph data converted: {} nodes, {} edges, first node x={:?}",
+                                    graph_data.nodes.len(),
+                                    graph_data.edges.len(),
+                                    graph_data.nodes.first().map(|n| n.x)
+                                )
+                                .into(),
+                            );
+
                             state.pending_data = Some(graph_data);
                             web_sys::console::log_1(
-                                &format!("Graph data loaded: {} nodes", node_count).into(),
+                                &format!(
+                                    "Graph data loaded: {} nodes, {} edges",
+                                    node_count, edge_count
+                                )
+                                .into(),
                             );
                         }
                         Err(e) => {
@@ -101,6 +136,8 @@ impl GraphApp {
                             );
                         }
                     }
+                } else {
+                    web_sys::console::error_1(&"Failed to acquire async_state lock".into());
                 }
 
                 // Request repaint

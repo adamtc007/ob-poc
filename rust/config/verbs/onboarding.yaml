@@ -1,0 +1,183 @@
+domains:
+  onboarding:
+    description: "CBU onboarding workflow orchestration with dependency-aware resource provisioning"
+    verbs:
+      # =====================================================================
+      # PLANNING
+      # =====================================================================
+
+      plan:
+        description: |
+          Create onboarding plan by expanding products to resources.
+          Generates service-resource.provision statements with dependency ordering.
+        behavior: plugin
+        handler: onboarding_plan
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: products
+            type: string_list
+            required: true
+            description: List of product codes to onboard (e.g., ["CUSTODY", "FUND_ACCOUNTING"])
+        produces:
+          type: onboarding_plan
+        returns:
+          type: uuid
+          name: plan_id
+          capture: true
+
+      show-plan:
+        description: Display generated DSL statements and dependency graph
+        behavior: plugin
+        handler: onboarding_show_plan
+        args:
+          - name: plan-id
+            type: uuid
+            required: true
+        returns:
+          type: record
+
+      override-attribute:
+        description: Override an attribute value in the plan before execution
+        behavior: plugin
+        handler: onboarding_override_attr
+        args:
+          - name: plan-id
+            type: uuid
+            required: true
+          - name: resource
+            type: string
+            required: true
+            description: Resource type code (e.g., "CUSTODY_ACCT")
+          - name: attribute
+            type: string
+            required: true
+          - name: value
+            type: string
+            required: true
+        returns:
+          type: record
+
+      validate-plan:
+        description: Validate plan for completeness and capability coverage
+        behavior: plugin
+        handler: onboarding_validate_plan
+        args:
+          - name: plan-id
+            type: uuid
+            required: true
+        returns:
+          type: record
+
+      # =====================================================================
+      # EXECUTION
+      # =====================================================================
+
+      execute:
+        description: |
+          Compile and execute the plan's DSL statements.
+          Uses standard DSL compiler for dependency ordering.
+        behavior: plugin
+        handler: onboarding_execute
+        args:
+          - name: plan-id
+            type: uuid
+            required: true
+          - name: parallel
+            type: boolean
+            required: false
+            default: true
+            description: Execute stages in parallel where possible
+        produces:
+          type: onboarding_execution
+        returns:
+          type: uuid
+          name: execution_id
+          capture: true
+
+      status:
+        description: Check execution progress
+        behavior: plugin
+        handler: onboarding_status
+        args:
+          - name: execution-id
+            type: uuid
+            required: true
+        returns:
+          type: record
+
+      await:
+        description: Wait for execution to complete (with timeout)
+        behavior: plugin
+        handler: onboarding_await
+        args:
+          - name: execution-id
+            type: uuid
+            required: true
+          - name: timeout
+            type: integer
+            required: false
+            default: 300
+            description: Timeout in seconds
+        returns:
+          type: record
+
+      get-urls:
+        description: Retrieve resource URLs after successful execution
+        behavior: plugin
+        handler: onboarding_get_urls
+        args:
+          - name: execution-id
+            type: uuid
+            required: false
+          - name: cbu-id
+            type: uuid
+            required: false
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: cbu-name
+            type: string
+            required: false
+        returns:
+          type: record
+
+      # =====================================================================
+      # SIMPLE PATH
+      # =====================================================================
+
+      ensure:
+        description: |
+          Idempotent onboarding - plan, compile, execute in one operation.
+          Checks for existing resources before provisioning new ones.
+        behavior: plugin
+        handler: onboarding_ensure
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: products
+            type: string_list
+            required: true
+          - name: wait
+            type: boolean
+            required: false
+            default: true
+        returns:
+          type: record

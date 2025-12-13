@@ -20,9 +20,40 @@ impl ConfigLoader {
     }
 
     /// Create loader from DSL_CONFIG_DIR env var or default to "config"
+    ///
+    /// Path resolution order:
+    /// 1. DSL_CONFIG_DIR environment variable (explicit override)
+    /// 2. Relative "config" path (works when running from crate root)
+    /// 3. CARGO_MANIFEST_DIR/config (works in cargo test environments)
+    /// 4. Compile-time CARGO_MANIFEST_DIR embedded at build time
     pub fn from_env() -> Self {
-        let dir = std::env::var("DSL_CONFIG_DIR").unwrap_or_else(|_| "config".to_string());
-        Self::new(dir)
+        // Try explicit override first
+        if let Ok(dir) = std::env::var("DSL_CONFIG_DIR") {
+            return Self::new(dir);
+        }
+
+        // Try relative "config" (works when running from crate root)
+        if Path::new("config/verbs").exists() {
+            return Self::new("config");
+        }
+
+        // Try runtime CARGO_MANIFEST_DIR (set by cargo during build/test)
+        if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
+            let config_path = format!("{}/config", manifest_dir);
+            if Path::new(&config_path).join("verbs").exists() {
+                return Self::new(config_path);
+            }
+        }
+
+        // Use compile-time CARGO_MANIFEST_DIR (embedded when library is built)
+        // This is the most reliable for test binaries
+        let compile_time_config = concat!(env!("CARGO_MANIFEST_DIR"), "/config");
+        if Path::new(compile_time_config).join("verbs").exists() {
+            return Self::new(compile_time_config);
+        }
+
+        // Last resort - return "config" and let it fail with clear error
+        Self::new("config")
     }
 
     /// Get the config directory path

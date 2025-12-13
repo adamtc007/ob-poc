@@ -1279,6 +1279,27 @@ impl GenericCrudExecutor {
                 .to_string()
         };
 
+        // Check if entity already exists (idempotency) - unique constraint on (entity_type_id, name)
+        let existing_sql = format!(
+            r#"SELECT entity_id FROM "{}".entities WHERE entity_type_id = $1 AND name = $2"#,
+            crud.schema
+        );
+
+        if let Ok(existing_row) = sqlx::query(&existing_sql)
+            .bind(entity_type_id)
+            .bind(&entity_name)
+            .fetch_one(&self.pool)
+            .await
+        {
+            // Entity already exists - return existing ID (idempotent behavior)
+            let existing_id: Uuid = existing_row.try_get("entity_id")?;
+            debug!(
+                "ENTITY_CREATE: Entity '{}' already exists with id {}, returning existing",
+                entity_name, existing_id
+            );
+            return Ok(GenericExecutionResult::Uuid(existing_id));
+        }
+
         // INSERT into entities base table
         let base_sql = format!(
             r#"INSERT INTO "{}".entities (entity_id, entity_type_id, name) VALUES ($1, $2, $3)"#,

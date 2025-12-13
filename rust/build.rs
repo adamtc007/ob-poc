@@ -1,8 +1,10 @@
 //! Build script for ob-poc
-//!
-//! Proto compilation (disabled for Phase 1)
-//! WASM files are served directly from crates/ob-poc-ui/pkg
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
+    // Expose CARGO_MANIFEST_DIR at runtime for config loading in tests
+    println!(
+        "cargo:rustc-env=OB_POC_MANIFEST_DIR={}",
+        std::env::var("CARGO_MANIFEST_DIR").unwrap()
+    );
 }

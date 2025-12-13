@@ -139,8 +139,31 @@ impl CbuGraphWidget {
 
     /// Set graph data from server response (stores full data, filters for current view)
     pub fn set_data(&mut self, data: CbuGraphData) {
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(
+            &format!(
+                "set_data called: {} nodes, {} edges",
+                data.nodes.len(),
+                data.edges.len()
+            )
+            .into(),
+        );
+
         self.raw_data = Some(data);
         self.recompute_layout();
+
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(
+            &format!(
+                "after recompute_layout: layout_graph has {} nodes",
+                self.layout_graph
+                    .as_ref()
+                    .map(|g| g.nodes.len())
+                    .unwrap_or(0)
+            )
+            .into(),
+        );
+
         self.needs_initial_fit = true;
         self.input_state.clear_focus();
     }
@@ -248,78 +271,30 @@ impl CbuGraphWidget {
     /// Filter graph data based on current view mode
     /// - KycUbo: CBU + OWNERSHIP_CONTROL entities + UBO layer (ownership/control chain)
     /// - ServiceDelivery: CBU + TRADING_EXECUTION entities + Services (products/resources)
+    ///
+    /// If the preferred filter yields no entity nodes, falls back to showing all entities.
     fn filter_by_view_mode(&self, data: &CbuGraphData) -> CbuGraphData {
         // Filter nodes based on view mode using role_categories
-        let filtered_nodes: Vec<GraphNodeData> = match self.view_mode {
-            ViewMode::KycUbo => {
-                // Include: CBU, entities with OWNERSHIP_CONTROL roles, UBO layer, KYC layer
-                // These are the ownership/control entities (UBOs, shareholders, directors, GPs)
-                data.nodes
-                    .iter()
-                    .filter(|n| {
-                        // Always include non-entity nodes in appropriate layers
-                        if n.node_type != "entity" {
-                            return matches!(n.layer.as_str(), "core" | "kyc" | "ubo");
-                        }
-                        // For entities, include if they have OWNERSHIP_CONTROL or BOTH role category
-                        n.role_categories
-                            .iter()
-                            .any(|cat| cat == "OWNERSHIP_CONTROL" || cat == "BOTH")
-                    })
-                    .cloned()
-                    .collect()
-            }
-            ViewMode::ServiceDelivery => {
-                // Include: CBU, entities with TRADING_EXECUTION roles, Services layer
-                // These are the trading/operating entities (funds, managers, service providers)
-                data.nodes
-                    .iter()
-                    .filter(|n| {
-                        // Always include non-entity nodes in appropriate layers
-                        if n.node_type != "entity" {
-                            return matches!(n.layer.as_str(), "core" | "services");
-                        }
-                        // For entities, include if they have TRADING_EXECUTION or BOTH role category
-                        n.role_categories
-                            .iter()
-                            .any(|cat| cat == "TRADING_EXECUTION" || cat == "BOTH")
-                    })
-                    .cloned()
-                    .collect()
-            }
-            ViewMode::Custody => {
-                // Include: CBU, entities with custody relationships, custody layer
-                // Markets, SSIs, booking rules
-                data.nodes
-                    .iter()
-                    .filter(|n| {
-                        // Include core and custody layers
-                        matches!(n.layer.as_str(), "core" | "custody")
-                    })
-                    .cloned()
-                    .collect()
-            }
-            ViewMode::ProductsOnly => {
-                // Simplified view: just CBU and products
-                data.nodes
-                    .iter()
-                    .filter(|n| n.node_type == "cbu" || n.node_type == "product")
-                    .cloned()
-                    .collect()
-            }
-        };
+        let (filtered_nodes, fallback_used) = self.filter_nodes_by_view_mode(data);
 
         #[cfg(target_arch = "wasm32")]
         {
-            web_sys::console::log_1(
-                &format!(
+            let msg = if fallback_used {
+                format!(
+                    "filter_by_view_mode: view={:?}, raw={} nodes, filtered={} nodes (FALLBACK: no matching entities for view)",
+                    self.view_mode,
+                    data.nodes.len(),
+                    filtered_nodes.len()
+                )
+            } else {
+                format!(
                     "filter_by_view_mode: view={:?}, raw={} nodes, filtered={} nodes",
                     self.view_mode,
                     data.nodes.len(),
                     filtered_nodes.len()
                 )
-                .into(),
-            );
+            };
+            web_sys::console::log_1(&msg.into());
         }
 
         // Collect IDs of filtered nodes for edge filtering
@@ -343,6 +318,82 @@ impl CbuGraphWidget {
             jurisdiction: data.jurisdiction.clone(),
             nodes: filtered_nodes,
             edges: filtered_edges,
+        }
+    }
+
+    /// Filter nodes by view mode, returning (nodes, fallback_used)
+    /// If the preferred filter yields no entity nodes, falls back to all entities.
+    fn filter_nodes_by_view_mode(&self, data: &CbuGraphData) -> (Vec<GraphNodeData>, bool) {
+        // First, try the preferred filter for this view mode
+        let preferred_nodes: Vec<GraphNodeData> = match self.view_mode {
+            ViewMode::KycUbo => {
+                // Include: CBU, entities with OWNERSHIP_CONTROL roles, UBO layer, KYC layer
+                data.nodes
+                    .iter()
+                    .filter(|n| {
+                        if n.node_type != "entity" {
+                            return matches!(n.layer.as_str(), "core" | "kyc" | "ubo");
+                        }
+                        n.role_categories
+                            .iter()
+                            .any(|cat| cat == "OWNERSHIP_CONTROL" || cat == "BOTH")
+                    })
+                    .cloned()
+                    .collect()
+            }
+            ViewMode::ServiceDelivery => {
+                // Include: CBU, entities with TRADING_EXECUTION roles, Services layer
+                data.nodes
+                    .iter()
+                    .filter(|n| {
+                        if n.node_type != "entity" {
+                            return matches!(n.layer.as_str(), "core" | "services");
+                        }
+                        n.role_categories
+                            .iter()
+                            .any(|cat| cat == "TRADING_EXECUTION" || cat == "BOTH")
+                    })
+                    .cloned()
+                    .collect()
+            }
+            ViewMode::Custody => {
+                // Include: CBU, custody layer nodes
+                data.nodes
+                    .iter()
+                    .filter(|n| matches!(n.layer.as_str(), "core" | "custody"))
+                    .cloned()
+                    .collect()
+            }
+            ViewMode::ProductsOnly => {
+                // Simplified view: just CBU and products
+                data.nodes
+                    .iter()
+                    .filter(|n| n.node_type == "cbu" || n.node_type == "product")
+                    .cloned()
+                    .collect()
+            }
+        };
+
+        // Check if we have any entity nodes in the filtered set
+        let has_entities = preferred_nodes.iter().any(|n| n.node_type == "entity");
+
+        if has_entities {
+            // Preferred filter has entities, use it
+            (preferred_nodes, false)
+        } else {
+            // No entities matched the preferred filter - fall back to all entities
+            // This handles cases like a CBU with only TRADING_EXECUTION roles
+            // being viewed in KYC_UBO mode
+            let fallback_nodes: Vec<GraphNodeData> = data
+                .nodes
+                .iter()
+                .filter(|n| {
+                    // Include CBU root and all entities
+                    n.node_type == "cbu" || n.node_type == "entity"
+                })
+                .cloned()
+                .collect();
+            (fallback_nodes, true)
         }
     }
 
@@ -404,9 +455,21 @@ impl CbuGraphWidget {
     /// Main UI function
     pub fn ui(&mut self, ui: &mut egui::Ui) {
         let Some(graph) = self.layout_graph.as_mut() else {
+            #[cfg(target_arch = "wasm32")]
+            web_sys::console::log_1(&"ui(): No layout_graph, showing empty state".into());
             self.render_empty_state(ui);
             return;
         };
+
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(
+            &format!(
+                "ui(): Rendering graph with {} nodes, bounds={:?}",
+                graph.nodes.len(),
+                graph.bounds
+            )
+            .into(),
+        );
 
         // Allocate space and get painter
         let (response, painter) = ui.allocate_painter(ui.available_size(), Sense::click_and_drag());

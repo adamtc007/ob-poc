@@ -31,6 +31,7 @@ pub mod config;
 pub mod csg_linter;
 pub mod custom_ops;
 pub mod enrichment;
+pub mod entity_deps;
 pub mod execution_plan;
 pub mod executor;
 #[cfg(feature = "database")]
@@ -48,9 +49,9 @@ pub mod parser;
 pub mod ref_resolver;
 pub mod runtime_registry;
 pub mod semantic_context;
-pub mod suggestions;
 #[cfg(feature = "database")]
 pub mod semantic_validator;
+pub mod suggestions;
 pub mod topo_sort;
 pub mod validation;
 pub mod verb_registry;
@@ -65,6 +66,12 @@ pub use binding_context::{BindingContext, BindingInfo};
 pub use config::types::LookupConfig;
 pub use csg_linter::{CsgLinter, InferredContext, LintResult};
 pub use enrichment::{enrich_program, EnrichmentError, EnrichmentResult};
+#[cfg(feature = "database")]
+pub use entity_deps::init_entity_deps;
+pub use entity_deps::{
+    entity_deps, topological_sort_unified, DependencyKind, EntityDep, EntityDependencyRegistry,
+    EntityInstance, EntityTypeKey, TopoSortUnifiedError, TopoSortUnifiedResult,
+};
 pub use execution_plan::{
     compile, compile_with_planning, BindingInfo as PlanningBindingInfo, CompileError,
     ExecutionPlan, ExecutionStep, Injection, PlannerDiagnostic, PlanningContext, PlanningResult,

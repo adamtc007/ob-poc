@@ -104,8 +104,8 @@ impl JsBridge {
     pub fn emit_entity_selected(&self, entity_id: &str) {
         #[cfg(target_arch = "wasm32")]
         {
-            let mut init = CustomEventInit::new();
-            init.detail(&JsValue::from_str(entity_id));
+            let init = CustomEventInit::new();
+            init.set_detail(&JsValue::from_str(entity_id));
 
             if let Ok(event) = CustomEvent::new_with_event_init_dict("egui-entity-selected", &init)
             {
@@ -120,11 +120,12 @@ impl JsBridge {
     }
 
     /// Emit CBU changed event to JS
+    #[allow(dead_code)]
     pub fn emit_cbu_changed(&self, cbu_id: &str) {
         #[cfg(target_arch = "wasm32")]
         {
-            let mut init = CustomEventInit::new();
-            init.detail(&JsValue::from_str(cbu_id));
+            let init = CustomEventInit::new();
+            init.set_detail(&JsValue::from_str(cbu_id));
 
             if let Ok(event) = CustomEvent::new_with_event_init_dict("egui-cbu-changed", &init) {
                 let _ = self.window.dispatch_event(&event);
@@ -138,6 +139,7 @@ impl JsBridge {
     }
 
     /// Emit ready event to JS
+    #[allow(dead_code)]
     pub fn emit_ready(&self) {
         #[cfg(target_arch = "wasm32")]
         {

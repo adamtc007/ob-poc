@@ -27,7 +27,7 @@ futures = "0.3"
 uuid = { version = "1", features = ["serde", "v4"] }
 
 # Re-use existing ob-poc types
-ob-poc = { path = "../..", features = ["database"] }
+ob-poc = { path = "../..", features = ["server"] }
 
 # Shared API types (single source of truth for all boundaries)
 ob-poc-types = { path = "../ob-poc-types" }
@@ -37,6 +37,10 @@ sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chro
 
 # Entity resolution (same as LSP uses)
 dsl-lsp = { path = "../dsl-lsp" }
+
+# EntityGateway for embedded gRPC service
+entity-gateway = { path = "../entity-gateway" }
+tonic = "0.12"
 
 [features]
 default = []

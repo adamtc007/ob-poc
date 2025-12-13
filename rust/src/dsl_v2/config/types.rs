@@ -77,18 +77,44 @@ pub struct VerbConfig {
 /// Dataflow: what a verb produces when executed with :as @binding
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct VerbProduces {
-    /// The type of entity produced: "cbu", "entity", "case", "workstream", etc.
+    /// The type of entity produced: "cbu", "entity", "case", "resource_instance", etc.
     #[serde(rename = "type")]
     pub produced_type: String,
-    /// Optional subtype for entities: "proper_person", "limited_company", etc.
+    /// Static subtype for entities: "proper_person", "limited_company", "fund_umbrella", etc.
     #[serde(default)]
     pub subtype: Option<String>,
+    /// Dynamic subtype from argument value (e.g., "resource-type" for service-resource.provision)
+    /// When set, the subtype is extracted from the named argument at runtime
+    #[serde(default)]
+    pub subtype_from_arg: Option<String>,
     /// True if this is a lookup (resolved existing) rather than create (new)
     #[serde(default)]
     pub resolved: bool,
     /// Initial state when creating a new entity (for lifecycle tracking)
     #[serde(default)]
     pub initial_state: Option<String>,
+}
+
+impl VerbProduces {
+    /// Resolve the subtype for a given verb call's arguments
+    /// Returns static subtype if set, otherwise extracts from subtype_from_arg
+    pub fn resolve_subtype(&self, args: &[super::super::ast::Argument]) -> Option<String> {
+        // Static subtype takes precedence
+        if let Some(ref st) = self.subtype {
+            return Some(st.clone());
+        }
+
+        // Dynamic subtype from arg
+        if let Some(ref arg_name) = self.subtype_from_arg {
+            return args
+                .iter()
+                .find(|a| a.key == *arg_name)
+                .and_then(|a| a.value.as_string())
+                .map(|s| s.to_string());
+        }
+
+        None
+    }
 }
 
 /// Dataflow: what a verb consumes (dependencies)

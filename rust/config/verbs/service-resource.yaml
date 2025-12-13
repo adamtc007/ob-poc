@@ -128,7 +128,8 @@ domains:
             required: true
           - name: instance-url
             type: string
-            required: true
+            required: false
+            description: URL for resource instance (auto-generated if not provided)
           - name: instance-id
             type: string
             required: false
@@ -156,6 +157,35 @@ domains:
           - name: config
             type: json
             required: false
+          # Dependency tracking
+          - name: depends-on
+            type: string_list
+            required: false
+            description: |
+              URLs or @symbol references of resources this instance depends on.
+              Used by the DSL compiler for topological ordering.
+          # Specific dependency injections (from resource_dependencies config)
+          - name: settlement-account-url
+            type: string
+            required: false
+            description: URL of settlement account (auto-injected for dependent resources)
+          - name: custody-account-url
+            type: string
+            required: false
+            description: URL of custody account (auto-injected for dependent resources)
+          - name: nav-engine-url
+            type: string
+            required: false
+            description: URL of NAV engine (auto-injected for dependent resources)
+        consumes:
+          - arg: cbu-id
+            type: cbu
+          - arg: depends-on
+            type: resource_instance
+            required: false
+        produces:
+          type: resource_instance
+          resolved: false
         returns:
           type: uuid
           name: instance_id

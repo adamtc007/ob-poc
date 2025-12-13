@@ -224,6 +224,9 @@ impl LayoutEngine {
     }
 
     /// Compute layout from graph data
+    ///
+    /// If server provides x/y positions, use them directly.
+    /// Otherwise fall back to template-based layout.
     pub fn compute_layout(&self, data: &CbuGraphData) -> LayoutGraph {
         let mut graph = LayoutGraph::new(data.cbu_id);
         graph.cbu_category = data
@@ -233,6 +236,80 @@ impl LayoutEngine {
             .unwrap_or_default();
         graph.jurisdiction = data.jurisdiction.clone();
 
+        // Check if server provided positions (first node has x/y)
+        let has_server_positions = data.nodes.first().map(|n| n.x.is_some()).unwrap_or(false);
+
+        if has_server_positions {
+            // Use server-provided positions directly
+            return self.use_server_positions(data, graph);
+        }
+
+        // Fall back to template-based layout
+        self.compute_template_layout(data, graph)
+    }
+
+    /// Use server-provided x/y positions directly
+    fn use_server_positions(&self, data: &CbuGraphData, mut graph: LayoutGraph) -> LayoutGraph {
+        let default_size = Vec2::new(NODE_WIDTH, NODE_HEIGHT);
+
+        for node in &data.nodes {
+            let x = node.x.unwrap_or(0.0) as f32;
+            let y = node.y.unwrap_or(0.0) as f32;
+            let position = Pos2::new(x, y);
+
+            let layout_node = LayoutNode {
+                id: node.id.clone(),
+                entity_type: EntityType::from_str(&node.node_type),
+                primary_role: node
+                    .primary_role
+                    .as_ref()
+                    .map(|r| PrimaryRole::from_str(r))
+                    .unwrap_or(PrimaryRole::Unknown),
+                all_roles: node.roles.clone(),
+                label: node.label.clone(),
+                sublabel: node.sublabel.clone(),
+                jurisdiction: node.jurisdiction.clone(),
+                base_position: position,
+                offset: Vec2::ZERO,
+                position,
+                base_size: default_size,
+                size_override: None,
+                size: default_size,
+                in_focus: true,
+                is_cbu_root: node.node_type == "cbu",
+                style: node_style_for_role(
+                    node.primary_role
+                        .as_ref()
+                        .map(|r| PrimaryRole::from_str(r))
+                        .unwrap_or(PrimaryRole::Unknown),
+                    node.node_type == "cbu",
+                ),
+            };
+
+            graph.nodes.insert(node.id.clone(), layout_node);
+        }
+
+        // Create edges
+        for edge in &data.edges {
+            let layout_edge = LayoutEdge {
+                id: edge.id.clone(),
+                source_id: edge.source.clone(),
+                target_id: edge.target.clone(),
+                edge_type: EdgeType::from_str(&edge.edge_type),
+                label: edge.label.clone(),
+                control_points: Vec::new(),
+                in_focus: true,
+                style: EdgeStyle::default(),
+            };
+            graph.edges.push(layout_edge);
+        }
+
+        graph.recompute_bounds();
+        graph
+    }
+
+    /// Template-based layout (fallback when server doesn't provide positions)
+    fn compute_template_layout(&self, data: &CbuGraphData, mut graph: LayoutGraph) -> LayoutGraph {
         // Group nodes by slot assignment
         let mut slot_assignments: HashMap<&str, Vec<&GraphNodeData>> = HashMap::new();
         let mut unassigned: Vec<&GraphNodeData> = Vec::new();

@@ -291,52 +291,19 @@ All entity lookup and resolution flows through the **EntityGateway** gRPC servic
 | Generic Executor | `rust/src/dsl_v2/generic_executor.rs` | Runtime entity lookup with SQL fallback |
 | Agent Routes | `rust/src/api/agent_routes.rs` | Tool-use entity lookup |
 
-### Rust egui Web UI
+### Web UI Architecture
 
-The web UI is built with egui/eframe and compiles to both native and WASM targets. It provides a 4-panel layout:
+The web UI is split into two crates:
+- `rust/crates/ob-poc-web/` - Server-rendered HTML panels with embedded TypeScript
+- `rust/crates/ob-poc-graph/` - WASM-based interactive graph visualization
 
-```
-┌─────────────────┬─────────────────┐
-│  Graph (TL)     │  DSL Source (TR)│
-│                 │                 │
-├─────────────────┼─────────────────┤
-│  Chat (BL)      │  AST (BR)       │
-│                 │                 │
-└─────────────────┴─────────────────┘
-```
+The UI uses a 3-panel layout: Chat | DSL Editor | Results, with an optional graph panel.
 
-**Key modules:**
-- `rust/crates/ob-poc-ui/src/app.rs` - Main application with 4-panel layout
-- `rust/crates/ob-poc-ui/src/state/` - Centralized state management
-- `rust/crates/ob-poc-ui/src/panels/` - Chat, DSL, and AST panels
-- `rust/crates/ob-poc-ui/src/modals/` - Entity Finder and CBU Picker modals
-- `rust/crates/ob-poc-ui/src/graph/` - Interactive CBU graph with drag/zoom
-
-**Features:**
+**Key features:**
 - 4 view modes: KYC_UBO, SERVICE_DELIVERY, CUSTODY, PRODUCTS_ONLY
 - Vertical/Horizontal layout orientation
 - Node drag/resize with layout persistence
-- Entity Finder modal for resolving unresolved EntityRefs
-- CBU Picker modal for searching and selecting CBUs
-
-**Architecture patterns** are documented in `EGUI_ARCHITECTURE_PATTERN.MD`. Key patterns:
-
-1. **DomainState/UiState split** - Business data (CBUs, sessions, DSL) separate from interaction state (modals, view settings)
-2. **Event/Command pattern** - UI emits `AppEvent` → `handle_event()` mutates state → emits `AppCommand` → `execute_commands()` does IO
-3. **TaskStatus enum** - Background task lifecycle: `Idle`, `InProgress`, `Finished(Result<T, E>)`
-4. **Modal enum** - Single enum for all overlay states with embedded data (no flag soup)
-5. **Pure UI functions** - Panels take `&mut Ui` + state, return action enums
-6. **IO isolation** - Only `execute_commands()` performs network/clipboard operations
-
-**State types** (`rust/crates/ob-poc-ui/src/state/app_state.rs`):
-- `DomainState` - Session, CBUs, messages, DSL source, AST, pending operations
-- `UiState` - View mode, orientation, active modal, loading/error states
-- `AppEvent` - User intent (SelectCbu, SendMessage, OpenModal, etc.)
-- `AppCommand` - IO operations (LoadCbuList, SendChatMessage, CopyToClipboard, etc.)
-- `TaskStatus<T, E>` - Async operation lifecycle with `take_result()` for one-shot consumption
-- `BackgroundTasks` - Tracks status of all async operations (graph, layout, chat, etc.)
-
-When modifying egui code, agents MUST follow these patterns to avoid UI glitches.
+- Entity search and resolution via EntityGateway
 
 ## Shared Types Crate (ob-poc-types)
 
@@ -503,6 +470,7 @@ ob-poc/
 │   │   │   │   └── loader.rs       # ConfigLoader (from env or path)
 │   │   │   ├── runtime_registry.rs # RuntimeVerbRegistry (loads from YAML)
 │   │   │   ├── verb_registry.rs    # UnifiedVerbRegistry (wraps runtime)
+│   │   │   ├── entity_deps.rs      # Unified entity dependency DAG
 │   │   │   ├── generic_executor.rs # GenericCrudExecutor (14 CRUD ops)
 │   │   │   ├── executor.rs         # DslExecutor (orchestrates execution)
 │   │   │   ├── csg_linter.rs       # Context-sensitive validation
@@ -542,15 +510,30 @@ ob-poc/
 └── CLAUDE.md                       # This file
 ```
 
-## Visualization Architecture
+## Web UI Architecture
 
-The UI follows a **single pipeline** pattern. Server computes layout positions; UI renders SVG.
+The UI uses a **hybrid architecture**: HTML/TypeScript panels for text content, WASM/egui for the interactive graph.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Rust egui UI (WASM/Native)                    │
-│  Interactive graph with drag/zoom, server-computed positions    │
-│  rust/crates/ob-poc-ui/                                         │
+│                    ob-poc-web (Axum Server)                      │
+│  Port 3000 - serves HTML + static files + API                   │
+│  rust/crates/ob-poc-web/                                        │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────┬─────────────┐                                  │
+│  │ Chat Panel  │ DSL Panel   │  ← HTML/TypeScript               │
+│  │ (HTML/TS)   │ (HTML/TS)   │                                  │
+│  ├─────────────┼─────────────┤                                  │
+│  │ Graph       │ AST Panel   │  ← Graph is WASM/egui            │
+│  │ (WASM)      │ (HTML/TS)   │                                  │
+│  └─────────────┴─────────────┘                                  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    ob-poc-graph (WASM Component)                 │
+│  Interactive CBU graph with drag/zoom                           │
+│  rust/crates/ob-poc-graph/                                      │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -562,30 +545,24 @@ The UI follows a **single pipeline** pattern. Server computes layout positions; 
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    LayoutEngine                                  │
-│  Server-side layout: positions nodes by view mode + orientation │
-│  rust/src/graph/layout.rs                                       │
+│                    LayoutEngine + CbuGraphBuilder                │
+│  Server-side layout and graph construction                      │
+│  rust/src/graph/layout.rs, builder.rs                           │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    CbuGraphBuilder                               │
-│  Loads all layers: Core, Custody, KYC, UBO, Services            │
-│  rust/src/graph/builder.rs                                      │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                  VisualizationRepository                         │
-│  SINGLE point of DB access for all visualization queries        │
-│  rust/src/database/visualization_repository.rs                  │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      PostgreSQL / Oracle                         │
+│                      PostgreSQL                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+### Key Crates
+
+| Crate | Purpose |
+|-------|---------|
+| `ob-poc-web` | Axum server: HTML pages, API routes, static files |
+| `ob-poc-graph` | WASM/egui graph component embedded in HTML |
+| `ob-poc-types` | Shared API types (single source of truth) |
 
 ### View Modes
 
@@ -813,25 +790,22 @@ Users can customize node positions (drag) and sizes (shift+drag) in the graph vi
 
 **Key Implementation Files**:
 - `rust/src/database/visualization_repository.rs` - Layout CRUD operations
-- `rust/src/api/graph_routes.rs` - Layout API endpoints  
-- `rust/crates/ob-poc-ui/src/app.rs` - Fetch/save logic with debounce
-- `rust/crates/ob-poc-ui/src/graph/types.rs` - LayoutOverride, NodeOffset, NodeSizeOverride
-- `rust/crates/ob-poc-ui/src/graph/input.rs` - Drag/resize handling
+- `rust/src/api/graph_routes.rs` - Layout API endpoints
+- `rust/crates/ob-poc-graph/src/graph/` - Graph widget with drag/resize handling
 
 
 ```bash
 cd rust/
 
 # Build
-cargo build --features server --bin agentic_server        # Main server
+cargo build -p ob-poc-web                                 # Web server
 cargo build --features cli,database --bin dsl_cli         # CLI tool
 cargo build --features database                            # DSL library only
 cargo build --features mcp --bin dsl_mcp                  # MCP server
 
-# Run server (requires DATABASE_URL and ANTHROPIC_API_KEY)
+# Run web server (requires DATABASE_URL)
 DATABASE_URL="postgresql:///data_designer" \
-ANTHROPIC_API_KEY="sk-..." \
-./target/debug/agentic_server
+cargo run -p ob-poc-web
 # Open http://localhost:3000
 
 # Test
@@ -4005,6 +3979,128 @@ domains:
 ```
 
 No Rust code changes required for standard CRUD operations.
+
+## Unified Entity Dependency DAG
+
+The system uses a **unified entity dependency DAG** to manage dependencies between entity types during onboarding and execution planning. This replaces the older resource-specific dependency graph with a single, config-driven model.
+
+### Database Table: `entity_type_dependencies`
+
+```sql
+CREATE TABLE "ob-poc".entity_type_dependencies (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    source_type VARCHAR(100) NOT NULL,      -- e.g., "resource_instance", "kyc_case"
+    source_subtype VARCHAR(100),            -- e.g., "CUSTODY_ACCT", "NEW_CLIENT"
+    target_type VARCHAR(100) NOT NULL,      -- e.g., "cbu", "entity"
+    target_subtype VARCHAR(100),            -- optional subtype constraint
+    dependency_kind VARCHAR(20) NOT NULL,   -- REQUIRED, OPTIONAL, LIFECYCLE
+    description TEXT,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+**Key rows:**
+| source_type | source_subtype | target_type | kind |
+|-------------|----------------|-------------|------|
+| resource_instance | CUSTODY_ACCT | cbu | REQUIRED |
+| resource_instance | SWIFT_CONN | resource_instance:CUSTODY_ACCT | REQUIRED |
+| kyc_case | * | cbu | REQUIRED |
+| fund | * | cbu | REQUIRED |
+
+### Core Types (`rust/src/dsl_v2/entity_deps.rs`)
+
+```rust
+/// Key for matching entity types with optional subtype
+pub struct EntityTypeKey {
+    pub entity_type: String,
+    pub subtype: Option<String>,
+}
+
+/// A dependency edge in the graph
+pub struct EntityDep {
+    pub source: EntityTypeKey,
+    pub target: EntityTypeKey,
+    pub kind: DependencyKind,
+}
+
+/// Centralized registry loaded from DB
+pub struct EntityDependencyRegistry {
+    deps_by_source: HashMap<EntityTypeKey, Vec<EntityDep>>,
+    deps_by_target: HashMap<EntityTypeKey, Vec<EntityDep>>,
+    known_types: HashSet<EntityTypeKey>,
+}
+
+impl EntityDependencyRegistry {
+    /// Load from database
+    pub async fn load(pool: &PgPool) -> Result<Self, sqlx::Error>;
+    
+    /// Get dependencies of a type (what does X depend on?)
+    pub fn dependencies_of(&self, entity_type: &str, subtype: Option<&str>) -> Vec<&EntityDep>;
+    
+    /// Get dependents of a type (what depends on X?)
+    pub fn dependents_of(&self, entity_type: &str, subtype: Option<&str>) -> Vec<&EntityDep>;
+}
+
+/// Entity instance for topological sorting
+pub struct EntityInstance {
+    pub id: String,
+    pub entity_type: String,
+    pub subtype: Option<String>,
+    pub depends_on: Vec<String>,  // IDs of dependencies
+}
+
+/// Topological sort with parallel stage detection
+pub fn topological_sort_unified(
+    instances: &[EntityInstance]
+) -> Result<TopoSortUnifiedResult, TopoSortUnifiedError>;
+```
+
+### Topological Sort Result
+
+```rust
+pub struct TopoSortUnifiedResult {
+    pub stages: Vec<Vec<String>>,  // Parallel execution stages
+    pub order: Vec<String>,        // Linear order (stages flattened)
+}
+```
+
+Instances in the same stage have no inter-dependencies and can be processed in parallel.
+
+### Usage in Onboarding
+
+The onboarding custom_ops use the unified DAG for resource provisioning order:
+
+```rust
+// rust/src/dsl_v2/custom_ops/onboarding.rs
+let registry = EntityDependencyRegistry::load(pool).await?;
+
+// Build EntityInstance list from resources to provision
+let instances: Vec<EntityInstance> = resources.iter().map(|r| {
+    let deps = registry.dependencies_of("resource_instance", Some(&r.resource_code));
+    EntityInstance {
+        id: r.instance_id.to_string(),
+        entity_type: "resource_instance".to_string(),
+        subtype: Some(r.resource_code.clone()),
+        depends_on: /* resolve dep IDs */,
+    }
+}).collect();
+
+// Get execution order
+let result = topological_sort_unified(&instances)?;
+for stage in result.stages {
+    // Process stage in parallel
+}
+```
+
+### Migration from ResourceDependencyGraph
+
+The legacy `ResourceDependencyGraph` in `onboarding.rs` is deprecated. New code should use:
+
+| Old API | New API |
+|---------|---------|
+| `ResourceDependencyGraph::new()` | `EntityDependencyRegistry::load(pool).await` |
+| `graph.add_dependency()` | Use DB table `entity_type_dependencies` |
+| `graph.topological_sort()` | `topological_sort_unified(&instances)` |
 
 ## Agent Workflow (Conductor Mode)
 

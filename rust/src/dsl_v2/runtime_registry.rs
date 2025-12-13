@@ -249,6 +249,7 @@ impl RuntimeVerbRegistry {
                 produces: Some(VerbProduces {
                     produced_type: "entity".to_string(),
                     subtype: Some(type_code.clone()),
+                    subtype_from_arg: None,
                     resolved: false,
                     initial_state: Some("DRAFT".to_string()),
                 }),

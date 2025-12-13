@@ -19,6 +19,7 @@
 //! 4. Ensure operations are testable in isolation
 
 mod custody;
+mod onboarding;
 mod rfi;
 mod threshold;
 mod ubo_analysis;
@@ -34,6 +35,10 @@ use super::executor::{ExecutionContext, ExecutionResult};
 pub use custody::{
     DeriveRequiredCoverageOp, LookupSsiForTradeOp, SetupSsiFromDocumentOp, SubcustodianLookupOp,
     ValidateBookingCoverageOp,
+};
+pub use onboarding::{
+    OnboardingEnsureOp, OnboardingExecuteOp, OnboardingGetUrlsOp, OnboardingPlanOp,
+    OnboardingShowPlanOp, OnboardingStatusOp,
 };
 pub use rfi::{RfiCheckCompletionOp, RfiGenerateOp, RfiListByCaseOp};
 pub use threshold::{ThresholdCheckEntityOp, ThresholdDeriveOp, ThresholdEvaluateOp};
@@ -145,6 +150,14 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(UboSupersedeOp));
         registry.register(Arc::new(UboSnapshotCbuOp));
         registry.register(Arc::new(UboCompareSnapshotOp));
+
+        // Onboarding operations (Terraform-like resource provisioning with dependencies)
+        registry.register(Arc::new(OnboardingPlanOp));
+        registry.register(Arc::new(OnboardingShowPlanOp));
+        registry.register(Arc::new(OnboardingExecuteOp));
+        registry.register(Arc::new(OnboardingStatusOp));
+        registry.register(Arc::new(OnboardingGetUrlsOp));
+        registry.register(Arc::new(OnboardingEnsureOp));
 
         registry
     }
@@ -1062,13 +1075,22 @@ impl CustomOperation for ResourceCreateOp {
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing resource-type argument"))?;
 
-        // Get instance URL (required)
+        // Get instance URL (optional - auto-generate if not provided)
         let instance_url = verb_call
             .arguments
             .iter()
             .find(|a| a.key == "instance-url")
             .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing instance-url argument"))?;
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| {
+                // Auto-generate URN: urn:ob-poc:{cbu_id}:{resource_type}:{uuid}
+                format!(
+                    "urn:ob-poc:{}:{}:{}",
+                    cbu_id,
+                    resource_type_code.to_lowercase().replace('_', "-"),
+                    Uuid::new_v4()
+                )
+            });
 
         // Look up resource type ID
         let resource_type_id: Option<Uuid> = sqlx::query_scalar(
@@ -1139,6 +1161,25 @@ impl CustomOperation for ResourceCreateOp {
             service_id = services.into_iter().next();
         }
 
+        // Extract depends-on references (list of @symbol refs to other instances)
+        let depends_on_refs: Vec<Uuid> = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "depends-on")
+            .and_then(|a| a.value.as_list())
+            .map(|list| {
+                list.iter()
+                    .filter_map(|node| {
+                        if let Some(sym) = node.as_symbol() {
+                            ctx.resolve(sym)
+                        } else {
+                            node.as_uuid()
+                        }
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
         // Idempotent: INSERT or return existing using instance_url as conflict key
         let instance_id = Uuid::new_v4();
 
@@ -1170,6 +1211,21 @@ impl CustomOperation for ResourceCreateOp {
         .await?;
 
         let result_id = row.0;
+
+        // Record instance dependencies if any were specified
+        for dep_instance_id in depends_on_refs {
+            sqlx::query(
+                r#"INSERT INTO "ob-poc".resource_instance_dependencies
+                   (instance_id, depends_on_instance_id)
+                   VALUES ($1, $2)
+                   ON CONFLICT DO NOTHING"#,
+            )
+            .bind(result_id)
+            .bind(dep_instance_id)
+            .execute(pool)
+            .await?;
+        }
+
         ctx.bind("instance", result_id);
 
         Ok(ExecutionResult::Uuid(result_id))

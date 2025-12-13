@@ -73,17 +73,6 @@ enum Commands {
         release: bool,
     },
 
-    /// Build the WASM UI (ob-poc-ui crate)
-    Ui {
-        /// Release build
-        #[arg(short, long)]
-        release: bool,
-
-        /// Serve locally after build
-        #[arg(short, long)]
-        serve: bool,
-    },
-
     /// Run the EntityGateway gRPC server
     Gateway {
         /// Release build
@@ -229,9 +218,6 @@ fn main() -> Result<()> {
         Commands::DslApi { release } => {
             run_cargo_bin("dsl_api", "server", release, &[])?;
         }
-        Commands::Ui { release, serve } => {
-            build_ui(release, serve)?;
-        }
         Commands::Gateway { release } => {
             run_gateway(release)?;
         }
@@ -310,28 +296,6 @@ fn run_cargo_bin(bin: &str, features: &str, release: bool, extra_args: &[&str]) 
     run_command("cargo", &args)
 }
 
-/// Build the WASM UI
-fn build_ui(release: bool, serve: bool) -> Result<()> {
-    check_tool_installed("trunk", "cargo install trunk")?;
-
-    let ui_dir = project_root()?.join("crates/ob-poc-ui");
-
-    let mut args = vec!["build"];
-    if release {
-        args.push("--release");
-    }
-
-    println!("Building WASM UI...");
-    run_command_in_dir("trunk", &args, &ui_dir)?;
-
-    if serve {
-        println!("Serving UI at http://localhost:8080...");
-        run_command_in_dir("trunk", &["serve"], &ui_dir)?;
-    }
-
-    Ok(())
-}
-
 /// Run the EntityGateway
 fn run_gateway(release: bool) -> Result<()> {
     let gateway_dir = project_root()?.join("crates/entity-gateway");
@@ -358,9 +322,6 @@ fn build_all(release: bool) -> Result<()> {
 
     println!("Building MCP binary...");
     build_with_features("mcp", release)?;
-
-    println!("Building WASM UI...");
-    build_ui(release, false)?;
 
     println!("Building EntityGateway...");
     let gateway_dir = project_root()?.join("crates/entity-gateway");
@@ -895,20 +856,15 @@ fn run_clippy(fix: bool) -> Result<()> {
         run_command("cargo", &args)?;
     }
 
-    // Also run on UI crate
-    println!("Running clippy on ob-poc-ui...");
-    let ui_dir = project_root()?.join("crates/ob-poc-ui");
-    let mut args = vec!["clippy"];
-    if fix {
-        args.extend(["--fix", "--allow-dirty", "--allow-staged"]);
-    }
-    args.extend(["--", "-D", "warnings"]);
-    run_command_in_dir("cargo", &args, &ui_dir)?;
-
     // Also run on EntityGateway
     println!("Running clippy on entity-gateway...");
     let gateway_dir = project_root()?.join("crates/entity-gateway");
-    run_command_in_dir("cargo", &args, &gateway_dir)?;
+    let mut gateway_args = vec!["clippy"];
+    if fix {
+        gateway_args.extend(["--fix", "--allow-dirty", "--allow-staged"]);
+    }
+    gateway_args.extend(["--", "-D", "warnings"]);
+    run_command_in_dir("cargo", &gateway_args, &gateway_dir)?;
 
     println!("\nClippy passed on all feature combinations!");
     Ok(())
