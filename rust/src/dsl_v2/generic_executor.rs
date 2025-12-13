@@ -1021,7 +1021,10 @@ impl GenericCrudExecutor {
 
         let lookup_sql = format!(
             r#"SELECT "{}" FROM "{}"."{}" WHERE "{}" = $1"#,
-            lookup.primary_key, crud.schema, lookup.table, lookup.search_key
+            lookup.primary_key,
+            crud.schema,
+            lookup.table,
+            lookup.search_key.primary_column()
         );
 
         let role_row = sqlx::query(&lookup_sql)
@@ -1787,9 +1790,10 @@ impl GenericCrudExecutor {
 
         // Fallback to direct SQL if EntityGateway unavailable or no match
         let schema = lookup.schema.as_deref().unwrap_or("public");
+        let search_col = lookup.search_key.primary_column();
         let sql = format!(
             r#"SELECT "{}" FROM "{}"."{}" WHERE "{}" = $1"#,
-            lookup.primary_key, schema, lookup.table, lookup.search_key
+            lookup.primary_key, schema, lookup.table, search_col
         );
 
         debug!(
@@ -1810,7 +1814,7 @@ impl GenericCrudExecutor {
             None => Err(anyhow!(
                 "Lookup failed: no {} with {} = '{}' in {}.{}",
                 lookup.table,
-                lookup.search_key,
+                search_col,
                 code_value,
                 schema,
                 lookup.table,

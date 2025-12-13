@@ -297,9 +297,29 @@ pub struct LookupConfig {
     /// This becomes the ref_type in the LookupRef triplet: (ref_type, search_key, primary_key)
     #[serde(default)]
     pub entity_type: Option<String>,
-    /// The column containing human-readable search key (what user sees/types)
+    /// Search key configuration - either a simple column name or composite search key
+    ///
+    /// Simple (backwards compatible):
+    /// ```yaml
+    /// search_key: name
+    /// ```
+    ///
+    /// Composite (for high-volume tables like persons, companies):
+    /// ```yaml
+    /// search_key:
+    ///   primary: name
+    ///   discriminators:
+    ///     - field: date_of_birth
+    ///       from_arg: dob
+    ///       selectivity: 0.95
+    ///     - field: nationality
+    ///       from_arg: nationality
+    ///       selectivity: 0.7
+    ///   resolution_tiers: [exact, composite, contextual, fuzzy]
+    ///   min_confidence: 0.8
+    /// ```
     #[serde(alias = "code_column")]
-    pub search_key: String,
+    pub search_key: SearchKeyConfig,
     /// The column containing primary key (UUID for entities, code for reference data)
     #[serde(alias = "id_column")]
     pub primary_key: String,
@@ -311,6 +331,169 @@ pub struct LookupConfig {
     /// Defaults to "reference" if not specified (backwards compatible).
     #[serde(default)]
     pub resolution_mode: Option<ResolutionMode>,
+}
+
+// =============================================================================
+// SEARCH KEY CONFIG (for composite entity resolution at scale)
+// =============================================================================
+
+/// Search key configuration - supports both simple column names and composite keys.
+///
+/// At scale (100k+ persons), a simple name search returns too many "John Smith" matches.
+/// Composite search keys allow disambiguation via additional fields (DOB, nationality, etc.)
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum SearchKeyConfig {
+    /// Legacy: single column name (backwards compatible)
+    /// Example: `search_key: name`
+    Simple(String),
+    /// Composite: structured search key with discriminators
+    /// Example: `search_key: { primary: name, discriminators: [...] }`
+    Composite(CompositeSearchKey),
+}
+
+impl SearchKeyConfig {
+    /// Get the primary search column name
+    pub fn primary_column(&self) -> &str {
+        match self {
+            SearchKeyConfig::Simple(col) => col,
+            SearchKeyConfig::Composite(c) => &c.primary,
+        }
+    }
+
+    /// Check if this is a simple (single-column) search key
+    pub fn is_simple(&self) -> bool {
+        matches!(self, SearchKeyConfig::Simple(_))
+    }
+
+    /// Get discriminator fields if this is a composite key
+    pub fn discriminators(&self) -> &[SearchDiscriminator] {
+        match self {
+            SearchKeyConfig::Simple(_) => &[],
+            SearchKeyConfig::Composite(c) => &c.discriminators,
+        }
+    }
+
+    /// Get resolution tiers (defaults to [Fuzzy] for simple keys)
+    pub fn resolution_tiers(&self) -> Vec<ResolutionTier> {
+        match self {
+            SearchKeyConfig::Simple(_) => vec![ResolutionTier::Fuzzy],
+            SearchKeyConfig::Composite(c) => {
+                if c.resolution_tiers.is_empty() {
+                    vec![
+                        ResolutionTier::Exact,
+                        ResolutionTier::Composite,
+                        ResolutionTier::Contextual,
+                        ResolutionTier::Fuzzy,
+                    ]
+                } else {
+                    c.resolution_tiers.clone()
+                }
+            }
+        }
+    }
+
+    /// Get minimum confidence threshold (defaults to 0.8)
+    pub fn min_confidence(&self) -> f32 {
+        match self {
+            SearchKeyConfig::Simple(_) => 0.8,
+            SearchKeyConfig::Composite(c) => c.min_confidence,
+        }
+    }
+}
+
+impl Default for SearchKeyConfig {
+    fn default() -> Self {
+        SearchKeyConfig::Simple("name".to_string())
+    }
+}
+
+/// Composite search key with discriminators for disambiguation
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CompositeSearchKey {
+    /// Primary search field (always indexed, always searched first)
+    pub primary: String,
+
+    /// Discriminator fields that narrow the search when available
+    #[serde(default)]
+    pub discriminators: Vec<SearchDiscriminator>,
+
+    /// Resolution tiers in priority order (how to resolve based on available fields)
+    /// Default: [exact, composite, contextual, fuzzy]
+    #[serde(default)]
+    pub resolution_tiers: Vec<ResolutionTier>,
+
+    /// Minimum confidence threshold for auto-resolution (0.0-1.0)
+    /// Below this threshold, returns ambiguous candidates instead of single match
+    #[serde(default = "default_min_confidence")]
+    pub min_confidence: f32,
+}
+
+fn default_min_confidence() -> f32 {
+    0.8
+}
+
+/// A discriminator field that helps narrow search results
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SearchDiscriminator {
+    /// Database column name (e.g., "date_of_birth", "nationality")
+    pub field: String,
+
+    /// DSL argument that provides this value (e.g., "dob", "nationality")
+    /// If omitted, uses the field name
+    #[serde(default)]
+    pub from_arg: Option<String>,
+
+    /// How much this field narrows the search (0.0-1.0)
+    /// 1.0 = unique identifier (source_id)
+    /// 0.95 = nearly unique (name + dob)
+    /// 0.7 = helpful but not unique (nationality)
+    #[serde(default = "default_selectivity")]
+    pub selectivity: f32,
+
+    /// Is this field required for resolution?
+    /// If true, resolution fails if field is not provided
+    #[serde(default)]
+    pub required: bool,
+}
+
+fn default_selectivity() -> f32 {
+    0.5
+}
+
+impl SearchDiscriminator {
+    /// Get the argument name (uses field name if from_arg not specified)
+    pub fn arg_name(&self) -> &str {
+        self.from_arg.as_deref().unwrap_or(&self.field)
+    }
+}
+
+/// Resolution tier - determines which search strategy to use
+///
+/// The system tries tiers in order until it finds a match or exhausts options.
+/// More specific tiers (Exact) are faster and more confident than fuzzy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ResolutionTier {
+    /// Source system ID - exact O(1) lookup
+    /// Requires: source_system + source_id
+    /// Confidence: 1.0
+    Exact,
+
+    /// Composite index - name + DOB + nationality
+    /// Requires: name + at least one discriminator
+    /// Confidence: 0.95
+    Composite,
+
+    /// Context-scoped search - name within CBU/case scope
+    /// Requires: name + context (cbu_id, case_id)
+    /// Confidence: 0.85
+    Contextual,
+
+    /// Fuzzy substring/phonetic search
+    /// Requires: name only
+    /// Confidence: varies by match score
+    Fuzzy,
 }
 
 /// How entity references should be resolved in the UI
@@ -576,5 +759,95 @@ primary_key: role_id
 "#;
         let config: LookupConfig = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(config.resolution_mode, None);
+    }
+
+    #[test]
+    fn test_search_key_config_simple() {
+        // Simple string search key (backwards compatible)
+        let yaml = r#"
+table: cbus
+schema: ob-poc
+entity_type: cbu
+search_key: name
+primary_key: cbu_id
+"#;
+        let config: LookupConfig = serde_yaml::from_str(yaml).unwrap();
+        assert!(config.search_key.is_simple());
+        assert_eq!(config.search_key.primary_column(), "name");
+        assert!(config.search_key.discriminators().is_empty());
+    }
+
+    #[test]
+    fn test_search_key_config_composite() {
+        // Composite search key with discriminators
+        let yaml = r#"
+table: entity_proper_persons
+schema: ob-poc
+entity_type: proper_person
+search_key:
+  primary: search_name
+  discriminators:
+    - field: date_of_birth
+      from_arg: dob
+      selectivity: 0.95
+    - field: nationality
+      selectivity: 0.7
+  resolution_tiers: [exact, composite, fuzzy]
+  min_confidence: 0.85
+primary_key: entity_id
+resolution_mode: entity
+"#;
+        let config: LookupConfig = serde_yaml::from_str(yaml).unwrap();
+
+        // Check it parsed as composite
+        assert!(!config.search_key.is_simple());
+        assert_eq!(config.search_key.primary_column(), "search_name");
+
+        // Check discriminators
+        let discriminators = config.search_key.discriminators();
+        assert_eq!(discriminators.len(), 2);
+
+        assert_eq!(discriminators[0].field, "date_of_birth");
+        assert_eq!(discriminators[0].arg_name(), "dob");
+        assert!((discriminators[0].selectivity - 0.95).abs() < 0.001);
+
+        assert_eq!(discriminators[1].field, "nationality");
+        assert_eq!(discriminators[1].arg_name(), "nationality"); // defaults to field name
+        assert!((discriminators[1].selectivity - 0.7).abs() < 0.001);
+
+        // Check resolution tiers
+        let tiers = config.search_key.resolution_tiers();
+        assert_eq!(tiers.len(), 3);
+        assert_eq!(tiers[0], ResolutionTier::Exact);
+        assert_eq!(tiers[1], ResolutionTier::Composite);
+        assert_eq!(tiers[2], ResolutionTier::Fuzzy);
+
+        // Check min confidence
+        assert!((config.search_key.min_confidence() - 0.85).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_search_key_config_composite_defaults() {
+        // Composite with minimal config (defaults should kick in)
+        let yaml = r#"
+table: entities
+search_key:
+  primary: name
+primary_key: entity_id
+"#;
+        let config: LookupConfig = serde_yaml::from_str(yaml).unwrap();
+
+        assert!(!config.search_key.is_simple());
+        assert_eq!(config.search_key.primary_column(), "name");
+        assert!(config.search_key.discriminators().is_empty());
+
+        // Default resolution tiers
+        let tiers = config.search_key.resolution_tiers();
+        assert_eq!(tiers.len(), 4);
+        assert_eq!(tiers[0], ResolutionTier::Exact);
+        assert_eq!(tiers[3], ResolutionTier::Fuzzy);
+
+        // Default min confidence
+        assert!((config.search_key.min_confidence() - 0.8).abs() < 0.001);
     }
 }

@@ -151,7 +151,7 @@ impl<'a> Enricher<'a> {
 
                     AstNode::EntityRef {
                         entity_type,
-                        search_column: config.search_key.clone(),
+                        search_column: config.search_key.primary_column().to_string(),
                         value: s,
                         resolved_key: None,
                         span: arg_span, // Preserve span for LSP diagnostics
@@ -173,7 +173,7 @@ impl<'a> Enricher<'a> {
                     // UUID is already the resolved key
                     AstNode::EntityRef {
                         entity_type,
-                        search_column: config.search_key.clone(),
+                        search_column: config.search_key.primary_column().to_string(),
                         value: uuid.to_string(), // Use UUID as display value
                         resolved_key: Some(uuid.to_string()),
                         span: arg_span, // Preserve span for LSP diagnostics
@@ -224,7 +224,7 @@ impl<'a> Enricher<'a> {
 mod tests {
     use super::super::config::types::{
         ArgConfig, ArgType, CrudConfig, CrudOperation, DomainConfig, LookupConfig, ResolutionMode,
-        VerbBehavior, VerbConfig, VerbsConfig,
+        SearchKeyConfig, VerbBehavior, VerbConfig, VerbsConfig,
     };
     use super::*;
     use std::collections::HashMap;
@@ -292,7 +292,7 @@ mod tests {
                             table: "jurisdictions".to_string(),
                             schema: None,
                             entity_type: Some("jurisdiction".to_string()),
-                            search_key: "code".to_string(),
+                            search_key: SearchKeyConfig::Simple("code".to_string()),
                             primary_key: "code".to_string(),
                             resolution_mode: None, // reference data - autocomplete
                         }),
@@ -376,7 +376,7 @@ mod tests {
                             table: "entities".to_string(),
                             schema: None,
                             entity_type: Some("entity".to_string()),
-                            search_key: "name".to_string(),
+                            search_key: SearchKeyConfig::Simple("name".to_string()),
                             primary_key: "entity_id".to_string(),
                             resolution_mode: Some(ResolutionMode::Entity), // entity - search modal
                         }),
@@ -395,7 +395,7 @@ mod tests {
                             table: "roles".to_string(),
                             schema: None,
                             entity_type: Some("role".to_string()),
-                            search_key: "name".to_string(),
+                            search_key: SearchKeyConfig::Simple("name".to_string()),
                             primary_key: "name".to_string(),
                             resolution_mode: None, // reference data - autocomplete
                         }),

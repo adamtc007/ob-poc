@@ -521,7 +521,7 @@ async fn validate_with_fixes(
                                     &state.pool,
                                     lookup_config.schema.as_deref().unwrap_or("ob-poc"),
                                     &lookup_config.table,
-                                    &lookup_config.search_key,
+                                    lookup_config.search_key.primary_column(),
                                 )
                                 .await;
 

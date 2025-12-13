@@ -137,6 +137,48 @@ args:
 | `reference` | Roles, jurisdictions, currencies | Autocomplete dropdown |
 | `entity` | CBUs, people, funds, cases | Search modal with refinement |
 
+### Composite Search Keys (for high-volume tables)
+
+For tables with 100k+ records (e.g., persons, companies), a simple name search returns too many matches. The `search_key` config supports composite keys with discriminators:
+
+```yaml
+# Simple search key (backwards compatible)
+lookup:
+  entity_type: cbu
+  search_key: name
+  primary_key: cbu_id
+
+# Composite search key (for high-volume tables)
+lookup:
+  entity_type: proper_person
+  search_key:
+    primary: search_name           # Always searched
+    discriminators:                # Narrow results when available
+      - field: date_of_birth
+        from_arg: dob              # Maps to DSL :dob argument
+        selectivity: 0.95          # How much this narrows search
+      - field: nationality
+        selectivity: 0.7
+    resolution_tiers: [exact, composite, contextual, fuzzy]
+    min_confidence: 0.85
+  primary_key: entity_id
+  resolution_mode: entity
+```
+
+**Resolution Tiers** (tried in order):
+
+| Tier | Requires | Confidence | Performance |
+|------|----------|------------|-------------|
+| `exact` | source_system + source_id | 1.0 | O(1) |
+| `composite` | name + discriminators | 0.95 | O(log n) |
+| `contextual` | name + scope (CBU, case) | 0.85 | O(log n) |
+| `fuzzy` | name only | varies | O(n) |
+
+**Discriminator Selectivity**:
+- 1.0 = unique identifier (source_id)
+- 0.95 = nearly unique (name + dob)
+- 0.7 = helpful but not unique (nationality)
+
 ## Centralized Entity Lookup Architecture
 
 All entity lookup and resolution flows through the **EntityGateway** gRPC service. This ensures consistent fuzzy search behavior across the entire system.
