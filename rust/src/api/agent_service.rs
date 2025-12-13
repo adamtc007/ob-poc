@@ -203,6 +203,10 @@ pub struct AgentServiceConfig {
     pub max_retries: usize,
     /// EntityGateway address
     pub gateway_addr: String,
+    /// Enable pre-resolution: query EntityGateway before LLM to provide available entities
+    pub enable_pre_resolution: bool,
+    /// Maximum entities to pre-fetch per type for context injection
+    pub pre_resolution_limit: usize,
 }
 
 impl Default for AgentServiceConfig {
@@ -210,8 +214,25 @@ impl Default for AgentServiceConfig {
         Self {
             max_retries: 3,
             gateway_addr: gateway_addr(),
+            enable_pre_resolution: true,
+            pre_resolution_limit: 20,
         }
     }
+}
+
+/// Pre-resolved entities available for the LLM to reference
+#[derive(Debug, Clone, Default)]
+pub struct PreResolvedContext {
+    /// Available CBUs (name -> UUID)
+    pub cbus: Vec<(String, Uuid)>,
+    /// Available entities (name -> UUID, type)
+    pub entities: Vec<(String, Uuid, String)>,
+    /// Available products (code -> name)
+    pub products: Vec<(String, String)>,
+    /// Available roles (code)
+    pub roles: Vec<String>,
+    /// Available jurisdictions (code -> name)
+    pub jurisdictions: Vec<(String, String)>,
 }
 
 // ============================================================================
@@ -260,6 +281,132 @@ impl AgentService {
         Self { pool, config }
     }
 
+    /// Pre-resolve available entities from EntityGateway before LLM call
+    ///
+    /// This is Enhancement #1: Query EntityGateway upfront and inject available
+    /// entities into the LLM prompt. The LLM can then only reference entities
+    /// that actually exist, eliminating "entity not found" retries.
+    async fn pre_resolve_entities(&self) -> PreResolvedContext {
+        let mut context = PreResolvedContext::default();
+
+        let mut resolver = match GatewayRefResolver::connect(&self.config.gateway_addr).await {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::warn!("Pre-resolution: EntityGateway not available: {}", e);
+                return context;
+            }
+        };
+
+        let limit = self.config.pre_resolution_limit;
+
+        // Fetch CBUs - most commonly referenced
+        if let Ok(matches) = resolver.search_fuzzy(RefType::Cbu, "", limit).await {
+            context.cbus = matches
+                .into_iter()
+                .filter_map(|m| Uuid::parse_str(&m.value).ok().map(|id| (m.display, id)))
+                .collect();
+            tracing::debug!("Pre-resolved {} CBUs", context.cbus.len());
+        }
+
+        // Fetch entities (persons, companies)
+        if let Ok(matches) = resolver.search_fuzzy(RefType::Entity, "", limit).await {
+            context.entities = matches
+                .into_iter()
+                .filter_map(|m| {
+                    Uuid::parse_str(&m.value)
+                        .ok()
+                        .map(|id| (m.display.clone(), id, "entity".to_string()))
+                })
+                .collect();
+            tracing::debug!("Pre-resolved {} entities", context.entities.len());
+        }
+
+        // Fetch products
+        if let Ok(matches) = resolver.search_fuzzy(RefType::Product, "", limit).await {
+            context.products = matches.into_iter().map(|m| (m.value, m.display)).collect();
+            tracing::debug!("Pre-resolved {} products", context.products.len());
+        }
+
+        // Fetch roles
+        if let Ok(matches) = resolver.search_fuzzy(RefType::Role, "", limit).await {
+            context.roles = matches.into_iter().map(|m| m.value).collect();
+            tracing::debug!("Pre-resolved {} roles", context.roles.len());
+        }
+
+        // Fetch jurisdictions
+        if let Ok(matches) = resolver
+            .search_fuzzy(RefType::Jurisdiction, "", limit)
+            .await
+        {
+            context.jurisdictions = matches.into_iter().map(|m| (m.value, m.display)).collect();
+            tracing::debug!("Pre-resolved {} jurisdictions", context.jurisdictions.len());
+        }
+
+        context
+    }
+
+    /// Format pre-resolved entities for injection into LLM prompt
+    fn format_pre_resolved_context(&self, ctx: &PreResolvedContext) -> String {
+        let mut sections = Vec::new();
+
+        if !ctx.cbus.is_empty() {
+            let cbu_list: Vec<String> = ctx
+                .cbus
+                .iter()
+                .map(|(name, id)| format!("  - \"{}\" (id: {})", name, id))
+                .collect();
+            sections.push(format!(
+                "## Existing CBUs (use exact names or IDs)\n{}",
+                cbu_list.join("\n")
+            ));
+        }
+
+        if !ctx.entities.is_empty() {
+            let entity_list: Vec<String> = ctx
+                .entities
+                .iter()
+                .take(15) // Limit to avoid prompt bloat
+                .map(|(name, id, _)| format!("  - \"{}\" (id: {})", name, id))
+                .collect();
+            sections.push(format!("## Existing Entities\n{}", entity_list.join("\n")));
+        }
+
+        if !ctx.products.is_empty() {
+            let product_list: Vec<String> = ctx
+                .products
+                .iter()
+                .map(|(code, name)| format!("  - {} ({})", code, name))
+                .collect();
+            sections.push(format!(
+                "## Available Products (use CODE)\n{}",
+                product_list.join("\n")
+            ));
+        }
+
+        if !ctx.roles.is_empty() {
+            sections.push(format!("## Available Roles\n  {}", ctx.roles.join(", ")));
+        }
+
+        if !ctx.jurisdictions.is_empty() {
+            let juris_list: Vec<String> = ctx
+                .jurisdictions
+                .iter()
+                .take(20)
+                .map(|(code, name)| format!("{} ({})", code, name))
+                .collect();
+            sections.push(format!("## Jurisdictions\n  {}", juris_list.join(", ")));
+        }
+
+        if sections.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "\n\n# AVAILABLE DATA (use these exact values)\n\n{}",
+                sections.join("\n\n")
+            )
+        }
+    }
+
     /// Process a chat message and return response (with disambiguation if needed)
     ///
     /// This is the main entry point for agent chat. It:
@@ -293,9 +440,23 @@ impl AgentService {
         let session_bindings = session.context.bindings_for_llm();
         let session_named_refs = session.context.named_refs.clone();
 
-        // Build prompts
+        // Enhancement #1: Pre-resolve available entities before LLM call
+        // This injects available CBUs, entities, products, etc. into the prompt
+        // so the LLM can only reference things that actually exist
+        let pre_resolved = if self.config.enable_pre_resolution {
+            self.pre_resolve_entities().await
+        } else {
+            PreResolvedContext::default()
+        };
+        let pre_resolved_context = self.format_pre_resolved_context(&pre_resolved);
+
+        // Build prompts with pre-resolved data
         let vocab = self.build_vocab_prompt(None);
-        let system_prompt = self.build_intent_extraction_prompt(&vocab);
+        let system_prompt = format!(
+            "{}{}",
+            self.build_intent_extraction_prompt(&vocab),
+            pre_resolved_context
+        );
 
         let bindings_context = if !session_bindings.is_empty() {
             format!(
@@ -1017,7 +1178,15 @@ Intent: {{
     }
 
     /// Build tool definition for intent extraction
+    ///
+    /// Enhancement #2: The verb field uses an enum of all valid verb names from
+    /// the registry. This constrains LLM output to only valid verbs, eliminating
+    /// "unknown verb" errors entirely.
     fn build_intent_tool(&self) -> ToolDefinition {
+        // Get all valid verb names from registry for constrained output
+        let reg = registry();
+        let verb_names: Vec<String> = reg.all_verbs().map(|v| v.full_name()).collect();
+
         ToolDefinition {
             name: "generate_dsl_intents".to_string(),
             description: "Generate structured DSL intents from user request. Use 'lookups' for entity references that need database resolution.".to_string(),
@@ -1032,7 +1201,8 @@ Intent: {{
                             "properties": {
                                 "verb": {
                                     "type": "string",
-                                    "description": "The DSL verb, e.g., 'cbu.ensure', 'entity.create-proper-person'"
+                                    "enum": verb_names,
+                                    "description": "The DSL verb - MUST be one of the allowed values"
                                 },
                                 "params": {
                                     "type": "object",
