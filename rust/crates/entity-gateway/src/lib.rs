@@ -58,6 +58,8 @@ pub mod config;
 pub mod index;
 pub mod proto;
 pub mod refresh;
+pub mod search_engine;
+pub mod search_expr;
 pub mod server;
 
 // Re-export main types
@@ -67,4 +69,6 @@ pub use index::{
     TantivyIndex,
 };
 pub use refresh::{run_refresh_loop, RefreshPipeline};
+pub use search_engine::{RankedMatch, SearchEngine, SearchResult};
+pub use search_expr::{ParseError, SearchExpr, SearchQuery as SearchExprQuery, SearchSchema};
 pub use server::EntityGatewayService;

@@ -334,25 +334,56 @@ pub struct LookupConfig {
 }
 
 // =============================================================================
-// SEARCH KEY CONFIG (for composite entity resolution at scale)
+// SEARCH KEY CONFIG (S-expression syntax for composite entity resolution)
 // =============================================================================
 
-/// Search key configuration - supports both simple column names and composite keys.
+/// Search key configuration using s-expression syntax.
 ///
 /// At scale (100k+ persons), a simple name search returns too many "John Smith" matches.
 /// Composite search keys allow disambiguation via additional fields (DOB, nationality, etc.)
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(untagged)]
+///
+/// ## Syntax Examples
+///
+/// Simple (backwards compatible - just column name):
+/// ```yaml
+/// search_key: name
+/// search_key: search_name
+/// ```
+///
+/// Composite with discriminators (s-expression with nested lists):
+/// ```yaml
+/// # Primary column + discriminator columns
+/// search_key: "(search_name date_of_birth nationality)"
+///
+/// # With selectivity scores for discriminators
+/// search_key: "(search_name (date_of_birth :selectivity 0.95) (nationality :selectivity 0.7))"
+///
+/// # With options
+/// search_key: "(search_name (date_of_birth :selectivity 0.95 :required true) :min-confidence 0.85)"
+/// ```
+///
+/// The s-expression is parsed into a `CompositeSearchKey` structure.
+#[derive(Debug, Clone)]
 pub enum SearchKeyConfig {
-    /// Legacy: single column name (backwards compatible)
-    /// Example: `search_key: name`
+    /// Simple: single column name (backwards compatible)
     Simple(String),
-    /// Composite: structured search key with discriminators
-    /// Example: `search_key: { primary: name, discriminators: [...] }`
+    /// Composite: parsed from s-expression
     Composite(CompositeSearchKey),
 }
 
 impl SearchKeyConfig {
+    /// Parse a search key from string (simple name or s-expression)
+    pub fn parse(input: &str) -> Result<Self, String> {
+        let trimmed = input.trim();
+        if trimmed.starts_with('(') {
+            // S-expression - parse it
+            CompositeSearchKey::parse(trimmed).map(SearchKeyConfig::Composite)
+        } else {
+            // Simple column name
+            Ok(SearchKeyConfig::Simple(trimmed.to_string()))
+        }
+    }
+
     /// Get the primary search column name
     pub fn primary_column(&self) -> &str {
         match self {
@@ -364,6 +395,20 @@ impl SearchKeyConfig {
     /// Check if this is a simple (single-column) search key
     pub fn is_simple(&self) -> bool {
         matches!(self, SearchKeyConfig::Simple(_))
+    }
+
+    /// Get all columns needed for this search key
+    pub fn all_columns(&self) -> Vec<&str> {
+        match self {
+            SearchKeyConfig::Simple(col) => vec![col.as_str()],
+            SearchKeyConfig::Composite(c) => {
+                let mut cols = vec![c.primary.as_str()];
+                for d in &c.discriminators {
+                    cols.push(d.field.as_str());
+                }
+                cols
+            }
+        }
     }
 
     /// Get discriminator fields if this is a composite key
@@ -400,6 +445,14 @@ impl SearchKeyConfig {
             SearchKeyConfig::Composite(c) => c.min_confidence,
         }
     }
+
+    /// Serialize back to s-expression string
+    pub fn to_sexpr(&self) -> String {
+        match self {
+            SearchKeyConfig::Simple(col) => col.clone(),
+            SearchKeyConfig::Composite(c) => c.to_sexpr(),
+        }
+    }
 }
 
 impl Default for SearchKeyConfig {
@@ -408,29 +461,317 @@ impl Default for SearchKeyConfig {
     }
 }
 
+// Custom serde: deserialize from string (simple or s-expr), serialize to string
+impl<'de> Deserialize<'de> for SearchKeyConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        SearchKeyConfig::parse(&s).map_err(serde::de::Error::custom)
+    }
+}
+
+impl Serialize for SearchKeyConfig {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_sexpr())
+    }
+}
+
 /// Composite search key with discriminators for disambiguation
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub struct CompositeSearchKey {
     /// Primary search field (always indexed, always searched first)
     pub primary: String,
 
     /// Discriminator fields that narrow the search when available
-    #[serde(default)]
     pub discriminators: Vec<SearchDiscriminator>,
 
     /// Resolution tiers in priority order (how to resolve based on available fields)
     /// Default: [exact, composite, contextual, fuzzy]
-    #[serde(default)]
     pub resolution_tiers: Vec<ResolutionTier>,
 
     /// Minimum confidence threshold for auto-resolution (0.0-1.0)
     /// Below this threshold, returns ambiguous candidates instead of single match
-    #[serde(default = "default_min_confidence")]
     pub min_confidence: f32,
 }
 
-fn default_min_confidence() -> f32 {
-    0.8
+impl CompositeSearchKey {
+    /// Parse a composite search key from s-expression
+    ///
+    /// Syntax: `(primary_col [discriminator...] [:option value]...)`
+    ///
+    /// Where discriminator is either:
+    /// - `col_name` - simple column with default selectivity
+    /// - `(col_name :selectivity 0.95 [:required true])` - column with options
+    ///
+    /// Options:
+    /// - `:min-confidence 0.85` - minimum match confidence
+    /// - `:tiers (exact composite fuzzy)` - resolution tier order
+    pub fn parse(input: &str) -> Result<Self, String> {
+        let tokens = tokenize_sexpr(input)?;
+        if tokens.is_empty() {
+            return Err("Empty s-expression".to_string());
+        }
+
+        let mut primary: Option<String> = None;
+        let mut discriminators = Vec::new();
+        let mut min_confidence = 0.8f32;
+        let mut resolution_tiers = Vec::new();
+
+        let mut i = 0;
+        while i < tokens.len() {
+            match &tokens[i] {
+                SExprToken::Symbol(s) if s.starts_with(':') => {
+                    // Keyword option
+                    let Some(key) = s.strip_prefix(':') else {
+                        unreachable!()
+                    };
+                    i += 1;
+                    if i >= tokens.len() {
+                        return Err(format!("Missing value for :{}", key));
+                    }
+                    match key {
+                        "min-confidence" => {
+                            if let SExprToken::Symbol(v) = &tokens[i] {
+                                min_confidence = v
+                                    .parse()
+                                    .map_err(|_| format!("Invalid :min-confidence value: {}", v))?;
+                            }
+                        }
+                        "tiers" => {
+                            if let SExprToken::List(tier_tokens) = &tokens[i] {
+                                for t in tier_tokens {
+                                    if let SExprToken::Symbol(tier_name) = t {
+                                        resolution_tiers.push(parse_tier(tier_name)?);
+                                    }
+                                }
+                            }
+                        }
+                        _ => {} // Ignore unknown options
+                    }
+                    i += 1;
+                }
+                SExprToken::Symbol(s) => {
+                    // Column name
+                    if primary.is_none() {
+                        primary = Some(s.clone());
+                    } else {
+                        // Simple discriminator
+                        discriminators.push(SearchDiscriminator {
+                            field: s.clone(),
+                            from_arg: None,
+                            selectivity: 0.5,
+                            required: false,
+                        });
+                    }
+                    i += 1;
+                }
+                SExprToken::List(inner) => {
+                    // Discriminator with options: (col_name :selectivity 0.95 ...)
+                    let disc = parse_discriminator(inner)?;
+                    discriminators.push(disc);
+                    i += 1;
+                }
+            }
+        }
+
+        let primary = primary.ok_or_else(|| "Missing primary column in search key".to_string())?;
+
+        Ok(CompositeSearchKey {
+            primary,
+            discriminators,
+            resolution_tiers,
+            min_confidence,
+        })
+    }
+
+    /// Serialize to s-expression string
+    pub fn to_sexpr(&self) -> String {
+        let mut parts = vec![self.primary.clone()];
+
+        for d in &self.discriminators {
+            if d.selectivity == 0.5 && !d.required && d.from_arg.is_none() {
+                // Simple form
+                parts.push(d.field.clone());
+            } else {
+                // Full form with options
+                let mut disc_parts = vec![d.field.clone()];
+                if d.selectivity != 0.5 {
+                    disc_parts.push(format!(":selectivity {}", d.selectivity));
+                }
+                if d.required {
+                    disc_parts.push(":required true".to_string());
+                }
+                if let Some(ref arg) = d.from_arg {
+                    disc_parts.push(format!(":from-arg {}", arg));
+                }
+                parts.push(format!("({})", disc_parts.join(" ")));
+            }
+        }
+
+        if self.min_confidence != 0.8 {
+            parts.push(format!(":min-confidence {}", self.min_confidence));
+        }
+
+        if !self.resolution_tiers.is_empty() {
+            let tiers: Vec<&str> = self.resolution_tiers.iter().map(|t| t.as_str()).collect();
+            parts.push(format!(":tiers ({})", tiers.join(" ")));
+        }
+
+        format!("({})", parts.join(" "))
+    }
+}
+
+// =============================================================================
+// S-EXPRESSION TOKENIZER (for search key parsing)
+// =============================================================================
+
+/// Token types for s-expression parsing
+#[derive(Debug, Clone, PartialEq)]
+enum SExprToken {
+    Symbol(String),
+    List(Vec<SExprToken>),
+}
+
+/// Tokenize an s-expression string
+fn tokenize_sexpr(input: &str) -> Result<Vec<SExprToken>, String> {
+    let trimmed = input.trim();
+    if !trimmed.starts_with('(') || !trimmed.ends_with(')') {
+        return Err("S-expression must be wrapped in parentheses".to_string());
+    }
+
+    // Remove outer parens
+    let inner = &trimmed[1..trimmed.len() - 1];
+    tokenize_inner(inner)
+}
+
+fn tokenize_inner(input: &str) -> Result<Vec<SExprToken>, String> {
+    let mut tokens = Vec::new();
+    let mut chars = input.chars().peekable();
+
+    while let Some(&c) = chars.peek() {
+        if c.is_whitespace() {
+            chars.next();
+            continue;
+        }
+
+        if c == '(' {
+            // Nested list
+            chars.next();
+            let mut depth = 1;
+            let mut nested = String::new();
+            while depth > 0 {
+                match chars.next() {
+                    Some('(') => {
+                        depth += 1;
+                        nested.push('(');
+                    }
+                    Some(')') => {
+                        depth -= 1;
+                        if depth > 0 {
+                            nested.push(')');
+                        }
+                    }
+                    Some(ch) => nested.push(ch),
+                    None => return Err("Unclosed parenthesis".to_string()),
+                }
+            }
+            let inner_tokens = tokenize_inner(&nested)?;
+            tokens.push(SExprToken::List(inner_tokens));
+        } else {
+            // Symbol (including keywords like :selectivity)
+            let mut symbol = String::new();
+            while let Some(&ch) = chars.peek() {
+                if ch.is_whitespace() || ch == '(' || ch == ')' {
+                    break;
+                }
+                symbol.push(ch);
+                chars.next();
+            }
+            if !symbol.is_empty() {
+                tokens.push(SExprToken::Symbol(symbol));
+            }
+        }
+    }
+
+    Ok(tokens)
+}
+
+/// Parse a discriminator from tokens
+fn parse_discriminator(tokens: &[SExprToken]) -> Result<SearchDiscriminator, String> {
+    if tokens.is_empty() {
+        return Err("Empty discriminator".to_string());
+    }
+
+    let field = match &tokens[0] {
+        SExprToken::Symbol(s) => s.clone(),
+        _ => return Err("Discriminator must start with field name".to_string()),
+    };
+
+    let mut selectivity = 0.5f32;
+    let mut required = false;
+    let mut from_arg = None;
+
+    let mut i = 1;
+    while i < tokens.len() {
+        if let SExprToken::Symbol(s) = &tokens[i] {
+            if let Some(key) = s.strip_prefix(':') {
+                i += 1;
+                if i >= tokens.len() {
+                    break;
+                }
+                if let SExprToken::Symbol(val) = &tokens[i] {
+                    match key {
+                        "selectivity" => {
+                            selectivity = val.parse().unwrap_or(0.5);
+                        }
+                        "required" => {
+                            required = val == "true";
+                        }
+                        "from-arg" => {
+                            from_arg = Some(val.clone());
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        i += 1;
+    }
+
+    Ok(SearchDiscriminator {
+        field,
+        from_arg,
+        selectivity,
+        required,
+    })
+}
+
+/// Parse a resolution tier from string
+fn parse_tier(s: &str) -> Result<ResolutionTier, String> {
+    match s {
+        "exact" => Ok(ResolutionTier::Exact),
+        "composite" => Ok(ResolutionTier::Composite),
+        "contextual" => Ok(ResolutionTier::Contextual),
+        "fuzzy" => Ok(ResolutionTier::Fuzzy),
+        _ => Err(format!("Unknown resolution tier: {}", s)),
+    }
+}
+
+impl ResolutionTier {
+    /// Convert tier to string representation
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ResolutionTier::Exact => "exact",
+            ResolutionTier::Composite => "composite",
+            ResolutionTier::Contextual => "contextual",
+            ResolutionTier::Fuzzy => "fuzzy",
+        }
+    }
 }
 
 /// A discriminator field that helps narrow search results
@@ -778,22 +1119,13 @@ primary_key: cbu_id
     }
 
     #[test]
-    fn test_search_key_config_composite() {
-        // Composite search key with discriminators
+    fn test_search_key_config_composite_sexpr() {
+        // Composite search key using s-expression syntax
         let yaml = r#"
 table: entity_proper_persons
 schema: ob-poc
 entity_type: proper_person
-search_key:
-  primary: search_name
-  discriminators:
-    - field: date_of_birth
-      from_arg: dob
-      selectivity: 0.95
-    - field: nationality
-      selectivity: 0.7
-  resolution_tiers: [exact, composite, fuzzy]
-  min_confidence: 0.85
+search_key: "(search_name (date_of_birth :selectivity 0.95 :from-arg dob) (nationality :selectivity 0.7))"
 primary_key: entity_id
 resolution_mode: entity
 "#;
@@ -814,40 +1146,91 @@ resolution_mode: entity
         assert_eq!(discriminators[1].field, "nationality");
         assert_eq!(discriminators[1].arg_name(), "nationality"); // defaults to field name
         assert!((discriminators[1].selectivity - 0.7).abs() < 0.001);
-
-        // Check resolution tiers
-        let tiers = config.search_key.resolution_tiers();
-        assert_eq!(tiers.len(), 3);
-        assert_eq!(tiers[0], ResolutionTier::Exact);
-        assert_eq!(tiers[1], ResolutionTier::Composite);
-        assert_eq!(tiers[2], ResolutionTier::Fuzzy);
-
-        // Check min confidence
-        assert!((config.search_key.min_confidence() - 0.85).abs() < 0.001);
     }
 
     #[test]
-    fn test_search_key_config_composite_defaults() {
-        // Composite with minimal config (defaults should kick in)
+    fn test_search_key_config_composite_simple_form() {
+        // Composite with simple discriminator list (no options)
         let yaml = r#"
 table: entities
-search_key:
-  primary: name
+search_key: "(name date_of_birth nationality)"
 primary_key: entity_id
 "#;
         let config: LookupConfig = serde_yaml::from_str(yaml).unwrap();
 
         assert!(!config.search_key.is_simple());
         assert_eq!(config.search_key.primary_column(), "name");
-        assert!(config.search_key.discriminators().is_empty());
 
-        // Default resolution tiers
-        let tiers = config.search_key.resolution_tiers();
-        assert_eq!(tiers.len(), 4);
-        assert_eq!(tiers[0], ResolutionTier::Exact);
-        assert_eq!(tiers[3], ResolutionTier::Fuzzy);
+        let discriminators = config.search_key.discriminators();
+        assert_eq!(discriminators.len(), 2);
+        assert_eq!(discriminators[0].field, "date_of_birth");
+        assert_eq!(discriminators[1].field, "nationality");
 
-        // Default min confidence
-        assert!((config.search_key.min_confidence() - 0.8).abs() < 0.001);
+        // Default selectivity
+        assert!((discriminators[0].selectivity - 0.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_search_key_config_composite_with_options() {
+        // Composite with global options
+        let yaml = r#"
+table: entities
+search_key: "(name (dob :selectivity 0.95) :min-confidence 0.9)"
+primary_key: entity_id
+"#;
+        let config: LookupConfig = serde_yaml::from_str(yaml).unwrap();
+
+        assert!(!config.search_key.is_simple());
+        assert_eq!(config.search_key.primary_column(), "name");
+        assert!((config.search_key.min_confidence() - 0.9).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_search_key_all_columns() {
+        // Test all_columns() method
+        let sk = SearchKeyConfig::parse("(search_name date_of_birth nationality)").unwrap();
+        let cols = sk.all_columns();
+        assert_eq!(cols.len(), 3);
+        assert!(cols.contains(&"search_name"));
+        assert!(cols.contains(&"date_of_birth"));
+        assert!(cols.contains(&"nationality"));
+    }
+
+    #[test]
+    fn test_search_key_to_sexpr_roundtrip() {
+        // Test that to_sexpr produces valid s-expression that can be re-parsed
+        let original = "(search_name (date_of_birth :selectivity 0.95) nationality)";
+        let parsed = SearchKeyConfig::parse(original).unwrap();
+        let serialized = parsed.to_sexpr();
+        let reparsed = SearchKeyConfig::parse(&serialized).unwrap();
+
+        assert_eq!(parsed.primary_column(), reparsed.primary_column());
+        assert_eq!(
+            parsed.discriminators().len(),
+            reparsed.discriminators().len()
+        );
+    }
+
+    #[test]
+    fn test_tokenize_sexpr() {
+        let tokens = tokenize_sexpr("(name dob)").unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens[0], SExprToken::Symbol("name".to_string()));
+        assert_eq!(tokens[1], SExprToken::Symbol("dob".to_string()));
+    }
+
+    #[test]
+    fn test_tokenize_sexpr_nested() {
+        let tokens = tokenize_sexpr("(name (dob :selectivity 0.95))").unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens[0], SExprToken::Symbol("name".to_string()));
+        if let SExprToken::List(inner) = &tokens[1] {
+            assert_eq!(inner.len(), 3);
+            assert_eq!(inner[0], SExprToken::Symbol("dob".to_string()));
+            assert_eq!(inner[1], SExprToken::Symbol(":selectivity".to_string()));
+            assert_eq!(inner[2], SExprToken::Symbol("0.95".to_string()));
+        } else {
+            panic!("Expected nested list");
+        }
     }
 }

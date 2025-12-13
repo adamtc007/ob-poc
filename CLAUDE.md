@@ -137,33 +137,50 @@ args:
 | `reference` | Roles, jurisdictions, currencies | Autocomplete dropdown |
 | `entity` | CBUs, people, funds, cases | Search modal with refinement |
 
-### Composite Search Keys (for high-volume tables)
+### Composite Search Keys (S-Expression Syntax)
 
-For tables with 100k+ records (e.g., persons, companies), a simple name search returns too many matches. The `search_key` config supports composite keys with discriminators:
+For tables with 100k+ records (e.g., persons, companies), a simple name search returns too many matches. The `search_key` config uses **s-expression syntax** to define composite keys with discriminators:
 
 ```yaml
-# Simple search key (backwards compatible)
+# Simple search key (just a column name - backwards compatible)
 lookup:
   entity_type: cbu
   search_key: name
   primary_key: cbu_id
 
-# Composite search key (for high-volume tables)
+# Composite search key with discriminators (s-expression)
 lookup:
   entity_type: proper_person
-  search_key:
-    primary: search_name           # Always searched
-    discriminators:                # Narrow results when available
-      - field: date_of_birth
-        from_arg: dob              # Maps to DSL :dob argument
-        selectivity: 0.95          # How much this narrows search
-      - field: nationality
-        selectivity: 0.7
-    resolution_tiers: [exact, composite, contextual, fuzzy]
-    min_confidence: 0.85
+  search_key: "(search_name (date_of_birth :selectivity 0.95) (nationality :selectivity 0.7))"
   primary_key: entity_id
   resolution_mode: entity
+
+# With global options
+lookup:
+  entity_type: entity
+  search_key: "(name (jurisdiction :selectivity 0.8) :min-confidence 0.85 :tier composite)"
+  primary_key: entity_id
 ```
+
+**S-Expression Syntax**:
+
+```
+(primary_field discriminator1 discriminator2 ... :option value)
+
+Where discriminator is either:
+  - field_name                           ; simple field, default selectivity
+  - (field_name :selectivity 0.95)       ; field with selectivity
+  - (field_name :from-arg dob)           ; maps to DSL argument name
+```
+
+**Examples**:
+
+| S-Expression | Meaning |
+|--------------|---------|
+| `name` | Simple search on name column |
+| `(search_name date_of_birth)` | Search name, narrow by DOB |
+| `(search_name (dob :selectivity 0.95))` | Name + DOB with 95% selectivity |
+| `(name (nationality :selectivity 0.7) :min-confidence 0.9)` | Name + nationality, require 90% confidence |
 
 **Resolution Tiers** (tried in order):
 
@@ -178,6 +195,60 @@ lookup:
 - 1.0 = unique identifier (source_id)
 - 0.95 = nearly unique (name + dob)
 - 0.7 = helpful but not unique (nationality)
+
+### Search Engine Architecture
+
+The EntityGateway includes a **mini DSL interpreter** for search queries. Search schemas are parsed from verb YAML, and runtime queries are s-expressions with filled-in values.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   Verb YAML (design time)                        │
+│  search_key: "(search_name (dob :selectivity 0.95))"            │
+└─────────────────────────────────────────────────────────────────┘
+                              │ parse
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   SearchSchema                                   │
+│  primary_field: "search_name"                                   │
+│  discriminators: [{field: "dob", selectivity: 0.95}]            │
+│  rust/crates/entity-gateway/src/search_expr.rs                  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   SearchQuery (runtime)                          │
+│  primary_value: "John Smith"                                    │
+│  discriminators: {"dob": "1980-01-15"}                          │
+└─────────────────────────────────────────────────────────────────┘
+                              │ execute
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   SearchEngine                                   │
+│  1. Search primary field in Tantivy index                       │
+│  2. Score matches by discriminator similarity                   │
+│  3. Return ranked results with confidence scores                │
+│  rust/crates/entity-gateway/src/search_engine.rs                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key Types** (`rust/crates/entity-gateway/src/`):
+
+| Type | File | Purpose |
+|------|------|---------|
+| `SearchExpr` | search_expr.rs | Parsed s-expression AST |
+| `SearchSchema` | search_expr.rs | Schema definition from verb YAML |
+| `SearchQuery` | search_expr.rs | Runtime query with values |
+| `SearchEngine` | search_engine.rs | Interpreter that executes queries |
+| `SearchResult` | search_engine.rs | Ranked matches with confidence |
+| `RankedMatch` | search_engine.rs | Individual match with score |
+
+**Search Algorithm**:
+1. Parse schema from verb YAML `search_key` field
+2. At runtime, receive query with primary value + optional discriminators
+3. Search primary field using Tantivy fuzzy matching
+4. For each match, compute discriminator scores
+5. Combine scores: `final = primary_score * Π(1 - selectivity * (1 - match))`
+6. Filter by min_confidence, return ranked results
 
 ## Centralized Entity Lookup Architecture
 

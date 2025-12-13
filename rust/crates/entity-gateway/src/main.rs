@@ -52,13 +52,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create index registry - keyed by nickname field (uppercase), not YAML key
     let configs_by_nickname: std::collections::HashMap<String, _> = config
         .entities
-        .iter()
-        .map(|(_, cfg)| (cfg.nickname.clone(), cfg.clone()))
+        .values()
+        .map(|cfg| (cfg.nickname.clone(), cfg.clone()))
         .collect();
     let registry = Arc::new(IndexRegistry::new(configs_by_nickname));
 
     // Create indexes for each entity (using nickname from config)
-    for (_yaml_key, entity_config) in &config.entities {
+    for entity_config in config.entities.values() {
         tracing::info!(nickname = %entity_config.nickname, "Creating index");
         let index = TantivyIndex::new(entity_config.clone())?;
         registry
