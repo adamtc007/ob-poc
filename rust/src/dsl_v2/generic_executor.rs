@@ -140,7 +140,7 @@ impl GenericCrudExecutor {
         verb: &RuntimeVerb,
         args: &HashMap<String, JsonValue>,
     ) -> Result<GenericExecutionResult> {
-        eprintln!(
+        tracing::debug!(
             "DBG GenericCrudExecutor::execute ENTER {}.{}",
             verb.domain, verb.verb
         );
@@ -157,7 +157,7 @@ impl GenericCrudExecutor {
             }
         };
 
-        eprintln!(
+        tracing::debug!(
             "DBG GenericCrudExecutor: operation={:?} table={}.{}",
             crud.operation, crud.schema, crud.table
         );
@@ -179,7 +179,7 @@ impl GenericCrudExecutor {
             CrudOperation::EntityUpsert => self.execute_entity_upsert(verb, crud, args).await,
         };
 
-        eprintln!(
+        tracing::debug!(
             "DBG GenericCrudExecutor::execute EXIT result={:?}",
             result.is_ok()
         );
@@ -1696,20 +1696,20 @@ impl GenericCrudExecutor {
 
     /// Execute query returning single row
     async fn execute_with_bindings(&self, sql: &str, values: &[SqlValue]) -> Result<PgRow> {
-        eprintln!(
+        tracing::debug!(
             "DBG execute_with_bindings: sql_len={} binds={}",
             sql.len(),
             values.len()
         );
-        eprintln!("DBG SQL: {}", &sql[..sql.len().min(200)]);
+        tracing::debug!("SQL: {}", &sql[..sql.len().min(200)]);
 
         let mut query = sqlx::query(sql);
         for val in values {
             query = Self::bind_sql_value(query, val);
         }
-        eprintln!("DBG execute_with_bindings: calling fetch_one...");
+        tracing::debug!("execute_with_bindings: calling fetch_one...");
         let row = query.fetch_one(&self.pool).await?;
-        eprintln!("DBG execute_with_bindings: fetch_one returned OK");
+        tracing::debug!("execute_with_bindings: fetch_one returned OK");
         Ok(row)
     }
 

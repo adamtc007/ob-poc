@@ -329,7 +329,7 @@ impl CustomOperation for ValidateBookingCoverageOp {
         use serde_json::json;
         use uuid::Uuid;
 
-        eprintln!("DEBUG: ValidateBookingCoverageOp::execute ENTERED");
+        tracing::debug!("ValidateBookingCoverageOp::execute ENTERED");
 
         // Get CBU ID
         let cbu_id: Uuid = verb_call
@@ -345,7 +345,7 @@ impl CustomOperation for ValidateBookingCoverageOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
 
-        eprintln!("DEBUG: cbu_id = {}", cbu_id);
+        tracing::debug!("cbu_id = {}", cbu_id);
 
         // Find universe entries without matching booking rules
         let gaps = sqlx::query!(

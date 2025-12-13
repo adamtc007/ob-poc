@@ -164,26 +164,24 @@ impl DslExecutor {
         vc: &VerbCall,
         ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        eprintln!("DBG execute_verb: ENTER {}.{}", vc.domain, vc.verb);
+        tracing::debug!("execute_verb: ENTER {}.{}", vc.domain, vc.verb);
 
         // Look up verb in runtime registry (loaded from YAML)
-        eprintln!("DBG execute_verb: looking up in runtime registry...");
         let runtime_verb = runtime_registry()
             .get(&vc.domain, &vc.verb)
             .ok_or_else(|| anyhow!("Unknown verb: {}.{}", vc.domain, vc.verb))?;
-        eprintln!(
-            "DBG execute_verb: found verb, behavior={:?}",
+        tracing::debug!(
+            "execute_verb: found verb, behavior={:?}",
             runtime_verb.behavior
         );
 
         // Check if this is a plugin (custom operation)
         if let RuntimeBehavior::Plugin(_handler) = &runtime_verb.behavior {
-            eprintln!("DBG execute_verb: routing to PLUGIN");
+            tracing::debug!("execute_verb: routing to PLUGIN");
             // Dispatch to custom operations handler
             if let Some(op) = self.custom_ops.get(&vc.domain, &vc.verb) {
-                eprintln!("DBG execute_verb: calling plugin execute...");
                 let result = op.execute(vc, ctx, &self.pool).await;
-                eprintln!("DBG execute_verb: plugin returned {:?}", result.is_ok());
+                tracing::debug!("execute_verb: plugin returned {:?}", result.is_ok());
                 return result;
             }
             return Err(anyhow!(
@@ -192,23 +190,21 @@ impl DslExecutor {
                 vc.verb
             ));
         }
-        eprintln!("DBG execute_verb: routing to GENERIC executor");
+        tracing::debug!("execute_verb: routing to GENERIC executor");
 
         // Convert VerbCall arguments to JSON for generic executor
-        eprintln!("DBG execute_verb: converting args to JSON...");
         let json_args = Self::verbcall_args_to_json(&vc.arguments, ctx)?;
-        eprintln!(
-            "DBG execute_verb: json_args keys={:?}",
+        tracing::debug!(
+            "execute_verb: json_args keys={:?}",
             json_args.keys().collect::<Vec<_>>()
         );
 
         // Execute via generic executor
-        eprintln!("DBG execute_verb: calling generic_executor.execute...");
         let result = self
             .generic_executor
             .execute(runtime_verb, &json_args)
             .await?;
-        eprintln!("DBG execute_verb: generic executor returned {:?}", result);
+        tracing::debug!("execute_verb: generic executor returned {:?}", result);
 
         // Handle symbol capture
         if runtime_verb.returns.capture {
@@ -219,7 +215,7 @@ impl DslExecutor {
             }
         }
 
-        eprintln!("DBG execute_verb: EXIT success");
+        tracing::debug!("execute_verb: EXIT success");
         Ok(result.to_legacy())
     }
 
@@ -321,14 +317,14 @@ impl DslExecutor {
         plan: &super::execution_plan::ExecutionPlan,
         ctx: &mut ExecutionContext,
     ) -> Result<Vec<ExecutionResult>> {
-        eprintln!("DBG execute_plan: starting with {} steps", plan.steps.len());
+        tracing::debug!("execute_plan: starting with {} steps", plan.steps.len());
         let mut results: Vec<ExecutionResult> = Vec::with_capacity(plan.steps.len());
 
         for (step_index, step) in plan.steps.iter().enumerate() {
             // Clone the verb call so we can inject values
             let mut vc = step.verb_call.clone();
 
-            eprintln!(
+            tracing::debug!(
                 "DBG execute_plan: step {} verb={}.{} bind_as={:?}",
                 step_index, &vc.domain, &vc.verb, &step.bind_as
             );
@@ -356,17 +352,17 @@ impl DslExecutor {
             // Build args for idempotency check
             let verb_name = format!("{}.{}", vc.domain, vc.verb);
             let json_args = Self::verbcall_args_to_json(&vc.arguments, ctx)?;
-            eprintln!("DBG execute_plan: json_args={:?}", json_args);
+            tracing::debug!("execute_plan: json_args={:?}", json_args);
 
             // Check idempotency cache if enabled
             if ctx.idempotency_enabled {
-                eprintln!("DBG execute_plan: checking idempotency cache...");
+                tracing::debug!("execute_plan: checking idempotency cache...");
                 if let Some(cached) = self
                     .idempotency
                     .check(ctx.execution_id, step_index, &verb_name, &json_args)
                     .await?
                 {
-                    eprintln!("DBG execute_plan: cache HIT, returning cached result");
+                    tracing::debug!("execute_plan: cache HIT, returning cached result");
                     let result = cached.to_execution_result();
 
                     // Restore symbol binding from cached result
@@ -379,13 +375,13 @@ impl DslExecutor {
                     results.push(result);
                     continue;
                 }
-                eprintln!("DBG execute_plan: cache MISS, executing verb...");
+                tracing::debug!("execute_plan: cache MISS, executing verb...");
             }
 
             // Execute the verb call
-            eprintln!("DBG execute_plan: calling execute_verb...");
+            tracing::debug!("execute_plan: calling execute_verb...");
             let result = self.execute_verb(&vc, ctx).await?;
-            eprintln!("DBG execute_plan: execute_verb returned {:?}", result);
+            tracing::debug!("execute_plan: execute_verb returned {:?}", result);
 
             // Trace the result
             tracing::debug!(
