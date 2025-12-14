@@ -25,7 +25,7 @@ use crate::dsl_v2::validation::{
 };
 use crate::dsl_v2::verb_registry::registry;
 use sqlx::PgPool;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
 /// Semantic validator that checks AST against live database
@@ -62,6 +62,76 @@ impl SemanticValidator {
         linter.initialize().await?;
         self.csg_linter = Some(linter);
         Ok(self)
+    }
+
+    /// Batch resolve all EntityRefs in the AST upfront
+    ///
+    /// This is significantly more efficient than resolving during AST walk:
+    /// - Collects all refs by type in a single pass
+    /// - Makes one gRPC call per RefType (not per ref)
+    /// - 30 refs with 5 types = 5 gRPC calls instead of 30 (~6x speedup)
+    ///
+    /// Returns a cache map: (RefType, value) → ResolveResult
+    pub async fn batch_resolve_all_refs(
+        &mut self,
+        program: &Program,
+    ) -> HashMap<(RefType, String), ResolveResult> {
+        // Pass 1: Collect refs by type
+        let mut refs_by_type: HashMap<RefType, HashSet<String>> = HashMap::new();
+
+        for stmt in &program.statements {
+            if let Statement::VerbCall(vc) = stmt {
+                let full_verb = format!("{}.{}", vc.domain, vc.verb);
+                for arg in &vc.arguments {
+                    let key_with_colon = format!(":{}", arg.key);
+                    if let Some(ref_type) = arg_to_ref_type(&full_verb, &key_with_colon) {
+                        // Extract string value from various node types
+                        if let Some(value) = extract_string_value(&arg.value) {
+                            refs_by_type.entry(ref_type).or_default().insert(value);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Pass 2: Batch resolve each type
+        let mut all_results: HashMap<(RefType, String), ResolveResult> = HashMap::new();
+
+        let gateway = match self.resolver.as_gateway_resolver() {
+            Some(g) => g,
+            None => {
+                tracing::warn!("batch_resolve_all_refs requires gateway resolver");
+                return all_results;
+            }
+        };
+
+        for (ref_type, values) in refs_by_type {
+            let values_vec: Vec<String> = values.into_iter().collect();
+
+            match gateway.batch_resolve(ref_type, &values_vec).await {
+                Ok(results) => {
+                    for (value, result) in results {
+                        all_results.insert((ref_type, value), result);
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("Batch resolve failed for {:?}: {}", ref_type, e);
+                    // Fall back to individual resolution during AST walk
+                }
+            }
+        }
+
+        tracing::debug!(
+            "Batch resolved {} refs across {} types",
+            all_results.len(),
+            all_results
+                .keys()
+                .map(|(rt, _)| rt)
+                .collect::<HashSet<_>>()
+                .len()
+        );
+
+        all_results
     }
 
     /// Run CSG linting pass on parsed AST
@@ -1068,6 +1138,15 @@ fn entity_type_to_ref_type(entity_type: &str) -> RefType {
         "currency" => RefType::Currency,
         "client_type" => RefType::ClientType,
         _ => RefType::Entity, // Default fallback
+    }
+}
+
+/// Extract string value from AstNode for batch collection
+fn extract_string_value(node: &AstNode) -> Option<String> {
+    match node {
+        AstNode::Literal(Literal::String(s)) => Some(s.clone()),
+        AstNode::EntityRef { value, .. } => Some(value.clone()),
+        _ => None,
     }
 }
 
