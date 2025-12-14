@@ -77,6 +77,10 @@ export class ChatPanel {
     this.currentCbuId = cbuId;
   }
 
+  getSessionId(): string | null {
+    return this.sessionId;
+  }
+
   private async sendMessage() {
     const text = this.inputEl.value.trim();
     if (!text || !this.sessionId) return;

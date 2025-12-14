@@ -93,6 +93,34 @@
             }
         </script>
 
+        <!-- Entity Finder Modal -->
+        <dialog id="entity-finder-modal" class="entity-finder-modal">
+            <div class="modal-header">
+                <span class="modal-title">Resolve Entity Reference</span>
+                <button class="modal-close" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="search-context">
+                    <span class="context-label">Looking for:</span>
+                    <span
+                        id="entity-finder-context"
+                        class="context-value"
+                    ></span>
+                </div>
+                <div class="search-input-container">
+                    <input
+                        type="text"
+                        id="entity-finder-search"
+                        placeholder="Search..."
+                        autocomplete="off"
+                    />
+                </div>
+                <div id="entity-finder-results" class="search-results">
+                    <div class="search-placeholder">Type to search...</div>
+                </div>
+            </div>
+        </dialog>
+
         <!-- TypeScript panels -->
         <script type="module" src="/static/js/app.js"></script>
     </body>
