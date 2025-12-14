@@ -27,6 +27,7 @@
 pub mod applicability_rules;
 pub mod ast;
 pub mod binding_context;
+pub mod compiler;
 pub mod config;
 pub mod csg_linter;
 pub mod custom_ops;
@@ -65,6 +66,7 @@ pub use ast::{
     VerbCall,
 };
 pub use binding_context::{BindingContext, BindingInfo};
+pub use compiler::{compile_to_ops, CompileError as OpCompileError, CompiledProgram};
 pub use config::types::LookupConfig;
 pub use csg_linter::{CsgLinter, InferredContext, LintResult};
 pub use dag::{
