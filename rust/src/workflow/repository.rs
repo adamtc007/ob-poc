@@ -149,6 +149,7 @@ impl WorkflowRepository {
     }
 
     /// Log a state transition to the audit log
+    #[allow(clippy::too_many_arguments)]
     pub async fn log_transition(
         &self,
         instance_id: Uuid,

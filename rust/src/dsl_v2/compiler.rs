@@ -93,6 +93,7 @@ pub fn compile_to_ops(program: &Program) -> CompiledProgram {
 /// Compile a single VerbCall to Ops
 ///
 /// Returns (ops, optional_binding) where binding is (name, EntityKey).
+#[allow(clippy::type_complexity)]
 fn compile_verb_call(
     vc: &VerbCall,
     stmt_idx: usize,

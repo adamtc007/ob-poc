@@ -18,7 +18,7 @@ pub enum EntityType {
 
 impl EntityType {
     /// Parse from string (case-insensitive)
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "person" | "proper_person" | "properperson" => Some(Self::ProperPerson),
             "company" | "legal_entity" | "legalentity" | "limited_company" => {
@@ -395,24 +395,15 @@ mod tests {
 
     #[test]
     fn test_entity_type_from_str() {
+        assert_eq!(EntityType::parse("person"), Some(EntityType::ProperPerson));
+        assert_eq!(EntityType::parse("PERSON"), Some(EntityType::ProperPerson));
+        assert_eq!(EntityType::parse("company"), Some(EntityType::LegalEntity));
         assert_eq!(
-            EntityType::from_str("person"),
-            Some(EntityType::ProperPerson)
-        );
-        assert_eq!(
-            EntityType::from_str("PERSON"),
-            Some(EntityType::ProperPerson)
-        );
-        assert_eq!(
-            EntityType::from_str("company"),
+            EntityType::parse("legal_entity"),
             Some(EntityType::LegalEntity)
         );
-        assert_eq!(
-            EntityType::from_str("legal_entity"),
-            Some(EntityType::LegalEntity)
-        );
-        assert_eq!(EntityType::from_str("cbu"), Some(EntityType::Cbu));
-        assert_eq!(EntityType::from_str("unknown"), None);
+        assert_eq!(EntityType::parse("cbu"), Some(EntityType::Cbu));
+        assert_eq!(EntityType::parse("unknown"), None);
     }
 
     #[test]

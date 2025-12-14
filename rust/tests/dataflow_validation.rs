@@ -434,7 +434,7 @@ fn test_verbs_satisfiable_by_cbu() {
     // This test depends on verbs.yaml having consumes declarations
     // It's a smoke test that the API works
     assert!(
-        satisfiable.len() > 0 || !has_kyc_create,
+        !satisfiable.is_empty() || !has_kyc_create,
         "Should return some verbs or none if not configured"
     );
 }

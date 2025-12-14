@@ -11,7 +11,7 @@
 //! Run with: cargo test --features database --test incremental_session -- --test-threads=1
 
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -30,6 +30,7 @@ struct CreateSessionResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct ExecuteResponse {
     success: bool,
     results: Vec<Value>,
@@ -38,6 +39,7 @@ struct ExecuteResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct ValidateResponse {
     valid: bool,
     errors: Vec<String>,
@@ -90,6 +92,7 @@ impl TestSession {
         Ok(result)
     }
 
+    #[allow(dead_code)]
     async fn execute_with_timeout(
         &self,
         dsl: &str,
@@ -117,7 +120,7 @@ impl TestSession {
             "{} {} {}",
             base,
             self.test_name,
-            Uuid::new_v4().to_string()[..8].to_string()
+            &Uuid::new_v4().to_string()[..8]
         )
     }
 }
@@ -167,7 +170,7 @@ async fn test_02_binding_persistence_across_executions() {
         .await
         .expect("Step 1 failed");
     assert!(r1.success, "Step 1: {:?}", r1.errors);
-    let cbu_id = r1.bindings.as_ref().unwrap().get("cbu").copied();
+    let _cbu_id = r1.bindings.as_ref().unwrap().get("cbu").copied();
 
     // Step 2: Use @cbu from step 1
     let r2 = session
@@ -270,22 +273,20 @@ async fn test_05_full_onboarding_flow() {
     let name = session.unique_name("Full Flow Fund");
 
     // Step by step onboarding
-    let steps = vec![
-        format!(r#"(cbu.ensure :name "{}" :jurisdiction "LU" :client-type "fund" :as @cbu)"#, name),
+    let steps = [format!(r#"(cbu.ensure :name "{}" :jurisdiction "LU" :client-type "fund" :as @cbu)"#, name),
         r#"(entity.create-limited-company :name "HoldCo SARL" :jurisdiction "LU" :as @company)"#.to_string(),
         r#"(entity.create-proper-person :first-name "John" :last-name "Smith" :date-of-birth "1980-01-15" :as @john)"#.to_string(),
         r#"(cbu.assign-role :cbu-id @cbu :entity-id @company :role "PRINCIPAL")"#.to_string(),
         r#"(cbu.assign-role :cbu-id @cbu :entity-id @john :role "DIRECTOR")"#.to_string(),
         r#"(cbu.assign-role :cbu-id @cbu :entity-id @john :role "BENEFICIAL_OWNER" :ownership-percentage 100)"#.to_string(),
         r#"(kyc-case.create :cbu-id @cbu :case-type "NEW_CLIENT" :as @case)"#.to_string(),
-        r#"(entity-workstream.create :case-id @case :entity-id @john :is-ubo true :as @ws)"#.to_string(),
-    ];
+        r#"(entity-workstream.create :case-id @case :entity-id @john :is-ubo true :as @ws)"#.to_string()];
 
     for (i, dsl) in steps.iter().enumerate() {
         let result = session
             .execute(dsl)
             .await
-            .expect(&format!("Step {} failed", i + 1));
+            .unwrap_or_else(|_| panic!("Step {} failed", i + 1));
         assert!(
             result.success,
             "Step {} should succeed: {:?}",

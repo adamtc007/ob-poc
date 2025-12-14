@@ -228,7 +228,7 @@ impl TemplateExpander {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::templates::definition::TemplateMetadata;
+    
 
     fn sample_template() -> TemplateDefinition {
         serde_yaml::from_str(

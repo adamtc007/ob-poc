@@ -927,6 +927,7 @@ impl DslExecutor {
     }
 
     /// Convert JSON value to AST node
+    #[allow(clippy::only_used_in_recursion)]
     fn json_to_ast(&self, value: &JsonValue) -> Result<AstNode> {
         match value {
             JsonValue::String(s) => Ok(AstNode::Literal(Literal::String(s.clone()))),

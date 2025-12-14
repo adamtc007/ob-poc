@@ -54,7 +54,7 @@ pub enum ViewMode {
     /// KYC/UBO view - shows core entities, KYC status, and ownership chains
     #[default]
     KycUbo,
-    /// Service Delivery view - shows products, services, and resource instances
+    /// Service Delivery view - shows products (not services/resources)
     ServiceDelivery,
     /// Custody view - shows markets, SSIs, and booking rules
     Custody,
@@ -77,7 +77,7 @@ impl ViewMode {
     pub fn display_name(&self) -> &'static str {
         match self {
             ViewMode::KycUbo => "KYC / UBO",
-            ViewMode::ServiceDelivery => "Service Delivery",
+            ViewMode::ServiceDelivery => "Products",
             ViewMode::Custody => "Custody",
             ViewMode::ProductsOnly => "Products",
         }
@@ -342,16 +342,27 @@ impl CbuGraphWidget {
                     .collect()
             }
             ViewMode::ServiceDelivery => {
-                // Include: CBU, entities with TRADING_EXECUTION roles, Services layer
+                // Include: CBU, entities with TRADING_EXECUTION roles, Products only (not services/resources)
                 data.nodes
                     .iter()
                     .filter(|n| {
-                        if n.node_type != "entity" {
-                            return matches!(n.layer.as_str(), "core" | "services");
+                        // Always include CBU and products
+                        if n.node_type == "cbu" || n.node_type == "product" {
+                            return true;
                         }
-                        n.role_categories
-                            .iter()
-                            .any(|cat| cat == "TRADING_EXECUTION" || cat == "BOTH")
+                        // Exclude services and resources
+                        if n.node_type == "service" || n.node_type == "resource" {
+                            return false;
+                        }
+                        // For entities, filter by role category
+                        if n.node_type == "entity" {
+                            return n
+                                .role_categories
+                                .iter()
+                                .any(|cat| cat == "TRADING_EXECUTION" || cat == "BOTH");
+                        }
+                        // Include other core layer nodes
+                        n.layer.as_str() == "core"
                     })
                     .cloned()
                     .collect()

@@ -814,7 +814,7 @@ async fn test_coverage_validation_with_gap() {
 
     let bond_class_id = get_instrument_class_id(&pool, "GOVT_BOND")
         .await
-        .or_else(|| {
+        .or({
             // GOVT_BOND might not exist, skip test
             None
         });

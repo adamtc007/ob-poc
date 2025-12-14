@@ -1962,7 +1962,32 @@ The KYC case management and UBO domains manage entity-level investigations, scre
 
 ## CBU Entity Graph Model
 
-The CBU (Client Business Unit) is the root of a hierarchical graph connecting legal entities and natural persons.
+The CBU (Client Business Unit) is an **artificial focal point** - it has no real-world presence. It exists purely to connect real entities (funds, investment managers, management companies) via roles, and to attach products.
+
+### Conceptual Model
+
+```
+CBU (artificial focal point - no real presence)
+ │
+ ├── ASSET_OWNER role → Fund Entity (the actual fund, same name as CBU)
+ │                         │
+ │                         └── 100% owned by → ManCo
+ │                                               │
+ │                                               └── ownership chain to UBOs...
+ │
+ ├── INVESTMENT_MANAGER role → IM Company (shared across many CBUs)
+ │
+ ├── MANCO role → Management Company (shared across many CBUs)
+ │
+ └── Products → Custody, Fund Accounting (linked directly to CBU)
+```
+
+**Key principles:**
+- **CBU is artificial** - a context/focal point to group related entities
+- **Fund is the ASSET_OWNER** - the real fund entity inherits the CBU name
+- **IM/ManCo are shared** - same entity can serve multiple CBUs
+- **Products link to CBU** - not to the fund or IM entities
+- **UBO chains** flow from Fund → ManCo → natural persons
 
 ### Entity Categories
 
@@ -1976,21 +2001,25 @@ The CBU (Client Business Unit) is the root of a hierarchical graph connecting le
 ### Graph Structure
 
 ```
-CBU (virtual root)
+CBU (artificial focal point)
  │
- ├── SHELL (e.g., Fund SICAV)
- │    ├── SHELL (e.g., ManCo S.à r.l.)
- │    │    └── PERSON (Director)
- │    └── PERSON (Compliance Officer)
+ ├── ASSET_OWNER → Fund SICAV (same name as CBU)
  │
- └── SHELL (e.g., General Partner LP)
-      └── PERSON (Managing Partner)
+ ├── MANCO → ManCo S.à r.l. (shared)
+ │    └── PERSON (Director)
+ │
+ ├── INVESTMENT_MANAGER → IM GmbH (shared)
+ │    └── PERSON (Portfolio Manager)
+ │
+ └── Products → [Custody, Fund Accounting]
 ```
 
 **Key rules:**
-- CBU is NOT an entity - it's a virtual grouping node
-- SHELLs can link to other SHELLs (ownership chains) and to PERSONs (officers/UBOs)
-- PERSONs are always leaf nodes (cannot own other entities in this model)
+- CBU is NOT an entity - it's an artificial grouping/context
+- Fund entity attached via ASSET_OWNER role carries the CBU name
+- Same IM/ManCo entities serve multiple CBUs
+- Products link to CBU, not to fund or IM entities
+- UBO tracing follows ownership from Fund entity upward
 
 ### Connection Types
 

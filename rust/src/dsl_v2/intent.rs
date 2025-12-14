@@ -178,7 +178,6 @@ impl DslIntentBatch {
 ///     source_text: Some("Add John Smith as director of Apex Fund"),
 /// }
 /// ```
-
 #[cfg(test)]
 mod tests {
     use super::*;
