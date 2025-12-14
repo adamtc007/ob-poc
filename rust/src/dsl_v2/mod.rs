@@ -30,6 +30,7 @@ pub mod binding_context;
 pub mod config;
 pub mod csg_linter;
 pub mod custom_ops;
+pub mod dag;
 pub mod enrichment;
 pub mod entity_deps;
 pub mod execution_plan;
@@ -44,6 +45,7 @@ pub mod intent;
 pub mod intent_extractor;
 #[cfg(feature = "database")]
 pub mod lsp_validator;
+pub mod ops;
 pub mod parser;
 #[cfg(feature = "database")]
 pub mod ref_resolver;
@@ -65,6 +67,10 @@ pub use ast::{
 pub use binding_context::{BindingContext, BindingInfo};
 pub use config::types::LookupConfig;
 pub use csg_linter::{CsgLinter, InferredContext, LintResult};
+pub use dag::{
+    build_execution_plan, collect_external_refs, describe_plan, CycleError, ExecutionPhase,
+    ExecutionPlan as DagExecutionPlan,
+};
 pub use enrichment::{enrich_program, EnrichmentError, EnrichmentResult};
 #[cfg(feature = "database")]
 pub use entity_deps::init_entity_deps;
@@ -88,6 +94,7 @@ pub use intent::{ArgIntent, DslIntent, DslIntentBatch, ResolvedArg};
 pub use intent_extractor::IntentExtractor;
 #[cfg(feature = "database")]
 pub use lsp_validator::LspValidator;
+pub use ops::{DocKey, EntityKey, Op, OpRef};
 pub use parser::{parse_program, parse_single_verb};
 #[cfg(feature = "database")]
 pub use ref_resolver::RefResolver;

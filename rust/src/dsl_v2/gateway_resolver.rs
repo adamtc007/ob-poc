@@ -129,6 +129,82 @@ impl GatewayRefResolver {
         Ok(ResolveResult::NotFound { suggestions })
     }
 
+    /// Batch resolve multiple values of the same type in one gRPC call
+    ///
+    /// This is significantly more efficient than calling `resolve` in a loop:
+    /// - 30 EntityRefs with 5 types = 5 gRPC calls instead of 30
+    /// - ~6x performance improvement
+    pub async fn batch_resolve(
+        &mut self,
+        ref_type: RefType,
+        values: &[String],
+    ) -> Result<std::collections::HashMap<String, ResolveResult>, String> {
+        use std::collections::HashMap;
+
+        if values.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let nickname = ref_type_to_nickname(ref_type);
+
+        let request = SearchRequest {
+            nickname: nickname.to_string(),
+            values: values.to_vec(),
+            search_key: None,
+            mode: SearchMode::Exact as i32,
+            limit: None, // Return all matches
+        };
+
+        let response = self
+            .client
+            .search(request)
+            .await
+            .map_err(|e| format!("EntityGateway batch search failed: {}", e))?;
+
+        // Build result map: input value → ResolveResult
+        let mut results = HashMap::new();
+        let matches = response.into_inner().matches;
+
+        // Index matches by their input value for quick lookup (case-insensitive)
+        let match_index: HashMap<String, _> = matches
+            .into_iter()
+            .map(|m| (m.input.to_uppercase(), m))
+            .collect();
+
+        for value in values {
+            let value_upper = value.to_uppercase();
+            if let Some(m) = match_index.get(&value_upper) {
+                if let Ok(uuid) = Uuid::parse_str(&m.token) {
+                    results.insert(
+                        value.clone(),
+                        ResolveResult::Found {
+                            id: uuid,
+                            display: m.display.clone(),
+                        },
+                    );
+                } else {
+                    results.insert(
+                        value.clone(),
+                        ResolveResult::FoundByCode {
+                            code: m.token.clone(),
+                            uuid: None,
+                            display: m.display.clone(),
+                        },
+                    );
+                }
+            } else {
+                results.insert(
+                    value.clone(),
+                    ResolveResult::NotFound {
+                        suggestions: vec![],
+                    },
+                );
+            }
+        }
+
+        Ok(results)
+    }
+
     /// Search with fuzzy matching (for autocomplete-like scenarios)
     pub async fn search_fuzzy(
         &mut self,
