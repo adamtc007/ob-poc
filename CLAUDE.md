@@ -3774,6 +3774,57 @@ rust/src/templates/
 | `escalate-case` | Escalate to higher authority | `escalation_required` |
 | `approve-case` | Final case approval | `pending_approval` |
 
+### Template Test Harness
+
+The `template_harness` binary validates all templates through the DSL pipeline.
+
+**Usage:**
+
+```bash
+cd rust/
+
+# Basic run - load, expand, parse, compile all templates
+cargo run --bin template_harness
+
+# Verbose - show expanded DSL for each template
+cargo run --bin template_harness -- --verbose
+
+# JSON output for scripting
+cargo run --bin template_harness -- --json
+
+# Execute against database (requires DATABASE_URL)
+DATABASE_URL="postgresql:///data_designer" \
+cargo run --features database --bin template_harness -- --execute
+
+# Custom templates directory
+cargo run --bin template_harness -- --templates-dir /path/to/templates
+```
+
+**CLI Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--verbose`, `-v` | Show expanded DSL for each template |
+| `--json` | Output results as JSON |
+| `--execute`, `-e` | Execute DSL against database |
+| `--templates-dir`, `-d` | Override templates directory path |
+
+**Pipeline:**
+
+```
+Load templates → Expand with sample params → Parse DSL → Compile → (Execute)
+```
+
+**Module:** `rust/src/templates/harness.rs`
+
+| Type | Description |
+|------|-------------|
+| `TemplateTestResult` | Per-template result with expansion/parse/compile/execute status |
+| `HarnessResult` | Aggregate results with summary stats |
+| `get_sample_params()` | Sample parameters for all 12 templates |
+| `run_harness()` | Full pipeline with optional DB execution |
+| `run_harness_no_db()` | Pipeline without database execution |
+
 ## Agentic DSL Generation
 
 The `rust/src/agentic/` module provides AI-powered DSL generation from natural language, specifically optimized for custody onboarding scenarios.
