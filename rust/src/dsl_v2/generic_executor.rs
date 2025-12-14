@@ -29,6 +29,13 @@ use tonic::transport::Channel;
 use super::config::types::{ArgType, CrudOperation, ReturnTypeConfig};
 use super::runtime_registry::{RuntimeArg, RuntimeBehavior, RuntimeCrudConfig, RuntimeVerb};
 
+#[cfg(feature = "database")]
+use super::compiler::{compile_to_ops, CompileError};
+#[cfg(feature = "database")]
+use super::dag::{build_execution_plan, describe_plan, CycleError};
+#[cfg(feature = "database")]
+use super::ops::{EntityKey, Op};
+
 // =============================================================================
 // EXECUTION RESULT
 // =============================================================================
@@ -64,6 +71,78 @@ impl GenericExecutionResult {
         }
     }
 }
+
+// =============================================================================
+// DAG EXECUTION RESULT
+// =============================================================================
+
+/// Result of DAG-based execution
+#[cfg(feature = "database")]
+#[derive(Debug)]
+pub enum DagExecutionResult {
+    /// Dry run - returns the execution plan description
+    Plan(String),
+    /// Executed successfully - returns results per op
+    Executed {
+        /// Results for each op, keyed by binding name if present
+        bindings: HashMap<String, Uuid>,
+        /// Number of ops executed
+        ops_executed: usize,
+    },
+}
+
+/// Error during DAG execution
+#[cfg(feature = "database")]
+#[derive(Debug)]
+pub enum DagExecutionError {
+    /// Compilation failed
+    CompileErrors(Vec<CompileError>),
+    /// Cycle detected in dependency graph
+    CycleDetected(CycleError),
+    /// Op execution failed
+    OpFailed {
+        op_index: usize,
+        op_description: String,
+        error: String,
+    },
+    /// Other error
+    Other(String),
+}
+
+#[cfg(feature = "database")]
+impl std::fmt::Display for DagExecutionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DagExecutionError::CompileErrors(errors) => {
+                write!(f, "Compilation failed:\n")?;
+                for e in errors {
+                    write!(f, "  - {}\n", e)?;
+                }
+                Ok(())
+            }
+            DagExecutionError::CycleDetected(e) => {
+                write!(f, "Cycle detected: {}", e.explanation)
+            }
+            DagExecutionError::OpFailed {
+                op_index,
+                op_description,
+                error,
+            } => {
+                write!(
+                    f,
+                    "Op {} ({}) failed: {}",
+                    op_index + 1,
+                    op_description,
+                    error
+                )
+            }
+            DagExecutionError::Other(msg) => write!(f, "{}", msg),
+        }
+    }
+}
+
+#[cfg(feature = "database")]
+impl std::error::Error for DagExecutionError {}
 
 // =============================================================================
 // SQL VALUE TYPE (internal)
@@ -187,6 +266,281 @@ impl GenericCrudExecutor {
             result.is_ok()
         );
         result
+    }
+
+    // =========================================================================
+    // DAG-BASED EXECUTION
+    // =========================================================================
+
+    /// Execute a program using DAG-based ordering
+    ///
+    /// This method:
+    /// 1. Compiles the AST to primitive Ops
+    /// 2. Builds an execution plan with topological sort
+    /// 3. Executes ops in dependency order
+    ///
+    /// Benefits:
+    /// - Correct execution order regardless of source order
+    /// - Cycle detection at compile time
+    /// - Dry-run capability (show plan without executing)
+    pub async fn execute_with_dag(
+        &self,
+        program: &super::ast::Program,
+        dry_run: bool,
+    ) -> Result<DagExecutionResult, DagExecutionError> {
+        // Step 1: Compile AST to Ops
+        let compiled = compile_to_ops(program);
+        if !compiled.is_ok() {
+            return Err(DagExecutionError::CompileErrors(compiled.errors));
+        }
+
+        // Step 2: Build execution plan (topological sort)
+        let plan = build_execution_plan(compiled.ops).map_err(DagExecutionError::CycleDetected)?;
+
+        // Step 3: Dry run - just return the plan description
+        if dry_run {
+            return Ok(DagExecutionResult::Plan(describe_plan(&plan)));
+        }
+
+        // Step 4: Execute ops in order, tracking bindings
+        let mut bindings: HashMap<String, Uuid> = HashMap::new();
+        let mut entity_keys_to_uuids: HashMap<EntityKey, Uuid> = HashMap::new();
+
+        for (idx, op) in plan.ops.iter().enumerate() {
+            match self.execute_op(op, &entity_keys_to_uuids).await {
+                Ok(result) => {
+                    // Track bindings and entity keys
+                    if let Some((binding, key, uuid)) = result {
+                        bindings.insert(binding.clone(), uuid);
+                        entity_keys_to_uuids.insert(key, uuid);
+                    }
+                }
+                Err(e) => {
+                    return Err(DagExecutionError::OpFailed {
+                        op_index: idx,
+                        op_description: op.describe(),
+                        error: e.to_string(),
+                    });
+                }
+            }
+        }
+
+        Ok(DagExecutionResult::Executed {
+            bindings,
+            ops_executed: plan.ops.len(),
+        })
+    }
+
+    /// Execute a single Op
+    ///
+    /// Returns Ok(Some((binding, key, uuid))) if the op produces a binding,
+    /// Ok(None) otherwise.
+    async fn execute_op(
+        &self,
+        op: &Op,
+        resolved_keys: &HashMap<EntityKey, Uuid>,
+    ) -> Result<Option<(String, EntityKey, Uuid)>> {
+        match op {
+            Op::EnsureEntity {
+                entity_type,
+                key,
+                attrs,
+                binding,
+                ..
+            } => {
+                // Map entity_type to verb
+                let (domain, verb_name) = match entity_type.as_str() {
+                    "cbu" => ("cbu", "ensure"),
+                    "proper_person" => ("entity", "create-proper-person"),
+                    "limited_company" => ("entity", "create-limited-company"),
+                    "partnership" => ("entity", "create-partnership-limited"),
+                    "trust" => ("entity", "create-trust-discretionary"),
+                    _ => ("entity", "create-limited-company"), // fallback
+                };
+
+                // Convert attrs to args format
+                let mut args: HashMap<String, JsonValue> = HashMap::new();
+                for (k, v) in attrs {
+                    // Convert snake_case to kebab-case for arg names
+                    let arg_name = k.replace('_', "-");
+                    args.insert(arg_name, v.clone());
+                }
+
+                // Look up verb and execute
+                let runtime_reg = super::runtime_registry::runtime_registry();
+                if let Some(runtime_verb) = runtime_reg.get(domain, verb_name) {
+                    let result = self.execute(runtime_verb, &args).await?;
+                    if let GenericExecutionResult::Uuid(uuid) = result {
+                        let binding_name = binding.clone().unwrap_or_else(|| key.key.clone());
+                        return Ok(Some((binding_name, key.clone(), uuid)));
+                    }
+                }
+                Ok(None)
+            }
+
+            Op::LinkRole {
+                cbu,
+                entity,
+                role,
+                ownership_percentage,
+                ..
+            } => {
+                let cbu_id = resolved_keys
+                    .get(cbu)
+                    .ok_or_else(|| anyhow!("CBU not resolved: {:?}", cbu))?;
+                let entity_id = resolved_keys
+                    .get(entity)
+                    .ok_or_else(|| anyhow!("Entity not resolved: {:?}", entity))?;
+
+                let mut args: HashMap<String, JsonValue> = HashMap::new();
+                args.insert("cbu-id".to_string(), json!(cbu_id.to_string()));
+                args.insert("entity-id".to_string(), json!(entity_id.to_string()));
+                args.insert("role".to_string(), json!(role));
+                if let Some(pct) = ownership_percentage {
+                    args.insert("ownership-percentage".to_string(), json!(pct.to_string()));
+                }
+
+                let runtime_reg = super::runtime_registry::runtime_registry();
+                if let Some(runtime_verb) = runtime_reg.get("cbu", "assign-role") {
+                    self.execute(runtime_verb, &args).await?;
+                }
+                Ok(None)
+            }
+
+            Op::UnlinkRole {
+                cbu, entity, role, ..
+            } => {
+                let cbu_id = resolved_keys
+                    .get(cbu)
+                    .ok_or_else(|| anyhow!("CBU not resolved: {:?}", cbu))?;
+                let entity_id = resolved_keys
+                    .get(entity)
+                    .ok_or_else(|| anyhow!("Entity not resolved: {:?}", entity))?;
+
+                let mut args: HashMap<String, JsonValue> = HashMap::new();
+                args.insert("cbu-id".to_string(), json!(cbu_id.to_string()));
+                args.insert("entity-id".to_string(), json!(entity_id.to_string()));
+                args.insert("role".to_string(), json!(role));
+
+                let runtime_reg = super::runtime_registry::runtime_registry();
+                if let Some(runtime_verb) = runtime_reg.get("cbu", "remove-role") {
+                    self.execute(runtime_verb, &args).await?;
+                }
+                Ok(None)
+            }
+
+            Op::AddOwnership {
+                owner,
+                owned,
+                percentage,
+                ownership_type,
+                ..
+            } => {
+                let owner_id = resolved_keys
+                    .get(owner)
+                    .ok_or_else(|| anyhow!("Owner not resolved: {:?}", owner))?;
+                let owned_id = resolved_keys
+                    .get(owned)
+                    .ok_or_else(|| anyhow!("Owned not resolved: {:?}", owned))?;
+
+                let mut args: HashMap<String, JsonValue> = HashMap::new();
+                args.insert("owner-entity-id".to_string(), json!(owner_id.to_string()));
+                args.insert("owned-entity-id".to_string(), json!(owned_id.to_string()));
+                args.insert("percentage".to_string(), json!(percentage.to_string()));
+                args.insert("ownership-type".to_string(), json!(ownership_type));
+
+                let runtime_reg = super::runtime_registry::runtime_registry();
+                if let Some(runtime_verb) = runtime_reg.get("ubo", "add-ownership") {
+                    self.execute(runtime_verb, &args).await?;
+                }
+                Ok(None)
+            }
+
+            Op::CreateCase {
+                cbu,
+                case_type,
+                binding,
+                ..
+            } => {
+                let cbu_id = resolved_keys
+                    .get(cbu)
+                    .ok_or_else(|| anyhow!("CBU not resolved: {:?}", cbu))?;
+
+                let mut args: HashMap<String, JsonValue> = HashMap::new();
+                args.insert("cbu-id".to_string(), json!(cbu_id.to_string()));
+                args.insert("case-type".to_string(), json!(case_type));
+
+                let runtime_reg = super::runtime_registry::runtime_registry();
+                if let Some(runtime_verb) = runtime_reg.get("kyc-case", "create") {
+                    let result = self.execute(runtime_verb, &args).await?;
+                    if let GenericExecutionResult::Uuid(uuid) = result {
+                        let key = EntityKey::new("case", format!("{}:case", cbu.key));
+                        let binding_name = binding.clone().unwrap_or_else(|| key.key.clone());
+                        return Ok(Some((binding_name, key, uuid)));
+                    }
+                }
+                Ok(None)
+            }
+
+            Op::CreateWorkstream {
+                case,
+                entity,
+                binding,
+                ..
+            } => {
+                let case_id = resolved_keys
+                    .get(case)
+                    .ok_or_else(|| anyhow!("Case not resolved: {:?}", case))?;
+                let entity_id = resolved_keys
+                    .get(entity)
+                    .ok_or_else(|| anyhow!("Entity not resolved: {:?}", entity))?;
+
+                let mut args: HashMap<String, JsonValue> = HashMap::new();
+                args.insert("case-id".to_string(), json!(case_id.to_string()));
+                args.insert("entity-id".to_string(), json!(entity_id.to_string()));
+
+                let runtime_reg = super::runtime_registry::runtime_registry();
+                if let Some(runtime_verb) = runtime_reg.get("entity-workstream", "create") {
+                    let result = self.execute(runtime_verb, &args).await?;
+                    if let GenericExecutionResult::Uuid(uuid) = result {
+                        let key =
+                            EntityKey::new("workstream", format!("{}:{}", case.key, entity.key));
+                        let binding_name = binding.clone().unwrap_or_else(|| key.key.clone());
+                        return Ok(Some((binding_name, key, uuid)));
+                    }
+                }
+                Ok(None)
+            }
+
+            Op::RunScreening {
+                workstream,
+                screening_type,
+                ..
+            } => {
+                let workstream_id = resolved_keys
+                    .get(workstream)
+                    .ok_or_else(|| anyhow!("Workstream not resolved: {:?}", workstream))?;
+
+                let mut args: HashMap<String, JsonValue> = HashMap::new();
+                args.insert(
+                    "workstream-id".to_string(),
+                    json!(workstream_id.to_string()),
+                );
+                args.insert("screening-type".to_string(), json!(screening_type));
+
+                let runtime_reg = super::runtime_registry::runtime_registry();
+                if let Some(runtime_verb) = runtime_reg.get("case-screening", "run") {
+                    self.execute(runtime_verb, &args).await?;
+                }
+                Ok(None)
+            }
+
+            // Ops that we don't fully implement yet - log and skip
+            _ => {
+                tracing::debug!("Skipping unimplemented op: {}", op.describe());
+                Ok(None)
+            }
+        }
     }
 
     // =========================================================================
