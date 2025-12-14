@@ -124,6 +124,10 @@ impl ToolHandlers {
             "workflow_transition" => self.workflow_transition(args).await,
             "workflow_start" => self.workflow_start(args).await,
             "resolve_blocker" => self.resolve_blocker(args),
+            // Template tools
+            "template_list" => self.template_list(args),
+            "template_get" => self.template_get(args),
+            "template_expand" => self.template_expand(args),
             _ => Err(anyhow!("Unknown tool: {}", name)),
         }
     }
@@ -1495,6 +1499,192 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
             "verb": verb,
             "dsl_template": template,
             "description": description
+        }))
+    }
+
+    // ==================== Template Tools ====================
+
+    /// List available templates with filtering
+    fn template_list(&self, args: Value) -> Result<Value> {
+        use crate::templates::TemplateRegistry;
+        use std::path::Path;
+
+        let config_dir = std::env::var("DSL_CONFIG_DIR").unwrap_or_else(|_| "config".to_string());
+        let templates_path = Path::new(&config_dir).join("templates");
+
+        let registry = TemplateRegistry::load_from_dir(&templates_path)
+            .map_err(|e| anyhow!("Failed to load templates: {}", e))?;
+
+        // Apply filters
+        let templates: Vec<_> = if let Some(blocker) = args["blocker"].as_str() {
+            registry.find_by_blocker(blocker)
+        } else if let Some(tag) = args["tag"].as_str() {
+            registry.find_by_tag(tag)
+        } else if let (Some(workflow), Some(state)) =
+            (args["workflow"].as_str(), args["state"].as_str())
+        {
+            registry.find_by_workflow_state(workflow, state)
+        } else if let Some(search) = args["search"].as_str() {
+            registry.search(search)
+        } else {
+            registry.list()
+        };
+
+        let results: Vec<_> = templates
+            .iter()
+            .map(|t| {
+                json!({
+                    "template_id": t.template,
+                    "name": t.metadata.name,
+                    "summary": t.metadata.summary,
+                    "tags": t.tags,
+                    "resolves_blockers": t.workflow_context.resolves_blockers,
+                    "applicable_states": t.workflow_context.applicable_states
+                })
+            })
+            .collect();
+
+        Ok(json!({
+            "count": results.len(),
+            "templates": results
+        }))
+    }
+
+    /// Get full template details
+    fn template_get(&self, args: Value) -> Result<Value> {
+        use crate::templates::TemplateRegistry;
+        use std::path::Path;
+
+        let template_id = args["template_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("template_id required"))?;
+
+        let config_dir = std::env::var("DSL_CONFIG_DIR").unwrap_or_else(|_| "config".to_string());
+        let templates_path = Path::new(&config_dir).join("templates");
+
+        let registry = TemplateRegistry::load_from_dir(&templates_path)
+            .map_err(|e| anyhow!("Failed to load templates: {}", e))?;
+
+        let template = registry
+            .get(template_id)
+            .ok_or_else(|| anyhow!("Template not found: {}", template_id))?;
+
+        // Build parameter info
+        let params: Vec<_> = template
+            .params
+            .iter()
+            .map(|(name, def)| {
+                json!({
+                    "name": name,
+                    "type": def.param_type,
+                    "required": def.required,
+                    "source": def.source,
+                    "default": def.default,
+                    "prompt": def.prompt,
+                    "example": def.example,
+                    "validation": def.validation,
+                    "enum_values": def.enum_values
+                })
+            })
+            .collect();
+
+        Ok(json!({
+            "template_id": template.template,
+            "version": template.version,
+            "metadata": {
+                "name": template.metadata.name,
+                "summary": template.metadata.summary,
+                "description": template.metadata.description,
+                "when_to_use": template.metadata.when_to_use,
+                "when_not_to_use": template.metadata.when_not_to_use,
+                "effects": template.metadata.effects,
+                "next_steps": template.metadata.next_steps
+            },
+            "tags": template.tags,
+            "workflow_context": {
+                "applicable_workflows": template.workflow_context.applicable_workflows,
+                "applicable_states": template.workflow_context.applicable_states,
+                "resolves_blockers": template.workflow_context.resolves_blockers
+            },
+            "params": params,
+            "body": template.body,
+            "outputs": template.outputs,
+            "related_templates": template.related_templates
+        }))
+    }
+
+    /// Expand a template to DSL source text
+    fn template_expand(&self, args: Value) -> Result<Value> {
+        use crate::templates::{ExpansionContext, TemplateExpander, TemplateRegistry};
+        use std::collections::HashMap;
+        use std::path::Path;
+
+        let template_id = args["template_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("template_id required"))?;
+
+        let config_dir = std::env::var("DSL_CONFIG_DIR").unwrap_or_else(|_| "config".to_string());
+        let templates_path = Path::new(&config_dir).join("templates");
+
+        let registry = TemplateRegistry::load_from_dir(&templates_path)
+            .map_err(|e| anyhow!("Failed to load templates: {}", e))?;
+
+        let template = registry
+            .get(template_id)
+            .ok_or_else(|| anyhow!("Template not found: {}", template_id))?;
+
+        // Build explicit params from args
+        let explicit_params: HashMap<String, String> = args["params"]
+            .as_object()
+            .map(|o| {
+                o.iter()
+                    .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        // Build expansion context from session info
+        let mut context = ExpansionContext::new();
+
+        if let Some(cbu_id) = args["cbu_id"].as_str() {
+            if let Ok(uuid) = Uuid::parse_str(cbu_id) {
+                context.current_cbu = Some(uuid);
+            }
+        }
+
+        if let Some(case_id) = args["case_id"].as_str() {
+            if let Ok(uuid) = Uuid::parse_str(case_id) {
+                context.current_case = Some(uuid);
+            }
+        }
+
+        // Expand template
+        let result = TemplateExpander::expand(template, &explicit_params, &context);
+
+        // Format missing params prompt if any
+        let prompt = if result.missing_params.is_empty() {
+            None
+        } else {
+            Some(TemplateExpander::format_missing_params_prompt(
+                &result.missing_params,
+            ))
+        };
+
+        Ok(json!({
+            "template_id": result.template_id,
+            "dsl": result.dsl,
+            "complete": result.missing_params.is_empty(),
+            "filled_params": result.filled_params,
+            "missing_params": result.missing_params.iter().map(|p| json!({
+                "name": p.name,
+                "type": p.param_type,
+                "prompt": p.prompt,
+                "example": p.example,
+                "required": p.required,
+                "validation": p.validation
+            })).collect::<Vec<_>>(),
+            "prompt": prompt,
+            "outputs": result.outputs
         }))
     }
 }

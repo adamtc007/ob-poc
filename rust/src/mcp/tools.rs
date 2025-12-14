@@ -443,5 +443,104 @@ Suggested actions:
                 "required": ["blocker_type"]
             }),
         },
+        // Template tools
+        Tool {
+            name: "template_list".into(),
+            description: r#"List available DSL templates, optionally filtered.
+
+Templates are pre-built DSL patterns for common operations like:
+- Adding directors, signatories, UBOs
+- Running screening, reviewing hits
+- Document cataloging and extraction
+- KYC case management
+
+Use to discover what operations are available."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "workflow": {
+                        "type": "string",
+                        "description": "Filter by workflow (e.g., kyc_onboarding)"
+                    },
+                    "state": {
+                        "type": "string",
+                        "description": "Filter by workflow state (e.g., ENTITY_COLLECTION)"
+                    },
+                    "blocker": {
+                        "type": "string",
+                        "description": "Find templates that resolve this blocker type (e.g., missing_role:DIRECTOR)"
+                    },
+                    "tag": {
+                        "type": "string",
+                        "description": "Filter by tag (e.g., director, ubo, screening)"
+                    },
+                    "search": {
+                        "type": "string",
+                        "description": "Search in name, description, tags"
+                    }
+                }
+            }),
+        },
+        Tool {
+            name: "template_get".into(),
+            description: r#"Get full template details including:
+- When to use / when not to use
+- Required parameters with types and examples
+- Effects and next steps
+- The DSL pattern that will be generated
+
+Use before calling template_expand to understand what a template does."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "template_id": {
+                        "type": "string",
+                        "description": "Template ID (e.g., onboard-director, review-screening-hit)"
+                    }
+                },
+                "required": ["template_id"]
+            }),
+        },
+        Tool {
+            name: "template_expand".into(),
+            description: r#"Expand a template to DSL source text.
+
+Substitutes parameters and returns reviewable DSL code.
+Parameters are resolved in order:
+1. Explicit params you provide
+2. Session context (current_cbu, current_case)
+3. Default values from template
+
+Returns:
+- dsl: The expanded DSL source code
+- missing_params: Any required params still needed
+- prompt: Human-readable prompt for missing params
+
+Use this to generate DSL from templates, then review/edit before execution."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "template_id": {
+                        "type": "string",
+                        "description": "Template ID to expand"
+                    },
+                    "params": {
+                        "type": "object",
+                        "description": "Parameter values to substitute"
+                    },
+                    "cbu_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Current CBU context (for session params)"
+                    },
+                    "case_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Current KYC case context (for session params)"
+                    }
+                },
+                "required": ["template_id"]
+            }),
+        },
     ]
 }
