@@ -56,6 +56,9 @@ pub mod agentic;
 #[cfg(feature = "database")]
 pub mod graph;
 
+// Trading profile document types and materialization
+pub mod trading_profile;
+
 // Database integration re-exports (when database feature is enabled)
 #[cfg(feature = "database")]
 pub use database::DictionaryDatabaseService;

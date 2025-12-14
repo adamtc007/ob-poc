@@ -1,0 +1,194 @@
+domains:
+  trading-profile:
+    description: "Trading profile document management - single source of truth for CBU trading configuration"
+    verbs:
+      import:
+        description: Import a trading profile document from YAML/JSON file or inline content
+        behavior: plugin
+        handler: import_trading_profile
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: file-path
+            type: string
+            required: false
+            description: Path to YAML/JSON file containing the trading profile
+          - name: document
+            type: json
+            required: false
+            description: Inline JSON document (alternative to file-path)
+          - name: version
+            type: integer
+            required: false
+            default: 1
+            description: Version number for the profile
+          - name: status
+            type: string
+            required: false
+            default: DRAFT
+            valid_values:
+              - DRAFT
+              - PENDING_REVIEW
+              - ACTIVE
+          - name: notes
+            type: string
+            required: false
+            description: Import notes
+        returns:
+          type: uuid
+          name: profile_id
+          capture: true
+
+      read:
+        description: Read a trading profile by ID
+        behavior: crud
+        crud:
+          operation: select
+          table: cbu_trading_profiles
+          schema: ob-poc
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+            maps_to: profile_id
+        returns:
+          type: record
+
+      get-active:
+        description: Get the active trading profile for a CBU
+        behavior: plugin
+        handler: get_active_trading_profile
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record
+
+      list-versions:
+        description: List all versions of trading profiles for a CBU
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: cbu_trading_profiles
+          schema: ob-poc
+          fk_col: cbu_id
+          order_by: version DESC
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record_set
+
+      activate:
+        description: Activate a trading profile (sets status to ACTIVE, supersedes previous active)
+        behavior: plugin
+        handler: activate_trading_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+            description: The profile to activate
+          - name: activated-by
+            type: string
+            required: false
+            description: User who activated the profile
+        returns:
+          type: record
+
+      materialize:
+        description: Materialize trading profile to operational tables (universe, SSIs, booking rules)
+        behavior: plugin
+        handler: materialize_trading_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+            description: The profile to materialize
+          - name: sections
+            type: string_list
+            required: false
+            description: "Sections to materialize (default: all). Options: universe, ssis, booking_rules, isda, subcustodians"
+          - name: dry-run
+            type: boolean
+            required: false
+            default: false
+            description: If true, show what would be created without actually creating
+          - name: force
+            type: boolean
+            required: false
+            default: false
+            description: If true, overwrite existing records instead of skipping
+        returns:
+          type: record
+          description: Materialization result with counts of records created/updated/deleted
+
+      validate:
+        description: Validate a trading profile document without importing
+        behavior: plugin
+        handler: validate_trading_profile
+        args:
+          - name: file-path
+            type: string
+            required: false
+            description: Path to YAML/JSON file
+          - name: document
+            type: json
+            required: false
+            description: Inline JSON document
+        returns:
+          type: record
+          description: Validation result with any errors or warnings
+
+      diff:
+        description: Compare two trading profile versions
+        behavior: plugin
+        handler: diff_trading_profiles
+        args:
+          - name: profile-id-1
+            type: uuid
+            required: true
+            description: First profile to compare
+          - name: profile-id-2
+            type: uuid
+            required: true
+            description: Second profile to compare
+        returns:
+          type: record
+          description: Diff result showing additions, removals, and changes
+
+      export:
+        description: Export a trading profile to YAML format
+        behavior: plugin
+        handler: export_trading_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: output-path
+            type: string
+            required: false
+            description: Path to write output (if omitted, returns content)
+        returns:
+          type: record

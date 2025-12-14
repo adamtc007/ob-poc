@@ -1671,6 +1671,131 @@ The `cbu-custody` domain implements a three-layer model for settlement instructi
 - `FOP` - Free of Payment
 - `RVP` - Receive vs Payment
 
+## Trading Profile DSL
+
+The `trading-profile` domain provides a document-centric approach to CBU trading configuration. A single JSONB document is the source of truth, which is then materialized to operational tables.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                  Trading Profile Document                        │
+│  YAML/JSON source of truth for CBU trading configuration        │
+│  Stored in: ob-poc.cbu_trading_profiles                         │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Materialization                               │
+│  Document → Operational Tables (atomic sync)                    │
+│  - custody.cbu_instrument_universe                              │
+│  - custody.cbu_ssi                                              │
+│  - custody.ssi_booking_rules                                    │
+│  - custody.isda_agreements + csa_agreements                     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Trading Profile Verbs
+
+| Verb | Description |
+|------|-------------|
+| `trading-profile.import` | Import trading profile from YAML file |
+| `trading-profile.get-active` | Get active profile for a CBU |
+| `trading-profile.activate` | Activate a draft profile (supersedes previous) |
+| `trading-profile.materialize` | Sync document to operational tables |
+| `trading-profile.validate` | Validate document without importing |
+
+### Document Structure
+
+```yaml
+# Key sections of a trading profile document
+universe:
+  base_currency: EUR
+  allowed_currencies: [EUR, USD, GBP]
+  allowed_markets:
+    - mic: XETR          # ISO 10383 MIC code
+      currencies: [EUR]
+      settlement_types: [DVP]
+  instrument_classes:
+    - class_code: EQUITY
+      is_held: true
+      is_traded: true
+
+standing_instructions:
+  CUSTODY:
+    - name: DE_EQUITY_SSI
+      mic: XETR
+      currency: EUR
+      custody_account: "DE-DEPOT-001"
+      custody_bic: "DEUTDEFF"
+  OTC_COLLATERAL:
+    - name: GS_COLLATERAL_SSI
+      counterparty:
+        type: LEI
+        value: "W22LROWP2IHZNBB6K528"
+      currency: USD
+
+booking_rules:
+  - name: "German Equities"
+    priority: 10
+    match:
+      mic: XETR
+      instrument_class: EQUITY
+    ssi_ref: DE_EQUITY_SSI
+
+isda_agreements:
+  - counterparty:
+      type: LEI
+      value: "W22LROWP2IHZNBB6K528"
+    agreement_date: "2020-03-15"
+    governing_law: ENGLISH
+    csa:
+      csa_type: VM
+      collateral_ssi_ref: GS_COLLATERAL_SSI  # Reference pattern
+```
+
+### EntityRef Pattern
+
+Entity references use a type+value pattern for resolution at materialization time:
+
+```yaml
+counterparty:
+  type: LEI      # LEI, BIC, NAME, or UUID
+  value: "W22LROWP2IHZNBB6K528"
+```
+
+Resolution checks (in order for LEI):
+1. `ob-poc.entity_funds.lei`
+2. `ob-poc.entity_manco.lei`
+3. `custody.entity_settlement_identity.lei`
+
+### CSA Reference Pattern
+
+CSA collateral SSIs use a reference pattern instead of inline definition:
+
+```yaml
+# In standing_instructions.OTC_COLLATERAL:
+- name: GS_COLLATERAL_SSI
+  counterparty: { type: LEI, value: "..." }
+  currency: USD
+  custody_account: "COLL-GS-001"
+
+# In isda_agreements[].csa:
+csa:
+  csa_type: VM
+  collateral_ssi_ref: GS_COLLATERAL_SSI  # References SSI by name
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/src/trading_profile/types.rs` | Document type definitions |
+| `rust/src/trading_profile/resolve.rs` | EntityRef → UUID resolution |
+| `rust/src/trading_profile/validate.rs` | SSI reference validation |
+| `rust/src/dsl_v2/custom_ops/trading_profile.rs` | Verb implementations |
+| `rust/config/seed/trading_profiles/` | Example YAML profiles |
+
 ## KYC & UBO DSL
 
 The KYC case management and UBO domains manage entity-level investigations, screenings, ownership chains, and UBO determinations.

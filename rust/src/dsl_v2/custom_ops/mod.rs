@@ -22,6 +22,7 @@ mod custody;
 mod onboarding;
 mod rfi;
 mod threshold;
+mod trading_profile;
 mod ubo_analysis;
 
 use anyhow::Result;
@@ -42,6 +43,10 @@ pub use onboarding::{
 };
 pub use rfi::{RfiCheckCompletionOp, RfiGenerateOp, RfiListByCaseOp};
 pub use threshold::{ThresholdCheckEntityOp, ThresholdDeriveOp, ThresholdEvaluateOp};
+pub use trading_profile::{
+    TradingProfileActivateOp, TradingProfileGetActiveOp, TradingProfileImportOp,
+    TradingProfileMaterializeOp, TradingProfileValidateOp,
+};
 pub use ubo_analysis::{
     UboCheckCompletenessOp, UboCompareSnapshotOp, UboDiscoverOwnerOp, UboInferChainOp,
     UboSnapshotCbuOp, UboSupersedeOp, UboTraceChainsOp,
@@ -158,6 +163,13 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(OnboardingStatusOp));
         registry.register(Arc::new(OnboardingGetUrlsOp));
         registry.register(Arc::new(OnboardingEnsureOp));
+
+        // Trading Profile operations
+        registry.register(Arc::new(TradingProfileImportOp));
+        registry.register(Arc::new(TradingProfileGetActiveOp));
+        registry.register(Arc::new(TradingProfileActivateOp));
+        registry.register(Arc::new(TradingProfileMaterializeOp));
+        registry.register(Arc::new(TradingProfileValidateOp));
 
         registry
     }

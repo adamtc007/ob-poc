@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict RFNAqAKSW3IO4JUJ70Hs1v5GjwSzS3lbDwepKOsrfsiiQr2YuufGcrr9ie55gUG
+\restrict VsfsqNgdOelmv5vuru8RW5SdDRlUpadG0p2lfDSjdJymJt7GFe6SkqXGQQBAygB
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -1587,6 +1587,20 @@ $$;
 
 
 --
+-- Name: update_entity_deps_timestamp(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".update_entity_deps_timestamp() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: update_timestamp(); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -3106,6 +3120,50 @@ COMMENT ON COLUMN "ob-poc".cbu_resource_instances.instance_url IS 'Unique URL/en
 
 
 --
+-- Name: cbu_trading_profiles; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".cbu_trading_profiles (
+    profile_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cbu_id uuid NOT NULL,
+    version integer DEFAULT 1 NOT NULL,
+    status character varying(20) DEFAULT 'DRAFT'::character varying NOT NULL,
+    document jsonb NOT NULL,
+    document_hash text NOT NULL,
+    created_by character varying(255),
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    activated_at timestamp with time zone,
+    activated_by character varying(255),
+    notes text,
+    CONSTRAINT cbu_trading_profiles_status_check CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'PENDING_REVIEW'::character varying, 'ACTIVE'::character varying, 'SUPERSEDED'::character varying, 'ARCHIVED'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE cbu_trading_profiles; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".cbu_trading_profiles IS 'Versioned trading profile documents - single source of truth for CBU trading configuration.
+Documents are materialized to operational tables (cbu_ssi, ssi_booking_rules, etc.) via the
+trading-profile.materialize verb.';
+
+
+--
+-- Name: COLUMN cbu_trading_profiles.document; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".cbu_trading_profiles.document IS 'JSONB document containing: universe, investment_managers, isda_agreements, settlement_config,
+booking_rules, standing_instructions, pricing_matrix, valuation_config, constraints';
+
+
+--
+-- Name: COLUMN cbu_trading_profiles.document_hash; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".cbu_trading_profiles.document_hash IS 'SHA-256 hash of document for change detection and idempotency';
+
+
+--
 -- Name: cbus; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -4188,6 +4246,84 @@ CREATE TABLE "ob-poc".entity_share_classes (
 
 
 --
+-- Name: entity_type_dependencies; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".entity_type_dependencies (
+    dependency_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    from_type character varying(50) NOT NULL,
+    from_subtype character varying(50),
+    to_type character varying(50) NOT NULL,
+    to_subtype character varying(50),
+    via_arg character varying(100),
+    dependency_kind character varying(20) DEFAULT 'required'::character varying,
+    condition_expr text,
+    priority integer DEFAULT 100,
+    is_active boolean DEFAULT true,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT entity_type_dependencies_dependency_kind_check CHECK (((dependency_kind)::text = ANY ((ARRAY['required'::character varying, 'optional'::character varying, 'conditional'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE entity_type_dependencies; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".entity_type_dependencies IS 'Unified entity/resource dependency graph. Drives compiler ordering, linter validation, and onboarding workflows.
+from_type/subtype depends on to_type/subtype. via_arg indicates which DSL argument carries the reference.';
+
+
+--
+-- Name: COLUMN entity_type_dependencies.from_type; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".entity_type_dependencies.from_type IS 'Entity type that has the dependency (e.g., resource_instance, entity, case, workstream)';
+
+
+--
+-- Name: COLUMN entity_type_dependencies.from_subtype; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".entity_type_dependencies.from_subtype IS 'Subtype qualifier (e.g., CUSTODY_ACCT for resources, fund_sub for entities)';
+
+
+--
+-- Name: COLUMN entity_type_dependencies.to_type; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".entity_type_dependencies.to_type IS 'Entity type that is depended upon';
+
+
+--
+-- Name: COLUMN entity_type_dependencies.to_subtype; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".entity_type_dependencies.to_subtype IS 'Subtype qualifier for the dependency target';
+
+
+--
+-- Name: COLUMN entity_type_dependencies.via_arg; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".entity_type_dependencies.via_arg IS 'DSL argument name that carries this dependency (for linter validation)';
+
+
+--
+-- Name: COLUMN entity_type_dependencies.dependency_kind; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".entity_type_dependencies.dependency_kind IS 'required = must exist before creation, optional = may be linked, lifecycle = state transition dependency';
+
+
+--
+-- Name: COLUMN entity_type_dependencies.priority; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".entity_type_dependencies.priority IS 'Ordering hint when multiple dependencies exist (lower = higher priority)';
+
+
+--
 -- Name: entity_types; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -4415,6 +4551,41 @@ COMMENT ON TABLE "ob-poc".observation_discrepancies IS 'Tracks discrepancies det
 
 
 --
+-- Name: onboarding_executions; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".onboarding_executions (
+    execution_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    plan_id uuid NOT NULL,
+    status character varying(20) DEFAULT 'pending'::character varying,
+    started_at timestamp with time zone,
+    completed_at timestamp with time zone,
+    error_message text,
+    result_urls jsonb,
+    CONSTRAINT onboarding_executions_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'running'::character varying, 'complete'::character varying, 'failed'::character varying, 'cancelled'::character varying])::text[])))
+);
+
+
+--
+-- Name: onboarding_plans; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".onboarding_plans (
+    plan_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cbu_id uuid NOT NULL,
+    products text[] NOT NULL,
+    generated_dsl text NOT NULL,
+    dependency_graph jsonb NOT NULL,
+    resource_count integer NOT NULL,
+    status character varying(20) DEFAULT 'pending'::character varying,
+    attribute_overrides jsonb DEFAULT '{}'::jsonb,
+    created_at timestamp with time zone DEFAULT now(),
+    expires_at timestamp with time zone DEFAULT (now() + '24:00:00'::interval),
+    CONSTRAINT onboarding_plans_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'modified'::character varying, 'validated'::character varying, 'executing'::character varying, 'complete'::character varying, 'failed'::character varying])::text[])))
+);
+
+
+--
 -- Name: onboarding_products; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -4445,6 +4616,25 @@ CREATE TABLE "ob-poc".onboarding_requests (
     updated_at timestamp with time zone DEFAULT now(),
     completed_at timestamp with time zone,
     CONSTRAINT onboarding_requests_request_state_check CHECK (((request_state)::text = ANY (ARRAY[('draft'::character varying)::text, ('products_selected'::character varying)::text, ('services_discovered'::character varying)::text, ('services_configured'::character varying)::text, ('resources_allocated'::character varying)::text, ('complete'::character varying)::text])))
+);
+
+
+--
+-- Name: onboarding_tasks; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".onboarding_tasks (
+    task_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    execution_id uuid NOT NULL,
+    resource_code character varying(50) NOT NULL,
+    resource_instance_id uuid,
+    stage integer NOT NULL,
+    status character varying(20) DEFAULT 'pending'::character varying,
+    started_at timestamp with time zone,
+    completed_at timestamp with time zone,
+    error_message text,
+    retry_count integer DEFAULT 0,
+    CONSTRAINT onboarding_tasks_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'running'::character varying, 'complete'::character varying, 'failed'::character varying, 'skipped'::character varying])::text[])))
 );
 
 
@@ -4578,6 +4768,33 @@ CREATE TABLE "ob-poc".resource_attribute_requirements (
 
 
 --
+-- Name: resource_dependencies; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".resource_dependencies (
+    dependency_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    resource_type_id uuid NOT NULL,
+    depends_on_type_id uuid NOT NULL,
+    dependency_type character varying(20) DEFAULT 'required'::character varying,
+    inject_arg character varying(100) NOT NULL,
+    condition_expression text,
+    priority integer DEFAULT 100,
+    is_active boolean DEFAULT true,
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT no_self_dependency CHECK ((resource_type_id <> depends_on_type_id)),
+    CONSTRAINT resource_dependencies_dependency_type_check CHECK (((dependency_type)::text = ANY ((ARRAY['required'::character varying, 'optional'::character varying, 'conditional'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE resource_dependencies; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".resource_dependencies IS 'Resource type dependencies for onboarding. E.g., custody_account depends on cash_account.
+The inject_arg specifies which provisioning argument receives the dependency URL.';
+
+
+--
 -- Name: resource_instance_attributes; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -4603,6 +4820,18 @@ CREATE TABLE "ob-poc".resource_instance_attributes (
 --
 
 COMMENT ON TABLE "ob-poc".resource_instance_attributes IS 'Attribute values for resource instances - dense storage (row exists = value set)';
+
+
+--
+-- Name: resource_instance_dependencies; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".resource_instance_dependencies (
+    instance_id uuid NOT NULL,
+    depends_on_instance_id uuid NOT NULL,
+    dependency_type character varying(20) DEFAULT 'required'::character varying,
+    created_at timestamp with time zone DEFAULT now()
+);
 
 
 --
@@ -4968,6 +5197,24 @@ COMMENT ON TABLE "ob-poc".threshold_requirements IS 'KYC attribute requirements 
 
 
 --
+-- Name: trading_profile_materializations; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".trading_profile_materializations (
+    materialization_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    profile_id uuid NOT NULL,
+    materialized_at timestamp with time zone DEFAULT now() NOT NULL,
+    materialized_by character varying(255),
+    sections_materialized text[] NOT NULL,
+    records_created jsonb DEFAULT '{}'::jsonb NOT NULL,
+    records_updated jsonb DEFAULT '{}'::jsonb NOT NULL,
+    records_deleted jsonb DEFAULT '{}'::jsonb NOT NULL,
+    errors jsonb,
+    duration_ms integer
+);
+
+
+--
 -- Name: trust_parties; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -5124,6 +5371,25 @@ CREATE TABLE "ob-poc".ubo_snapshots (
 --
 
 COMMENT ON TABLE "ob-poc".ubo_snapshots IS 'Point-in-time snapshots of UBO ownership state for a CBU';
+
+
+--
+-- Name: v_active_trading_profiles; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_active_trading_profiles AS
+ SELECT tp.profile_id,
+    tp.cbu_id,
+    c.name AS cbu_name,
+    tp.version,
+    tp.document,
+    tp.document_hash,
+    tp.created_at,
+    tp.activated_at,
+    tp.activated_by
+   FROM ("ob-poc".cbu_trading_profiles tp
+     JOIN "ob-poc".cbus c ON ((c.cbu_id = tp.cbu_id)))
+  WHERE ((tp.status)::text = 'ACTIVE'::text);
 
 
 --
@@ -6155,6 +6421,14 @@ ALTER TABLE ONLY custody.cbu_ssi_agent_override
 
 
 --
+-- Name: cbu_ssi cbu_ssi_cbu_id_ssi_name_key; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_ssi
+    ADD CONSTRAINT cbu_ssi_cbu_id_ssi_name_key UNIQUE (cbu_id, ssi_name);
+
+
+--
 -- Name: cbu_ssi cbu_ssi_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
 --
 
@@ -6635,6 +6909,22 @@ ALTER TABLE ONLY "ob-poc".cbu_resource_instances
 
 
 --
+-- Name: cbu_trading_profiles cbu_trading_profiles_cbu_id_version_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_trading_profiles
+    ADD CONSTRAINT cbu_trading_profiles_cbu_id_version_key UNIQUE (cbu_id, version);
+
+
+--
+-- Name: cbu_trading_profiles cbu_trading_profiles_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_trading_profiles
+    ADD CONSTRAINT cbu_trading_profiles_pkey PRIMARY KEY (profile_id);
+
+
+--
 -- Name: cbus cbus_name_jurisdiction_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -7027,6 +7317,22 @@ ALTER TABLE ONLY "ob-poc".entity_trusts
 
 
 --
+-- Name: entity_type_dependencies entity_type_dependencies_from_type_from_subtype_to_type_to__key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_type_dependencies
+    ADD CONSTRAINT entity_type_dependencies_from_type_from_subtype_to_type_to__key UNIQUE (from_type, from_subtype, to_type, to_subtype);
+
+
+--
+-- Name: entity_type_dependencies entity_type_dependencies_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_type_dependencies
+    ADD CONSTRAINT entity_type_dependencies_pkey PRIMARY KEY (dependency_id);
+
+
+--
 -- Name: entity_types entity_types_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -7107,6 +7413,22 @@ ALTER TABLE ONLY "ob-poc".observation_discrepancies
 
 
 --
+-- Name: onboarding_executions onboarding_executions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_executions
+    ADD CONSTRAINT onboarding_executions_pkey PRIMARY KEY (execution_id);
+
+
+--
+-- Name: onboarding_plans onboarding_plans_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_plans
+    ADD CONSTRAINT onboarding_plans_pkey PRIMARY KEY (plan_id);
+
+
+--
 -- Name: onboarding_products onboarding_products_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -7128,6 +7450,14 @@ ALTER TABLE ONLY "ob-poc".onboarding_products
 
 ALTER TABLE ONLY "ob-poc".onboarding_requests
     ADD CONSTRAINT onboarding_requests_pkey PRIMARY KEY (request_id);
+
+
+--
+-- Name: onboarding_tasks onboarding_tasks_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_tasks
+    ADD CONSTRAINT onboarding_tasks_pkey PRIMARY KEY (task_id);
 
 
 --
@@ -7219,6 +7549,22 @@ ALTER TABLE ONLY "ob-poc".resource_attribute_requirements
 
 
 --
+-- Name: resource_dependencies resource_dependencies_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".resource_dependencies
+    ADD CONSTRAINT resource_dependencies_pkey PRIMARY KEY (dependency_id);
+
+
+--
+-- Name: resource_dependencies resource_dependencies_resource_type_id_depends_on_type_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".resource_dependencies
+    ADD CONSTRAINT resource_dependencies_resource_type_id_depends_on_type_id_key UNIQUE (resource_type_id, depends_on_type_id);
+
+
+--
 -- Name: resource_instance_attributes resource_instance_attributes_instance_id_attribute_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -7232,6 +7578,14 @@ ALTER TABLE ONLY "ob-poc".resource_instance_attributes
 
 ALTER TABLE ONLY "ob-poc".resource_instance_attributes
     ADD CONSTRAINT resource_instance_attributes_pkey PRIMARY KEY (value_id);
+
+
+--
+-- Name: resource_instance_dependencies resource_instance_dependencies_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".resource_instance_dependencies
+    ADD CONSTRAINT resource_instance_dependencies_pkey PRIMARY KEY (instance_id, depends_on_instance_id);
 
 
 --
@@ -7464,6 +7818,14 @@ ALTER TABLE ONLY "ob-poc".threshold_requirements
 
 ALTER TABLE ONLY "ob-poc".threshold_requirements
     ADD CONSTRAINT threshold_requirements_pkey PRIMARY KEY (requirement_id);
+
+
+--
+-- Name: trading_profile_materializations trading_profile_materializations_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".trading_profile_materializations
+    ADD CONSTRAINT trading_profile_materializations_pkey PRIMARY KEY (materialization_id);
 
 
 --
@@ -7704,6 +8066,13 @@ ALTER TABLE ONLY public.rules
 
 ALTER TABLE ONLY public.rules
     ADD CONSTRAINT rules_rule_id_key UNIQUE (rule_id);
+
+
+--
+-- Name: cbu_instrument_universe_no_counterparty_key; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE UNIQUE INDEX cbu_instrument_universe_no_counterparty_key ON custody.cbu_instrument_universe USING btree (cbu_id, instrument_class_id, market_id) WHERE (counterparty_entity_id IS NULL);
 
 
 --
@@ -8813,6 +9182,27 @@ CREATE INDEX idx_entity_crud_rules_table ON "ob-poc".entity_crud_rules USING btr
 
 
 --
+-- Name: idx_entity_deps_from; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_deps_from ON "ob-poc".entity_type_dependencies USING btree (from_type, from_subtype);
+
+
+--
+-- Name: idx_entity_deps_priority; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_deps_priority ON "ob-poc".entity_type_dependencies USING btree (from_type, from_subtype, priority) WHERE (is_active = true);
+
+
+--
+-- Name: idx_entity_deps_to; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_deps_to ON "ob-poc".entity_type_dependencies USING btree (to_type, to_subtype);
+
+
+--
 -- Name: idx_entity_funds_jurisdiction; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -9037,6 +9427,13 @@ CREATE INDEX idx_master_entity_xref_type ON "ob-poc".master_entity_xref USING bt
 
 
 --
+-- Name: idx_materializations_profile; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_materializations_profile ON "ob-poc".trading_profile_materializations USING btree (profile_id);
+
+
+--
 -- Name: idx_obs_attribute; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -9072,6 +9469,27 @@ CREATE INDEX idx_obs_source_type ON "ob-poc".attribute_observations USING btree 
 
 
 --
+-- Name: idx_onboarding_executions_plan; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_onboarding_executions_plan ON "ob-poc".onboarding_executions USING btree (plan_id);
+
+
+--
+-- Name: idx_onboarding_plans_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_onboarding_plans_cbu ON "ob-poc".onboarding_plans USING btree (cbu_id);
+
+
+--
+-- Name: idx_onboarding_plans_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_onboarding_plans_status ON "ob-poc".onboarding_plans USING btree (status);
+
+
+--
 -- Name: idx_onboarding_products_request; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -9090,6 +9508,20 @@ CREATE INDEX idx_onboarding_request_cbu ON "ob-poc".onboarding_requests USING bt
 --
 
 CREATE INDEX idx_onboarding_request_state ON "ob-poc".onboarding_requests USING btree (request_state);
+
+
+--
+-- Name: idx_onboarding_tasks_exec; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_onboarding_tasks_exec ON "ob-poc".onboarding_tasks USING btree (execution_id);
+
+
+--
+-- Name: idx_onboarding_tasks_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_onboarding_tasks_status ON "ob-poc".onboarding_tasks USING btree (status);
 
 
 --
@@ -9209,6 +9641,20 @@ CREATE INDEX idx_proper_persons_id_document ON "ob-poc".entity_proper_persons US
 --
 
 CREATE INDEX idx_proper_persons_nationality ON "ob-poc".entity_proper_persons USING btree (nationality);
+
+
+--
+-- Name: idx_resource_deps_on; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_resource_deps_on ON "ob-poc".resource_dependencies USING btree (depends_on_type_id);
+
+
+--
+-- Name: idx_resource_deps_type; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_resource_deps_type ON "ob-poc".resource_dependencies USING btree (resource_type_id);
 
 
 --
@@ -9412,6 +9858,20 @@ CREATE INDEX idx_threshold_requirements_band ON "ob-poc".threshold_requirements 
 --
 
 CREATE INDEX idx_threshold_requirements_role ON "ob-poc".threshold_requirements USING btree (entity_role);
+
+
+--
+-- Name: idx_trading_profiles_cbu_active; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_trading_profiles_cbu_active ON "ob-poc".cbu_trading_profiles USING btree (cbu_id, status) WHERE ((status)::text = 'ACTIVE'::text);
+
+
+--
+-- Name: idx_trading_profiles_cbu_version; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_trading_profiles_cbu_version ON "ob-poc".cbu_trading_profiles USING btree (cbu_id, version DESC);
 
 
 --
@@ -9739,6 +10199,13 @@ CREATE TRIGGER trg_cbu_status_change AFTER UPDATE ON "ob-poc".cbus FOR EACH ROW 
 --
 
 CREATE TRIGGER trg_cri_updated BEFORE UPDATE ON "ob-poc".cbu_resource_instances FOR EACH ROW EXECUTE FUNCTION "ob-poc".update_timestamp();
+
+
+--
+-- Name: entity_type_dependencies trg_entity_deps_updated_at; Type: TRIGGER; Schema: ob-poc; Owner: -
+--
+
+CREATE TRIGGER trg_entity_deps_updated_at BEFORE UPDATE ON "ob-poc".entity_type_dependencies FOR EACH ROW EXECUTE FUNCTION "ob-poc".update_entity_deps_timestamp();
 
 
 --
@@ -10414,6 +10881,14 @@ ALTER TABLE ONLY "ob-poc".cbu_resource_instances
 
 
 --
+-- Name: cbu_trading_profiles cbu_trading_profiles_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_trading_profiles
+    ADD CONSTRAINT cbu_trading_profiles_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
 -- Name: cbus cbus_commercial_client_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -10990,6 +11465,22 @@ ALTER TABLE ONLY "ob-poc".observation_discrepancies
 
 
 --
+-- Name: onboarding_executions onboarding_executions_plan_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_executions
+    ADD CONSTRAINT onboarding_executions_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES "ob-poc".onboarding_plans(plan_id);
+
+
+--
+-- Name: onboarding_plans onboarding_plans_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_plans
+    ADD CONSTRAINT onboarding_plans_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id);
+
+
+--
 -- Name: onboarding_products onboarding_products_product_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -11011,6 +11502,22 @@ ALTER TABLE ONLY "ob-poc".onboarding_products
 
 ALTER TABLE ONLY "ob-poc".onboarding_requests
     ADD CONSTRAINT onboarding_requests_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id);
+
+
+--
+-- Name: onboarding_tasks onboarding_tasks_execution_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_tasks
+    ADD CONSTRAINT onboarding_tasks_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES "ob-poc".onboarding_executions(execution_id);
+
+
+--
+-- Name: onboarding_tasks onboarding_tasks_resource_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_tasks
+    ADD CONSTRAINT onboarding_tasks_resource_instance_id_fkey FOREIGN KEY (resource_instance_id) REFERENCES "ob-poc".cbu_resource_instances(instance_id);
 
 
 --
@@ -11086,6 +11593,22 @@ ALTER TABLE ONLY "ob-poc".resource_attribute_requirements
 
 
 --
+-- Name: resource_dependencies resource_dependencies_depends_on_type_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".resource_dependencies
+    ADD CONSTRAINT resource_dependencies_depends_on_type_id_fkey FOREIGN KEY (depends_on_type_id) REFERENCES "ob-poc".service_resource_types(resource_id);
+
+
+--
+-- Name: resource_dependencies resource_dependencies_resource_type_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".resource_dependencies
+    ADD CONSTRAINT resource_dependencies_resource_type_id_fkey FOREIGN KEY (resource_type_id) REFERENCES "ob-poc".service_resource_types(resource_id);
+
+
+--
 -- Name: resource_instance_attributes resource_instance_attributes_attribute_uuid_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -11099,6 +11622,22 @@ ALTER TABLE ONLY "ob-poc".resource_instance_attributes
 
 ALTER TABLE ONLY "ob-poc".resource_instance_attributes
     ADD CONSTRAINT resource_instance_attributes_instance_id_fkey FOREIGN KEY (instance_id) REFERENCES "ob-poc".cbu_resource_instances(instance_id) ON DELETE CASCADE;
+
+
+--
+-- Name: resource_instance_dependencies resource_instance_dependencies_depends_on_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".resource_instance_dependencies
+    ADD CONSTRAINT resource_instance_dependencies_depends_on_instance_id_fkey FOREIGN KEY (depends_on_instance_id) REFERENCES "ob-poc".cbu_resource_instances(instance_id);
+
+
+--
+-- Name: resource_instance_dependencies resource_instance_dependencies_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".resource_instance_dependencies
+    ADD CONSTRAINT resource_instance_dependencies_instance_id_fkey FOREIGN KEY (instance_id) REFERENCES "ob-poc".cbu_resource_instances(instance_id);
 
 
 --
@@ -11179,6 +11718,14 @@ ALTER TABLE ONLY "ob-poc".service_resource_capabilities
 
 ALTER TABLE ONLY "ob-poc".threshold_requirements
     ADD CONSTRAINT threshold_requirements_risk_band_fkey FOREIGN KEY (risk_band) REFERENCES "ob-poc".risk_bands(band_code);
+
+
+--
+-- Name: trading_profile_materializations trading_profile_materializations_profile_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".trading_profile_materializations
+    ADD CONSTRAINT trading_profile_materializations_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES "ob-poc".cbu_trading_profiles(profile_id) ON DELETE CASCADE;
 
 
 --
@@ -11385,5 +11932,5 @@ ALTER TABLE ONLY public.rules
 -- PostgreSQL database dump complete
 --
 
-\unrestrict RFNAqAKSW3IO4JUJ70Hs1v5GjwSzS3lbDwepKOsrfsiiQr2YuufGcrr9ie55gUG
+\unrestrict VsfsqNgdOelmv5vuru8RW5SdDRlUpadG0p2lfDSjdJymJt7GFe6SkqXGQQBAygB
 

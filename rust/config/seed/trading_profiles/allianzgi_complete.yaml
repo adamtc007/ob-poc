@@ -1,0 +1,708 @@
+# Complete Trading Profile Example
+# AllianzGI Global Multi-Asset Fund with full OTC and settlement configuration
+# UPDATED: CSA now uses collateral_ssi_ref (reference pattern)
+
+profile_id: "00000000-0000-0000-0000-000000000001"
+cbu_id: "00000000-0000-0000-0000-000000000010"
+version: 1
+status: DRAFT
+as_of: "2025-12-14"
+name: "AllianzGI Global Multi-Asset Complete Profile"
+
+# ==============================================================================
+# UNIVERSE: What can be traded
+# ==============================================================================
+universe:
+  base_currency: EUR
+  allowed_currencies: [EUR, USD, GBP, CHF, JPY, HKD, SGD, AUD]
+
+  allowed_markets:
+    # Europe
+    - mic: XETR
+      currencies: [EUR]
+      settlement_types: [DVP, FOP]
+    - mic: XLON
+      currencies: [GBP]
+      settlement_types: [DVP]
+    - mic: XSWX
+      currencies: [CHF]
+      settlement_types: [DVP]
+    - mic: XPAR
+      currencies: [EUR]
+      settlement_types: [DVP]
+    - mic: XAMS
+      currencies: [EUR]
+      settlement_types: [DVP]
+
+    # Americas
+    - mic: XNYS
+      currencies: [USD]
+      settlement_types: [DVP]
+    - mic: XNAS
+      currencies: [USD]
+      settlement_types: [DVP]
+
+    # Asia Pacific
+    - mic: XHKG
+      currencies: [HKD]
+      settlement_types: [DVP]
+    - mic: XTKS
+      currencies: [JPY]
+      settlement_types: [DVP]
+    - mic: XASX
+      currencies: [AUD]
+      settlement_types: [DVP]
+    - mic: XSES
+      currencies: [SGD]
+      settlement_types: [DVP]
+
+  instrument_classes:
+    - class_code: EQUITY
+      cfi_prefixes: ["ES", "EP", "EC"]
+      is_held: true
+      is_traded: true
+    - class_code: GOVT_BOND
+      cfi_prefixes: ["DB"]
+      is_held: true
+      is_traded: true
+    - class_code: CORP_BOND
+      cfi_prefixes: ["DC"]
+      is_held: true
+      is_traded: true
+    - class_code: ETF
+      cfi_prefixes: ["EU", "EI"]
+      is_held: true
+      is_traded: true
+    - class_code: OTC_DERIVATIVE
+      isda_asset_classes: [RATES, FX, CREDIT]
+      is_held: false
+      is_traded: true
+
+# ==============================================================================
+# INVESTMENT MANAGERS
+# ==============================================================================
+investment_managers:
+  # Default (all assets)
+  - priority: 100
+    manager:
+      type: LEI
+      value: "5493001KJTIIGC8Y1R12"
+    role: INVESTMENT_MANAGER
+    scope:
+      all: true
+    instruction_method: SWIFT
+    can_trade: true
+    can_settle: true
+
+  # European equities specialist
+  - priority: 10
+    manager:
+      type: LEI
+      value: "549300EUEQUITYSPEC01"
+    role: INVESTMENT_MANAGER
+    scope:
+      all: false
+      markets: [XETR, XLON, XSWX, XPAR, XAMS]
+      instrument_classes: [EQUITY]
+    instruction_method: CTM
+    can_trade: true
+    can_settle: true
+
+  # Asian equities specialist
+  - priority: 10
+    manager:
+      type: LEI
+      value: "549300ASIAEQUITY0001"
+    role: INVESTMENT_MANAGER
+    scope:
+      all: false
+      markets: [XHKG, XTKS, XASX, XSES]
+      instrument_classes: [EQUITY]
+    instruction_method: SWIFT
+    can_trade: true
+    can_settle: true
+
+  # Fixed income manager
+  - priority: 10
+    manager:
+      type: LEI
+      value: "549300FIXEDINCOME001"
+    role: INVESTMENT_MANAGER
+    scope:
+      all: false
+      instrument_classes: [GOVT_BOND, CORP_BOND]
+    instruction_method: SWIFT
+    can_trade: true
+    can_settle: true
+
+  # Derivatives overlay manager
+  - priority: 10
+    manager:
+      type: LEI
+      value: "549300DERIVOVERLAY01"
+    role: OVERLAY_MANAGER
+    scope:
+      all: false
+      instrument_classes: [OTC_DERIVATIVE]
+    instruction_method: API
+    can_trade: true
+    can_settle: false
+
+# ==============================================================================
+# ISDA AGREEMENTS: OTC Derivatives Framework
+# NOTE: CSA uses collateral_ssi_ref to reference SSIs defined in standing_instructions
+# ==============================================================================
+isda_agreements:
+  # Goldman Sachs - Rates and FX
+  - counterparty:
+      type: LEI
+      value: "W22LROWP2IHZNBB6K528"
+    agreement_date: "2020-03-15"
+    governing_law: ENGLISH
+    effective_date: "2020-04-01"
+
+    product_coverage:
+      - asset_class: RATES
+        base_products: [SWAP, SWAPTION, CAP_FLOOR, FRA]
+      - asset_class: FX
+        base_products: [FORWARD, OPTION, SWAP, NDF]
+
+    csa:
+      csa_type: VM
+      threshold_amount: 0
+      threshold_currency: USD
+      minimum_transfer_amount: 500000
+      rounding_amount: 10000
+
+      eligible_collateral:
+        - type: CASH
+          currencies: [USD, EUR, GBP]
+          haircut_pct: 0
+        - type: GOVT_BOND
+          issuers: [US, DE, GB, FR]
+          min_rating: AA-
+          haircut_pct: 2.0
+        - type: GOVT_BOND
+          issuers: [JP]
+          min_rating: A
+          haircut_pct: 3.0
+
+      # REFERENCE to SSI defined in standing_instructions.OTC_COLLATERAL
+      collateral_ssi_ref: "GS_COLLATERAL_SSI"
+
+      valuation_time: "16:00"
+      valuation_timezone: America/New_York
+      notification_time: "18:00"
+      settlement_days: 1
+      dispute_resolution: CALCULATION_AGENT
+
+  # JP Morgan - Credit derivatives
+  - counterparty:
+      type: LEI
+      value: "8IE5DZWZ7BX5LA5DJB03"
+    agreement_date: "2019-06-01"
+    governing_law: NEW_YORK
+    effective_date: "2019-07-01"
+
+    product_coverage:
+      - asset_class: CREDIT
+        base_products: [CDS, CDX, TRANCHE, LCDS]
+
+    csa:
+      csa_type: VM_IM
+      threshold_amount: 0
+      threshold_currency: USD
+      minimum_transfer_amount: 1000000
+      rounding_amount: 50000
+
+      eligible_collateral:
+        - type: CASH
+          currencies: [USD]
+          haircut_pct: 0
+        - type: GOVT_BOND
+          issuers: [US]
+          min_rating: AA
+          haircut_pct: 2.0
+
+      initial_margin:
+        calculation_method: ISDA_SIMM
+        posting_frequency: DAILY
+        segregation_required: true
+        custodian:
+          type: LEI
+          value: "HPFHU0OQ28E4N0NFVK49"  # BNY as IM custodian
+
+      # REFERENCE to SSI defined in standing_instructions.OTC_COLLATERAL
+      collateral_ssi_ref: "JPM_COLLATERAL_SSI"
+
+      valuation_time: "15:00"
+      valuation_timezone: America/New_York
+      settlement_days: 1
+
+  # Barclays - Additional rates capacity
+  - counterparty:
+      type: LEI
+      value: "213800LBQA1Y9L22JB70"
+    agreement_date: "2021-01-15"
+    governing_law: ENGLISH
+    effective_date: "2021-02-01"
+
+    product_coverage:
+      - asset_class: RATES
+        base_products: [SWAP, SWAPTION]
+      - asset_class: FX
+        base_products: [FORWARD, OPTION]
+
+    csa:
+      csa_type: VM
+      threshold_amount: 0
+      threshold_currency: GBP
+      minimum_transfer_amount: 250000
+
+      eligible_collateral:
+        - type: CASH
+          currencies: [GBP, EUR, USD]
+          haircut_pct: 0
+
+      # REFERENCE to SSI defined in standing_instructions.OTC_COLLATERAL
+      collateral_ssi_ref: "BARC_COLLATERAL_SSI"
+
+      valuation_time: "16:00"
+      valuation_timezone: Europe/London
+      settlement_days: 1
+
+# ==============================================================================
+# SETTLEMENT CONFIGURATION
+# ==============================================================================
+settlement_config:
+  # Trade matching platforms
+  matching_platforms:
+    - platform: CTM
+      participant_id: "ALLIANZGI-CTM-001"
+      enabled_markets: [XNYS, XNAS, XLON, XETR, XPAR, XAMS, XSWX]
+      matching_rules:
+        auto_match: true
+        tolerance_price_pct: 0.01
+        tolerance_quantity: 0
+        auto_affirm_threshold_usd: 10000000
+
+    - platform: ALERT
+      participant_id: "ALLIANZGI-ALERT-001"
+      enabled_markets: [XHKG, XTKS, XASX, XSES]
+      matching_rules:
+        auto_match: false
+        enrichment_sources: [SUBCUST_NETWORK, CLIENT_SSI, COUNTERPARTY_SSI]
+
+  # Our settlement identities
+  settlement_identities:
+    - role: PRINCIPAL
+      bic: "ALLIGILA"
+      lei: "5493001KJTIIGC8Y1R12"
+      alert_participant_id: "ALLIANZGI-ALERT-001"
+      ctm_participant_id: "ALLIANZGI-CTM-001"
+
+  # Subcustodian network (overrides to default BNY network)
+  subcustodian_network:
+    # Hong Kong via HSBC
+    - market: XHKG
+      currency: HKD
+      subcustodian:
+        bic: "HSBCHKHH"
+        name: "HSBC Hong Kong"
+        local_agent_account: "HK-HSBC-LOCAL-001"
+      place_of_settlement: "CCASCHKX"
+      is_primary: true
+
+    # Japan via Mizuho
+    - market: XTKS
+      currency: JPY
+      subcustodian:
+        bic: "MABORJPJ"
+        name: "Mizuho Bank Japan"
+        local_agent_account: "JP-MIZUHO-LOCAL-001"
+      place_of_settlement: "JASDECJP"
+      is_primary: true
+
+    # Germany via Deutsche Bank (instead of default)
+    - market: XETR
+      currency: EUR
+      subcustodian:
+        bic: "DEUTDEFF"
+        name: "Deutsche Bank Germany"
+        local_agent_account: "DE-DB-LOCAL-001"
+      place_of_settlement: "DAABORDC"
+      is_primary: true
+
+    # UK via HSBC
+    - market: XLON
+      currency: GBP
+      subcustodian:
+        bic: "MIDLGB22"
+        name: "HSBC UK"
+        local_agent_account: "UK-HSBC-LOCAL-001"
+      place_of_settlement: "CABORDC1"
+      is_primary: true
+
+    # US via BNY (default, but explicit)
+    - market: XNYS
+      currency: USD
+      subcustodian:
+        bic: "IRVTUS3N"
+        name: "BNY Mellon USA"
+      place_of_settlement: "DTCYUS33"
+      is_primary: true
+
+    # Australia via HSBC
+    - market: XASX
+      currency: AUD
+      subcustodian:
+        bic: "HKBAAU2S"
+        name: "HSBC Australia"
+        local_agent_account: "AU-HSBC-LOCAL-001"
+      place_of_settlement: "XCHEAU2S"
+      is_primary: true
+
+  # Enrichment chain priority
+  enrichment_chain:
+    - CLIENT_SSI
+    - SUBCUST_NETWORK
+    - COUNTERPARTY_SSI
+    - ALERT_NETWORK
+
+  # Instruction type preferences
+  instruction_preferences:
+    - instruction_type: DELIVERY_FREE
+      swift_msg: MT542
+      iso20022_msg: sese.023
+      auto_release: false
+      requires_approval: true
+
+    - instruction_type: RECEIPT_VS_PAYMENT
+      swift_msg: MT541
+      iso20022_msg: sese.023
+      auto_release: true
+      requires_approval: false
+
+    - instruction_type: DELIVERY_VS_PAYMENT
+      swift_msg: MT543
+      iso20022_msg: sese.023
+      auto_release: true
+      requires_approval: false
+
+# ==============================================================================
+# BOOKING RULES: ALERT-Style SSI Selection
+# ==============================================================================
+booking_rules:
+  # OTC with specific counterparties
+  - name: "Goldman OTC Rates/FX"
+    priority: 5
+    match:
+      counterparty:
+        type: LEI
+        value: "W22LROWP2IHZNBB6K528"
+      instrument_class: OTC_DERIVATIVE
+    ssi_ref: GS_COLLATERAL_SSI
+
+  - name: "JP Morgan Credit Derivatives"
+    priority: 5
+    match:
+      counterparty:
+        type: LEI
+        value: "8IE5DZWZ7BX5LA5DJB03"
+      instrument_class: OTC_DERIVATIVE
+    ssi_ref: JPM_COLLATERAL_SSI
+
+  # Market-specific rules
+  - name: "German Equities via Clearstream"
+    priority: 10
+    match:
+      market: XETR
+      instrument_class: EQUITY
+    ssi_ref: DE_EQUITY_SSI
+
+  - name: "UK Equities via CREST"
+    priority: 10
+    match:
+      market: XLON
+      instrument_class: EQUITY
+    ssi_ref: UK_EQUITY_SSI
+
+  - name: "US Equities via DTC"
+    priority: 10
+    match:
+      market: XNYS
+      instrument_class: EQUITY
+    ssi_ref: US_EQUITY_SSI
+
+  - name: "US Equities NASDAQ via DTC"
+    priority: 10
+    match:
+      market: XNAS
+      instrument_class: EQUITY
+    ssi_ref: US_EQUITY_SSI
+
+  - name: "Hong Kong via CCASS"
+    priority: 10
+    match:
+      market: XHKG
+    ssi_ref: HK_SSI
+
+  - name: "Japan via JASDEC"
+    priority: 10
+    match:
+      market: XTKS
+    ssi_ref: JP_SSI
+
+  # Instrument class defaults
+  - name: "EUR Government Bonds"
+    priority: 20
+    match:
+      instrument_class: GOVT_BOND
+      currency: EUR
+    ssi_ref: EUR_BOND_SSI
+
+  - name: "USD Government Bonds"
+    priority: 20
+    match:
+      instrument_class: GOVT_BOND
+      currency: USD
+    ssi_ref: USD_BOND_SSI
+
+  - name: "All Corporate Bonds"
+    priority: 30
+    match:
+      instrument_class: CORP_BOND
+    ssi_ref: DEFAULT_SSI
+
+  # Catch-all
+  - name: "Default Fallback"
+    priority: 100
+    match: {}
+    ssi_ref: DEFAULT_SSI
+
+# ==============================================================================
+# STANDING INSTRUCTIONS
+# This is the SINGLE SOURCE OF TRUTH for all SSIs
+# CSA.collateral_ssi_ref and booking_rules.ssi_ref reference these by name
+# ==============================================================================
+standing_instructions:
+  CUSTODY:
+    # Germany
+    - name: DE_EQUITY_SSI
+      market: XETR
+      currency: EUR
+      custody_account: "DE-DEPOT-ALLIANZ-001"
+      custody_bic: "DEUTDEFF"
+      cash_account: "DE-CASH-ALLIANZ-001"
+      cash_bic: "DEUTDEFF"
+      settlement_model: DVP
+      cutoff:
+        time: "16:00"
+        timezone: Europe/Berlin
+
+    # UK
+    - name: UK_EQUITY_SSI
+      market: XLON
+      currency: GBP
+      custody_account: "GB-DEPOT-ALLIANZ-001"
+      custody_bic: "MIDLGB22"
+      cash_account: "GB-CASH-ALLIANZ-001"
+      cash_bic: "MIDLGB22"
+      settlement_model: DVP
+      cutoff:
+        time: "15:30"
+        timezone: Europe/London
+
+    # US
+    - name: US_EQUITY_SSI
+      market: XNYS
+      currency: USD
+      custody_account: "US-DEPOT-ALLIANZ-001"
+      custody_bic: "IRVTUS3N"
+      cash_account: "US-CASH-ALLIANZ-001"
+      cash_bic: "IRVTUS3N"
+      settlement_model: DVP
+      cutoff:
+        time: "15:00"
+        timezone: America/New_York
+
+    # Hong Kong
+    - name: HK_SSI
+      market: XHKG
+      currency: HKD
+      custody_account: "HK-DEPOT-ALLIANZ-001"
+      custody_bic: "HSBCHKHH"
+      cash_account: "HK-CASH-ALLIANZ-001"
+      cash_bic: "HSBCHKHH"
+      settlement_model: DVP
+      cutoff:
+        time: "15:00"
+        timezone: Asia/Hong_Kong
+
+    # Japan
+    - name: JP_SSI
+      market: XTKS
+      currency: JPY
+      custody_account: "JP-DEPOT-ALLIANZ-001"
+      custody_bic: "MABORJPJ"
+      cash_account: "JP-CASH-ALLIANZ-001"
+      cash_bic: "MABORJPJ"
+      settlement_model: DVP
+      cutoff:
+        time: "14:00"
+        timezone: Asia/Tokyo
+
+    # Bonds - EUR
+    - name: EUR_BOND_SSI
+      currency: EUR
+      custody_account: "EU-BOND-DEPOT-001"
+      custody_bic: "CABORDC1"
+      cash_account: "EU-BOND-CASH-001"
+      cash_bic: "CABORDC1"
+      settlement_model: DVP
+
+    # Bonds - USD
+    - name: USD_BOND_SSI
+      currency: USD
+      custody_account: "US-BOND-DEPOT-001"
+      custody_bic: "IRVTUS3N"
+      cash_account: "US-BOND-CASH-001"
+      cash_bic: "IRVTUS3N"
+      settlement_model: DVP
+
+    # Default
+    - name: DEFAULT_SSI
+      custody_account: "DEFAULT-DEPOT-001"
+      custody_bic: "IRVTDEFX"
+      cash_account: "DEFAULT-CASH-001"
+      cash_bic: "IRVTDEFX"
+      settlement_model: DVP
+
+  # OTC Collateral SSIs - Referenced by CSA.collateral_ssi_ref
+  OTC_COLLATERAL:
+    # Goldman Sachs collateral SSI
+    - name: GS_COLLATERAL_SSI
+      counterparty:
+        type: LEI
+        value: "W22LROWP2IHZNBB6K528"
+      currency: USD
+      custody_account: "COLL-GS-EUR-001"
+      custody_bic: "IRVTDEFX"
+      cash_account: "CASH-GS-EUR-001"
+      cash_bic: "IRVTDEFX"
+
+    # JP Morgan collateral SSI
+    - name: JPM_COLLATERAL_SSI
+      counterparty:
+        type: LEI
+        value: "8IE5DZWZ7BX5LA5DJB03"
+      currency: USD
+      custody_account: "COLL-JPM-USD-001"
+      custody_bic: "IRVTUS3N"
+      cash_account: "CASH-JPM-USD-001"
+      cash_bic: "IRVTUS3N"
+
+    # Barclays collateral SSI
+    - name: BARC_COLLATERAL_SSI
+      counterparty:
+        type: LEI
+        value: "213800LBQA1Y9L22JB70"
+      currency: GBP
+      custody_account: "COLL-BARC-GBP-001"
+      custody_bic: "IRVTGB2X"
+      cash_account: "CASH-BARC-GBP-001"
+      cash_bic: "IRVTGB2X"
+
+  FUND_ACCOUNTING:
+    - name: FA_PRIMARY
+      provider_ref: "FA-ALLIANZ-001"
+      channel: SFTP
+      reporting_frequency: DAILY
+
+# ==============================================================================
+# PRICING MATRIX
+# ==============================================================================
+pricing_matrix:
+  # Listed equities - primary
+  - priority: 1
+    scope:
+      instrument_classes: [EQUITY, ETF]
+    source: BLOOMBERG
+    price_type: CLOSING
+    max_age_hours: 24
+    tolerance_pct: 5.0
+
+  # Listed equities - fallback
+  - priority: 2
+    scope:
+      instrument_classes: [EQUITY, ETF]
+    source: REUTERS
+    price_type: CLOSING
+    fallback_source: BLOOMBERG
+    max_age_hours: 48
+
+  # Government bonds - primary
+  - priority: 1
+    scope:
+      instrument_classes: [GOVT_BOND]
+    source: BLOOMBERG
+    price_type: MID
+    max_age_hours: 24
+    tolerance_pct: 2.0
+
+  # Corporate bonds - Markit for credit spreads
+  - priority: 1
+    scope:
+      instrument_classes: [CORP_BOND]
+    source: MARKIT
+    price_type: MID
+    max_age_hours: 24
+    tolerance_pct: 3.0
+
+  # Corporate bonds - Bloomberg fallback
+  - priority: 2
+    scope:
+      instrument_classes: [CORP_BOND]
+    source: BLOOMBERG
+    price_type: MID
+    fallback_source: MARKIT
+    max_age_hours: 48
+
+  # OTC derivatives - mark to model
+  - priority: 1
+    scope:
+      instrument_classes: [OTC_DERIVATIVE]
+    source: MODEL
+    price_type: MID
+    max_age_hours: 24
+
+# ==============================================================================
+# VALUATION CONFIG
+# ==============================================================================
+valuation_config:
+  frequency: DAILY
+  cutoff_time: "16:00"
+  timezone: Europe/Luxembourg
+  pricing_point: T
+  swing_pricing: true
+  swing_threshold_pct: 2.5
+  holiday_calendars: [LU, US, GB, DE, JP, HK]
+
+# ==============================================================================
+# TRADING CONSTRAINTS
+# ==============================================================================
+constraints:
+  short_selling: PROHIBITED
+  leverage:
+    max_gross: 1.0
+    max_net: 1.0
+
+# ==============================================================================
+# METADATA
+# ==============================================================================
+metadata:
+  source: bulk-import
+  source_ref: seed/allianzgi
+  created_by: system
+  notes: "Complete multi-asset profile with ISDA/CSA and full settlement config"
+  regulatory_framework: UCITS
