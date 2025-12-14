@@ -29,6 +29,19 @@ use sqlx::PgPool;
 // TYPES
 // =============================================================================
 
+/// Row type for entity_type_dependencies query
+#[cfg(feature = "database")]
+type DepRow = (
+    String,         // from_type
+    Option<String>, // from_subtype
+    String,         // to_type
+    Option<String>, // to_subtype
+    Option<String>, // via_arg
+    String,         // dependency_kind
+    Option<String>, // condition_expr
+    i32,            // priority
+);
+
 /// Kind of dependency relationship
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DependencyKind {
@@ -141,16 +154,7 @@ impl EntityDependencyRegistry {
     /// Load dependencies from database
     #[cfg(feature = "database")]
     pub async fn load(pool: &PgPool) -> Result<Self, sqlx::Error> {
-        let rows: Vec<(
-            String,         // from_type
-            Option<String>, // from_subtype
-            String,         // to_type
-            Option<String>, // to_subtype
-            Option<String>, // via_arg
-            String,         // dependency_kind
-            Option<String>, // condition_expr
-            i32,            // priority
-        )> = sqlx::query_as(
+        let rows: Vec<DepRow> = sqlx::query_as(
             r#"SELECT from_type, from_subtype, to_type, to_subtype, via_arg,
                       dependency_kind, condition_expr, priority
                FROM "ob-poc".entity_type_dependencies

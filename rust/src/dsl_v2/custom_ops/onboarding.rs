@@ -29,6 +29,7 @@ use sqlx::PgPool;
 
 /// Resource discovered during product expansion
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields used for display/logging in future iterations
 pub struct ResourceToProvision {
     pub resource_type_id: Uuid,
     pub resource_code: String,
