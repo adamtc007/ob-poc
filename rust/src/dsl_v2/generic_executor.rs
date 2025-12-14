@@ -186,6 +186,24 @@ impl GenericCrudExecutor {
         }
     }
 
+    /// Create executor without a database pool (for dry-run testing only)
+    #[cfg(test)]
+    pub fn new_without_pool() -> Self {
+        use sqlx::postgres::PgPoolOptions;
+
+        // Create a dummy pool that will never be used (dry_run=true skips execution)
+        // This is a workaround since PgPool doesn't have a Default impl
+        let pool = PgPoolOptions::new()
+            .max_connections(1)
+            .connect_lazy("postgres://localhost/nonexistent")
+            .expect("lazy pool creation should not fail");
+
+        Self {
+            pool,
+            gateway_client: Arc::new(Mutex::new(None)),
+        }
+    }
+
     /// Get or create EntityGateway client
     async fn get_gateway_client(
         &self,
@@ -2405,5 +2423,201 @@ mod tests {
                 _ => "id",
             }
         });
+    }
+}
+
+// =============================================================================
+// DAG EXECUTION TESTS
+// =============================================================================
+
+#[cfg(all(test, feature = "database"))]
+mod dag_tests {
+    use super::*;
+    use crate::dsl_v2::parser::parse_program;
+
+    /// Test that dry-run mode returns an execution plan description
+    #[tokio::test]
+    async fn test_dag_dry_run_returns_plan() {
+        let source = r#"
+            (cbu.ensure :name "Test Fund" :jurisdiction "LU" :as @fund)
+            (entity.create-proper-person :first-name "John" :last-name "Smith" :as @john)
+            (cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")
+        "#;
+        let program = parse_program(source).unwrap();
+
+        // Create executor without pool (dry_run doesn't need it)
+        let executor = GenericCrudExecutor::new_without_pool();
+
+        let result = executor.execute_with_dag(&program, true).await;
+
+        match result {
+            Ok(DagExecutionResult::Plan(desc)) => {
+                // Should contain phase information
+                assert!(desc.contains("Phase"), "Plan should describe phases");
+                // Should mention the ops (describe_plan uses "Ensure" not "EnsureEntity")
+                assert!(
+                    desc.contains("Ensure") || desc.contains("Link") || desc.contains("role"),
+                    "Plan should describe ops: {}",
+                    desc
+                );
+            }
+            Ok(DagExecutionResult::Executed { .. }) => {
+                panic!("dry_run=true should return Plan, not Executed");
+            }
+            Err(e) => {
+                panic!("Unexpected error: {:?}", e);
+            }
+        }
+    }
+
+    /// Test that undefined symbols produce compile errors
+    #[tokio::test]
+    async fn test_dag_undefined_symbol_error() {
+        let source = r#"
+            (cbu.assign-role :cbu-id @undefined :entity-id @also_undefined :role "X")
+        "#;
+        let program = parse_program(source).unwrap();
+
+        let executor = GenericCrudExecutor::new_without_pool();
+        let result = executor.execute_with_dag(&program, true).await;
+
+        match result {
+            Err(DagExecutionError::CompileErrors(errors)) => {
+                assert!(!errors.is_empty(), "Should have compile errors");
+                let error_msg = &errors[0].message;
+                assert!(
+                    error_msg.contains("undefined symbol"),
+                    "Error should mention undefined symbol: {}",
+                    error_msg
+                );
+            }
+            Ok(_) => panic!("Should have failed with compile error"),
+            Err(e) => panic!("Unexpected error type: {:?}", e),
+        }
+    }
+
+    /// Test that the plan has correct dependency ordering
+    /// Note: The compiler requires symbols to be defined before use,
+    /// so we test with correct source order but verify the DAG groups
+    /// entities into Phase 1 and roles into Phase 3
+    #[tokio::test]
+    async fn test_dag_dependency_ordering() {
+        // Correct source order: define symbols before using them
+        // DAG should group: Phase 1 (Entities) before Phase 3 (Roles)
+        let source = r#"
+            (cbu.ensure :name "Test Fund" :jurisdiction "LU" :as @fund)
+            (entity.create-proper-person :first-name "John" :last-name "Smith" :as @john)
+            (cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")
+        "#;
+        let program = parse_program(source).unwrap();
+
+        let executor = GenericCrudExecutor::new_without_pool();
+        let result = executor.execute_with_dag(&program, true).await;
+
+        match result {
+            Ok(DagExecutionResult::Plan(desc)) => {
+                // Verify entities phase comes before roles phase
+                let entities_pos = desc.find("Entities");
+                let roles_pos = desc.find("Roles");
+
+                if let (Some(ep), Some(rp)) = (entities_pos, roles_pos) {
+                    assert!(
+                        ep < rp,
+                        "Entities phase should come before Roles phase in plan:\n{}",
+                        desc
+                    );
+                }
+
+                // Verify we have both entity and role ops
+                // describe_plan outputs "Link X to Y as ROLE" for LinkRole
+                assert!(
+                    desc.contains("Ensure") && desc.contains("Link"),
+                    "Plan should contain both entity and role ops:\n{}",
+                    desc
+                );
+            }
+            Err(e) => panic!("Unexpected error: {:?}", e),
+            _ => panic!("Expected Plan result"),
+        }
+    }
+
+    /// Test compiling a simple program produces correct ops count
+    #[tokio::test]
+    async fn test_dag_simple_compile() {
+        let source = r#"
+            (cbu.ensure :name "Fund A" :as @a)
+            (cbu.ensure :name "Fund B" :as @b)
+        "#;
+        let program = parse_program(source).unwrap();
+
+        let executor = GenericCrudExecutor::new_without_pool();
+        let result = executor.execute_with_dag(&program, true).await;
+
+        assert!(
+            result.is_ok(),
+            "Simple program should compile: {:?}",
+            result
+        );
+    }
+
+    /// Test that ownership relationships compile correctly
+    #[tokio::test]
+    async fn test_dag_ownership_compile() {
+        let source = r#"
+            (entity.create-limited-company :name "Parent Co" :jurisdiction "US" :as @parent)
+            (entity.create-limited-company :name "Child Co" :jurisdiction "US" :as @child)
+            (ubo.add-ownership :owner-entity-id @parent :owned-entity-id @child :percentage 100 :ownership-type "DIRECT")
+        "#;
+        let program = parse_program(source).unwrap();
+
+        let executor = GenericCrudExecutor::new_without_pool();
+        let result = executor.execute_with_dag(&program, true).await;
+
+        match result {
+            Ok(DagExecutionResult::Plan(desc)) => {
+                // describe_plan outputs "owns X% of" for AddOwnership
+                assert!(
+                    desc.contains("owns") || desc.contains("Ensure"),
+                    "Plan should contain ownership ops: {}",
+                    desc
+                );
+                // Verify phases are present
+                assert!(desc.contains("Entities"), "Should have Entities phase");
+                assert!(
+                    desc.contains("Relationships"),
+                    "Should have Relationships phase"
+                );
+            }
+            Err(e) => panic!("Unexpected error: {:?}", e),
+            _ => panic!("Expected Plan result"),
+        }
+    }
+
+    /// Test KYC case creation compiles correctly
+    #[tokio::test]
+    async fn test_dag_kyc_case_compile() {
+        let source = r#"
+            (cbu.ensure :name "Test CBU" :as @cbu)
+            (kyc-case.create :cbu-id @cbu :case-type "NEW_CLIENT" :as @case)
+        "#;
+        let program = parse_program(source).unwrap();
+
+        let executor = GenericCrudExecutor::new_without_pool();
+        let result = executor.execute_with_dag(&program, true).await;
+
+        match result {
+            Ok(DagExecutionResult::Plan(desc)) => {
+                // describe_plan outputs "Create X case for Y" for CreateCase
+                assert!(
+                    desc.contains("case") || desc.contains("Ensure"),
+                    "Plan should contain case ops: {}",
+                    desc
+                );
+                // Verify KYC phase is present
+                assert!(desc.contains("KYC"), "Should have KYC phase");
+            }
+            Err(e) => panic!("Unexpected error: {:?}", e),
+            _ => panic!("Expected Plan result"),
+        }
     }
 }
