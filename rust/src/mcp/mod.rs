@@ -41,9 +41,19 @@
 //! DATABASE_URL=postgresql://localhost/ob-poc ./target/debug/dsl_mcp
 //! ```
 
+pub mod enrichment;
 pub mod handlers;
 pub mod protocol;
+pub mod resolution;
 pub mod server;
+pub mod session;
 pub mod tools;
+pub mod types;
 
+pub use enrichment::{EntityContext, EntityEnricher, EntityType, OwnershipContext, RoleContext};
+pub use resolution::{
+    ConversationContext, EnrichedMatch, ResolutionConfidence, ResolutionResult, ResolutionStrategy,
+    SuggestedAction,
+};
 pub use server::McpServer;
+pub use types::*;

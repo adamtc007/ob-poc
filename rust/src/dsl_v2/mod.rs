@@ -95,7 +95,10 @@ pub use execution_plan::{
     SyntheticStep,
 };
 pub use execution_result::{ExecutionResults, StepResult};
-pub use executor::{DslExecutor, ExecutionContext, ExecutionResult, ReturnType};
+pub use executor::{
+    DagExecutionResult, DslExecutor, ExecutionContext, ExecutionResult, OpExecutionResult,
+    ReturnType,
+};
 #[cfg(feature = "database")]
 pub use gateway_resolver::GatewayRefResolver;
 #[cfg(feature = "database")]

@@ -1,5 +1,6 @@
 //! LSP request handlers.
 
+pub mod code_actions;
 pub mod completion;
 pub mod diagnostics;
 pub mod goto_definition;

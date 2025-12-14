@@ -3282,6 +3282,123 @@ psql -d data_designer -f schema_export.sql
 
 ```
 
+## Workflow Orchestration
+
+The workflow module provides stateful orchestration for KYC, UBO, and onboarding processes. Workflows are defined in YAML and executed by a state machine engine.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           WORKFLOW ENGINE                                   │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
+│  │  Workflow   │  │   State     │  │ Transition  │  │  Blocker    │        │
+│  │ Definition  │  │  Tracker    │  │   Guard     │  │  Resolver   │        │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘        │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           DSL EXECUTION                                     │
+│              Workflow emits DSL → Executor runs → Results fed back          │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Concepts
+
+| Concept | Description |
+|---------|-------------|
+| **WorkflowDefinition** | YAML-defined state machine with states, transitions, guards |
+| **WorkflowInstance** | Running instance of a workflow for a specific subject (CBU, entity, case) |
+| **Guard** | Condition that must be met before a transition can occur |
+| **Blocker** | Actionable item preventing advancement (includes resolution DSL verb) |
+| **Auto-transition** | Automatic state change when guard passes |
+| **Manual transition** | Requires explicit user action |
+
+### Module Structure
+
+```
+rust/src/workflow/
+├── mod.rs              # Module exports
+├── definition.rs       # WorkflowDefinition, parsing YAML
+├── state.rs            # WorkflowInstance, StateTransition, Blocker types
+├── guards.rs           # GuardEvaluator with guard implementations
+├── engine.rs           # WorkflowEngine core logic
+└── repository.rs       # Database persistence
+
+rust/config/workflows/
+└── kyc_onboarding.yaml # KYC onboarding workflow definition
+```
+
+### Blocker Types
+
+| Type | Description | Resolution Verb |
+|------|-------------|-----------------|
+| `MissingRole` | Required role not assigned | `cbu.assign-role` |
+| `MissingDocument` | Required document not present | `document.catalog` |
+| `PendingScreening` | Entity needs screening | `case-screening.run` |
+| `UnresolvedAlert` | Screening hit needs review | `case-screening.review-hit` |
+| `IncompleteOwnership` | Ownership doesn't sum to 100% | `ubo.add-ownership` |
+| `UnverifiedUbo` | UBO needs verification | `ubo.verify-ubo` |
+| `ManualApprovalRequired` | Analyst approval needed | `kyc-case.update-status` |
+
+### KYC Onboarding Workflow States
+
+```
+INTAKE → ENTITY_COLLECTION → SCREENING → DOCUMENT_COLLECTION → UBO_DETERMINATION → REVIEW → APPROVED
+                                                                                          ↓
+                                                                                      REJECTED
+                                                                                          ↓
+                                                                                    REMEDIATION
+```
+
+| State | Description | Guard to Exit |
+|-------|-------------|---------------|
+| `INTAKE` | Initial data gathering | Auto (no guard) |
+| `ENTITY_COLLECTION` | Collecting directors, UBOs, signatories | `entities_complete` |
+| `SCREENING` | Running AML/PEP/sanctions screening | `screening_complete` |
+| `DOCUMENT_COLLECTION` | Gathering required documents | `documents_complete` |
+| `UBO_DETERMINATION` | Calculating and verifying beneficial owners | `ubo_complete` |
+| `REVIEW` | Analyst review of complete package | `review_approved` / `review_rejected` |
+| `APPROVED` | Onboarding complete (terminal) | - |
+| `REJECTED` | Onboarding rejected (terminal) | - |
+| `REMEDIATION` | Issues found, need correction | - |
+
+### Example Usage
+
+```rust
+use ob_poc::workflow::{WorkflowEngine, WorkflowLoader};
+
+// Load workflow definitions
+let definitions = WorkflowLoader::load_from_dir(Path::new("config/workflows"))?;
+let engine = WorkflowEngine::new(pool, definitions);
+
+// Start a workflow for a CBU
+let instance = engine.start_workflow("kyc_onboarding", "cbu", cbu_id, None).await?;
+
+// Get current status with blockers
+let status = engine.get_status(instance.instance_id).await?;
+println!("State: {}, Blockers: {:?}", status.current_state, status.blockers);
+
+// Try to advance (evaluates guards, auto-transitions if possible)
+let instance = engine.try_advance(instance.instance_id).await?;
+
+// Manual transition (e.g., analyst approval)
+let instance = engine.transition(
+    instance.instance_id,
+    "APPROVED",
+    Some("analyst@example.com".to_string()),
+    Some("All requirements met".to_string())
+).await?;
+```
+
+### Database Tables
+
+| Table | Purpose |
+|-------|---------|
+| `workflow_instances` | Running workflow instances with state, history, blockers |
+| `workflow_audit_log` | Audit trail of all state transitions |
+
 ## MCP Server Tools
 
 For Claude Desktop integration. The MCP server (`dsl_mcp`) provides tools for DSL generation and execution.
@@ -3304,8 +3421,45 @@ For Claude Desktop integration. The MCP server (`dsl_mcp`) provides tools for DS
 | `cbu_get` | Get CBU with entities, roles, documents, screenings |
 | `cbu_list` | List/search CBUs with filtering |
 | `entity_get` | Get entity details with relationships |
+| `entity_search` | **Smart entity search with disambiguation** - fuzzy search with enriched context |
 | `verbs_list` | List available DSL verbs (optionally by domain) |
 | `schema_info` | Get entity types, roles, document types |
+
+### Key Tool: `entity_search`
+
+The `entity_search` tool provides intelligent entity lookup with rich context for disambiguation. It uses EntityGateway for fuzzy search and enriches results with roles, relationships, and dates.
+
+```json
+// Basic search
+{"entity_type": "person", "query": "John Smith"}
+
+// Search with conversation context for smarter resolution
+{
+  "entity_type": "person",
+  "query": "John",
+  "conversation_hints": {
+    "mentioned_roles": ["DIRECTOR"],
+    "mentioned_cbu": "Apex Fund",
+    "mentioned_nationality": "US"
+  }
+}
+```
+
+**Response includes:**
+- `matches[]` - Enriched results with disambiguation labels
+- `resolution` - Suggested action: `auto_resolve`, `ask_user`, `suggest_create`, or `need_more_info`
+- `confidence` - Resolution confidence: `high`, `medium`, `low`, or `none`
+
+**Entity context returned for each match:**
+- Nationality, DOB (for persons)
+- Jurisdiction, registration number (for companies)
+- Roles and CBU associations
+- Ownership relationships
+- Created/updated timestamps
+
+**Disambiguation labels** are human-readable summaries like:
+- `"John Smith (US) b.1975 - Director at Apex Fund"`
+- `"Holdings Ltd (LU) #B123456 - 2 roles"`
 
 ### Key Tool: `dsl_lookup`
 
@@ -3332,6 +3486,29 @@ Get full parameter information for any verb:
 {"verb": "cbu.add-product"}
 // Returns: parameters with types, required flags, descriptions, and example usage
 ```
+
+### MCP Module Structure
+
+```
+rust/src/mcp/
+├── mod.rs              # Module exports
+├── tools.rs            # Tool schema definitions (JSON Schema)
+├── handlers.rs         # Tool implementation handlers
+├── types.rs            # Agent-friendly response types
+├── enrichment.rs       # EntityEnricher - fetches rich context for disambiguation
+└── resolution.rs       # ResolutionStrategy - determines auto-resolve vs ask user
+```
+
+**Key Types:**
+
+| Type | Module | Description |
+|------|--------|-------------|
+| `EntityEnricher` | enrichment | Fetches roles, ownership, dates from DB |
+| `EntityContext` | enrichment | Rich context (nationality, DOB, jurisdiction, roles) |
+| `ResolutionStrategy` | resolution | Analyzes matches to suggest action |
+| `ResolutionConfidence` | resolution | High, Medium, Low, None |
+| `SuggestedAction` | resolution | AutoResolve, AskUser, SuggestCreate, NeedMoreInfo |
+| `ConversationContext` | resolution | Hints from conversation (roles, CBU, nationality) |
 
 ## Agentic DSL Generation
 

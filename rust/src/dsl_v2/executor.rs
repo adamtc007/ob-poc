@@ -16,9 +16,15 @@ use uuid::Uuid;
 #[cfg(feature = "database")]
 use super::ast::{AstNode, Literal, VerbCall};
 #[cfg(feature = "database")]
+use super::compiler::compile_to_ops;
+#[cfg(feature = "database")]
 use super::custom_ops::CustomOperationRegistry;
 #[cfg(feature = "database")]
+use super::dag::{build_execution_plan, describe_plan};
+#[cfg(feature = "database")]
 use super::generic_executor::{GenericCrudExecutor, GenericExecutionResult};
+#[cfg(feature = "database")]
+use super::ops::{EntityKey, Op};
 #[cfg(feature = "database")]
 use super::runtime_registry::{runtime_registry, RuntimeBehavior};
 
@@ -447,6 +453,529 @@ impl DslExecutor {
             .map_err(|e| anyhow!("Compile error: {}", e))?;
 
         self.execute_plan(&plan, ctx).await
+    }
+}
+
+// ============================================================================
+// DAG-based Execution (Op primitives)
+// ============================================================================
+
+/// Result of DAG-based execution
+#[cfg(feature = "database")]
+#[derive(Debug)]
+pub struct DagExecutionResult {
+    /// Results indexed by source statement
+    pub results: Vec<OpExecutionResult>,
+    /// Symbol table: binding name → UUID
+    pub symbols: HashMap<String, Uuid>,
+    /// Plan description (for dry-run output)
+    pub plan_description: String,
+}
+
+/// Result of executing a single Op
+#[cfg(feature = "database")]
+#[derive(Debug, Clone)]
+pub struct OpExecutionResult {
+    /// Source statement index
+    pub source_stmt: usize,
+    /// Op description
+    pub description: String,
+    /// Result UUID if applicable
+    pub result_id: Option<Uuid>,
+    /// Whether this was a dry-run (not actually executed)
+    pub dry_run: bool,
+}
+
+#[cfg(feature = "database")]
+impl DslExecutor {
+    /// Execute DSL using the DAG-based Op pipeline
+    ///
+    /// This method:
+    /// 1. Parses source to AST
+    /// 2. Compiles AST to Ops via `compile_to_ops()`
+    /// 3. Builds DAG via `build_execution_plan()` (topological sort)
+    /// 4. Executes Ops in dependency order
+    ///
+    /// If `dry_run` is true, returns the execution plan without executing.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let result = executor.execute_with_dag(source, &mut ctx, false).await?;
+    /// for r in &result.results {
+    ///     println!("{}: {:?}", r.description, r.result_id);
+    /// }
+    /// ```
+    pub async fn execute_with_dag(
+        &self,
+        source: &str,
+        ctx: &mut ExecutionContext,
+        dry_run: bool,
+    ) -> Result<DagExecutionResult> {
+        // Step 1: Parse
+        let program =
+            super::parser::parse_program(source).map_err(|e| anyhow!("Parse error: {}", e))?;
+
+        // Step 2: Compile to Ops
+        let compiled = compile_to_ops(&program);
+        if !compiled.is_ok() {
+            let errors: Vec<String> = compiled.errors.iter().map(|e| e.to_string()).collect();
+            bail!("Compilation errors:\n{}", errors.join("\n"));
+        }
+
+        // Step 3: Build DAG (topological sort)
+        let dag_plan =
+            build_execution_plan(compiled.ops).map_err(|e| anyhow!("DAG cycle error: {}", e))?;
+
+        let plan_description = describe_plan(&dag_plan);
+
+        // Step 4: Execute (or dry-run)
+        let mut results = Vec::with_capacity(dag_plan.ops.len());
+        let mut symbols: HashMap<String, Uuid> = HashMap::new();
+
+        if dry_run {
+            // Dry-run: just describe what would happen
+            for op in &dag_plan.ops {
+                results.push(OpExecutionResult {
+                    source_stmt: op.source_stmt(),
+                    description: op.describe(),
+                    result_id: None,
+                    dry_run: true,
+                });
+            }
+        } else {
+            // Execute each Op in topological order
+            for op in &dag_plan.ops {
+                let result = self.execute_op(op, ctx, &symbols).await?;
+
+                // Capture binding if present
+                if let Some(binding) = op.binding() {
+                    if let Some(uuid) = result.result_id {
+                        ctx.bind(binding, uuid);
+                        symbols.insert(binding.to_string(), uuid);
+                    }
+                }
+
+                results.push(result);
+            }
+        }
+
+        Ok(DagExecutionResult {
+            results,
+            symbols,
+            plan_description,
+        })
+    }
+
+    /// Execute a single Op by converting it to a VerbCall and routing through execute_verb
+    async fn execute_op(
+        &self,
+        op: &Op,
+        ctx: &mut ExecutionContext,
+        symbols: &HashMap<String, Uuid>,
+    ) -> Result<OpExecutionResult> {
+        let source_stmt = op.source_stmt();
+        let description = op.describe();
+
+        // Convert Op to VerbCall and execute
+        let result_id = match op {
+            Op::EnsureEntity {
+                entity_type, attrs, ..
+            } => {
+                // Map entity_type to domain.verb
+                let (domain, verb) = match entity_type.as_str() {
+                    "cbu" => ("cbu", "ensure"),
+                    "proper_person" => ("entity", "create-proper-person"),
+                    "limited_company" => ("entity", "create-limited-company"),
+                    "partnership" => ("entity", "create-partnership-limited"),
+                    "trust" => ("entity", "create-trust-discretionary"),
+                    _ => bail!("Unknown entity type for execution: {}", entity_type),
+                };
+
+                let vc = self.build_verb_call(domain, verb, attrs)?;
+                let result = self.execute_verb(&vc, ctx).await?;
+
+                match result {
+                    ExecutionResult::Uuid(id) => Some(id),
+                    _ => None,
+                }
+            }
+
+            Op::LinkRole {
+                cbu,
+                entity,
+                role,
+                ownership_percentage,
+                ..
+            } => {
+                let mut attrs = HashMap::new();
+                attrs.insert("cbu-id".to_string(), self.resolve_key(cbu, symbols)?);
+                attrs.insert("entity-id".to_string(), self.resolve_key(entity, symbols)?);
+                attrs.insert("role".to_string(), serde_json::json!(role));
+                if let Some(pct) = ownership_percentage {
+                    attrs.insert(
+                        "ownership-percentage".to_string(),
+                        serde_json::json!(pct.to_string()),
+                    );
+                }
+
+                let vc = self.build_verb_call("cbu", "assign-role", &attrs)?;
+                self.execute_verb(&vc, ctx).await?;
+                None
+            }
+
+            Op::UnlinkRole {
+                cbu, entity, role, ..
+            } => {
+                let mut attrs = HashMap::new();
+                attrs.insert("cbu-id".to_string(), self.resolve_key(cbu, symbols)?);
+                attrs.insert("entity-id".to_string(), self.resolve_key(entity, symbols)?);
+                attrs.insert("role".to_string(), serde_json::json!(role));
+
+                let vc = self.build_verb_call("cbu", "remove-role", &attrs)?;
+                self.execute_verb(&vc, ctx).await?;
+                None
+            }
+
+            Op::AddOwnership {
+                owner,
+                owned,
+                percentage,
+                ownership_type,
+                ..
+            } => {
+                let mut attrs = HashMap::new();
+                attrs.insert(
+                    "owner-entity-id".to_string(),
+                    self.resolve_key(owner, symbols)?,
+                );
+                attrs.insert(
+                    "owned-entity-id".to_string(),
+                    self.resolve_key(owned, symbols)?,
+                );
+                attrs.insert(
+                    "percentage".to_string(),
+                    serde_json::json!(percentage.to_string()),
+                );
+                attrs.insert(
+                    "ownership-type".to_string(),
+                    serde_json::json!(ownership_type),
+                );
+
+                let vc = self.build_verb_call("ubo", "add-ownership", &attrs)?;
+                self.execute_verb(&vc, ctx).await?;
+                None
+            }
+
+            Op::RegisterUBO {
+                cbu,
+                subject,
+                ubo_person,
+                qualifying_reason,
+                ownership_percentage,
+                ..
+            } => {
+                let mut attrs = HashMap::new();
+                attrs.insert("cbu-id".to_string(), self.resolve_key(cbu, symbols)?);
+                attrs.insert(
+                    "subject-entity-id".to_string(),
+                    self.resolve_key(subject, symbols)?,
+                );
+                attrs.insert(
+                    "ubo-person-id".to_string(),
+                    self.resolve_key(ubo_person, symbols)?,
+                );
+                attrs.insert(
+                    "qualifying-reason".to_string(),
+                    serde_json::json!(qualifying_reason),
+                );
+                if let Some(pct) = ownership_percentage {
+                    attrs.insert(
+                        "ownership-percentage".to_string(),
+                        serde_json::json!(pct.to_string()),
+                    );
+                }
+
+                let vc = self.build_verb_call("ubo", "register-ubo", &attrs)?;
+                self.execute_verb(&vc, ctx).await?;
+                None
+            }
+
+            Op::CreateCase { cbu, case_type, .. } => {
+                let mut attrs = HashMap::new();
+                attrs.insert("cbu-id".to_string(), self.resolve_key(cbu, symbols)?);
+                attrs.insert("case-type".to_string(), serde_json::json!(case_type));
+
+                let vc = self.build_verb_call("kyc-case", "create", &attrs)?;
+                let result = self.execute_verb(&vc, ctx).await?;
+
+                match result {
+                    ExecutionResult::Uuid(id) => Some(id),
+                    _ => None,
+                }
+            }
+
+            Op::UpdateCaseStatus { case, status, .. } => {
+                let mut attrs = HashMap::new();
+                attrs.insert("case-id".to_string(), self.resolve_key(case, symbols)?);
+                attrs.insert("status".to_string(), serde_json::json!(status));
+
+                let vc = self.build_verb_call("kyc-case", "update-status", &attrs)?;
+                self.execute_verb(&vc, ctx).await?;
+                None
+            }
+
+            Op::CreateWorkstream { case, entity, .. } => {
+                let mut attrs = HashMap::new();
+                attrs.insert("case-id".to_string(), self.resolve_key(case, symbols)?);
+                attrs.insert("entity-id".to_string(), self.resolve_key(entity, symbols)?);
+
+                let vc = self.build_verb_call("entity-workstream", "create", &attrs)?;
+                let result = self.execute_verb(&vc, ctx).await?;
+
+                match result {
+                    ExecutionResult::Uuid(id) => Some(id),
+                    _ => None,
+                }
+            }
+
+            Op::RunScreening {
+                workstream,
+                screening_type,
+                ..
+            } => {
+                let mut attrs = HashMap::new();
+                attrs.insert(
+                    "workstream-id".to_string(),
+                    self.resolve_key(workstream, symbols)?,
+                );
+                attrs.insert(
+                    "screening-type".to_string(),
+                    serde_json::json!(screening_type),
+                );
+
+                let vc = self.build_verb_call("case-screening", "run", &attrs)?;
+                self.execute_verb(&vc, ctx).await?;
+                None
+            }
+
+            Op::AddUniverse {
+                cbu,
+                instrument_class,
+                market,
+                currencies,
+                settlement_types,
+                ..
+            } => {
+                let mut attrs = HashMap::new();
+                attrs.insert("cbu-id".to_string(), self.resolve_key(cbu, symbols)?);
+                attrs.insert(
+                    "instrument-class".to_string(),
+                    serde_json::json!(instrument_class),
+                );
+                if let Some(m) = market {
+                    attrs.insert("market".to_string(), serde_json::json!(m));
+                }
+                attrs.insert("currencies".to_string(), serde_json::json!(currencies));
+                attrs.insert(
+                    "settlement-types".to_string(),
+                    serde_json::json!(settlement_types),
+                );
+
+                let vc = self.build_verb_call("cbu-custody", "add-universe", &attrs)?;
+                self.execute_verb(&vc, ctx).await?;
+                None
+            }
+
+            Op::CreateSSI {
+                cbu,
+                name,
+                ssi_type,
+                attrs: ssi_attrs,
+                ..
+            } => {
+                let mut attrs = HashMap::new();
+                attrs.insert("cbu-id".to_string(), self.resolve_key(cbu, symbols)?);
+                attrs.insert("name".to_string(), serde_json::json!(name));
+                attrs.insert("type".to_string(), serde_json::json!(ssi_type));
+                // Merge SSI-specific attrs
+                for (k, v) in ssi_attrs {
+                    attrs.insert(k.clone(), v.clone());
+                }
+
+                let vc = self.build_verb_call("cbu-custody", "create-ssi", &attrs)?;
+                let result = self.execute_verb(&vc, ctx).await?;
+
+                match result {
+                    ExecutionResult::Uuid(id) => Some(id),
+                    _ => None,
+                }
+            }
+
+            Op::AddBookingRule {
+                cbu,
+                ssi,
+                name,
+                priority,
+                criteria,
+                ..
+            } => {
+                let mut attrs = HashMap::new();
+                attrs.insert("cbu-id".to_string(), self.resolve_key(cbu, symbols)?);
+                attrs.insert("ssi-id".to_string(), self.resolve_key(ssi, symbols)?);
+                attrs.insert("name".to_string(), serde_json::json!(name));
+                attrs.insert("priority".to_string(), serde_json::json!(priority));
+                // Merge criteria
+                for (k, v) in criteria {
+                    attrs.insert(k.clone(), v.clone());
+                }
+
+                let vc = self.build_verb_call("cbu-custody", "add-booking-rule", &attrs)?;
+                self.execute_verb(&vc, ctx).await?;
+                None
+            }
+
+            Op::UpsertDoc { key, cbu, .. } => {
+                let mut attrs = HashMap::new();
+                attrs.insert("doc-type".to_string(), serde_json::json!(&key.doc_type));
+                attrs.insert("title".to_string(), serde_json::json!(&key.key));
+                if let Some(c) = cbu {
+                    attrs.insert("cbu-id".to_string(), self.resolve_key(c, symbols)?);
+                }
+
+                let vc = self.build_verb_call("document", "catalog", &attrs)?;
+                let result = self.execute_verb(&vc, ctx).await?;
+
+                match result {
+                    ExecutionResult::Uuid(id) => Some(id),
+                    _ => None,
+                }
+            }
+
+            Op::AttachEvidence {
+                cbu,
+                evidence_type,
+                attestation_ref,
+                ..
+            } => {
+                let mut attrs = HashMap::new();
+                attrs.insert("cbu-id".to_string(), self.resolve_key(cbu, symbols)?);
+                attrs.insert(
+                    "evidence-type".to_string(),
+                    serde_json::json!(evidence_type),
+                );
+                if let Some(a) = attestation_ref {
+                    attrs.insert("attestation-ref".to_string(), serde_json::json!(a));
+                }
+
+                let vc = self.build_verb_call("cbu", "attach-evidence", &attrs)?;
+                self.execute_verb(&vc, ctx).await?;
+                None
+            }
+
+            Op::SetFK { .. } => {
+                // SetFK is handled by the entity creation - FKs are set via attrs
+                // This is a placeholder for future two-phase execution
+                tracing::debug!("SetFK op - skipping (handled during entity creation)");
+                None
+            }
+
+            Op::Materialize { .. } => {
+                // Materialize is a custom operation - skip for now
+                tracing::warn!("Materialize op not yet implemented in DAG executor");
+                None
+            }
+
+            Op::RequireRef { .. } => {
+                // RequireRef is validation-only, no execution needed
+                None
+            }
+        };
+
+        Ok(OpExecutionResult {
+            source_stmt,
+            description,
+            result_id,
+            dry_run: false,
+        })
+    }
+
+    /// Build a VerbCall from domain, verb, and attributes
+    fn build_verb_call(
+        &self,
+        domain: &str,
+        verb: &str,
+        attrs: &HashMap<String, JsonValue>,
+    ) -> Result<VerbCall> {
+        let mut arguments = Vec::new();
+
+        for (key, value) in attrs {
+            let ast_value = self.json_to_ast(value)?;
+            arguments.push(super::ast::Argument {
+                key: key.clone(),
+                value: ast_value,
+                span: super::ast::Span::default(),
+            });
+        }
+
+        Ok(VerbCall {
+            domain: domain.to_string(),
+            verb: verb.to_string(),
+            arguments,
+            binding: None,
+            span: super::ast::Span::default(),
+        })
+    }
+
+    /// Convert JSON value to AST node
+    fn json_to_ast(&self, value: &JsonValue) -> Result<AstNode> {
+        match value {
+            JsonValue::String(s) => Ok(AstNode::Literal(Literal::String(s.clone()))),
+            JsonValue::Number(n) => {
+                if let Some(i) = n.as_i64() {
+                    Ok(AstNode::Literal(Literal::Integer(i)))
+                } else if let Some(f) = n.as_f64() {
+                    Ok(AstNode::Literal(Literal::Decimal(
+                        rust_decimal::Decimal::from_f64_retain(f)
+                            .ok_or_else(|| anyhow!("Invalid decimal: {}", f))?,
+                    )))
+                } else {
+                    bail!("Invalid number: {}", n)
+                }
+            }
+            JsonValue::Bool(b) => Ok(AstNode::Literal(Literal::Boolean(*b))),
+            JsonValue::Null => Ok(AstNode::Literal(Literal::Null)),
+            JsonValue::Array(arr) => {
+                let items: Result<Vec<AstNode>> = arr.iter().map(|v| self.json_to_ast(v)).collect();
+                Ok(AstNode::List {
+                    items: items?,
+                    span: super::ast::Span::default(),
+                })
+            }
+            JsonValue::Object(obj) => {
+                let mut entries = Vec::new();
+                for (k, v) in obj {
+                    entries.push((k.clone(), self.json_to_ast(v)?));
+                }
+                Ok(AstNode::Map {
+                    entries,
+                    span: super::ast::Span::default(),
+                })
+            }
+        }
+    }
+
+    /// Resolve an EntityKey to a JSON value (UUID string or name)
+    fn resolve_key(&self, key: &EntityKey, symbols: &HashMap<String, Uuid>) -> Result<JsonValue> {
+        // Check if key refers to a symbol
+        if key.entity_type == "symbol" {
+            if let Some(uuid) = symbols.get(&key.key) {
+                return Ok(JsonValue::String(uuid.to_string()));
+            }
+            bail!("Unresolved symbol: @{}", key.key);
+        }
+
+        // Otherwise return the key value (will be resolved by GenericCrudExecutor)
+        Ok(JsonValue::String(key.key.clone()))
     }
 }
 

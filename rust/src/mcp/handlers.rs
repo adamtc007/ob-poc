@@ -116,43 +116,116 @@ impl ToolHandlers {
             "dsl_lookup" => self.dsl_lookup(args).await,
             "dsl_complete" => self.dsl_complete(args),
             "dsl_signature" => self.dsl_signature(args),
+            "session_context" => self.session_context(args),
+            "entity_search" => self.entity_search(args).await,
+            // Workflow orchestration tools
+            "workflow_status" => self.workflow_status(args).await,
+            "workflow_advance" => self.workflow_advance(args).await,
+            "workflow_transition" => self.workflow_transition(args).await,
+            "workflow_start" => self.workflow_start(args).await,
+            "resolve_blocker" => self.resolve_blocker(args),
             _ => Err(anyhow!("Unknown tool: {}", name)),
         }
     }
 
-    /// Validate DSL source code
+    /// Validate DSL source code with enhanced diagnostics
+    ///
+    /// Uses the planning facade to provide:
+    /// - Structured diagnostics with resolution options
+    /// - Suggested fixes for implicit creates
+    /// - Reordering warnings
     async fn dsl_validate(&self, args: Value) -> Result<Value> {
+        use super::types::{AgentDiagnostic, ResolutionOption, SuggestedFix, ValidationOutput};
+        use crate::dsl_v2::config::ConfigLoader;
+        use crate::dsl_v2::planning_facade::{analyse_and_plan, PlanningInput};
+        use crate::dsl_v2::runtime_registry::RuntimeVerbRegistry;
+        use std::sync::Arc;
+
         let source = args["source"]
             .as_str()
             .ok_or_else(|| anyhow!("source required"))?;
 
-        let ast = match parse_program(source) {
-            Ok(ast) => ast,
-            Err(e) => {
-                return Ok(json!({
-                    "valid": false,
-                    "errors": [{"type": "parse", "message": format!("{:?}", e)}]
-                }))
-            }
+        // Get session bindings if provided (for future use with known_symbols)
+        let session_id = args["session_id"].as_str();
+        let _binding_context = session_id.and_then(super::session::get_session_bindings);
+
+        // Load verb registry for planning
+        let loader = ConfigLoader::from_env();
+        let config = loader
+            .load_verbs()
+            .map_err(|e| anyhow!("Failed to load verbs config: {}", e))?;
+        let registry = Arc::new(RuntimeVerbRegistry::from_config(&config));
+
+        // Run planning facade
+        let planning_input = PlanningInput::new(source, registry);
+        let output = analyse_and_plan(planning_input);
+
+        // Convert diagnostics to agent-friendly format
+        let diagnostics: Vec<AgentDiagnostic> = output
+            .diagnostics
+            .iter()
+            .map(|d| {
+                let mut resolution_options = Vec::new();
+
+                // Add resolution options based on diagnostic code
+                if let Some(ref fix) = d.suggested_fix {
+                    resolution_options.push(ResolutionOption {
+                        description: fix.description.clone(),
+                        action: "replace".to_string(),
+                        replacement: Some(fix.replacement.clone()),
+                    });
+                }
+
+                // Add search option for undefined symbols
+                if matches!(
+                    d.code,
+                    crate::dsl_v2::diagnostics::DiagnosticCode::UndefinedSymbol
+                ) {
+                    resolution_options.push(ResolutionOption {
+                        description: "Search for existing entity".to_string(),
+                        action: "search".to_string(),
+                        replacement: None,
+                    });
+                }
+
+                AgentDiagnostic {
+                    severity: d.severity.into(),
+                    message: d.message.clone(),
+                    location: d.span.clone().map(|s| s.into()),
+                    code: format!("{:?}", d.code),
+                    resolution_options,
+                }
+            })
+            .collect();
+
+        // Convert synthetic steps to suggested fixes
+        let suggested_fixes: Vec<SuggestedFix> = output
+            .synthetic_steps
+            .iter()
+            .map(|step| SuggestedFix {
+                description: format!(
+                    "Create {} '{}' with {}",
+                    step.entity_type, step.binding, step.canonical_verb
+                ),
+                dsl: step.suggested_dsl.clone(),
+                insert_at: Some(step.insert_before_stmt as u32),
+            })
+            .collect();
+
+        // Build plan summary if available
+        let plan_summary = output.plan.as_ref().map(|p| p.describe());
+
+        let has_errors = diagnostics.iter().any(|d| d.severity == "error");
+
+        let validation_output = ValidationOutput {
+            valid: !has_errors,
+            diagnostics,
+            plan_summary,
+            suggested_fixes,
+            needs_reorder: output.was_reordered,
         };
 
-        match compile(&ast) {
-            Ok(plan) => Ok(json!({
-                "valid": true,
-                "step_count": plan.steps.len(),
-                "steps": plan.steps.iter().enumerate().map(|(i, s)| {
-                    json!({
-                        "index": i,
-                        "verb": format!("{}.{}", s.verb_call.domain, s.verb_call.verb),
-                        "binding": s.bind_as
-                    })
-                }).collect::<Vec<_>>()
-            })),
-            Err(e) => Ok(json!({
-                "valid": false,
-                "errors": [{"type": "compile", "message": format!("{:?}", e)}]
-            })),
-        }
+        Ok(serde_json::to_value(validation_output).unwrap())
     }
 
     /// Execute DSL against the database
@@ -998,6 +1071,430 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
                     .collect::<Vec<_>>()
                     .join(" ")
             )
+        }))
+    }
+
+    /// Manage conversation session state
+    ///
+    /// Sessions persist bindings across multiple DSL executions within a conversation.
+    fn session_context(&self, args: Value) -> Result<Value> {
+        use super::session;
+        use super::types::SessionAction;
+
+        let action: SessionAction =
+            serde_json::from_value(args).map_err(|e| anyhow!("Invalid session action: {}", e))?;
+
+        let state = session::session_context(action).map_err(|e| anyhow!("{}", e))?;
+
+        Ok(serde_json::to_value(state).unwrap())
+    }
+
+    /// Search for entities with fuzzy matching, enrichment, and smart disambiguation
+    ///
+    /// Returns matches enriched with context (roles, relationships, dates) and
+    /// uses resolution strategy to determine whether to auto-resolve, ask user,
+    /// or suggest creating a new entity.
+    ///
+    /// ## Features
+    /// - Rich context for disambiguation (nationality, DOB, roles, ownership)
+    /// - Context-aware auto-resolution (e.g., "the director" → picks entity with DIRECTOR role)
+    /// - Human-readable disambiguation labels
+    /// - Confidence scoring with suggested actions
+    async fn entity_search(&self, args: Value) -> Result<Value> {
+        use super::enrichment::{EntityEnricher, EntityType as EnrichEntityType};
+        use super::resolution::{ConversationContext, EnrichedMatch, ResolutionStrategy};
+
+        let query = args["query"]
+            .as_str()
+            .ok_or_else(|| anyhow!("query required"))?;
+        let entity_type_str = args["entity_type"].as_str();
+        let limit = args["limit"].as_i64().unwrap_or(10) as i32;
+
+        // Parse conversation hints for context-aware resolution
+        let conversation_hints: Option<ConversationContext> = args
+            .get("conversation_hints")
+            .and_then(|v| serde_json::from_value(v.clone()).ok());
+
+        // Map entity_type to EntityGateway nickname
+        let nickname = match entity_type_str {
+            Some("cbu") => "CBU",
+            Some("entity") => "ENTITY",
+            Some("person") => "PERSON",
+            Some("company") | Some("legal_entity") => "LEGAL_ENTITY",
+            Some("document") => "DOCUMENT",
+            Some("product") => "PRODUCT",
+            Some("service") => "SERVICE",
+            None => "ENTITY", // Default to entity search
+            Some(t) => {
+                return Err(anyhow!(
+                    "Unknown entity_type: {}. Valid types: cbu, entity, person, company, document, product, service",
+                    t
+                ));
+            }
+        };
+
+        // Step 1: Search via EntityGateway
+        let raw_matches = self.gateway_search(nickname, Some(query), limit).await?;
+
+        if raw_matches.is_empty() {
+            let result = super::resolution::ResolutionResult {
+                confidence: super::resolution::ResolutionConfidence::None,
+                action: super::resolution::SuggestedAction::SuggestCreate,
+                prompt: Some(format!(
+                    "No matches found for '{}'. Would you like to create a new entity?",
+                    query
+                )),
+            };
+            return Ok(json!({
+                "matches": [],
+                "resolution_confidence": result.confidence,
+                "suggested_action": result.action,
+                "disambiguation_prompt": result.prompt
+            }));
+        }
+
+        // Step 2: Extract UUIDs for enrichment
+        let ids: Vec<Uuid> = raw_matches
+            .iter()
+            .filter_map(|(id, _, _)| Uuid::parse_str(id).ok())
+            .collect();
+
+        // Step 3: Determine entity type for enrichment
+        let enrich_type = match entity_type_str {
+            Some("person") => EnrichEntityType::ProperPerson,
+            Some("company") | Some("legal_entity") => EnrichEntityType::LegalEntity,
+            Some("cbu") => EnrichEntityType::Cbu,
+            _ => EnrichEntityType::ProperPerson, // Default
+        };
+
+        // Step 4: Enrich with context (roles, nationality, etc.)
+        let enricher = EntityEnricher::new(self.pool.clone());
+        let contexts = enricher.enrich(enrich_type, &ids).await.unwrap_or_default();
+
+        // Step 5: Build enriched matches with disambiguation labels
+        let enriched_matches: Vec<EnrichedMatch> = raw_matches
+            .iter()
+            .map(|(id, display, score)| {
+                let uuid = Uuid::parse_str(id).ok();
+                let context = uuid
+                    .and_then(|u| contexts.get(&u).cloned())
+                    .unwrap_or_default();
+                let disambiguation_label = context.disambiguation_label(display, enrich_type);
+
+                EnrichedMatch {
+                    id: id.clone(),
+                    display: display.clone(),
+                    score: *score,
+                    entity_type: entity_type_str.unwrap_or("entity").to_string(),
+                    context,
+                    disambiguation_label,
+                }
+            })
+            .collect();
+
+        // Step 6: Analyze and determine resolution strategy
+        let resolution =
+            ResolutionStrategy::analyze(&enriched_matches, conversation_hints.as_ref());
+
+        // Step 7: Build response
+        Ok(json!({
+            "matches": enriched_matches,
+            "resolution_confidence": resolution.confidence,
+            "suggested_action": resolution.action,
+            "disambiguation_prompt": resolution.prompt
+        }))
+    }
+
+    // ==================== Workflow Orchestration Tools ====================
+
+    /// Get workflow status for a subject
+    async fn workflow_status(&self, args: Value) -> Result<Value> {
+        use crate::workflow::{WorkflowEngine, WorkflowLoader};
+        use std::path::Path;
+
+        let subject_type = args["subject_type"]
+            .as_str()
+            .ok_or_else(|| anyhow!("subject_type required"))?;
+        let subject_id: Uuid = args["subject_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("subject_id required"))?
+            .parse()
+            .map_err(|_| anyhow!("Invalid subject_id UUID"))?;
+        let workflow_id = args["workflow_id"].as_str().unwrap_or("kyc_onboarding");
+
+        // Load workflow definitions
+        let config_dir = std::env::var("DSL_CONFIG_DIR").unwrap_or_else(|_| "config".to_string());
+        let workflows_path = Path::new(&config_dir).join("workflows");
+        let definitions = WorkflowLoader::load_from_dir(&workflows_path)
+            .map_err(|e| anyhow!("Failed to load workflows: {}", e))?;
+
+        let engine = WorkflowEngine::new(self.pool.clone(), definitions);
+
+        // Find or get existing workflow
+        let instance = engine
+            .find_or_start(workflow_id, subject_type, subject_id, None)
+            .await
+            .map_err(|e| anyhow!("Workflow error: {}", e))?;
+
+        let status = engine
+            .get_status(instance.instance_id)
+            .await
+            .map_err(|e| anyhow!("Failed to get status: {}", e))?;
+
+        Ok(serde_json::to_value(status)?)
+    }
+
+    /// Try to advance workflow automatically
+    async fn workflow_advance(&self, args: Value) -> Result<Value> {
+        use crate::workflow::{WorkflowEngine, WorkflowLoader};
+        use std::path::Path;
+
+        let subject_type = args["subject_type"]
+            .as_str()
+            .ok_or_else(|| anyhow!("subject_type required"))?;
+        let subject_id: Uuid = args["subject_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("subject_id required"))?
+            .parse()
+            .map_err(|_| anyhow!("Invalid subject_id UUID"))?;
+        let workflow_id = args["workflow_id"].as_str().unwrap_or("kyc_onboarding");
+
+        let config_dir = std::env::var("DSL_CONFIG_DIR").unwrap_or_else(|_| "config".to_string());
+        let workflows_path = Path::new(&config_dir).join("workflows");
+        let definitions = WorkflowLoader::load_from_dir(&workflows_path)
+            .map_err(|e| anyhow!("Failed to load workflows: {}", e))?;
+
+        let engine = WorkflowEngine::new(self.pool.clone(), definitions);
+
+        // Find existing workflow
+        let instance = engine
+            .find_or_start(workflow_id, subject_type, subject_id, None)
+            .await
+            .map_err(|e| anyhow!("Workflow error: {}", e))?;
+
+        // Try to advance
+        let advanced = engine
+            .try_advance(instance.instance_id)
+            .await
+            .map_err(|e| anyhow!("Failed to advance: {}", e))?;
+
+        // Get updated status
+        let status = engine
+            .get_status(advanced.instance_id)
+            .await
+            .map_err(|e| anyhow!("Failed to get status: {}", e))?;
+
+        Ok(json!({
+            "advanced": advanced.current_state != instance.current_state,
+            "previous_state": instance.current_state,
+            "current_state": advanced.current_state,
+            "status": status
+        }))
+    }
+
+    /// Manually transition to a specific state
+    async fn workflow_transition(&self, args: Value) -> Result<Value> {
+        use crate::workflow::{WorkflowEngine, WorkflowLoader};
+        use std::path::Path;
+
+        let subject_type = args["subject_type"]
+            .as_str()
+            .ok_or_else(|| anyhow!("subject_type required"))?;
+        let subject_id: Uuid = args["subject_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("subject_id required"))?
+            .parse()
+            .map_err(|_| anyhow!("Invalid subject_id UUID"))?;
+        let workflow_id = args["workflow_id"].as_str().unwrap_or("kyc_onboarding");
+        let to_state = args["to_state"]
+            .as_str()
+            .ok_or_else(|| anyhow!("to_state required"))?;
+        let reason = args["reason"].as_str().map(|s| s.to_string());
+
+        let config_dir = std::env::var("DSL_CONFIG_DIR").unwrap_or_else(|_| "config".to_string());
+        let workflows_path = Path::new(&config_dir).join("workflows");
+        let definitions = WorkflowLoader::load_from_dir(&workflows_path)
+            .map_err(|e| anyhow!("Failed to load workflows: {}", e))?;
+
+        let engine = WorkflowEngine::new(self.pool.clone(), definitions);
+
+        // Find existing workflow
+        let instance = engine
+            .find_or_start(workflow_id, subject_type, subject_id, None)
+            .await
+            .map_err(|e| anyhow!("Workflow error: {}", e))?;
+
+        let previous_state = instance.current_state.clone();
+
+        // Transition
+        let transitioned = engine
+            .transition(
+                instance.instance_id,
+                to_state,
+                Some("mcp_tool".to_string()),
+                reason,
+            )
+            .await
+            .map_err(|e| anyhow!("Transition failed: {}", e))?;
+
+        // Get updated status
+        let status = engine
+            .get_status(transitioned.instance_id)
+            .await
+            .map_err(|e| anyhow!("Failed to get status: {}", e))?;
+
+        Ok(json!({
+            "success": true,
+            "previous_state": previous_state,
+            "current_state": transitioned.current_state,
+            "status": status
+        }))
+    }
+
+    /// Start a new workflow
+    async fn workflow_start(&self, args: Value) -> Result<Value> {
+        use crate::workflow::{WorkflowEngine, WorkflowLoader};
+        use std::path::Path;
+
+        let workflow_id = args["workflow_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("workflow_id required"))?;
+        let subject_type = args["subject_type"]
+            .as_str()
+            .ok_or_else(|| anyhow!("subject_type required"))?;
+        let subject_id: Uuid = args["subject_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("subject_id required"))?
+            .parse()
+            .map_err(|_| anyhow!("Invalid subject_id UUID"))?;
+
+        let config_dir = std::env::var("DSL_CONFIG_DIR").unwrap_or_else(|_| "config".to_string());
+        let workflows_path = Path::new(&config_dir).join("workflows");
+        let definitions = WorkflowLoader::load_from_dir(&workflows_path)
+            .map_err(|e| anyhow!("Failed to load workflows: {}", e))?;
+
+        let engine = WorkflowEngine::new(self.pool.clone(), definitions);
+
+        // Start new workflow
+        let instance = engine
+            .start_workflow(
+                workflow_id,
+                subject_type,
+                subject_id,
+                Some("mcp_tool".to_string()),
+            )
+            .await
+            .map_err(|e| anyhow!("Failed to start workflow: {}", e))?;
+
+        // Get status
+        let status = engine
+            .get_status(instance.instance_id)
+            .await
+            .map_err(|e| anyhow!("Failed to get status: {}", e))?;
+
+        Ok(json!({
+            "instance_id": instance.instance_id,
+            "workflow_id": workflow_id,
+            "current_state": instance.current_state,
+            "status": status
+        }))
+    }
+
+    /// Get DSL template to resolve a blocker
+    fn resolve_blocker(&self, args: Value) -> Result<Value> {
+        let blocker_type = args["blocker_type"]
+            .as_str()
+            .ok_or_else(|| anyhow!("blocker_type required"))?;
+        let context = args.get("context").cloned().unwrap_or(json!({}));
+
+        let (verb, template, description) = match blocker_type {
+            "missing_role" => {
+                let role = context["role"].as_str().unwrap_or("DIRECTOR");
+                let cbu_id = context["cbu_id"].as_str().unwrap_or("<cbu-id>");
+                let entity_id = context["entity_id"].as_str().unwrap_or("<entity-id>");
+                (
+                    "cbu.assign-role",
+                    format!(
+                        "(cbu.assign-role :cbu-id {} :entity-id {} :role \"{}\")",
+                        cbu_id, entity_id, role
+                    ),
+                    format!("Assign {} role to entity", role),
+                )
+            }
+            "missing_document" => {
+                let doc_type = context["document_type"].as_str().unwrap_or("PASSPORT");
+                let cbu_id = context["cbu_id"].as_str().unwrap_or("<cbu-id>");
+                (
+                    "document.catalog",
+                    format!(
+                        "(document.catalog :cbu-id {} :doc-type \"{}\" :title \"<title>\")",
+                        cbu_id, doc_type
+                    ),
+                    format!("Catalog {} document", doc_type),
+                )
+            }
+            "pending_screening" => {
+                let entity_id = context["entity_id"].as_str().unwrap_or("<entity-id>");
+                let workstream_id = context["workstream_id"]
+                    .as_str()
+                    .unwrap_or("<workstream-id>");
+                (
+                    "case-screening.run",
+                    format!(
+                        "(case-screening.run :workstream-id {} :screening-type \"SANCTIONS\")",
+                        workstream_id
+                    ),
+                    format!("Run screening for entity {}", entity_id),
+                )
+            }
+            "unresolved_alert" => {
+                let screening_id = context["screening_id"].as_str().unwrap_or("<screening-id>");
+                (
+                    "case-screening.review-hit",
+                    format!(
+                        "(case-screening.review-hit :screening-id {} :disposition \"FALSE_POSITIVE\" :notes \"<reason>\")",
+                        screening_id
+                    ),
+                    "Review and resolve screening alert".to_string(),
+                )
+            }
+            "incomplete_ownership" => {
+                let owner_id = context["owner_entity_id"]
+                    .as_str()
+                    .unwrap_or("<owner-entity-id>");
+                let owned_id = context["owned_entity_id"]
+                    .as_str()
+                    .unwrap_or("<owned-entity-id>");
+                (
+                    "ubo.add-ownership",
+                    format!(
+                        "(ubo.add-ownership :owner-entity-id {} :owned-entity-id {} :percentage <pct> :ownership-type \"DIRECT\")",
+                        owner_id, owned_id
+                    ),
+                    "Add ownership relationship".to_string(),
+                )
+            }
+            "unverified_ubo" => {
+                let ubo_id = context["ubo_id"].as_str().unwrap_or("<ubo-id>");
+                (
+                    "ubo.verify-ubo",
+                    format!(
+                        "(ubo.verify-ubo :ubo-id {} :verification-status \"VERIFIED\" :risk-rating \"LOW\")",
+                        ubo_id
+                    ),
+                    "Verify UBO".to_string(),
+                )
+            }
+            _ => {
+                return Err(anyhow!("Unknown blocker type: {}", blocker_type));
+            }
+        };
+
+        Ok(json!({
+            "blocker_type": blocker_type,
+            "verb": verb,
+            "dsl_template": template,
+            "description": description
         }))
     }
 }

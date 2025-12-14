@@ -226,5 +226,222 @@ pub fn get_tools() -> Vec<Tool> {
                 "required": ["instruction"]
             }),
         },
+        Tool {
+            name: "session_context".into(),
+            description: "Manage conversation session state. Create session at start, tracks bindings across DSL executions. Use 'create' at conversation start, then pass session_id to dsl_execute.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": ["create", "get", "update", "undo", "clear"],
+                        "description": "Session action: create (new session), get (current state), update (add bindings), undo (revert last execution), clear (reset all)"
+                    },
+                    "session_id": {
+                        "type": "string",
+                        "description": "Session ID (required for get/update/undo/clear)"
+                    },
+                    "bindings": {
+                        "type": "object",
+                        "description": "For update action: name → uuid mappings to add"
+                    }
+                },
+                "required": ["action"]
+            }),
+        },
+        Tool {
+            name: "entity_search".into(),
+            description: r#"Search for entities with rich context for smart disambiguation.
+
+Returns matches enriched with:
+- Context (nationality, DOB, roles, ownership, jurisdiction)
+- Disambiguation labels for display
+- Resolution confidence and suggested action
+
+Use conversation_hints to enable context-aware auto-resolution:
+- If user mentioned "director", matches with DIRECTOR role are preferred
+- If user mentioned a CBU name, entities linked to it are preferred
+- If user mentioned nationality (e.g., "British"), matches are filtered
+
+Suggested actions:
+- auto_resolve: Single clear match, use it directly
+- ask_user: Multiple similar matches, show disambiguation prompt
+- suggest_create: No good matches, offer to create new entity"#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Search query (name or partial name)"
+                    },
+                    "entity_type": {
+                        "type": "string",
+                        "enum": ["cbu", "entity", "person", "company", "document", "product", "service"],
+                        "description": "Filter by entity type"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Max results to return"
+                    },
+                    "conversation_hints": {
+                        "type": "object",
+                        "description": "Context from conversation to improve resolution",
+                        "properties": {
+                            "mentioned_roles": {
+                                "type": "array",
+                                "items": { "type": "string" },
+                                "description": "Roles mentioned in conversation (e.g., ['DIRECTOR', 'UBO'])"
+                            },
+                            "mentioned_cbu": {
+                                "type": "string",
+                                "description": "CBU name mentioned in conversation"
+                            },
+                            "mentioned_nationality": {
+                                "type": "string",
+                                "description": "Nationality mentioned (e.g., 'US', 'GB', 'British')"
+                            },
+                            "mentioned_jurisdiction": {
+                                "type": "string",
+                                "description": "Jurisdiction mentioned (e.g., 'LU', 'Luxembourg')"
+                            },
+                            "current_cbu_id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "description": "Currently active CBU in the session"
+                            }
+                        }
+                    }
+                },
+                "required": ["query"]
+            }),
+        },
+        // Workflow orchestration tools
+        Tool {
+            name: "workflow_status".into(),
+            description: "Get current workflow status, blockers, and available actions for a subject.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "subject_type": {
+                        "type": "string",
+                        "enum": ["cbu", "entity", "case"],
+                        "description": "Type of subject (cbu, entity, case)"
+                    },
+                    "subject_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "UUID of the subject"
+                    },
+                    "workflow_id": {
+                        "type": "string",
+                        "default": "kyc_onboarding",
+                        "description": "Workflow ID (default: kyc_onboarding)"
+                    }
+                },
+                "required": ["subject_type", "subject_id"]
+            }),
+        },
+        Tool {
+            name: "workflow_advance".into(),
+            description: "Try to advance workflow to next state (evaluates guards and auto-transitions).".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "subject_type": {
+                        "type": "string",
+                        "enum": ["cbu", "entity", "case"],
+                        "description": "Type of subject"
+                    },
+                    "subject_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "UUID of the subject"
+                    },
+                    "workflow_id": {
+                        "type": "string",
+                        "default": "kyc_onboarding",
+                        "description": "Workflow ID"
+                    }
+                },
+                "required": ["subject_type", "subject_id"]
+            }),
+        },
+        Tool {
+            name: "workflow_transition".into(),
+            description: "Manually transition to a specific state.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "subject_type": {
+                        "type": "string",
+                        "description": "Type of subject"
+                    },
+                    "subject_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "UUID of the subject"
+                    },
+                    "workflow_id": {
+                        "type": "string",
+                        "default": "kyc_onboarding",
+                        "description": "Workflow ID"
+                    },
+                    "to_state": {
+                        "type": "string",
+                        "description": "Target state to transition to"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Reason for the transition"
+                    }
+                },
+                "required": ["subject_type", "subject_id", "to_state"]
+            }),
+        },
+        Tool {
+            name: "workflow_start".into(),
+            description: "Start a new workflow for a subject.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "workflow_id": {
+                        "type": "string",
+                        "default": "kyc_onboarding",
+                        "description": "Workflow ID to start"
+                    },
+                    "subject_type": {
+                        "type": "string",
+                        "enum": ["cbu", "entity", "case"],
+                        "description": "Type of subject"
+                    },
+                    "subject_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "UUID of the subject"
+                    }
+                },
+                "required": ["workflow_id", "subject_type", "subject_id"]
+            }),
+        },
+        Tool {
+            name: "resolve_blocker".into(),
+            description: "Get DSL template to resolve a specific blocker type.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "blocker_type": {
+                        "type": "string",
+                        "enum": ["missing_role", "missing_document", "pending_screening", "unresolved_alert", "incomplete_ownership", "unverified_ubo"],
+                        "description": "Type of blocker to resolve"
+                    },
+                    "context": {
+                        "type": "object",
+                        "description": "Blocker-specific context (e.g., role name, entity_id)"
+                    }
+                },
+                "required": ["blocker_type"]
+            }),
+        },
     ]
 }

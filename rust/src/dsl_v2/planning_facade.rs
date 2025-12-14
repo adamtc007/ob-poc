@@ -124,7 +124,7 @@ impl PlannedExecution {
 }
 
 /// Output from the planning facade
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct PlanningOutput {
     /// Parsed program (empty if parse failed)
     pub program: Program,
@@ -195,14 +195,12 @@ pub fn analyse_and_plan(input: PlanningInput) -> PlanningOutput {
         let mut diag = Diagnostic::error(DiagnosticCode::UndefinedSymbol, err.message.clone());
 
         // Try to get span from the statement
-        if let Some(stmt) = program.statements.get(err.stmt_idx) {
-            if let super::ast::Statement::VerbCall(vc) = stmt {
-                diag = diag.with_span(SourceSpan::from_byte_offset(
-                    input.source,
-                    vc.span.start,
-                    vc.span.end,
-                ));
-            }
+        if let Some(super::ast::Statement::VerbCall(vc)) = program.statements.get(err.stmt_idx) {
+            diag = diag.with_span(SourceSpan::from_byte_offset(
+                input.source,
+                vc.span.start,
+                vc.span.end,
+            ));
         }
 
         output.diagnostics.push(diag);

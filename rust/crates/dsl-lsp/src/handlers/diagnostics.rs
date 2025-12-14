@@ -1,20 +1,57 @@
 //! Diagnostics handler for the DSL Language Server.
 //!
-//! Uses the unified LspValidator from ob_poc for semantic validation.
+//! Uses the unified LspValidator from ob_poc for semantic validation,
+//! plus the planning facade for DAG-based analysis.
+//!
 //! This ensures LSP and Server use the SAME validation pipeline.
 
+use std::sync::Arc;
 use tower_lsp::lsp_types::*;
 
 use crate::analysis::document::DocumentState;
 use crate::analysis::parse_with_v2;
 
+use ob_poc::dsl_v2::config::ConfigLoader;
+use ob_poc::dsl_v2::planning_facade::{analyse_and_plan, PlanningInput};
+use ob_poc::dsl_v2::runtime_registry::RuntimeVerbRegistry;
 use ob_poc::dsl_v2::validation::{Severity, ValidationContext};
 use ob_poc::dsl_v2::LspValidator;
 
+/// Create a planning registry from config
+/// This is cached after first call via lazy_static pattern
+fn create_planning_registry() -> Arc<RuntimeVerbRegistry> {
+    use std::sync::OnceLock;
+    static REGISTRY: OnceLock<Arc<RuntimeVerbRegistry>> = OnceLock::new();
+
+    REGISTRY
+        .get_or_init(|| {
+            let loader = ConfigLoader::from_env();
+            let config = loader
+                .load_verbs()
+                .expect("Failed to load verbs config for planning");
+            Arc::new(RuntimeVerbRegistry::from_config(&config))
+        })
+        .clone()
+}
+
+/// Result of document analysis including planning info for code actions
+pub struct AnalysisResult {
+    pub state: DocumentState,
+    pub diagnostics: Vec<Diagnostic>,
+    pub planning_output: ob_poc::dsl_v2::planning_facade::PlanningOutput,
+}
+
 /// Analyze a document with full semantic validation via EntityGateway.
 ///
-/// This is the primary validation path - uses the same validator as the server.
+/// This is the primary validation path - uses the same validator as the server,
+/// plus the planning facade for DAG-based dependency analysis.
 pub async fn analyze_document_async(text: &str) -> (DocumentState, Vec<Diagnostic>) {
+    let result = analyze_document_full(text).await;
+    (result.state, result.diagnostics)
+}
+
+/// Full analysis returning planning output for code actions
+pub async fn analyze_document_full(text: &str) -> AnalysisResult {
     // Step 1: Parse to get DocumentState (for LSP features like symbols, completions)
     let (state, mut diagnostics) = parse_with_v2(text);
 
@@ -39,7 +76,23 @@ pub async fn analyze_document_async(text: &str) -> (DocumentState, Vec<Diagnosti
         }
     }
 
-    (state, diagnostics)
+    // Step 3: Run planning facade for DAG-based analysis
+    // This catches reordering issues, cycle detection, and provides plan info
+    // Create a fresh registry from config (same as server startup)
+    let registry = create_planning_registry();
+    let planning_input = PlanningInput::new(text, registry);
+    let planning_output = analyse_and_plan(planning_input);
+
+    // Convert planning diagnostics to LSP format
+    for diag in &planning_output.diagnostics {
+        diagnostics.push(convert_planning_diagnostic(diag, text));
+    }
+
+    AnalysisResult {
+        state,
+        diagnostics,
+        planning_output,
+    }
 }
 
 /// Synchronous fallback for when async isn't available.
@@ -49,7 +102,7 @@ pub fn analyze_document(text: &str) -> (DocumentState, Vec<Diagnostic>) {
     parse_with_v2(text)
 }
 
-/// Convert internal Diagnostic to LSP Diagnostic format
+/// Convert internal Diagnostic (from validation module) to LSP Diagnostic format
 fn convert_diagnostic(diag: &ob_poc::dsl_v2::validation::Diagnostic, source: &str) -> Diagnostic {
     // Convert SourceSpan to LSP Range
     let range = span_to_range(&diag.span, source);
@@ -83,6 +136,63 @@ fn convert_diagnostic(diag: &ob_poc::dsl_v2::validation::Diagnostic, source: &st
         code: Some(NumberOrString::String(diag.code.as_str().to_string())),
         source: Some("dsl-lsp".to_string()),
         message,
+        related_information: None,
+        tags: None,
+        code_description: None,
+        data: None,
+    }
+}
+
+/// Convert planning facade Diagnostic to LSP Diagnostic format
+fn convert_planning_diagnostic(
+    diag: &ob_poc::dsl_v2::diagnostics::Diagnostic,
+    _source: &str,
+) -> Diagnostic {
+    use ob_poc::dsl_v2::diagnostics::Severity as PlanningSeverity;
+
+    // Convert span to LSP Range
+    let range = if let Some(ref span) = diag.span {
+        Range {
+            start: Position {
+                line: span.start_line.saturating_sub(1), // LSP is 0-indexed
+                character: span.start_col.saturating_sub(1),
+            },
+            end: Position {
+                line: span.end_line.saturating_sub(1),
+                character: span.end_col.saturating_sub(1),
+            },
+        }
+    } else {
+        // No span - use start of document
+        Range {
+            start: Position {
+                line: 0,
+                character: 0,
+            },
+            end: Position {
+                line: 0,
+                character: 0,
+            },
+        }
+    };
+
+    // Convert severity
+    let severity = match diag.severity {
+        PlanningSeverity::Error => Some(DiagnosticSeverity::ERROR),
+        PlanningSeverity::Warning => Some(DiagnosticSeverity::WARNING),
+        PlanningSeverity::Hint => Some(DiagnosticSeverity::HINT),
+        PlanningSeverity::Info => Some(DiagnosticSeverity::INFORMATION),
+    };
+
+    // Generate diagnostic code string
+    let code_str = format!("{:?}", diag.code);
+
+    Diagnostic {
+        range,
+        severity,
+        code: Some(NumberOrString::String(code_str)),
+        source: Some("dsl-planner".to_string()),
+        message: diag.message.clone(),
         related_information: None,
         tags: None,
         code_description: None,

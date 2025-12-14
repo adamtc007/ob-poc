@@ -114,9 +114,9 @@ impl std::fmt::Display for DagExecutionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DagExecutionError::CompileErrors(errors) => {
-                write!(f, "Compilation failed:\n")?;
+                writeln!(f, "Compilation failed:")?;
                 for e in errors {
-                    write!(f, "  - {}\n", e)?;
+                    writeln!(f, "  - {}", e)?;
                 }
                 Ok(())
             }

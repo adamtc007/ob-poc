@@ -1,0 +1,229 @@
+# KYC Onboarding Workflow
+# Full KYC onboarding for a new Client Business Unit (CBU)
+
+workflow: kyc_onboarding
+version: 1
+description: Full KYC onboarding for a new CBU
+
+# Workflow is triggered by CBU creation
+trigger:
+  event: cbu.created
+  conditions:
+    - field: client_type
+      in: [FUND, CORPORATE, INSTITUTIONAL, TRUST]
+
+# Define the workflow states
+states:
+  INTAKE:
+    description: Initial data gathering
+    initial: true
+
+  ENTITY_COLLECTION:
+    description: Collecting related entities (directors, UBOs, signatories)
+
+  SCREENING:
+    description: Running AML/PEP/sanctions screening on all entities
+
+  DOCUMENT_COLLECTION:
+    description: Gathering required documentation
+
+  UBO_DETERMINATION:
+    description: Calculating and verifying beneficial owners
+
+  REVIEW:
+    description: Analyst review of complete package
+
+  APPROVED:
+    description: Onboarding complete, ready for business
+    terminal: true
+
+  REJECTED:
+    description: Onboarding rejected
+    terminal: true
+
+  REMEDIATION:
+    description: Issues found, need correction
+
+# Define valid state transitions
+transitions:
+  - from: INTAKE
+    to: ENTITY_COLLECTION
+    auto: true
+    description: Automatic progression after CBU created
+
+  - from: ENTITY_COLLECTION
+    to: SCREENING
+    guard: entities_complete
+    description: Proceed to screening when minimum entities collected
+
+  - from: SCREENING
+    to: DOCUMENT_COLLECTION
+    guard: screening_complete
+    description: Proceed to document collection when screening complete
+
+  - from: DOCUMENT_COLLECTION
+    to: UBO_DETERMINATION
+    guard: documents_complete
+    description: Proceed to UBO determination when documents collected
+
+  - from: UBO_DETERMINATION
+    to: REVIEW
+    guard: ubo_complete
+    description: Proceed to review when UBO determination complete
+
+  - from: REVIEW
+    to: APPROVED
+    guard: review_approved
+    manual: true
+    description: Approve the onboarding
+
+  - from: REVIEW
+    to: REJECTED
+    guard: review_rejected
+    manual: true
+    description: Reject the onboarding
+
+  - from: REVIEW
+    to: REMEDIATION
+    manual: true
+    description: Send back for remediation
+
+  - from: REMEDIATION
+    to: ENTITY_COLLECTION
+    description: Restart from entity collection after remediation
+
+# Requirements at each state
+requirements:
+  ENTITY_COLLECTION:
+    - type: role_count
+      role: DIRECTOR
+      min: 1
+      description: At least one director required
+
+    - type: role_count
+      role: AUTHORIZED_SIGNATORY
+      min: 1
+      description: At least one authorized signatory required
+
+  SCREENING:
+    - type: all_entities_screened
+      description: All linked entities must have screening results
+
+  DOCUMENT_COLLECTION:
+    - type: document_set
+      documents:
+        - CERTIFICATE_OF_INCORPORATION
+        - REGISTER_OF_DIRECTORS
+        - REGISTER_OF_SHAREHOLDERS
+      description: Corporate documents required
+
+    - type: per_entity_document
+      entity_type: DIRECTOR
+      documents:
+        - PASSPORT
+        - PROOF_OF_ADDRESS
+      description: ID documents for each director
+
+  UBO_DETERMINATION:
+    - type: ownership_complete
+      threshold: 100
+      description: Total ownership must be documented
+
+    - type: all_ubos_verified
+      description: All UBOs must be verified
+
+  REVIEW:
+    - type: no_open_alerts
+      description: No unresolved screening alerts
+
+    - type: case_checklist_complete
+      description: All checklist items signed off
+
+# Actions available at each state
+actions:
+  INTAKE:
+    - action: update_cbu
+      verb: cbu.update
+      description: Update CBU details
+
+  ENTITY_COLLECTION:
+    - action: add_person
+      verb: entity.create-proper-person
+      description: Add a natural person
+
+    - action: add_company
+      verb: entity.create-limited-company
+      description: Add a legal entity
+
+    - action: add_role
+      verb: cbu.assign-role
+      description: Assign a role to an entity
+
+    - action: add_ownership
+      verb: ubo.add-ownership
+      description: Add ownership relationship
+
+  SCREENING:
+    - action: create_case
+      verb: kyc-case.create
+      description: Create KYC case
+
+    - action: create_workstream
+      verb: entity-workstream.create
+      description: Create entity workstream
+
+    - action: run_screening
+      verb: case-screening.run
+      description: Run screening on entity
+
+    - action: review_hit
+      verb: case-screening.review-hit
+      description: Review a screening hit
+
+  DOCUMENT_COLLECTION:
+    - action: catalog_document
+      verb: document.catalog
+      description: Catalog a document
+
+    - action: extract_document
+      verb: document.extract
+      description: Extract data from document
+
+  UBO_DETERMINATION:
+    - action: calculate_ubo
+      verb: ubo.trace-chains
+      description: Trace ownership chains
+
+    - action: register_ubo
+      verb: ubo.register-ubo
+      description: Register a UBO determination
+
+    - action: verify_ubo
+      verb: ubo.verify-ubo
+      description: Verify a beneficial owner
+
+  REVIEW:
+    - action: set_risk_rating
+      verb: kyc-case.set-risk-rating
+      description: Set case risk rating
+
+    - action: approve
+      verb: kyc-case.update-status
+      description: Approve the case
+
+    - action: reject
+      verb: kyc-case.update-status
+      description: Reject the case
+
+    - action: escalate
+      verb: kyc-case.escalate
+      description: Escalate for senior review
+
+  REMEDIATION:
+    - action: raise_red_flag
+      verb: red-flag.raise
+      description: Raise a red flag
+
+    - action: mitigate_flag
+      verb: red-flag.mitigate
+      description: Mitigate a red flag

@@ -10,6 +10,7 @@ use tower_lsp::{Client, LanguageServer};
 use crate::analysis::{DocumentState, SymbolTable};
 use crate::entity_client::{gateway_addr, EntityLookupClient};
 use crate::handlers;
+use ob_poc::dsl_v2::planning_facade::PlanningOutput;
 
 /// DSL Language Server state.
 pub struct DslLanguageServer {
@@ -17,6 +18,8 @@ pub struct DslLanguageServer {
     client: Client,
     /// Open documents and their state
     documents: Arc<RwLock<HashMap<Url, DocumentState>>>,
+    /// Planning output for each document (for code actions)
+    planning_outputs: Arc<RwLock<HashMap<Url, PlanningOutput>>>,
     /// Session symbol table (shared across documents)
     symbols: Arc<RwLock<SymbolTable>>,
     /// Entity Gateway client for lookups (replaces direct DB access)
@@ -29,6 +32,7 @@ impl DslLanguageServer {
         Self {
             client,
             documents: Arc::new(RwLock::new(HashMap::new())),
+            planning_outputs: Arc::new(RwLock::new(HashMap::new())),
             symbols: Arc::new(RwLock::new(SymbolTable::new())),
             entity_client: Arc::new(RwLock::new(None)),
         }
@@ -74,23 +78,35 @@ impl DslLanguageServer {
 
     /// Analyze a document and publish diagnostics.
     async fn analyze_document(&self, uri: &Url, text: &str) {
-        // Use async validation with EntityGateway for full semantic validation
-        let (state, diagnostics) = handlers::diagnostics::analyze_document_async(text).await;
+        // Use full analysis to get planning output for code actions
+        let result = handlers::diagnostics::analyze_document_full(text).await;
 
         // Store document state
         {
             let mut docs = self.documents.write().await;
-            docs.insert(uri.clone(), state.clone());
+            docs.insert(uri.clone(), result.state.clone());
+        }
+
+        // Store planning output for code actions
+        {
+            let mut planning = self.planning_outputs.write().await;
+            planning.insert(uri.clone(), result.planning_output);
         }
 
         // Update symbol table from this document
         {
             let mut symbols = self.symbols.write().await;
-            symbols.merge_from_document(uri, &state);
+            symbols.merge_from_document(uri, &result.state);
         }
 
         // Publish diagnostics
-        self.publish_diagnostics(uri.clone(), diagnostics).await;
+        self.publish_diagnostics(uri.clone(), result.diagnostics)
+            .await;
+    }
+
+    /// Get planning output for a document (for code actions)
+    pub async fn get_planning_output(&self, uri: &Url) -> Option<PlanningOutput> {
+        self.planning_outputs.read().await.get(uri).cloned()
     }
 }
 
@@ -136,6 +152,17 @@ impl LanguageServer for DslLanguageServer {
 
                 // Document symbols (outline)
                 document_symbol_provider: Some(OneOf::Left(true)),
+
+                // Code actions (quick fixes, refactoring)
+                code_action_provider: Some(CodeActionProviderCapability::Options(
+                    CodeActionOptions {
+                        code_action_kinds: Some(vec![
+                            CodeActionKind::QUICKFIX,
+                            CodeActionKind::REFACTOR_REWRITE,
+                        ]),
+                        ..Default::default()
+                    },
+                )),
 
                 ..Default::default()
             },
@@ -197,6 +224,12 @@ impl LanguageServer for DslLanguageServer {
         {
             let mut docs = self.documents.write().await;
             docs.remove(&params.text_document.uri);
+        }
+
+        // Remove planning output
+        {
+            let mut planning = self.planning_outputs.write().await;
+            planning.remove(&params.text_document.uri);
         }
 
         // Clear diagnostics
@@ -295,6 +328,34 @@ impl LanguageServer for DslLanguageServer {
         }
 
         Ok(None)
+    }
+
+    async fn code_action(&self, params: CodeActionParams) -> Result<Option<CodeActionResponse>> {
+        let uri = &params.text_document.uri;
+        let range = params.range;
+
+        tracing::debug!("Code action request: uri={}, range={:?}", uri, range);
+
+        // Get document and planning output
+        let doc = match self.get_document(uri).await {
+            Some(d) => d,
+            None => return Ok(None),
+        };
+
+        let planning_output = match self.get_planning_output(uri).await {
+            Some(p) => p,
+            None => return Ok(None),
+        };
+
+        // Generate code actions from planning output
+        let actions =
+            handlers::code_actions::get_code_actions(&planning_output, range, uri, &doc.text);
+
+        if actions.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(actions))
+        }
     }
 }
 

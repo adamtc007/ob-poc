@@ -13,6 +13,8 @@
 - ⏳ NOT STARTED
 - 🚫 BLOCKED (by dependency)
 
+**Last Updated**: 2025-12-14 - MCP Agent Integration Complete
+
 ---
 
 ## Executive Summary
@@ -24,9 +26,9 @@
 | Schema Cleanup | 1 | 1 | 0 |
 | Missing Verbs | 3 | 3 | 0 |
 | Core Infrastructure | 4 | 4 | 0 |
-| DAG Execution | 5 | 4 | 1 |
-| Tooling (LSP/REPL) | 3 | 0 | 3 |
-| **Total** | **21** | **17** | **4** |
+| DAG Execution | 5 | 5 | 0 |
+| Tooling (LSP/REPL) | 3 | 3 | 0 |
+| **Total** | **21** | **21** | **0** |
 
 ---
 
@@ -613,7 +615,7 @@ pub fn describe_plan(plan: &ExecutionPlan) -> String {
 
 ---
 
-## 4.4 ⏳ Update `executor.rs` - DAG-Aware Execution [REMAINING]
+## 4.4 ✅ Update `executor.rs` - DAG-Aware Execution [DONE]
 
 **File**: `rust/src/dsl_v2/executor.rs` (modify existing)
 
@@ -750,7 +752,7 @@ async fn test_dry_run_shows_plan() {
 
 # PART 5: TOOLING (LSP/REPL)
 
-## 5.1 ⏳ Wire Planning Facade into LSP Handler [REMAINING]
+## 5.1 ✅ Wire Planning Facade into LSP Handler [DONE]
 
 **File**: `rust/src/dsl_v2/lsp_handler.rs` (or similar)
 
@@ -786,7 +788,7 @@ pub async fn handle_did_change(&self, params: DidChangeTextDocumentParams) {
 
 ---
 
-## 5.2 ⏳ Add Code Actions for Implicit Creates [REMAINING]
+## 5.2 ✅ Add Code Actions for Implicit Creates [DONE]
 
 When validation detects a reference to undefined binding, offer to insert create statement:
 
@@ -812,7 +814,7 @@ fn offer_implicit_create_action(&self, step: &SyntheticStep) {
 
 ---
 
-## 5.3 ⏳ Add Reorder Code Action [REMAINING]
+## 5.3 ✅ Add Reorder Code Action [DONE]
 
 When DAG shows statements need reordering, offer to fix:
 

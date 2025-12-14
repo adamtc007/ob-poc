@@ -56,6 +56,10 @@ pub mod agentic;
 #[cfg(feature = "database")]
 pub mod graph;
 
+// Workflow orchestration module
+#[cfg(feature = "database")]
+pub mod workflow;
+
 // Trading profile document types and materialization
 pub mod trading_profile;
 
