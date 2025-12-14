@@ -95,6 +95,8 @@ domains:
               - BLOCKED
               - WITHDRAWN
               - EXPIRED
+              - REFER_TO_REGULATOR
+              - DO_NOT_ONBOARD
         returns:
           type: affected
       escalate:
@@ -233,6 +235,8 @@ domains:
               - REJECTED
               - WITHDRAWN
               - EXPIRED
+              - REFER_TO_REGULATOR
+              - DO_NOT_ONBOARD
           - name: notes
             type: string
             required: false
@@ -283,3 +287,48 @@ domains:
             maps_to: status
         returns:
           type: record_set
+      reopen:
+        description: Reopen a closed case for remediation or review
+        behavior: crud
+        crud:
+          operation: update
+          table: cases
+          schema: kyc
+          key: case_id
+          set_values:
+            closed_at: null
+        emits_event: case.reopened
+        args:
+          - name: case-id
+            type: uuid
+            required: true
+            maps_to: case_id
+            lookup:
+              table: cases
+              entity_type: kyc_case
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
+          - name: reopen-reason
+            type: string
+            required: true
+            maps_to: notes
+          - name: new-case-type
+            type: string
+            required: false
+            maps_to: case_type
+            default: REMEDIATION
+            valid_values:
+              - REMEDIATION
+              - EVENT_DRIVEN
+              - PERIODIC_REVIEW
+          - name: new-status
+            type: string
+            required: false
+            maps_to: status
+            default: INTAKE
+            valid_values:
+              - INTAKE
+              - DISCOVERY
+        returns:
+          type: affected

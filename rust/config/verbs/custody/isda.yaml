@@ -25,6 +25,12 @@ domains:
             type: uuid
             required: true
             maps_to: counterparty_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
           - name: agreement-date
             type: date
             required: true

@@ -11,56 +11,56 @@ domains:
           schema: ob-poc
           returning: ownership_id
         args:
-        - name: owner-entity-id
-          type: uuid
-          required: true
-          maps_to: owner_entity_id
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
-        - name: owned-entity-id
-          type: uuid
-          required: true
-          maps_to: owned_entity_id
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
-        - name: percentage
-          type: decimal
-          required: true
-          maps_to: ownership_percent
-        - name: ownership-type
-          type: string
-          required: true
-          maps_to: ownership_type
-          valid_values:
-          - DIRECT
-          - INDIRECT
-          - BENEFICIAL
-        - name: effective-from
-          type: date
-          required: false
-          maps_to: effective_from
-        - name: evidence-doc-id
-          type: uuid
-          required: false
-          maps_to: evidence_doc_id
-          lookup:
-            table: document_catalog
-            entity_type: document
-            schema: ob-poc
-            search_key: document_name
-            primary_key: doc_id
-        - name: notes
-          type: string
-          required: false
-          maps_to: notes
+          - name: owner-entity-id
+            type: uuid
+            required: true
+            maps_to: owner_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: owned-entity-id
+            type: uuid
+            required: true
+            maps_to: owned_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: percentage
+            type: decimal
+            required: true
+            maps_to: ownership_percent
+          - name: ownership-type
+            type: string
+            required: true
+            maps_to: ownership_type
+            valid_values:
+              - DIRECT
+              - INDIRECT
+              - BENEFICIAL
+          - name: effective-from
+            type: date
+            required: false
+            maps_to: effective_from
+          - name: evidence-doc-id
+            type: uuid
+            required: false
+            maps_to: evidence_doc_id
+            lookup:
+              table: document_catalog
+              entity_type: document
+              schema: ob-poc
+              search_key: document_name
+              primary_key: doc_id
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
         returns:
           type: uuid
           name: ownership_id
@@ -74,27 +74,27 @@ domains:
           schema: ob-poc
           key: ownership_id
         args:
-        - name: ownership-id
-          type: uuid
-          required: true
-          maps_to: ownership_id
-          lookup:
-            table: ownership_relationships
-            schema: ob-poc
-            search_key: ownership_id
-            primary_key: ownership_id
-        - name: percentage
-          type: decimal
-          required: false
-          maps_to: ownership_percent
-        - name: effective-to
-          type: date
-          required: false
-          maps_to: effective_to
-        - name: notes
-          type: string
-          required: false
-          maps_to: notes
+          - name: ownership-id
+            type: uuid
+            required: true
+            maps_to: ownership_id
+            lookup:
+              table: ownership_relationships
+              schema: ob-poc
+              search_key: ownership_id
+              primary_key: ownership_id
+          - name: percentage
+            type: decimal
+            required: false
+            maps_to: ownership_percent
+          - name: effective-to
+            type: date
+            required: false
+            maps_to: effective_to
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
         returns:
           type: affected
       end-ownership:
@@ -106,19 +106,19 @@ domains:
           schema: ob-poc
           key: ownership_id
         args:
-        - name: ownership-id
-          type: uuid
-          required: true
-          maps_to: ownership_id
-          lookup:
-            table: ownership_relationships
-            schema: ob-poc
-            search_key: ownership_id
-            primary_key: ownership_id
-        - name: effective-to
-          type: date
-          required: true
-          maps_to: effective_to
+          - name: ownership-id
+            type: uuid
+            required: true
+            maps_to: ownership_id
+            lookup:
+              table: ownership_relationships
+              schema: ob-poc
+              search_key: ownership_id
+              primary_key: ownership_id
+          - name: effective-to
+            type: date
+            required: true
+            maps_to: effective_to
         returns:
           type: affected
       list-owners:
@@ -130,16 +130,16 @@ domains:
           schema: ob-poc
           fk_col: owned_entity_id
         args:
-        - name: entity-id
-          type: uuid
-          required: true
-          maps_to: owned_entity_id
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: owned_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         returns:
           type: record_set
       list-owned:
@@ -151,16 +151,16 @@ domains:
           schema: ob-poc
           fk_col: owner_entity_id
         args:
-        - name: entity-id
-          type: uuid
-          required: true
-          maps_to: owner_entity_id
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: owner_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         returns:
           type: record_set
       register-ubo:
@@ -171,70 +171,70 @@ domains:
           table: ubo_registry
           schema: ob-poc
           conflict_keys:
-          - subject_entity_id
-          - ubo_proper_person_id
-          - relationship_type
+            - subject_entity_id
+            - ubo_proper_person_id
+            - relationship_type
           returning: ubo_id
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          maps_to: cbu_id
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
-        - name: subject-entity-id
-          type: uuid
-          required: true
-          maps_to: subject_entity_id
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
-        - name: ubo-person-id
-          type: uuid
-          required: true
-          maps_to: ubo_proper_person_id
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
-        - name: relationship-type
-          type: string
-          required: true
-          maps_to: relationship_type
-        - name: qualifying-reason
-          type: string
-          required: true
-          maps_to: qualifying_reason
-          valid_values:
-          - OWNERSHIP_25PCT
-          - CONTROL
-          - SENIOR_MANAGEMENT
-          - OTHER
-        - name: ownership-percentage
-          type: decimal
-          required: false
-          maps_to: ownership_percentage
-        - name: control-type
-          type: string
-          required: false
-          maps_to: control_type
-        - name: workflow-type
-          type: string
-          required: true
-          maps_to: workflow_type
-        - name: regulatory-framework
-          type: string
-          required: false
-          maps_to: regulatory_framework
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: subject-entity-id
+            type: uuid
+            required: true
+            maps_to: subject_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: ubo-person-id
+            type: uuid
+            required: true
+            maps_to: ubo_proper_person_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: relationship-type
+            type: string
+            required: true
+            maps_to: relationship_type
+          - name: qualifying-reason
+            type: string
+            required: true
+            maps_to: qualifying_reason
+            valid_values:
+              - OWNERSHIP_25PCT
+              - CONTROL
+              - SENIOR_MANAGEMENT
+              - OTHER
+          - name: ownership-percentage
+            type: decimal
+            required: false
+            maps_to: ownership_percentage
+          - name: control-type
+            type: string
+            required: false
+            maps_to: control_type
+          - name: workflow-type
+            type: string
+            required: true
+            maps_to: workflow_type
+          - name: regulatory-framework
+            type: string
+            required: false
+            maps_to: regulatory_framework
         returns:
           type: uuid
           name: ubo_id
@@ -248,33 +248,37 @@ domains:
           schema: ob-poc
           key: ubo_id
         args:
-        - name: ubo-id
-          type: uuid
-          required: true
-          maps_to: ubo_id
-          lookup:
-            table: ubo_determinations
-            schema: ob-poc
-            search_key: ubo_id
-            primary_key: ubo_id
-        - name: verification-status
-          type: string
-          required: true
-          maps_to: verification_status
-          valid_values:
-          - PENDING
-          - VERIFIED
-          - FAILED
-          - DISPUTED
-        - name: risk-rating
-          type: string
-          required: false
-          maps_to: risk_rating
-          valid_values:
-          - LOW
-          - MEDIUM
-          - HIGH
-          - PROHIBITED
+          - name: ubo-id
+            type: uuid
+            required: true
+            maps_to: ubo_id
+            lookup:
+              table: ubo_registry
+              entity_type: ubo
+              schema: ob-poc
+              search_key: ubo_id
+              primary_key: ubo_id
+          - name: verification-status
+            type: string
+            required: true
+            maps_to: verification_status
+            valid_values:
+              - SUSPECTED
+              - PENDING
+              - PROVEN
+              - VERIFIED
+              - FAILED
+              - DISPUTED
+              - REMOVED
+          - name: risk-rating
+            type: string
+            required: false
+            maps_to: risk_rating
+            valid_values:
+              - LOW
+              - MEDIUM
+              - HIGH
+              - PROHIBITED
         returns:
           type: affected
       list-ubos:
@@ -286,19 +290,19 @@ domains:
           schema: ob-poc
           fk_col: cbu_id
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
-        - name: verification-status
-          type: string
-          required: false
-          maps_to: verification_status
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: verification-status
+            type: string
+            required: false
+            maps_to: verification_status
         returns:
           type: record_set
       list-by-subject:
@@ -310,42 +314,119 @@ domains:
           schema: ob-poc
           fk_col: subject_entity_id
         args:
-        - name: subject-entity-id
-          type: uuid
-          required: true
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
+          - name: subject-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         returns:
           type: record_set
       calculate:
         description: Calculate ultimate beneficial ownership chain
         behavior: plugin
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
-        - name: entity-id
-          type: uuid
-          required: true
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
-        - name: threshold
-          type: decimal
-          required: false
-          default: 25.0
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: threshold
+            type: decimal
+            required: false
+            default: 25.0
         returns:
           type: record_set
+      supersede-ubo:
+        description: Supersede a UBO determination when ownership changes
+        behavior: crud
+        crud:
+          operation: update
+          table: ubo_registry
+          schema: ob-poc
+          key: ubo_id
+          set_values:
+            superseded_at: now()
+        args:
+          - name: ubo-id
+            type: uuid
+            required: true
+            maps_to: ubo_id
+            lookup:
+              table: ubo_registry
+              entity_type: ubo
+              schema: ob-poc
+              search_key: ubo_id
+              primary_key: ubo_id
+          - name: superseded-by
+            type: uuid
+            required: true
+            maps_to: superseded_by
+            description: ID of the new UBO determination that replaces this one
+            lookup:
+              table: ubo_registry
+              entity_type: ubo
+              schema: ob-poc
+              search_key: ubo_id
+              primary_key: ubo_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: closed_reason
+        returns:
+          type: affected
+      close-ubo:
+        description: Close a UBO record (no longer a UBO)
+        behavior: crud
+        crud:
+          operation: update
+          table: ubo_registry
+          schema: ob-poc
+          key: ubo_id
+          set_values:
+            verification_status: REMOVED
+            closed_at: now()
+        args:
+          - name: ubo-id
+            type: uuid
+            required: true
+            maps_to: ubo_id
+            lookup:
+              table: ubo_registry
+              entity_type: ubo
+              schema: ob-poc
+              search_key: ubo_id
+              primary_key: ubo_id
+          - name: removal-reason
+            type: string
+            required: true
+            maps_to: removal_reason
+          - name: replacement-ubo-id
+            type: uuid
+            required: false
+            maps_to: replacement_ubo_id
+            description: If this UBO is being replaced by another
+            lookup:
+              table: ubo_registry
+              entity_type: ubo
+              schema: ob-poc
+              search_key: ubo_id
+              primary_key: ubo_id
+        returns:
+          type: affected

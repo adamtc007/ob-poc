@@ -73,7 +73,7 @@ domains:
           maps_to: workstream_id
           lookup:
             table: entity_workstreams
-            entity_type: workstream
+            entity_type: entity_workstream
             schema: kyc
             search_key: workstream_id
             primary_key: workstream_id
