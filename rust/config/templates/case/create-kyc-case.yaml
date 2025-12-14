@@ -1,0 +1,100 @@
+template: create-kyc-case
+version: 1
+
+metadata:
+  name: Create KYC Case
+  summary: Create a new KYC case for a CBU with initial setup
+
+  description: |
+    Creates a new KYC case for client onboarding or periodic review.
+    This initializes the case with:
+    - Case record with type and status
+    - Initial entity workstreams for known entities
+    - SLA deadline based on case type
+
+    This is typically the first step in any KYC workflow.
+
+  when_to_use:
+    - Starting new client onboarding
+    - Initiating periodic review
+    - Event-driven review required
+
+  when_not_to_use:
+    - Case already exists for this CBU/period
+    - Just need to add entities to existing case
+
+  effects:
+    - KYC case created
+    - Initial workstreams created for CBU entities
+    - SLA deadline set
+    - Case event logged
+
+  next_steps:
+    - Add directors and signatories
+    - Determine UBO structure
+    - Begin document collection
+
+tags:
+  - case
+  - kyc
+  - onboarding
+  - creation
+
+workflow_context:
+  applicable_workflows:
+    - kyc_onboarding
+    - periodic_review
+  applicable_states:
+    - INITIATED
+    - INTAKE
+  resolves_blockers:
+    - no_kyc_case
+
+params:
+  cbu_id:
+    type: cbu_ref
+    required: true
+    source: session
+    description: CBU for the KYC case
+
+  case_type:
+    type: enum
+    required: true
+    enum_values:
+      - NEW_CLIENT
+      - PERIODIC_REVIEW
+      - EVENT_DRIVEN
+      - REMEDIATION
+    prompt: "Type of KYC case"
+
+  risk_rating:
+    type: enum
+    required: false
+    enum_values:
+      - LOW
+      - MEDIUM
+      - HIGH
+      - VERY_HIGH
+    prompt: "Initial risk rating (if known)"
+
+  notes:
+    type: string
+    required: false
+    prompt: "Initial case notes"
+
+body: |
+  (kyc-case.create
+    :cbu "$cbu_id"
+    :case-type $case_type
+    :risk-rating $risk_rating
+    :notes "$notes")
+
+outputs:
+  case_id:
+    type: uuid
+    description: Created KYC case ID
+
+related_templates:
+  - onboard-director
+  - onboard-signatory
+  - add-ownership

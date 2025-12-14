@@ -1,0 +1,332 @@
+//! Template Expander
+//!
+//! Expands template definitions to DSL source text by substituting parameters.
+
+use std::collections::HashMap;
+use uuid::Uuid;
+
+use super::definition::{ParamDefinition, TemplateDefinition};
+
+/// Session context for template expansion
+#[derive(Debug, Clone, Default)]
+pub struct ExpansionContext {
+    /// Current CBU (if any)
+    pub current_cbu: Option<Uuid>,
+    /// Current KYC case (if any)
+    pub current_case: Option<Uuid>,
+    /// Named bindings from previous executions or resolved entities
+    pub bindings: HashMap<String, String>,
+}
+
+impl ExpansionContext {
+    /// Create a new empty context
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Create context with CBU
+    pub fn with_cbu(cbu_id: Uuid) -> Self {
+        Self {
+            current_cbu: Some(cbu_id),
+            ..Default::default()
+        }
+    }
+
+    /// Add a binding
+    pub fn bind(&mut self, name: impl Into<String>, value: impl Into<String>) {
+        self.bindings.insert(name.into(), value.into());
+    }
+}
+
+/// Result of template expansion
+#[derive(Debug, Clone)]
+pub struct ExpansionResult {
+    /// The expanded DSL source text
+    pub dsl: String,
+    /// Parameters that were filled
+    pub filled_params: Vec<String>,
+    /// Parameters still needing values
+    pub missing_params: Vec<MissingParam>,
+    /// What the template will output
+    pub outputs: Vec<String>,
+    /// Template ID that was expanded
+    pub template_id: String,
+}
+
+/// A parameter that still needs a value
+#[derive(Debug, Clone)]
+pub struct MissingParam {
+    /// Parameter name
+    pub name: String,
+    /// Parameter type
+    pub param_type: String,
+    /// Human-readable prompt
+    pub prompt: String,
+    /// Example value
+    pub example: Option<String>,
+    /// Is this required?
+    pub required: bool,
+    /// Validation hint
+    pub validation: Option<String>,
+}
+
+/// Expands templates to DSL source text
+pub struct TemplateExpander;
+
+impl TemplateExpander {
+    /// Expand a template to DSL text
+    ///
+    /// Substitutes parameters in order of precedence:
+    /// 1. Explicit params provided
+    /// 2. Session context (current_cbu, current_case, bindings)
+    /// 3. Default values from param definition
+    /// 4. Leave as placeholder if still unknown (and track as missing)
+    pub fn expand(
+        template: &TemplateDefinition,
+        explicit_params: &HashMap<String, String>,
+        context: &ExpansionContext,
+    ) -> ExpansionResult {
+        let mut dsl = template.body.clone();
+        let mut filled = Vec::new();
+        let mut missing = Vec::new();
+
+        for (name, param_def) in &template.params {
+            let value = Self::resolve_param(name, param_def, explicit_params, context);
+
+            match value {
+                Some(v) => {
+                    // Substitute $param with value
+                    dsl = Self::substitute_param(&dsl, name, &v);
+                    filled.push(name.clone());
+                }
+                None if param_def.required => {
+                    // Required but missing - add to missing list
+                    missing.push(MissingParam {
+                        name: name.clone(),
+                        param_type: param_def.param_type.clone(),
+                        prompt: param_def
+                            .prompt
+                            .clone()
+                            .unwrap_or_else(|| format!("Value for {}", name)),
+                        example: param_def.example.clone(),
+                        required: true,
+                        validation: param_def.validation.clone(),
+                    });
+                }
+                None => {
+                    // Optional and missing - try default
+                    if let Some(default) = &param_def.default {
+                        let resolved_default = Self::resolve_default(default, explicit_params);
+                        dsl = Self::substitute_param(&dsl, name, &resolved_default);
+                        filled.push(name.clone());
+                    }
+                    // If no default, leave placeholder or empty
+                }
+            }
+        }
+
+        let outputs = template.outputs.keys().cloned().collect();
+
+        ExpansionResult {
+            dsl,
+            filled_params: filled,
+            missing_params: missing,
+            outputs,
+            template_id: template.template.clone(),
+        }
+    }
+
+    /// Substitute a parameter in the DSL text
+    fn substitute_param(dsl: &str, name: &str, value: &str) -> String {
+        let mut result = dsl.to_string();
+
+        // Handle "$param" (quoted)
+        result = result.replace(&format!("\"${}\"", name), &format!("\"{}\"", value));
+
+        // Handle $param (unquoted - for enum values, numbers, etc.)
+        result = result.replace(&format!("${}", name), value);
+
+        result
+    }
+
+    /// Resolve a parameter value
+    fn resolve_param(
+        name: &str,
+        param_def: &ParamDefinition,
+        explicit: &HashMap<String, String>,
+        context: &ExpansionContext,
+    ) -> Option<String> {
+        // 1. Check explicit params first
+        if let Some(v) = explicit.get(name) {
+            return Some(v.clone());
+        }
+
+        // 2. Check source directive
+        match param_def.source.as_deref() {
+            Some("session") => {
+                // Try to get from session context
+                match name {
+                    "cbu_id" | "cbu" => context.current_cbu.map(|u| u.to_string()),
+                    "case_id" | "case" => context.current_case.map(|u| u.to_string()),
+                    _ => context.bindings.get(name).cloned(),
+                }
+            }
+            Some("blocker") => {
+                // Would be populated by blocker context - check bindings
+                context.bindings.get(name).cloned()
+            }
+            Some(ref_name) if ref_name.starts_with('$') => {
+                // Reference another parameter: source: "$nationality"
+                let ref_param = &ref_name[1..];
+                explicit.get(ref_param).cloned()
+            }
+            _ => {
+                // Check bindings as fallback
+                context.bindings.get(name).cloned()
+            }
+        }
+    }
+
+    /// Resolve a default value
+    fn resolve_default(default: &str, explicit: &HashMap<String, String>) -> String {
+        if default == "today" {
+            chrono::Utc::now().format("%Y-%m-%d").to_string()
+        } else if let Some(ref_name) = default.strip_prefix('$') {
+            // Reference another param
+            explicit
+                .get(ref_name)
+                .cloned()
+                .unwrap_or_else(|| default.to_string())
+        } else {
+            default.to_string()
+        }
+    }
+
+    /// Check if expansion has all required params
+    pub fn is_complete(result: &ExpansionResult) -> bool {
+        result.missing_params.is_empty()
+    }
+
+    /// Format missing params as a prompt for the user
+    pub fn format_missing_params_prompt(missing: &[MissingParam]) -> String {
+        if missing.is_empty() {
+            return String::new();
+        }
+
+        let mut prompt = String::from("Please provide the following:\n");
+        for param in missing {
+            prompt.push_str(&format!("- {}", param.prompt));
+            if let Some(ref example) = param.example {
+                prompt.push_str(&format!(" (e.g., {})", example));
+            }
+            prompt.push('\n');
+        }
+        prompt
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::templates::definition::TemplateMetadata;
+
+    fn sample_template() -> TemplateDefinition {
+        serde_yaml::from_str(
+            r#"
+template: test-expand
+version: 1
+metadata:
+  name: Test Expansion
+  summary: Test template expansion
+params:
+  cbu_id:
+    type: cbu_ref
+    required: true
+    source: session
+  name:
+    type: string
+    required: true
+    prompt: "Enter name"
+    example: "John Smith"
+  country:
+    type: string
+    required: false
+    default: "US"
+body: |
+  (entity.create :cbu "$cbu_id" :name "$name" :country "$country")
+"#,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn test_expand_with_all_params() {
+        let template = sample_template();
+        let mut params = HashMap::new();
+        params.insert("name".to_string(), "Alice".to_string());
+
+        let context = ExpansionContext::with_cbu(Uuid::new_v4());
+
+        let result = TemplateExpander::expand(&template, &params, &context);
+
+        assert!(result.missing_params.is_empty());
+        assert!(result.dsl.contains("Alice"));
+        assert!(result.dsl.contains("US")); // Default value
+    }
+
+    #[test]
+    fn test_expand_missing_required() {
+        let template = sample_template();
+        let params = HashMap::new();
+        let context = ExpansionContext::new(); // No CBU
+
+        let result = TemplateExpander::expand(&template, &params, &context);
+
+        // Should have 2 missing: cbu_id (no session) and name (required, no value)
+        assert_eq!(result.missing_params.len(), 2);
+        assert!(result.missing_params.iter().any(|p| p.name == "cbu_id"));
+        assert!(result.missing_params.iter().any(|p| p.name == "name"));
+    }
+
+    #[test]
+    fn test_expand_with_session_context() {
+        let template = sample_template();
+        let mut params = HashMap::new();
+        params.insert("name".to_string(), "Bob".to_string());
+
+        let cbu_id = Uuid::new_v4();
+        let context = ExpansionContext::with_cbu(cbu_id);
+
+        let result = TemplateExpander::expand(&template, &params, &context);
+
+        assert!(result.missing_params.is_empty());
+        assert!(result.dsl.contains(&cbu_id.to_string()));
+    }
+
+    #[test]
+    fn test_format_missing_params() {
+        let missing = vec![
+            MissingParam {
+                name: "name".to_string(),
+                param_type: "string".to_string(),
+                prompt: "Enter name".to_string(),
+                example: Some("John".to_string()),
+                required: true,
+                validation: None,
+            },
+            MissingParam {
+                name: "date".to_string(),
+                param_type: "date".to_string(),
+                prompt: "Enter date".to_string(),
+                example: None,
+                required: true,
+                validation: None,
+            },
+        ];
+
+        let prompt = TemplateExpander::format_missing_params_prompt(&missing);
+        assert!(prompt.contains("Enter name"));
+        assert!(prompt.contains("John"));
+        assert!(prompt.contains("Enter date"));
+    }
+}

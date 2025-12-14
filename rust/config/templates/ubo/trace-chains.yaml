@@ -1,0 +1,84 @@
+template: trace-chains
+version: 1
+
+metadata:
+  name: Trace Ownership Chains
+  summary: Trace all ownership chains to natural persons for UBO determination
+
+  description: |
+    Traverses the ownership structure starting from a target entity and
+    traces all paths up through holding companies to natural persons.
+    This is the core algorithm for UBO determination.
+
+    The trace will:
+    - Follow all ownership relationships
+    - Calculate cumulative ownership percentages
+    - Identify natural persons with qualifying ownership (>25%)
+    - Flag incomplete chains needing further investigation
+
+  when_to_use:
+    - After ownership structure is populated
+    - Workflow requires UBO determination
+    - User asks "who owns X?" or "trace UBOs for X"
+
+  when_not_to_use:
+    - Ownership structure not yet populated
+    - Single known owner (use register-ubo directly)
+
+  effects:
+    - Ownership chains computed and stored
+    - Potential UBOs identified
+    - Incomplete chains flagged for follow-up
+
+  next_steps:
+    - Register identified UBOs
+    - Investigate incomplete chains
+    - Verify UBO identities
+
+tags:
+  - ubo
+  - ownership
+  - trace
+  - calculation
+
+workflow_context:
+  applicable_workflows:
+    - kyc_onboarding
+    - ubo_determination
+  applicable_states:
+    - UBO_DETERMINATION
+  resolves_blockers:
+    - ubo_not_traced
+
+params:
+  cbu_id:
+    type: cbu_ref
+    required: true
+    source: session
+    description: CBU to trace ownership for
+
+  target_entity_id:
+    type: entity_ref
+    required: false
+    description: Specific entity to trace (defaults to main CBU entity)
+
+  threshold:
+    type: decimal
+    required: false
+    default: "25"
+    prompt: "UBO threshold percentage"
+
+body: |
+  (ubo.trace-chains
+    :cbu "$cbu_id"
+    :threshold $threshold)
+
+outputs:
+  chains:
+    type: json
+    description: Computed ownership chains with percentages
+
+related_templates:
+  - add-ownership
+  - register-ubo
+  - verify-ubo

@@ -1,0 +1,136 @@
+template: onboard-director
+version: 1
+
+metadata:
+  name: Onboard Director
+  summary: Add a natural person as director with full KYC setup
+
+  description: |
+    Creates a new person entity and onboards them as a director of a CBU.
+    This is a multi-step operation that:
+    1. Creates the person entity with identity information
+    2. Assigns them the DIRECTOR role on the CBU
+    3. Creates a KYC entity workstream for tracking
+    4. Requests required identity documents (passport, proof of address)
+    5. Initiates AML/PEP/sanctions screening
+
+    Use this when adding a NEW person as director. If the person already
+    exists in the system, use assign-existing-director instead.
+
+  when_to_use:
+    - Adding a new director who doesn't exist in the system
+    - Workflow blocker shows "missing_role:DIRECTOR"
+    - User says "add [name] as director" and person not found
+
+  when_not_to_use:
+    - Person already exists (use cbu.assign-role directly)
+    - Adding a corporate director (use add-corporate-director)
+    - Just need to assign role without KYC setup
+
+  effects:
+    - New person entity created
+    - DIRECTOR role assigned to CBU
+    - Entity workstream created in KYC case
+    - Document requests sent (passport, proof of address)
+    - Screening check queued
+
+  next_steps:
+    - Upload/catalog documents for the person
+    - Review screening results if hits found
+    - Add more directors if required (check workflow blockers)
+    - Add authorized signatories
+
+tags:
+  - director
+  - person
+  - role
+  - entity-collection
+  - kyc
+  - onboarding
+
+workflow_context:
+  applicable_workflows:
+    - kyc_onboarding
+    - cbu_creation
+  applicable_states:
+    - ENTITY_COLLECTION
+    - REMEDIATION
+  resolves_blockers:
+    - missing_role:DIRECTOR
+
+params:
+  cbu_id:
+    type: cbu_ref
+    required: true
+    source: session
+    description: Target CBU for the director
+
+  case_id:
+    type: uuid
+    required: true
+    source: session
+    description: Active KYC case for workstream creation
+
+  name:
+    type: string
+    required: true
+    prompt: "Director's full legal name"
+    example: "John Smith"
+
+  date_of_birth:
+    type: date
+    required: true
+    prompt: "Date of birth"
+    example: "1975-03-15"
+    validation: "Must be in past, person must be 18+"
+
+  nationality:
+    type: country_code
+    required: true
+    prompt: "Nationality (ISO 2-letter code)"
+    example: "GB"
+
+  tax_residency:
+    type: country_code
+    required: false
+    default: "$nationality"
+    prompt: "Tax residency country (if different from nationality)"
+
+  effective_date:
+    type: date
+    required: false
+    default: "today"
+    prompt: "Role effective date"
+
+body: |
+  (let [person (entity.create-proper-person
+                 :name "$name"
+                 :date-of-birth "$date_of_birth"
+                 :nationality "$nationality"
+                 :tax-residency "$tax_residency")]
+    (cbu.assign-role
+      :cbu "$cbu_id"
+      :entity person
+      :role DIRECTOR
+      :effective-from "$effective_date")
+    (entity-workstream.create
+      :case "$case_id"
+      :entity person)
+    (document.request
+      :entity person
+      :types [PASSPORT PROOF_OF_ADDRESS])
+    (case-screening.run
+      :case "$case_id"
+      :entity person))
+
+outputs:
+  person:
+    type: entity_ref
+    description: Created person entity ID (bound to 'person' in let)
+    binding: person
+
+related_templates:
+  - onboard-signatory
+  - add-corporate-director
+  - catalog-document
+  - review-screening-hit

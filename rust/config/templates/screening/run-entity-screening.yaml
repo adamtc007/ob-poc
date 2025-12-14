@@ -1,0 +1,89 @@
+template: run-entity-screening
+version: 1
+
+metadata:
+  name: Run Entity Screening
+  summary: Run comprehensive AML/PEP/sanctions screening on an entity
+
+  description: |
+    Initiates a full screening suite on an entity including:
+    - Sanctions list screening (OFAC, EU, UN, etc.)
+    - PEP (Politically Exposed Person) check
+    - Adverse media screening
+
+    This is typically done for all entities in a KYC case,
+    especially directors, UBOs, and controlling persons.
+
+  when_to_use:
+    - New entity added to KYC case
+    - Periodic review requires re-screening
+    - Workflow blocker shows "screening_required"
+
+  when_not_to_use:
+    - Entity already screened recently
+    - Low-risk entity with simplified due diligence
+
+  effects:
+    - Screening requests created
+    - Results will be available for review
+    - Hits will create blockers requiring review
+
+  next_steps:
+    - Wait for screening results
+    - Review any hits found
+    - Clear false positives or escalate true matches
+
+tags:
+  - screening
+  - sanctions
+  - pep
+  - aml
+  - kyc
+
+workflow_context:
+  applicable_workflows:
+    - kyc_case
+    - kyc_onboarding
+  applicable_states:
+    - SCREENING
+    - ENTITY_COLLECTION
+  resolves_blockers:
+    - screening_required
+
+params:
+  case_id:
+    type: uuid
+    required: true
+    source: session
+    description: Active KYC case
+
+  workstream_id:
+    type: uuid
+    required: true
+    prompt: "Entity workstream ID"
+
+  screening_types:
+    type: array
+    required: false
+    default: "[SANCTIONS, PEP, ADVERSE_MEDIA]"
+    prompt: "Types of screening to run"
+
+body: |
+  (case-screening.run
+    :workstream "$workstream_id"
+    :screening-type SANCTIONS)
+  (case-screening.run
+    :workstream "$workstream_id"
+    :screening-type PEP)
+  (case-screening.run
+    :workstream "$workstream_id"
+    :screening-type ADVERSE_MEDIA)
+
+outputs:
+  screening_ids:
+    type: array
+    description: Created screening request IDs
+
+related_templates:
+  - review-screening-hit
+  - clear-false-positive
