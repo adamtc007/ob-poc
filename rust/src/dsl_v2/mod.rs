@@ -52,6 +52,7 @@ pub mod ops;
 pub mod parser;
 #[cfg(feature = "database")]
 pub mod ref_resolver;
+pub mod repl_session;
 pub mod runtime_registry;
 pub mod semantic_context;
 #[cfg(feature = "database")]
@@ -108,6 +109,7 @@ pub use ops::{DocKey, EntityKey, Op, OpRef};
 pub use parser::{parse_program, parse_single_verb};
 #[cfg(feature = "database")]
 pub use ref_resolver::RefResolver;
+pub use repl_session::{ExecutedBlock, ReplSession};
 pub use runtime_registry::{runtime_registry, RuntimeVerbRegistry};
 pub use semantic_context::SemanticContextStore;
 #[cfg(feature = "database")]
