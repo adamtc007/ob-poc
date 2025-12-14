@@ -41,8 +41,12 @@ pub struct ProductService {
 }
 
 impl ProductService {
-    pub fn new(pool: PgPool) -> Self { Self { pool } }
-    pub fn pool(&self) -> &PgPool { &self.pool }
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+    pub fn pool(&self) -> &PgPool {
+        &self.pool
+    }
 
     pub async fn create_product(&self, fields: &NewProductFields) -> Result<Uuid> {
         let product_id = Uuid::new_v4();
@@ -65,22 +69,38 @@ impl ProductService {
             .bind(name).fetch_optional(&self.pool).await.context("Failed to get Product by name")
     }
 
-    pub async fn list_products(&self, limit: Option<i32>, offset: Option<i32>) -> Result<Vec<ProductRow>> {
+    pub async fn list_products(
+        &self,
+        limit: Option<i32>,
+        offset: Option<i32>,
+    ) -> Result<Vec<ProductRow>> {
         sqlx::query_as::<_, ProductRow>(r#"SELECT product_id, name, description, product_code, product_category, regulatory_framework, min_asset_requirement, is_active, metadata, created_at, updated_at FROM "ob-poc".products ORDER BY created_at DESC LIMIT $1 OFFSET $2"#)
             .bind(limit.unwrap_or(100)).bind(offset.unwrap_or(0)).fetch_all(&self.pool).await.context("Failed to list Products")
     }
 
-    pub async fn update_product(&self, product_id: Uuid, name: Option<&str>, description: Option<&str>) -> Result<bool> {
+    pub async fn update_product(
+        &self,
+        product_id: Uuid,
+        name: Option<&str>,
+        description: Option<&str>,
+    ) -> Result<bool> {
         let result = sqlx::query(r#"UPDATE "ob-poc".products SET name = COALESCE($1, name), description = COALESCE($2, description), updated_at = NOW() WHERE product_id = $3"#)
             .bind(name).bind(description).bind(product_id).execute(&self.pool).await.context("Failed to update Product")?;
-        if result.rows_affected() > 0 { info!("Updated Product {}", product_id); }
+        if result.rows_affected() > 0 {
+            info!("Updated Product {}", product_id);
+        }
         Ok(result.rows_affected() > 0)
     }
 
     pub async fn delete_product(&self, product_id: Uuid) -> Result<bool> {
         let result = sqlx::query(r#"DELETE FROM "ob-poc".products WHERE product_id = $1"#)
-            .bind(product_id).execute(&self.pool).await.context("Failed to delete Product")?;
-        if result.rows_affected() > 0 { info!("Deleted Product {}", product_id); }
+            .bind(product_id)
+            .execute(&self.pool)
+            .await
+            .context("Failed to delete Product")?;
+        if result.rows_affected() > 0 {
+            info!("Deleted Product {}", product_id);
+        }
         Ok(result.rows_affected() > 0)
     }
 }

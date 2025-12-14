@@ -278,12 +278,12 @@ mod tests {
 
     #[test]
     fn test_normalize_entity_type() {
-        assert_eq!(normalize_entity_type("cbu"), "cbu");
-        assert_eq!(normalize_entity_type("CBU"), "cbu");
-        assert_eq!(normalize_entity_type("person"), "person");
-        assert_eq!(normalize_entity_type("proper_person"), "person");
-        assert_eq!(normalize_entity_type("company"), "legal_entity");
-        assert_eq!(normalize_entity_type("unknown"), "unknown");
+        assert_eq!(normalize_entity_type("cbu"), "CBU");
+        assert_eq!(normalize_entity_type("CBU"), "CBU");
+        assert_eq!(normalize_entity_type("person"), "PERSON");
+        assert_eq!(normalize_entity_type("proper_person"), "PERSON");
+        assert_eq!(normalize_entity_type("company"), "LEGAL_ENTITY");
+        assert_eq!(normalize_entity_type("unknown"), "UNKNOWN");
     }
 
     #[test]

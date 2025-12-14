@@ -142,7 +142,8 @@ impl GenericCrudExecutor {
     ) -> Result<GenericExecutionResult> {
         tracing::debug!(
             "DBG GenericCrudExecutor::execute ENTER {}.{}",
-            verb.domain, verb.verb
+            verb.domain,
+            verb.verb
         );
 
         let crud = match &verb.behavior {
@@ -159,7 +160,9 @@ impl GenericCrudExecutor {
 
         tracing::debug!(
             "DBG GenericCrudExecutor: operation={:?} table={}.{}",
-            crud.operation, crud.schema, crud.table
+            crud.operation,
+            crud.schema,
+            crud.table
         );
 
         let result = match crud.operation {

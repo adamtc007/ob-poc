@@ -104,7 +104,7 @@ pub fn topological_sort(
             if vc.verb.starts_with("create") || vc.verb == "ensure" {
                 // Check for generic :id or domain-specific id (e.g. :cbu-id for cbu domain)
                 let domain_id_arg = format!("{}-id", vc.domain);
-                
+
                 for arg in &vc.arguments {
                     if arg.key == "id" || arg.key == domain_id_arg {
                         if let Some(val_str) = extract_literal_string_or_uuid(&arg.value) {
@@ -132,12 +132,7 @@ pub fn topological_sort(
                 // Check for implicit key references (literals that match a produced PK)
                 // Only if NOT a creation verb (or if it is, ensure we don't depend on ourselves)
                 // Actually, even creators might depend on other entities (e.g. create-entity :cbu-id "...")
-                collect_implicit_refs(
-                    &arg.value,
-                    &pk_to_stmt,
-                    idx,
-                    &mut deps
-                );
+                collect_implicit_refs(&arg.value, &pk_to_stmt, idx, &mut deps);
             }
         }
     }
@@ -315,12 +310,7 @@ pub fn topological_sort_with_lifecycle(
                 );
 
                 // Check for implicit key references (literals that match a produced PK)
-                collect_implicit_refs(
-                    &arg.value,
-                    &pk_to_stmt,
-                    idx,
-                    &mut deps
-                );
+                collect_implicit_refs(&arg.value, &pk_to_stmt, idx, &mut deps);
             }
 
             // Lifecycle dependencies: requires_states
@@ -628,9 +618,9 @@ fn collect_implicit_refs(
             }
         }
         AstNode::Nested(vc) => {
-             for arg in &vc.arguments {
-                 collect_implicit_refs(&arg.value, pk_to_stmt, current_idx, deps);
-             }
+            for arg in &vc.arguments {
+                collect_implicit_refs(&arg.value, pk_to_stmt, current_idx, deps);
+            }
         }
         _ => {}
     }

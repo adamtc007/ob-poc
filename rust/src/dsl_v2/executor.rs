@@ -326,7 +326,10 @@ impl DslExecutor {
 
             tracing::debug!(
                 "DBG execute_plan: step {} verb={}.{} bind_as={:?}",
-                step_index, &vc.domain, &vc.verb, &step.bind_as
+                step_index,
+                &vc.domain,
+                &vc.verb,
+                &step.bind_as
             );
 
             // Trace each verb execution

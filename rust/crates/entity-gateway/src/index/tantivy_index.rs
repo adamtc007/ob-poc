@@ -267,8 +267,7 @@ impl SearchIndex for TantivyIndex {
                         Box::new(TermQuery::new(term, Default::default()))
                     } else {
                         // IndexMode::Trigram: word tokenizer, use QueryParser for word matching
-                        let query_parser =
-                            QueryParser::for_index(&self.index, vec![exact_field]);
+                        let query_parser = QueryParser::for_index(&self.index, vec![exact_field]);
                         match query_parser.parse_query(&input_normalized) {
                             Ok(q) => q,
                             Err(_) => {

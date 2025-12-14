@@ -136,8 +136,12 @@ impl MockExtractionService {
         }
     }
 
-    pub fn with_mock_data(mut self, #[allow(dead_code)]
-    doc_id: Uuid, attr_id: Uuid, value: serde_json::Value) -> Self {
+    pub fn with_mock_data(
+        mut self,
+        #[allow(dead_code)] doc_id: Uuid,
+        attr_id: Uuid,
+        value: serde_json::Value,
+    ) -> Self {
         self.mock_data.insert((doc_id, attr_id), value);
         self
     }
@@ -317,4 +321,3 @@ struct AttributeDefinition {
     name: String,
     data_type: String,
 }
-

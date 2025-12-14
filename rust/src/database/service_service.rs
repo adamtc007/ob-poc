@@ -37,8 +37,12 @@ pub struct ServiceService {
 }
 
 impl ServiceService {
-    pub fn new(pool: PgPool) -> Self { Self { pool } }
-    pub fn pool(&self) -> &PgPool { &self.pool }
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+    pub fn pool(&self) -> &PgPool {
+        &self.pool
+    }
 
     pub async fn create_service(&self, fields: &NewServiceFields) -> Result<Uuid> {
         let service_id = Uuid::new_v4();
@@ -60,22 +64,38 @@ impl ServiceService {
             .bind(name).fetch_optional(&self.pool).await.context("Failed to get Service by name")
     }
 
-    pub async fn list_services(&self, limit: Option<i32>, offset: Option<i32>) -> Result<Vec<ServiceRow>> {
+    pub async fn list_services(
+        &self,
+        limit: Option<i32>,
+        offset: Option<i32>,
+    ) -> Result<Vec<ServiceRow>> {
         sqlx::query_as::<_, ServiceRow>(r#"SELECT service_id, name, description, service_code, service_category, sla_definition, is_active, created_at, updated_at FROM "ob-poc".services ORDER BY created_at DESC LIMIT $1 OFFSET $2"#)
             .bind(limit.unwrap_or(100)).bind(offset.unwrap_or(0)).fetch_all(&self.pool).await.context("Failed to list Services")
     }
 
-    pub async fn update_service(&self, service_id: Uuid, name: Option<&str>, description: Option<&str>) -> Result<bool> {
+    pub async fn update_service(
+        &self,
+        service_id: Uuid,
+        name: Option<&str>,
+        description: Option<&str>,
+    ) -> Result<bool> {
         let result = sqlx::query(r#"UPDATE "ob-poc".services SET name = COALESCE($1, name), description = COALESCE($2, description), updated_at = NOW() WHERE service_id = $3"#)
             .bind(name).bind(description).bind(service_id).execute(&self.pool).await.context("Failed to update Service")?;
-        if result.rows_affected() > 0 { info!("Updated Service {}", service_id); }
+        if result.rows_affected() > 0 {
+            info!("Updated Service {}", service_id);
+        }
         Ok(result.rows_affected() > 0)
     }
 
     pub async fn delete_service(&self, service_id: Uuid) -> Result<bool> {
         let result = sqlx::query(r#"DELETE FROM "ob-poc".services WHERE service_id = $1"#)
-            .bind(service_id).execute(&self.pool).await.context("Failed to delete Service")?;
-        if result.rows_affected() > 0 { info!("Deleted Service {}", service_id); }
+            .bind(service_id)
+            .execute(&self.pool)
+            .await
+            .context("Failed to delete Service")?;
+        if result.rows_affected() > 0 {
+            info!("Deleted Service {}", service_id);
+        }
         Ok(result.rows_affected() > 0)
     }
 

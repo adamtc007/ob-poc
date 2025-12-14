@@ -76,7 +76,7 @@ impl InputHandler {
         screen_rect: Rect,
     ) -> bool {
         let mut needs_repaint = false;
-        
+
         // Debug: log shift state and drag state
         #[cfg(target_arch = "wasm32")]
         {
@@ -142,7 +142,7 @@ impl InputHandler {
             }
         }
 
-                // Handle drag for moving/resizing nodes or panning
+        // Handle drag for moving/resizing nodes or panning
         if response.dragged() {
             let delta = response.drag_delta();
             if delta.length() > 0.0 {
@@ -168,12 +168,11 @@ impl InputHandler {
                     } else {
                         // No shift = move mode
                         if let Some(node) = graph.get_node_mut(node_id) {
-                            if let (Some(start_world), Some(start_off), Some(pos)) = (
-                                state.drag_start_world,
-                                state.drag_start_offset,
-                                pointer_pos,
-                            ) {
-                                let world_delta = camera.screen_to_world(pos, screen_rect) - start_world;
+                            if let (Some(start_world), Some(start_off), Some(pos)) =
+                                (state.drag_start_world, state.drag_start_offset, pointer_pos)
+                            {
+                                let world_delta =
+                                    camera.screen_to_world(pos, screen_rect) - start_world;
                                 node.offset = start_off + world_delta;
                                 node.position = node.base_position + node.offset;
                                 graph.recompute_bounds();
@@ -209,7 +208,7 @@ impl InputHandler {
             state.is_panning = false;
         }
 
-// Clear drag/resize on mouse up
+        // Clear drag/resize on mouse up
         let primary_down = response.ctx.input(|i| i.pointer.primary_down());
         if !primary_down {
             state.dragging_node = None;

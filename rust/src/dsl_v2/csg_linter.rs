@@ -669,7 +669,7 @@ impl CsgLinter {
                         // Actually, attaching to CBU in REPL via :cbu <id> doesn't use standard verb.
                         // But (cbu.ensure) might optionally take an ID.
                         // Generally, reusing an ID explicitly IS the anti-pattern, we prefer resolving by name or @ref.
-                        
+
                         diagnostics.push(Diagnostic {
                             severity: Severity::Warning,
                             span: self.span_to_source_span(&arg.span, source),
@@ -982,11 +982,14 @@ mod tests {
         let source = r#"(cbu.ensure :name "Test" :id "550e8400-e29b-41d4-a716-446655440000")"#;
         let ast = crate::dsl_v2::parse_program(source).unwrap();
         let context = crate::dsl_v2::validation::ValidationContext::default();
-        
+
         let result = linter.lint(ast, &context, source).await;
-        
+
         assert!(result.has_warnings(), "Should have warnings");
-        let warning = result.diagnostics.iter().find(|d| d.code == crate::dsl_v2::validation::DiagnosticCode::HardcodedUuid);
+        let warning = result
+            .diagnostics
+            .iter()
+            .find(|d| d.code == crate::dsl_v2::validation::DiagnosticCode::HardcodedUuid);
         assert!(warning.is_some(), "Should have HardcodedUuid warning");
     }
 }
