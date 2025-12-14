@@ -1,0 +1,182 @@
+# Periodic Review Workflow
+# Scheduled KYC refresh based on risk rating
+
+workflow: periodic_review
+version: 1
+description: Scheduled periodic KYC review
+
+trigger:
+  event: periodic-review.due
+  conditions:
+    - field: review_type
+      in: [ANNUAL, TRIENNIAL, RISK_BASED]
+
+states:
+  SCHEDULED:
+    description: Review scheduled, not yet started
+    initial: true
+
+  INITIATED:
+    description: Review initiated, case created
+
+  DATA_REFRESH:
+    description: Refreshing entity and document data
+
+  SCREENING_REFRESH:
+    description: Running updated screening checks
+
+  CHANGE_ANALYSIS:
+    description: Analyzing changes since last review
+
+  REVIEW_COMPLETE:
+    description: Review complete, no material changes
+    terminal: true
+
+  ESCALATED_TO_FULL_REVIEW:
+    description: Material changes found, full review required
+    terminal: true
+
+  DEFERRED:
+    description: Review deferred (with approval)
+
+transitions:
+  - from: SCHEDULED
+    to: INITIATED
+    auto: true
+    description: Auto-initiate when due date reached
+
+  - from: INITIATED
+    to: DATA_REFRESH
+    guard: case_created
+    description: KYC case created for review
+
+  - from: DATA_REFRESH
+    to: SCREENING_REFRESH
+    guard: data_refreshed
+    description: Data refresh complete
+
+  - from: SCREENING_REFRESH
+    to: CHANGE_ANALYSIS
+    guard: screening_refreshed
+    description: Screening refresh complete
+
+  - from: CHANGE_ANALYSIS
+    to: REVIEW_COMPLETE
+    guard: no_material_changes
+    description: No material changes, close review
+
+  - from: CHANGE_ANALYSIS
+    to: ESCALATED_TO_FULL_REVIEW
+    guard: material_changes_found
+    description: Material changes require full review
+
+  # Deferral path
+  - from: SCHEDULED
+    to: DEFERRED
+    manual: true
+    guard: deferral_approved
+    description: Defer review with approval
+
+  - from: DEFERRED
+    to: SCHEDULED
+    manual: true
+    description: Reschedule deferred review
+
+requirements:
+  INITIATED:
+    - type: case_exists
+      case_type: PERIODIC_REVIEW
+      description: KYC case created for this review
+
+  DATA_REFRESH:
+    - type: entity_data_current
+      max_age_days: 30
+      description: Entity data refreshed within 30 days
+
+    - type: documents_reviewed
+      description: Document validity checked
+
+  SCREENING_REFRESH:
+    - type: all_screenings_current
+      max_age_days: 30
+      description: All screenings run within 30 days
+
+  CHANGE_ANALYSIS:
+    - type: change_log_reviewed
+      description: All changes since last review documented
+
+    - type: risk_reassessment_complete
+      description: Risk rating reassessed
+
+  REVIEW_COMPLETE:
+    - type: sign_off_recorded
+      description: Analyst sign-off recorded
+
+    - type: next_review_scheduled
+      description: Next review date set
+
+  DEFERRED:
+    - type: deferral_reason_documented
+      description: Deferral reason documented
+
+    - type: deferral_approval_recorded
+      description: Deferral approved by authorized person
+
+actions:
+  SCHEDULED:
+    - action: initiate_review
+      verb: periodic-review.initiate
+      description: Initiate the review
+
+    - action: defer_review
+      verb: periodic-review.defer
+      description: Request deferral
+
+  INITIATED:
+    - action: create_case
+      verb: kyc-case.create
+      description: Create KYC case for review
+
+  DATA_REFRESH:
+    - action: refresh_entity
+      verb: entity-workstream.refresh
+      description: Refresh entity data
+
+    - action: request_updated_docs
+      verb: document.request
+      description: Request updated documents
+
+    - action: verify_document
+      verb: document.verify
+      description: Verify document still valid
+
+  SCREENING_REFRESH:
+    - action: run_screening
+      verb: case-screening.run
+      description: Run screening refresh
+
+    - action: review_hit
+      verb: case-screening.review-hit
+      description: Review any new hits
+
+  CHANGE_ANALYSIS:
+    - action: log_change
+      verb: periodic-review.log-change
+      description: Log material change
+
+    - action: reassess_risk
+      verb: kyc-case.set-risk-rating
+      description: Reassess risk rating
+
+    - action: complete_review
+      verb: periodic-review.complete
+      description: Complete review (no changes)
+
+    - action: escalate_to_full
+      verb: periodic-review.escalate
+      description: Escalate to full review
+
+  DEFERRED:
+    - action: reschedule
+      verb: periodic-review.reschedule
+      description: Reschedule deferred review

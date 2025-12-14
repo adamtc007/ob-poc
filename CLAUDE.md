@@ -3322,13 +3322,61 @@ rust/src/workflow/
 ├── mod.rs              # Module exports
 ├── definition.rs       # WorkflowDefinition, parsing YAML
 ├── state.rs            # WorkflowInstance, StateTransition, Blocker types
-├── guards.rs           # GuardEvaluator with guard implementations
+├── guards.rs           # GuardEvaluator (uses requirements + custom guards)
+├── requirements.rs     # RequirementEvaluator (YAML-driven checks)
 ├── engine.rs           # WorkflowEngine core logic
 └── repository.rs       # Database persistence
 
 rust/config/workflows/
 └── kyc_onboarding.yaml # KYC onboarding workflow definition
 ```
+
+### YAML-Driven Requirements
+
+Guards are now data-driven from YAML requirements. Add new requirements by editing YAML, not Rust code.
+
+**Requirement Types:**
+
+| Type | YAML Example | What It Checks |
+|------|--------------|----------------|
+| `role_count` | `{type: role_count, role: DIRECTOR, min: 1}` | Minimum entities with role |
+| `all_entities_screened` | `{type: all_entities_screened}` | All linked entities screened |
+| `document_set` | `{type: document_set, documents: [CERT_OF_INC, REG_OF_DIRS]}` | CBU-level docs present |
+| `per_entity_document` | `{type: per_entity_document, entity_type: DIRECTOR, documents: [PASSPORT]}` | Docs per entity with role |
+| `ownership_complete` | `{type: ownership_complete, threshold: 100}` | Ownership sums to threshold |
+| `all_ubos_verified` | `{type: all_ubos_verified}` | All UBOs verified/proven |
+| `no_open_alerts` | `{type: no_open_alerts}` | No unresolved screening hits |
+| `case_checklist_complete` | `{type: case_checklist_complete}` | All doc requests fulfilled |
+
+**Example YAML:**
+```yaml
+requirements:
+  ENTITY_COLLECTION:
+    - type: role_count
+      role: DIRECTOR
+      min: 1
+      description: At least one director
+    - type: role_count
+      role: AUTHORIZED_SIGNATORY
+      min: 1
+  
+  DOCUMENT_COLLECTION:
+    - type: document_set
+      documents:
+        - CERTIFICATE_OF_INCORPORATION
+        - REGISTER_OF_DIRECTORS
+    - type: per_entity_document
+      entity_type: DIRECTOR
+      documents:
+        - PASSPORT
+```
+
+**How It Works:**
+1. Engine calls `GuardEvaluator.evaluate_for_transition()`
+2. Evaluator gets requirements for target state from YAML
+3. `RequirementEvaluator` checks each requirement against DB
+4. If transition has a named guard, also evaluates that
+5. Returns combined blockers from requirements + custom guard
 
 ### Blocker Types
 

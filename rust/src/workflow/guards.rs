@@ -1,46 +1,166 @@
 //! Guard Evaluation
 //!
-//! Guards determine if a workflow transition is allowed.
-//! Each guard evaluates conditions and returns blockers if not met.
+//! Guards now evaluate requirements from YAML definitions.
+//! Two-phase evaluation:
+//! 1. Evaluate requirements for target state from workflow definition
+//! 2. If transition has a named custom guard, also run that
+//!
+//! This makes guards data-driven - add requirements to YAML, not code.
 
 use sqlx::PgPool;
+use std::collections::HashMap;
+use std::sync::Arc;
 use uuid::Uuid;
 
+use super::definition::WorkflowDefinition;
+use super::requirements::RequirementEvaluator;
 use super::state::{Blocker, BlockerType};
+use super::WorkflowError;
 
 /// Evaluates transition guards against the database
 pub struct GuardEvaluator {
     pool: PgPool,
+    requirement_evaluator: RequirementEvaluator,
+    definitions: Arc<HashMap<String, WorkflowDefinition>>,
 }
 
 impl GuardEvaluator {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+    /// Create a new guard evaluator with workflow definitions
+    pub fn new(pool: PgPool, definitions: Arc<HashMap<String, WorkflowDefinition>>) -> Self {
+        Self {
+            requirement_evaluator: RequirementEvaluator::new(pool.clone()),
+            pool,
+            definitions,
+        }
     }
 
-    /// Evaluate a guard by name
+    /// Evaluate guard for a transition
+    ///
+    /// Two-phase evaluation:
+    /// 1. Evaluate requirements for the TARGET state from YAML
+    /// 2. If transition has a named custom guard, also run that
+    pub async fn evaluate_for_transition(
+        &self,
+        workflow_id: &str,
+        from_state: &str,
+        to_state: &str,
+        subject_id: Uuid,
+        subject_type: &str,
+    ) -> Result<GuardResult, WorkflowError> {
+        let definition = match self.definitions.get(workflow_id) {
+            Some(d) => d,
+            None => {
+                return Ok(GuardResult::failed(format!(
+                    "Unknown workflow: {}",
+                    workflow_id
+                )))
+            }
+        };
+
+        let mut all_blockers = Vec::new();
+
+        // 1. Evaluate requirements for TARGET state
+        if let Some(requirements) = definition.requirements.get(to_state) {
+            let blockers = self
+                .requirement_evaluator
+                .evaluate_all(requirements, subject_id)
+                .await?;
+            all_blockers.extend(blockers);
+        }
+
+        // 2. If transition has a named guard, also run that
+        if let Some(transition) = definition.get_transition(from_state, to_state) {
+            if let Some(guard_name) = &transition.guard {
+                let custom_result = self
+                    .evaluate_custom_guard(guard_name, subject_id, subject_type)
+                    .await?;
+                all_blockers.extend(custom_result.blockers);
+            }
+        }
+
+        if all_blockers.is_empty() {
+            Ok(GuardResult::passed())
+        } else {
+            Ok(GuardResult::blocked(all_blockers))
+        }
+    }
+
+    /// Legacy: Evaluate a guard by name only (for backward compatibility)
     pub async fn evaluate(
         &self,
         guard_name: &str,
         subject_id: Uuid,
-        _subject_type: &str,
+        subject_type: &str,
     ) -> Result<GuardResult, sqlx::Error> {
+        self.evaluate_custom_guard(guard_name, subject_id, subject_type)
+            .await
+            .map_err(|e| match e {
+                WorkflowError::Database(e) => e,
+                _ => sqlx::Error::Protocol(e.to_string()),
+            })
+    }
+
+    /// Evaluate a custom named guard (for complex logic not expressible as requirements)
+    async fn evaluate_custom_guard(
+        &self,
+        guard_name: &str,
+        subject_id: Uuid,
+        _subject_type: &str,
+    ) -> Result<GuardResult, WorkflowError> {
         match guard_name {
+            // Case status checks (can't be expressed as simple requirements)
+            "review_approved" => self.check_case_status(subject_id, "APPROVED").await,
+            "review_rejected" => self.check_case_status(subject_id, "REJECTED").await,
+
+            // Legacy guards - now mostly handled by requirements, but keep for compatibility
             "entities_complete" => self.check_entities_complete(subject_id).await,
             "screening_complete" => self.check_screening_complete(subject_id).await,
             "documents_complete" => self.check_documents_complete(subject_id).await,
             "ubo_complete" => self.check_ubo_complete(subject_id).await,
-            "review_approved" => self.check_review_approved(subject_id).await,
-            "review_rejected" => self.check_review_rejected(subject_id).await,
-            _ => Ok(GuardResult::failed(format!(
-                "Unknown guard: {}",
-                guard_name
-            ))),
+
+            _ => {
+                // Unknown guard - log warning but don't block
+                tracing::warn!("Unknown custom guard: {}", guard_name);
+                Ok(GuardResult::passed())
+            }
         }
     }
 
-    /// Check if minimum entity/role requirements are met
-    async fn check_entities_complete(&self, cbu_id: Uuid) -> Result<GuardResult, sqlx::Error> {
+    /// Check if case has specific status
+    async fn check_case_status(
+        &self,
+        cbu_id: Uuid,
+        required_status: &str,
+    ) -> Result<GuardResult, WorkflowError> {
+        let case_status: Option<String> = sqlx::query_scalar(
+            r#"
+            SELECT status FROM kyc.cases
+            WHERE cbu_id = $1
+            ORDER BY opened_at DESC
+            LIMIT 1
+            "#,
+        )
+        .bind(cbu_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(WorkflowError::Database)?;
+
+        if case_status.as_deref() == Some(required_status) {
+            Ok(GuardResult::passed())
+        } else {
+            Ok(GuardResult::blocked(vec![Blocker::new(
+                BlockerType::ManualApprovalRequired,
+                format!("Case must be {}", required_status),
+            )
+            .with_resolution("kyc-case.update-status")]))
+        }
+    }
+
+    // --- Legacy guard implementations (for backward compatibility) ---
+    // These are now mostly replaced by YAML requirements but kept for
+    // workflows that still use named guards directly
+
+    async fn check_entities_complete(&self, cbu_id: Uuid) -> Result<GuardResult, WorkflowError> {
         let mut blockers = Vec::new();
 
         // Check for at least one director
@@ -54,7 +174,8 @@ impl GuardEvaluator {
         )
         .bind(cbu_id)
         .fetch_one(&self.pool)
-        .await?;
+        .await
+        .map_err(WorkflowError::Database)?;
 
         if director_count < 1 {
             blockers.push(
@@ -81,7 +202,8 @@ impl GuardEvaluator {
         )
         .bind(cbu_id)
         .fetch_one(&self.pool)
-        .await?;
+        .await
+        .map_err(WorkflowError::Database)?;
 
         if sig_count < 1 {
             blockers.push(
@@ -104,8 +226,7 @@ impl GuardEvaluator {
         }
     }
 
-    /// Check if all linked entities have been screened
-    async fn check_screening_complete(&self, cbu_id: Uuid) -> Result<GuardResult, sqlx::Error> {
+    async fn check_screening_complete(&self, cbu_id: Uuid) -> Result<GuardResult, WorkflowError> {
         // Find entities linked to this CBU that need screening
         let unscreened: Vec<(Uuid, String)> = sqlx::query_as(
             r#"
@@ -122,7 +243,8 @@ impl GuardEvaluator {
         )
         .bind(cbu_id)
         .fetch_all(&self.pool)
-        .await?;
+        .await
+        .map_err(WorkflowError::Database)?;
 
         if unscreened.is_empty() {
             // Also check for unresolved alerts via KYC screenings
@@ -138,7 +260,8 @@ impl GuardEvaluator {
             )
             .bind(cbu_id)
             .fetch_all(&self.pool)
-            .await?;
+            .await
+            .map_err(WorkflowError::Database)?;
 
             if open_alerts.is_empty() {
                 return Ok(GuardResult::passed());
@@ -177,8 +300,7 @@ impl GuardEvaluator {
         Ok(GuardResult::blocked(blockers))
     }
 
-    /// Check if required documents are present
-    async fn check_documents_complete(&self, cbu_id: Uuid) -> Result<GuardResult, sqlx::Error> {
+    async fn check_documents_complete(&self, cbu_id: Uuid) -> Result<GuardResult, WorkflowError> {
         let mut blockers = Vec::new();
 
         // Check CBU-level required documents
@@ -202,7 +324,8 @@ impl GuardEvaluator {
             .bind(cbu_id)
             .bind(doc_type)
             .fetch_one(&self.pool)
-            .await?;
+            .await
+            .map_err(WorkflowError::Database)?;
 
             if !exists {
                 blockers.push(
@@ -231,7 +354,8 @@ impl GuardEvaluator {
         )
         .bind(cbu_id)
         .fetch_all(&self.pool)
-        .await?;
+        .await
+        .map_err(WorkflowError::Database)?;
 
         for (director_id, director_name) in directors {
             // Check passport
@@ -248,7 +372,8 @@ impl GuardEvaluator {
             )
             .bind(director_id)
             .fetch_one(&self.pool)
-            .await?;
+            .await
+            .map_err(WorkflowError::Database)?;
 
             if !has_passport {
                 blockers.push(
@@ -272,8 +397,7 @@ impl GuardEvaluator {
         }
     }
 
-    /// Check if UBO determination is complete
-    async fn check_ubo_complete(&self, cbu_id: Uuid) -> Result<GuardResult, sqlx::Error> {
+    async fn check_ubo_complete(&self, cbu_id: Uuid) -> Result<GuardResult, WorkflowError> {
         let mut blockers = Vec::new();
 
         // Check ownership totals to approximately 100%
@@ -287,7 +411,8 @@ impl GuardEvaluator {
         )
         .bind(cbu_id)
         .fetch_one(&self.pool)
-        .await?;
+        .await
+        .map_err(WorkflowError::Database)?;
 
         let total: f64 = total_ownership
             .map(|d| d.to_string().parse().unwrap_or(0.0))
@@ -318,7 +443,8 @@ impl GuardEvaluator {
         )
         .bind(cbu_id)
         .fetch_all(&self.pool)
-        .await?;
+        .await
+        .map_err(WorkflowError::Database)?;
 
         for (ubo_id, name) in unverified_ubos {
             blockers.push(
@@ -338,50 +464,6 @@ impl GuardEvaluator {
             Ok(GuardResult::passed())
         } else {
             Ok(GuardResult::blocked(blockers))
-        }
-    }
-
-    /// Check if case has been approved
-    async fn check_review_approved(&self, cbu_id: Uuid) -> Result<GuardResult, sqlx::Error> {
-        let case_status: Option<String> = sqlx::query_scalar(
-            r#"
-            SELECT status FROM kyc.cases
-            WHERE cbu_id = $1
-            ORDER BY opened_at DESC
-            LIMIT 1
-            "#,
-        )
-        .bind(cbu_id)
-        .fetch_optional(&self.pool)
-        .await?;
-
-        match case_status.as_deref() {
-            Some("APPROVED") => Ok(GuardResult::passed()),
-            _ => Ok(GuardResult::blocked(vec![Blocker::new(
-                BlockerType::ManualApprovalRequired,
-                "Analyst approval required",
-            )
-            .with_resolution("kyc-case.update-status")])),
-        }
-    }
-
-    /// Check if case has been rejected
-    async fn check_review_rejected(&self, cbu_id: Uuid) -> Result<GuardResult, sqlx::Error> {
-        let case_status: Option<String> = sqlx::query_scalar(
-            r#"
-            SELECT status FROM kyc.cases
-            WHERE cbu_id = $1
-            ORDER BY opened_at DESC
-            LIMIT 1
-            "#,
-        )
-        .bind(cbu_id)
-        .fetch_optional(&self.pool)
-        .await?;
-
-        match case_status.as_deref() {
-            Some("REJECTED") => Ok(GuardResult::passed()),
-            _ => Ok(GuardResult::blocked(vec![])), // Empty blockers means just not passed
         }
     }
 }

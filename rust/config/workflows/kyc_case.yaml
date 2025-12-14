@@ -1,0 +1,306 @@
+# KYC Case Workflow
+# Manages the lifecycle of a KYC review case
+
+workflow: kyc_case
+version: 1
+description: KYC case review lifecycle
+
+trigger:
+  event: kyc-case.created
+  conditions:
+    - field: case_type
+      in: [INITIAL, PERIODIC_REVIEW, TRIGGER_EVENT, ENHANCED_DUE_DILIGENCE]
+
+states:
+  OPENED:
+    description: Case opened, awaiting assignment
+    initial: true
+
+  ASSIGNED:
+    description: Case assigned to analyst
+
+  DATA_GATHERING:
+    description: Collecting entity data and documents
+
+  SCREENING:
+    description: Running AML/PEP/sanctions screening
+
+  ANALYSIS:
+    description: Analyst reviewing findings
+
+  ESCALATED:
+    description: Escalated for senior review
+
+  PENDING_APPROVAL:
+    description: Awaiting final approval
+
+  APPROVED:
+    description: Case approved, onboarding can proceed
+    terminal: true
+
+  REJECTED:
+    description: Case rejected, cannot onboard
+    terminal: true
+
+  ON_HOLD:
+    description: Case on hold pending external input
+
+  CLOSED_NO_ACTION:
+    description: Case closed without decision (e.g., client withdrew)
+    terminal: true
+
+transitions:
+  # Normal flow
+  - from: OPENED
+    to: ASSIGNED
+    guard: analyst_assigned
+    description: Case assigned to analyst
+
+  - from: ASSIGNED
+    to: DATA_GATHERING
+    auto: true
+    description: Begin data gathering
+
+  - from: DATA_GATHERING
+    to: SCREENING
+    guard: data_gathering_complete
+    description: Data collection complete, begin screening
+
+  - from: SCREENING
+    to: ANALYSIS
+    guard: screening_complete
+    description: Screening complete, begin analysis
+
+  - from: ANALYSIS
+    to: PENDING_APPROVAL
+    guard: analysis_complete
+    description: Analysis complete, ready for approval
+
+  - from: PENDING_APPROVAL
+    to: APPROVED
+    guard: approval_granted
+    manual: true
+    description: Final approval
+
+  - from: PENDING_APPROVAL
+    to: REJECTED
+    guard: rejection_confirmed
+    manual: true
+    description: Case rejected
+
+  # Escalation paths
+  - from: ANALYSIS
+    to: ESCALATED
+    manual: true
+    description: Escalate for senior review
+
+  - from: ESCALATED
+    to: ANALYSIS
+    manual: true
+    description: Return to analyst after escalation review
+
+  - from: ESCALATED
+    to: PENDING_APPROVAL
+    guard: escalation_resolved
+    description: Escalation resolved, proceed to approval
+
+  - from: ESCALATED
+    to: REJECTED
+    manual: true
+    description: Reject after escalation review
+
+  # Hold states
+  - from: DATA_GATHERING
+    to: ON_HOLD
+    manual: true
+    description: Put on hold (awaiting client response)
+
+  - from: SCREENING
+    to: ON_HOLD
+    manual: true
+    description: Put on hold (external check pending)
+
+  - from: ANALYSIS
+    to: ON_HOLD
+    manual: true
+    description: Put on hold (additional info needed)
+
+  - from: ON_HOLD
+    to: DATA_GATHERING
+    manual: true
+    description: Resume from hold to data gathering
+
+  - from: ON_HOLD
+    to: SCREENING
+    manual: true
+    description: Resume from hold to screening
+
+  - from: ON_HOLD
+    to: ANALYSIS
+    manual: true
+    description: Resume from hold to analysis
+
+  # Cancellation
+  - from: OPENED
+    to: CLOSED_NO_ACTION
+    manual: true
+    description: Close without action
+
+  - from: ASSIGNED
+    to: CLOSED_NO_ACTION
+    manual: true
+    description: Close without action
+
+  - from: ON_HOLD
+    to: CLOSED_NO_ACTION
+    manual: true
+    description: Close after extended hold
+
+requirements:
+  ASSIGNED:
+    - type: field_present
+      fields:
+        - assigned_to
+      description: Analyst must be assigned
+
+  DATA_GATHERING:
+    - type: entity_workstreams_created
+      description: Entity workstreams created for all linked entities
+
+  SCREENING:
+    - type: all_workstreams_data_complete
+      description: All entity workstreams have required data
+
+  ANALYSIS:
+    - type: all_screenings_complete
+      description: All screening checks completed
+
+    - type: no_pending_hits
+      description: All screening hits reviewed
+
+  PENDING_APPROVAL:
+    - type: risk_rating_set
+      description: Case risk rating determined
+
+    - type: checklist_complete
+      description: All checklist items completed
+
+    - type: no_open_red_flags
+      description: All red flags resolved or mitigated
+
+  APPROVED:
+    - type: approval_recorded
+      description: Approval decision recorded with rationale
+
+  REJECTED:
+    - type: rejection_recorded
+      description: Rejection decision recorded with rationale
+
+actions:
+  OPENED:
+    - action: assign_analyst
+      verb: kyc-case.assign
+      description: Assign case to analyst
+
+    - action: set_priority
+      verb: kyc-case.set-priority
+      description: Set case priority
+
+  ASSIGNED:
+    - action: create_workstream
+      verb: entity-workstream.create
+      description: Create entity workstream
+
+    - action: add_checklist_item
+      verb: kyc-case.add-checklist-item
+      description: Add checklist item
+
+  DATA_GATHERING:
+    - action: catalog_document
+      verb: document.catalog
+      description: Catalog a document
+
+    - action: extract_document
+      verb: document.extract
+      description: Extract data from document
+
+    - action: update_workstream
+      verb: entity-workstream.update
+      description: Update workstream data
+
+    - action: request_info
+      verb: kyc-case.request-info
+      description: Request additional information
+
+  SCREENING:
+    - action: run_screening
+      verb: case-screening.run
+      description: Run screening check
+
+    - action: review_hit
+      verb: case-screening.review-hit
+      description: Review screening hit
+
+    - action: clear_hit
+      verb: case-screening.clear-hit
+      description: Clear hit as false positive
+
+    - action: confirm_hit
+      verb: case-screening.confirm-hit
+      description: Confirm hit as true match
+
+  ANALYSIS:
+    - action: raise_red_flag
+      verb: red-flag.raise
+      description: Raise a red flag
+
+    - action: mitigate_red_flag
+      verb: red-flag.mitigate
+      description: Mitigate a red flag
+
+    - action: set_risk_rating
+      verb: kyc-case.set-risk-rating
+      description: Set case risk rating
+
+    - action: complete_checklist
+      verb: kyc-case.complete-checklist-item
+      description: Complete checklist item
+
+    - action: add_note
+      verb: kyc-case.add-note
+      description: Add analyst note
+
+    - action: escalate
+      verb: kyc-case.escalate
+      description: Escalate case
+
+  ESCALATED:
+    - action: add_escalation_note
+      verb: kyc-case.add-note
+      description: Add escalation review note
+
+    - action: resolve_escalation
+      verb: kyc-case.resolve-escalation
+      description: Resolve escalation
+
+  PENDING_APPROVAL:
+    - action: approve
+      verb: kyc-case.approve
+      description: Approve the case
+
+    - action: reject
+      verb: kyc-case.reject
+      description: Reject the case
+
+    - action: request_changes
+      verb: kyc-case.request-changes
+      description: Request changes before approval
+
+  ON_HOLD:
+    - action: add_hold_note
+      verb: kyc-case.add-note
+      description: Add note about hold reason
+
+    - action: resume
+      verb: kyc-case.resume
+      description: Resume case from hold

@@ -1,0 +1,209 @@
+# UBO Determination Workflow
+# Beneficial ownership identification and verification
+
+workflow: ubo_determination
+version: 1
+description: Beneficial ownership determination and verification
+
+trigger:
+  event: ubo.determination-requested
+  conditions:
+    - field: trigger_type
+      in: [INITIAL, CHANGE_EVENT, PERIODIC_REFRESH]
+
+states:
+  INITIATED:
+    description: UBO determination initiated
+    initial: true
+
+  OWNERSHIP_MAPPING:
+    description: Mapping ownership structure
+
+  CHAIN_TRACING:
+    description: Tracing ownership chains to natural persons
+
+  UBO_IDENTIFICATION:
+    description: Identifying beneficial owners (>25% threshold)
+
+  VERIFICATION:
+    description: Verifying identified UBOs
+
+  DOCUMENTATION:
+    description: Documenting UBO determination rationale
+
+  COMPLETE:
+    description: UBO determination complete
+    terminal: true
+
+  BLOCKED:
+    description: Cannot complete - missing information
+    terminal: true
+
+transitions:
+  - from: INITIATED
+    to: OWNERSHIP_MAPPING
+    auto: true
+    description: Begin ownership mapping
+
+  - from: OWNERSHIP_MAPPING
+    to: CHAIN_TRACING
+    guard: ownership_mapped
+    description: Direct ownership captured
+
+  - from: CHAIN_TRACING
+    to: UBO_IDENTIFICATION
+    guard: chains_traced
+    description: Ownership chains traced
+
+  - from: UBO_IDENTIFICATION
+    to: VERIFICATION
+    guard: ubos_identified
+    description: UBOs identified
+
+  - from: VERIFICATION
+    to: DOCUMENTATION
+    guard: all_ubos_verified
+    description: All UBOs verified
+
+  - from: DOCUMENTATION
+    to: COMPLETE
+    guard: documentation_complete
+    description: Documentation complete
+
+  # Blocked paths
+  - from: OWNERSHIP_MAPPING
+    to: BLOCKED
+    manual: true
+    description: Cannot obtain ownership information
+
+  - from: CHAIN_TRACING
+    to: BLOCKED
+    manual: true
+    description: Ownership chain cannot be traced
+
+  - from: VERIFICATION
+    to: BLOCKED
+    manual: true
+    description: UBO verification failed
+
+requirements:
+  OWNERSHIP_MAPPING:
+    - type: ownership_complete
+      threshold: 100
+      description: Total ownership must equal 100%
+
+  CHAIN_TRACING:
+    - type: all_entities_typed
+      description: All owner entities have entity type determined
+
+    - type: no_unknown_owners
+      description: No unidentified owners in structure
+
+  UBO_IDENTIFICATION:
+    - type: chains_resolved_to_persons
+      description: All chains traced to natural persons or exempt entities
+
+    - type: ubo_threshold_applied
+      threshold: 25
+      description: 25% threshold applied to identify UBOs
+
+  VERIFICATION:
+    - type: all_ubos_have_identity_docs
+      description: Identity documents collected for all UBOs
+
+    - type: all_ubos_screened
+      description: All UBOs screened
+
+  DOCUMENTATION:
+    - type: ubo_register_complete
+      description: UBO register populated
+
+    - type: determination_rationale_recorded
+      description: Rationale for UBO determination documented
+
+    - type: exemptions_documented
+      description: Any exemptions documented with justification
+
+actions:
+  INITIATED:
+    - action: set_threshold
+      verb: ubo.set-threshold
+      description: Set UBO threshold (default 25%)
+
+  OWNERSHIP_MAPPING:
+    - action: add_ownership
+      verb: ubo.add-ownership
+      description: Add ownership relationship
+
+    - action: add_owner_entity
+      verb: entity.create-limited-company
+      description: Add corporate owner
+
+    - action: add_owner_person
+      verb: entity.create-proper-person
+      description: Add individual owner
+
+    - action: set_ownership_percent
+      verb: ubo.update-ownership
+      description: Update ownership percentage
+
+  CHAIN_TRACING:
+    - action: trace_chains
+      verb: ubo.trace-chains
+      description: Trace ownership chains
+
+    - action: add_intermediate
+      verb: ubo.add-intermediate
+      description: Add intermediate entity in chain
+
+    - action: mark_exempt
+      verb: ubo.mark-exempt
+      description: Mark entity as exempt from further tracing
+
+  UBO_IDENTIFICATION:
+    - action: calculate_ubo
+      verb: ubo.calculate
+      description: Calculate beneficial owners
+
+    - action: register_ubo
+      verb: ubo.register-ubo
+      description: Register identified UBO
+
+    - action: apply_control_test
+      verb: ubo.apply-control-test
+      description: Apply control test for <25% owners
+
+  VERIFICATION:
+    - action: verify_identity
+      verb: ubo.verify-identity
+      description: Verify UBO identity
+
+    - action: run_screening
+      verb: case-screening.run
+      description: Screen UBO
+
+    - action: verify_ubo
+      verb: ubo.verify-ubo
+      description: Mark UBO as verified
+
+  DOCUMENTATION:
+    - action: document_rationale
+      verb: ubo.document-rationale
+      description: Document determination rationale
+
+    - action: document_exemption
+      verb: ubo.document-exemption
+      description: Document exemption reason
+
+    - action: finalize_register
+      verb: ubo.finalize-register
+      description: Finalize UBO register
+
+  BLOCKED:
+    - action: document_blocker
+      verb: ubo.document-blocker
+      description: Document reason for block
+
+    - action: request_info
+      verb: kyc-case.request-info
+      description: Request missing information

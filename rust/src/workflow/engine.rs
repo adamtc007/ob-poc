@@ -2,6 +2,8 @@
 //!
 //! Core workflow execution logic. Manages state transitions, guard evaluation,
 //! and blocker tracking.
+//!
+//! Guards now evaluate YAML requirements plus optional custom guards.
 
 use serde::Serialize;
 use sqlx::PgPool;
@@ -25,10 +27,11 @@ pub struct WorkflowEngine {
 impl WorkflowEngine {
     /// Create a new workflow engine
     pub fn new(pool: PgPool, definitions: HashMap<String, WorkflowDefinition>) -> Self {
+        let definitions = Arc::new(definitions);
         Self {
             repo: WorkflowRepository::new(pool.clone()),
-            guard_evaluator: GuardEvaluator::new(pool),
-            definitions: Arc::new(definitions),
+            guard_evaluator: GuardEvaluator::new(pool, definitions.clone()),
+            definitions,
         }
     }
 
@@ -91,10 +94,10 @@ impl WorkflowEngine {
             .get(&instance.workflow_id)
             .ok_or_else(|| WorkflowError::UnknownWorkflow(instance.workflow_id.clone()))?;
 
-        // Evaluate current blockers
-        let blockers = self.evaluate_blockers(&instance, definition).await?;
+        // Evaluate current blockers (from all outgoing transitions)
+        let blockers = self.evaluate_all_blockers(&instance, definition).await?;
 
-        // Get available transitions
+        // Get available transitions with their guard status
         let available_transitions = self
             .get_available_transitions(&instance, definition)
             .await?;
@@ -144,27 +147,19 @@ impl WorkflowEngine {
             .collect();
 
         for transition in auto_transitions {
-            let can_transition = if let Some(guard) = &transition.guard {
-                let result = self
-                    .guard_evaluator
-                    .evaluate(guard, instance.subject_id, &instance.subject_type)
-                    .await
-                    .map_err(WorkflowError::Database)?;
+            // Use the new evaluate_for_transition which checks YAML requirements + custom guards
+            let result = self
+                .guard_evaluator
+                .evaluate_for_transition(
+                    &instance.workflow_id,
+                    &instance.current_state,
+                    &transition.to,
+                    instance.subject_id,
+                    &instance.subject_type,
+                )
+                .await?;
 
-                if result.passed {
-                    true
-                } else {
-                    // Update blockers
-                    instance.blockers = result.blockers;
-                    self.repo.save(&instance).await?;
-                    false
-                }
-            } else {
-                // No guard means always pass
-                true
-            };
-
-            if can_transition {
+            if result.passed {
                 // Execute transition
                 instance = self
                     .execute_transition(instance, &transition.to, None, None)
@@ -172,6 +167,10 @@ impl WorkflowEngine {
 
                 // Recursively try to advance again (boxed to avoid infinite future size)
                 return Box::pin(self.try_advance(instance.instance_id)).await;
+            } else {
+                // Update blockers
+                instance.blockers = result.blockers;
+                self.repo.save(&instance).await?;
             }
         }
 
@@ -193,27 +192,30 @@ impl WorkflowEngine {
             .ok_or_else(|| WorkflowError::UnknownWorkflow(instance.workflow_id.clone()))?;
 
         // Validate transition exists
-        let transition = definition
-            .get_transition(&instance.current_state, to_state)
-            .ok_or_else(|| WorkflowError::InvalidTransition {
+        if !definition.is_valid_transition(&instance.current_state, to_state) {
+            return Err(WorkflowError::InvalidTransition {
                 from: instance.current_state.clone(),
                 to: to_state.to_string(),
-            })?;
+            });
+        }
 
-        // Check guard if present
-        if let Some(guard) = &transition.guard {
-            let result = self
-                .guard_evaluator
-                .evaluate(guard, instance.subject_id, &instance.subject_type)
-                .await
-                .map_err(WorkflowError::Database)?;
+        // Evaluate guard using requirements + custom guard
+        let result = self
+            .guard_evaluator
+            .evaluate_for_transition(
+                &instance.workflow_id,
+                &instance.current_state,
+                to_state,
+                instance.subject_id,
+                &instance.subject_type,
+            )
+            .await?;
 
-            if !result.passed {
-                return Err(WorkflowError::GuardFailed {
-                    guard: guard.clone(),
-                    blockers: result.blockers,
-                });
-            }
+        if !result.passed {
+            return Err(WorkflowError::GuardFailed {
+                guard: format!("transition to {}", to_state),
+                blockers: result.blockers,
+            });
         }
 
         self.execute_transition(instance, to_state, by, reason)
@@ -250,28 +252,29 @@ impl WorkflowEngine {
         Ok(instance)
     }
 
-    /// Evaluate all blockers for current state
-    async fn evaluate_blockers(
+    /// Evaluate all blockers for current state (from all outgoing transitions)
+    async fn evaluate_all_blockers(
         &self,
         instance: &WorkflowInstance,
         definition: &WorkflowDefinition,
     ) -> Result<Vec<Blocker>, WorkflowError> {
-        // Find transitions from current state
         let outgoing = definition.transitions_from(&instance.current_state);
-
         let mut all_blockers = Vec::new();
 
         for transition in outgoing {
-            if let Some(guard) = &transition.guard {
-                let result = self
-                    .guard_evaluator
-                    .evaluate(guard, instance.subject_id, &instance.subject_type)
-                    .await
-                    .map_err(WorkflowError::Database)?;
+            let result = self
+                .guard_evaluator
+                .evaluate_for_transition(
+                    &instance.workflow_id,
+                    &instance.current_state,
+                    &transition.to,
+                    instance.subject_id,
+                    &instance.subject_type,
+                )
+                .await?;
 
-                if !result.passed {
-                    all_blockers.extend(result.blockers);
-                }
+            if !result.passed {
+                all_blockers.extend(result.blockers);
             }
         }
 
@@ -292,22 +295,25 @@ impl WorkflowEngine {
         let mut transitions = Vec::new();
 
         for t in outgoing {
-            let guard_status = if let Some(guard) = &t.guard {
-                let result = self
-                    .guard_evaluator
-                    .evaluate(guard, instance.subject_id, &instance.subject_type)
-                    .await
-                    .map_err(WorkflowError::Database)?;
+            let result = self
+                .guard_evaluator
+                .evaluate_for_transition(
+                    &instance.workflow_id,
+                    &instance.current_state,
+                    &t.to,
+                    instance.subject_id,
+                    &instance.subject_type,
+                )
+                .await?;
 
-                if result.passed {
-                    GuardStatus::Passed
-                } else {
-                    GuardStatus::Blocked {
-                        blockers: result.blockers,
-                    }
-                }
-            } else {
+            let guard_status = if result.passed {
+                GuardStatus::Passed
+            } else if result.blockers.is_empty() {
                 GuardStatus::NoGuard
+            } else {
+                GuardStatus::Blocked {
+                    blockers: result.blockers,
+                }
             };
 
             let state_def = definition.states.get(&t.to);

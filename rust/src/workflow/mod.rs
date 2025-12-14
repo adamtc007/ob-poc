@@ -49,6 +49,7 @@ mod definition;
 mod engine;
 mod guards;
 mod repository;
+mod requirements;
 mod state;
 
 pub use definition::{
@@ -60,6 +61,7 @@ pub use engine::{
 };
 pub use guards::{GuardEvaluator, GuardResult};
 pub use repository::WorkflowRepository;
+pub use requirements::RequirementEvaluator;
 pub use state::{Blocker, BlockerType, StateTransition, WorkflowInstance};
 
 /// Workflow-related errors

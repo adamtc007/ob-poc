@@ -1,0 +1,149 @@
+# CBU Creation Workflow
+# Initial setup of a Client Business Unit before KYC onboarding begins
+
+workflow: cbu_creation
+version: 1
+description: Initial CBU setup and data capture
+
+# Triggered when a new CBU record is created
+trigger:
+  event: cbu.created
+  conditions:
+    - field: status
+      equals: DRAFT
+
+states:
+  DRAFT:
+    description: Initial creation, basic details only
+    initial: true
+
+  DATA_CAPTURE:
+    description: Capturing core CBU information
+
+  STRUCTURE_SETUP:
+    description: Setting up fund structure, relationships, products
+
+  READY_FOR_KYC:
+    description: CBU setup complete, ready to start KYC
+    terminal: true
+
+  CANCELLED:
+    description: CBU creation cancelled
+    terminal: true
+
+transitions:
+  - from: DRAFT
+    to: DATA_CAPTURE
+    auto: true
+    description: Auto-advance once created
+
+  - from: DATA_CAPTURE
+    to: STRUCTURE_SETUP
+    guard: basic_data_complete
+    description: Core data captured
+
+  - from: STRUCTURE_SETUP
+    to: READY_FOR_KYC
+    guard: structure_complete
+    description: Structure and products configured
+
+  - from: DRAFT
+    to: CANCELLED
+    manual: true
+    description: Cancel before setup
+
+  - from: DATA_CAPTURE
+    to: CANCELLED
+    manual: true
+    description: Cancel during data capture
+
+  - from: STRUCTURE_SETUP
+    to: CANCELLED
+    manual: true
+    description: Cancel during structure setup
+
+requirements:
+  DATA_CAPTURE:
+    - type: field_present
+      fields:
+        - name
+        - jurisdiction
+        - client_type
+      description: Basic CBU details required
+
+  STRUCTURE_SETUP:
+    - type: field_present
+      fields:
+        - name
+        - jurisdiction
+        - client_type
+        - domicile
+      description: Core CBU data required
+
+    - type: role_count
+      role: PRIMARY_CONTACT
+      min: 1
+      description: At least one primary contact
+
+  READY_FOR_KYC:
+    - type: product_assigned
+      min: 1
+      description: At least one product assigned
+
+    - type: conditional
+      condition:
+        field: client_type
+        in: [FUND, SUB_FUND]
+      requirement:
+        type: relationship_exists
+        relationship_type: MANAGEMENT_COMPANY
+      description: Funds must have management company linked
+
+    - type: conditional
+      condition:
+        field: client_type
+        equals: SUB_FUND
+      requirement:
+        type: relationship_exists
+        relationship_type: UMBRELLA
+      description: Sub-funds must be linked to umbrella
+
+actions:
+  DRAFT:
+    - action: update_cbu
+      verb: cbu.update
+      description: Update CBU details
+
+  DATA_CAPTURE:
+    - action: update_cbu
+      verb: cbu.update
+      description: Update CBU details
+
+    - action: set_domicile
+      verb: cbu.set-domicile
+      description: Set CBU domicile
+
+    - action: add_contact
+      verb: cbu.assign-role
+      description: Add primary contact
+
+  STRUCTURE_SETUP:
+    - action: add_product
+      verb: cbu.add-product
+      description: Add product to CBU
+
+    - action: link_management_company
+      verb: fund.link-management-company
+      description: Link management company (funds)
+
+    - action: link_umbrella
+      verb: fund.link-umbrella
+      description: Link umbrella fund (sub-funds)
+
+    - action: add_service
+      verb: cbu.add-service
+      description: Add service to CBU
+
+    - action: set_relationship
+      verb: cbu.set-relationship
+      description: Set CBU relationship
