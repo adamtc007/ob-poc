@@ -2152,6 +2152,7 @@ impl GenericCrudExecutor {
 
                     // Look for exact match
                     let code_upper = code_value.to_uppercase();
+                    let mut found_non_uuid_match = false;
                     for m in &matches {
                         if m.token.to_uppercase() == code_upper
                             || m.display.to_uppercase() == code_upper
@@ -2160,13 +2161,14 @@ impl GenericCrudExecutor {
                             if let Ok(uuid) = Uuid::parse_str(&m.token) {
                                 return Ok(uuid);
                             }
-                            // Token might be a code - need to fetch UUID from DB
+                            // Token is a code (not UUID) - fall through to SQL lookup
+                            found_non_uuid_match = true;
                             break;
                         }
                     }
 
-                    // No exact match - provide suggestions
-                    if !matches.is_empty() {
+                    // No exact match and no code match - provide suggestions
+                    if !found_non_uuid_match && !matches.is_empty() {
                         let suggestions: Vec<String> =
                             matches.iter().map(|m| m.display.clone()).collect();
                         return Err(anyhow!(

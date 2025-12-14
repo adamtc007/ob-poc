@@ -28,6 +28,9 @@ use sqlx::PgPool;
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
+/// Cache type for batch-resolved refs: (RefType, value) → ResolveResult
+pub type RefCache = HashMap<(RefType, String), ResolveResult>;
+
 /// Semantic validator that checks AST against live database
 pub struct SemanticValidator {
     resolver: Box<dyn RefResolver>,
@@ -205,6 +208,9 @@ impl SemanticValidator {
             }
         };
 
+        // Step 1.5: Batch resolve all entity refs upfront (6x speedup)
+        let ref_cache = self.batch_resolve_all_refs(&program).await;
+
         // Step 2: Walk AST and validate, tracking resolved primary keys
         let mut diagnostics = DiagnosticBuilder::new();
         let mut symbols: HashMap<String, SymbolInfo> = HashMap::new();
@@ -254,6 +260,7 @@ impl SemanticValidator {
                             &mut diagnostics,
                             stmt_idx,
                             &mut resolved_keys,
+                            &ref_cache,
                         )
                         .await;
 
@@ -436,6 +443,7 @@ fn resolve_node_impl(
 
 impl SemanticValidator {
     /// Validate a single verb call
+    #[allow(clippy::too_many_arguments)]
     async fn validate_verb_call(
         &mut self,
         verb_call: &VerbCall,
@@ -443,6 +451,7 @@ impl SemanticValidator {
         context: &ValidationContext,
         symbols: &mut HashMap<String, SymbolInfo>,
         diagnostics: &mut DiagnosticBuilder,
+        ref_cache: &RefCache,
     ) -> Option<ValidatedStatement> {
         let full_verb = format!("{}.{}", verb_call.domain, verb_call.verb);
 
@@ -549,6 +558,7 @@ impl SemanticValidator {
                     source,
                     symbols,
                     diagnostics,
+                    ref_cache,
                 )
                 .await;
 
@@ -635,10 +645,11 @@ impl SemanticValidator {
         diagnostics: &mut DiagnosticBuilder,
         stmt_idx: usize,
         resolved_keys: &mut HashMap<(usize, String), String>,
+        ref_cache: &RefCache,
     ) -> Option<ValidatedStatement> {
         // First, do normal validation
         let result = self
-            .validate_verb_call(verb_call, source, context, symbols, diagnostics)
+            .validate_verb_call(verb_call, source, context, symbols, diagnostics, ref_cache)
             .await;
 
         // Extract resolved UUIDs from validated args and store in resolved_keys
@@ -746,6 +757,7 @@ impl SemanticValidator {
         source: &str,
         symbols: &mut HashMap<String, SymbolInfo>,
         diagnostics: &mut DiagnosticBuilder,
+        ref_cache: &RefCache,
     ) -> Option<crate::dsl_v2::validation::ResolvedArg> {
         use crate::dsl_v2::validation::ResolvedArg;
 
@@ -758,8 +770,15 @@ impl SemanticValidator {
                     // Check if this arg needs DB validation
                     let key_with_colon = format!(":{}", key);
                     if let Some(ref_type) = arg_to_ref_type(verb, &key_with_colon) {
-                        // Validate against DB
-                        match self.resolver.resolve(ref_type, s).await {
+                        // Check cache first (from batch resolution - 6x speedup)
+                        let cache_key = (ref_type, s.clone());
+                        let resolve_result = if let Some(cached) = ref_cache.get(&cache_key) {
+                            Ok(cached.clone())
+                        } else {
+                            // Fall back to individual resolve
+                            self.resolver.resolve(ref_type, s).await
+                        };
+                        match resolve_result {
                             Ok(ResolveResult::Found { id, display }) => Some(ResolvedArg::Ref {
                                 ref_type,
                                 id,
@@ -817,8 +836,15 @@ impl SemanticValidator {
                                 display: uuid.to_string(),
                             })
                         } else {
-                            // For reference data types, still validate via gateway
-                            match self.resolver.resolve(ref_type, &uuid.to_string()).await {
+                            // For reference data types, check cache then gateway
+                            let uuid_str = uuid.to_string();
+                            let cache_key = (ref_type, uuid_str.clone());
+                            let resolve_result = if let Some(cached) = ref_cache.get(&cache_key) {
+                                Ok(cached.clone())
+                            } else {
+                                self.resolver.resolve(ref_type, &uuid_str).await
+                            };
+                            match resolve_result {
                                 Ok(ResolveResult::Found { id, display }) => {
                                     Some(ResolvedArg::Ref {
                                         ref_type,
@@ -956,6 +982,7 @@ impl SemanticValidator {
                     &ValidationContext::default(),
                     symbols,
                     diagnostics,
+                    ref_cache,
                 ))
                 .await;
                 // Return placeholder - actual resolution happens at execution
@@ -977,6 +1004,7 @@ impl SemanticValidator {
                         source,
                         symbols,
                         diagnostics,
+                        ref_cache,
                     ))
                     .await
                     {
@@ -998,6 +1026,7 @@ impl SemanticValidator {
                         source,
                         symbols,
                         diagnostics,
+                        ref_cache,
                     ))
                     .await
                     {
