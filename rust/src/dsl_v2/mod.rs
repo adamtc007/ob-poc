@@ -32,9 +32,11 @@ pub mod config;
 pub mod csg_linter;
 pub mod custom_ops;
 pub mod dag;
+pub mod diagnostics;
 pub mod enrichment;
 pub mod entity_deps;
 pub mod execution_plan;
+pub mod execution_result;
 pub mod executor;
 #[cfg(feature = "database")]
 pub mod gateway_resolver;
@@ -73,6 +75,11 @@ pub use dag::{
     build_execution_plan, collect_external_refs, describe_plan, CycleError, ExecutionPhase,
     ExecutionPlan as DagExecutionPlan,
 };
+pub use diagnostics::{
+    cycle_error, implicit_create_hint, missing_arg_error, undefined_symbol_error,
+    unknown_verb_error, Diagnostic, DiagnosticCode, RelatedInfo, Severity, SourceSpan,
+    SuggestedFix,
+};
 pub use enrichment::{enrich_program, EnrichmentError, EnrichmentResult};
 #[cfg(feature = "database")]
 pub use entity_deps::init_entity_deps;
@@ -85,6 +92,7 @@ pub use execution_plan::{
     ExecutionPlan, ExecutionStep, Injection, PlannerDiagnostic, PlanningContext, PlanningResult,
     SyntheticStep,
 };
+pub use execution_result::{ExecutionResults, StepResult};
 pub use executor::{DslExecutor, ExecutionContext, ExecutionResult, ReturnType};
 #[cfg(feature = "database")]
 pub use gateway_resolver::GatewayRefResolver;
