@@ -154,6 +154,9 @@ impl Blocker {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum BlockerType {
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Core / Entity Structure
+    // ─────────────────────────────────────────────────────────────────────────────
     /// Missing a required role
     MissingRole {
         role: String,
@@ -161,6 +164,29 @@ pub enum BlockerType {
         current: u32,
     },
 
+    /// Required field is missing or empty
+    FieldMissing { field: String },
+
+    /// Product not assigned or insufficient products
+    MissingProduct {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        product_type: Option<String>,
+        required: u32,
+        current: u32,
+    },
+
+    /// Required relationship does not exist
+    MissingRelationship {
+        relationship_type: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        from_entity: Option<Uuid>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        to_entity: Option<Uuid>,
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Documents
+    // ─────────────────────────────────────────────────────────────────────────────
     /// Missing a required document
     MissingDocument {
         document_type: String,
@@ -168,18 +194,122 @@ pub enum BlockerType {
         for_entity: Option<Uuid>,
     },
 
+    /// Document not reviewed
+    DocumentNotReviewed {
+        document_id: Uuid,
+        document_type: String,
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // KYC Case
+    // ─────────────────────────────────────────────────────────────────────────────
+    /// No KYC case exists for this subject
+    NoCaseExists {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        case_type: Option<String>,
+    },
+
+    /// Case has no analyst assigned
+    NoAnalystAssigned { case_id: Uuid },
+
+    /// Risk rating has not been set
+    RiskRatingNotSet { case_id: Uuid },
+
+    /// Approval not recorded
+    ApprovalNotRecorded { case_id: Uuid },
+
+    /// Rejection not recorded (for terminal rejection state)
+    RejectionNotRecorded { case_id: Uuid },
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Workstreams
+    // ─────────────────────────────────────────────────────────────────────────────
+    /// Entity workstream missing
+    WorkstreamMissing { entity_id: Uuid },
+
+    /// Workstream data incomplete
+    WorkstreamIncomplete {
+        workstream_id: Uuid,
+        entity_id: Uuid,
+        missing_fields: Vec<String>,
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Screening
+    // ─────────────────────────────────────────────────────────────────────────────
     /// Entity needs screening
     PendingScreening { entity_id: Uuid },
+
+    /// Screening is stale/expired
+    StaleScreening {
+        entity_id: Uuid,
+        screening_type: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        last_screened_at: Option<DateTime<Utc>>,
+        max_age_days: u32,
+    },
 
     /// Unresolved screening alert
     UnresolvedAlert { alert_id: Uuid, entity_id: Uuid },
 
+    /// Pending hit requires review
+    PendingHit {
+        screening_id: Uuid,
+        entity_id: Uuid,
+        hit_type: String,
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // UBO / Ownership
+    // ─────────────────────────────────────────────────────────────────────────────
     /// Ownership structure incomplete
     IncompleteOwnership { current_total: f64, required: f64 },
 
     /// UBO not verified
     UnverifiedUbo { ubo_id: Uuid, person_name: String },
 
+    /// Ownership chains not resolved to natural persons
+    UnresolvedOwnershipChain {
+        entity_id: Uuid,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        chain_depth: Option<u32>,
+    },
+
+    /// UBO threshold not applied
+    UboThresholdNotApplied { cbu_id: Uuid },
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Periodic Review / Freshness
+    // ─────────────────────────────────────────────────────────────────────────────
+    /// Entity data is stale
+    EntityDataStale {
+        entity_id: Uuid,
+        last_updated: DateTime<Utc>,
+        max_age_days: u32,
+    },
+
+    /// Change log not reviewed
+    ChangeLogNotReviewed {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        changes_since: Option<DateTime<Utc>>,
+        pending_count: u32,
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Sign-off / Completion
+    // ─────────────────────────────────────────────────────────────────────────────
+    /// Sign-off not recorded
+    SignOffMissing {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        required_role: Option<String>,
+    },
+
+    /// Next review date not scheduled
+    NextReviewNotScheduled,
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Generic
+    // ─────────────────────────────────────────────────────────────────────────────
     /// Requires manual approval
     ManualApprovalRequired,
 
@@ -191,12 +321,48 @@ impl BlockerType {
     /// Get a suggested DSL verb to resolve this blocker
     pub fn suggested_verb(&self) -> Option<&'static str> {
         match self {
+            // Core / Entity Structure
             BlockerType::MissingRole { .. } => Some("cbu.assign-role"),
+            BlockerType::FieldMissing { .. } => Some("cbu.update"),
+            BlockerType::MissingProduct { .. } => Some("cbu.add-product"),
+            BlockerType::MissingRelationship { .. } => Some("ubo.add-ownership"),
+
+            // Documents
             BlockerType::MissingDocument { .. } => Some("document.catalog"),
+            BlockerType::DocumentNotReviewed { .. } => Some("doc-request.verify"),
+
+            // KYC Case
+            BlockerType::NoCaseExists { .. } => Some("kyc-case.create"),
+            BlockerType::NoAnalystAssigned { .. } => Some("kyc-case.assign"),
+            BlockerType::RiskRatingNotSet { .. } => Some("kyc-case.set-risk-rating"),
+            BlockerType::ApprovalNotRecorded { .. } => Some("kyc-case.update-status"),
+            BlockerType::RejectionNotRecorded { .. } => Some("kyc-case.update-status"),
+
+            // Workstreams
+            BlockerType::WorkstreamMissing { .. } => Some("entity-workstream.create"),
+            BlockerType::WorkstreamIncomplete { .. } => Some("entity-workstream.update-status"),
+
+            // Screening
             BlockerType::PendingScreening { .. } => Some("case-screening.run"),
+            BlockerType::StaleScreening { .. } => Some("case-screening.run"),
             BlockerType::UnresolvedAlert { .. } => Some("case-screening.review-hit"),
+            BlockerType::PendingHit { .. } => Some("case-screening.review-hit"),
+
+            // UBO / Ownership
             BlockerType::IncompleteOwnership { .. } => Some("ubo.add-ownership"),
             BlockerType::UnverifiedUbo { .. } => Some("ubo.verify-ubo"),
+            BlockerType::UnresolvedOwnershipChain { .. } => Some("ubo.trace-chains"),
+            BlockerType::UboThresholdNotApplied { .. } => Some("threshold.derive"),
+
+            // Periodic Review / Freshness
+            BlockerType::EntityDataStale { .. } => Some("entity.update"),
+            BlockerType::ChangeLogNotReviewed { .. } => None, // UI action, no DSL verb
+
+            // Sign-off / Completion
+            BlockerType::SignOffMissing { .. } => Some("kyc-case.update-status"),
+            BlockerType::NextReviewNotScheduled => Some("kyc-case.update-status"),
+
+            // Generic
             BlockerType::ManualApprovalRequired => Some("kyc-case.update-status"),
             BlockerType::Custom { .. } => None,
         }

@@ -91,6 +91,9 @@ pub enum WorkflowError {
     #[error("YAML parse error: {0}")]
     YamlParse(#[from] serde_yaml::Error),
 
+    #[error("JSON serialization error: {0}")]
+    JsonSerialize(#[from] serde_json::Error),
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 }

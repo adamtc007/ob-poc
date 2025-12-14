@@ -1,8 +1,11 @@
 //! Workflow Definition Types and YAML Loading
 //!
 //! Workflows are defined in YAML files and loaded at startup.
+//! Definitions are also cached to the database for fast querying.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use sqlx::PgPool;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -42,6 +45,18 @@ pub struct WorkflowDefinition {
 
 fn default_version() -> u32 {
     1
+}
+
+fn default_min_one() -> u32 {
+    1
+}
+
+fn default_ubo_threshold() -> f64 {
+    25.0
+}
+
+fn default_max_age_days() -> u32 {
+    90
 }
 
 impl WorkflowDefinition {
@@ -154,28 +169,71 @@ pub struct TransitionDef {
     pub description: Option<String>,
 }
 
+/// Condition for conditional requirements
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConditionalCheck {
+    /// Field to check
+    pub field: String,
+    /// Exact value match
+    #[serde(default)]
+    pub equals: Option<String>,
+    /// Match any of these values
+    #[serde(rename = "in", default)]
+    pub in_values: Vec<String>,
+}
+
 /// Requirement definition for a state
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum RequirementDef {
+    // --- Core entity requirements ---
     /// Minimum count of a role
     RoleCount {
         role: String,
+        #[serde(default = "default_min_one")]
         min: u32,
         #[serde(default)]
         description: String,
     },
-    /// All entities must be screened
-    AllEntitiesScreened {
+
+    /// Check that specified fields have non-null values
+    FieldPresent {
+        fields: Vec<String>,
         #[serde(default)]
         description: String,
     },
-    /// Required document set
+
+    /// At least N products assigned
+    ProductAssigned {
+        #[serde(default = "default_min_one")]
+        min: u32,
+        #[serde(default)]
+        description: String,
+    },
+
+    /// Check relationship exists (e.g., MANAGEMENT_COMPANY, UMBRELLA)
+    RelationshipExists {
+        relationship_type: String,
+        #[serde(default)]
+        description: String,
+    },
+
+    /// Apply requirement only when condition is met
+    Conditional {
+        condition: ConditionalCheck,
+        requirement: Box<RequirementDef>,
+        #[serde(default)]
+        description: String,
+    },
+
+    // --- Document requirements ---
+    /// Required document set at CBU level
     DocumentSet {
         documents: Vec<String>,
         #[serde(default)]
         description: String,
     },
+
     /// Document required per entity of a type
     PerEntityDocument {
         entity_type: String,
@@ -183,27 +241,228 @@ pub enum RequirementDef {
         #[serde(default)]
         description: String,
     },
+
+    /// All documents reviewed
+    DocumentsReviewed {
+        #[serde(default)]
+        description: String,
+    },
+
+    // --- Screening requirements ---
+    /// All entities must be screened
+    AllEntitiesScreened {
+        #[serde(default)]
+        description: String,
+    },
+
+    /// All screenings run within N days
+    AllScreeningsCurrent {
+        #[serde(default = "default_max_age_days")]
+        max_age_days: u32,
+        #[serde(default)]
+        description: String,
+    },
+
+    /// All screenings complete (not pending)
+    AllScreeningsComplete {
+        #[serde(default)]
+        description: String,
+    },
+
+    /// No open alerts/red flags
+    NoOpenAlerts {
+        #[serde(default)]
+        description: String,
+    },
+
+    /// No open red flags
+    NoOpenRedFlags {
+        #[serde(default)]
+        description: String,
+    },
+
+    /// No pending screening hits
+    NoPendingHits {
+        #[serde(default)]
+        description: String,
+    },
+
+    // --- UBO requirements ---
     /// Ownership must sum to threshold
     OwnershipComplete {
+        #[serde(default = "default_ubo_threshold")]
         threshold: f64,
         #[serde(default)]
         description: String,
     },
+
     /// All UBOs must be verified
     AllUbosVerified {
         #[serde(default)]
         description: String,
     },
-    /// No open alerts
-    NoOpenAlerts {
+
+    /// All UBOs screened
+    AllUbosScreened {
         #[serde(default)]
         description: String,
     },
+
+    /// All UBOs have identity documents
+    AllUbosHaveIdentityDocs {
+        #[serde(default)]
+        description: String,
+    },
+
+    /// All ownership chains traced to natural persons
+    ChainsResolvedToPersons {
+        #[serde(default)]
+        description: String,
+    },
+
+    /// UBO threshold applied and UBOs identified
+    UboThresholdApplied {
+        #[serde(default = "default_ubo_threshold")]
+        threshold: f64,
+        #[serde(default)]
+        description: String,
+    },
+
+    /// UBO register complete
+    UboRegisterComplete {
+        #[serde(default)]
+        description: String,
+    },
+
+    /// No unknown owners in chains
+    NoUnknownOwners {
+        #[serde(default)]
+        description: String,
+    },
+
+    /// Exemptions documented for non-person chain terminations
+    ExemptionsDocumented {
+        #[serde(default)]
+        description: String,
+    },
+
+    /// Determination rationale recorded
+    DeterminationRationaleRecorded {
+        #[serde(default)]
+        description: String,
+    },
+
+    // --- Case requirements ---
+    /// KYC case exists for this subject
+    CaseExists {
+        #[serde(default)]
+        case_type: Option<String>,
+        #[serde(default)]
+        description: String,
+    },
+
+    /// Analyst assigned to case
+    AnalystAssigned {
+        #[serde(default)]
+        description: String,
+    },
+
+    /// Risk rating has been set
+    RiskRatingSet {
+        #[serde(default)]
+        description: String,
+    },
+
     /// Case checklist complete
     CaseChecklistComplete {
         #[serde(default)]
         description: String,
     },
+
+    /// Generic checklist complete
+    ChecklistComplete {
+        #[serde(default)]
+        description: String,
+    },
+
+    /// Case approval recorded
+    ApprovalRecorded {
+        #[serde(default)]
+        description: String,
+    },
+
+    /// Case rejection recorded
+    RejectionRecorded {
+        #[serde(default)]
+        description: String,
+    },
+
+    // --- Workstream requirements ---
+    /// Entity workstreams created for all linked entities
+    EntityWorkstreamsCreated {
+        #[serde(default)]
+        description: String,
+    },
+
+    /// All workstreams have required data
+    AllWorkstreamsDataComplete {
+        #[serde(default)]
+        description: String,
+    },
+
+    /// All entities have types assigned
+    AllEntitiesTyped {
+        #[serde(default)]
+        description: String,
+    },
+
+    // --- Data freshness ---
+    /// Entity data refreshed within N days
+    EntityDataCurrent {
+        #[serde(default = "default_max_age_days")]
+        max_age_days: u32,
+        #[serde(default)]
+        description: String,
+    },
+
+    /// Change log reviewed
+    ChangeLogReviewed {
+        #[serde(default)]
+        description: String,
+    },
+
+    /// Risk reassessment complete
+    RiskReassessmentComplete {
+        #[serde(default)]
+        description: String,
+    },
+
+    // --- Sign-off and scheduling ---
+    /// Sign-off recorded
+    SignOffRecorded {
+        #[serde(default)]
+        description: String,
+    },
+
+    /// Next review date scheduled
+    NextReviewScheduled {
+        #[serde(default)]
+        description: String,
+    },
+
+    // --- Deferral ---
+    /// Deferral reason documented
+    DeferralReasonDocumented {
+        #[serde(default)]
+        description: String,
+    },
+
+    /// Deferral approval recorded
+    DeferralApprovalRecorded {
+        #[serde(default)]
+        description: String,
+    },
+
     /// Custom requirement
     Custom {
         code: String,
@@ -257,6 +516,62 @@ impl WorkflowLoader {
         }
 
         Ok(definitions)
+    }
+
+    /// Load workflows from YAML and sync to database
+    pub async fn load_and_sync(
+        dir: &Path,
+        pool: &PgPool,
+    ) -> Result<HashMap<String, WorkflowDefinition>, WorkflowError> {
+        let definitions = Self::load_from_dir(dir)?;
+
+        for (workflow_id, def) in &definitions {
+            Self::sync_to_db(pool, workflow_id, def).await?;
+        }
+
+        Ok(definitions)
+    }
+
+    /// Sync a single workflow definition to database
+    async fn sync_to_db(
+        pool: &PgPool,
+        workflow_id: &str,
+        def: &WorkflowDefinition,
+    ) -> Result<(), WorkflowError> {
+        let json = serde_json::to_value(def)?;
+        let hash = Self::content_hash(&json);
+
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".workflow_definitions
+            (workflow_id, version, description, definition_json, content_hash, loaded_at)
+            VALUES ($1, $2, $3, $4, $5, NOW())
+            ON CONFLICT (workflow_id) DO UPDATE SET
+                version = EXCLUDED.version,
+                description = EXCLUDED.description,
+                definition_json = EXCLUDED.definition_json,
+                content_hash = EXCLUDED.content_hash,
+                loaded_at = NOW()
+            WHERE workflow_definitions.content_hash != EXCLUDED.content_hash
+        "#,
+        )
+        .bind(workflow_id)
+        .bind(def.version as i32)
+        .bind(&def.description)
+        .bind(&json)
+        .bind(&hash)
+        .execute(pool)
+        .await
+        .map_err(WorkflowError::Database)?;
+
+        Ok(())
+    }
+
+    /// Compute SHA-256 hash of JSON content
+    fn content_hash(json: &serde_json::Value) -> String {
+        let content = serde_json::to_string(json).unwrap_or_default();
+        let hash = Sha256::digest(content.as_bytes());
+        format!("{:x}", hash)
     }
 
     /// Load a single workflow definition from a file
@@ -344,5 +659,28 @@ actions:
         let transitions = def.transitions_from("INTAKE");
         assert_eq!(transitions.len(), 1);
         assert_eq!(transitions[0].to, "PROCESSING");
+    }
+
+    #[test]
+    fn test_conditional_requirement() {
+        let yaml = r#"
+workflow: test
+states:
+  S1:
+    initial: true
+transitions: []
+requirements:
+  S1:
+    - type: conditional
+      condition:
+        field: client_type
+        in: [FUND, SUB_FUND]
+      requirement:
+        type: relationship_exists
+        relationship_type: MANAGEMENT_COMPANY
+      description: Funds need ManCo
+"#;
+        let def = WorkflowLoader::load_from_str(yaml).unwrap();
+        assert_eq!(def.requirements.get("S1").unwrap().len(), 1);
     }
 }
