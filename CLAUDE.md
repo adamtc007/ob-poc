@@ -3558,6 +3558,222 @@ rust/src/mcp/
 | `SuggestedAction` | resolution | AutoResolve, AskUser, SuggestCreate, NeedMoreInfo |
 | `ConversationContext` | resolution | Hints from conversation (roles, CBU, nationality) |
 
+### Template Tools
+
+Templates are pre-built DSL patterns for common multi-step operations. They capture domain lifecycle patterns and expand to reviewable DSL source text.
+
+| Tool | Description |
+|------|-------------|
+| `template_list` | List/search templates by tag, blocker, workflow state, or text |
+| `template_get` | Get full template details with params, effects, and DSL body |
+| `template_expand` | Expand template to DSL source text with parameter substitution |
+
+**Usage Flow:**
+
+```json
+// 1. Find templates that resolve a blocker
+{"tool": "template_list", "args": {"blocker": "missing_role:DIRECTOR"}}
+
+// 2. Get template details
+{"tool": "template_get", "args": {"template_id": "onboard-director"}}
+
+// 3. Expand with parameters
+{"tool": "template_expand", "args": {
+  "template_id": "onboard-director",
+  "cbu_id": "uuid-of-cbu",
+  "case_id": "uuid-of-case",
+  "params": {
+    "name": "John Smith",
+    "date_of_birth": "1975-03-15",
+    "nationality": "GB"
+  }
+}}
+// Returns: { "dsl": "(let [person ...]...)", "complete": true, ... }
+```
+
+**Template Expansion:**
+- Parameters resolved in order: explicit → session context → defaults
+- Returns `missing_params` with prompts if required params not provided
+- Returns reviewable/editable DSL source text
+
+## Template System
+
+Templates capture domain lifecycle patterns - chained verb sequences that accomplish business goals. They serve as prompt enhancement for agent DSL generation.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         USER / AGENT                            │
+│  "Add John Doe as director to Apex Fund"                        │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Template Selection                           │
+│  1. Parse intent: action=add_director, person="John Doe"        │
+│  2. Check if person exists → NOT FOUND (needs creation)         │
+│  3. Select template: onboard-director                           │
+│  4. Check params: missing dob, nationality → prompt user        │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Template Expansion                           │
+│  Substitute parameters → DSL SOURCE TEXT                        │
+│  Agent can REVIEW and EDIT before execution                     │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Normal DSL Pipeline                          │
+│  Parse → Entity Resolution → Validate → Execute                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Directory Structure
+
+```
+rust/config/templates/
+├── director/
+│   └── onboard-director.yaml
+├── signatory/
+│   └── onboard-signatory.yaml
+├── ubo/
+│   ├── add-ownership.yaml
+│   ├── trace-chains.yaml
+│   └── register-ubo.yaml
+├── screening/
+│   ├── run-entity-screening.yaml
+│   └── review-screening-hit.yaml
+├── documents/
+│   ├── catalog-document.yaml
+│   └── request-documents.yaml
+└── case/
+    ├── create-kyc-case.yaml
+    ├── escalate-case.yaml
+    └── approve-case.yaml
+```
+
+### Template YAML Schema
+
+```yaml
+template: onboard-director
+version: 1
+
+metadata:
+  name: Onboard Director
+  summary: Add a natural person as director with full KYC setup
+  description: |
+    Creates person entity, assigns DIRECTOR role, creates workstream,
+    requests documents, and initiates screening.
+  when_to_use:
+    - Adding a new director who doesn't exist in the system
+    - Workflow blocker shows "missing_role:DIRECTOR"
+  when_not_to_use:
+    - Person already exists (use cbu.assign-role directly)
+  effects:
+    - New person entity created
+    - DIRECTOR role assigned to CBU
+    - Entity workstream created in KYC case
+  next_steps:
+    - Upload/catalog documents for the person
+    - Review screening results if hits found
+
+tags:
+  - director
+  - person
+  - role
+  - kyc
+
+workflow_context:
+  applicable_workflows:
+    - kyc_onboarding
+  applicable_states:
+    - ENTITY_COLLECTION
+  resolves_blockers:
+    - missing_role:DIRECTOR
+
+params:
+  cbu_id:
+    type: cbu_ref
+    required: true
+    source: session
+  name:
+    type: string
+    required: true
+    prompt: "Director's full legal name"
+    example: "John Smith"
+  date_of_birth:
+    type: date
+    required: true
+    prompt: "Date of birth"
+  nationality:
+    type: country_code
+    required: true
+    prompt: "Nationality (ISO 2-letter code)"
+
+body: |
+  (let [person (entity.create-proper-person
+                 :name "$name"
+                 :date-of-birth "$date_of_birth"
+                 :nationality "$nationality")]
+    (cbu.assign-role :cbu "$cbu_id" :entity person :role DIRECTOR)
+    (entity-workstream.create :case "$case_id" :entity person)
+    (case-screening.run :case "$case_id" :entity person))
+
+outputs:
+  person:
+    type: entity_ref
+    description: Created person entity ID
+```
+
+### Rust Module Structure
+
+```
+rust/src/templates/
+├── mod.rs              # Module exports
+├── definition.rs       # TemplateDefinition, ParamDefinition, WorkflowContext
+├── registry.rs         # TemplateRegistry with multi-index lookup
+├── expander.rs         # TemplateExpander for parameter substitution
+└── error.rs            # TemplateError enum
+```
+
+### Key Types
+
+| Type | Description |
+|------|-------------|
+| `TemplateDefinition` | Full template with metadata, params, body, outputs |
+| `TemplateMetadata` | Name, summary, when_to_use, effects, next_steps |
+| `ParamDefinition` | Type, required, source, default, prompt, validation |
+| `WorkflowContext` | Applicable workflows, states, resolves_blockers |
+| `TemplateRegistry` | Indexes by tag, blocker, workflow_state |
+| `TemplateExpander` | Parameter substitution with context resolution |
+| `ExpansionResult` | DSL text, filled_params, missing_params, outputs |
+
+### Parameter Resolution Order
+
+1. **Explicit params** - Values provided in the expand call
+2. **Session context** - current_cbu, current_case from session
+3. **Default values** - From param definition (supports `$other_param` refs, `today`)
+
+### Available Templates
+
+| Template | Description | Resolves Blockers |
+|----------|-------------|-------------------|
+| `onboard-director` | Add new director with full KYC | `missing_role:DIRECTOR` |
+| `onboard-signatory` | Add authorized signatory | `missing_role:AUTHORIZED_SIGNATORY` |
+| `add-ownership` | Record ownership relationship | `incomplete_ownership` |
+| `trace-chains` | Trace ownership to natural persons | `ubo_not_traced` |
+| `register-ubo` | Register identified UBO | `ubo_not_registered` |
+| `run-entity-screening` | Run AML/PEP/sanctions screening | `screening_required` |
+| `review-screening-hit` | Disposition a screening hit | `unresolved_alert` |
+| `catalog-document` | Catalog received document | `missing_document` |
+| `request-documents` | Create document requests | `docs_not_requested` |
+| `create-kyc-case` | Initialize KYC case | `no_kyc_case` |
+| `escalate-case` | Escalate to higher authority | `escalation_required` |
+| `approve-case` | Final case approval | `pending_approval` |
+
 ## Agentic DSL Generation
 
 The `rust/src/agentic/` module provides AI-powered DSL generation from natural language, specifically optimized for custody onboarding scenarios.
