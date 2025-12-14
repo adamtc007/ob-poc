@@ -50,6 +50,7 @@ pub mod intent_extractor;
 pub mod lsp_validator;
 pub mod ops;
 pub mod parser;
+pub mod planning_facade;
 #[cfg(feature = "database")]
 pub mod ref_resolver;
 pub mod repl_session;
@@ -107,6 +108,10 @@ pub use intent_extractor::IntentExtractor;
 pub use lsp_validator::LspValidator;
 pub use ops::{DocKey, EntityKey, Op, OpRef};
 pub use parser::{parse_program, parse_single_verb};
+pub use planning_facade::{
+    analyse_and_plan, quick_validate, ImplicitCreateMode, PlannedExecution, PlanningInput,
+    PlanningOutput, SyntheticStep as FacadeSyntheticStep,
+};
 #[cfg(feature = "database")]
 pub use ref_resolver::RefResolver;
 pub use repl_session::{ExecutedBlock, ReplSession};

@@ -471,6 +471,13 @@ ob-poc/
 │   │   │   ├── runtime_registry.rs # RuntimeVerbRegistry (loads from YAML)
 │   │   │   ├── verb_registry.rs    # UnifiedVerbRegistry (wraps runtime)
 │   │   │   ├── entity_deps.rs      # Unified entity dependency DAG
+│   │   │   ├── ops.rs              # Op enum (primitive operations)
+│   │   │   ├── compiler.rs         # AST → Ops compiler
+│   │   │   ├── dag.rs              # DAG builder + toposort
+│   │   │   ├── diagnostics.rs      # Unified diagnostic types for LSP
+│   │   │   ├── execution_result.rs # StepResult enum + ExecutionResults
+│   │   │   ├── repl_session.rs     # REPL state with undo support
+│   │   │   ├── planning_facade.rs  # Central analyse_and_plan() entrypoint
 │   │   │   ├── generic_executor.rs # GenericCrudExecutor (14 CRUD ops)
 │   │   │   ├── executor.rs         # DslExecutor (orchestrates execution)
 │   │   │   ├── csg_linter.rs       # Context-sensitive validation
@@ -3440,6 +3447,100 @@ dsl_cli custody -i "..." --format json
 **Pattern-Based Generation**: Classification enables pattern-specific few-shot examples and complexity scaling.
 
 **Retry Loop**: Validation failures feed back to Claude with error messages for self-correction (max 3 attempts).
+
+## DAG Execution Layer
+
+The DSL execution system uses a Terraform-style execution model with dependency-aware ordering:
+
+```
+Source → Parse → AST → Enrich → Compile → Ops → DAG → Toposort → Execute
+```
+
+### Key Modules
+
+| Module | File | Purpose |
+|--------|------|---------|
+| `Op` enum | `ops.rs` | Primitive operations (EnsureEntity, SetFK, LinkRole, etc.) |
+| Compiler | `compiler.rs` | Transforms AST VerbCalls → Op sequence |
+| DAG Builder | `dag.rs` | Builds dependency graph, performs toposort, detects cycles |
+| Diagnostics | `diagnostics.rs` | Unified diagnostic types for LSP (Severity, DiagnosticCode, SourceSpan) |
+| Execution Results | `execution_result.rs` | StepResult enum + ExecutionResults accumulator |
+| REPL Session | `repl_session.rs` | Tracks executed blocks with undo support for incremental execution |
+| Planning Facade | `planning_facade.rs` | Central `analyse_and_plan()` entrypoint |
+
+### Op Types
+
+```rust
+pub enum Op {
+    EnsureEntity { entity_type, key, attrs, source_stmt },
+    SetFK { source, field, target, source_stmt },
+    LinkRole { cbu, entity, role, source_stmt },
+    AddOwnership { owner, owned, percentage, ownership_type, source_stmt },
+    RegisterUBO { cbu, subject, ubo_person, qualifying_reason, source_stmt },
+    UpsertDoc { doc_type, key, content, source_stmt },
+    CreateCase { cbu, case_type, source_stmt },
+    RunScreening { entity, screening_type, source_stmt },
+    Materialize { source, sections, force, source_stmt },
+    RequireRef { ref_type, value, source_stmt },
+    // ... more variants
+}
+```
+
+Each Op declares its dependencies via `dependencies()` and what it produces via `produces()`. The DAG builder uses this to determine execution order.
+
+### Planning Facade
+
+The `analyse_and_plan()` function is the central entrypoint for DSL analysis:
+
+```rust
+pub fn analyse_and_plan(input: PlanningInput) -> PlanningOutput {
+    // 1. Parse DSL source → Program
+    // 2. Compile to Ops
+    // 3. Build DAG and toposort
+    // 4. Detect cycles, collect diagnostics
+    // 5. Return plan + diagnostics (even with errors, for LSP)
+}
+```
+
+**PlanningInput** includes:
+- `source: &str` - DSL source text
+- `registry: Arc<RuntimeVerbRegistry>` - Verb definitions
+- `executed_bindings: Option<&BindingContext>` - From REPL session
+- `implicit_create_mode: ImplicitCreateMode` - Disabled/Enabled/Silent
+
+**PlanningOutput** includes:
+- `program: Program` - Parsed AST
+- `diagnostics: Vec<Diagnostic>` - All errors/warnings/hints
+- `plan: Option<PlannedExecution>` - Topologically sorted ops
+- `was_reordered: bool` - True if source order differs from execution order
+
+### REPL Session State
+
+For incremental REPL execution, `ReplSession` tracks previously executed blocks:
+
+```rust
+let mut session = ReplSession::new();
+
+// Execute first block
+session.append_executed(program1, bindings1, types1);
+
+// Next block can reference @bindings from previous blocks
+let ctx = session.binding_context();
+assert!(ctx.has("fund"));
+
+// Undo last block
+session.undo();
+```
+
+### Batch Resolution
+
+The `gateway_resolver.rs` includes `batch_resolve()` for performance:
+
+```rust
+// Instead of 30 sequential gRPC calls (150ms)
+// Batch by RefType: 5 calls (25ms) = 6x speedup
+let results = resolver.batch_resolve(RefType::Entity, &values).await?;
+```
 
 ## Intent Extraction Pipeline
 
