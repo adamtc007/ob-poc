@@ -66,7 +66,7 @@ The pipeline is split into fast local stages (parse, enrich) and slower network 
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │              Stage 3: Semantic Validation (DB/gRPC)              │
-│  Resolves EntityRefs via EntityGateway                          │
+│  Batch resolves EntityRefs via EntityGateway (~6x speedup)      │
 │  EntityRef { resolved_key: Some(uuid) } = resolved              │
 │  rust/src/dsl_v2/semantic_validator.rs                          │
 └─────────────────────────────────────────────────────────────────┘
@@ -290,6 +290,29 @@ All entity lookup and resolution flows through the **EntityGateway** gRPC servic
 | Gateway Resolver | `rust/src/dsl_v2/gateway_resolver.rs` | CSG linter reference validation |
 | Generic Executor | `rust/src/dsl_v2/generic_executor.rs` | Runtime entity lookup with SQL fallback |
 | Agent Routes | `rust/src/api/agent_routes.rs` | Tool-use entity lookup |
+
+### Batch Resolution Optimization
+
+The semantic validator uses **batch resolution** for ~6x speedup:
+
+```
+Without batch: 30 refs × 1 gRPC call each = 30 round trips
+With batch:    30 refs grouped by 5 RefTypes = 5 gRPC calls
+```
+
+**How it works:**
+1. `validate()` calls `batch_resolve_all_refs()` after parsing
+2. Collects all EntityRefs by RefType in single AST pass
+3. Makes one gRPC `SearchRequest` per RefType (batch of values)
+4. Stores results in `RefCache: HashMap<(RefType, String), ResolveResult>`
+5. `validate_argument_value()` checks cache before individual `resolve()`
+
+**Key types:**
+```rust
+pub type RefCache = HashMap<(RefType, String), ResolveResult>;
+```
+
+This optimization is transparent - validation semantics unchanged, just faster.
 
 ### Web UI Architecture
 
