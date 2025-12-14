@@ -100,11 +100,6 @@ path = "src/bin/dsl_mcp.rs"
 required-features = ["mcp"]
 
 [[bin]]
-name = "run_e2e_tests"
-path = "src/bin/run_e2e_tests.rs"
-required-features = ["database"]
-
-[[bin]]
 name = "dsl_api"
 path = "src/bin/dsl_api.rs"
 required-features = ["server"]

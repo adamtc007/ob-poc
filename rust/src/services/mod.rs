@@ -10,12 +10,6 @@
 // Entity search is now handled by EntityGateway gRPC service.
 // See rust/crates/entity-gateway/ for the central lookup service.
 
-// Agent E2E test harness
-#[cfg(feature = "database")]
-pub mod agent_e2e_test_harness;
-#[cfg(feature = "database")]
-pub use agent_e2e_test_harness::{AgentE2ETestHarness, E2ETestScenario, TestResult};
-
 // Attribute services
 pub mod attribute_executor;
 
@@ -29,9 +23,6 @@ pub mod extraction_service;
 // Executor services
 pub mod sink_executor;
 pub mod source_executor;
-
-// Test harness
-pub mod document_attribute_test_harness;
 
 // Re-exports
 pub use dictionary_service_impl::DictionaryServiceImpl;
