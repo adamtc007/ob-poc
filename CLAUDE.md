@@ -793,6 +793,61 @@ Users can customize node positions (drag) and sizes (shift+drag) in the graph vi
 - `rust/src/api/graph_routes.rs` - Layout API endpoints
 - `rust/crates/ob-poc-graph/src/graph/` - Graph widget with drag/resize handling
 
+## xtask Development Automation
+
+The `xtask` crate provides type-safe, cross-platform build automation. All commands are invoked via `cargo x <command>`.
+
+### Quick Reference
+
+```bash
+cd rust/
+
+# Development workflow
+cargo x pre-commit          # Format + clippy + unit tests (fast)
+cargo x check               # Compile + clippy + tests
+cargo x check --db          # Include database integration tests
+
+# Individual tasks
+cargo x fmt                 # Format code
+cargo x fmt --check         # Check formatting only
+cargo x clippy              # Run clippy on all feature combinations
+cargo x clippy --fix        # Auto-fix clippy warnings
+cargo x test                # Run all tests
+cargo x test --lib          # Unit tests only (faster)
+cargo x test --filter foo   # Filter by test name
+
+# Build
+cargo x build               # Build all binaries (debug)
+cargo x build --release     # Build all binaries (release)
+
+# Utilities
+cargo x schema-export       # Export DB schema to schema_export.sql
+cargo x ts-bindings         # Generate TypeScript bindings from ob-poc-types
+cargo x dsl-tests           # Run DSL test scenarios
+cargo x serve               # Start agentic server (port 3000)
+cargo x serve --port 8080   # Custom port
+
+# CI
+cargo x ci                  # Full pipeline: fmt, clippy, test, build
+```
+
+### Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `check` | Compile + clippy + tests (add `--db` for integration tests) |
+| `clippy` | Run clippy on all feature combinations (database, server, mcp, cli) |
+| `test` | Run tests (`--lib` for unit only, `--db` for integration, `--filter` to match) |
+| `fmt` | Format code (`--check` to verify only) |
+| `build` | Build all binaries (`--release` for optimized) |
+| `schema-export` | Export database schema to `schema_export.sql` |
+| `ts-bindings` | Generate TypeScript bindings from ob-poc-types |
+| `dsl-tests` | Run DSL test scenarios via `tests/scenarios/run_tests.sh` |
+| `serve` | Start agentic server (`--port` to customize) |
+| `ci` | Full CI pipeline: format check, clippy, tests, build |
+| `pre-commit` | Fast pre-commit hook: format, clippy, unit tests |
+
+### Manual Commands (Legacy)
 
 ```bash
 cd rust/
@@ -809,7 +864,7 @@ cargo run -p ob-poc-web
 # Open http://localhost:3000
 
 # Test
-cargo test --features database --lib                  # Unit tests (~143)
+cargo test --features database --lib                  # Unit tests (~273)
 cargo test --features database --test db_integration  # DB tests
 ./tests/scenarios/run_tests.sh                        # DSL scenarios
 ./tests/mcp_test.sh                                   # MCP protocol tests
