@@ -33,6 +33,7 @@
 mod definition;
 mod error;
 mod expander;
+pub mod harness;
 mod registry;
 
 pub use definition::{
@@ -40,4 +41,5 @@ pub use definition::{
 };
 pub use error::TemplateError;
 pub use expander::{ExpansionContext, ExpansionResult, MissingParam, TemplateExpander};
+pub use harness::{get_sample_params, run_harness_no_db, HarnessResult, TemplateTestResult};
 pub use registry::TemplateRegistry;
