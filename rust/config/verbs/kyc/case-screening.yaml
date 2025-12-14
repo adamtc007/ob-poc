@@ -3,7 +3,7 @@ domains:
     description: Sanctions, PEP, and adverse media screening for KYC workstreams
     verbs:
       run:
-        description: Initiate a screening
+        description: Initiate a screening. Idempotent via (workstream_id, screening_type) - one screening per type per workstream.
         behavior: crud
         produces:
           type: screening
@@ -13,10 +13,13 @@ domains:
             type: workstream
             required: true
         crud:
-          operation: insert
+          operation: upsert
           table: screenings
           schema: kyc
           returning: screening_id
+          conflict_keys:
+            - workstream_id
+            - screening_type
         emits_event: screening.started
         args:
           - name: workstream-id

@@ -3,211 +3,231 @@ domains:
     description: Fund subscription, redemption, and transfer transactions
     verbs:
       subscribe:
-        description: Record a subscription (investor buying units)
+        description: Record a subscription (investor buying units). Idempotent via (holding_id, trade_date, reference).
         behavior: crud
         crud:
-          operation: insert
+          operation: upsert
           table: movements
           schema: kyc
           returning: id
+          conflict_keys:
+            - holding_id
+            - trade_date
+            - reference
         args:
-        - name: holding-id
-          type: uuid
-          required: true
-          maps_to: holding_id
-          lookup:
-            table: holdings
-            entity_type: holding
-            schema: kyc
-            search_key: id
-            primary_key: id
-        - name: units
-          type: decimal
-          required: true
-          maps_to: units
-        - name: price-per-unit
-          type: decimal
-          required: true
-          maps_to: price_per_unit
-        - name: amount
-          type: decimal
-          required: false
-          maps_to: amount
-        - name: currency
-          type: string
-          required: false
-          maps_to: currency
-          default: EUR
-        - name: trade-date
-          type: date
-          required: true
-          maps_to: trade_date
-        - name: settlement-date
-          type: date
-          required: false
-          maps_to: settlement_date
-        - name: reference
-          type: string
-          required: false
-          maps_to: reference
-        - name: notes
-          type: string
-          required: false
-          maps_to: notes
+          - name: holding-id
+            type: uuid
+            required: true
+            maps_to: holding_id
+            lookup:
+              table: holdings
+              entity_type: holding
+              schema: kyc
+              search_key: id
+              primary_key: id
+          - name: units
+            type: decimal
+            required: true
+            maps_to: units
+          - name: price-per-unit
+            type: decimal
+            required: true
+            maps_to: price_per_unit
+          - name: amount
+            type: decimal
+            required: false
+            maps_to: amount
+          - name: currency
+            type: string
+            required: false
+            maps_to: currency
+            default: EUR
+          - name: trade-date
+            type: date
+            required: true
+            maps_to: trade_date
+          - name: settlement-date
+            type: date
+            required: false
+            maps_to: settlement_date
+          - name: reference
+            type: string
+            required: true
+            maps_to: reference
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
         returns:
           type: uuid
           name: movement_id
           capture: true
         set_values:
           movement_type: subscription
+
       redeem:
-        description: Record a redemption (investor selling units)
+        description: Record a redemption (investor selling units). Idempotent via (holding_id, trade_date, reference).
         behavior: crud
         crud:
-          operation: insert
+          operation: upsert
           table: movements
           schema: kyc
           returning: id
+          conflict_keys:
+            - holding_id
+            - trade_date
+            - reference
         args:
-        - name: holding-id
-          type: uuid
-          required: true
-          maps_to: holding_id
-          lookup:
-            table: holdings
-            entity_type: holding
-            schema: kyc
-            search_key: id
-            primary_key: id
-        - name: units
-          type: decimal
-          required: true
-          maps_to: units
-        - name: price-per-unit
-          type: decimal
-          required: true
-          maps_to: price_per_unit
-        - name: amount
-          type: decimal
-          required: false
-          maps_to: amount
-        - name: currency
-          type: string
-          required: false
-          maps_to: currency
-          default: EUR
-        - name: trade-date
-          type: date
-          required: true
-          maps_to: trade_date
-        - name: settlement-date
-          type: date
-          required: false
-          maps_to: settlement_date
-        - name: reference
-          type: string
-          required: false
-          maps_to: reference
-        - name: notes
-          type: string
-          required: false
-          maps_to: notes
+          - name: holding-id
+            type: uuid
+            required: true
+            maps_to: holding_id
+            lookup:
+              table: holdings
+              entity_type: holding
+              schema: kyc
+              search_key: id
+              primary_key: id
+          - name: units
+            type: decimal
+            required: true
+            maps_to: units
+          - name: price-per-unit
+            type: decimal
+            required: true
+            maps_to: price_per_unit
+          - name: amount
+            type: decimal
+            required: false
+            maps_to: amount
+          - name: currency
+            type: string
+            required: false
+            maps_to: currency
+            default: EUR
+          - name: trade-date
+            type: date
+            required: true
+            maps_to: trade_date
+          - name: settlement-date
+            type: date
+            required: false
+            maps_to: settlement_date
+          - name: reference
+            type: string
+            required: true
+            maps_to: reference
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
         returns:
           type: uuid
           name: movement_id
           capture: true
         set_values:
           movement_type: redemption
+
       transfer-in:
-        description: Record an incoming transfer of units
+        description: Record an incoming transfer of units. Idempotent via (holding_id, trade_date, reference).
         behavior: crud
         crud:
-          operation: insert
+          operation: upsert
           table: movements
           schema: kyc
           returning: id
+          conflict_keys:
+            - holding_id
+            - trade_date
+            - reference
         args:
-        - name: holding-id
-          type: uuid
-          required: true
-          maps_to: holding_id
-          lookup:
-            table: holdings
-            entity_type: holding
-            schema: kyc
-            search_key: id
-            primary_key: id
-        - name: units
-          type: decimal
-          required: true
-          maps_to: units
-        - name: price-per-unit
-          type: decimal
-          required: false
-          maps_to: price_per_unit
-        - name: trade-date
-          type: date
-          required: true
-          maps_to: trade_date
-        - name: reference
-          type: string
-          required: false
-          maps_to: reference
-        - name: notes
-          type: string
-          required: false
-          maps_to: notes
+          - name: holding-id
+            type: uuid
+            required: true
+            maps_to: holding_id
+            lookup:
+              table: holdings
+              entity_type: holding
+              schema: kyc
+              search_key: id
+              primary_key: id
+          - name: units
+            type: decimal
+            required: true
+            maps_to: units
+          - name: price-per-unit
+            type: decimal
+            required: false
+            maps_to: price_per_unit
+          - name: trade-date
+            type: date
+            required: true
+            maps_to: trade_date
+          - name: reference
+            type: string
+            required: true
+            maps_to: reference
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
         returns:
           type: uuid
           name: movement_id
           capture: true
         set_values:
           movement_type: transfer_in
+
       transfer-out:
-        description: Record an outgoing transfer of units
+        description: Record an outgoing transfer of units. Idempotent via (holding_id, trade_date, reference).
         behavior: crud
         crud:
-          operation: insert
+          operation: upsert
           table: movements
           schema: kyc
           returning: id
+          conflict_keys:
+            - holding_id
+            - trade_date
+            - reference
         args:
-        - name: holding-id
-          type: uuid
-          required: true
-          maps_to: holding_id
-          lookup:
-            table: holdings
-            entity_type: holding
-            schema: kyc
-            search_key: id
-            primary_key: id
-        - name: units
-          type: decimal
-          required: true
-          maps_to: units
-        - name: price-per-unit
-          type: decimal
-          required: false
-          maps_to: price_per_unit
-        - name: trade-date
-          type: date
-          required: true
-          maps_to: trade_date
-        - name: reference
-          type: string
-          required: false
-          maps_to: reference
-        - name: notes
-          type: string
-          required: false
-          maps_to: notes
+          - name: holding-id
+            type: uuid
+            required: true
+            maps_to: holding_id
+            lookup:
+              table: holdings
+              entity_type: holding
+              schema: kyc
+              search_key: id
+              primary_key: id
+          - name: units
+            type: decimal
+            required: true
+            maps_to: units
+          - name: price-per-unit
+            type: decimal
+            required: false
+            maps_to: price_per_unit
+          - name: trade-date
+            type: date
+            required: true
+            maps_to: trade_date
+          - name: reference
+            type: string
+            required: true
+            maps_to: reference
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
         returns:
           type: uuid
           name: movement_id
           capture: true
         set_values:
           movement_type: transfer_out
+
       confirm:
         description: Confirm a pending movement
         behavior: crud
@@ -219,18 +239,19 @@ domains:
           set_values:
             status: confirmed
         args:
-        - name: movement-id
-          type: uuid
-          required: true
-          maps_to: id
-          lookup:
-            table: movements
-            entity_type: movement
-            schema: kyc
-            search_key: id
-            primary_key: id
+          - name: movement-id
+            type: uuid
+            required: true
+            maps_to: id
+            lookup:
+              table: movements
+              entity_type: movement
+              schema: kyc
+              search_key: id
+              primary_key: id
         returns:
           type: affected
+
       settle:
         description: Mark a movement as settled
         behavior: crud
@@ -242,22 +263,23 @@ domains:
           set_values:
             status: settled
         args:
-        - name: movement-id
-          type: uuid
-          required: true
-          maps_to: id
-          lookup:
-            table: movements
-            entity_type: movement
-            schema: kyc
-            search_key: id
-            primary_key: id
-        - name: settlement-date
-          type: date
-          required: false
-          maps_to: settlement_date
+          - name: movement-id
+            type: uuid
+            required: true
+            maps_to: id
+            lookup:
+              table: movements
+              entity_type: movement
+              schema: kyc
+              search_key: id
+              primary_key: id
+          - name: settlement-date
+            type: date
+            required: false
+            maps_to: settlement_date
         returns:
           type: affected
+
       cancel:
         description: Cancel a pending movement
         behavior: crud
@@ -269,22 +291,23 @@ domains:
           set_values:
             status: cancelled
         args:
-        - name: movement-id
-          type: uuid
-          required: true
-          maps_to: id
-          lookup:
-            table: movements
-            entity_type: movement
-            schema: kyc
-            search_key: id
-            primary_key: id
-        - name: notes
-          type: string
-          required: false
-          maps_to: notes
+          - name: movement-id
+            type: uuid
+            required: true
+            maps_to: id
+            lookup:
+              table: movements
+              entity_type: movement
+              schema: kyc
+              search_key: id
+              primary_key: id
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
         returns:
           type: affected
+
       list-by-holding:
         description: List movements for a holding
         behavior: crud
@@ -294,25 +317,26 @@ domains:
           schema: kyc
           fk_col: holding_id
         args:
-        - name: holding-id
-          type: uuid
-          required: true
-          lookup:
-            table: holdings
-            entity_type: holding
-            schema: kyc
-            search_key: id
-            primary_key: id
-        - name: movement-type
-          type: string
-          required: false
-          maps_to: movement_type
-        - name: status
-          type: string
-          required: false
-          maps_to: status
+          - name: holding-id
+            type: uuid
+            required: true
+            lookup:
+              table: holdings
+              entity_type: holding
+              schema: kyc
+              search_key: id
+              primary_key: id
+          - name: movement-type
+            type: string
+            required: false
+            maps_to: movement_type
+          - name: status
+            type: string
+            required: false
+            maps_to: status
         returns:
           type: record_set
+
       read:
         description: Read a movement by ID
         behavior: crud
@@ -321,15 +345,15 @@ domains:
           table: movements
           schema: kyc
         args:
-        - name: movement-id
-          type: uuid
-          required: true
-          maps_to: id
-          lookup:
-            table: movements
-            entity_type: movement
-            schema: kyc
-            search_key: id
-            primary_key: id
+          - name: movement-id
+            type: uuid
+            required: true
+            maps_to: id
+            lookup:
+              table: movements
+              entity_type: movement
+              schema: kyc
+              search_key: id
+              primary_key: id
         returns:
           type: record

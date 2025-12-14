@@ -181,6 +181,8 @@ impl eframe::App for GraphApp {
         // Check for view mode changes from JS
         if let Some(mode) = self.js_bridge.poll_view_mode_request() {
             self.view_mode = mode;
+            // Update graph widget's view mode for filtering
+            self.graph_widget.set_view_mode(mode);
             // Reload graph with new view mode
             if let Some(cbu_id) = self.current_cbu {
                 self.load_cbu(cbu_id);
