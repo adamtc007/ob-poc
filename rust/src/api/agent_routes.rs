@@ -18,9 +18,9 @@
 //! - POST   /api/agent/onboard/render    - Render an onboarding template with parameters
 
 use crate::api::session::{
-    create_session_store, ChatRequest, ChatResponse, CreateSessionRequest, CreateSessionResponse,
-    ExecuteResponse, ExecutionResult, MessageRole, SessionState, SessionStateResponse,
-    SessionStore,
+    create_session_store, AgentSession, ChatRequest, ChatResponse, CreateSessionRequest,
+    CreateSessionResponse, ExecuteResponse, ExecutionResult, MessageRole, SessionState,
+    SessionStateResponse, SessionStore,
 };
 use crate::database::generation_log_repository::{
     CompileResult, GenerationAttempt, GenerationLogRepository, LintResult, ParseResult,
@@ -343,14 +343,23 @@ async fn create_session(
     State(state): State<AgentState>,
     Json(req): Json<CreateSessionRequest>,
 ) -> Result<Json<CreateSessionResponse>, StatusCode> {
+    tracing::info!("=== CREATE SESSION ===");
+    tracing::info!("Domain hint: {:?}", req.domain_hint);
+
     let session = crate::api::session::AgentSession::new(req.domain_hint.clone());
     let session_id = session.id;
     let created_at = session.created_at;
+
+    tracing::info!("Created session ID: {}", session_id);
 
     // Store in memory
     {
         let mut sessions = state.sessions.write().await;
         sessions.insert(session_id, session);
+        tracing::info!(
+            "Session stored in memory, total sessions: {}",
+            sessions.len()
+        );
     }
 
     // Persist to database asynchronously (simple insert, ~1-5ms)
@@ -364,22 +373,42 @@ async fn create_session(
         }
     });
 
-    Ok(Json(CreateSessionResponse {
+    let response = CreateSessionResponse {
         session_id,
         created_at,
         state: SessionState::New,
-    }))
+    };
+    tracing::info!(
+        "Returning CreateSessionResponse: session_id={}, state={:?}",
+        response.session_id,
+        response.state
+    );
+    Ok(Json(response))
 }
 
-/// GET /api/session/:id - Get session state
+/// GET /api/session/:id - Get session state (creates if not found)
 async fn get_session(
     State(state): State<AgentState>,
     Path(session_id): Path<Uuid>,
-) -> Result<Json<SessionStateResponse>, StatusCode> {
-    let sessions = state.sessions.read().await;
-    let session = sessions.get(&session_id).ok_or(StatusCode::NOT_FOUND)?;
+) -> Json<SessionStateResponse> {
+    // Try to get existing session, or create a new one with the requested ID
+    let session = {
+        let sessions = state.sessions.read().await;
+        sessions.get(&session_id).cloned()
+    };
 
-    Ok(Json(SessionStateResponse {
+    let session = match session {
+        Some(s) => s,
+        None => {
+            // Create new session with the requested ID
+            let new_session = AgentSession::new(None);
+            let mut sessions = state.sessions.write().await;
+            sessions.insert(session_id, new_session.clone());
+            new_session
+        }
+    };
+
+    Json(SessionStateResponse {
         session_id,
         state: session.state.clone(),
         message_count: session.messages.len(),
@@ -389,7 +418,7 @@ async fn get_session(
         context: session.context.clone(),
         messages: session.messages.clone(),
         can_execute: !session.assembled_dsl.is_empty(),
-    }))
+    })
 }
 
 /// DELETE /api/session/:id - Delete session
@@ -426,13 +455,25 @@ async fn chat_session(
 ) -> Result<Json<ChatResponse>, StatusCode> {
     use crate::api::agent_service::AgentChatRequest;
 
+    tracing::info!("=== CHAT SESSION START ===");
+    tracing::info!("Session ID: {}", session_id);
+    tracing::info!("Message: {:?}", req.message);
+    tracing::info!("CBU ID: {:?}", req.cbu_id);
+
     // Get session (create if needed)
     let mut session = {
         let sessions = state.sessions.read().await;
-        sessions
-            .get(&session_id)
-            .cloned()
-            .ok_or(StatusCode::NOT_FOUND)?
+        tracing::info!("Looking up session in store...");
+        match sessions.get(&session_id) {
+            Some(s) => {
+                tracing::info!("Session found, state: {:?}", s.state);
+                s.clone()
+            }
+            None => {
+                tracing::warn!("Session NOT FOUND: {}", session_id);
+                return Err(StatusCode::NOT_FOUND);
+            }
+        }
     };
 
     // Create LLM client (uses AGENT_BACKEND env var to select provider)
@@ -450,6 +491,7 @@ async fn chat_session(
                 dsl_source: None,
                 ast: None,
                 bindings: None,
+                commands: None,
             }));
         }
     };
@@ -487,6 +529,7 @@ async fn chat_session(
                 dsl_source: None,
                 ast: None,
                 bindings: None,
+                commands: None,
             }));
         }
     };
@@ -522,6 +565,7 @@ async fn chat_session(
         } else {
             Some(session.context.bindings.clone())
         },
+        commands: response.commands,
     }))
 }
 
@@ -1184,12 +1228,22 @@ async fn clear_session_dsl(
 pub struct SetBindingRequest {
     /// The binding name (without @)
     pub name: String,
-    /// The UUID to bind
+    /// The UUID to bind (accepts string for TypeScript compat)
+    #[serde(deserialize_with = "deserialize_uuid_string")]
     pub id: Uuid,
     /// Entity type (e.g., "cbu", "entity", "case")
     pub entity_type: String,
     /// Human-readable display name
     pub display_name: String,
+}
+
+/// Deserialize UUID from string
+fn deserialize_uuid_string<'de, D>(deserializer: D) -> Result<Uuid, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s: String = serde::Deserialize::deserialize(deserializer)?;
+    Uuid::parse_str(&s).map_err(serde::de::Error::custom)
 }
 
 /// Response from setting a binding
@@ -1209,16 +1263,8 @@ async fn set_session_binding(
     Path(session_id): Path<Uuid>,
     Json(req): Json<SetBindingRequest>,
 ) -> Result<Json<SetBindingResponse>, StatusCode> {
-    eprintln!(
-        "[BIND-RUST] Received bind request for session {} - name={} id={} type={}",
-        session_id, req.name, req.id, req.entity_type
-    );
-
     let mut sessions = state.sessions.write().await;
-    let session = sessions.get_mut(&session_id).ok_or_else(|| {
-        eprintln!("[BIND-RUST] Session {} NOT FOUND", session_id);
-        StatusCode::NOT_FOUND
-    })?;
+    let session = sessions.get_mut(&session_id).ok_or(StatusCode::NOT_FOUND)?;
 
     // Set the typed binding (includes display name for LLM context)
     let actual_name =
@@ -1236,19 +1282,24 @@ async fn set_session_binding(
         session.context.set_active_cbu(req.id, &req.display_name);
     }
 
-    eprintln!(
-        "[BIND-RUST] SUCCESS - Session {} - Set @{} = {} (type: {}, display: {})",
-        session_id, actual_name, req.id, req.entity_type, req.display_name
+    tracing::debug!(
+        "Bind success: session={} @{}={} type={}",
+        session_id,
+        actual_name,
+        req.id,
+        req.entity_type
     );
-    eprintln!(
-        "[BIND-RUST] named_refs now: {:?}",
-        session.context.named_refs
-    );
+
+    // Clone before dropping the lock to avoid holding it during response serialization
+    // This fixes a deadlock that caused ERR_EMPTY_RESPONSE
+    let bindings_clone = session.context.named_refs.clone();
+    let actual_name_clone = actual_name.clone();
+    drop(sessions);
 
     Ok(Json(SetBindingResponse {
         success: true,
-        binding_name: actual_name,
-        bindings: session.context.named_refs.clone(),
+        binding_name: actual_name_clone,
+        bindings: bindings_clone,
     }))
 }
 

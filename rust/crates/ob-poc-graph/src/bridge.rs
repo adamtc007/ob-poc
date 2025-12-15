@@ -19,6 +19,8 @@ static PENDING_CBU: Mutex<Option<String>> = Mutex::new(None);
 static PENDING_FOCUS: Mutex<Option<String>> = Mutex::new(None);
 #[cfg(target_arch = "wasm32")]
 static PENDING_VIEW_MODE: Mutex<Option<String>> = Mutex::new(None);
+#[cfg(target_arch = "wasm32")]
+static PENDING_REFRESH: Mutex<bool> = Mutex::new(false);
 
 /// Bridge for communication between WASM and HTML
 pub struct JsBridge {
@@ -96,6 +98,18 @@ impl JsBridge {
             mode_callback.as_ref().unchecked_ref(),
         );
         mode_callback.forget();
+
+        // Listen for refresh-graph events (triggered after DSL execution)
+        let refresh_callback = Closure::<dyn Fn(CustomEvent)>::new(move |_event: CustomEvent| {
+            if let Ok(mut pending) = PENDING_REFRESH.lock() {
+                *pending = true;
+            }
+        });
+        let _ = window.add_event_listener_with_callback(
+            "refresh-graph",
+            refresh_callback.as_ref().unchecked_ref(),
+        );
+        refresh_callback.forget();
 
         tracing::info!("JsBridge: event listeners registered on window");
     }
@@ -194,6 +208,22 @@ impl JsBridge {
         }
         #[cfg(not(target_arch = "wasm32"))]
         None
+    }
+
+    /// Poll for pending refresh request (triggered after DSL execution)
+    pub fn poll_refresh_request(&mut self) -> bool {
+        #[cfg(target_arch = "wasm32")]
+        {
+            if let Ok(mut pending) = PENDING_REFRESH.lock() {
+                let should_refresh = *pending;
+                *pending = false;
+                should_refresh
+            } else {
+                false
+            }
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        false
     }
 }
 

@@ -11,7 +11,7 @@ use eframe::egui;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
-pub use graph::{CbuGraphData, CbuGraphWidget, GraphEdgeData, GraphNodeData};
+pub use graph::{CbuGraphData, CbuGraphWidget, GraphEdgeData, GraphNodeData, ViewMode};
 
 /// Shared state for async graph loading
 #[derive(Default)]
@@ -189,6 +189,14 @@ impl eframe::App for GraphApp {
             }
         }
 
+        // Check for refresh requests from JS (triggered after DSL execution)
+        if self.js_bridge.poll_refresh_request() {
+            if let Some(cbu_id) = self.current_cbu {
+                tracing::debug!("Refreshing graph for CBU: {}", cbu_id);
+                self.load_cbu(cbu_id);
+            }
+        }
+
         // Render graph - full canvas, no panels
         egui::CentralPanel::default().show(ctx, |ui| {
             self.graph_widget.ui(ui);
@@ -201,20 +209,10 @@ impl eframe::App for GraphApp {
     }
 }
 
-// WASM entry point
+// WASM entry point - NOTE: No #[wasm_bindgen(start)] because this crate
+// is used as a library by ob-poc-ui, which handles initialization.
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
-
-#[cfg(target_arch = "wasm32")]
-#[wasm_bindgen(start)]
-pub fn start() -> Result<(), JsValue> {
-    console_error_panic_hook::set_once();
-    tracing_wasm::set_as_global_default();
-
-    tracing::info!("OB-POC Graph WASM starting");
-
-    Ok(())
-}
 
 /// Start the graph app on a canvas element
 #[cfg(target_arch = "wasm32")]

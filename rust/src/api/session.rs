@@ -100,10 +100,17 @@ pub struct PendingDsl {
 // ============================================================================
 
 /// The main agent session - lives server-side
+/// Session key = (user_id, entity_type, entity_id)
 #[derive(Debug, Clone, Serialize)]
 pub struct AgentSession {
-    /// Unique session identifier
+    /// Unique session identifier (for backwards compat - may equal entity_id)
     pub id: Uuid,
+    /// User ID for audit trail (nil UUID = anonymous/dev mode)
+    pub user_id: Uuid,
+    /// Entity type this session operates on ("cbu", "kyc_case", "onboarding", etc.)
+    pub entity_type: String,
+    /// Entity ID this session operates on (CBU ID, case ID, etc.)
+    pub entity_id: Option<Uuid>,
     /// When the session was created
     pub created_at: DateTime<Utc>,
     /// When the session was last updated
@@ -133,11 +140,22 @@ pub struct AgentSession {
 }
 
 impl AgentSession {
-    /// Create a new session with optional domain hint
-    pub fn new(domain_hint: Option<String>) -> Self {
+    /// Create a new session for an entity
+    /// - user_id: None = anonymous/dev mode (nil UUID)
+    /// - entity_type: "cbu", "kyc_case", "onboarding", etc.
+    /// - entity_id: Some(uuid) if known, None if creating new
+    pub fn new_for_entity(
+        user_id: Option<Uuid>,
+        entity_type: &str,
+        entity_id: Option<Uuid>,
+        domain_hint: Option<String>,
+    ) -> Self {
         let now = Utc::now();
         Self {
-            id: Uuid::new_v4(),
+            id: entity_id.unwrap_or_else(Uuid::new_v4),
+            user_id: user_id.unwrap_or(Uuid::nil()),
+            entity_type: entity_type.to_string(),
+            entity_id,
             created_at: now,
             updated_at: now,
             state: SessionState::New,
@@ -151,6 +169,18 @@ impl AgentSession {
                 ..Default::default()
             },
         }
+    }
+
+    /// Create a new CBU session (anonymous/dev mode)
+    pub fn new(domain_hint: Option<String>) -> Self {
+        Self::new_for_entity(None, "cbu", None, domain_hint)
+    }
+
+    /// Set entity ID after creation (e.g., after cbu.ensure executes)
+    pub fn set_entity_id(&mut self, entity_id: Uuid) {
+        self.entity_id = Some(entity_id);
+        self.id = entity_id; // Session ID follows entity ID
+        self.updated_at = Utc::now();
     }
 
     /// Set pending DSL (parsed and ready for user confirmation)
@@ -463,6 +493,9 @@ impl SessionContext {
 
     /// Set a typed binding with display name
     /// Returns the actual binding name used (may have suffix if collision)
+    ///
+    /// Special handling for "cbu" binding: always replaces (no suffix) since
+    /// the UI's active CBU should always be @cbu, not @cbu_2, @cbu_3, etc.
     pub fn set_binding(
         &mut self,
         name: &str,
@@ -470,9 +503,12 @@ impl SessionContext {
         entity_type: &str,
         display_name: &str,
     ) -> String {
-        // Handle collision - append suffix if name already exists
-        let actual_name = if self.bindings.contains_key(name) {
-            // Find unique name with suffix
+        // Special case: "cbu" binding always replaces - the UI's active CBU
+        // should always be accessible as @cbu, not @cbu_2, @cbu_3
+        let actual_name = if name == "cbu" {
+            name.to_string()
+        } else if self.bindings.contains_key(name) {
+            // Handle collision - append suffix if name already exists
             let mut suffix = 2;
             loop {
                 let candidate = format!("{}_{}", name, suffix);
@@ -776,6 +812,9 @@ pub struct ChatResponse {
     /// Session bindings with type info
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bindings: Option<HashMap<String, BoundEntity>>,
+    /// Commands for the UI to execute (uses shared type from ob_poc_types)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub commands: Option<Vec<ob_poc_types::AgentCommand>>,
 }
 
 /// Response with session state

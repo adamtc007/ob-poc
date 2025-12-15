@@ -77,7 +77,7 @@ impl ViewMode {
     pub fn display_name(&self) -> &'static str {
         match self {
             ViewMode::KycUbo => "KYC / UBO",
-            ViewMode::ServiceDelivery => "Products",
+            ViewMode::ServiceDelivery => "Services",
             ViewMode::Custody => "Custody",
             ViewMode::ProductsOnly => "Products",
         }
@@ -483,9 +483,23 @@ impl CbuGraphWidget {
         );
 
         // Allocate space and get painter
-        let (response, painter) = ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
+        let available = ui.available_size();
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(&format!("graph ui(): available_size={:?}", available).into());
+
+        let (response, painter) = ui.allocate_painter(available, Sense::click_and_drag());
 
         let screen_rect = response.rect;
+
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(
+            &format!(
+                "graph ui(): screen_rect={:?}, hovered={}",
+                screen_rect,
+                response.hovered()
+            )
+            .into(),
+        );
 
         // Initial fit on first render
         if self.needs_initial_fit {

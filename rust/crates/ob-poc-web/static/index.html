@@ -1,125 +1,42 @@
-<!doctype html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>OB-POC - KYC/AML Onboarding</title>
-        <link rel="stylesheet" href="/static/styles/main.css" />
-    </head>
-    <body>
-        <div id="app-container">
-            <!-- Left Column: 3 stacked panels (Chat, DSL, AST) -->
-            <div id="left-column">
-                <!-- Top: Chat Panel -->
-                <div id="chat-panel" class="panel">
-                    <div class="panel-header">
-                        <span class="panel-title">Agent Chat</span>
-                        <span id="session-status" class="status-badge"
-                            >new</span
-                        >
-                    </div>
-                    <div id="chat-messages"></div>
-                    <div id="chat-input-area">
-                        <textarea
-                            id="chat-input"
-                            placeholder="Describe your onboarding scenario... (Enter to send)"
-                            rows="2"
-                        ></textarea>
-                    </div>
-                </div>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OB-POC</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1a1a; }
+        canvas { width: 100%; height: 100%; display: block; }
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #888;
+            font-family: sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">Loading OB-POC...</div>
+    <canvas id="app"></canvas>
+    <script type="module">
+        import init, { init_ui, start_app } from '/static/wasm/ob_poc_ui.js';
 
-                <!-- Middle: DSL Panel -->
-                <div id="dsl-panel" class="panel">
-                    <div class="panel-header">
-                        <span class="panel-title">DSL Source</span>
-                        <span id="dsl-status" class="status-badge">empty</span>
-                    </div>
-                    <div id="dsl-content">
-                        <pre><code id="dsl-source" class="language-clojure">; DSL will appear here after chat</code></pre>
-                    </div>
-                </div>
-
-                <!-- Bottom: AST Panel -->
-                <div id="ast-panel" class="panel">
-                    <div class="panel-header">
-                        <span class="panel-title">AST</span>
-                        <button id="ast-expand-all" class="btn btn-small">
-                            Expand All
-                        </button>
-                        <button id="ast-collapse-all" class="btn btn-small">
-                            Collapse All
-                        </button>
-                    </div>
-                    <div id="ast-tree"></div>
-                </div>
-            </div>
-
-            <!-- Right Column: Full-height CBU Graph (WASM/egui) -->
-            <div id="cbu-panel" class="panel">
-                <div class="panel-header">
-                    <span class="panel-title">CBU Graph</span>
-                    <select id="cbu-selector" class="cbu-dropdown">
-                        <option value="">Select a CBU...</option>
-                    </select>
-                    <select id="view-mode" class="view-dropdown">
-                        <option value="KYC_UBO">KYC / UBO</option>
-                        <option value="SERVICE_DELIVERY">Products</option>
-                        <option value="CUSTODY">Custody</option>
-                    </select>
-                </div>
-                <div id="graph-container">
-                    <canvas id="egui-canvas"></canvas>
-                    <div id="graph-loading" class="loading-overlay">
-                        <span>Loading graph...</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- WASM for graph visualization -->
-        <script type="module">
-            import init, { start_graph } from "/static/wasm/ob_poc_graph.js";
-
+        async function run() {
             try {
                 await init();
-                start_graph("egui-canvas");
-                document.getElementById("graph-loading").style.display = "none";
+                init_ui();
+                start_app('app');
+                document.getElementById('loading').style.display = 'none';
             } catch (e) {
-                console.error("Failed to load WASM graph:", e);
-                document.getElementById("graph-loading").innerHTML =
-                    `<span>WASM error: ${e.message || e}</span>`;
+                document.getElementById('loading').textContent = 'Failed to load: ' + e;
+                console.error('Failed to start app:', e);
             }
-        </script>
+        }
 
-        <!-- Entity Finder Modal -->
-        <dialog id="entity-finder-modal" class="entity-finder-modal">
-            <div class="modal-header">
-                <span class="modal-title">Resolve Entity Reference</span>
-                <button class="modal-close" aria-label="Close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="search-context">
-                    <span class="context-label">Looking for:</span>
-                    <span
-                        id="entity-finder-context"
-                        class="context-value"
-                    ></span>
-                </div>
-                <div class="search-input-container">
-                    <input
-                        type="text"
-                        id="entity-finder-search"
-                        placeholder="Search..."
-                        autocomplete="off"
-                    />
-                </div>
-                <div id="entity-finder-results" class="search-results">
-                    <div class="search-placeholder">Type to search...</div>
-                </div>
-            </div>
-        </dialog>
-
-        <!-- TypeScript panels -->
-        <script type="module" src="/static/js/app.js"></script>
-    </body>
+        run();
+    </script>
+</body>
 </html>

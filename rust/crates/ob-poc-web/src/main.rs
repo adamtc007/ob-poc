@@ -1,11 +1,7 @@
-//! OB-POC Hybrid Web Server
+//! OB-POC Web Server
 //!
-//! Serves the hybrid UI architecture:
-//! - HTML/TypeScript for Chat, DSL, AST panels
-//! - WASM/egui for CBU graph visualization
-//!
-//! Also provides all API endpoints for DSL generation, entity search,
-//! attributes, and DSL viewer.
+//! Serves the egui-based UI via WASM and provides all API endpoints
+//! for DSL generation, entity search, attributes, and DSL viewer.
 
 mod routes;
 mod state;
@@ -210,7 +206,7 @@ async fn main() {
         .route("/api/chat/stream", get(routes::chat::chat_stream))
         // Static files (JS, CSS, WASM)
         .nest_service("/static", ServeDir::new(&static_dir))
-        // Index.html at root
+        // Index.html at root (egui app)
         .route("/", get(routes::static_files::serve_index))
         // Add state
         .with_state(state)

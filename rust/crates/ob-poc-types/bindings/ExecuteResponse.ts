@@ -4,4 +4,8 @@ import type { ExecuteResult } from "./ExecuteResult";
 /**
  * Response from DSL execution
  */
-export type ExecuteResponse = { success: boolean, results: Array<ExecuteResult>, errors: Array<string>, bindings?: { [key in string]?: string }, };
+export type ExecuteResponse = { success: boolean, results: Array<ExecuteResult>, errors: Array<string>, 
+/**
+ * New session state after execution (accept any JSON)
+ */
+new_state: unknown, bindings?: { [key in string]?: string }, };

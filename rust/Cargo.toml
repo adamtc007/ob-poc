@@ -13,6 +13,7 @@ rust-version = "1.84"
 # Workspace crates
 dsl_types = { path = "../dsl_types" }
 entity-gateway = { path = "crates/entity-gateway", optional = true }
+ob-poc-types = { path = "crates/ob-poc-types" }
 
 # Core libraries
 anyhow = "1.0"
@@ -126,6 +127,7 @@ members = [
     ".",
     "crates/dsl-lsp",
     "crates/ob-poc-graph",
+    "crates/ob-poc-ui",
     "crates/ob-poc-web",
     "crates/ob-poc-types",
     "crates/entity-gateway",

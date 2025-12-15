@@ -45,12 +45,49 @@ pub struct CreateSessionRequest {
 }
 
 /// Response after creating a session
+/// NOTE: Accepts flexible types to handle server's native types
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct CreateSessionResponse {
-    pub session_id: String, // UUID as string for TS
-    pub state: String,
-    pub created_at: String, // ISO 8601
+    /// Session ID - server sends UUID, we accept any string-serializable value
+    #[serde(deserialize_with = "deserialize_uuid_or_string")]
+    pub session_id: String,
+    /// State - server sends enum, we accept anything
+    #[serde(default)]
+    #[ts(type = "unknown")]
+    pub state: serde_json::Value,
+    /// Created at - server sends DateTime, we accept any
+    #[serde(default)]
+    #[ts(type = "unknown")]
+    pub created_at: serde_json::Value,
+}
+
+/// Helper to deserialize UUID or String into String
+fn deserialize_uuid_or_string<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de;
+
+    struct UuidOrStringVisitor;
+
+    impl<'de> de::Visitor<'de> for UuidOrStringVisitor {
+        type Value = String;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a UUID or string")
+        }
+
+        fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
+            Ok(v.to_string())
+        }
+
+        fn visit_string<E: de::Error>(self, v: String) -> Result<Self::Value, E> {
+            Ok(v)
+        }
+    }
+
+    deserializer.deserialize_any(UuidOrStringVisitor)
 }
 
 /// Bound entity info for session state
@@ -63,12 +100,18 @@ pub struct BoundEntityInfo {
 }
 
 /// Session state response
+/// NOTE: Accepts flexible types to handle server's native types
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct SessionStateResponse {
+    #[serde(deserialize_with = "deserialize_uuid_or_string")]
     pub session_id: String,
-    pub state: String,
+    #[serde(default)]
+    #[ts(type = "unknown")]
+    pub state: serde_json::Value,
+    #[serde(default)]
     pub message_count: usize,
+    #[serde(default)]
     pub can_execute: bool,
     #[serde(default)]
     #[ts(optional)]
@@ -79,7 +122,29 @@ pub struct SessionStateResponse {
     pub active_cbu: Option<BoundEntityInfo>,
     /// Named bindings available in the session (name -> entity info)
     #[serde(default)]
-    pub bindings: std::collections::HashMap<String, BoundEntityInfo>,
+    #[ts(type = "Record<string, unknown>")]
+    pub bindings: serde_json::Value,
+    // Extra fields from server
+    #[serde(default)]
+    #[ts(optional)]
+    #[ts(type = "unknown")]
+    pub pending_intents: Option<serde_json::Value>,
+    #[serde(default)]
+    #[ts(optional)]
+    #[ts(type = "unknown")]
+    pub assembled_dsl: Option<serde_json::Value>,
+    #[serde(default)]
+    #[ts(optional)]
+    #[ts(type = "unknown")]
+    pub combined_dsl: Option<serde_json::Value>,
+    #[serde(default)]
+    #[ts(optional)]
+    #[ts(type = "unknown")]
+    pub context: Option<serde_json::Value>,
+    #[serde(default)]
+    #[ts(optional)]
+    #[ts(type = "unknown")]
+    pub messages: Option<serde_json::Value>,
 }
 
 // ============================================================================
@@ -96,22 +161,46 @@ pub struct ChatRequest {
 }
 
 /// Chat response from agent
+/// NOTE: Fields use #[serde(default)] to be flexible with server response
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct ChatResponse {
     pub message: String,
+    #[serde(default)]
     pub can_execute: bool,
     #[serde(default)]
     #[ts(optional)]
     pub dsl_source: Option<String>,
+    /// AST - accepts any JSON since server sends different format
     #[serde(default)]
     #[ts(optional)]
-    pub ast: Option<Vec<AstStatement>>,
-    pub session_state: String,
+    #[ts(type = "unknown")]
+    pub ast: Option<serde_json::Value>,
+    /// Session state - accepts any JSON (server sends enum, we accept anything)
+    #[serde(default)]
+    #[ts(type = "unknown")]
+    pub session_state: serde_json::Value,
     /// UI commands to execute (show CBU, highlight entity, etc.)
     #[serde(default)]
     #[ts(optional)]
     pub commands: Option<Vec<AgentCommand>>,
+    // Extra fields from server that we ignore but must accept
+    #[serde(default)]
+    #[ts(optional)]
+    #[ts(type = "unknown")]
+    pub intents: Option<serde_json::Value>,
+    #[serde(default)]
+    #[ts(optional)]
+    #[ts(type = "unknown")]
+    pub validation_results: Option<serde_json::Value>,
+    #[serde(default)]
+    #[ts(optional)]
+    #[ts(type = "unknown")]
+    pub assembled_dsl: Option<serde_json::Value>,
+    #[serde(default)]
+    #[ts(optional)]
+    #[ts(type = "unknown")]
+    pub bindings: Option<serde_json::Value>,
 }
 
 /// SSE stream event - MUST use tagged enum for TypeScript discrimination
@@ -134,11 +223,30 @@ pub enum ChatStreamEvent {
 }
 
 /// Commands the agent can issue to the UI
+/// This is the canonical vocabulary for agent → UI communication.
+/// The LLM maps natural language ("run it", "undo that") to these commands.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(tag = "action", rename_all = "snake_case")]
 #[ts(export)]
 pub enum AgentCommand {
-    /// Show a specific CBU in the graph
+    // =========================================================================
+    // REPL Commands
+    // =========================================================================
+    /// Execute accumulated DSL ("execute", "run it", "do it", "go")
+    Execute,
+    /// Undo last DSL block ("undo", "take that back", "never mind")
+    Undo,
+    /// Clear all accumulated DSL ("clear", "start over", "reset")
+    Clear,
+    /// Delete specific statement by index ("delete the second one", "remove that")
+    Delete { index: u32 },
+    /// Delete the last statement ("delete that", "remove the last one")
+    DeleteLast,
+
+    // =========================================================================
+    // Navigation Commands
+    // =========================================================================
+    /// Show a specific CBU in the graph ("show me X fund")
     ShowCbu { cbu_id: String },
     /// Highlight an entity in the graph
     HighlightEntity { entity_id: String },
@@ -167,9 +275,13 @@ pub struct ExecuteResponse {
     pub success: bool,
     pub results: Vec<ExecuteResult>,
     pub errors: Vec<String>,
+    /// New session state after execution (accept any JSON)
+    #[serde(default)]
+    #[ts(type = "unknown")]
+    pub new_state: serde_json::Value,
     #[serde(default)]
     #[ts(optional)]
-    pub bindings: Option<std::collections::HashMap<String, String>>, // name -> UUID
+    pub bindings: Option<std::collections::HashMap<String, String>>, // name -> UUID (as string)
 }
 
 /// Individual statement execution result
@@ -177,11 +289,17 @@ pub struct ExecuteResponse {
 #[ts(export)]
 pub struct ExecuteResult {
     pub statement_index: usize,
+    #[serde(default)]
+    #[ts(optional)]
+    pub dsl: Option<String>,
     pub success: bool,
     pub message: String,
     #[serde(default)]
     #[ts(optional)]
     pub entity_id: Option<String>,
+    #[serde(default)]
+    #[ts(optional)]
+    pub entity_type: Option<String>,
 }
 
 // ============================================================================
@@ -575,6 +693,81 @@ pub enum ChatPayload {
 }
 
 // ============================================================================
+// ENTITY SEARCH API (for resolution popups in egui)
+// ============================================================================
+
+/// A single match from entity search
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct EntitySearchMatch {
+    /// Primary key (UUID or code)
+    pub value: String,
+    /// Human-readable label
+    pub display: String,
+    /// Additional context
+    #[serde(default)]
+    #[ts(optional)]
+    pub detail: Option<String>,
+    /// Relevance score
+    pub score: f32,
+}
+
+/// Response from entity search
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct EntitySearchResponse {
+    pub matches: Vec<EntitySearchMatch>,
+    pub total: usize,
+    pub truncated: bool,
+}
+
+// ============================================================================
+// BIND ENTITY API (for binding CBU to session)
+// ============================================================================
+
+/// Request to set a binding in a session (matches agent_routes.rs SetBindingRequest)
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct SetBindingRequest {
+    /// Binding name (without @)
+    pub name: String,
+    /// UUID to bind (as string for TS compat)
+    pub id: String,
+    /// Entity type (e.g., "cbu", "entity", "case")
+    pub entity_type: String,
+    /// Human-readable display name
+    pub display_name: String,
+}
+
+/// Response from setting a binding (matches agent_routes.rs SetBindingResponse)
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct SetBindingResponse {
+    pub success: bool,
+    pub binding_name: String,
+    pub bindings: std::collections::HashMap<String, String>,
+}
+
+// ============================================================================
+// VALIDATION API (for DSL validation in egui)
+// ============================================================================
+
+/// Request to validate DSL
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ValidateDslRequest {
+    pub dsl: String,
+}
+
+/// Response from DSL validation
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ValidateDslResponse {
+    pub valid: bool,
+    pub errors: Vec<String>,
+}
+
+// ============================================================================
 // CONVERSION HELPERS
 // ============================================================================
 
@@ -582,8 +775,8 @@ impl CreateSessionResponse {
     pub fn new(session_id: Uuid, state: &str, created_at: DateTime<Utc>) -> Self {
         Self {
             session_id: session_id.to_string(),
-            state: state.to_string(),
-            created_at: created_at.to_rfc3339(),
+            state: serde_json::Value::String(state.to_string()),
+            created_at: serde_json::Value::String(created_at.to_rfc3339()),
         }
     }
 }
@@ -608,18 +801,22 @@ impl ExecuteResult {
     pub fn success(index: usize, message: &str, entity_id: Option<Uuid>) -> Self {
         Self {
             statement_index: index,
+            dsl: None,
             success: true,
             message: message.to_string(),
             entity_id: entity_id.map(|id| id.to_string()),
+            entity_type: None,
         }
     }
 
     pub fn failure(index: usize, message: &str) -> Self {
         Self {
             statement_index: index,
+            dsl: None,
             success: false,
             message: message.to_string(),
             entity_id: None,
+            entity_type: None,
         }
     }
 }
@@ -683,6 +880,7 @@ mod tests {
             success: true,
             results: vec![ExecuteResult::success(0, "OK", None)],
             errors: vec![],
+            new_state: serde_json::Value::String("executed".to_string()),
             bindings: None,
         };
 
@@ -703,5 +901,42 @@ mod tests {
         // UUID should be serialized as string, not object
         assert!(json.contains(&id.to_string()));
         assert!(!json.contains("Uuid"));
+    }
+
+    #[test]
+    fn agent_command_execute_serializes() {
+        let cmd = AgentCommand::Execute;
+        let json = serde_json::to_string(&cmd).unwrap();
+        println!("AgentCommand::Execute JSON: {}", json);
+        assert!(json.contains(r#""action":"execute""#));
+    }
+
+    #[test]
+    fn optional_commands_with_execute() {
+        // Simulate what server sends
+        #[derive(serde::Serialize)]
+        struct TestResponse {
+            message: String,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            commands: Option<Vec<AgentCommand>>,
+        }
+
+        let resp = TestResponse {
+            message: "Executing...".to_string(),
+            commands: Some(vec![AgentCommand::Execute]),
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        println!("TestResponse JSON: {}", json);
+
+        // Verify commands field is present and correctly serialized
+        assert!(json.contains(r#""commands""#), "commands field missing");
+        assert!(
+            json.contains(r#""action":"execute""#),
+            "execute action missing"
+        );
+        assert!(
+            !json.contains(r#""commands":null"#),
+            "commands should not be null"
+        );
     }
 }

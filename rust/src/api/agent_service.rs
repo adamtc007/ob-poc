@@ -184,17 +184,8 @@ pub struct AgentChatResponse {
     pub commands: Option<Vec<AgentCommand>>,
 }
 
-/// Commands the agent can issue to the UI
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "action", rename_all = "snake_case")]
-pub enum AgentCommand {
-    /// Show a specific CBU in the graph
-    ShowCbu { cbu_id: String },
-    /// Highlight an entity in the graph
-    HighlightEntity { entity_id: String },
-    /// Navigate to a line in the DSL panel
-    NavigateDsl { line: u32 },
-}
+// Re-export AgentCommand from ob_poc_types as the single source of truth
+pub use ob_poc_types::AgentCommand;
 
 /// Configuration for the agent service
 #[derive(Debug, Clone)]
@@ -421,8 +412,20 @@ impl AgentService {
         request: &AgentChatRequest,
         llm_client: Arc<dyn LlmClient>,
     ) -> Result<AgentChatResponse, String> {
+        tracing::info!("=== AGENT SERVICE process_chat START ===");
+        tracing::info!("User message: {:?}", request.message);
+        tracing::info!("CBU ID: {:?}", request.cbu_id);
+        tracing::info!("Session ID: {}", session.id);
+
         // Check for "show CBU" command first
         if let Some(cmd_response) = self.handle_show_command(&request.message).await? {
+            tracing::info!("Handled as show command");
+            return Ok(cmd_response);
+        }
+
+        // Check for DSL management commands (delete, undo, clear, execute)
+        if let Some(cmd_response) = self.handle_dsl_command(session, &request.message).await? {
+            tracing::info!("Handled as DSL command");
             return Ok(cmd_response);
         }
 
@@ -517,15 +520,78 @@ impl AgentService {
                 }
             };
 
-            // Parse intents and explanation
-            let intents: Vec<VerbIntent> =
-                serde_json::from_value(tool_result.arguments["intents"].clone())
-                    .unwrap_or_default();
+            // Check for clarification request first
+            let needs_clarification = tool_result.arguments["needs_clarification"]
+                .as_bool()
+                .unwrap_or(false);
 
             let explanation = tool_result.arguments["explanation"]
                 .as_str()
                 .unwrap_or("")
                 .to_string();
+
+            if needs_clarification {
+                // LLM detected ambiguity and needs clarification from user
+                let clarification = &tool_result.arguments["clarification"];
+                let question = clarification["question"]
+                    .as_str()
+                    .unwrap_or("Could you please clarify your request?");
+                let ambiguity_type = clarification["ambiguity_type"]
+                    .as_str()
+                    .unwrap_or("unknown");
+
+                tracing::debug!(
+                    "Clarification needed: type={}, question={}",
+                    ambiguity_type,
+                    question
+                );
+
+                // Build a user-friendly clarification message
+                let clarification_message =
+                    if let Some(interpretations) = clarification["interpretations"].as_array() {
+                        let options: Vec<String> = interpretations
+                            .iter()
+                            .filter_map(|i| {
+                                let opt = i["option"].as_i64().unwrap_or(0);
+                                let desc = i["description"].as_str().unwrap_or("");
+                                if !desc.is_empty() {
+                                    Some(format!("  {}. {}", opt, desc))
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+
+                        if options.is_empty() {
+                            question.to_string()
+                        } else {
+                            format!("{}\n\nOptions:\n{}", question, options.join("\n"))
+                        }
+                    } else {
+                        question.to_string()
+                    };
+
+                session.add_agent_message(clarification_message.clone(), None, None);
+                // Use PendingValidation to indicate we're waiting for user clarification
+                session.state = SessionState::PendingValidation;
+
+                return Ok(AgentChatResponse {
+                    message: clarification_message,
+                    intents: vec![],
+                    validation_results: vec![],
+                    session_state: SessionState::PendingValidation,
+                    can_execute: false,
+                    dsl_source: None,
+                    ast: None,
+                    disambiguation: None,
+                    commands: None,
+                });
+            }
+
+            // Parse intents
+            let intents: Vec<VerbIntent> =
+                serde_json::from_value(tool_result.arguments["intents"].clone())
+                    .unwrap_or_default();
 
             if intents.is_empty() {
                 if attempt < self.config.max_retries - 1 {
@@ -916,6 +982,219 @@ impl AgentService {
         }
     }
 
+    /// Handle DSL management commands: delete, undo, clear, execute
+    ///
+    /// Recognized patterns:
+    /// - "delete <search>" / "remove <search>" - removes statement containing search term
+    /// - "undo" / "undo last" - removes last statement
+    /// - "clear" / "clear all" / "reset" - clears all DSL
+    /// - "execute" / "run" / "go" - executes accumulated DSL
+    async fn handle_dsl_command(
+        &self,
+        session: &mut AgentSession,
+        message: &str,
+    ) -> Result<Option<AgentChatResponse>, String> {
+        let lower_msg = message.to_lowercase().trim().to_string();
+        let words: Vec<&str> = lower_msg.split_whitespace().collect();
+
+        tracing::debug!("[DSL_CMD] message='{}' words={:?}", message, words);
+
+        if words.is_empty() {
+            return Ok(None);
+        }
+
+        // Execute command - handles: run, execute, go, do it, run it, execute it, etc.
+        let is_execute = matches!(words[0], "execute" | "run" | "go" | "do")
+            || (words.len() >= 2
+                && matches!(
+                    (words[0], words[1]),
+                    ("run", "it")
+                        | ("do", "it")
+                        | ("execute", "it")
+                        | ("run", "that")
+                        | ("execute", "that")
+                ));
+        if is_execute {
+            tracing::info!("[DSL_CMD] Matched execute/run/go command");
+            if session.assembled_dsl.is_empty() {
+                return Ok(Some(AgentChatResponse {
+                    message: "No DSL to execute. Add some statements first.".to_string(),
+                    intents: vec![],
+                    validation_results: vec![],
+                    session_state: session.state.clone(),
+                    can_execute: false,
+                    dsl_source: None,
+                    ast: None,
+                    disambiguation: None,
+                    commands: Some(vec![AgentCommand::Execute]),
+                }));
+            }
+            return Ok(Some(AgentChatResponse {
+                message: format!(
+                    "Executing {} DSL statement(s)...",
+                    session.assembled_dsl.len()
+                ),
+                intents: vec![],
+                validation_results: vec![],
+                session_state: SessionState::ReadyToExecute,
+                can_execute: true,
+                dsl_source: Some(session.assembled_dsl.join("\n\n")),
+                ast: None,
+                disambiguation: None,
+                commands: Some(vec![AgentCommand::Execute]),
+            }));
+        }
+
+        // Undo command
+        if words[0] == "undo" {
+            if session.assembled_dsl.is_empty() {
+                return Ok(Some(AgentChatResponse {
+                    message: "Nothing to undo.".to_string(),
+                    intents: vec![],
+                    validation_results: vec![],
+                    session_state: session.state.clone(),
+                    can_execute: false,
+                    dsl_source: None,
+                    ast: None,
+                    disambiguation: None,
+                    commands: None,
+                }));
+            }
+            let removed = session.assembled_dsl.pop().unwrap_or_default();
+            // Extract a short description from the removed DSL
+            let desc = removed.lines().next().unwrap_or(&removed);
+            let desc_short = if desc.len() > 60 {
+                format!("{}...", &desc[..60])
+            } else {
+                desc.to_string()
+            };
+            session.state = if session.assembled_dsl.is_empty() {
+                SessionState::New
+            } else {
+                SessionState::ReadyToExecute
+            };
+            return Ok(Some(AgentChatResponse {
+                message: format!(
+                    "Removed: {}\n{} statement(s) remaining.",
+                    desc_short,
+                    session.assembled_dsl.len()
+                ),
+                intents: vec![],
+                validation_results: vec![],
+                session_state: session.state.clone(),
+                can_execute: !session.assembled_dsl.is_empty(),
+                dsl_source: if session.assembled_dsl.is_empty() {
+                    None
+                } else {
+                    Some(session.assembled_dsl.join("\n\n"))
+                },
+                ast: None,
+                disambiguation: None,
+                commands: None,
+            }));
+        }
+
+        // Clear command
+        if matches!(words[0], "clear" | "reset") {
+            let count = session.assembled_dsl.len();
+            session.assembled_dsl.clear();
+            session.pending_intents.clear();
+            session.state = SessionState::New;
+            return Ok(Some(AgentChatResponse {
+                message: format!("Cleared {} DSL statement(s).", count),
+                intents: vec![],
+                validation_results: vec![],
+                session_state: SessionState::New,
+                can_execute: false,
+                dsl_source: None,
+                ast: None,
+                disambiguation: None,
+                commands: None,
+            }));
+        }
+
+        // Delete/remove command - search for matching statement
+        if matches!(words[0], "delete" | "remove") && words.len() > 1 {
+            let search_term = words[1..].join(" ");
+
+            // Find statement containing the search term (case-insensitive)
+            let idx = session
+                .assembled_dsl
+                .iter()
+                .position(|stmt| stmt.to_lowercase().contains(&search_term));
+
+            if let Some(idx) = idx {
+                let removed = session.assembled_dsl.remove(idx);
+                let desc = removed.lines().next().unwrap_or(&removed);
+                let desc_short = if desc.len() > 60 {
+                    format!("{}...", &desc[..60])
+                } else {
+                    desc.to_string()
+                };
+                session.state = if session.assembled_dsl.is_empty() {
+                    SessionState::New
+                } else {
+                    SessionState::ReadyToExecute
+                };
+                return Ok(Some(AgentChatResponse {
+                    message: format!(
+                        "Removed statement {}: {}\n{} statement(s) remaining.",
+                        idx + 1,
+                        desc_short,
+                        session.assembled_dsl.len()
+                    ),
+                    intents: vec![],
+                    validation_results: vec![],
+                    session_state: session.state.clone(),
+                    can_execute: !session.assembled_dsl.is_empty(),
+                    dsl_source: if session.assembled_dsl.is_empty() {
+                        None
+                    } else {
+                        Some(session.assembled_dsl.join("\n\n"))
+                    },
+                    ast: None,
+                    disambiguation: None,
+                    commands: None,
+                }));
+            } else {
+                // No match - list available statements
+                let available: Vec<String> = session
+                    .assembled_dsl
+                    .iter()
+                    .enumerate()
+                    .map(|(i, stmt)| {
+                        let first_line = stmt.lines().next().unwrap_or(stmt);
+                        let short = if first_line.len() > 50 {
+                            format!("{}...", &first_line[..50])
+                        } else {
+                            first_line.to_string()
+                        };
+                        format!("{}. {}", i + 1, short)
+                    })
+                    .collect();
+
+                return Ok(Some(AgentChatResponse {
+                    message: format!(
+                        "No statement matching '{}'. Available:\n{}",
+                        search_term,
+                        available.join("\n")
+                    ),
+                    intents: vec![],
+                    validation_results: vec![],
+                    session_state: session.state.clone(),
+                    can_execute: !session.assembled_dsl.is_empty(),
+                    dsl_source: None,
+                    ast: None,
+                    disambiguation: None,
+                    commands: None,
+                }));
+            }
+        }
+
+        // Not a DSL command
+        Ok(None)
+    }
+
     /// Collect all entity lookups from intents
     fn collect_lookups(&self, intents: &[VerbIntent]) -> HashMap<String, EntityLookup> {
         let mut lookups = HashMap::new();
@@ -1049,12 +1328,13 @@ impl AgentService {
             .as_ref()
             .and_then(|src| parse_program(src).ok().map(|prog| prog.statements));
 
-        // Update session
+        // Update session - accumulate DSL incrementally
         if let Some(ref dsl_source) = dsl {
             if let Some(ref ast_statements) = ast {
                 session.set_pending_dsl(dsl_source.clone(), ast_statements.clone());
             }
-            session.assembled_dsl = vec![dsl_source.clone()];
+            // Push to accumulated DSL (incremental REPL)
+            session.assembled_dsl.push(dsl_source.clone());
 
             if all_valid {
                 session.state = SessionState::ReadyToExecute;
@@ -1071,8 +1351,15 @@ impl AgentService {
             Some(session.assembled_dsl.join("\n\n"))
         };
 
+        // Include active CBU name in response message for clarity
+        let message = if let Some(ref cbu) = session.context.active_cbu {
+            format!("[{}] {}", cbu.display_name, explanation)
+        } else {
+            explanation
+        };
+
         Ok(AgentChatResponse {
-            message: explanation,
+            message,
             intents,
             validation_results,
             session_state: session.state.clone(),
@@ -1120,50 +1407,44 @@ impl AgentService {
 
     /// Build system prompt for intent extraction
     fn build_intent_extraction_prompt(&self, vocab: &str) -> String {
+        // Include domain knowledge and ambiguity detection rules
+        let domain_knowledge = include_str!("prompts/domain_knowledge.md");
+        let ambiguity_rules = include_str!("prompts/ambiguity_detection.md");
+
         format!(
-            r#"You are a DSL intent extraction assistant. Convert natural language to structured DSL intents.
+            r#"You are a KYC/AML onboarding DSL assistant. Convert natural language to structured DSL intents.
 
 IMPORTANT: You MUST use the generate_dsl_intents tool to return your response. Do NOT return plain text.
 
 ## Available DSL Verbs
 
-{}
+{vocab}
 
 ## Intent Structure
 
 Each intent represents a single DSL verb call with:
 - verb: The verb name (e.g., "cbu.ensure", "entity.create-proper-person")
 - params: Literal parameter values (e.g., {{"name": "Acme Corp", "jurisdiction": "LU"}})
-- refs: References to previous results (e.g., {{"cbu-id": "@result_1"}})
+- refs: References to previous results or session bindings (e.g., {{"cbu-id": "@cbu"}} or {{"cbu-id": "@result_1"}})
 - lookups: Entity references needing database resolution
 
 ## Rules
 
 1. Use exact verb names from the vocabulary
 2. Use exact parameter names (with hyphens, e.g., "client-type" not "clientType")
-3. For sequences, use @result_N references where N is the sequence number
-4. Common client types: "fund", "corporate", "individual"
-5. Use ISO codes for jurisdictions: "LU", "US", "GB", "IE", etc.
+3. If @cbu is available in session context, use it for cbu-id parameters
+4. For sequences of new entities, use @result_N references where N is the sequence number
+5. Check for ambiguity before generating intents - ask for clarification if needed
 
-## Product Codes (MUST use exact uppercase codes)
+{domain_knowledge}
 
-| User Says | Product Code |
-|-----------|--------------|
-| custody, safekeeping | CUSTODY |
-| fund accounting, fund admin, NAV | FUND_ACCOUNTING |
-| transfer agency, TA, investor registry | TRANSFER_AGENCY |
-| middle office, trade capture | MIDDLE_OFFICE |
-| collateral, margin | COLLATERAL_MGMT |
-| FX, foreign exchange | MARKETS_FX |
-| alternatives, alts, hedge fund admin | ALTS |
-
-IMPORTANT: Always use the UPPERCASE product codes, never the display names.
+{ambiguity_rules}
 
 ## Entity Lookups
 
 When the user mentions existing entities by name:
 - Use the "lookups" field to request entity resolution
-- Provide search_text (the name) and entity_type (person, company, cbu, entity)
+- Provide search_text (the name) and entity_type (person, company, cbu, entity, product, role)
 - If jurisdiction is mentioned, include jurisdiction_hint
 
 Example: "Add John Smith as director of Apex Capital"
@@ -1179,13 +1460,24 @@ Intent: {{
   "refs": {{}}
 }}
 
-User: "Add custody product to the fund"
+User: "Add custody product to the fund" (with @cbu in session)
 Intent: {{
   "verb": "cbu.add-product",
   "params": {{"product": "CUSTODY"}},
-  "refs": {{"cbu-id": "@result_1"}}
-}}"#,
-            vocab
+  "refs": {{"cbu-id": "@cbu"}}
+}}
+
+User: "Add John Smith as director"  (with @cbu in session)
+Intent 1: {{
+  "verb": "entity.create-proper-person",
+  "params": {{"first-name": "John", "last-name": "Smith"}},
+  "refs": {{}}
+}}
+Intent 2: {{
+  "verb": "cbu.assign-role",
+  "params": {{"role": "DIRECTOR"}},
+  "refs": {{"cbu-id": "@cbu", "entity-id": "@result_1"}}
+}}"#
         )
     }
 
@@ -1201,13 +1493,50 @@ Intent: {{
 
         ToolDefinition {
             name: "generate_dsl_intents".to_string(),
-            description: "Generate structured DSL intents from user request. Use 'lookups' for entity references that need database resolution.".to_string(),
+            description: "Generate structured DSL intents from user request. Use 'lookups' for entity references that need database resolution. Set needs_clarification=true if the request is ambiguous.".to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
+                    "needs_clarification": {
+                        "type": "boolean",
+                        "description": "Set to true if the request is ambiguous and needs clarification before proceeding",
+                        "default": false
+                    },
+                    "clarification": {
+                        "type": "object",
+                        "description": "Required when needs_clarification is true",
+                        "properties": {
+                            "ambiguity_type": {
+                                "type": "string",
+                                "enum": ["name_parsing", "entity_match", "missing_context", "multiple_interpretations"],
+                                "description": "Type of ambiguity detected"
+                            },
+                            "original_text": {
+                                "type": "string",
+                                "description": "The ambiguous part of the input"
+                            },
+                            "interpretations": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "option": { "type": "integer" },
+                                        "interpretation": { "type": "string" },
+                                        "description": { "type": "string" }
+                                    }
+                                },
+                                "description": "Possible interpretations of the ambiguous input"
+                            },
+                            "question": {
+                                "type": "string",
+                                "description": "Clear question to ask the user for clarification"
+                            }
+                        },
+                        "required": ["ambiguity_type", "question"]
+                    },
                     "intents": {
                         "type": "array",
-                        "description": "List of DSL verb intents",
+                        "description": "List of DSL verb intents (empty if needs_clarification is true)",
                         "items": {
                             "type": "object",
                             "properties": {
@@ -1245,7 +1574,7 @@ Intent: {{
                     },
                     "explanation": {
                         "type": "string",
-                        "description": "Brief explanation of what the DSL will do"
+                        "description": "Brief explanation of what the DSL will do, or why clarification is needed"
                     }
                 },
                 "required": ["intents", "explanation"]

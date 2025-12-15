@@ -102,7 +102,15 @@ impl Camera2D {
         );
         let zoom_x = padded_screen.width() / bounds.width();
         let zoom_y = padded_screen.height() / bounds.height();
-        self.target_zoom = zoom_x.min(zoom_y).clamp(self.min_zoom, self.max_zoom);
+        let new_zoom = zoom_x.min(zoom_y).clamp(self.min_zoom, self.max_zoom);
+
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(&format!(
+            "fit_to_bounds: bounds={:?}, screen={:?}, padded_screen={}x{}, zoom_x={:.3}, zoom_y={:.3}, final_zoom={:.3}",
+            bounds, screen_rect, padded_screen.width(), padded_screen.height(), zoom_x, zoom_y, new_zoom
+        ).into());
+
+        self.target_zoom = new_zoom;
     }
 
     /// Transform world position to screen position

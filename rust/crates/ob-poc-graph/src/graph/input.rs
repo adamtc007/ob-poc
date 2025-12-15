@@ -220,6 +220,10 @@ impl InputHandler {
 
         // Handle scroll for zooming
         let scroll_delta = response.ctx.input(|i| i.raw_scroll_delta);
+        #[cfg(target_arch = "wasm32")]
+        if scroll_delta.y != 0.0 {
+            web_sys::console::log_1(&format!("Scroll detected: {:?}", scroll_delta).into());
+        }
         if scroll_delta.y != 0.0 {
             let zoom_factor = 1.0 + scroll_delta.y * 0.001;
             if let Some(pos) = pointer_pos {

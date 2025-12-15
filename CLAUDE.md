@@ -316,6 +316,8 @@ This optimization is transparent - validation semantics unchanged, just faster.
 
 ### Web UI Architecture
 
+> **📘 See also:** `EGUI.md` for the full egui/WASM refactoring brief and implementation guide.
+
 The web UI is split into two crates:
 - `rust/crates/ob-poc-web/` - Server-rendered HTML panels with embedded TypeScript
 - `rust/crates/ob-poc-graph/` - WASM-based interactive graph visualization
@@ -628,6 +630,511 @@ The UI uses a **hybrid architecture**: HTML/TypeScript panels for text content, 
 | kyc | verification, document | KYC status, document requests |
 | ubo | entity (UBO-specific) | Ownership chains, control relationships |
 | services | product, service, resource | Products → Services → Resource instances |
+
+## egui State Management & Best Practices
+
+The UI uses egui in immediate mode with server-first state management. These patterns are **mandatory** for all egui code in this project.
+
+### Philosophy: Why These Patterns Exist
+
+egui is an **immediate mode** GUI. This is fundamentally different from React, Vue, or any retained mode framework. Understanding this difference is critical.
+
+**Retained Mode (React, etc.):**
+```
+Component Tree (persistent)
+     │
+     ├── State lives IN components
+     ├── Changes trigger re-render of subtree
+     ├── Virtual DOM diffs old vs new
+     └── Minimal DOM updates applied
+```
+
+**Immediate Mode (egui):**
+```
+Every frame (60fps):
+     │
+     ├── Read current state
+     ├── Paint everything from scratch
+     ├── Check what user clicked/typed
+     ├── Return interactions
+     └── Caller decides what to do
+     
+     (No component tree. No persistence. No diffing.)
+```
+
+**Why this matters:**
+
+1. **There are no components** - Functions paint UI and return. They don't "exist" between frames. Trying to give them persistent state creates bugs.
+
+2. **State must live OUTSIDE the UI** - egui functions are pure: `(state) -> painted pixels + interactions`. State lives in your `App` struct, not in widgets.
+
+3. **60fps means "just refetch" is cheap** - In React, you optimize to avoid re-renders. In egui, you're already re-rendering 60x/second. Fetching fresh server state fits naturally.
+
+4. **Callbacks are an anti-pattern** - In React, `onClick={() => setState(...)}` is idiomatic. In egui, callbacks capture `&mut self` and create borrow checker nightmares. Return values are the answer.
+
+5. **"Dirty" flags fight the model** - egui assumes everything redraws every frame. Adding dirty tracking means you're building a retained mode system on top of immediate mode. Just let it redraw.
+
+**The mental model:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         YOUR APP                                 │
+│                                                                  │
+│   ┌─────────────┐    ┌─────────────┐    ┌─────────────┐        │
+│   │   Server    │───▶│  AppState   │───▶│    egui     │        │
+│   │   (truth)   │    │  (mirror)   │    │  (painter)  │        │
+│   └─────────────┘    └─────────────┘    └─────────────┘        │
+│         ▲                   │                   │               │
+│         │                   │                   ▼               │
+│         │                   │            ┌─────────────┐        │
+│         │                   │            │  Response   │        │
+│         │                   │            │  (clicks,   │        │
+│         │                   │            │   typing)   │        │
+│         │                   │            └──────┬──────┘        │
+│         │                   │                   │               │
+│         │                   ▼                   ▼               │
+│         │            ┌─────────────────────────────┐            │
+│         └────────────│      Action Handler         │            │
+│                      │  (POST to server, refetch)  │            │
+│                      └─────────────────────────────┘            │
+└─────────────────────────────────────────────────────────────────┘
+
+The loop:
+1. Server has truth
+2. AppState mirrors server (via fetch)
+3. egui paints AppState
+4. User interacts → Response
+5. Handler POSTs to server
+6. Refetch → AppState updated
+7. Next frame paints new state
+```
+
+**Why server-first works perfectly with egui:**
+
+| egui Reality | Server-First Response |
+|--------------|----------------------|
+| Redraws everything every frame | So "just fetch and paint" is natural |
+| No component state | So state lives on server, no sync needed |
+| Returns interactions, doesn't handle them | So POST to server, let IT handle logic |
+| No diffing/optimization | So refetch entire state, paint it fresh |
+
+**The key insight:** egui's "limitation" (no persistent state) becomes a strength when paired with server-first architecture. You CAN'T have state drift if the UI has no state. Every frame is a fresh, accurate render of server truth.
+
+**When you're tempted to add local state, ask:**
+- "Is this text the user is actively typing?" → Yes: TextBuffers (the ONE exception)
+- "Is this data that came from the server?" → No local state. Fetch it.
+- "Am I caching to avoid re-fetching?" → Don't. Let the server/EntityGateway cache.
+- "Am I tracking dirty/changed flags?" → Don't. POST action, then refetch.
+
+### Core Principle: Server is the Single Source of Truth
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    APPROVED STATE MODEL                          │
+├─────────────────────────────────────────────────────────────────┤
+│  SERVER DATA (fetched via API, NEVER modified locally)          │
+│  ├── session: Option<SessionStateResponse>                      │
+│  ├── graph_data: Option<CbuGraphData>                           │
+│  ├── validation: Option<ValidationResponse>                     │
+│  └── execution: Option<ExecuteResponse>                         │
+├─────────────────────────────────────────────────────────────────┤
+│  UI-ONLY STATE (ephemeral, not persisted)                       │
+│  ├── buffers: TextBuffers (draft text being edited)             │
+│  ├── view_mode: ViewMode                                        │
+│  ├── selected_entity_id: Option<String>                         │
+│  └── camera: Camera2D (pan/zoom)                                │
+├─────────────────────────────────────────────────────────────────┤
+│  ASYNC COORDINATION                                              │
+│  └── async_state: Arc<Mutex<AsyncState>>                        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Anti-Patterns (NEVER DO)
+
+```rust
+// ❌ WRONG: Local state that mirrors server data
+pub struct AppState {
+    local_messages: Vec<Message>,           // NO - server owns messages
+    is_dirty: bool,                         // NO - refetch instead
+    cached_entities: HashMap<Uuid, Entity>, // NO - server owns entities
+    last_known_cbu: Option<Cbu>,           // NO - fetch from session
+}
+
+// ❌ WRONG: Modifying server data locally
+fn handle_new_message(&mut self, msg: Message) {
+    self.session.messages.push(msg);  // NO - this will drift from server
+}
+
+// ❌ WRONG: Complex sync logic
+if self.is_dirty && self.last_sync > 5.0 {
+    self.sync_to_server();  // NO - creates race conditions
+}
+```
+
+### Approved Patterns
+
+#### Pattern 1: Action → Server → Refetch → Render
+
+Every user action that changes data follows this flow:
+
+```rust
+// ✅ CORRECT: Server roundtrip for mutations
+fn handle_execute(&mut self, ctx: &egui::Context) {
+    let dsl = self.buffers.dsl_editor.clone();
+    let async_state = Arc::clone(&self.async_state);
+    let ctx = ctx.clone();
+    
+    // 1. Set loading state
+    {
+        let mut state = async_state.lock().unwrap();
+        state.executing = true;
+    }
+    
+    // 2. POST to server
+    spawn_local(async move {
+        let result = api::execute_dsl(&dsl).await;
+        
+        // 3. Store result for next frame
+        if let Ok(mut state) = async_state.lock() {
+            state.pending_execution = Some(result);
+            state.executing = false;
+        }
+        
+        // 4. Trigger repaint
+        ctx.request_repaint();
+    });
+}
+
+// 5. In update(), process pending and refetch dependents
+fn process_pending(&mut self) {
+    if let Some(result) = self.async_state.lock().unwrap().pending_execution.take() {
+        self.execution = Some(result);
+        self.refetch_session();  // Server tells us new state
+        self.refetch_graph();    // Graph may have changed
+    }
+}
+```
+
+#### Pattern 2: TextBuffers are the ONLY Local Mutable State
+
+```rust
+// ✅ CORRECT: Explicit text buffer struct
+#[derive(Default)]
+pub struct TextBuffers {
+    pub chat_input: String,      // Draft message being typed
+    pub dsl_editor: String,      // DSL being edited
+    pub search_query: String,    // Entity search input
+    pub dsl_dirty: bool,         // For "unsaved changes" warning ONLY
+}
+
+// Usage in UI
+fn chat_input(ui: &mut Ui, buffers: &mut TextBuffers) {
+    let response = ui.text_edit_singleline(&mut buffers.chat_input);
+    if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+        // Submit to server, then clear
+        submit_chat(&buffers.chat_input);
+        buffers.chat_input.clear();
+    }
+}
+```
+
+#### Pattern 3: Async State Coordination
+
+```rust
+// ✅ CORRECT: Centralized async state
+#[derive(Default)]
+pub struct AsyncState {
+    // Pending results (written by spawn_local, read by update loop)
+    pub pending_session: Option<Result<SessionStateResponse, String>>,
+    pub pending_graph: Option<Result<CbuGraphData, String>>,
+    pub pending_validation: Option<Result<ValidationResponse, String>>,
+    pub pending_execution: Option<Result<ExecuteResponse, String>>,
+    
+    // Loading flags (for spinners)
+    pub loading_session: bool,
+    pub loading_graph: bool,
+    pub loading_chat: bool,
+    pub executing: bool,
+    
+    // Error display
+    pub last_error: Option<String>,
+}
+
+// Process at start of each frame
+fn process_async_results(&mut self) {
+    let mut state = self.async_state.lock().unwrap();
+    
+    if let Some(result) = state.pending_session.take() {
+        state.loading_session = false;
+        match result {
+            Ok(session) => {
+                // Sync DSL editor if server has content and we're not dirty
+                if let Some(ref dsl) = session.pending_dsl {
+                    if !self.buffers.dsl_dirty {
+                        self.buffers.dsl_editor = dsl.clone();
+                    }
+                }
+                self.session = Some(session);
+            }
+            Err(e) => state.last_error = Some(e),
+        }
+    }
+    
+    // ... similar for other pending results
+}
+```
+
+#### Pattern 4: Graph Widget State Isolation
+
+The graph widget owns ONLY rendering state, not business data:
+
+```rust
+// ✅ CORRECT: Widget owns camera/interaction, not data
+pub struct CbuGraphWidget {
+    // Rendering state (widget-owned)
+    camera: Camera2D,
+    input_state: InputState,
+    
+    // Data from server (set via set_data, never modified)
+    raw_data: Option<CbuGraphData>,
+    layout_graph: Option<LayoutGraph>,  // Computed from raw_data
+    
+    // View filtering (affects what's shown, not the data)
+    view_mode: ViewMode,
+}
+
+impl CbuGraphWidget {
+    // ✅ Data flows IN, never modified
+    pub fn set_data(&mut self, data: CbuGraphData) {
+        self.raw_data = Some(data);
+        self.recompute_layout();  // Pure computation, no side effects
+    }
+    
+    // ✅ Events flow OUT via return values, not callbacks
+    pub fn selected_entity_changed(&mut self) -> Option<String> {
+        self.input_state.take_selection_change()
+    }
+}
+```
+
+#### Pattern 5: No Callbacks, Use Return Values
+
+```rust
+// ❌ WRONG: Callback-based event handling
+impl CbuGraphWidget {
+    pub fn on_entity_selected(&mut self, callback: impl Fn(String)) {
+        // Creates lifetime/ownership nightmares
+    }
+}
+
+// ✅ CORRECT: Return value based
+impl CbuGraphWidget {
+    pub fn ui(&mut self, ui: &mut egui::Ui) -> GraphResponse {
+        // ... render ...
+        GraphResponse {
+            selected_entity: self.input_state.take_selection(),
+            hovered_entity: self.input_state.hovered.clone(),
+            needs_repaint: self.camera_is_animating(),
+        }
+    }
+}
+
+// Caller handles the response
+fn update(&mut self, ctx: &egui::Context) {
+    let response = self.graph_widget.ui(ui);
+    if let Some(entity_id) = response.selected_entity {
+        self.selected_entity_id = Some(entity_id);
+    }
+}
+```
+
+#### Pattern 6: Loading States
+
+```rust
+// ✅ CORRECT: Explicit loading UI
+fn render_panel(&mut self, ui: &mut egui::Ui) {
+    let loading = self.async_state.lock().unwrap().loading_graph;
+    
+    if loading {
+        ui.centered_and_justified(|ui| {
+            ui.spinner();
+            ui.label("Loading...");
+        });
+        return;
+    }
+    
+    let Some(ref data) = self.graph_data else {
+        ui.centered_and_justified(|ui| {
+            ui.label("Select a CBU to view");
+        });
+        return;
+    };
+    
+    // Render actual content
+    self.render_graph(ui, data);
+}
+```
+
+### File Organization
+
+```
+rust/crates/ob-poc-ui/src/
+├── lib.rs              # WASM entry point only
+├── app.rs              # App struct, update() loop, layout
+├── state.rs            # AppState, AsyncState, TextBuffers (state definitions)
+├── api.rs              # HTTP client (get, post, SSE helpers)
+├── panels/             # UI panels (each receives &mut AppState)
+│   ├── mod.rs
+│   ├── chat.rs         # fn chat_panel(ui: &mut Ui, state: &mut AppState)
+│   ├── dsl_editor.rs
+│   ├── results.rs
+│   └── toolbar.rs
+└── widgets/            # Reusable widgets (pure, no AppState access)
+    ├── mod.rs
+    ├── status_badge.rs # fn kyc_badge(ui: &mut Ui, status: &KycStatus)
+    └── message.rs      # fn render_message(ui: &mut Ui, msg: &Message)
+```
+
+### Key Rules Summary
+
+| Rule | Rationale |
+|------|-----------|
+| Server owns all business data | Prevents drift, single source of truth |
+| TextBuffers is the only local mutable state | Explicit about what UI owns |
+| Actions go through server, then refetch | No local state sync bugs |
+| Widgets return events, don't use callbacks | Simpler ownership, no lifetime issues |
+| AsyncState coordinates all async ops | Centralized, predictable async handling |
+| Loading states are explicit | User always knows what's happening |
+| No `is_dirty` flags for sync | Refetch is simpler and more reliable |
+
+### Common Mistakes and Fixes
+
+| Mistake | Fix |
+|---------|-----|
+| Storing `Vec<Message>` locally | Fetch from `session.messages` each frame |
+| `if changed { sync() }` patterns | POST action, then refetch |
+| Callbacks for widget events | Return `Option<Event>` from widget |
+| `Arc<Mutex<>>` everywhere | Only for `AsyncState`, everything else is owned |
+| Caching entity lookups | Let server/EntityGateway handle caching |
+| Local "optimistic updates" | Wait for server confirmation, show spinner |
+
+### WASM/egui Debugging in Chrome
+
+#### Essential Setup (MUST have in lib.rs)
+
+```rust
+#[wasm_bindgen(start)]
+pub fn main() -> Result<(), JsValue> {
+    // Converts panics to readable stack traces in console
+    console_error_panic_hook::set_once();
+    
+    // Routes tracing macros to browser console
+    tracing_wasm::set_as_global_default();
+    
+    tracing::info!("WASM module initialized");
+    Ok(())
+}
+```
+
+Without `console_error_panic_hook`, panics show as cryptic "unreachable executed" errors.
+
+#### Build for Debugging
+
+```bash
+# Development build with debug info and source maps
+wasm-pack build --target web --dev
+
+# This generates:
+# - pkg/ob_poc_ui.wasm      (unoptimized, with debug info)
+# - pkg/ob_poc_ui.wasm.map  (source map for Rust debugging)
+```
+
+**Never debug release builds** - optimizations break line correlation.
+
+#### Chrome DevTools Setup
+
+1. Open DevTools (F12)
+2. Settings (⚙️) → Experiments → Enable **"WebAssembly Debugging: DWARF support"**
+3. Restart DevTools
+4. Sources panel → Add workspace folder (your project root)
+5. `.rs` files appear under `wasm://` - set breakpoints directly in Rust
+
+#### Tracing for State Debugging
+
+Use `tracing`, not `println!` or `log::info!`:
+
+```rust
+use tracing::{debug, info, warn, error};
+
+fn process_async_results(&mut self) {
+    let state = self.async_state.lock().unwrap();
+    
+    // Structured logging with field inspection
+    debug!(?state.loading_session, ?state.loading_graph, "async state check");
+    
+    if let Some(ref err) = state.last_error {
+        error!(%err, "async operation failed");
+    }
+}
+```
+
+#### egui Built-in Debug Tools
+
+```rust
+// Toggle inspection UI with F1 (dev builds only)
+fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    #[cfg(debug_assertions)]
+    if ctx.input(|i| i.key_pressed(egui::Key::F1)) {
+        self.show_debug = !self.show_debug;
+    }
+    
+    #[cfg(debug_assertions)]
+    if self.show_debug {
+        egui::Window::new("Debug").show(ctx, |ui| {
+            // Async state visibility
+            let state = self.async_state.lock().unwrap();
+            ui.label(format!("loading_session: {}", state.loading_session));
+            ui.label(format!("loading_graph: {}", state.loading_graph));
+            ui.label(format!("executing: {}", state.executing));
+            if let Some(ref err) = state.last_error {
+                ui.colored_label(egui::Color32::RED, err);
+            }
+            
+            ui.separator();
+            
+            // egui's built-in inspection
+            ctx.inspection_ui(ui);
+        });
+    }
+}
+```
+
+#### Network Tab is Your Friend
+
+With server-first architecture, **every user action should produce a network request**:
+
+| User Action | Expected Network Activity |
+|-------------|--------------------------|
+| Select CBU | `GET /api/cbu/:id/graph` |
+| Send chat | `POST /api/session/:id/chat` (or SSE stream) |
+| Execute DSL | `POST /api/session/:id/execute` then refetch |
+| Change view mode | `GET /api/cbu/:id/graph?view_mode=...` |
+
+If state seems wrong:
+1. Check Network tab - did the request fire?
+2. Check response - is server returning expected data?
+3. Check console - any tracing output showing state update?
+
+#### Common WASM Debugging Issues
+
+| Symptom | Likely Cause | Fix |
+|---------|--------------|-----|
+| "unreachable executed" | Panic without hook | Add `console_error_panic_hook::set_once()` |
+| No `.rs` files in Sources | Missing source map | Build with `--dev`, check `.wasm.map` exists |
+| Breakpoints don't hit | Release build or wrong workspace | Rebuild with `--dev`, add correct folder |
+| State not updating | Async result not processed | Check `process_async_results()` called in `update()` |
+| UI frozen | `lock().unwrap()` deadlock | Never hold lock across await points |
+| "recursive mutex" | Locking same mutex twice | Extract data from lock, drop lock, then use data |
 
 ## Zed Extension (DSL Syntax Highlighting)
 

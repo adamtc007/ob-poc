@@ -3,8 +3,9 @@ import type { BoundEntityInfo } from "./BoundEntityInfo";
 
 /**
  * Session state response
+ * NOTE: Accepts flexible types to handle server's native types
  */
-export type SessionStateResponse = { session_id: string, state: string, message_count: number, can_execute: boolean, dsl_source?: string, 
+export type SessionStateResponse = { session_id: string, state: unknown, message_count: number, can_execute: boolean, dsl_source?: string, 
 /**
  * Active CBU for this session (if set via bind)
  */
@@ -12,4 +13,4 @@ active_cbu?: BoundEntityInfo,
 /**
  * Named bindings available in the session (name -> entity info)
  */
-bindings: { [key in string]?: BoundEntityInfo }, };
+bindings: Record<string, unknown>, pending_intents?: unknown, assembled_dsl?: unknown, combined_dsl?: unknown, context?: unknown, messages?: unknown, };

@@ -2,5 +2,18 @@
 
 /**
  * Response after creating a session
+ * NOTE: Accepts flexible types to handle server's native types
  */
-export type CreateSessionResponse = { session_id: string, state: string, created_at: string, };
+export type CreateSessionResponse = { 
+/**
+ * Session ID - server sends UUID, we accept any string-serializable value
+ */
+session_id: string, 
+/**
+ * State - server sends enum, we accept anything
+ */
+state: unknown, 
+/**
+ * Created at - server sends DateTime, we accept any
+ */
+created_at: unknown, };
