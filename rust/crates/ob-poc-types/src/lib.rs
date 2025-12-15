@@ -300,6 +300,11 @@ pub struct ExecuteResult {
     #[serde(default)]
     #[ts(optional)]
     pub entity_type: Option<String>,
+    /// Query result data (for cbu.show, cbu.list, etc.)
+    #[serde(default)]
+    #[ts(optional)]
+    #[ts(type = "unknown")]
+    pub result: Option<serde_json::Value>,
 }
 
 // ============================================================================
@@ -759,12 +764,31 @@ pub struct ValidateDslRequest {
     pub dsl: String,
 }
 
-/// Response from DSL validation
+/// Validation error with location info
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ValidationError {
+    #[serde(default)]
+    #[ts(optional)]
+    pub line: Option<usize>,
+    #[serde(default)]
+    #[ts(optional)]
+    pub column: Option<usize>,
+    pub message: String,
+    #[serde(default)]
+    #[ts(optional)]
+    pub suggestion: Option<String>,
+}
+
+/// Response from /api/agent/validate (matches server's ValidationResult)
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct ValidateDslResponse {
     pub valid: bool,
-    pub errors: Vec<String>,
+    #[serde(default)]
+    pub errors: Vec<ValidationError>,
+    #[serde(default)]
+    pub warnings: Vec<String>,
 }
 
 // ============================================================================
@@ -806,6 +830,19 @@ impl ExecuteResult {
             message: message.to_string(),
             entity_id: entity_id.map(|id| id.to_string()),
             entity_type: None,
+            result: None,
+        }
+    }
+
+    pub fn success_with_result(index: usize, message: &str, result: serde_json::Value) -> Self {
+        Self {
+            statement_index: index,
+            dsl: None,
+            success: true,
+            message: message.to_string(),
+            entity_id: None,
+            entity_type: None,
+            result: Some(result),
         }
     }
 
@@ -817,6 +854,7 @@ impl ExecuteResult {
             message: message.to_string(),
             entity_id: None,
             entity_type: None,
+            result: None,
         }
     }
 }

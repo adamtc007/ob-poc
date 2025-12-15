@@ -31,7 +31,7 @@ impl App {
             session: None,
             session_id: None,
             graph_data: None,
-            validation_errors: Vec::new(),
+            validation_result: None,
             execution: None,
             messages: Vec::new(),
             cbu_list: Vec::new(),

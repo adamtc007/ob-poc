@@ -178,17 +178,15 @@ pub async fn send_chat(session_id: Uuid, message: &str) -> Result<ChatResponse, 
 // =============================================================================
 
 /// Validate DSL syntax and semantics
-/// Returns list of error strings (empty = valid)
-pub async fn validate_dsl(dsl: &str) -> Result<Vec<String>, String> {
-    let response: ValidateDslResponse = post(
+/// Returns ValidateDslResponse with errors and warnings
+pub async fn validate_dsl(dsl: &str) -> Result<ValidateDslResponse, String> {
+    post(
         "/api/agent/validate",
         &ValidateDslRequest {
             dsl: dsl.to_string(),
         },
     )
-    .await?;
-
-    Ok(response.errors)
+    .await
 }
 
 /// Execute DSL with explicit content (for manual DSL editor execution)

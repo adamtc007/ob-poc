@@ -40,7 +40,7 @@ pub fn dsl_editor_panel(ui: &mut Ui, state: &mut AppState) {
                 if ui.button("Clear").clicked() {
                     state.buffers.dsl_editor.clear();
                     state.buffers.dsl_dirty = true;
-                    state.validation_errors.clear();
+                    state.validation_result = None;
                 }
             });
         });
@@ -48,16 +48,32 @@ pub fn dsl_editor_panel(ui: &mut Ui, state: &mut AppState) {
         ui.separator();
 
         // Validation errors (if any)
-        if !state.validation_errors.is_empty() {
+        let has_errors = state
+            .validation_result
+            .as_ref()
+            .map(|r| !r.errors.is_empty())
+            .unwrap_or(false);
+        if has_errors {
             egui::Frame::default()
                 .fill(Color32::from_rgb(60, 30, 30))
                 .inner_margin(4.0)
                 .show(ui, |ui| {
-                    for error in &state.validation_errors {
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("!").color(Color32::RED));
-                            ui.label(RichText::new(error).color(Color32::LIGHT_RED).small());
-                        });
+                    if let Some(ref result) = state.validation_result {
+                        for error in &result.errors {
+                            ui.horizontal(|ui| {
+                                ui.label(RichText::new("!").color(Color32::RED));
+                                let loc = match (error.line, error.column) {
+                                    (Some(l), Some(c)) => format!("[{}:{}] ", l, c),
+                                    (Some(l), None) => format!("[{}] ", l),
+                                    _ => String::new(),
+                                };
+                                ui.label(
+                                    RichText::new(format!("{}{}", loc, error.message))
+                                        .color(Color32::LIGHT_RED)
+                                        .small(),
+                                );
+                            });
+                        }
                     }
                 });
             ui.separator();
@@ -75,7 +91,7 @@ pub fn dsl_editor_panel(ui: &mut Ui, state: &mut AppState) {
             if response.response.changed() {
                 state.buffers.dsl_dirty = true;
                 // Clear validation when content changes
-                state.validation_errors.clear();
+                state.validation_result = None;
             }
         });
 

@@ -13,7 +13,7 @@
 //! - Caching entities locally
 
 use ob_poc_graph::{CbuGraphData, CbuGraphWidget, ViewMode};
-use ob_poc_types::{CbuSummary, ExecuteResponse, SessionStateResponse};
+use ob_poc_types::{CbuSummary, ExecuteResponse, SessionStateResponse, ValidateDslResponse};
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
@@ -63,7 +63,7 @@ pub struct AppState {
 
     /// Last validation errors (empty = valid)
     /// These are plain strings from the validation API
-    pub validation_errors: Vec<String>,
+    pub validation_result: Option<ValidateDslResponse>,
 
     /// Last execution result
     pub execution: Option<ExecuteResponse>,
@@ -110,7 +110,7 @@ impl Default for AppState {
             session: None,
             session_id: None,
             graph_data: None,
-            validation_errors: Vec::new(),
+            validation_result: None,
             execution: None,
             messages: Vec::new(),
             cbu_list: Vec::new(),
@@ -213,7 +213,7 @@ pub struct AsyncState {
     pub pending_session: Option<Result<SessionStateResponse, String>>,
     pub pending_session_id: Option<Uuid>,
     pub pending_graph: Option<Result<CbuGraphData, String>>,
-    pub pending_validation: Option<Result<Vec<String>, String>>,
+    pub pending_validation: Option<Result<ValidateDslResponse, String>>,
     pub pending_execution: Option<Result<ExecuteResponse, String>>,
     pub pending_cbu_list: Option<Result<Vec<CbuSummary>, String>>,
     pub pending_chat: Option<Result<ChatMessage, String>>,
@@ -304,7 +304,7 @@ impl AppState {
         // Process validation
         if let Some(result) = state.pending_validation.take() {
             match result {
-                Ok(errors) => self.validation_errors = errors,
+                Ok(response) => self.validation_result = Some(response),
                 Err(e) => state.last_error = Some(e),
             }
         }

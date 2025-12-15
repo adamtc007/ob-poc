@@ -355,10 +355,11 @@ Plus: TS ◄──CustomEvent──► WASM (just entity IDs)
 ### Rules
 
 1. **All API types live in `ob-poc-types`** - No inline struct definitions in handlers
-2. **Use `#[derive(TS)]`** for TypeScript generation via ts-rs
-3. **Tagged enums only**: `#[serde(tag = "type")]` for TypeScript discriminated unions
-4. **UUIDs as Strings** in API types for TypeScript compatibility
-5. **CustomEvent payloads**: Keep simple - just IDs as strings
+2. **Server wins** - UI types must match what server sends, not the other way around
+3. **Use `#[derive(TS)]`** for TypeScript generation via ts-rs
+4. **Tagged enums only**: `#[serde(tag = "type")]` for TypeScript discriminated unions
+5. **UUIDs as Strings** in API types for TypeScript compatibility
+6. **CustomEvent payloads**: Keep simple - just IDs as strings
 
 ### Workflow
 
