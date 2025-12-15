@@ -584,10 +584,11 @@ impl DiagnosticBuilder {
             message: message.into(),
             suggestions: Vec::new(),
         });
-        // Safety: we just pushed, so last() is Some
-        unsafe {
-            &mut *(self.diagnostics.last_mut().unwrap() as *mut Diagnostic as *mut DiagnosticEntry)
-        }
+        // Safe: we just pushed, so last_mut() is guaranteed to be Some
+        // DiagnosticEntry is #[repr(transparent)] over Diagnostic
+        let last = self.diagnostics.last_mut().expect("just pushed");
+        // Safe transmute due to #[repr(transparent)]
+        unsafe { &mut *(last as *mut Diagnostic as *mut DiagnosticEntry) }
     }
 
     pub fn warning(
@@ -603,9 +604,10 @@ impl DiagnosticBuilder {
             message: message.into(),
             suggestions: Vec::new(),
         });
-        unsafe {
-            &mut *(self.diagnostics.last_mut().unwrap() as *mut Diagnostic as *mut DiagnosticEntry)
-        }
+        // Safe: we just pushed, so last_mut() is guaranteed to be Some
+        let last = self.diagnostics.last_mut().expect("just pushed");
+        // Safe transmute due to #[repr(transparent)]
+        unsafe { &mut *(last as *mut Diagnostic as *mut DiagnosticEntry) }
     }
 
     pub fn build(self) -> Vec<Diagnostic> {

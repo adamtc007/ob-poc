@@ -3,4 +3,4 @@
 /**
  * Individual statement execution result
  */
-export type ExecuteResult = { statement_index: number, success: boolean, message: string, entity_id: string | null, };
+export type ExecuteResult = { statement_index: number, success: boolean, message: string, entity_id?: string, };

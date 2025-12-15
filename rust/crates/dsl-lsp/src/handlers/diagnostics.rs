@@ -39,6 +39,8 @@ pub struct AnalysisResult {
     pub state: DocumentState,
     pub diagnostics: Vec<Diagnostic>,
     pub planning_output: ob_poc::dsl_v2::planning_facade::PlanningOutput,
+    /// Semantic diagnostics with entity suggestions (for code actions)
+    pub semantic_diagnostics: Vec<ob_poc::dsl_v2::validation::Diagnostic>,
 }
 
 /// Analyze a document with full semantic validation via EntityGateway.
@@ -56,10 +58,14 @@ pub async fn analyze_document_full(text: &str) -> AnalysisResult {
     let (state, mut diagnostics) = parse_with_v2(text);
 
     // Step 2: Run full semantic validation via EntityGateway
+    let mut semantic_diagnostics = Vec::new();
     match LspValidator::connect().await {
         Ok(mut validator) => {
             let context = ValidationContext::default();
             let (semantic_diags, _validated) = validator.validate(text, &context).await;
+
+            // Store semantic diagnostics for code actions (entity suggestions)
+            semantic_diagnostics = semantic_diags.clone();
 
             // Convert semantic diagnostics to LSP format
             for diag in semantic_diags {
@@ -92,6 +98,7 @@ pub async fn analyze_document_full(text: &str) -> AnalysisResult {
         state,
         diagnostics,
         planning_output,
+        semantic_diagnostics,
     }
 }
 

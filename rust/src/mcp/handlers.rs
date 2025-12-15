@@ -229,7 +229,8 @@ impl ToolHandlers {
             needs_reorder: output.was_reordered,
         };
 
-        Ok(serde_json::to_value(validation_output).unwrap())
+        serde_json::to_value(validation_output)
+            .map_err(|e| anyhow!("Failed to serialize validation output: {}", e))
     }
 
     /// Execute DSL against the database
@@ -1090,7 +1091,7 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
 
         let state = session::session_context(action).map_err(|e| anyhow!("{}", e))?;
 
-        Ok(serde_json::to_value(state).unwrap())
+        serde_json::to_value(state).map_err(|e| anyhow!("Failed to serialize session state: {}", e))
     }
 
     /// Search for entities with fuzzy matching, enrichment, and smart disambiguation

@@ -458,10 +458,22 @@ impl AgentService {
             pre_resolved_context
         );
 
-        let bindings_context = if !session_bindings.is_empty() {
+        // Build session context for LLM - include active CBU and bindings
+        let active_cbu_context = session.context.active_cbu_for_llm();
+        let bindings_context = if !session_bindings.is_empty() || active_cbu_context.is_some() {
+            let mut parts = Vec::new();
+            if let Some(cbu) = active_cbu_context {
+                parts.push(cbu);
+            }
+            if !session_bindings.is_empty() {
+                parts.push(format!(
+                    "Available references: {}",
+                    session_bindings.join(", ")
+                ));
+            }
             format!(
-                "\n\n[SESSION CONTEXT: Available references from previous commands: {}. Use these exact @names in the refs field when referring to these entities.]",
-                session_bindings.join(", ")
+                "\n\n[SESSION CONTEXT: {}. Use the active CBU for operations that need a CBU. Use exact @names in the refs field when referring to entities.]",
+                parts.join(". ")
             )
         } else {
             String::new()

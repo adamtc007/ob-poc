@@ -11,12 +11,22 @@ import {
   DisambiguationSelection,
 } from "./types.js";
 
+/** Info about an unresolved entity reference in the AST */
+export interface UnresolvedRef {
+  statementIndex: number;
+  argKey: string;
+  entityType: string;
+  searchText: string;
+}
+
 export type ChatCallback = {
   onDsl: (source: string) => void;
   onAst: (statements: AstStatement[]) => void;
   onCanExecute: (can: boolean) => void;
   onStatusChange: (status: string) => void;
   onCommand: (command: AgentCommand) => void;
+  /** Called when AST contains unresolved entity refs - UI should prompt resolution */
+  onUnresolvedRefs?: (refs: UnresolvedRef[]) => void;
 };
 
 export class ChatPanel {
@@ -54,7 +64,7 @@ export class ChatPanel {
     });
   }
 
-  private async createSession() {
+  async createSession() {
     try {
       const response = await fetch("/api/session", {
         method: "POST",
@@ -79,6 +89,13 @@ export class ChatPanel {
 
   getSessionId(): string | null {
     return this.sessionId;
+  }
+
+  /** Recreate session (e.g., after server restart invalidates old session) */
+  async recreateSession(): Promise<void> {
+    console.log("[Chat] Recreating session...");
+    this.sessionId = null;
+    await this.createSession();
   }
 
   private async sendMessage() {
@@ -117,6 +134,13 @@ export class ChatPanel {
     this.updateStatus("pending");
     this.setLoading(true);
 
+    console.log(
+      "[Chat] Sending message with cbu_id:",
+      this.currentCbuId,
+      "sessionId:",
+      this.sessionId,
+    );
+
     try {
       const response = await fetch(`/api/session/${this.sessionId}/chat`, {
         method: "POST",
@@ -140,11 +164,19 @@ export class ChatPanel {
         if (data.dsl_source) {
           this.callbacks.onDsl(data.dsl_source);
           this.hasPendingDsl = true;
-          // Conversational prompt - no buttons
-          this.appendSystemMessage("Execute, add more commands, or cancel?");
         }
         if (data.ast) {
           this.callbacks.onAst(data.ast);
+
+          // Check for unresolved entity references
+          const unresolvedRefs = this.extractUnresolvedRefs(data.ast);
+          if (unresolvedRefs.length > 0 && this.callbacks.onUnresolvedRefs) {
+            // Notify the app about unresolved refs - it will open the entity finder
+            this.callbacks.onUnresolvedRefs(unresolvedRefs);
+          } else if (data.can_execute) {
+            // Only show execute prompt if all refs are resolved
+            this.appendSystemMessage("Execute, add more commands, or cancel?");
+          }
         }
         if (data.can_execute) {
           this.callbacks.onCanExecute(true);
@@ -305,5 +337,79 @@ export class ChatPanel {
   private setLoading(loading: boolean) {
     this.isLoading = loading;
     this.inputEl.disabled = loading;
+  }
+
+  /**
+   * Extract unresolved EntityRefs from the AST.
+   * An EntityRef is unresolved if resolved_key is null/undefined.
+   */
+  private extractUnresolvedRefs(ast: AstStatement[]): UnresolvedRef[] {
+    const unresolvedRefs: UnresolvedRef[] = [];
+
+    ast.forEach((stmt, stmtIndex) => {
+      if (!stmt.VerbCall) return;
+
+      stmt.VerbCall.arguments.forEach((arg) => {
+        this.findUnresolvedInValue(
+          arg.value,
+          stmtIndex,
+          arg.key,
+          unresolvedRefs,
+        );
+      });
+    });
+
+    return unresolvedRefs;
+  }
+
+  /**
+   * Recursively find unresolved EntityRefs in a value
+   */
+  private findUnresolvedInValue(
+    value: unknown,
+    stmtIndex: number,
+    argKey: string,
+    refs: UnresolvedRef[],
+  ): void {
+    if (!value || typeof value !== "object") return;
+
+    // Check if this is an EntityRef
+    if ("EntityRef" in (value as Record<string, unknown>)) {
+      const entityRef = (value as Record<string, unknown>).EntityRef as {
+        entity_type: string;
+        value: string;
+        resolved_key?: string | null;
+      };
+
+      if (!entityRef.resolved_key) {
+        refs.push({
+          statementIndex: stmtIndex,
+          argKey: argKey,
+          entityType: entityRef.entity_type,
+          searchText: entityRef.value,
+        });
+      }
+      return;
+    }
+
+    // Check if this is a List
+    if ("List" in (value as Record<string, unknown>)) {
+      const list = (value as Record<string, unknown>).List as unknown[];
+      list.forEach((item) =>
+        this.findUnresolvedInValue(item, stmtIndex, argKey, refs),
+      );
+      return;
+    }
+
+    // Recurse into other object types
+    if (Array.isArray(value)) {
+      value.forEach((item) =>
+        this.findUnresolvedInValue(item, stmtIndex, argKey, refs),
+      );
+    } else {
+      Object.values(value as Record<string, unknown>).forEach((v) =>
+        this.findUnresolvedInValue(v, stmtIndex, argKey, refs),
+      );
+    }
   }
 }

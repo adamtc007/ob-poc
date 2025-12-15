@@ -268,8 +268,12 @@ pub struct AgentState {
 
 impl AgentState {
     pub fn new(pool: PgPool) -> Self {
+        Self::with_sessions(pool, create_session_store())
+    }
+
+    /// Create with a shared session store (for integration with other routers)
+    pub fn with_sessions(pool: PgPool, sessions: SessionStore) -> Self {
         let dsl_v2_executor = Arc::new(DslExecutor::new(pool.clone()));
-        let sessions = create_session_store();
         let generation_log = Arc::new(GenerationLogRepository::new(pool.clone()));
         let session_repo = Arc::new(crate::database::SessionRepository::new(pool.clone()));
         let agent_service = Arc::new(crate::api::agent_service::AgentService::with_pool(
@@ -291,7 +295,12 @@ impl AgentState {
 // ============================================================================
 
 pub fn create_agent_router(pool: PgPool) -> Router {
-    let state = AgentState::new(pool);
+    create_agent_router_with_sessions(pool, create_session_store())
+}
+
+/// Create agent router with a shared session store
+pub fn create_agent_router_with_sessions(pool: PgPool, sessions: SessionStore) -> Router {
+    let state = AgentState::with_sessions(pool, sessions);
 
     Router::new()
         // Session management
@@ -454,19 +463,33 @@ async fn chat_session(
     // Build request for AgentService
     let agent_request = AgentChatRequest {
         message: req.message.clone(),
-        cbu_id: None,
+        cbu_id: req.cbu_id,
         disambiguation_response: None,
     };
 
     // Delegate to centralized AgentService
-    let response = state
+    let response = match state
         .agent_service
         .process_chat(&mut session, &agent_request, llm_client)
         .await
-        .map_err(|e| {
+    {
+        Ok(r) => r,
+        Err(e) => {
             tracing::error!("AgentService error: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+            // Return error as JSON response instead of opaque 500
+            return Ok(Json(ChatResponse {
+                message: format!("Agent error: {}", e),
+                intents: vec![],
+                assembled_dsl: None,
+                validation_results: vec![],
+                session_state: session.state.clone(),
+                can_execute: false,
+                dsl_source: None,
+                ast: None,
+                bindings: None,
+            }));
+        }
+    };
 
     // Persist session changes back
     {

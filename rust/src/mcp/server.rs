@@ -87,14 +87,28 @@ impl McpServer {
                         version: env!("CARGO_PKG_VERSION").into(),
                     },
                 };
-                JsonRpcResponse::success(id, serde_json::to_value(result).unwrap())
+                match serde_json::to_value(result) {
+                    Ok(v) => JsonRpcResponse::success(id, v),
+                    Err(e) => JsonRpcResponse::error(
+                        id,
+                        INTERNAL_ERROR,
+                        format!("Serialization error: {}", e),
+                    ),
+                }
             }
 
             "notifications/initialized" => JsonRpcResponse::success(id, Value::Null),
 
             "tools/list" => {
                 let result = ToolsListResult { tools: get_tools() };
-                JsonRpcResponse::success(id, serde_json::to_value(result).unwrap())
+                match serde_json::to_value(result) {
+                    Ok(v) => JsonRpcResponse::success(id, v),
+                    Err(e) => JsonRpcResponse::error(
+                        id,
+                        INTERNAL_ERROR,
+                        format!("Serialization error: {}", e),
+                    ),
+                }
             }
 
             "tools/call" => {
@@ -105,7 +119,14 @@ impl McpServer {
 
                 eprintln!("[dsl_mcp] Calling tool: {}", params.name);
                 let result = self.handlers.handle(&params.name, params.arguments).await;
-                JsonRpcResponse::success(id, serde_json::to_value(result).unwrap())
+                match serde_json::to_value(result) {
+                    Ok(v) => JsonRpcResponse::success(id, v),
+                    Err(e) => JsonRpcResponse::error(
+                        id,
+                        INTERNAL_ERROR,
+                        format!("Serialization error: {}", e),
+                    ),
+                }
             }
 
             _ => JsonRpcResponse::error(

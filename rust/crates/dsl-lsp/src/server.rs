@@ -20,6 +20,8 @@ pub struct DslLanguageServer {
     documents: Arc<RwLock<HashMap<Url, DocumentState>>>,
     /// Planning output for each document (for code actions)
     planning_outputs: Arc<RwLock<HashMap<Url, PlanningOutput>>>,
+    /// Semantic diagnostics for each document (for entity suggestion code actions)
+    semantic_diagnostics: Arc<RwLock<HashMap<Url, Vec<ob_poc::dsl_v2::validation::Diagnostic>>>>,
     /// Session symbol table (shared across documents)
     symbols: Arc<RwLock<SymbolTable>>,
     /// Entity Gateway client for lookups (replaces direct DB access)
@@ -33,6 +35,7 @@ impl DslLanguageServer {
             client,
             documents: Arc::new(RwLock::new(HashMap::new())),
             planning_outputs: Arc::new(RwLock::new(HashMap::new())),
+            semantic_diagnostics: Arc::new(RwLock::new(HashMap::new())),
             symbols: Arc::new(RwLock::new(SymbolTable::new())),
             entity_client: Arc::new(RwLock::new(None)),
         }
@@ -93,6 +96,12 @@ impl DslLanguageServer {
             planning.insert(uri.clone(), result.planning_output);
         }
 
+        // Store semantic diagnostics for entity suggestion code actions
+        {
+            let mut sem_diags = self.semantic_diagnostics.write().await;
+            sem_diags.insert(uri.clone(), result.semantic_diagnostics);
+        }
+
         // Update symbol table from this document
         {
             let mut symbols = self.symbols.write().await;
@@ -107,6 +116,19 @@ impl DslLanguageServer {
     /// Get planning output for a document (for code actions)
     pub async fn get_planning_output(&self, uri: &Url) -> Option<PlanningOutput> {
         self.planning_outputs.read().await.get(uri).cloned()
+    }
+
+    /// Get semantic diagnostics for a document (for entity suggestion code actions)
+    pub async fn get_semantic_diagnostics(
+        &self,
+        uri: &Url,
+    ) -> Vec<ob_poc::dsl_v2::validation::Diagnostic> {
+        self.semantic_diagnostics
+            .read()
+            .await
+            .get(uri)
+            .cloned()
+            .unwrap_or_default()
     }
 }
 
@@ -347,9 +369,17 @@ impl LanguageServer for DslLanguageServer {
             None => return Ok(None),
         };
 
-        // Generate code actions from planning output
-        let actions =
-            handlers::code_actions::get_code_actions(&planning_output, range, uri, &doc.text);
+        // Get semantic diagnostics for entity suggestion actions
+        let semantic_diagnostics = self.get_semantic_diagnostics(uri).await;
+
+        // Generate code actions from planning output and semantic diagnostics
+        let actions = handlers::code_actions::get_code_actions(
+            &planning_output,
+            &semantic_diagnostics,
+            range,
+            uri,
+            &doc.text,
+        );
 
         if actions.is_empty() {
             Ok(None)

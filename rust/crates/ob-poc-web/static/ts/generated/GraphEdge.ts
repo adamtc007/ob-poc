@@ -3,4 +3,4 @@
 /**
  * Edge in the CBU graph
  */
-export type GraphEdge = { id: string, source: string, target: string, edge_type: string, label: string | null, };
+export type GraphEdge = { id: string, source: string, target: string, edge_type: string, label?: string, };

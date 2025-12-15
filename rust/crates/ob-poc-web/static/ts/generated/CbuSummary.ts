@@ -3,4 +3,4 @@
 /**
  * CBU summary for list views
  */
-export type CbuSummary = { cbu_id: string, name: string, jurisdiction: string | null, client_type: string | null, };
+export type CbuSummary = { cbu_id: string, name: string, jurisdiction?: string, client_type?: string, };

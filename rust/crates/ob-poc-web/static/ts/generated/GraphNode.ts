@@ -3,20 +3,20 @@
 /**
  * Node in the CBU graph
  */
-export type GraphNode = { id: string, node_type: string, layer: string, label: string, sublabel: string | null, status: string, roles: Array<string>, role_categories: Array<string>, primary_role: string | null, jurisdiction: string | null, ownership_pct: number | null, 
+export type GraphNode = { id: string, node_type: string, layer: string, label: string, sublabel?: string, status: string, roles: Array<string>, role_categories: Array<string>, primary_role?: string, jurisdiction?: string, ownership_pct?: number, 
 /**
  * Role priority for layout ordering
  */
-role_priority: number | null, 
+role_priority?: number, 
 /**
  * Additional node data (JSON blob) - skipped in TS, use `any` in TypeScript
  */
-data: Record<string, unknown> | null, 
+data?: Record<string, unknown> | null, 
 /**
  * Server-computed X position
  */
-x: number | null, 
+x?: number, 
 /**
  * Server-computed Y position
  */
-y: number | null, };
+y?: number, };

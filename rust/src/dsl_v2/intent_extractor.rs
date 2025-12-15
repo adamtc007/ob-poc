@@ -58,13 +58,15 @@ enum RawArgIntent {
 
 impl IntentExtractor {
     /// Create a new intent extractor with explicit API key
-    pub fn new(api_key: String) -> Self {
-        let client = create_llm_client_with_key(api_key).expect("Failed to create LLM client");
-        Self { client }
+    ///
+    /// Returns an error if the LLM client cannot be created.
+    pub fn new(api_key: String) -> Result<Self> {
+        let client = create_llm_client_with_key(api_key)?;
+        Ok(Self { client })
     }
 
     /// Create with a specific model (legacy compatibility)
-    pub fn with_model(api_key: String, _model: &str) -> Self {
+    pub fn with_model(api_key: String, _model: &str) -> Result<Self> {
         // Model is now controlled via environment variables
         Self::new(api_key)
     }

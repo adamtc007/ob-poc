@@ -3,4 +3,4 @@
 /**
  * DSL source response
  */
-export type DslResponse = { source: string, session_id: string | null, };
+export type DslResponse = { source: string, session_id?: string, };

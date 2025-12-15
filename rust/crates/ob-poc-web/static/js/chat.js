@@ -1,4 +1,4 @@
-// Chat Panel - SSE streaming for agent responses
+// Chat Panel - SSE streaming for agent responses with disambiguation support
 export class ChatPanel {
     constructor(callbacks) {
         this.sessionId = null;
@@ -6,16 +6,19 @@ export class ChatPanel {
         this.currentStream = null;
         this.hasPendingDsl = false;
         this.isLoading = false;
-        this.messagesEl = document.getElementById('chat-messages');
-        this.inputEl = document.getElementById('chat-input');
-        this.statusEl = document.getElementById('session-status');
+        // Disambiguation state
+        this.pendingDisambiguation = null;
+        this.disambiguationSelections = new Map();
+        this.messagesEl = document.getElementById("chat-messages");
+        this.inputEl = document.getElementById("chat-input");
+        this.statusEl = document.getElementById("session-status");
         this.callbacks = callbacks;
         this.setupEventListeners();
         this.createSession();
     }
     setupEventListeners() {
-        this.inputEl.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
+        this.inputEl.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 this.sendMessage();
             }
@@ -23,57 +26,60 @@ export class ChatPanel {
     }
     async createSession() {
         try {
-            const response = await fetch('/api/session', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+            const response = await fetch("/api/session", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({}),
             });
             const data = await response.json();
             this.sessionId = data.session_id;
-            this.updateStatus('new');
-            this.appendSystemMessage('Session created. Ask the agent to help with onboarding.');
+            this.updateStatus("new");
+            this.appendSystemMessage("Session created. Ask the agent to help with onboarding.");
         }
         catch (error) {
             this.appendSystemMessage(`Failed to create session: ${error}`);
-            this.updateStatus('error');
+            this.updateStatus("error");
         }
     }
     setCbuId(cbuId) {
         this.currentCbuId = cbuId;
     }
+    getSessionId() {
+        return this.sessionId;
+    }
     async sendMessage() {
         const text = this.inputEl.value.trim();
         if (!text || !this.sessionId)
             return;
-        this.inputEl.value = '';
-        this.appendMessage('user', text);
+        this.inputEl.value = "";
+        this.appendMessage("user", text);
         // Handle conversational commands when DSL is pending
         const lowerText = text.toLowerCase();
         if (this.hasPendingDsl) {
-            if (lowerText === 'execute' ||
-                lowerText === 'run' ||
-                lowerText === 'go') {
+            if (lowerText === "execute" ||
+                lowerText === "run" ||
+                lowerText === "go") {
                 this.execute();
                 return;
             }
-            if (lowerText === 'cancel' ||
-                lowerText === 'clear' ||
-                lowerText === 'reset') {
-                this.callbacks.onDsl('');
+            if (lowerText === "cancel" ||
+                lowerText === "clear" ||
+                lowerText === "reset") {
+                this.callbacks.onDsl("");
                 this.callbacks.onAst([]);
                 this.callbacks.onCanExecute(false);
                 this.hasPendingDsl = false;
-                this.appendSystemMessage('Cancelled. Start a new request.');
+                this.appendSystemMessage("Cancelled. Start a new request.");
                 return;
             }
             // Otherwise, treat as "add more" - send to agent to append
         }
-        this.updateStatus('pending');
+        this.updateStatus("pending");
         this.setLoading(true);
         try {
             const response = await fetch(`/api/session/${this.sessionId}/chat`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     message: text,
                     cbu_id: this.currentCbuId,
@@ -86,13 +92,13 @@ export class ChatPanel {
             }
             else if (data.message) {
                 // Immediate response (non-streaming)
-                this.appendMessage('assistant', data.message);
-                this.updateStatus(data.session_state || 'new');
+                this.appendMessage("assistant", data.message);
+                this.updateStatus(data.session_state || "new");
                 if (data.dsl_source) {
                     this.callbacks.onDsl(data.dsl_source);
                     this.hasPendingDsl = true;
                     // Conversational prompt - no buttons
-                    this.appendSystemMessage('Execute, add more commands, or cancel?');
+                    this.appendSystemMessage("Execute, add more commands, or cancel?");
                 }
                 if (data.ast) {
                     this.callbacks.onAst(data.ast);
@@ -111,45 +117,45 @@ export class ChatPanel {
         }
         catch (error) {
             this.appendSystemMessage(`Error: ${error}`);
-            this.updateStatus('error');
+            this.updateStatus("error");
             this.setLoading(false);
         }
     }
     streamResponse(streamId) {
-        const msgEl = this.appendMessage('assistant', '');
+        const msgEl = this.appendMessage("assistant", "");
         this.currentStream = new EventSource(`/api/chat/stream?id=${streamId}`);
         this.currentStream.onmessage = (event) => {
             try {
                 const chunk = JSON.parse(event.data);
                 switch (chunk.type) {
-                    case 'chunk':
-                        msgEl.textContent += chunk.content || '';
+                    case "chunk":
+                        msgEl.textContent += chunk.content || "";
                         break;
-                    case 'dsl':
+                    case "dsl":
                         if (chunk.source) {
                             this.callbacks.onDsl(chunk.source);
                         }
                         break;
-                    case 'ast':
+                    case "ast":
                         if (chunk.statements) {
                             this.callbacks.onAst(chunk.statements);
                         }
                         break;
-                    case 'done':
+                    case "done":
                         this.currentStream?.close();
                         this.currentStream = null;
-                        this.updateStatus('ready');
+                        this.updateStatus("ready");
                         if (chunk.can_execute) {
                             this.callbacks.onCanExecute(true);
                             this.hasPendingDsl = true;
                         }
                         this.setLoading(false);
                         break;
-                    case 'error':
+                    case "error":
                         this.appendSystemMessage(`Error: ${chunk.message}`);
                         this.currentStream?.close();
                         this.currentStream = null;
-                        this.updateStatus('error');
+                        this.updateStatus("error");
                         this.setLoading(false);
                         break;
                 }
@@ -167,18 +173,18 @@ export class ChatPanel {
     async execute() {
         if (!this.sessionId)
             return;
-        this.updateStatus('executing');
+        this.updateStatus("executing");
         this.hasPendingDsl = false;
         try {
             const response = await fetch(`/api/session/${this.sessionId}/execute`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({}),
             });
             const data = await response.json();
             if (data.success) {
-                this.appendSystemMessage('DSL executed successfully!');
-                this.updateStatus('executed');
+                this.appendSystemMessage("DSL executed successfully!");
+                this.updateStatus("executed");
                 // Show results
                 for (const result of data.results || []) {
                     if (result.entity_id) {
@@ -187,26 +193,26 @@ export class ChatPanel {
                 }
             }
             else {
-                this.appendSystemMessage(`Execution failed: ${data.errors?.join(', ')}`);
-                this.updateStatus('error');
+                this.appendSystemMessage(`Execution failed: ${data.errors?.join(", ")}`);
+                this.updateStatus("error");
             }
         }
         catch (error) {
             this.appendSystemMessage(`Execution error: ${error}`);
-            this.updateStatus('error');
+            this.updateStatus("error");
         }
     }
     async clear() {
-        this.messagesEl.innerHTML = '';
+        this.messagesEl.innerHTML = "";
         this.hasPendingDsl = false;
-        this.callbacks.onDsl('');
+        this.callbacks.onDsl("");
         this.callbacks.onAst([]);
         this.callbacks.onCanExecute(false);
         // Create new session
         await this.createSession();
     }
     appendMessage(role, content) {
-        const msgEl = document.createElement('div');
+        const msgEl = document.createElement("div");
         msgEl.className = `chat-message ${role}`;
         msgEl.textContent = content;
         this.messagesEl.appendChild(msgEl);
@@ -214,26 +220,26 @@ export class ChatPanel {
         return msgEl;
     }
     appendSystemMessage(content) {
-        const msgEl = document.createElement('div');
-        msgEl.className = 'chat-message system';
+        const msgEl = document.createElement("div");
+        msgEl.className = "chat-message system";
         msgEl.textContent = content;
         this.messagesEl.appendChild(msgEl);
         this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
     }
     updateStatus(status) {
         this.statusEl.textContent = status;
-        this.statusEl.className = 'status-badge';
-        if (status === 'ready' || status === 'ready_to_execute') {
-            this.statusEl.classList.add('ready');
+        this.statusEl.className = "status-badge";
+        if (status === "ready" || status === "ready_to_execute") {
+            this.statusEl.classList.add("ready");
         }
-        else if (status === 'pending' || status === 'pending_validation') {
-            this.statusEl.classList.add('pending');
+        else if (status === "pending" || status === "pending_validation") {
+            this.statusEl.classList.add("pending");
         }
-        else if (status === 'error') {
-            this.statusEl.classList.add('error');
+        else if (status === "error") {
+            this.statusEl.classList.add("error");
         }
-        else if (status === 'executed') {
-            this.statusEl.classList.add('executed');
+        else if (status === "executed") {
+            this.statusEl.classList.add("executed");
         }
         this.callbacks.onStatusChange(status);
     }

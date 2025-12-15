@@ -40,7 +40,7 @@ pub use attribute_routes::create_attribute_router;
 pub use entity_routes::create_entity_router;
 
 #[cfg(feature = "server")]
-pub use agent_routes::create_agent_router;
+pub use agent_routes::{create_agent_router, create_agent_router_with_sessions};
 
 #[cfg(feature = "server")]
 pub use dsl_viewer_routes::create_dsl_viewer_router;

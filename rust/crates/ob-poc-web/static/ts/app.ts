@@ -1,6 +1,6 @@
 // OB-POC Hybrid UI - Main Application Entry Point
 
-import { ChatPanel } from "./chat.js";
+import { ChatPanel, UnresolvedRef } from "./chat.js";
 import { DslPanel } from "./dsl.js";
 import { AstPanel, UnresolvedRefContext } from "./ast.js";
 import { WasmBridge } from "./bridge.js";
@@ -46,6 +46,7 @@ class App {
       onCanExecute: (can) => this.handleCanExecuteChanged(can),
       onStatusChange: (status) => this.handleStatusChanged(status),
       onCommand: (cmd) => this.handleAgentCommand(cmd),
+      onUnresolvedRefs: (refs) => this.handleUnresolvedRefs(refs),
     });
 
     // Setup CBU selector
@@ -108,6 +109,9 @@ class App {
     // Tell WASM to load the CBU graph
     this.wasmBridge.loadCbu(cbuId);
 
+    // Bind CBU to session context so agent can reference it as @cbu
+    await this.bindCbuToSession(cbuId);
+
     // Also load DSL for this CBU if any exists
     try {
       const response = await fetch(`/api/cbu/${cbuId}/dsl`);
@@ -124,6 +128,123 @@ class App {
       }
     } catch (error) {
       console.error("[App] Failed to load CBU data:", error);
+    }
+  }
+
+  private async bindCbuToSession(cbuId: string) {
+    const sessionId = this.chatPanel.getSessionId();
+    console.log(
+      "[App] bindCbuToSession called - cbuId:",
+      cbuId,
+      "sessionId:",
+      sessionId,
+    );
+    if (!sessionId) {
+      console.warn(
+        "[App] No session to bind CBU to - session not yet created?",
+      );
+      return;
+    }
+
+    // Get CBU name from selector for display
+    const selectedOption = this.cbuSelector.selectedOptions[0];
+    const displayName = selectedOption?.textContent || cbuId;
+    console.log("[App] Binding CBU to session:", {
+      sessionId,
+      cbuId,
+      displayName,
+    });
+
+    try {
+      const response = await fetch(`/api/session/${sessionId}/bind`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "cbu",
+          id: cbuId,
+          entity_type: "cbu",
+          display_name: displayName,
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log(
+          "[App] CBU bound to session:",
+          result.binding_name,
+          "=",
+          cbuId,
+        );
+      } else if (response.status === 404) {
+        // Session expired or server restarted - recreate session and retry
+        console.warn("[App] Session not found, recreating...");
+        await this.chatPanel.recreateSession();
+        // Retry bind with new session
+        const newSessionId = this.chatPanel.getSessionId();
+        if (newSessionId) {
+          const retryResponse = await fetch(
+            `/api/session/${newSessionId}/bind`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                name: "cbu",
+                id: cbuId,
+                entity_type: "cbu",
+                display_name: displayName,
+              }),
+            },
+          );
+          if (retryResponse.ok) {
+            const result = await retryResponse.json();
+            console.log(
+              "[App] CBU bound after session recreate:",
+              result.binding_name,
+            );
+          } else {
+            console.error(
+              "[App] Failed to bind CBU after recreate:",
+              await retryResponse.text(),
+            );
+          }
+        }
+      } else {
+        console.error("[App] Failed to bind CBU:", await response.text());
+      }
+    } catch (error) {
+      // Network error - likely server restart, try recreating session
+      console.warn(
+        "[App] Network error binding CBU, recreating session...",
+        error,
+      );
+      try {
+        await this.chatPanel.recreateSession();
+        const newSessionId = this.chatPanel.getSessionId();
+        if (newSessionId) {
+          const retryResponse = await fetch(
+            `/api/session/${newSessionId}/bind`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                name: "cbu",
+                id: cbuId,
+                entity_type: "cbu",
+                display_name: displayName,
+              }),
+            },
+          );
+          if (retryResponse.ok) {
+            const result = await retryResponse.json();
+            console.log(
+              "[App] CBU bound after session recreate:",
+              result.binding_name,
+            );
+          }
+        }
+      } catch (retryError) {
+        console.error("[App] Failed to recreate session:", retryError);
+      }
     }
   }
 
@@ -184,6 +305,38 @@ class App {
     } else if (status === "error") {
       this.dslPanel.markError();
     }
+  }
+
+  /**
+   * Handle unresolved entity refs from chat response.
+   * Auto-opens the entity finder for the first unresolved ref.
+   */
+  private handleUnresolvedRefs(refs: UnresolvedRef[]) {
+    if (refs.length === 0) return;
+
+    console.log(`[App] ${refs.length} unresolved entity ref(s) detected`);
+
+    // Open the entity finder for the first unresolved ref
+    const first = refs[0];
+    const resolveCtx: ResolveContext = {
+      entityType: first.entityType,
+      searchText: first.searchText,
+      statementIndex: first.statementIndex,
+      argKey: first.argKey,
+    };
+
+    // Show a helpful message about what's happening
+    const remaining = refs.length - 1;
+    const msg =
+      remaining > 0
+        ? `Resolve "${first.searchText}" (${remaining} more after this)`
+        : `Resolve "${first.searchText}"`;
+    console.log(`[App] ${msg}`);
+
+    // Open the entity finder modal
+    this.entityFinder.open(resolveCtx, (context, match) => {
+      this.handleEntityResolution(context, match);
+    });
   }
 
   private handleUnresolvedRefClick(ctx: UnresolvedRefContext) {

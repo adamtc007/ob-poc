@@ -370,6 +370,9 @@ Plus: TS ◄──CustomEvent──► WASM (just entity IDs)
 | Type | Boundary | Usage |
 |------|----------|-------|
 | `CreateSessionRequest/Response` | Server↔TS | Session creation |
+| `SessionStateResponse` | Server→TS | Session state with `active_cbu` and `bindings` |
+| `BindEntityRequest/Response` | Server↔TS | Bind entity to session context |
+| `BoundEntityInfo` | Server→TS | Entity info (id, name, entity_type) in session state |
 | `ChatRequest/Response` | Server↔TS | Chat messages |
 | `ChatStreamEvent` | Server→TS (SSE) | Streaming chat events |
 | `ExecuteRequest/Response` | Server↔TS | DSL execution |
@@ -1207,7 +1210,9 @@ steps:
 | `POST /api/agent/generate-with-tools` | Generate DSL with Claude tool_use (looks up real IDs) |
 | `POST /api/agent/validate` | Validate DSL syntax/semantics |
 | `POST /api/session` | Create new session |
+| `GET /api/session/:id` | Get session state (includes active_cbu, bindings) |
 | `POST /api/session/:id/chat` | Send chat message |
+| `POST /api/session/:id/bind` | Bind entity to session (e.g., active CBU) |
 | `POST /api/session/:id/execute` | Execute DSL |
 | `GET /api/templates` | List templates |
 | `GET /api/dsl/list` | List DSL instances |
@@ -1232,6 +1237,49 @@ curl -X POST http://localhost:3000/api/agent/generate-with-tools \
 Claude will:
 1. Call `lookup_cbu` with "Apex Capital" to verify it exists
 2. Generate DSL using the confirmed CBU name
+
+### Session Management Architecture
+
+Sessions are managed server-side with a shared in-memory store. The UI sends state changes to the server and receives updates.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Browser (TypeScript)                          │
+│  - ChatPanel creates session on init                            │
+│  - App binds CBU selection to session                           │
+│  - Auto-recovery on 404 (server restart)                        │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Shared SessionStore                           │
+│  Arc<RwLock<HashMap<Uuid, AgentSession>>>                       │
+│  - Single store shared across all routers                       │
+│  - agent_routes and web app use same store                      │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    AgentSession                                  │
+│  - messages: Vec<Message>                                       │
+│  - context.active_cbu: Option<BoundEntity>                      │
+│  - context.bindings: HashMap<String, BoundEntity>               │
+│  - pending/ast state for DSL execution                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key endpoints:**
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/session` | Create new session, returns `session_id` |
+| `GET /api/session/:id` | Get session state with `active_cbu` and `bindings` |
+| `POST /api/session/:id/bind` | Bind entity (CBU, etc.) to session context |
+| `POST /api/session/:id/chat` | Chat with agent (uses `active_cbu` in prompt) |
+
+**Session auto-recovery:** When the UI gets a 404 on bind (e.g., after server restart), it automatically recreates the session and retries.
+
+**Active CBU context:** When a CBU is bound to the session, the agent receives it in the system prompt, enabling context-aware responses like "Add a director to [CBU Name]".
 
 ## DSL Syntax
 

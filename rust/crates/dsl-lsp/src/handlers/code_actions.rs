@@ -3,19 +3,23 @@
 //! Provides quick fixes and refactoring suggestions:
 //! - Implicit create actions for undefined symbols
 //! - Reorder statements for dependency resolution
+//! - Entity suggestion quick fixes for unresolved refs
 
 use tower_lsp::lsp_types::*;
 
 use ob_poc::dsl_v2::diagnostics::{DiagnosticCode, SuggestedFix};
 use ob_poc::dsl_v2::planning_facade::{PlanningOutput, SyntheticStep};
+use ob_poc::dsl_v2::validation::{Diagnostic as SemanticDiagnostic, Suggestion};
 
-/// Generate code actions from planning output
+/// Generate code actions from planning output and semantic diagnostics
 ///
 /// This produces:
 /// - Quick fixes for implicit creates (undefined symbols)
 /// - Refactoring actions for reordering
+/// - Entity suggestion quick fixes (e.g., "Did you mean 'John Smith'?")
 pub fn get_code_actions(
     planning_output: &PlanningOutput,
+    semantic_diagnostics: &[SemanticDiagnostic],
     range: Range,
     uri: &Url,
     source: &str,
@@ -40,6 +44,15 @@ pub fn get_code_actions(
     for diag in &planning_output.diagnostics {
         if let Some(ref fix) = diag.suggested_fix {
             if let Some(action) = create_fix_action(diag, fix, uri, source) {
+                actions.push(CodeActionOrCommand::CodeAction(action));
+            }
+        }
+    }
+
+    // Add quick fixes from semantic diagnostics (entity suggestions)
+    for diag in semantic_diagnostics {
+        for suggestion in &diag.suggestions {
+            if let Some(action) = create_suggestion_action(diag, suggestion, uri, source) {
                 actions.push(CodeActionOrCommand::CodeAction(action));
             }
         }
@@ -206,6 +219,75 @@ fn create_fix_action(
 
     Some(CodeAction {
         title: fix.description.clone(),
+        kind: Some(CodeActionKind::QUICKFIX),
+        diagnostics: None,
+        edit: Some(WorkspaceEdit {
+            changes: Some(changes),
+            document_changes: None,
+            change_annotations: None,
+        }),
+        command: None,
+        is_preferred: Some(is_preferred),
+        disabled: None,
+        data: None,
+    })
+}
+
+/// Create a code action from a semantic diagnostic suggestion (entity resolution)
+///
+/// When an entity reference can't be resolved but similar entities exist,
+/// this creates quick fix actions like "Replace with 'John Smith'"
+fn create_suggestion_action(
+    diag: &SemanticDiagnostic,
+    suggestion: &Suggestion,
+    uri: &Url,
+    _source: &str,
+) -> Option<CodeAction> {
+    // Use the suggestion's span if provided, otherwise use the diagnostic span
+    let span = suggestion.replace_span.or(Some(diag.span))?;
+
+    // Convert to LSP range (0-indexed)
+    // SourceSpan has: line (1-based), column (0-based), offset, length
+    let start_line = span.line.saturating_sub(1); // Convert to 0-based
+    let start_char = span.column;
+
+    // For end position, we need to calculate based on length
+    // This is simplified - assumes the replacement is on a single line
+    let end_char = start_char + span.length;
+
+    let range = Range {
+        start: Position {
+            line: start_line,
+            character: start_char,
+        },
+        end: Position {
+            line: start_line, // Same line (simplified)
+            character: end_char,
+        },
+    };
+
+    // For entity references, we need to replace the quoted string value
+    // The replacement should be the entity name/value
+    let edit = TextEdit {
+        range,
+        new_text: format!("\"{}\"", suggestion.replacement),
+    };
+
+    let mut changes = std::collections::HashMap::new();
+    changes.insert(uri.clone(), vec![edit]);
+
+    // First suggestion is preferred (highest confidence)
+    let is_preferred = suggestion.confidence > 0.8;
+
+    // Format title with confidence
+    let title = format!(
+        "Replace with '{}' ({:.0}% match)",
+        suggestion.replacement,
+        suggestion.confidence * 100.0
+    );
+
+    Some(CodeAction {
+        title,
         kind: Some(CodeActionKind::QUICKFIX),
         diagnostics: None,
         edit: Some(WorkspaceEdit {

@@ -1,27 +1,27 @@
 //! SSE streaming endpoint for agent chat
 //!
-//! Provides real-time streaming of agent responses to the HTML chat panel.
+//! NOTE: Streaming is not currently implemented. The chat panel uses
+//! `/api/session/:id/chat` for request/response style chat.
+//! This endpoint is kept as a stub for future streaming support.
 
 use axum::{
-    extract::{Query, State},
+    extract::Query,
     response::sse::{Event, KeepAlive, Sse},
 };
 use futures::stream::{self, Stream};
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
-use std::time::Duration;
 use uuid::Uuid;
-
-use crate::state::AppState;
 
 #[derive(Debug, Deserialize)]
 pub struct StreamParams {
+    #[allow(dead_code)]
     pub id: Uuid,
 }
 
 #[derive(Debug, Serialize)]
 #[serde(tag = "type")]
-#[allow(dead_code)] // Variants used for SSE protocol, not all paths exercised yet
+#[allow(dead_code)] // Variants for SSE protocol, not all paths exercised yet
 pub enum StreamChunk {
     #[serde(rename = "chunk")]
     Chunk { content: String },
@@ -35,50 +35,23 @@ pub enum StreamChunk {
     Error { message: String },
 }
 
+/// SSE streaming endpoint (stub - streaming not yet implemented)
+///
+/// Currently returns an immediate "not implemented" error and closes.
+/// The chat panel falls back to polling `/api/session/:id/chat`.
 pub async fn chat_stream(
-    Query(params): Query<StreamParams>,
-    State(state): State<AppState>,
+    Query(_params): Query<StreamParams>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
-    let stream_id = params.id;
-
-    // Create a stream that polls for chunks
-    let stream = stream::unfold(
-        (state, stream_id, false),
-        |(state, stream_id, mut done)| async move {
-            if done {
-                return None;
-            }
-
-            // Check for pending chunks
-            let streams = state.pending_streams.read().await;
-            if let Some(pending) = streams.get(&stream_id) {
-                if pending.complete {
-                    done = true;
-                    let chunk = StreamChunk::Done { can_execute: true };
-                    let event = Event::default()
-                        .event("message")
-                        .data(serde_json::to_string(&chunk).unwrap());
-                    return Some((Ok(event), (state.clone(), stream_id, done)));
-                }
-
-                // Return any pending chunks
-                if !pending.chunks.is_empty() {
-                    let content = pending.chunks.join("");
-                    let chunk = StreamChunk::Chunk { content };
-                    let event = Event::default()
-                        .event("message")
-                        .data(serde_json::to_string(&chunk).unwrap());
-                    return Some((Ok(event), (state.clone(), stream_id, done)));
-                }
-            }
-            drop(streams);
-
-            // No data yet, send keepalive ping
-            tokio::time::sleep(Duration::from_millis(100)).await;
-            let event = Event::default().comment("keepalive");
-            Some((Ok(event), (state.clone(), stream_id, done)))
-        },
-    );
+    // Return a single error event and close the stream
+    let stream = stream::once(async {
+        let chunk = StreamChunk::Error {
+            message: "Streaming not implemented. Use /api/session/:id/chat instead.".to_string(),
+        };
+        let event = Event::default()
+            .event("message")
+            .data(serde_json::to_string(&chunk).unwrap());
+        Ok::<_, Infallible>(event)
+    });
 
     Sse::new(stream).keep_alive(KeepAlive::default())
 }

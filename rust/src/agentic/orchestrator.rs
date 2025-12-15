@@ -47,7 +47,7 @@ impl AgentOrchestrator {
     /// Create a new orchestrator with explicit API key (without database support)
     pub fn new(api_key: String) -> Result<Self> {
         Ok(Self {
-            intent_extractor: IntentExtractor::new(api_key.clone()),
+            intent_extractor: IntentExtractor::new(api_key.clone())?,
             feedback_loop: FeedbackLoop::new(api_key, 3)?,
             #[cfg(feature = "database")]
             executor: None,
@@ -68,7 +68,7 @@ impl AgentOrchestrator {
     #[cfg(feature = "database")]
     pub fn with_executor(api_key: String, pool: sqlx::PgPool) -> Result<Self> {
         Ok(Self {
-            intent_extractor: IntentExtractor::new(api_key.clone()),
+            intent_extractor: IntentExtractor::new(api_key.clone())?,
             feedback_loop: FeedbackLoop::new(api_key, 3)?,
             executor: Some(crate::dsl_v2::DslExecutor::new(pool)),
         })
@@ -321,7 +321,7 @@ impl OrchestratorBuilder {
     pub fn build(self) -> Result<AgentOrchestrator> {
         let (intent_extractor, feedback_loop) = if let Some(api_key) = self.api_key {
             (
-                IntentExtractor::new(api_key.clone()),
+                IntentExtractor::new(api_key.clone())?,
                 FeedbackLoop::new(api_key, self.max_retries)?,
             )
         } else {

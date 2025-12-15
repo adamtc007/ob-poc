@@ -246,9 +246,9 @@ pub struct IntentExtractor {
 
 impl IntentExtractor {
     /// Create a new intent extractor with explicit API key
-    pub fn new(api_key: String) -> Self {
-        let client = create_llm_client_with_key(api_key).expect("Failed to create LLM client");
-        Self { client }
+    pub fn new(api_key: String) -> Result<Self> {
+        let client = create_llm_client_with_key(api_key)?;
+        Ok(Self { client })
     }
 
     /// Create from environment variables

@@ -255,7 +255,12 @@ impl SearchIndex for TantivyIndex {
 
             let tantivy_query: Box<dyn Query> = match query.mode {
                 MatchMode::Fuzzy => {
-                    self.build_fuzzy_query(search_field, exact_field, &input_normalized)
+                    if input_normalized.is_empty() {
+                        // Empty fuzzy query - return top results (for pre-resolution)
+                        Box::new(tantivy::query::AllQuery)
+                    } else {
+                        self.build_fuzzy_query(search_field, exact_field, &input_normalized)
+                    }
                 }
                 MatchMode::Exact => {
                     if input_normalized.is_empty() {

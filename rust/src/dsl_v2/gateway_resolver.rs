@@ -251,7 +251,19 @@ impl GatewayRefResolver {
         result: &ResolveResult,
     ) -> Diagnostic {
         let ResolveResult::NotFound { suggestions } = result else {
-            panic!("diagnostic_for_failure called with non-failure result");
+            // This is a programming error - caller should only pass NotFound results
+            debug_assert!(
+                false,
+                "diagnostic_for_failure called with non-failure result"
+            );
+            // Return a generic error diagnostic as fallback
+            return Diagnostic {
+                severity: Severity::Error,
+                span,
+                code: DiagnosticCode::InvalidValue,
+                message: format!("Resolution failed for '{}' (unexpected result type)", value),
+                suggestions: Vec::new(),
+            };
         };
 
         let (code, type_name) = match ref_type {

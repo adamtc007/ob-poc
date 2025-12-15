@@ -10,10 +10,7 @@
 mod routes;
 mod state;
 
-use axum::{
-    routing::{get, post},
-    Router,
-};
+use axum::{routing::get, Router};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::{
@@ -27,7 +24,8 @@ use crate::state::AppState;
 
 // Import API routers from main ob-poc crate
 use ob_poc::api::{
-    create_agent_router, create_attribute_router, create_dsl_viewer_router, create_entity_router,
+    create_agent_router_with_sessions, create_attribute_router, create_dsl_viewer_router,
+    create_entity_router, create_session_store,
 };
 
 // EntityGateway for entity resolution
@@ -173,7 +171,10 @@ async fn main() {
         tracing::info!("EntityGateway started successfully");
     }
 
-    // Create shared state
+    // Create single shared session store for agent routers
+    let sessions = create_session_store();
+
+    // Create shared state for CBU/graph endpoints
     let state = AppState::new(pool.clone());
 
     // Static file serving - point to our static directory
@@ -191,15 +192,15 @@ async fn main() {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    // Build stateless API router (from main ob-poc crate)
+    // Build stateless API router (from main ob-poc crate) with SHARED session store
     let api_router: Router<()> = Router::new()
-        .merge(create_agent_router(pool.clone()))
+        .merge(create_agent_router_with_sessions(pool.clone(), sessions))
         .merge(create_attribute_router(pool.clone()))
         .merge(create_entity_router())
         .merge(create_dsl_viewer_router(pool));
 
     // Build main app router with state
-    // Note: Session routes are provided by create_agent_router, not duplicated here
+    // Session routes (including /bind) now share the same session store via create_agent_router_with_sessions
     let app = Router::new()
         // CBU API routes (custom implementations using AppState)
         .route("/api/cbu", get(routes::api::list_cbus))

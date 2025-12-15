@@ -53,6 +53,15 @@ pub struct CreateSessionResponse {
     pub created_at: String, // ISO 8601
 }
 
+/// Bound entity info for session state
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct BoundEntityInfo {
+    pub id: String,          // UUID as string
+    pub name: String,        // Display name
+    pub entity_type: String, // e.g., "cbu", "entity"
+}
+
 /// Session state response
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
@@ -64,6 +73,13 @@ pub struct SessionStateResponse {
     #[serde(default)]
     #[ts(optional)]
     pub dsl_source: Option<String>,
+    /// Active CBU for this session (if set via bind)
+    #[serde(default)]
+    #[ts(optional)]
+    pub active_cbu: Option<BoundEntityInfo>,
+    /// Named bindings available in the session (name -> entity info)
+    #[serde(default)]
+    pub bindings: std::collections::HashMap<String, BoundEntityInfo>,
 }
 
 // ============================================================================

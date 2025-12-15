@@ -164,10 +164,11 @@ pub fn topological_sort(
         let mut next_ready = vec![];
         for (other_idx, other_deps) in &deps {
             if other_deps.contains(&idx) {
-                let deg = in_degree.get_mut(other_idx).unwrap();
-                *deg -= 1;
-                if *deg == 0 {
-                    next_ready.push(*other_idx);
+                if let Some(deg) = in_degree.get_mut(other_idx) {
+                    *deg -= 1;
+                    if *deg == 0 {
+                        next_ready.push(*other_idx);
+                    }
                 }
             }
         }
@@ -353,7 +354,9 @@ pub fn topological_sort_with_lifecycle(
                                     if let Some(&transition_idx) = state_transitions.get(&key) {
                                         if transition_idx != idx {
                                             // Add lifecycle dependency edge
-                                            deps.get_mut(&idx).unwrap().insert(transition_idx);
+                                            if let Some(dep_set) = deps.get_mut(&idx) {
+                                                dep_set.insert(transition_idx);
+                                            }
                                             found_transition = true;
                                         }
                                     }
@@ -381,9 +384,11 @@ pub fn topological_sort_with_lifecycle(
                                                             .contains(initial_state)
                                                         {
                                                             // Producer sets the required state, add dataflow dep
-                                                            deps.get_mut(&idx)
-                                                                .unwrap()
-                                                                .insert(producer_idx);
+                                                            if let Some(dep_set) =
+                                                                deps.get_mut(&idx)
+                                                            {
+                                                                dep_set.insert(producer_idx);
+                                                            }
                                                             found_transition = true;
                                                         }
                                                     }
@@ -438,10 +443,11 @@ pub fn topological_sort_with_lifecycle(
         let mut next_ready = vec![];
         for (other_idx, other_deps) in &deps {
             if other_deps.contains(&idx) {
-                let deg = in_degree.get_mut(other_idx).unwrap();
-                *deg -= 1;
-                if *deg == 0 {
-                    next_ready.push(*other_idx);
+                if let Some(deg) = in_degree.get_mut(other_idx) {
+                    *deg -= 1;
+                    if *deg == 0 {
+                        next_ready.push(*other_idx);
+                    }
                 }
             }
         }
@@ -555,7 +561,9 @@ fn collect_symbol_refs(
             if let Some(&producer_idx) = binding_to_stmt.get(ref_name) {
                 if producer_idx != current_idx {
                     // This statement depends on producer_idx
-                    deps.get_mut(&current_idx).unwrap().insert(producer_idx);
+                    if let Some(dep_set) = deps.get_mut(&current_idx) {
+                        dep_set.insert(producer_idx);
+                    }
                 }
             }
             // If from executed context, no dependency to track (already satisfied)
@@ -595,7 +603,9 @@ fn collect_implicit_refs(
         AstNode::Literal(Literal::String(s)) => {
             if let Some(&producer_idx) = pk_to_stmt.get(s) {
                 if producer_idx != current_idx {
-                    deps.get_mut(&current_idx).unwrap().insert(producer_idx);
+                    if let Some(dep_set) = deps.get_mut(&current_idx) {
+                        dep_set.insert(producer_idx);
+                    }
                 }
             }
         }
@@ -603,7 +613,9 @@ fn collect_implicit_refs(
             let s = u.to_string();
             if let Some(&producer_idx) = pk_to_stmt.get(&s) {
                 if producer_idx != current_idx {
-                    deps.get_mut(&current_idx).unwrap().insert(producer_idx);
+                    if let Some(dep_set) = deps.get_mut(&current_idx) {
+                        dep_set.insert(producer_idx);
+                    }
                 }
             }
         }

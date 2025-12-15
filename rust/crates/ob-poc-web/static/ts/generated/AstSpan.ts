@@ -3,4 +3,4 @@
 /**
  * Source location span
  */
-export type AstSpan = { start: number, end: number, start_line: number | null, end_line: number | null, };
+export type AstSpan = { start: number, end: number, start_line?: number, end_line?: number, };

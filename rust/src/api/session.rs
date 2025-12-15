@@ -746,6 +746,9 @@ pub struct CreateSessionResponse {
 pub struct ChatRequest {
     /// The user's message
     pub message: String,
+    /// Optional CBU context (selected in UI)
+    #[serde(default)]
+    pub cbu_id: Option<uuid::Uuid>,
 }
 
 /// Response from a chat message (intent-based)

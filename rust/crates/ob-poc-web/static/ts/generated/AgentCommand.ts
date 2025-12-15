@@ -3,4 +3,4 @@
 /**
  * Commands the agent can issue to the UI
  */
-export type AgentCommand = { 'action': 'show_cbu', cbu_id: string, } | { 'action': 'highlight_entity', entity_id: string, } | { 'action': 'navigate_dsl', line: number, } | { 'action': 'focus_ast', node_id: string, };
+export type AgentCommand = { "action": "show_cbu", cbu_id: string, } | { "action": "highlight_entity", entity_id: string, } | { "action": "navigate_dsl", line: number, } | { "action": "focus_ast", node_id: string, };
