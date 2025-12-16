@@ -634,6 +634,8 @@ The UI uses a **hybrid architecture**: HTML/TypeScript panels for text content, 
 
 ## egui State Management & Best Practices
 
+> **⛔ TL;DR:** Read `/EGUI-RULES.md` for the 5 non-negotiable rules in a short checklist format. This section explains the WHY. EGUI-RULES.md is the quick reference WHAT.
+
 The UI uses egui in immediate mode with server-first state management. These patterns are **mandatory** for all egui code in this project.
 
 ### Philosophy: Why These Patterns Exist
@@ -857,6 +859,11 @@ pub struct AsyncState {
     pub loading_chat: bool,
     pub executing: bool,
     
+    // Trigger flags (set by actions, processed ONCE in update loop)
+    // These coordinate when to refetch - NOT dirty tracking
+    pub needs_graph_refetch: bool,
+    pub pending_cbu_id: Option<Uuid>,
+    
     // Error display
     pub last_error: Option<String>,
 }
@@ -882,6 +889,40 @@ fn process_async_results(&mut self) {
     }
     
     // ... similar for other pending results
+}
+
+// ✅ CRITICAL: Central update loop processes trigger flags ONCE
+fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    // STEP 1: Process any pending async results
+    self.state.process_async_results();
+
+    // STEP 2: Handle trigger flags (SINGLE CENTRAL PLACE)
+    // All graph/session refetches happen here, AFTER all state changes
+    if let Some(cbu_id) = self.state.take_pending_graph_refetch() {
+        self.state.fetch_graph(cbu_id);
+    }
+
+    // STEP 3: Render panels (they return actions, don't mutate state directly)
+    // ...
+}
+
+// Actions SET flags, they don't fetch directly
+pub fn set_view_mode(&mut self, mode: ViewMode) {
+    self.view_mode = mode;
+    self.graph_widget.set_view_mode(mode);
+    // Set flag - actual fetch happens in update() after all state changes
+    if let Ok(mut state) = self.async_state.lock() {
+        state.needs_graph_refetch = true;
+    }
+}
+
+pub fn select_cbu(&mut self, cbu_id: Uuid) {
+    self.session_id = Some(cbu_id);
+    // Set flags - actual fetch happens in update()
+    if let Ok(mut state) = self.async_state.lock() {
+        state.pending_cbu_id = Some(cbu_id);
+        state.needs_graph_refetch = true;
+    }
 }
 ```
 
@@ -1360,12 +1401,21 @@ cargo x test --filter foo   # Filter by test name
 # Build
 cargo x build               # Build all binaries (debug)
 cargo x build --release     # Build all binaries (release)
+cargo x wasm                # Build WASM components only
+cargo x wasm --release      # Build WASM in release mode
+
+# Deploy (recommended for UI development)
+cargo x deploy              # Full deploy: WASM + server + start
+cargo x deploy --release    # Release builds
+cargo x deploy --skip-wasm  # Skip WASM rebuild (faster if only Rust changed)
+cargo x deploy --no-run     # Build only, don't start server
+cargo x deploy --port 8080  # Custom port
 
 # Utilities
 cargo x schema-export       # Export DB schema to schema_export.sql
 cargo x ts-bindings         # Generate TypeScript bindings from ob-poc-types
 cargo x dsl-tests           # Run DSL test scenarios
-cargo x serve               # Start agentic server (port 3000)
+cargo x serve               # Start web server (port 3000)
 cargo x serve --port 8080   # Custom port
 
 # CI
@@ -1381,10 +1431,12 @@ cargo x ci                  # Full pipeline: fmt, clippy, test, build
 | `test` | Run tests (`--lib` for unit only, `--db` for integration, `--filter` to match) |
 | `fmt` | Format code (`--check` to verify only) |
 | `build` | Build all binaries (`--release` for optimized) |
+| `wasm` | Build WASM component (ob-poc-ui) to static/wasm/ |
+| `deploy` | Full deploy: WASM + server build + start (`--skip-wasm`, `--no-run`, `--release`) |
+| `serve` | Start web server (`--port` to customize) |
 | `schema-export` | Export database schema to `schema_export.sql` |
 | `ts-bindings` | Generate TypeScript bindings from ob-poc-types |
 | `dsl-tests` | Run DSL test scenarios via `tests/scenarios/run_tests.sh` |
-| `serve` | Start agentic server (`--port` to customize) |
 | `ci` | Full CI pipeline: format check, clippy, tests, build |
 | `pre-commit` | Fast pre-commit hook: format, clippy, unit tests |
 

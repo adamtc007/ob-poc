@@ -23,9 +23,11 @@ pub enum RiskRating {
     Prohibited,
 }
 
-impl RiskRating {
-    pub fn from_str(s: &str) -> Self {
-        match s.to_uppercase().as_str() {
+impl std::str::FromStr for RiskRating {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s.to_uppercase().as_str() {
             "UNRATED" | "NOT_RATED" => Self::Unrated,
             "STANDARD" => Self::Standard,
             "LOW" => Self::Low,
@@ -33,7 +35,7 @@ impl RiskRating {
             "HIGH" => Self::High,
             "PROHIBITED" | "VERY_HIGH" => Self::Prohibited,
             _ => Self::Unrated,
-        }
+        })
     }
 }
 
@@ -64,9 +66,11 @@ pub enum KycStatus {
     Expired,
 }
 
-impl KycStatus {
-    pub fn from_str(s: &str) -> Self {
-        match s.to_uppercase().replace('-', "_").as_str() {
+impl std::str::FromStr for KycStatus {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s.to_uppercase().replace('-', "_").as_str() {
             "NOT_STARTED" | "NOTSTARTED" => Self::NotStarted,
             "PENDING" => Self::Pending,
             "IN_PROGRESS" | "INPROGRESS" => Self::InProgress,
@@ -74,7 +78,7 @@ impl KycStatus {
             "REJECTED" | "FAILED" => Self::Rejected,
             "EXPIRED" => Self::Expired,
             _ => Self::NotStarted,
-        }
+        })
     }
 }
 

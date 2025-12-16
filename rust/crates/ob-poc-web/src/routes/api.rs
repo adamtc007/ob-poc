@@ -85,18 +85,50 @@ pub async fn get_cbu_graph(
     let view_mode = ViewMode::parse(params.view_mode.as_deref().unwrap_or("KYC_UBO"));
     let orientation = Orientation::parse(params.orientation.as_deref().unwrap_or("VERTICAL"));
 
-    // Build graph with all layers
-    let mut graph = CbuGraphBuilder::new(cbu_id)
-        .with_custody(true)
-        .with_kyc(true)
-        .with_ubo(true)
-        .with_services(true)
-        .build(&repo)
-        .await
-        .map_err(|e| {
-            tracing::error!("Graph build error: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    // Build graph filtered by view_mode - server does the filtering
+    let mut graph = match view_mode {
+        ViewMode::KycUbo => {
+            // KYC/UBO view: entities + KYC + UBO layers, no services
+            CbuGraphBuilder::new(cbu_id)
+                .with_custody(false)
+                .with_kyc(true)
+                .with_ubo(true)
+                .with_services(false)
+                .build(&repo)
+                .await
+        }
+        ViewMode::ServiceDelivery => {
+            // Service Delivery view: products + services + resources, no entities/KYC/UBO
+            CbuGraphBuilder::new(cbu_id)
+                .with_custody(false)
+                .with_kyc(false)
+                .with_ubo(false)
+                .with_services(true)
+                .with_entities(false)
+                .build(&repo)
+                .await
+        }
+        ViewMode::ProductsOnly => {
+            // Products only: just CBU + products
+            CbuGraphBuilder::new(cbu_id)
+                .with_custody(false)
+                .with_kyc(false)
+                .with_ubo(false)
+                .with_services(true) // Load services layer to get products
+                .with_entities(false)
+                .build(&repo)
+                .await
+        }
+    }
+    .map_err(|e| {
+        tracing::error!("Graph build error: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    // For PRODUCTS_ONLY, filter out services and resources after loading
+    if view_mode == ViewMode::ProductsOnly {
+        graph.filter_to_products_only();
+    }
 
     // Apply server-side layout (computes x/y positions)
     let layout_engine = LayoutEngine::with_orientation(view_mode, orientation);

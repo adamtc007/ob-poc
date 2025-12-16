@@ -7,6 +7,41 @@ use egui::{Color32, FontId, Pos2, Stroke, Vec2};
 use super::types::{EntityType, LayoutNode, PrimaryRole};
 
 // =============================================================================
+// RENDER CONTEXT
+// =============================================================================
+
+/// Bundled rendering parameters to reduce function arguments
+struct RenderContext {
+    pos: Pos2,
+    size: Vec2,
+    fill: Color32,
+    border: Color32,
+    text_color: Color32,
+    opacity: f32,
+}
+
+impl RenderContext {
+    fn new(node: &LayoutNode, pos: Pos2, size: Vec2, opacity: f32) -> Self {
+        Self {
+            pos,
+            size,
+            fill: apply_opacity(node.style.fill_color, opacity),
+            border: apply_opacity(node.style.border_color, opacity),
+            text_color: apply_opacity(node.style.text_color, opacity),
+            opacity,
+        }
+    }
+
+    fn rect(&self) -> egui::Rect {
+        egui::Rect::from_center_size(self.pos, self.size)
+    }
+
+    fn radius(&self) -> f32 {
+        self.size.x.min(self.size.y) / 2.0
+    }
+}
+
+// =============================================================================
 // DETAIL LEVEL
 // =============================================================================
 
@@ -30,21 +65,17 @@ pub enum DetailLevel {
 
 impl DetailLevel {
     /// Determine LOD from screen-space radius
-    /// Based on zoom percentage of base node size (~100px):
-    /// - Icon only: < 30% (< 30px)
-    /// - Labels (Compact): 30-80% (30-80px)
-    /// - Full text (Standard+): 80%+ (80px+)
     pub fn from_screen_size(screen_width: f32, is_focused: bool) -> Self {
         if is_focused {
             return DetailLevel::Focused;
         }
 
         match screen_width {
-            w if w < 8.0 => DetailLevel::Micro,      // tiny dot
-            w if w < 30.0 => DetailLevel::Icon,      // icon only, no text (< 30%)
-            w if w < 80.0 => DetailLevel::Compact,   // labels/truncated name (30-80%)
-            w if w < 120.0 => DetailLevel::Standard, // full text (80%+)
-            _ => DetailLevel::Expanded,              // all details
+            w if w < 8.0 => DetailLevel::Micro,
+            w if w < 30.0 => DetailLevel::Icon,
+            w if w < 80.0 => DetailLevel::Compact,
+            w if w < 120.0 => DetailLevel::Standard,
+            _ => DetailLevel::Expanded,
         }
     }
 }
@@ -62,74 +93,17 @@ pub fn render_node_at_lod(
     lod: DetailLevel,
     opacity: f32,
 ) {
-    let fill = apply_opacity(node.style.fill_color, opacity);
-    let border = apply_opacity(node.style.border_color, opacity);
-    let text_color = apply_opacity(node.style.text_color, opacity);
+    let ctx = RenderContext::new(node, screen_pos, screen_size, opacity);
 
     match lod {
-        DetailLevel::Micro => {
-            render_micro(painter, screen_pos, fill);
-        }
-        DetailLevel::Icon => {
-            render_icon(
-                painter,
-                node,
-                screen_pos,
-                screen_size,
-                fill,
-                border,
-                opacity,
-            );
-        }
-        DetailLevel::Compact => {
-            render_compact(
-                painter,
-                node,
-                screen_pos,
-                screen_size,
-                fill,
-                border,
-                text_color,
-                opacity,
-            );
-        }
-        DetailLevel::Standard => {
-            render_standard(
-                painter,
-                node,
-                screen_pos,
-                screen_size,
-                fill,
-                border,
-                text_color,
-                opacity,
-            );
-        }
-        DetailLevel::Expanded => {
-            render_expanded(
-                painter,
-                node,
-                screen_pos,
-                screen_size,
-                fill,
-                border,
-                text_color,
-                opacity,
-            );
-        }
+        DetailLevel::Micro => render_micro(painter, &ctx),
+        DetailLevel::Icon => render_icon(painter, node, &ctx),
+        DetailLevel::Compact => render_compact(painter, node, &ctx),
+        DetailLevel::Standard => render_standard(painter, node, &ctx),
+        DetailLevel::Expanded => render_expanded(painter, node, &ctx),
         DetailLevel::Focused => {
-            // Focused nodes render at Standard detail, card is separate
-            render_standard(
-                painter,
-                node,
-                screen_pos,
-                screen_size,
-                fill,
-                border,
-                text_color,
-                opacity,
-            );
-            render_focus_ring(painter, screen_pos, screen_size);
+            render_standard(painter, node, &ctx);
+            render_focus_ring(painter, &ctx);
         }
     }
 }
@@ -139,118 +113,84 @@ pub fn render_node_at_lod(
 // =============================================================================
 
 /// Micro: Just a colored dot
-fn render_micro(painter: &egui::Painter, pos: Pos2, color: Color32) {
-    painter.circle_filled(pos, 6.0, color);
-    // White outline for visibility
-    painter.circle_stroke(pos, 6.0, Stroke::new(1.0, Color32::WHITE));
+fn render_micro(painter: &egui::Painter, ctx: &RenderContext) {
+    painter.circle_filled(ctx.pos, 6.0, ctx.fill);
+    painter.circle_stroke(ctx.pos, 6.0, Stroke::new(1.0, Color32::WHITE));
 }
 
-/// Icon: Shape with entity type color - NO TEXT at this level
-fn render_icon(
-    painter: &egui::Painter,
-    node: &LayoutNode,
-    pos: Pos2,
-    size: Vec2,
-    fill: Color32,
-    border: Color32,
-    opacity: f32,
-) {
-    let radius = size.x.min(size.y) / 2.0;
+/// Icon: Shape with entity type color - NO TEXT
+fn render_icon(painter: &egui::Painter, node: &LayoutNode, ctx: &RenderContext) {
+    let radius = ctx.radius();
 
-    // Render shape based on entity type - NO TEXT, just shapes
     match node.entity_type {
         EntityType::ProperPerson => {
-            // Circle for persons
-            painter.circle_filled(pos, radius, fill);
-            painter.circle_stroke(pos, radius, Stroke::new(2.0, border));
+            painter.circle_filled(ctx.pos, radius, ctx.fill);
+            painter.circle_stroke(ctx.pos, radius, Stroke::new(2.0, ctx.border));
         }
         EntityType::Trust => {
-            // Triangle for trusts
-            render_triangle(painter, pos, radius, fill, border);
+            render_triangle(painter, ctx.pos, radius, ctx.fill, ctx.border);
         }
         _ => {
-            // Rounded rect for companies/funds/CBU
-            let rect = egui::Rect::from_center_size(pos, Vec2::splat(radius * 1.8));
-            painter.rect_filled(rect, 4.0, fill);
-            painter.rect_stroke(rect, 4.0, Stroke::new(2.0, border));
+            let rect = egui::Rect::from_center_size(ctx.pos, Vec2::splat(radius * 1.8));
+            painter.rect_filled(rect, 4.0, ctx.fill);
+            painter.rect_stroke(rect, 4.0, Stroke::new(2.0, ctx.border));
         }
     }
 
-    // UBO indicator - small green dot
+    // UBO indicator
     if node.primary_role == PrimaryRole::UltimateBeneficialOwner {
-        let badge_pos = pos + Vec2::new(radius * 0.7, -radius * 0.7);
-        let badge_color = apply_opacity(Color32::from_rgb(76, 175, 80), opacity);
+        let badge_pos = ctx.pos + Vec2::new(radius * 0.7, -radius * 0.7);
+        let badge_color = apply_opacity(Color32::from_rgb(76, 175, 80), ctx.opacity);
         painter.circle_filled(badge_pos, 5.0, badge_color);
     }
 }
 
 /// Compact: Shape + truncated name
-fn render_compact(
-    painter: &egui::Painter,
-    node: &LayoutNode,
-    pos: Pos2,
-    size: Vec2,
-    fill: Color32,
-    border: Color32,
-    text_color: Color32,
-    opacity: f32,
-) {
-    let rect = egui::Rect::from_center_size(pos, size);
-    let corner = 6.0;
+fn render_compact(painter: &egui::Painter, node: &LayoutNode, ctx: &RenderContext) {
+    let rect = ctx.rect();
 
-    painter.rect_filled(rect, corner, fill);
-    painter.rect_stroke(rect, corner, Stroke::new(1.5, border));
+    painter.rect_filled(rect, 6.0, ctx.fill);
+    painter.rect_stroke(rect, 6.0, Stroke::new(1.5, ctx.border));
 
     // Truncated name
     let name = truncate_name(&node.label, 12);
-    let font_size = (size.y * 0.25).clamp(8.0, 11.0);
+    let font_size = (ctx.size.y * 0.25).clamp(8.0, 11.0);
     painter.text(
-        pos,
+        ctx.pos,
         egui::Align2::CENTER_CENTER,
         name,
         FontId::proportional(font_size),
-        text_color,
+        ctx.text_color,
     );
 
-    // Role badge (top-right) - also show in compact view
     if !node.is_cbu_root {
-        render_role_badge(painter, node, rect, opacity);
+        render_role_badge(painter, node, rect, ctx.opacity);
     }
 }
 
 /// Standard: Full name + role badge
-fn render_standard(
-    painter: &egui::Painter,
-    node: &LayoutNode,
-    pos: Pos2,
-    size: Vec2,
-    fill: Color32,
-    border: Color32,
-    text_color: Color32,
-    opacity: f32,
-) {
-    let rect = egui::Rect::from_center_size(pos, size);
-    let corner = 8.0;
+fn render_standard(painter: &egui::Painter, node: &LayoutNode, ctx: &RenderContext) {
+    let rect = ctx.rect();
     let border_width = if node.is_cbu_root { 3.0 } else { 2.0 };
 
-    painter.rect_filled(rect, corner, fill);
-    painter.rect_stroke(rect, corner, Stroke::new(border_width, border));
+    painter.rect_filled(rect, 8.0, ctx.fill);
+    painter.rect_stroke(rect, 8.0, Stroke::new(border_width, ctx.border));
 
     // Label
-    let font_size = (size.y * 0.18).clamp(10.0, 13.0);
+    let font_size = (ctx.size.y * 0.18).clamp(10.0, 13.0);
     painter.text(
-        pos - Vec2::new(0.0, size.y * 0.15),
+        ctx.pos - Vec2::new(0.0, ctx.size.y * 0.15),
         egui::Align2::CENTER_CENTER,
         &node.label,
         FontId::proportional(font_size),
-        text_color,
+        ctx.text_color,
     );
 
     // Sublabel
     if let Some(ref sublabel) = node.sublabel {
-        let sublabel_color = apply_opacity(Color32::from_rgb(180, 180, 180), opacity);
+        let sublabel_color = apply_opacity(Color32::from_rgb(180, 180, 180), ctx.opacity);
         painter.text(
-            pos + Vec2::new(0.0, size.y * 0.12),
+            ctx.pos + Vec2::new(0.0, ctx.size.y * 0.12),
             egui::Align2::CENTER_CENTER,
             sublabel,
             FontId::proportional(font_size * 0.8),
@@ -258,14 +198,13 @@ fn render_standard(
         );
     }
 
-    // Role badge (top-right)
     if !node.is_cbu_root {
-        render_role_badge(painter, node, rect, opacity);
+        render_role_badge(painter, node, rect, ctx.opacity);
     }
 
     // Jurisdiction (top-left)
     if let Some(ref jurisdiction) = node.jurisdiction {
-        let flag_color = apply_opacity(Color32::from_rgb(120, 120, 120), opacity);
+        let flag_color = apply_opacity(Color32::from_rgb(120, 120, 120), ctx.opacity);
         painter.text(
             rect.left_top() + Vec2::new(5.0, 5.0),
             egui::Align2::LEFT_TOP,
@@ -277,26 +216,14 @@ fn render_standard(
 }
 
 /// Expanded: All details inline
-fn render_expanded(
-    painter: &egui::Painter,
-    node: &LayoutNode,
-    pos: Pos2,
-    size: Vec2,
-    fill: Color32,
-    border: Color32,
-    text_color: Color32,
-    opacity: f32,
-) {
-    // Base rendering same as standard
-    render_standard(painter, node, pos, size, fill, border, text_color, opacity);
+fn render_expanded(painter: &egui::Painter, node: &LayoutNode, ctx: &RenderContext) {
+    render_standard(painter, node, ctx);
 
-    // Additional details at bottom of node
-    let rect = egui::Rect::from_center_size(pos, size);
-
-    // Show all roles
+    // Additional details at bottom
     if node.all_roles.len() > 1 {
+        let rect = ctx.rect();
         let roles_text = node.all_roles.join(", ");
-        let roles_color = apply_opacity(Color32::from_rgb(150, 150, 150), opacity);
+        let roles_color = apply_opacity(Color32::from_rgb(150, 150, 150), ctx.opacity);
         painter.text(
             rect.center_bottom() - Vec2::new(0.0, 8.0),
             egui::Align2::CENTER_BOTTOM,
@@ -311,15 +238,12 @@ fn render_expanded(
 // HELPER RENDERERS
 // =============================================================================
 
-/// Render role badge in top-right corner
 fn render_role_badge(painter: &egui::Painter, node: &LayoutNode, rect: egui::Rect, opacity: f32) {
     let badge_text = role_badge_text(&node.primary_role);
-
     if badge_text.is_empty() {
         return;
     }
 
-    // Use black text for visibility
     let text_color = apply_opacity(Color32::BLACK, opacity);
     let badge_pos = rect.right_top() + Vec2::new(-5.0, 5.0);
 
@@ -332,7 +256,6 @@ fn render_role_badge(painter: &egui::Painter, node: &LayoutNode, rect: egui::Rec
     );
 }
 
-/// Render triangle shape for trusts
 fn render_triangle(
     painter: &egui::Painter,
     center: Pos2,
@@ -351,10 +274,9 @@ fn render_triangle(
     ));
 }
 
-/// Render focus ring around selected node
-fn render_focus_ring(painter: &egui::Painter, pos: Pos2, size: Vec2) {
-    let ring_size = size + Vec2::splat(8.0);
-    let rect = egui::Rect::from_center_size(pos, ring_size);
+fn render_focus_ring(painter: &egui::Painter, ctx: &RenderContext) {
+    let ring_size = ctx.size + Vec2::splat(8.0);
+    let rect = egui::Rect::from_center_size(ctx.pos, ring_size);
     painter.rect_stroke(
         rect,
         12.0,
@@ -366,7 +288,6 @@ fn render_focus_ring(painter: &egui::Painter, pos: Pos2, size: Vec2) {
 // UTILITIES
 // =============================================================================
 
-/// Truncate name to max characters
 fn truncate_name(name: &str, max_chars: usize) -> String {
     if name.len() <= max_chars {
         name.to_string()
@@ -375,22 +296,18 @@ fn truncate_name(name: &str, max_chars: usize) -> String {
     }
 }
 
-/// Apply opacity to a color
 fn apply_opacity(color: Color32, opacity: f32) -> Color32 {
     let [r, g, b, a] = color.to_array();
     Color32::from_rgba_unmultiplied(r, g, b, (a as f32 * opacity) as u8)
 }
 
-/// Get abbreviated role text for badge
 fn role_badge_text(role: &PrimaryRole) -> &'static str {
     match role {
-        // Ownership/Control
         PrimaryRole::UltimateBeneficialOwner => "UBO",
         PrimaryRole::BeneficialOwner => "BO",
         PrimaryRole::Shareholder => "SH",
         PrimaryRole::GeneralPartner => "GP",
         PrimaryRole::LimitedPartner => "LP",
-        // Governance
         PrimaryRole::Director => "Dir",
         PrimaryRole::Officer => "Off",
         PrimaryRole::ConductingOfficer => "CO",
@@ -399,7 +316,6 @@ fn role_badge_text(role: &PrimaryRole) -> &'static str {
         PrimaryRole::Protector => "Prot",
         PrimaryRole::Beneficiary => "Ben",
         PrimaryRole::Settlor => "Settlor",
-        // Fund structure
         PrimaryRole::Principal => "Prin",
         PrimaryRole::AssetOwner => "AO",
         PrimaryRole::MasterFund => "Master",
@@ -409,7 +325,6 @@ fn role_badge_text(role: &PrimaryRole) -> &'static str {
         PrimaryRole::InvestmentManager => "IM",
         PrimaryRole::InvestmentAdvisor => "IA",
         PrimaryRole::Sponsor => "Sponsor",
-        // Service providers
         PrimaryRole::Administrator => "Admin",
         PrimaryRole::Custodian => "Cust",
         PrimaryRole::Depositary => "Dep",
@@ -418,7 +333,6 @@ fn role_badge_text(role: &PrimaryRole) -> &'static str {
         PrimaryRole::PrimeBroker => "PB",
         PrimaryRole::Auditor => "Audit",
         PrimaryRole::LegalCounsel => "Legal",
-        // Other
         PrimaryRole::AuthorizedSignatory => "AS",
         PrimaryRole::ContactPerson => "CP",
         PrimaryRole::CommercialClient => "Client",

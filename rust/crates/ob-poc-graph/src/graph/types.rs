@@ -27,9 +27,11 @@ pub enum CbuCategory {
     CorrespondentBank,
 }
 
-impl CbuCategory {
-    pub fn from_str(s: &str) -> Self {
-        match s.to_uppercase().as_str() {
+impl std::str::FromStr for CbuCategory {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s.to_uppercase().as_str() {
             "FUND_MANDATE" => Self::FundMandate,
             "CORPORATE_GROUP" => Self::CorporateGroup,
             "INSTITUTIONAL_ACCOUNT" => Self::InstitutionalAccount,
@@ -38,7 +40,7 @@ impl CbuCategory {
             "INTERNAL_TEST" => Self::InternalTest,
             "CORRESPONDENT_BANK" => Self::CorrespondentBank,
             _ => Self::CorporateGroup, // fallback
-        }
+        })
     }
 }
 
@@ -91,9 +93,11 @@ pub enum PrimaryRole {
     Unknown,
 }
 
-impl PrimaryRole {
-    pub fn from_str(s: &str) -> Self {
-        match s.to_uppercase().replace('-', "_").as_str() {
+impl std::str::FromStr for PrimaryRole {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s.to_uppercase().replace('-', "_").as_str() {
             // Ownership/Control
             "ULTIMATE_BENEFICIAL_OWNER" | "UBO" => Self::UltimateBeneficialOwner,
             "BENEFICIAL_OWNER" => Self::BeneficialOwner,
@@ -133,9 +137,11 @@ impl PrimaryRole {
             "CONTACT_PERSON" => Self::ContactPerson,
             "COMMERCIAL_CLIENT" => Self::CommercialClient,
             _ => Self::Unknown,
-        }
+        })
     }
+}
 
+impl PrimaryRole {
     /// Priority for layout ordering (higher = more important = placed first)
     pub fn priority(&self) -> i32 {
         match self {
@@ -203,10 +209,12 @@ pub enum EntityType {
     Resource,
 }
 
-impl EntityType {
-    pub fn from_str(s: &str) -> Self {
+impl std::str::FromStr for EntityType {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         let lower = s.to_lowercase();
-        if lower.contains("person") {
+        Ok(if lower.contains("person") {
             Self::ProperPerson
         } else if lower.contains("company") || lower.contains("limited") {
             Self::LimitedCompany
@@ -224,7 +232,7 @@ impl EntityType {
             Self::Resource
         } else {
             Self::Unknown
-        }
+        })
     }
 }
 
@@ -357,14 +365,16 @@ pub enum EdgeType {
     Other,
 }
 
-impl EdgeType {
-    pub fn from_str(s: &str) -> Self {
-        match s.to_lowercase().as_str() {
+impl std::str::FromStr for EdgeType {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s.to_lowercase().as_str() {
             "has_role" | "hasrole" => Self::HasRole,
             "owns" => Self::Owns,
             "controls" => Self::Controls,
             _ => Self::Other,
-        }
+        })
     }
 }
 

@@ -19,6 +19,7 @@ pub struct CbuGraphBuilder {
     include_kyc: bool,
     include_ubo: bool,
     include_services: bool,
+    include_entities: bool,
 }
 
 impl CbuGraphBuilder {
@@ -30,6 +31,7 @@ impl CbuGraphBuilder {
             include_kyc: false,
             include_ubo: false,
             include_services: false,
+            include_entities: true, // Entities are loaded by default
         }
     }
 
@@ -54,6 +56,12 @@ impl CbuGraphBuilder {
     /// Include services layer (products, services, resources)
     pub fn with_services(mut self, include: bool) -> Self {
         self.include_services = include;
+        self
+    }
+
+    /// Include core entities linked via cbu_entity_roles
+    pub fn with_entities(mut self, include: bool) -> Self {
+        self.include_entities = include;
         self
     }
 
@@ -98,8 +106,10 @@ impl CbuGraphBuilder {
             ..Default::default()
         });
 
-        // Always load linked entities (Core layer)
-        self.load_entities(&mut graph, repo).await?;
+        // Load linked entities (Core layer) if requested
+        if self.include_entities {
+            self.load_entities(&mut graph, repo).await?;
+        }
 
         // Load custody layer
         if self.include_custody {

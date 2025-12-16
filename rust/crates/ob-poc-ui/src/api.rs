@@ -28,23 +28,30 @@ const BASE_URL: &str = "";
 /// GET request returning JSON
 pub async fn get<T: DeserializeOwned>(path: &str) -> Result<T, String> {
     let url = format!("{}{}", BASE_URL, path);
+    web_sys::console::log_1(&format!("api::get: starting request to {}", url).into());
 
     let opts = RequestInit::new();
     opts.set_method("GET");
     opts.set_mode(RequestMode::SameOrigin);
+    web_sys::console::log_1(&"api::get: created RequestInit".into());
 
     let request = Request::new_with_str_and_init(&url, &opts)
         .map_err(|e| format!("Request creation failed: {:?}", e))?;
+    web_sys::console::log_1(&"api::get: created Request".into());
 
     request
         .headers()
         .set("Accept", "application/json")
         .map_err(|e| format!("Header set failed: {:?}", e))?;
+    web_sys::console::log_1(&"api::get: set headers".into());
 
     let window = web_sys::window().ok_or("No window")?;
+    web_sys::console::log_1(&"api::get: got window, calling fetch...".into());
+
     let resp_value = JsFuture::from(window.fetch_with_request(&request))
         .await
         .map_err(|e| format!("Fetch failed: {:?}", e))?;
+    web_sys::console::log_1(&"api::get: fetch completed".into());
 
     let resp: Response = resp_value.dyn_into().map_err(|_| "Response cast failed")?;
 
@@ -213,22 +220,17 @@ pub async fn execute_session(session_id: Uuid) -> Result<ExecuteResponse, String
 }
 
 // =============================================================================
-// Graph API
+// Graph API (single source of truth - no delegation)
 // =============================================================================
 
 /// Get CBU graph data
 pub async fn get_cbu_graph(cbu_id: Uuid, view_mode: ViewMode) -> Result<CbuGraphData, String> {
-    let view_mode_str = match view_mode {
-        ViewMode::KycUbo => "KYC_UBO",
-        ViewMode::ServiceDelivery => "SERVICE_DELIVERY",
-        ViewMode::Custody => "CUSTODY",
-        ViewMode::ProductsOnly => "PRODUCTS_ONLY",
-    };
-    get(&format!(
-        "/api/cbu/{}/graph?view_mode={}",
-        cbu_id, view_mode_str
-    ))
-    .await
+    let view_mode_str = view_mode.as_str();
+    let url = format!("/api/cbu/{}/graph?view_mode={}", cbu_id, view_mode_str);
+
+    // Use shared CbuGraphResponse type, then convert to CbuGraphData
+    let response: ob_poc_types::CbuGraphResponse = get(&url).await?;
+    Ok(response.into())
 }
 
 // =============================================================================
@@ -254,6 +256,7 @@ pub async fn start_resolution(session_id: Uuid) -> Result<ResolutionSessionRespo
 }
 
 /// Get current resolution state
+#[allow(dead_code)]
 pub async fn get_resolution(session_id: Uuid) -> Result<ResolutionSessionResponse, String> {
     get(&format!("/api/session/{}/resolution", session_id)).await
 }
@@ -294,6 +297,7 @@ pub async fn select_resolution(
 }
 
 /// Confirm a resolution (mark as reviewed)
+#[allow(dead_code)]
 pub async fn confirm_resolution(
     session_id: Uuid,
     ref_id: &str,
@@ -362,6 +366,7 @@ pub fn set_local_storage(key: &str, value: &str) -> Result<(), String> {
 }
 
 /// Remove value from localStorage
+#[allow(dead_code)]
 pub fn remove_local_storage(key: &str) -> Result<(), String> {
     let window = web_sys::window().ok_or("No window")?;
     let storage = window

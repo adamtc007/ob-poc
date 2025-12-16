@@ -1,5 +1,18 @@
 # TODO: Agent REPL Template & Bulk Integration
 
+## ⛔ FOR PHASE 4 (UI WORK)
+
+**Before writing ANY egui/WASM code, read `/EGUI-RULES.md` completely.**
+
+The 5 non-negotiable rules:
+1. NO local state mirroring server data
+2. Actions return values, NO callbacks  
+3. Short lock, then render
+4. Process async FIRST, render SECOND
+5. All mutations go through server round-trip
+
+---
+
 ## Context
 
 Templates exist as a concept (see TEMPLATES.md). This TODO covers integrating template macro expansion into the agent REPL session, then extending to bulk operations.

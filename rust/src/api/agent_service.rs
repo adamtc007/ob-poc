@@ -1358,16 +1358,24 @@ impl AgentService {
             explanation
         };
 
+        // Auto-execute if DSL is valid and ready
+        let can_execute = session.can_execute() && all_valid;
+        let commands = if can_execute && combined_dsl.is_some() {
+            Some(vec![AgentCommand::Execute])
+        } else {
+            None
+        };
+
         Ok(AgentChatResponse {
             message,
             intents,
             validation_results,
             session_state: session.state.clone(),
-            can_execute: session.can_execute() && all_valid,
+            can_execute,
             dsl_source: combined_dsl,
             ast,
             disambiguation: None,
-            commands: None,
+            commands,
         })
     }
 

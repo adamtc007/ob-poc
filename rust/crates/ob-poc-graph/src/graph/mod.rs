@@ -54,10 +54,8 @@ pub enum ViewMode {
     /// KYC/UBO view - shows core entities, KYC status, and ownership chains
     #[default]
     KycUbo,
-    /// Service Delivery view - shows products (not services/resources)
+    /// Service Delivery view - shows products, services, resources
     ServiceDelivery,
-    /// Custody view - shows markets, SSIs, and booking rules
-    Custody,
     /// Products only view - simplified product overview
     ProductsOnly,
 }
@@ -68,7 +66,6 @@ impl ViewMode {
         match self {
             ViewMode::KycUbo => "KYC_UBO",
             ViewMode::ServiceDelivery => "SERVICE_DELIVERY",
-            ViewMode::Custody => "CUSTODY",
             ViewMode::ProductsOnly => "PRODUCTS_ONLY",
         }
     }
@@ -78,7 +75,6 @@ impl ViewMode {
         match self {
             ViewMode::KycUbo => "KYC / UBO",
             ViewMode::ServiceDelivery => "Services",
-            ViewMode::Custody => "Custody",
             ViewMode::ProductsOnly => "Products",
         }
     }
@@ -88,7 +84,6 @@ impl ViewMode {
         &[
             ViewMode::KycUbo,
             ViewMode::ServiceDelivery,
-            ViewMode::Custody,
             ViewMode::ProductsOnly,
         ]
     }
@@ -140,14 +135,27 @@ impl CbuGraphWidget {
     /// Set graph data from server response (stores full data, filters for current view)
     pub fn set_data(&mut self, data: CbuGraphData) {
         #[cfg(target_arch = "wasm32")]
-        web_sys::console::log_1(
-            &format!(
-                "set_data called: {} nodes, {} edges",
-                data.nodes.len(),
-                data.edges.len()
-            )
-            .into(),
-        );
+        {
+            web_sys::console::log_1(
+                &format!(
+                    "CbuGraphWidget.set_data: {} nodes, {} edges, current view_mode={:?}",
+                    data.nodes.len(),
+                    data.edges.len(),
+                    self.view_mode
+                )
+                .into(),
+            );
+            // Log first few nodes for debugging
+            for (i, node) in data.nodes.iter().take(5).enumerate() {
+                web_sys::console::log_1(
+                    &format!(
+                        "  node[{}]: id={}, type={}, layer={}, x={:?}, y={:?}",
+                        i, node.id, node.node_type, node.layer, node.x, node.y
+                    )
+                    .into(),
+                );
+            }
+        }
 
         self.raw_data = Some(data);
         self.recompute_layout();
@@ -231,181 +239,38 @@ impl CbuGraphWidget {
             self.view_mode = mode;
             #[cfg(target_arch = "wasm32")]
             web_sys::console::log_1(&format!("View mode changed to: {:?}", mode).into());
-            self.recompute_layout();
+            // Note: View mode change triggers a server refetch via the UI layer.
+            // The client just stores the mode for reference; actual filtering is done server-side.
             self.needs_initial_fit = true;
         }
     }
 
-    /// Filter raw data by view mode and recompute layout
+    /// Compute layout from raw data (no filtering - server provides filtered data)
     fn recompute_layout(&mut self) {
         let Some(ref raw) = self.raw_data else {
             self.layout_graph = None;
             return;
         };
 
-        // Filter nodes/edges based on view mode
-        let filtered = self.filter_by_view_mode(raw);
-
         #[cfg(target_arch = "wasm32")]
         web_sys::console::log_1(
             &format!(
-                "Recompute layout: raw={} nodes, filtered={} nodes, view={:?}",
+                "Recompute layout: {} nodes (server-filtered for view={:?})",
                 raw.nodes.len(),
-                filtered.nodes.len(),
                 self.view_mode
             )
             .into(),
         );
 
-        // Determine category and create layout engine
-        let category = filtered
+        // Server already filtered by view_mode - client just computes layout
+        let category = raw
             .cbu_category
             .as_ref()
-            .map(|s| CbuCategory::from_str(s))
+            .and_then(|s| s.parse().ok())
             .unwrap_or_default();
 
         let engine = LayoutEngine::new(category);
-        self.layout_graph = Some(engine.compute_layout(&filtered));
-    }
-
-    /// Filter graph data based on current view mode
-    /// - KycUbo: CBU + OWNERSHIP_CONTROL entities + UBO layer (ownership/control chain)
-    /// - ServiceDelivery: CBU + TRADING_EXECUTION entities + Services (products/resources)
-    ///
-    /// If the preferred filter yields no entity nodes, falls back to showing all entities.
-    fn filter_by_view_mode(&self, data: &CbuGraphData) -> CbuGraphData {
-        // Filter nodes based on view mode using role_categories
-        let (filtered_nodes, fallback_used) = self.filter_nodes_by_view_mode(data);
-
-        #[cfg(target_arch = "wasm32")]
-        {
-            let msg = if fallback_used {
-                format!(
-                    "filter_by_view_mode: view={:?}, raw={} nodes, filtered={} nodes (FALLBACK: no matching entities for view)",
-                    self.view_mode,
-                    data.nodes.len(),
-                    filtered_nodes.len()
-                )
-            } else {
-                format!(
-                    "filter_by_view_mode: view={:?}, raw={} nodes, filtered={} nodes",
-                    self.view_mode,
-                    data.nodes.len(),
-                    filtered_nodes.len()
-                )
-            };
-            web_sys::console::log_1(&msg.into());
-        }
-
-        // Collect IDs of filtered nodes for edge filtering
-        let node_ids: std::collections::HashSet<&str> =
-            filtered_nodes.iter().map(|n| n.id.as_str()).collect();
-
-        // Filter edges - both source and target must be in filtered nodes
-        let filtered_edges: Vec<GraphEdgeData> = data
-            .edges
-            .iter()
-            .filter(|e| {
-                node_ids.contains(e.source.as_str()) && node_ids.contains(e.target.as_str())
-            })
-            .cloned()
-            .collect();
-
-        CbuGraphData {
-            cbu_id: data.cbu_id,
-            label: data.label.clone(),
-            cbu_category: data.cbu_category.clone(),
-            jurisdiction: data.jurisdiction.clone(),
-            nodes: filtered_nodes,
-            edges: filtered_edges,
-        }
-    }
-
-    /// Filter nodes by view mode, returning (nodes, fallback_used)
-    /// If the preferred filter yields no entity nodes, falls back to all entities.
-    fn filter_nodes_by_view_mode(&self, data: &CbuGraphData) -> (Vec<GraphNodeData>, bool) {
-        // First, try the preferred filter for this view mode
-        let preferred_nodes: Vec<GraphNodeData> = match self.view_mode {
-            ViewMode::KycUbo => {
-                // Include: CBU, entities with OWNERSHIP_CONTROL roles, UBO layer, KYC layer
-                data.nodes
-                    .iter()
-                    .filter(|n| {
-                        if n.node_type != "entity" {
-                            return matches!(n.layer.as_str(), "core" | "kyc" | "ubo");
-                        }
-                        n.role_categories
-                            .iter()
-                            .any(|cat| cat == "OWNERSHIP_CONTROL" || cat == "BOTH")
-                    })
-                    .cloned()
-                    .collect()
-            }
-            ViewMode::ServiceDelivery => {
-                // Include: CBU, entities with TRADING_EXECUTION roles, Products only (not services/resources)
-                data.nodes
-                    .iter()
-                    .filter(|n| {
-                        // Always include CBU and products
-                        if n.node_type == "cbu" || n.node_type == "product" {
-                            return true;
-                        }
-                        // Exclude services and resources
-                        if n.node_type == "service" || n.node_type == "resource" {
-                            return false;
-                        }
-                        // For entities, filter by role category
-                        if n.node_type == "entity" {
-                            return n
-                                .role_categories
-                                .iter()
-                                .any(|cat| cat == "TRADING_EXECUTION" || cat == "BOTH");
-                        }
-                        // Include other core layer nodes
-                        n.layer.as_str() == "core"
-                    })
-                    .cloned()
-                    .collect()
-            }
-            ViewMode::Custody => {
-                // Include: CBU, custody layer nodes
-                data.nodes
-                    .iter()
-                    .filter(|n| matches!(n.layer.as_str(), "core" | "custody"))
-                    .cloned()
-                    .collect()
-            }
-            ViewMode::ProductsOnly => {
-                // Simplified view: just CBU and products
-                data.nodes
-                    .iter()
-                    .filter(|n| n.node_type == "cbu" || n.node_type == "product")
-                    .cloned()
-                    .collect()
-            }
-        };
-
-        // Check if we have any entity nodes in the filtered set
-        let has_entities = preferred_nodes.iter().any(|n| n.node_type == "entity");
-
-        if has_entities {
-            // Preferred filter has entities, use it
-            (preferred_nodes, false)
-        } else {
-            // No entities matched the preferred filter - fall back to all entities
-            // This handles cases like a CBU with only TRADING_EXECUTION roles
-            // being viewed in KYC_UBO mode
-            let fallback_nodes: Vec<GraphNodeData> = data
-                .nodes
-                .iter()
-                .filter(|n| {
-                    // Include CBU root and all entities
-                    n.node_type == "cbu" || n.node_type == "entity"
-                })
-                .cloned()
-                .collect();
-            (fallback_nodes, true)
-        }
+        self.layout_graph = Some(engine.compute_layout(raw));
     }
 
     /// Get current view mode

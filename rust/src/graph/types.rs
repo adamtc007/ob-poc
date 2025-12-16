@@ -251,6 +251,25 @@ impl CbuGraph {
         }
     }
 
+    /// Filter graph to products only (removes services, resources, entities)
+    /// Used for PRODUCTS_ONLY view mode
+    pub fn filter_to_products_only(&mut self) {
+        // Keep only CBU and Product nodes
+        let kept_node_ids: std::collections::HashSet<String> = self
+            .nodes
+            .iter()
+            .filter(|n| matches!(n.node_type, NodeType::Cbu | NodeType::Product))
+            .map(|n| n.id.clone())
+            .collect();
+
+        self.nodes
+            .retain(|n| matches!(n.node_type, NodeType::Cbu | NodeType::Product));
+
+        // Keep only edges where both source and target are kept
+        self.edges
+            .retain(|e| kept_node_ids.contains(&e.source) && kept_node_ids.contains(&e.target));
+    }
+
     /// Build layer information for UI rendering
     pub fn build_layer_info(&mut self) {
         self.layers = vec![

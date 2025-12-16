@@ -148,7 +148,8 @@ fn render_focus_card_content(
         ui.collapsing(RichText::new("Roles").strong(), |ui| {
             for role in &data.roles {
                 ui.horizontal(|ui| {
-                    let role_parsed = PrimaryRole::from_str(&role.role);
+                    let role_parsed: PrimaryRole =
+                        role.role.parse().unwrap_or(PrimaryRole::Unknown);
                     let color = role_color(role_parsed);
                     ui.colored_label(color, format!("  {}", role.role));
 

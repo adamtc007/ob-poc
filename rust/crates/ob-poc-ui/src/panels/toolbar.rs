@@ -65,13 +65,13 @@ pub fn toolbar(ui: &mut Ui, state: &mut AppState) -> ToolbarAction {
                 for mode in &[
                     ViewMode::KycUbo,
                     ViewMode::ServiceDelivery,
-                    ViewMode::Custody,
                     ViewMode::ProductsOnly,
                 ] {
                     if ui
                         .selectable_label(state.view_mode == *mode, view_mode_name(*mode))
                         .clicked()
                     {
+                        web_sys::console::log_1(&format!("View mode clicked: {:?}", mode).into());
                         action.change_view_mode = Some(*mode);
                     }
                 }
@@ -130,7 +130,6 @@ fn view_mode_name(mode: ViewMode) -> &'static str {
     match mode {
         ViewMode::KycUbo => "KYC/UBO",
         ViewMode::ServiceDelivery => "Services",
-        ViewMode::Custody => "Custody",
         ViewMode::ProductsOnly => "Products",
     }
 }

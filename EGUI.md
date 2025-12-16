@@ -1,5 +1,13 @@
 # EGUI.md - Full egui/WASM/Rust Stack Refactoring Brief
 
+## ⛔ QUICK REFERENCE: Read EGUI-RULES.md First
+
+**Before implementing ANY egui panels, read `/EGUI-RULES.md` (246 lines).**
+
+It contains the 5 non-negotiable rules that MUST be followed. This document (EGUI.md) is the comprehensive brief. EGUI-RULES.md is the short, sharp checklist.
+
+---
+
 ## Executive Summary
 
 Refactor ob-poc from hybrid architecture (Axum + TypeScript/HTML + egui/WASM graph) to **full egui/WASM/Rust** UI. The server remains the single source of truth. The UI becomes a pure view/render layer with zero business logic.

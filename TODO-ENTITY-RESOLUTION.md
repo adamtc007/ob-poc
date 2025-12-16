@@ -1,13 +1,31 @@
 # TODO: Entity Resolution UI Implementation
 
-## Reference Documents (MUST READ BEFORE CODING)
+## ⛔ MANDATORY FIRST STEP
+
+**Before writing ANY code, read `/EGUI-RULES.md` completely.**
+
+Then confirm you understand by checking these boxes mentally:
+- [ ] NO local state mirroring server data
+- [ ] Actions return values, NO callbacks
+- [ ] Short lock, then render (never hold lock during UI)
+- [ ] Process async FIRST in update(), render SECOND
+- [ ] All mutations go through server round-trip
+
+**If you find yourself writing `self.xxx.push()` or `self.xxx = ...` for server data inside a panel, STOP. You are violating the rules.**
+
+---
+
+## Reference Documents
+
+## Reference Documents
 
 | Document | Purpose | Priority |
 |----------|---------|----------|
-| **`CLAUDE.md` - egui State Management section** | Architecture patterns, anti-patterns, async handling | **CRITICAL - READ FIRST** |
-| `docs/ENTITY_RESOLUTION_UI.md` | Detailed design spec | Reference |
-| `docs/ENTITY_RESOLUTION_UI_PROPOSAL.md` | Design decisions & rationale | Reference |
+| **`EGUI-RULES.md`** | 5 non-negotiable rules - SHORT, READ FIRST | **⛔ MANDATORY** |
+| `CLAUDE.md` - egui section | Full patterns, examples, rationale | Reference |
 | `EGUI.md` | Full egui refactoring brief | Reference |
+| `docs/ENTITY_RESOLUTION_UI.md` | Detailed design spec | Reference |
+| `docs/ENTITY_RESOLUTION_UI_PROPOSAL.md` | Design decisions | Reference |
 
 ---
 

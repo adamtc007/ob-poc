@@ -232,7 +232,7 @@ impl LayoutEngine {
         graph.cbu_category = data
             .cbu_category
             .as_ref()
-            .map(|s| CbuCategory::from_str(s))
+            .and_then(|s| s.parse().ok())
             .unwrap_or_default();
         graph.jurisdiction = data.jurisdiction.clone();
 
@@ -259,11 +259,11 @@ impl LayoutEngine {
 
             let layout_node = LayoutNode {
                 id: node.id.clone(),
-                entity_type: EntityType::from_str(&node.node_type),
+                entity_type: node.node_type.parse().unwrap_or_default(),
                 primary_role: node
                     .primary_role
                     .as_ref()
-                    .map(|r| PrimaryRole::from_str(r))
+                    .and_then(|r| r.parse().ok())
                     .unwrap_or(PrimaryRole::Unknown),
                 all_roles: node.roles.clone(),
                 label: node.label.clone(),
@@ -280,7 +280,7 @@ impl LayoutEngine {
                 style: node_style_for_role(
                     node.primary_role
                         .as_ref()
-                        .map(|r| PrimaryRole::from_str(r))
+                        .and_then(|r| r.parse().ok())
                         .unwrap_or(PrimaryRole::Unknown),
                     node.node_type == "cbu",
                 ),
@@ -295,7 +295,7 @@ impl LayoutEngine {
                 id: edge.id.clone(),
                 source_id: edge.source.clone(),
                 target_id: edge.target.clone(),
-                edge_type: EdgeType::from_str(&edge.edge_type),
+                edge_type: edge.edge_type.parse().unwrap_or(EdgeType::Other),
                 label: edge.label.clone(),
                 control_points: Vec::new(),
                 in_focus: true,
@@ -373,11 +373,11 @@ impl LayoutEngine {
                 id: edge.id.clone(),
                 source_id: edge.source.clone(),
                 target_id: edge.target.clone(),
-                edge_type: EdgeType::from_str(&edge.edge_type),
+                edge_type: edge.edge_type.parse().unwrap_or(EdgeType::Other),
                 label: edge.label.clone(),
                 control_points: Vec::new(),
                 in_focus: true,
-                style: edge_style_for_type(EdgeType::from_str(&edge.edge_type)),
+                style: edge_style_for_type(edge.edge_type.parse().unwrap_or(EdgeType::Other)),
             };
             graph.edges.push(layout_edge);
         }
@@ -408,11 +408,11 @@ impl LayoutEngine {
                 base_position: position,
                 offset: Vec2::ZERO,
                 id: node.id.clone(),
-                entity_type: EntityType::from_str(&node.node_type),
+                entity_type: node.node_type.parse().unwrap_or_default(),
                 primary_role: node
                     .primary_role
                     .as_ref()
-                    .map(|r| PrimaryRole::from_str(r))
+                    .and_then(|r| r.parse().ok())
                     .unwrap_or(PrimaryRole::Unknown),
                 all_roles: node.roles.clone(),
                 label: node.label.clone(),
@@ -427,7 +427,7 @@ impl LayoutEngine {
                 style: node_style_for_role(
                     node.primary_role
                         .as_ref()
-                        .map(|r| PrimaryRole::from_str(r))
+                        .and_then(|r| r.parse().ok())
                         .unwrap_or(PrimaryRole::Unknown),
                     node.node_type == "cbu",
                 ),
@@ -453,11 +453,11 @@ impl LayoutEngine {
                 base_position: position,
                 offset: Vec2::ZERO,
                 id: node.id.clone(),
-                entity_type: EntityType::from_str(&node.node_type),
+                entity_type: node.node_type.parse().unwrap_or_default(),
                 primary_role: node
                     .primary_role
                     .as_ref()
-                    .map(|r| PrimaryRole::from_str(r))
+                    .and_then(|r| r.parse().ok())
                     .unwrap_or(PrimaryRole::Unknown),
                 all_roles: node.roles.clone(),
                 label: node.label.clone(),

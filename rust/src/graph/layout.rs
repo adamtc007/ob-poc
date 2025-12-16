@@ -15,8 +15,6 @@ pub enum ViewMode {
     ProductsOnly,
     /// Service Delivery view: Products → Services → Resources tree (detailed, for onboarding)
     ServiceDelivery,
-    /// Custody view: Markets → Universe/SSI/Rules
-    Custody,
 }
 
 impl ViewMode {
@@ -24,7 +22,6 @@ impl ViewMode {
         match s.to_uppercase().as_str() {
             "PRODUCTS_ONLY" | "PRODUCTS" => ViewMode::ProductsOnly,
             "SERVICE_DELIVERY" | "SERVICES" => ViewMode::ServiceDelivery,
-            "CUSTODY" => ViewMode::Custody,
             _ => ViewMode::KycUbo, // Default
         }
     }
@@ -34,7 +31,6 @@ impl ViewMode {
             ViewMode::KycUbo => "KYC_UBO",
             ViewMode::ProductsOnly => "PRODUCTS_ONLY",
             ViewMode::ServiceDelivery => "SERVICE_DELIVERY",
-            ViewMode::Custody => "CUSTODY",
         }
     }
 }
@@ -151,7 +147,6 @@ impl LayoutEngine {
             (ViewMode::ServiceDelivery, Orientation::Horizontal) => {
                 self.layout_service_delivery_horizontal(graph)
             }
-            (ViewMode::Custody, _) => self.layout_custody(graph), // Custody is always vertical for now
         }
     }
 
@@ -312,40 +307,6 @@ impl LayoutEngine {
         self.layout_tier_centered(&mut graph.nodes, &tier_2, 2, center_x);
         self.layout_tier_centered(&mut graph.nodes, &tier_3, 3, center_x);
         self.layout_tier_centered(&mut graph.nodes, &tier_4, 4, center_x);
-    }
-
-    /// Custody layout: Markets as columns, Universe/SSI/Rules under each
-    fn layout_custody(&self, graph: &mut CbuGraph) {
-        let center_x = self.config.canvas_width / 2.0;
-
-        let mut tier_0: Vec<usize> = Vec::new(); // CBU
-        let mut markets: Vec<usize> = Vec::new();
-        let mut universe: Vec<usize> = Vec::new();
-        let mut ssis: Vec<usize> = Vec::new();
-        let mut rules: Vec<usize> = Vec::new();
-        let mut isda: Vec<usize> = Vec::new();
-        let mut csa: Vec<usize> = Vec::new();
-
-        for (idx, node) in graph.nodes.iter().enumerate() {
-            match node.node_type {
-                NodeType::Cbu => tier_0.push(idx),
-                NodeType::Market => markets.push(idx),
-                NodeType::Universe => universe.push(idx),
-                NodeType::Ssi => ssis.push(idx),
-                NodeType::BookingRule => rules.push(idx),
-                NodeType::Isda => isda.push(idx),
-                NodeType::Csa => csa.push(idx),
-                _ => {} // Skip entities, services in custody view
-            }
-        }
-
-        self.layout_tier_centered(&mut graph.nodes, &tier_0, 0, center_x);
-        self.layout_tier_centered(&mut graph.nodes, &markets, 1, center_x);
-        self.layout_tier_centered(&mut graph.nodes, &universe, 2, center_x - 150.0);
-        self.layout_tier_centered(&mut graph.nodes, &ssis, 2, center_x + 150.0);
-        self.layout_tier_centered(&mut graph.nodes, &rules, 3, center_x);
-        self.layout_tier_centered(&mut graph.nodes, &isda, 4, center_x - 100.0);
-        self.layout_tier_centered(&mut graph.nodes, &csa, 4, center_x + 100.0);
     }
 
     /// KYC/UBO layout (HORIZONTAL - left to right): Tiers flow horizontally, splits are top/bottom
@@ -611,7 +572,8 @@ mod tests {
             ViewMode::ServiceDelivery
         );
         assert_eq!(ViewMode::parse("services"), ViewMode::ServiceDelivery);
-        assert_eq!(ViewMode::parse("CUSTODY"), ViewMode::Custody);
+        assert_eq!(ViewMode::parse("PRODUCTS_ONLY"), ViewMode::ProductsOnly);
+        assert_eq!(ViewMode::parse("CUSTODY"), ViewMode::KycUbo); // Custody removed, defaults to KycUbo
         assert_eq!(ViewMode::parse("unknown"), ViewMode::KycUbo); // Default
     }
 

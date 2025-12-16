@@ -10,7 +10,8 @@ axum = { version = "0.7", features = ["ws"] }
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 tower = "0.4"
-tower-http = { version = "0.5", features = ["fs", "cors", "trace"] }
+tower-http = { version = "0.5", features = ["fs", "cors", "trace", "set-header"] }
+http = "1.0"
 
 # Serialization
 serde = { version = "1", features = ["derive"] }

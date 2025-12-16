@@ -69,7 +69,7 @@ enum Command {
     /// Run DSL test scenarios
     DslTests,
 
-    /// Start the agentic server
+    /// Start the web server (ob-poc-web)
     Serve {
         /// Port to listen on
         #[arg(long, default_value = "3000")]
@@ -81,6 +81,29 @@ enum Command {
 
     /// Pre-commit hook: check + clippy + test
     PreCommit,
+
+    /// Build and deploy: WASM components + web server, then start
+    Deploy {
+        /// Build in release mode
+        #[arg(long)]
+        release: bool,
+        /// Port to listen on
+        #[arg(long, default_value = "3000")]
+        port: u16,
+        /// Skip WASM rebuild (faster if only Rust server changed)
+        #[arg(long)]
+        skip_wasm: bool,
+        /// Don't start the server after building
+        #[arg(long)]
+        no_run: bool,
+    },
+
+    /// Build WASM component (ob-poc-ui only, includes ob-poc-graph as dependency)
+    Wasm {
+        /// Build in release mode
+        #[arg(long)]
+        release: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -103,6 +126,13 @@ fn main() -> Result<()> {
         Command::Serve { port } => serve(&sh, port),
         Command::Ci => ci(&sh),
         Command::PreCommit => pre_commit(&sh),
+        Command::Deploy {
+            release,
+            port,
+            skip_wasm,
+            no_run,
+        } => deploy(&sh, release, port, skip_wasm, no_run),
+        Command::Wasm { release } => build_wasm(&sh, release),
     }
 }
 
@@ -190,13 +220,10 @@ fn fmt(sh: &Shell, check: bool) -> Result<()> {
 }
 
 fn build(sh: &Shell, release: bool) -> Result<()> {
-    let binaries = [
-        ("agentic_server", "server"),
-        ("dsl_cli", "cli,database"),
-        ("dsl_mcp", "mcp"),
-    ];
+    // Build CLI tools from main crate
+    let cli_binaries = [("dsl_cli", "cli,database"), ("dsl_mcp", "mcp")];
 
-    for (bin, features) in binaries {
+    for (bin, features) in cli_binaries {
         println!("Building {bin}...");
         if release {
             cmd!(
@@ -207,6 +234,14 @@ fn build(sh: &Shell, release: bool) -> Result<()> {
         } else {
             cmd!(sh, "cargo build --bin {bin} --features {features}").run()?;
         }
+    }
+
+    // Build web server (separate package)
+    println!("Building ob-poc-web...");
+    if release {
+        cmd!(sh, "cargo build --release -p ob-poc-web").run()?;
+    } else {
+        cmd!(sh, "cargo build -p ob-poc-web").run()?;
     }
 
     Ok(())
@@ -260,13 +295,24 @@ fn dsl_tests(sh: &Shell) -> Result<()> {
 }
 
 fn serve(sh: &Shell, port: u16) -> Result<()> {
-    println!("Starting agentic server on port {port}...");
     let port_str = port.to_string();
-    cmd!(
-        sh,
-        "cargo run --features server --bin agentic_server -- --port {port_str}"
-    )
-    .run()?;
+
+    // Kill any existing server on this port
+    println!("Stopping any existing server on port {port}...");
+    let _ = cmd!(sh, "pkill -f ob-poc-web").run();
+    let _ = cmd!(sh, "lsof -ti:{port_str}").read().map(|pids| {
+        for pid in pids.lines() {
+            let _ = cmd!(sh, "kill -9 {pid}").run();
+        }
+    });
+    std::thread::sleep(std::time::Duration::from_millis(500));
+
+    println!("Starting ob-poc-web server on port {port}...");
+    let db_url =
+        std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".to_string());
+    sh.set_var("DATABASE_URL", &db_url);
+    sh.set_var("SERVER_PORT", &port_str);
+    cmd!(sh, "cargo run -p ob-poc-web").run()?;
     Ok(())
 }
 
@@ -303,5 +349,119 @@ fn pre_commit(sh: &Shell) -> Result<()> {
     cmd!(sh, "cargo test --lib --features database").run()?;
 
     println!("\nPre-commit checks passed!");
+    Ok(())
+}
+
+fn build_wasm(sh: &Shell, release: bool) -> Result<()> {
+    let root = project_root()?;
+    let wasm_out = root.join("rust/crates/ob-poc-web/static/wasm");
+
+    // Ensure wasm-pack is installed
+    if cmd!(sh, "which wasm-pack").run().is_err() {
+        println!("Installing wasm-pack...");
+        cmd!(sh, "cargo install wasm-pack").run()?;
+    }
+
+    // Only build ob-poc-ui - it includes ob-poc-graph as a dependency
+    let wasm_crates = ["ob-poc-ui"];
+
+    for crate_name in wasm_crates {
+        println!("\n=== Building {} WASM ===", crate_name);
+        let crate_dir = root.join(format!("rust/crates/{}", crate_name));
+        sh.change_dir(&crate_dir);
+
+        let out_dir = wasm_out.to_str().context("Invalid wasm output path")?;
+        if release {
+            cmd!(
+                sh,
+                "wasm-pack build --release --target web --out-dir {out_dir}"
+            )
+            .run()
+            .with_context(|| format!("Failed to build {} WASM", crate_name))?;
+        } else {
+            cmd!(sh, "wasm-pack build --dev --target web --out-dir {out_dir}")
+                .run()
+                .with_context(|| format!("Failed to build {} WASM", crate_name))?;
+        }
+        println!("  {} built successfully", crate_name);
+    }
+
+    // Return to rust dir
+    sh.change_dir(root.join("rust"));
+
+    println!("\nWASM components built to: {}", wasm_out.display());
+    Ok(())
+}
+
+fn deploy(sh: &Shell, release: bool, port: u16, skip_wasm: bool, no_run: bool) -> Result<()> {
+    println!("===========================================");
+    println!("  OB-POC Deploy Pipeline");
+    println!("===========================================\n");
+
+    let root = project_root()?;
+
+    // Step 1: Kill existing server (by name and by port)
+    println!("Step 1: Stopping existing server...");
+    let _ = cmd!(sh, "pkill -f ob-poc-web").run(); // Ignore error if not running
+    let port_str = port.to_string();
+    // Also kill anything on the target port
+    let _ = cmd!(sh, "lsof -ti:{port_str}").read().map(|pids| {
+        for pid in pids.lines() {
+            let _ = cmd!(sh, "kill -9 {pid}").run();
+        }
+    });
+    std::thread::sleep(std::time::Duration::from_millis(500));
+
+    // Step 2: Build WASM (unless skipped)
+    if !skip_wasm {
+        println!("\nStep 2: Building WASM components...");
+        build_wasm(sh, release)?;
+    } else {
+        println!("\nStep 2: Skipping WASM build (--skip-wasm)");
+    }
+
+    // Step 3: Build web server
+    println!("\nStep 3: Building web server...");
+    sh.change_dir(root.join("rust"));
+    if release {
+        cmd!(sh, "cargo build -p ob-poc-web --release")
+            .run()
+            .context("Failed to build ob-poc-web")?;
+    } else {
+        cmd!(sh, "cargo build -p ob-poc-web")
+            .run()
+            .context("Failed to build ob-poc-web")?;
+    }
+    println!("  ob-poc-web built successfully");
+
+    if no_run {
+        println!("\n===========================================");
+        println!("  Build complete (--no-run specified)");
+        println!("===========================================");
+        return Ok(());
+    }
+
+    // Step 4: Start server
+    println!("\nStep 4: Starting server on port {}...", port);
+    println!("\n===========================================");
+    println!("  Server starting at http://localhost:{}", port);
+    println!("  Press Ctrl+C to stop");
+    println!("===========================================\n");
+
+    let port_str = port.to_string();
+    let bin_path = if release {
+        root.join("rust/target/release/ob-poc-web")
+    } else {
+        root.join("rust/target/debug/ob-poc-web")
+    };
+    let bin_path_str = bin_path.to_str().context("Invalid binary path")?;
+
+    // Set environment and run
+    let db_url =
+        std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".to_string());
+    sh.set_var("DATABASE_URL", &db_url);
+    sh.set_var("SERVER_PORT", &port_str);
+    cmd!(sh, "{bin_path_str}").run()?;
+
     Ok(())
 }

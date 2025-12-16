@@ -33,7 +33,11 @@ pub struct GraphQuery {
 
 /// GET /api/cbu/{cbu_id}/graph?view_mode=KYC_UBO&orientation=VERTICAL
 /// Returns graph data with server-computed layout positions
-/// View mode determines which layers are emphasized and how nodes are arranged
+/// View mode determines which nodes are included and how they're arranged:
+/// - KYC_UBO: CBU + entities (by role category) + KYC/UBO layers
+/// - SERVICE_DELIVERY: CBU + products + services + resources (no entities)
+/// - CUSTODY: CBU + custody layer (markets, SSIs, rules)
+/// - PRODUCTS_ONLY: CBU + products only
 /// Orientation determines flow direction: VERTICAL (top-to-bottom) or HORIZONTAL (left-to-right)
 pub async fn get_cbu_graph(
     State(pool): State<PgPool>,
@@ -44,15 +48,47 @@ pub async fn get_cbu_graph(
     let view_mode = ViewMode::parse(params.view_mode.as_deref().unwrap_or("KYC_UBO"));
     let orientation = Orientation::parse(params.orientation.as_deref().unwrap_or("VERTICAL"));
 
-    // Always load ALL layers - layout engine positions nodes based on view mode
-    let mut graph = CbuGraphBuilder::new(cbu_id)
-        .with_custody(true)
-        .with_kyc(true)
-        .with_ubo(true)
-        .with_services(true)
-        .build(&repo)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    // Load layers based on view_mode - server does the filtering
+    let mut graph = match view_mode {
+        ViewMode::KycUbo => {
+            // KYC/UBO view: entities + KYC + UBO layers, no services
+            CbuGraphBuilder::new(cbu_id)
+                .with_custody(false)
+                .with_kyc(true)
+                .with_ubo(true)
+                .with_services(false)
+                .build(&repo)
+                .await
+        }
+        ViewMode::ServiceDelivery => {
+            // Service Delivery view: products + services + resources, no entities/KYC/UBO
+            CbuGraphBuilder::new(cbu_id)
+                .with_custody(false)
+                .with_kyc(false)
+                .with_ubo(false)
+                .with_services(true)
+                .with_entities(false) // Skip entity loading
+                .build(&repo)
+                .await
+        }
+        ViewMode::ProductsOnly => {
+            // Products only: just CBU + products
+            CbuGraphBuilder::new(cbu_id)
+                .with_custody(false)
+                .with_kyc(false)
+                .with_ubo(false)
+                .with_services(true) // Services layer loads products
+                .with_entities(false)
+                .build(&repo)
+                .await
+        }
+    }
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // For PRODUCTS_ONLY, filter out services and resources after loading
+    if view_mode == ViewMode::ProductsOnly {
+        graph.filter_to_products_only();
+    }
 
     // Apply server-side layout based on view mode and orientation
     let layout_engine = LayoutEngine::with_orientation(view_mode, orientation);

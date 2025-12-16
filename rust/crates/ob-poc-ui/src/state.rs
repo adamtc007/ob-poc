@@ -61,7 +61,7 @@ pub struct AppState {
     pub session_id: Option<Uuid>,
 
     /// Graph data for current CBU
-    /// Set via refetch_graph(), never modified directly
+    /// Set via fetch_graph() in update() loop, never modified directly
     pub graph_data: Option<CbuGraphData>,
 
     /// Last validation errors (empty = valid)
@@ -255,9 +255,11 @@ pub struct AsyncState {
 
     // Command triggers (from agent commands)
     pub pending_execute: Option<Uuid>, // Session ID to execute
-    pub pending_undo: Option<Uuid>,    // Session ID to undo
-    pub pending_clear: Option<Uuid>,   // Session ID to clear
-    pub pending_delete: Option<(Uuid, u32)>, // Session ID + index to delete
+
+    // State change flags (set by actions, processed centrally in update loop)
+    // These are checked ONCE in update() AFTER process_async_results()
+    pub needs_graph_refetch: bool, // CBU selected or view mode changed
+    pub pending_cbu_id: Option<Uuid>, // CBU to fetch graph for (set by select_cbu)
 
     // Execution tracking - prevents repeated refetch
     pub execution_handled: bool,
@@ -329,10 +331,19 @@ impl AppState {
             state.loading_graph = false;
             match result {
                 Ok(data) => {
+                    web_sys::console::log_1(
+                        &format!(
+                            "process_async_results: graph received {} nodes, {} edges",
+                            data.nodes.len(),
+                            data.edges.len()
+                        )
+                        .into(),
+                    );
                     self.graph_widget.set_data(data.clone());
                     self.graph_data = Some(data);
                 }
                 Err(e) => {
+                    web_sys::console::error_1(&format!("Graph fetch failed: {}", e).into());
                     state.last_error = Some(format!("Graph fetch failed: {}", e));
                 }
             }
@@ -362,7 +373,7 @@ impl AppState {
             match result {
                 Ok(execution) => {
                     self.execution = Some(execution);
-                    // Note: refetch_graph() and refetch_session() should be called
+                    // Note: graph refetch triggered via needs_graph_refetch flag
                     // by the caller after this returns, since they need &mut self
                 }
                 Err(e) => state.last_error = Some(e),
@@ -439,6 +450,30 @@ impl AppState {
         } else {
             None
         }
+    }
+
+    /// Check if graph refetch is needed and return the CBU ID to fetch
+    /// Called ONCE per frame in update() - the single central place for graph fetches
+    pub fn take_pending_graph_refetch(&self) -> Option<Uuid> {
+        let Ok(mut state) = self.async_state.lock() else {
+            return None;
+        };
+
+        if !state.needs_graph_refetch {
+            return None;
+        }
+
+        // Clear the flag
+        state.needs_graph_refetch = false;
+
+        // Use pending_cbu_id if set (from select_cbu), otherwise use session_id
+        if let Some(cbu_id) = state.pending_cbu_id.take() {
+            return Some(cbu_id);
+        }
+
+        // Fall back to current session_id (for view mode changes, execution complete)
+        drop(state); // Release lock before accessing self
+        self.session_id
     }
 
     /// Add a user message to the chat history

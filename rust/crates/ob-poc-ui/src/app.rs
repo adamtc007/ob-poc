@@ -63,14 +63,26 @@ impl eframe::App for App {
         // =================================================================
         self.state.process_async_results();
 
-        // After execution completes, refetch dependent data
-        // (This must be done here, not in process_async_results, because
-        // we need to call methods that take &mut self)
-        // We use execution_handled flag to ensure we only refetch once per execution
+        // =================================================================
+        // STEP 2: Handle state change flags (SINGLE CENTRAL PLACE)
+        // All graph/session refetches happen here, after ALL state changes
+        // =================================================================
+
+        // After execution completes, refetch session
         if self.state.should_handle_execution_complete() {
-            // Trigger refetches - server is source of truth
             self.state.refetch_session();
-            self.state.refetch_graph();
+            // Also trigger graph refetch
+            if let Ok(mut async_state) = self.state.async_state.lock() {
+                async_state.needs_graph_refetch = true;
+            }
+        }
+
+        // Central graph refetch - triggered by: select_cbu, set_view_mode, execution complete
+        if let Some(cbu_id) = self.state.take_pending_graph_refetch() {
+            web_sys::console::log_1(
+                &format!("update: central graph fetch for cbu_id={}", cbu_id).into(),
+            );
+            self.state.fetch_graph(cbu_id);
         }
 
         // Check for pending execute command from agent
@@ -224,6 +236,9 @@ impl App {
         }
 
         if let Some(mode) = action.change_view_mode {
+            web_sys::console::log_1(
+                &format!("handle_toolbar_action: changing view mode to {:?}", mode).into(),
+            );
             self.state.set_view_mode(mode);
         }
 
@@ -467,27 +482,14 @@ impl AppState {
         });
     }
 
-    /// Refetch graph for current CBU
-    pub fn refetch_graph(&mut self) {
-        let cbu_id = self
-            .session
-            .as_ref()
-            .and_then(|s| s.active_cbu.as_ref())
-            .and_then(|c| Uuid::parse_str(&c.id).ok());
-
-        let Some(cbu_id) = cbu_id else {
-            return;
-        };
-
-        self.fetch_graph(cbu_id);
-    }
-
-    /// Fetch graph for specific CBU
+    /// Fetch graph for specific CBU (called from central update() loop only)
     pub fn fetch_graph(&mut self, cbu_id: Uuid) {
-        tracing::info!(
-            "fetch_graph called: cbu_id={}, view_mode={:?}",
-            cbu_id,
-            self.view_mode
+        web_sys::console::log_1(
+            &format!(
+                "fetch_graph: cbu_id={}, view_mode={:?}",
+                cbu_id, self.view_mode
+            )
+            .into(),
         );
 
         {
@@ -500,11 +502,15 @@ impl AppState {
         let ctx = self.ctx.clone();
 
         spawn_local(async move {
-            tracing::info!("fetch_graph: calling API...");
+            web_sys::console::log_1(
+                &format!("fetch_graph: calling API for {:?}...", view_mode).into(),
+            );
             let result = api::get_cbu_graph(cbu_id, view_mode).await;
-            tracing::info!("fetch_graph: API returned, success={}", result.is_ok());
+            web_sys::console::log_1(
+                &format!("fetch_graph: API returned, success={}", result.is_ok()).into(),
+            );
             if let Err(ref e) = result {
-                tracing::error!("fetch_graph error: {}", e);
+                web_sys::console::error_1(&format!("fetch_graph error: {}", e).into());
             }
             if let Ok(mut state) = async_state.lock() {
                 state.pending_graph = Some(result);
@@ -516,7 +522,7 @@ impl AppState {
         });
     }
 
-    /// Select a CBU (bind to session, then refetch)
+    /// Select a CBU - sets state, graph refetch happens centrally in update()
     pub fn select_cbu(&mut self, cbu_id: Uuid, display_name: &str) {
         tracing::info!(
             "select_cbu called: cbu_id={}, old_session_id={:?}",
@@ -528,8 +534,11 @@ impl AppState {
         self.session_id = Some(cbu_id);
         let _ = api::set_local_storage("session_id", &cbu_id.to_string());
 
-        // Always fetch graph
-        self.fetch_graph(cbu_id);
+        // Set flags - actual fetch happens in update() after all state changes
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_cbu_id = Some(cbu_id);
+            state.needs_graph_refetch = true;
+        }
 
         let async_state = Arc::clone(&self.async_state);
         let ctx = self.ctx.clone();
@@ -554,11 +563,21 @@ impl AppState {
         });
     }
 
-    /// Set view mode and refetch graph
+    /// Set view mode - graph refetch happens centrally in update()
     pub fn set_view_mode(&mut self, mode: ViewMode) {
+        web_sys::console::log_1(
+            &format!(
+                "set_view_mode: changing from {:?} to {:?}",
+                self.view_mode, mode
+            )
+            .into(),
+        );
         self.view_mode = mode;
         self.graph_widget.set_view_mode(mode);
-        self.refetch_graph();
+        // Set flag - actual fetch happens in update() after all state changes
+        if let Ok(mut state) = self.async_state.lock() {
+            state.needs_graph_refetch = true;
+        }
     }
 
     /// Send chat message
@@ -631,40 +650,14 @@ impl AppState {
                                         );
                                         state.pending_execute = Some(session_id);
                                     }
-                                    ob_poc_types::AgentCommand::Undo => {
-                                        web_sys::console::log_1(
-                                            &format!("Command: Undo session_id={}", session_id)
-                                                .into(),
+                                    // TODO: Implement these commands
+                                    ob_poc_types::AgentCommand::Undo
+                                    | ob_poc_types::AgentCommand::Clear
+                                    | ob_poc_types::AgentCommand::Delete { .. }
+                                    | ob_poc_types::AgentCommand::DeleteLast => {
+                                        web_sys::console::warn_1(
+                                            &format!("Command not implemented: {:?}", cmd).into(),
                                         );
-                                        state.pending_undo = Some(session_id);
-                                    }
-                                    ob_poc_types::AgentCommand::Clear => {
-                                        web_sys::console::log_1(
-                                            &format!("Command: Clear session_id={}", session_id)
-                                                .into(),
-                                        );
-                                        state.pending_clear = Some(session_id);
-                                    }
-                                    ob_poc_types::AgentCommand::Delete { index } => {
-                                        web_sys::console::log_1(
-                                            &format!(
-                                                "Command: Delete index={} session_id={}",
-                                                index, session_id
-                                            )
-                                            .into(),
-                                        );
-                                        state.pending_delete = Some((session_id, *index));
-                                    }
-                                    ob_poc_types::AgentCommand::DeleteLast => {
-                                        // DeleteLast uses index u32::MAX as sentinel
-                                        web_sys::console::log_1(
-                                            &format!(
-                                                "Command: DeleteLast session_id={}",
-                                                session_id
-                                            )
-                                            .into(),
-                                        );
-                                        state.pending_delete = Some((session_id, u32::MAX));
                                     }
                                     // Navigation commands
                                     ob_poc_types::AgentCommand::ShowCbu { cbu_id } => {
@@ -979,7 +972,6 @@ impl AppState {
             return;
         };
 
-        let async_state = Arc::clone(&self.async_state);
         let ctx = self.ctx.clone();
 
         spawn_local(async move {

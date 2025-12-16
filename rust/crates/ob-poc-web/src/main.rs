@@ -7,11 +7,14 @@ mod routes;
 mod state;
 
 use axum::{routing::get, Router};
+use http::header::{HeaderValue, CACHE_CONTROL};
 use std::net::SocketAddr;
 use std::sync::Arc;
+use tower::ServiceBuilder;
 use tower_http::{
     cors::{Any, CorsLayer},
     services::ServeDir,
+    set_header::SetResponseHeaderLayer,
     trace::TraceLayer,
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -233,8 +236,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/cbu/:id/graph", get(routes::api::get_cbu_graph))
         // SSE streaming for agent chat
         .route("/api/chat/stream", get(routes::chat::chat_stream))
-        // Static files (JS, CSS, WASM)
-        .nest_service("/static", ServeDir::new(&static_dir))
+        // Static files (JS, CSS, WASM) with no-cache headers for development
+        .nest_service(
+            "/static",
+            ServiceBuilder::new()
+                .layer(SetResponseHeaderLayer::overriding(
+                    CACHE_CONTROL,
+                    HeaderValue::from_static("no-cache, no-store, must-revalidate"),
+                ))
+                .service(ServeDir::new(&static_dir).precompressed_gzip()),
+        )
         // Index.html at root (egui app)
         .route("/", get(routes::static_files::serve_index))
         // Add state
