@@ -27,7 +27,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .position(|a| a == "--templates-dir" || a == "-d")
         .and_then(|i| args.get(i + 1))
         .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("config/templates"));
+        .unwrap_or_else(|| PathBuf::from("config/verbs/templates"));
 
     // Check templates directory exists
     if !templates_dir.exists() {
@@ -128,8 +128,8 @@ fn print_results(result: &HarnessResult, verbose: bool) {
         };
 
         println!(
-            "│ {} {:<25} {:>8} {:>2} steps             │",
-            status, r.template_id, expansion_status, r.step_count
+            "│ {} {:<25} {:>8} {:>2} ops               │",
+            status, r.template_id, expansion_status, r.op_count
         );
 
         if !r.missing_params.is_empty() {

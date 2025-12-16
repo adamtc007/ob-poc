@@ -5,11 +5,14 @@
 
 use ob_poc_graph::{CbuGraphData, ViewMode};
 use ob_poc_types::{
-    CbuSummary, ChatRequest, ChatResponse, CreateSessionRequest, CreateSessionResponse,
-    ExecuteRequest, ExecuteResponse, SessionStateResponse, SetBindingRequest, SetBindingResponse,
-    ValidateDslRequest, ValidateDslResponse,
+    CbuSummary, ChatRequest, ChatResponse, CommitResolutionResponse, ConfirmAllRequest,
+    ConfirmResolutionRequest, CreateSessionRequest, CreateSessionResponse, ExecuteRequest,
+    ExecuteResponse, ResolutionSearchRequest, ResolutionSearchResponse, ResolutionSessionResponse,
+    SelectResolutionRequest, SelectResolutionResponse, SessionStateResponse, SetBindingRequest,
+    SetBindingResponse, StartResolutionRequest, ValidateDslRequest, ValidateDslResponse,
 };
 use serde::{de::DeserializeOwned, Serialize};
+use std::collections::HashMap;
 use uuid::Uuid;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
@@ -235,6 +238,103 @@ pub async fn get_cbu_graph(cbu_id: Uuid, view_mode: ViewMode) -> Result<CbuGraph
 /// List all CBUs
 pub async fn list_cbus() -> Result<Vec<CbuSummary>, String> {
     get("/api/cbu").await
+}
+
+// =============================================================================
+// Resolution API
+// =============================================================================
+
+/// Start entity resolution for session's DSL
+pub async fn start_resolution(session_id: Uuid) -> Result<ResolutionSessionResponse, String> {
+    post(
+        &format!("/api/session/{}/resolution/start", session_id),
+        &StartResolutionRequest { ref_ids: None },
+    )
+    .await
+}
+
+/// Get current resolution state
+pub async fn get_resolution(session_id: Uuid) -> Result<ResolutionSessionResponse, String> {
+    get(&format!("/api/session/{}/resolution", session_id)).await
+}
+
+/// Search for entity matches for a specific ref
+pub async fn search_resolution(
+    session_id: Uuid,
+    ref_id: &str,
+    query: &str,
+    discriminators: HashMap<String, String>,
+) -> Result<ResolutionSearchResponse, String> {
+    post(
+        &format!("/api/session/{}/resolution/search", session_id),
+        &ResolutionSearchRequest {
+            ref_id: ref_id.to_string(),
+            query: query.to_string(),
+            discriminators,
+            limit: Some(10),
+        },
+    )
+    .await
+}
+
+/// Select an entity for a ref
+pub async fn select_resolution(
+    session_id: Uuid,
+    ref_id: &str,
+    resolved_key: &str,
+) -> Result<SelectResolutionResponse, String> {
+    post(
+        &format!("/api/session/{}/resolution/select", session_id),
+        &SelectResolutionRequest {
+            ref_id: ref_id.to_string(),
+            resolved_key: resolved_key.to_string(),
+        },
+    )
+    .await
+}
+
+/// Confirm a resolution (mark as reviewed)
+pub async fn confirm_resolution(
+    session_id: Uuid,
+    ref_id: &str,
+) -> Result<ResolutionSessionResponse, String> {
+    post(
+        &format!("/api/session/{}/resolution/confirm", session_id),
+        &ConfirmResolutionRequest {
+            ref_id: ref_id.to_string(),
+        },
+    )
+    .await
+}
+
+/// Confirm all high-confidence resolutions
+pub async fn confirm_all_resolutions(
+    session_id: Uuid,
+    min_confidence: Option<f32>,
+) -> Result<ResolutionSessionResponse, String> {
+    post(
+        &format!("/api/session/{}/resolution/confirm-all", session_id),
+        &ConfirmAllRequest { min_confidence },
+    )
+    .await
+}
+
+/// Commit resolutions to AST
+pub async fn commit_resolution(session_id: Uuid) -> Result<CommitResolutionResponse, String> {
+    post(
+        &format!("/api/session/{}/resolution/commit", session_id),
+        &(),
+    )
+    .await
+}
+
+/// Cancel resolution session
+pub async fn cancel_resolution(session_id: Uuid) -> Result<(), String> {
+    post::<(), _>(
+        &format!("/api/session/{}/resolution/cancel", session_id),
+        &(),
+    )
+    .await
 }
 
 // =============================================================================

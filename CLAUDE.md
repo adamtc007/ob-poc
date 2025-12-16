@@ -1437,6 +1437,40 @@ RUST_LOG=ob_poc::dsl_v2=debug ./target/debug/dsl_cli execute -f file.dsl 2> trac
 | `debug` | Step execution, verb routing, generated SQL |
 | `trace` | SQL bind values, row counts (very verbose) |
 
+## Error Handling Guidelines
+
+The DSL execution pipeline uses proper `Result` error handling throughout. **Never use `.unwrap()` or `.expect()` in production code paths** - these cause server panics.
+
+### Panic-Free Patterns
+
+| Pattern | Use Case |
+|---------|----------|
+| `?` operator | Propagate errors up the call stack |
+| `.ok_or_else(\|\| anyhow!(...))` | Convert Option to Result with context |
+| `let Some(x) = ... else { continue }` | Skip missing items in loops |
+| `.unwrap_or_else(\|_\| default)` | Provide fallback for non-critical values |
+| `match` / `if let` | Explicit handling of all cases |
+
+### Audited Areas (Panic-Free)
+
+These production code paths have been audited and are panic-free:
+
+| Module | Status |
+|--------|--------|
+| `main.rs` (server startup) | ✅ Returns Result, graceful errors |
+| `generic_executor.rs` | ✅ All lookups return Result |
+| `custom_ops/*.rs` | ✅ Plugin handlers return Result |
+| `trading_profile.rs` | ✅ Uses `let Some() else` pattern |
+| `ubo_analysis.rs` | ✅ BigDecimal from constant, no parse |
+| `semantic_context.rs` | ✅ Valid placeholder URLs |
+| `csg_linter.rs` | ✅ Valid placeholder URLs |
+
+### Acceptable `.unwrap()` Locations
+
+- **Test code** (`#[test]`, `#[cfg(test)]`) - panics are expected for failures
+- **Static constants** with `.expect("static value")` - compile-time provable
+- **After explicit check** - `if x.is_none() { return } x.unwrap()` (prefer `let Some()`)
+
 ## DSL CLI (dsl_cli)
 
 The CLI provides headless access to the full DSL pipeline, including AI-powered generation.

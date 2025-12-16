@@ -1389,7 +1389,10 @@ impl GenericCrudExecutor {
             .get(&role_arg.name)
             .ok_or_else(|| anyhow!("Missing role argument"))?;
 
-        let lookup = role_arg.lookup.as_ref().unwrap();
+        let lookup = role_arg
+            .lookup
+            .as_ref()
+            .ok_or_else(|| anyhow!("Role argument missing lookup configuration"))?;
         let role_code = role_value
             .as_str()
             .ok_or_else(|| anyhow!("Role must be a string"))?;
@@ -1631,10 +1634,25 @@ impl GenericCrudExecutor {
 
         let entity_type_id: Uuid = type_row.try_get("entity_type_id")?;
         // Use explicit extension_table from config if present, otherwise from entity_types table
-        let extension_table: String = crud
-            .extension_table
-            .clone()
-            .unwrap_or_else(|| type_row.try_get("table_name").unwrap_or_default());
+        let extension_table: String = match crud.extension_table.clone() {
+            Some(t) => t,
+            None => {
+                let table_name: String = type_row.try_get("table_name").map_err(|e| {
+                    anyhow!(
+                        "No extension table found for entity type '{}': {}",
+                        type_code,
+                        e
+                    )
+                })?;
+                if table_name.is_empty() {
+                    return Err(anyhow!(
+                        "Extension table name is empty for entity type '{}'",
+                        type_code
+                    ));
+                }
+                table_name
+            }
+        };
 
         // Generate entity_id
         let entity_id = Uuid::new_v4();
@@ -2171,11 +2189,13 @@ impl GenericCrudExecutor {
                     if !found_non_uuid_match && !matches.is_empty() {
                         let suggestions: Vec<String> =
                             matches.iter().map(|m| m.display.clone()).collect();
+                        let first_suggestion =
+                            suggestions.first().map(|s| s.as_str()).unwrap_or("(none)");
                         return Err(anyhow!(
                             "Lookup failed: '{}' not found for {}\n  Did you mean: {}?\n  Available: {}",
                             code_value,
                             entity_type,
-                            suggestions.first().unwrap(),
+                            first_suggestion,
                             suggestions.join(", ")
                         ));
                     }

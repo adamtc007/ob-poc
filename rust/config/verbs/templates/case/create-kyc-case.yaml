@@ -1,0 +1,80 @@
+template: create-kyc-case
+version: 1
+
+primary_entity:
+  type: cbu
+  param: cbu_name
+  description: CBU to create KYC case for
+
+metadata:
+  name: Create KYC Case
+  summary: Initialize a new KYC case for a CBU
+
+  description: |
+    Creates a new KYC case for client onboarding or periodic review.
+    This is typically the first step in the KYC workflow.
+
+  when_to_use:
+    - Starting new client onboarding
+    - Initiating periodic review
+    - Workflow blocker shows "no_kyc_case"
+
+  when_not_to_use:
+    - Case already exists for this CBU
+    - Event-driven review (use different case type)
+
+  effects:
+    - KYC case created with INTAKE status
+    - SLA deadline set based on case type
+    - Ready for entity collection
+
+  next_steps:
+    - Add entities to case (directors, UBOs, etc.)
+    - Create entity workstreams
+    - Begin document collection
+
+tags:
+  - case
+  - kyc
+  - onboarding
+
+workflow_context:
+  applicable_workflows:
+    - kyc_onboarding
+  applicable_states:
+    - INTAKE
+  resolves_blockers:
+    - no_kyc_case
+
+params:
+  cbu_name:
+    type: string
+    required: true
+    source: session
+    description: CBU name
+
+  case_type:
+    type: enum
+    required: false
+    default: "NEW_CLIENT"
+    enum_values:
+      - NEW_CLIENT
+      - PERIODIC_REVIEW
+      - EVENT_DRIVEN
+      - REMEDIATION
+    prompt: "Type of KYC case"
+
+body: |
+  (kyc-case.create
+    :cbu-id "$cbu_name"
+    :case-type "$case_type"
+    :as @case)
+
+outputs:
+  case:
+    type: entity_ref
+    description: Created KYC case ID
+
+related_templates:
+  - onboard-director
+  - onboard-signatory

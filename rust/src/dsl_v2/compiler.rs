@@ -20,6 +20,9 @@
 
 use crate::dsl_v2::ast::{AstNode, Literal, Program, Statement, VerbCall};
 use crate::dsl_v2::ops::{DocKey, EntityKey, Op};
+// Note: RuntimeVerbRegistry import reserved for future GenericCrud support
+#[allow(unused_imports)]
+use crate::dsl_v2::runtime_registry::RuntimeVerbRegistry;
 use rust_decimal::Decimal;
 use std::collections::HashMap;
 use std::str::FromStr;

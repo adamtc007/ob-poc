@@ -56,9 +56,14 @@ impl ConfigLoader {
         Self::new("config")
     }
 
-    /// Get the config directory path
-    pub fn config_dir(&self) -> &str {
+    /// Get the config directory path as string slice
+    pub fn config_dir_str(&self) -> &str {
         &self.config_dir
+    }
+
+    /// Get the config directory as PathBuf
+    pub fn config_dir(&self) -> std::path::PathBuf {
+        std::path::PathBuf::from(&self.config_dir)
     }
 
     /// Load verb configuration

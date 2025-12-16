@@ -280,6 +280,26 @@ pub enum Op {
         value: String,
         source_stmt: usize,
     },
+
+    // =========================================================================
+    // Generic CRUD Operations
+    // =========================================================================
+    /// Generic CRUD operation for YAML-defined verbs
+    ///
+    /// Used for verbs with `behavior: crud` that don't need special Op handling.
+    /// The executor routes these to GenericCrudExecutor based on the verb name.
+    GenericCrud {
+        /// Full verb name: "domain.verb"
+        verb: String,
+        /// Arguments as JSON for generic executor
+        args: HashMap<String, serde_json::Value>,
+        /// Dependencies on other entities (by symbol name)
+        depends_on: Vec<EntityKey>,
+        /// Binding name if `:as @name` was used
+        binding: Option<String>,
+        /// Source statement index
+        source_stmt: usize,
+    },
 }
 
 impl Op {
@@ -303,6 +323,7 @@ impl Op {
             Op::AddBookingRule { source_stmt, .. } => *source_stmt,
             Op::Materialize { source_stmt, .. } => *source_stmt,
             Op::RequireRef { source_stmt, .. } => *source_stmt,
+            Op::GenericCrud { source_stmt, .. } => *source_stmt,
         }
     }
 
@@ -407,6 +428,13 @@ impl Op {
             } => {
                 format!("Require {} '{}'", ref_type, value)
             }
+            Op::GenericCrud { verb, binding, .. } => {
+                if let Some(b) = binding {
+                    format!("{} :as @{}", verb, b)
+                } else {
+                    verb.clone()
+                }
+            }
         }
     }
 
@@ -417,6 +445,7 @@ impl Op {
             Op::CreateCase { binding, .. } => binding.as_deref(),
             Op::CreateWorkstream { binding, .. } => binding.as_deref(),
             Op::CreateSSI { binding, .. } => binding.as_deref(),
+            Op::GenericCrud { binding, .. } => binding.as_deref(),
             _ => None,
         }
     }
@@ -477,6 +506,12 @@ impl Op {
                     .unwrap_or_else(|| EntityKey::new("ssi", format!("{}:{}", cbu.key, name)));
                 Some(OpRef::SSI(key))
             }
+            // GenericCrud produces an entity if it has a binding
+            Op::GenericCrud { binding, verb, .. } => binding.as_ref().map(|b| {
+                // Use the verb domain as entity type hint
+                let entity_type = verb.split('.').next().unwrap_or("generic");
+                OpRef::Entity(EntityKey::new(entity_type, b.clone()))
+            }),
             _ => None,
         }
     }
@@ -570,6 +605,12 @@ impl Op {
 
             // RequireRef has no runtime deps (validated at compile time)
             Op::RequireRef { .. } => vec![],
+
+            // GenericCrud depends on entities specified in depends_on
+            Op::GenericCrud { depends_on, .. } => depends_on
+                .iter()
+                .map(|k| OpRef::Entity(k.clone()))
+                .collect(),
         }
     }
 }

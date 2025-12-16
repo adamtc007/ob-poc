@@ -258,10 +258,11 @@ impl CustomOperation for UboTraceChainsOp {
             .unwrap_or(25.0);
 
         // Convert f64 to BigDecimal via string
+        // Default 25.0 is a valid BigDecimal constant - use from_str_radix for safety
         let threshold_bd: sqlx::types::BigDecimal = threshold
             .to_string()
             .parse()
-            .unwrap_or_else(|_| "25.0".parse().unwrap());
+            .unwrap_or_else(|_| sqlx::types::BigDecimal::from(25));
 
         // Call the SQL function - includes both ownership AND control relationships
         // Control relationships are UBO extensions per regulatory guidance
@@ -602,10 +603,11 @@ impl CustomOperation for UboCheckCompletenessOp {
             .unwrap_or(25.0);
 
         // Convert f64 to BigDecimal via string
+        // Default 25.0 is a valid BigDecimal constant - use from_str_radix for safety
         let threshold_bd: sqlx::types::BigDecimal = threshold
             .to_string()
             .parse()
-            .unwrap_or_else(|_| "25.0".parse().unwrap());
+            .unwrap_or_else(|_| sqlx::types::BigDecimal::from(25));
 
         // Call the SQL function
         let result = sqlx::query!(

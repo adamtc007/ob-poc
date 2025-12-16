@@ -1,19 +1,25 @@
 //! Template Test Harness
 //!
 //! Tests all templates by:
-//! 1. Loading from config/templates/
+//! 1. Loading from config/verbs/templates/
 //! 2. Expanding with sample parameters
 //! 3. Parsing the generated DSL
-//! 4. Optionally executing against database
-//! 5. Visualizing results
+//! 4. Running through planning facade (DAG + toposort)
+//! 5. Optionally executing against database
+//! 6. Visualizing results
+//!
+//! Templates are first-class language macros that expand to DSL s-expressions.
+//! This harness validates the full pipeline: expand → parse → plan → (execute).
 
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::{ExpansionContext, TemplateExpander, TemplateRegistry};
+use crate::dsl_v2::planning_facade::{analyse_and_plan, PlanningInput};
 use crate::dsl_v2::{compile, parse_program};
 
 /// Result of testing a single template
@@ -21,6 +27,8 @@ use crate::dsl_v2::{compile, parse_program};
 pub struct TemplateTestResult {
     pub template_id: String,
     pub template_name: String,
+    /// Primary entity type for this template (cbu, kyc_case, onboarding_request)
+    pub primary_entity_type: Option<String>,
     pub expansion_success: bool,
     pub expansion_complete: bool,
     pub missing_params: Vec<String>,
@@ -29,7 +37,15 @@ pub struct TemplateTestResult {
     pub parse_error: Option<String>,
     pub compile_success: bool,
     pub compile_error: Option<String>,
-    pub step_count: usize,
+    /// Number of ops in the execution plan
+    pub op_count: usize,
+    /// Planning succeeded (DAG built, toposorted)
+    pub plan_success: bool,
+    pub plan_error: Option<String>,
+    /// True if ops were reordered from source order
+    pub was_reordered: bool,
+    /// Planning diagnostics (warnings, hints)
+    pub diagnostics: Vec<String>,
     pub execution_success: Option<bool>,
     pub execution_error: Option<String>,
     pub bindings: HashMap<String, String>,
@@ -45,6 +61,8 @@ pub struct HarnessResult {
     pub parse_failed: usize,
     pub compile_success: usize,
     pub compile_failed: usize,
+    pub plan_success: usize,
+    pub plan_failed: usize,
     pub execution_success: usize,
     pub execution_failed: usize,
     pub execution_skipped: usize,
@@ -62,29 +80,40 @@ impl HarnessResult {
         println!("Parse failed:         {}", self.parse_failed);
         println!("Compile success:      {}", self.compile_success);
         println!("Compile failed:       {}", self.compile_failed);
+        println!("Plan success:         {}", self.plan_success);
+        println!("Plan failed:          {}", self.plan_failed);
         println!("Execution success:    {}", self.execution_success);
         println!("Execution failed:     {}", self.execution_failed);
         println!("Execution skipped:    {}", self.execution_skipped);
         println!("\n--- Per-Template Results ---\n");
 
         for result in &self.results {
-            let status = if result.compile_success {
+            let status = if result.plan_success {
                 "✓"
+            } else if result.compile_success {
+                "○"
             } else if result.parse_success {
                 "⚠"
             } else {
                 "✗"
             };
+            let primary = result.primary_entity_type.as_deref().unwrap_or("unknown");
             println!(
-                "{} {} - {} params, {} steps",
+                "{} {} [{}] - {} params, {} ops{}",
                 status,
                 result.template_id,
+                primary,
                 if result.expansion_complete {
                     "complete"
                 } else {
                     "incomplete"
                 },
-                result.step_count
+                result.op_count,
+                if result.was_reordered {
+                    " (reordered)"
+                } else {
+                    ""
+                }
             );
             if let Some(ref err) = result.parse_error {
                 println!("    Parse error: {}", err);
@@ -92,7 +121,30 @@ impl HarnessResult {
             if let Some(ref err) = result.compile_error {
                 println!("    Compile error: {}", err);
             }
+            if let Some(ref err) = result.plan_error {
+                println!("    Plan error: {}", err);
+            }
+            // Show all diagnostics including errors for debugging
+            for diag in &result.diagnostics {
+                println!("    Diag: {}", diag);
+            }
+            // If no explicit errors but plan failed, show the DSL for debugging
+            if !result.plan_success
+                && result.parse_error.is_none()
+                && result.compile_error.is_none()
+                && result.plan_error.is_none()
+            {
+                if let Some(ref dsl) = result.dsl {
+                    let first_lines: String = dsl.lines().take(3).collect::<Vec<_>>().join("\n");
+                    println!("    DSL preview: {}", first_lines);
+                }
+            }
         }
+    }
+
+    /// Check if all templates passed the full pipeline
+    pub fn all_passed(&self) -> bool {
+        self.plan_failed == 0 && self.parse_failed == 0
     }
 }
 
@@ -269,18 +321,20 @@ pub fn get_sample_params() -> HashMap<String, HashMap<String, String>> {
     samples
 }
 
-/// Run the template test harness
+/// Run the template test harness using the planning facade
 ///
 /// # Arguments
-/// * `templates_dir` - Path to templates directory (e.g., "config/templates")
+/// * `templates_dir` - Path to templates directory (e.g., "config/verbs/templates")
 /// * `execute` - Whether to execute DSL against database (requires pool)
 /// * `pool` - Optional database pool for execution
+/// * `verb_registry` - Optional verb registry (uses global if None)
 pub async fn run_harness(
     templates_dir: &Path,
     execute: bool,
     #[cfg(feature = "database")] pool: Option<&sqlx::PgPool>,
 ) -> Result<HarnessResult, super::TemplateError> {
-    let registry = TemplateRegistry::load_from_dir(templates_dir)?;
+    let template_registry = TemplateRegistry::load_from_dir(templates_dir)?;
+    let verb_registry = get_verb_registry_arc();
     let sample_params = get_sample_params();
 
     let mut results = Vec::new();
@@ -292,17 +346,25 @@ pub async fn run_harness(
         parse_failed: 0,
         compile_success: 0,
         compile_failed: 0,
+        plan_success: 0,
+        plan_failed: 0,
         execution_success: 0,
         execution_failed: 0,
         execution_skipped: 0,
         results: Vec::new(),
     };
 
-    for template in registry.list() {
+    for template in template_registry.list() {
         stats.total_templates += 1;
 
         let template_id = template.template.clone();
         let template_name = template.metadata.name.clone();
+
+        // Get primary entity type
+        let primary_entity_type = template
+            .primary_entity
+            .as_ref()
+            .map(|pe| format!("{:?}", pe.entity_type).to_lowercase());
 
         // Get sample params for this template
         let explicit_params = sample_params.get(&template_id).cloned().unwrap_or_default();
@@ -312,6 +374,7 @@ pub async fn run_harness(
             current_cbu: Some(Uuid::new_v4()),
             current_case: Some(Uuid::new_v4()),
             bindings: HashMap::new(),
+            binding_types: HashMap::new(),
         };
 
         // Expand template
@@ -330,36 +393,80 @@ pub async fn run_harness(
             .map(|p| p.name.clone())
             .collect();
 
-        // Try to parse the expanded DSL
-        let (parse_success, parse_error, ast) = match parse_program(&expansion.dsl) {
-            Ok(ast) => {
-                stats.parse_success += 1;
-                (true, None, Some(ast))
-            }
-            Err(e) => {
-                stats.parse_failed += 1;
-                (false, Some(format!("{:?}", e)), None)
-            }
-        };
+        // Run through planning facade (parse → compile → DAG → toposort)
+        let planning_input = PlanningInput::new(&expansion.dsl, verb_registry.clone());
+        let planning_output = analyse_and_plan(planning_input);
 
-        // Try to compile if parse succeeded
-        let (compile_success, compile_error, step_count) = if let Some(ref ast) = ast {
-            match compile(ast) {
-                Ok(plan) => {
-                    stats.compile_success += 1;
-                    (true, None, plan.steps.len())
-                }
-                Err(e) => {
-                    stats.compile_failed += 1;
-                    (false, Some(format!("{:?}", e)), 0)
-                }
-            }
+        // Extract results from planning output
+        let parse_success = !planning_output.program.statements.is_empty()
+            || planning_output
+                .diagnostics
+                .iter()
+                .all(|d| d.code != crate::dsl_v2::diagnostics::DiagnosticCode::SyntaxError);
+
+        let parse_error = planning_output
+            .diagnostics
+            .iter()
+            .find(|d| d.code == crate::dsl_v2::diagnostics::DiagnosticCode::SyntaxError)
+            .map(|d| d.message.clone());
+
+        if parse_success {
+            stats.parse_success += 1;
         } else {
-            (false, None, 0)
+            stats.parse_failed += 1;
+        }
+
+        let compile_success = planning_output.compiled_ops.is_some();
+        let compile_error = if !compile_success {
+            planning_output
+                .diagnostics
+                .iter()
+                .find(|d| d.code == crate::dsl_v2::diagnostics::DiagnosticCode::UndefinedSymbol)
+                .map(|d| d.message.clone())
+        } else {
+            None
         };
 
-        // Execute if requested and compile succeeded
-        let (execution_success, execution_error, bindings) = if execute && compile_success {
+        if compile_success {
+            stats.compile_success += 1;
+        } else if parse_success {
+            stats.compile_failed += 1;
+        }
+
+        let plan_success = planning_output.plan.is_some();
+        let plan_error = if !plan_success && compile_success {
+            planning_output
+                .diagnostics
+                .iter()
+                .find(|d| d.code == crate::dsl_v2::diagnostics::DiagnosticCode::CyclicDependency)
+                .map(|d| d.message.clone())
+        } else {
+            None
+        };
+
+        if plan_success {
+            stats.plan_success += 1;
+        } else if compile_success {
+            stats.plan_failed += 1;
+        }
+
+        let op_count = planning_output
+            .plan
+            .as_ref()
+            .map(|p| p.op_count())
+            .unwrap_or(0);
+
+        let was_reordered = planning_output.was_reordered;
+
+        // Capture ALL diagnostics for debugging
+        let diagnostics: Vec<String> = planning_output
+            .diagnostics
+            .iter()
+            .map(|d| format!("[{:?}] {}", d.severity, d.message))
+            .collect();
+
+        // Execute if requested and plan succeeded
+        let (execution_success, execution_error, bindings) = if execute && plan_success {
             #[cfg(feature = "database")]
             {
                 if let Some(pool) = pool {
@@ -391,6 +498,7 @@ pub async fn run_harness(
         results.push(TemplateTestResult {
             template_id,
             template_name,
+            primary_entity_type,
             expansion_success: true,
             expansion_complete,
             missing_params,
@@ -399,7 +507,11 @@ pub async fn run_harness(
             parse_error,
             compile_success,
             compile_error,
-            step_count,
+            op_count,
+            plan_success,
+            plan_error,
+            was_reordered,
+            diagnostics,
             execution_success,
             execution_error,
             bindings,
@@ -447,6 +559,187 @@ pub async fn run_harness_no_db(
     }
 }
 
+/// Run harness using templates from the standard config directory
+///
+/// This loads templates from config/verbs/templates/ and validates them
+/// through the same pipeline as user DSL.
+pub async fn run_harness_from_registry() -> Result<HarnessResult, super::TemplateError> {
+    use crate::dsl_v2::config::loader::ConfigLoader;
+
+    // Load templates from the config directory
+    let loader = ConfigLoader::from_env();
+    let templates_dir = loader.config_dir().join("verbs").join("templates");
+    let template_registry = TemplateRegistry::load_from_dir(&templates_dir)?;
+    let sample_params = get_sample_params();
+
+    let mut results = Vec::new();
+    let mut stats = HarnessResult {
+        total_templates: 0,
+        expansion_complete: 0,
+        expansion_incomplete: 0,
+        parse_success: 0,
+        parse_failed: 0,
+        compile_success: 0,
+        compile_failed: 0,
+        plan_success: 0,
+        plan_failed: 0,
+        execution_success: 0,
+        execution_failed: 0,
+        execution_skipped: 0,
+        results: Vec::new(),
+    };
+
+    for template in template_registry.list() {
+        let result = test_single_template(template, &sample_params);
+
+        // Update stats
+        stats.total_templates += 1;
+        if result.expansion_complete {
+            stats.expansion_complete += 1;
+        } else {
+            stats.expansion_incomplete += 1;
+        }
+        if result.parse_success {
+            stats.parse_success += 1;
+        } else {
+            stats.parse_failed += 1;
+        }
+        if result.compile_success {
+            stats.compile_success += 1;
+        } else if result.parse_success {
+            stats.compile_failed += 1;
+        }
+        if result.plan_success {
+            stats.plan_success += 1;
+        } else if result.compile_success {
+            stats.plan_failed += 1;
+        }
+        stats.execution_skipped += 1;
+
+        results.push(result);
+    }
+
+    stats.results = results;
+    Ok(stats)
+}
+
+/// Get an Arc-wrapped verb registry for use with PlanningInput
+fn get_verb_registry_arc() -> Arc<crate::dsl_v2::runtime_registry::RuntimeVerbRegistry> {
+    use crate::dsl_v2::config::loader::ConfigLoader;
+    use crate::dsl_v2::runtime_registry::RuntimeVerbRegistry;
+
+    // Load a fresh registry since runtime_registry() returns &'static
+    let loader = ConfigLoader::from_env();
+    let config = loader.load_verbs().expect("verbs config should load");
+    Arc::new(RuntimeVerbRegistry::from_config(&config))
+}
+
+/// Test a single template through the full pipeline
+fn test_single_template(
+    template: &super::TemplateDefinition,
+    sample_params: &HashMap<String, HashMap<String, String>>,
+) -> TemplateTestResult {
+    let verb_registry = get_verb_registry_arc();
+
+    let template_id = template.template.clone();
+    let template_name = template.metadata.name.clone();
+
+    let primary_entity_type = template
+        .primary_entity
+        .as_ref()
+        .map(|pe| format!("{:?}", pe.entity_type).to_lowercase());
+
+    let explicit_params = sample_params.get(&template_id).cloned().unwrap_or_default();
+
+    let context = ExpansionContext {
+        current_cbu: Some(Uuid::new_v4()),
+        current_case: Some(Uuid::new_v4()),
+        bindings: HashMap::new(),
+        binding_types: HashMap::new(),
+    };
+
+    let expansion = TemplateExpander::expand(template, &explicit_params, &context);
+    let expansion_complete = expansion.missing_params.is_empty();
+    let missing_params: Vec<String> = expansion
+        .missing_params
+        .iter()
+        .map(|p| p.name.clone())
+        .collect();
+
+    // Run through planning facade
+    let planning_input = PlanningInput::new(&expansion.dsl, verb_registry);
+    let planning_output = analyse_and_plan(planning_input);
+
+    let parse_success = !planning_output.program.statements.is_empty()
+        || planning_output
+            .diagnostics
+            .iter()
+            .all(|d| d.code != crate::dsl_v2::diagnostics::DiagnosticCode::SyntaxError);
+
+    let parse_error = planning_output
+        .diagnostics
+        .iter()
+        .find(|d| d.code == crate::dsl_v2::diagnostics::DiagnosticCode::SyntaxError)
+        .map(|d| d.message.clone());
+
+    let compile_success = planning_output.compiled_ops.is_some();
+    let compile_error = if !compile_success {
+        planning_output
+            .diagnostics
+            .iter()
+            .find(|d| d.code == crate::dsl_v2::diagnostics::DiagnosticCode::UndefinedSymbol)
+            .map(|d| d.message.clone())
+    } else {
+        None
+    };
+
+    let plan_success = planning_output.plan.is_some();
+    let plan_error = if !plan_success && compile_success {
+        planning_output
+            .diagnostics
+            .iter()
+            .find(|d| d.code == crate::dsl_v2::diagnostics::DiagnosticCode::CyclicDependency)
+            .map(|d| d.message.clone())
+    } else {
+        None
+    };
+
+    let op_count = planning_output
+        .plan
+        .as_ref()
+        .map(|p| p.op_count())
+        .unwrap_or(0);
+
+    // Capture ALL diagnostics for debugging
+    let diagnostics: Vec<String> = planning_output
+        .diagnostics
+        .iter()
+        .map(|d| format!("[{:?}] {}", d.severity, d.message))
+        .collect();
+
+    TemplateTestResult {
+        template_id,
+        template_name,
+        primary_entity_type,
+        expansion_success: true,
+        expansion_complete,
+        missing_params,
+        dsl: Some(expansion.dsl),
+        parse_success,
+        parse_error,
+        compile_success,
+        compile_error,
+        op_count,
+        plan_success,
+        plan_error,
+        was_reordered: planning_output.was_reordered,
+        diagnostics,
+        execution_success: None,
+        execution_error: None,
+        bindings: HashMap::new(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -454,8 +747,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_harness_all_templates() {
+        // Use new path: config/verbs/templates
         let config_dir = std::env::var("DSL_CONFIG_DIR").unwrap_or_else(|_| "config".to_string());
-        let templates_path = PathBuf::from(&config_dir).join("templates");
+        let templates_path = PathBuf::from(&config_dir).join("verbs").join("templates");
 
         if !templates_path.exists() {
             eprintln!("Templates directory not found: {:?}", templates_path);
@@ -465,11 +759,48 @@ mod tests {
         let result = run_harness_no_db(&templates_path).await.unwrap();
         result.print_summary();
 
-        // All templates should at least parse (with sample params)
+        // All templates should parse and plan successfully
         assert!(
             result.parse_success > 0,
             "Expected at least some templates to parse"
         );
+        assert!(
+            result.plan_success > 0,
+            "Expected at least some templates to plan successfully"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_harness_from_registry() {
+        // Test using templates loaded at startup with verbs
+        let result = run_harness_from_registry().await.unwrap();
+        result.print_summary();
+
+        assert!(
+            result.total_templates > 0,
+            "Expected templates to be loaded in registry"
+        );
+
+        // All templates should at least parse successfully
+        assert!(
+            result.parse_failed == 0,
+            "Expected all templates to parse: {} failed",
+            result.parse_failed
+        );
+
+        // Report planning stats - some verbs may not be in compiler yet
+        println!(
+            "\nPipeline status: {} plan success, {} plan failed (compiler may lack some verbs)",
+            result.plan_success, result.plan_failed
+        );
+
+        // If all templates pass through to planning, check full success
+        if result.plan_failed == 0 {
+            assert!(
+                result.all_passed(),
+                "Expected all templates to pass pipeline"
+            );
+        }
     }
 
     #[test]

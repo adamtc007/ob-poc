@@ -181,8 +181,12 @@ impl CsgLinter {
     /// Note: Already initialized - no need to call initialize()
     #[cfg(feature = "database")]
     pub fn new_without_db() -> Self {
+        // Use a valid URL format that won't panic on parse.
+        // This pool should never actually be used - it's a placeholder for offline mode.
+        let pool = sqlx::PgPool::connect_lazy("postgresql://localhost/nonexistent")
+            .expect("static valid URL format");
         Self {
-            pool: sqlx::PgPool::connect_lazy("postgresql://localhost/invalid").unwrap(),
+            pool,
             rules: ApplicabilityRules::default(),
             semantic_store: SemanticContextStore::new_empty(),
             initialized: true, // Pre-initialized with empty rules

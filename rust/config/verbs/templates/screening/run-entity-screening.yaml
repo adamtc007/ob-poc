@@ -1,0 +1,90 @@
+template: run-entity-screening
+version: 1
+
+primary_entity:
+  type: kyc_case
+  param: case_name
+  description: KYC case containing the workstream
+
+metadata:
+  name: Run Entity Screening
+  summary: Run comprehensive AML/PEP/sanctions screening on an entity
+
+  description: |
+    Initiates a full screening suite on an entity including:
+    - Sanctions list screening (OFAC, EU, UN, etc.)
+    - PEP (Politically Exposed Person) check
+    - Adverse media screening
+
+    This is typically done for all entities in a KYC case,
+    especially directors, UBOs, and controlling persons.
+
+  when_to_use:
+    - New entity added to KYC case
+    - Periodic review requires re-screening
+    - Workflow blocker shows "screening_required"
+
+  when_not_to_use:
+    - Entity already screened recently
+    - Low-risk entity with simplified due diligence
+
+  effects:
+    - Screening requests created
+    - Results will be available for review
+    - Hits will create blockers requiring review
+
+  next_steps:
+    - Wait for screening results
+    - Review any hits found
+    - Clear false positives or escalate true matches
+
+tags:
+  - screening
+  - sanctions
+  - pep
+  - aml
+  - kyc
+
+workflow_context:
+  applicable_workflows:
+    - kyc_case
+    - kyc_onboarding
+  applicable_states:
+    - SCREENING
+    - ENTITY_COLLECTION
+  resolves_blockers:
+    - screening_required
+
+params:
+  case_name:
+    type: string
+    required: true
+    source: session
+    description: Active KYC case name
+
+  workstream_name:
+    type: string
+    required: true
+    prompt: "Entity workstream name or entity name"
+
+body: |
+  (case-screening.run
+    :workstream-id "$workstream_name"
+    :screening-type "SANCTIONS"
+    :as @screening-sanctions)
+  (case-screening.run
+    :workstream-id "$workstream_name"
+    :screening-type "PEP"
+    :as @screening-pep)
+  (case-screening.run
+    :workstream-id "$workstream_name"
+    :screening-type "ADVERSE_MEDIA"
+    :as @screening-media)
+
+outputs:
+  screening_ids:
+    type: array
+    description: Created screening request IDs
+
+related_templates:
+  - review-screening-hit

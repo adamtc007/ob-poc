@@ -23,10 +23,15 @@ impl SemanticContextStore {
     }
 
     /// Create an empty store without database (for offline validation)
+    /// Uses a valid but non-functional connection string for the pool placeholder.
     #[cfg(feature = "database")]
     pub fn new_empty() -> Self {
+        // Use a valid URL format that won't panic on parse.
+        // This pool should never actually be used - it's a placeholder for offline mode.
+        let pool = sqlx::PgPool::connect_lazy("postgresql://localhost/nonexistent")
+            .expect("static valid URL format");
         Self {
-            pool: sqlx::PgPool::connect_lazy("postgresql://invalid").unwrap(),
+            pool,
             initialized: false,
         }
     }

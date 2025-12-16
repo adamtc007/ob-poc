@@ -1,0 +1,119 @@
+template: onboard-director
+version: 1
+
+primary_entity:
+  type: cbu
+  param: cbu_name
+  description: CBU to add director to
+
+metadata:
+  name: Onboard Director
+  summary: Add a natural person as director with full KYC setup
+
+  description: |
+    Creates person entity, assigns DIRECTOR role, creates workstream,
+    and initiates screening. This is the standard flow for adding
+    a new director who doesn't exist in the system.
+
+  when_to_use:
+    - Adding a new director who doesn't exist in the system
+    - Workflow blocker shows "missing_role:DIRECTOR"
+
+  when_not_to_use:
+    - Person already exists (use cbu.assign-role directly)
+
+  effects:
+    - New person entity created
+    - DIRECTOR role assigned to CBU
+    - Entity workstream created in KYC case
+    - Screening initiated
+
+  next_steps:
+    - Upload/catalog documents for the person
+    - Review screening results if hits found
+
+tags:
+  - director
+  - person
+  - role
+  - kyc
+
+workflow_context:
+  applicable_workflows:
+    - kyc_onboarding
+  applicable_states:
+    - ENTITY_COLLECTION
+  resolves_blockers:
+    - missing_role:DIRECTOR
+
+params:
+  cbu_name:
+    type: string
+    required: true
+    source: session
+    description: CBU name (resolved by entity gateway via verb lookup config)
+
+  case_name:
+    type: string
+    required: true
+    source: session
+    description: KYC case name or reference
+
+  first_name:
+    type: string
+    required: true
+    prompt: "Director's first name"
+    example: "John"
+
+  last_name:
+    type: string
+    required: true
+    prompt: "Director's last name"
+    example: "Smith"
+
+  date_of_birth:
+    type: date
+    required: true
+    prompt: "Date of birth (YYYY-MM-DD)"
+    example: "1975-03-15"
+
+  nationality:
+    type: string
+    required: true
+    prompt: "Nationality (ISO 2-letter code)"
+    example: "GB"
+
+body: |
+  (entity.create-proper-person
+    :first-name "$first_name"
+    :last-name "$last_name"
+    :date-of-birth "$date_of_birth"
+    :nationality "$nationality"
+    :as @person)
+  (cbu.assign-role
+    :cbu-id "$cbu_name"
+    :entity-id @person
+    :role "DIRECTOR")
+  (entity-workstream.create
+    :case-id "$case_name"
+    :entity-id @person
+    :discovery-reason "DIRECTOR"
+    :as @workstream)
+  (case-screening.run
+    :workstream-id @workstream
+    :screening-type "PEP")
+  (case-screening.run
+    :workstream-id @workstream
+    :screening-type "SANCTIONS")
+
+outputs:
+  person:
+    type: entity_ref
+    description: Created person entity ID
+  workstream:
+    type: entity_ref
+    description: Created entity workstream ID
+
+related_templates:
+  - onboard-signatory
+  - catalog-document

@@ -703,20 +703,16 @@ async fn materialize_universe(
     let mut created = 0;
 
     for market_cfg in &universe.allowed_markets {
-        let market_id = market_map.get(&market_cfg.mic);
-        if market_id.is_none() {
+        let Some(&market_id) = market_map.get(&market_cfg.mic) else {
             tracing::warn!(mic = %market_cfg.mic, "Market not found in reference data, skipping");
             continue;
-        }
-        let market_id = *market_id.unwrap();
+        };
 
         for inst_cfg in &universe.instrument_classes {
-            let class_id = instrument_class_map.get(&inst_cfg.class_code);
-            if class_id.is_none() {
+            let Some(&class_id) = instrument_class_map.get(&inst_cfg.class_code) else {
                 tracing::warn!(code = %inst_cfg.class_code, "Instrument class not found, skipping");
                 continue;
-            }
-            let class_id = *class_id.unwrap();
+            };
 
             // Build currencies array
             let currencies: Vec<String> = if market_cfg.currencies.is_empty() {
@@ -779,12 +775,10 @@ async fn materialize_booking_rules(
 
     for rule in rules {
         // Look up SSI ID from name
-        let ssi_id = ssi_name_to_id.get(&rule.ssi_ref);
-        if ssi_id.is_none() {
+        let Some(&ssi_id) = ssi_name_to_id.get(&rule.ssi_ref) else {
             tracing::warn!(ssi_ref = %rule.ssi_ref, rule = %rule.name, "SSI not found for booking rule, skipping");
             continue;
-        }
-        let ssi_id = *ssi_id.unwrap();
+        };
 
         // Look up instrument_class_id if specified
         let instrument_class_id = rule

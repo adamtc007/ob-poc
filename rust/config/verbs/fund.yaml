@@ -906,74 +906,7 @@ domains:
           type: record_set
 
       # =========================================================================
-      # FUND VISUALIZATION
+      # FUND VISUALIZATION (TODO: implement handlers before enabling)
       # =========================================================================
-
-      show-structure:
-        description: Show complete fund structure (umbrella → subfunds → share classes)
-        behavior: plugin
-        plugin:
-          handler: FundShowStructureOp
-        args:
-          - name: fund-id
-            type: uuid
-            required: true
-            description: Any fund entity (will traverse up/down to show full structure)
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: include-service-providers
-            type: boolean
-            required: false
-            default: true
-          - name: include-investments
-            type: boolean
-            required: false
-            default: false
-            description: Include FoF investment links
-        returns:
-          type: record
-          description: Hierarchical fund structure
-
-      calculate-lookthrough:
-        description: Calculate look-through ownership from FoF to underlying entities
-        behavior: plugin
-        plugin:
-          handler: FundLookthroughOp
-        args:
-          - name: fund-id
-            type: uuid
-            required: true
-            description: The Fund-of-Funds to calculate from
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: target-entity-id
-            type: uuid
-            required: false
-            description: Optional - calculate ownership of specific entity
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: threshold
-            type: decimal
-            required: false
-            default: 0.0
-            description: Minimum % to include in results
-          - name: max-depth
-            type: integer
-            required: false
-            default: 10
-            description: Maximum chain depth to traverse
-        returns:
-          type: record_set
-          description: All entities with effective ownership percentages
+      # show-structure and calculate-lookthrough verbs removed - no plugin handlers exist
+      # Re-add when FundShowStructureOp and FundLookthroughOp are implemented

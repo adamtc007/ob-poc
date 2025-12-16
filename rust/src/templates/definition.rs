@@ -1,9 +1,60 @@
 //! Template Definition Types
 //!
 //! YAML schema for workflow templates that expand to DSL source text.
+//!
+//! Templates are macros in the DSL - they expand to plain verb calls at parse time.
+//! Each template declares a primary entity type (CBU, KYC Case, etc.) that defines
+//! the root scope for all operations in the template.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+/// Primary entity type that defines the root scope for a template
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PrimaryEntityType {
+    /// Client Business Unit - the main onboarding context
+    Cbu,
+    /// KYC Case - investigation/review context
+    KycCase,
+    /// Onboarding Request - bulk onboarding context
+    OnboardingRequest,
+}
+
+impl PrimaryEntityType {
+    /// Get the table name for this entity type
+    pub fn table_name(&self) -> &'static str {
+        match self {
+            PrimaryEntityType::Cbu => "cbus",
+            PrimaryEntityType::KycCase => "kyc.cases",
+            PrimaryEntityType::OnboardingRequest => "onboarding_requests",
+        }
+    }
+
+    /// Get the primary key column name
+    pub fn pk_column(&self) -> &'static str {
+        match self {
+            PrimaryEntityType::Cbu => "cbu_id",
+            PrimaryEntityType::KycCase => "case_id",
+            PrimaryEntityType::OnboardingRequest => "request_id",
+        }
+    }
+}
+
+/// Defines the primary entity scope for a template
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PrimaryEntity {
+    /// The entity type (cbu, kyc_case, onboarding_request)
+    #[serde(rename = "type")]
+    pub entity_type: PrimaryEntityType,
+
+    /// Which parameter holds the primary entity ID
+    pub param: String,
+
+    /// Description of this primary entity context
+    #[serde(default)]
+    pub description: String,
+}
 
 /// A complete template definition loaded from YAML
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -14,6 +65,11 @@ pub struct TemplateDefinition {
     /// Version number
     #[serde(default = "default_version")]
     pub version: u32,
+
+    /// Primary entity scope - defines the root entity type for this template
+    /// Used for session binding and bulk execution
+    #[serde(default)]
+    pub primary_entity: Option<PrimaryEntity>,
 
     /// Rich metadata for agent understanding
     pub metadata: TemplateMetadata,
@@ -191,6 +247,26 @@ impl TemplateDefinition {
                 .any(|s| s == state);
         workflow_match && state_match
     }
+
+    /// Get the primary entity type for this template
+    pub fn primary_entity_type(&self) -> Option<PrimaryEntityType> {
+        self.primary_entity.as_ref().map(|p| p.entity_type)
+    }
+
+    /// Get the parameter name that holds the primary entity ID
+    pub fn primary_entity_param(&self) -> Option<&str> {
+        self.primary_entity.as_ref().map(|p| p.param.as_str())
+    }
+
+    /// Check if this template is scoped to a CBU
+    pub fn is_cbu_scoped(&self) -> bool {
+        matches!(self.primary_entity_type(), Some(PrimaryEntityType::Cbu))
+    }
+
+    /// Check if this template is scoped to a KYC case
+    pub fn is_kyc_case_scoped(&self) -> bool {
+        matches!(self.primary_entity_type(), Some(PrimaryEntityType::KycCase))
+    }
 }
 
 #[cfg(test)]
@@ -200,6 +276,11 @@ mod tests {
     const SAMPLE_TEMPLATE: &str = r#"
 template: onboard-director
 version: 1
+
+primary_entity:
+  type: cbu
+  param: cbu_id
+  description: Target CBU for director onboarding
 
 metadata:
   name: Onboard Director
@@ -240,8 +321,14 @@ params:
     prompt: "Date of birth"
 
 body: |
-  (let [person (entity.create-proper-person :name "$name" :date-of-birth "$date_of_birth")]
-    (cbu.assign-role :cbu "$cbu_id" :entity person :role DIRECTOR))
+  (entity.create-proper-person
+    :name "$name"
+    :date-of-birth "$date_of_birth"
+    :as @person)
+  (cbu.assign-role
+    :cbu-id "$cbu_id"
+    :entity-id @person
+    :role "DIRECTOR")
 
 outputs:
   person:
@@ -288,5 +375,42 @@ outputs:
         let template: TemplateDefinition = serde_yaml::from_str(SAMPLE_TEMPLATE).unwrap();
         assert!(template.applies_to_state("kyc_onboarding", "ENTITY_COLLECTION"));
         assert!(!template.applies_to_state("kyc_onboarding", "SCREENING"));
+    }
+
+    #[test]
+    fn test_primary_entity() {
+        let template: TemplateDefinition = serde_yaml::from_str(SAMPLE_TEMPLATE).unwrap();
+
+        // Should have primary_entity
+        assert!(template.primary_entity.is_some());
+
+        let pe = template.primary_entity.as_ref().unwrap();
+        assert_eq!(pe.entity_type, super::PrimaryEntityType::Cbu);
+        assert_eq!(pe.param, "cbu_id");
+
+        // Helper methods
+        assert!(template.is_cbu_scoped());
+        assert!(!template.is_kyc_case_scoped());
+        assert_eq!(template.primary_entity_param(), Some("cbu_id"));
+    }
+
+    #[test]
+    fn test_primary_entity_type_methods() {
+        use super::PrimaryEntityType;
+
+        assert_eq!(PrimaryEntityType::Cbu.table_name(), "cbus");
+        assert_eq!(PrimaryEntityType::Cbu.pk_column(), "cbu_id");
+
+        assert_eq!(PrimaryEntityType::KycCase.table_name(), "kyc.cases");
+        assert_eq!(PrimaryEntityType::KycCase.pk_column(), "case_id");
+
+        assert_eq!(
+            PrimaryEntityType::OnboardingRequest.table_name(),
+            "onboarding_requests"
+        );
+        assert_eq!(
+            PrimaryEntityType::OnboardingRequest.pk_column(),
+            "request_id"
+        );
     }
 }

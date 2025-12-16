@@ -24,9 +24,17 @@ pub mod extraction_service;
 pub mod sink_executor;
 pub mod source_executor;
 
+// Resolution service (entity reference disambiguation)
+pub mod resolution_service;
+
+// DSL enrichment (source → segments for UI display)
+pub mod dsl_enrichment;
+
 // Re-exports
 pub use dictionary_service_impl::DictionaryServiceImpl;
 pub use document_attribute_crud_service::DocumentAttributeCrudService;
 pub use document_extraction_service::DocumentExtractionService;
+pub use dsl_enrichment::{bindings_from_session_context, enrich_dsl, BindingInfo};
+pub use resolution_service::{create_resolution_store, ResolutionService, ResolutionStore};
 pub use sink_executor::CompositeSinkExecutor;
 pub use source_executor::CompositeSourceExecutor;

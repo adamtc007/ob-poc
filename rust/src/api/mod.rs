@@ -34,6 +34,9 @@ pub mod dsl_viewer_routes;
 pub mod graph_routes;
 
 #[cfg(feature = "server")]
+pub mod resolution_routes;
+
+#[cfg(feature = "server")]
 pub use attribute_routes::create_attribute_router;
 
 #[cfg(feature = "server")]
@@ -56,3 +59,6 @@ pub use intent::{AssembledDsl, IntentSequence, VerbIntent};
 
 #[cfg(feature = "server")]
 pub use agent_service::{AgentChatRequest, AgentChatResponse, AgentCommand, AgentService};
+
+#[cfg(feature = "server")]
+pub use resolution_routes::create_resolution_router;

@@ -1,0 +1,109 @@
+template: onboard-signatory
+version: 1
+
+primary_entity:
+  type: cbu
+  param: cbu_name
+  description: CBU to add signatory to
+
+metadata:
+  name: Onboard Authorized Signatory
+  summary: Add a natural person as authorized signatory with KYC
+
+  description: |
+    Creates person entity, assigns AUTHORIZED_SIGNATORY role,
+    creates workstream, and initiates screening. Similar to
+    director onboarding but with signatory role.
+
+  when_to_use:
+    - Adding a new signatory who doesn't exist in the system
+    - Workflow blocker shows "missing_role:AUTHORIZED_SIGNATORY"
+
+  when_not_to_use:
+    - Person already exists (use cbu.assign-role directly)
+    - Person is already a director (assign signatory role only)
+
+  effects:
+    - New person entity created
+    - AUTHORIZED_SIGNATORY role assigned to CBU
+    - Entity workstream created in KYC case
+
+  next_steps:
+    - Upload/catalog identity documents
+    - Review screening results
+
+tags:
+  - signatory
+  - person
+  - role
+  - kyc
+
+workflow_context:
+  applicable_workflows:
+    - kyc_onboarding
+  applicable_states:
+    - ENTITY_COLLECTION
+  resolves_blockers:
+    - missing_role:AUTHORIZED_SIGNATORY
+
+params:
+  cbu_name:
+    type: string
+    required: true
+    source: session
+    description: CBU name (resolved by entity gateway via verb lookup config)
+
+  case_name:
+    type: string
+    required: true
+    source: session
+    description: KYC case name or reference
+
+  first_name:
+    type: string
+    required: true
+    prompt: "Signatory's first name"
+
+  last_name:
+    type: string
+    required: true
+    prompt: "Signatory's last name"
+
+  date_of_birth:
+    type: date
+    required: false
+    prompt: "Date of birth (YYYY-MM-DD)"
+
+  nationality:
+    type: string
+    required: false
+    prompt: "Nationality (ISO 2-letter code)"
+
+body: |
+  (entity.create-proper-person
+    :first-name "$first_name"
+    :last-name "$last_name"
+    :date-of-birth "$date_of_birth"
+    :nationality "$nationality"
+    :as @person)
+  (cbu.assign-role
+    :cbu-id "$cbu_name"
+    :entity-id @person
+    :role "AUTHORIZED_SIGNATORY")
+  (entity-workstream.create
+    :case-id "$case_name"
+    :entity-id @person
+    :discovery-reason "AUTHORIZED_SIGNATORY"
+    :as @workstream)
+
+outputs:
+  person:
+    type: entity_ref
+    description: Created person entity ID
+  workstream:
+    type: entity_ref
+    description: Created entity workstream ID
+
+related_templates:
+  - onboard-director
+  - catalog-document

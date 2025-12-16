@@ -1,0 +1,97 @@
+template: approve-case
+version: 1
+
+primary_entity:
+  type: kyc_case
+  param: case_name
+  description: KYC case to approve
+
+metadata:
+  name: Approve Case
+  summary: Approve a KYC case and complete onboarding
+
+  description: |
+    Approves a KYC case after all requirements are satisfied:
+    - All entities verified
+    - All documents collected and verified
+    - All screenings clear or resolved
+    - No blocking red flags
+
+    This is the final step that allows the client to be onboarded
+    and services to be activated.
+
+  when_to_use:
+    - All KYC requirements satisfied
+    - Case in REVIEW state
+    - User is authorized approver
+
+  when_not_to_use:
+    - Outstanding blockers exist
+    - Not authorized to approve
+    - Case needs escalation
+
+  effects:
+    - Case status set to APPROVED
+    - CBU status updated to ACTIVE
+    - Next review date scheduled
+    - Case closed with approval
+
+  next_steps:
+    - Activate client services
+    - Schedule periodic review
+    - Archive case documents
+
+tags:
+  - case
+  - approval
+  - decision
+  - completion
+
+workflow_context:
+  applicable_workflows:
+    - kyc_case
+    - kyc_onboarding
+  applicable_states:
+    - REVIEW
+    - FINAL_APPROVAL
+  resolves_blockers:
+    - pending_approval
+
+params:
+  case_name:
+    type: string
+    required: true
+    source: session
+    description: Case name or reference
+
+  risk_rating:
+    type: enum
+    required: true
+    enum_values:
+      - LOW
+      - MEDIUM
+      - HIGH
+    prompt: "Final risk rating"
+
+  review_period_months:
+    type: integer
+    required: false
+    default: "12"
+    prompt: "Months until next periodic review"
+
+  approval_notes:
+    type: string
+    required: false
+    prompt: "Approval notes/conditions"
+
+body: |
+  (kyc-case.set-risk-rating
+    :case-id "$case_name"
+    :risk-rating "$risk_rating")
+  (kyc-case.close
+    :case-id "$case_name"
+    :status "APPROVED"
+    :notes "$approval_notes")
+
+related_templates:
+  - escalate-case

@@ -102,5 +102,8 @@ pub async fn get_cbu_graph(
     let layout_engine = LayoutEngine::with_orientation(view_mode, orientation);
     layout_engine.layout(&mut graph);
 
-    Ok(Json(serde_json::to_value(graph).unwrap_or_default()))
+    serde_json::to_value(graph).map(Json).map_err(|e| {
+        tracing::error!("Graph serialization error: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })
 }

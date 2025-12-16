@@ -311,6 +311,7 @@ pub fn create_agent_router_with_sessions(pool: PgPool, sessions: SessionStore) -
         .route("/api/session/:id/execute", post(execute_session_dsl))
         .route("/api/session/:id/clear", post(clear_session_dsl))
         .route("/api/session/:id/bind", post(set_session_binding))
+        .route("/api/session/:id/dsl/enrich", get(get_enriched_dsl))
         // DSL parsing and entity reference resolution
         .route("/api/dsl/parse", post(parse_dsl))
         .route("/api/dsl/resolve-ref", post(resolve_entity_ref))
@@ -1301,6 +1302,70 @@ async fn set_session_binding(
         binding_name: actual_name_clone,
         bindings: bindings_clone,
     }))
+}
+
+/// GET /api/session/:id/dsl/enrich - Get enriched DSL with binding info for display
+///
+/// Returns the session's DSL source with inline binding information:
+/// - @symbols resolved to display names
+/// - EntityRefs marked as resolved or needing resolution
+/// - Binding summary for context panel
+///
+/// This is optimized for fast round-trips - no database or EntityGateway calls.
+async fn get_enriched_dsl(
+    State(state): State<AgentState>,
+    Path(session_id): Path<Uuid>,
+) -> Result<Json<ob_poc_types::EnrichedDsl>, StatusCode> {
+    let sessions = state.sessions.read().await;
+    let session = sessions.get(&session_id).ok_or(StatusCode::NOT_FOUND)?;
+
+    // Get DSL source from session
+    let dsl_source = if !session.assembled_dsl.is_empty() {
+        session.assembled_dsl.join("\n\n")
+    } else {
+        session.context.to_dsl_source()
+    };
+
+    if dsl_source.trim().is_empty() {
+        // Return empty enriched DSL
+        return Ok(Json(ob_poc_types::EnrichedDsl {
+            source: String::new(),
+            segments: vec![],
+            binding_summary: vec![],
+            fully_resolved: true,
+        }));
+    }
+
+    // Convert session bindings to enrichment format
+    let bindings = crate::services::bindings_from_session_context(&session.context.bindings);
+
+    // Get active CBU for summary
+    let active_cbu = session
+        .context
+        .bindings
+        .get("cbu")
+        .map(|b| crate::services::BindingInfo {
+            id: b.id,
+            display_name: b.display_name.clone(),
+            entity_type: b.entity_type.clone(),
+        });
+
+    // Enrich DSL
+    match crate::services::enrich_dsl(&dsl_source, &bindings, active_cbu.as_ref()) {
+        Ok(enriched) => Ok(Json(enriched)),
+        Err(e) => {
+            tracing::warn!("DSL enrichment failed: {}", e);
+            // Return raw DSL on parse failure
+            Ok(Json(ob_poc_types::EnrichedDsl {
+                source: dsl_source,
+                segments: vec![ob_poc_types::DslDisplaySegment::Text {
+                    content: format!("Parse error: {}", e),
+                }],
+                binding_summary: vec![],
+                fully_resolved: false,
+            }))
+        }
+    }
 }
 
 // ============================================================================

@@ -6,6 +6,8 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use super::definition::{ParamDefinition, TemplateDefinition};
+use crate::api::session::SessionContext;
+use crate::dsl_v2::repl_session::ReplSession;
 
 /// Session context for template expansion
 #[derive(Debug, Clone, Default)]
@@ -15,7 +17,11 @@ pub struct ExpansionContext {
     /// Current KYC case (if any)
     pub current_case: Option<Uuid>,
     /// Named bindings from previous executions or resolved entities
+    /// Format: name → UUID string
     pub bindings: HashMap<String, String>,
+    /// Entity type information for bindings (for type validation)
+    /// Format: name → entity_type (e.g., "cbu", "entity.proper_person")
+    pub binding_types: HashMap<String, String>,
 }
 
 impl ExpansionContext {
@@ -32,9 +38,129 @@ impl ExpansionContext {
         }
     }
 
+    /// Create context from a ReplSession
+    ///
+    /// Automatically populates:
+    /// - All executed bindings (name → UUID)
+    /// - Entity types for each binding
+    /// - Extracts current_cbu from bindings named "cbu" or "fund"
+    /// - Extracts current_case from bindings named "case" or "kyc_case"
+    pub fn from_repl_session(session: &ReplSession) -> Self {
+        let mut ctx = Self::new();
+
+        // Populate bindings from session
+        for name in session.binding_names() {
+            if let Some(pk) = session.get_binding(name) {
+                ctx.bindings.insert(name.to_string(), pk.to_string());
+
+                // Also track entity type
+                if let Some(ty) = session.get_binding_type(name) {
+                    ctx.binding_types.insert(name.to_string(), ty.to_string());
+                }
+
+                // Extract current_cbu from common binding names
+                match name {
+                    "cbu" | "fund" | "active_cbu" => {
+                        if ctx.current_cbu.is_none() {
+                            ctx.current_cbu = Some(pk);
+                        }
+                    }
+                    "case" | "kyc_case" | "active_case" => {
+                        if ctx.current_case.is_none() {
+                            ctx.current_case = Some(pk);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        ctx
+    }
+
+    /// Create context from an AgentSession's SessionContext
+    ///
+    /// Uses the session's bound entities and active CBU/case.
+    pub fn from_session_context(session_ctx: &SessionContext) -> Self {
+        let mut ctx = Self::new();
+
+        // Set active CBU if present
+        if let Some(ref active_cbu) = session_ctx.active_cbu {
+            ctx.current_cbu = Some(active_cbu.id);
+            ctx.bindings
+                .insert("cbu".to_string(), active_cbu.id.to_string());
+            ctx.binding_types
+                .insert("cbu".to_string(), "cbu".to_string());
+        }
+
+        // Populate from bindings
+        for (name, bound) in &session_ctx.bindings {
+            ctx.bindings.insert(name.clone(), bound.id.to_string());
+            ctx.binding_types
+                .insert(name.clone(), bound.entity_type.clone());
+        }
+
+        // Also include named_refs for backward compat
+        for (name, pk) in &session_ctx.named_refs {
+            if !ctx.bindings.contains_key(name) {
+                ctx.bindings.insert(name.clone(), pk.to_string());
+            }
+        }
+
+        // Set current_case from primary keys if available
+        if let Some(case_id) = session_ctx.primary_keys.kyc_case_id {
+            ctx.current_case = Some(case_id);
+        }
+
+        ctx
+    }
+
     /// Add a binding
     pub fn bind(&mut self, name: impl Into<String>, value: impl Into<String>) {
         self.bindings.insert(name.into(), value.into());
+    }
+
+    /// Add a typed binding
+    pub fn bind_typed(
+        &mut self,
+        name: impl Into<String>,
+        value: impl Into<String>,
+        entity_type: impl Into<String>,
+    ) {
+        let name = name.into();
+        self.bindings.insert(name.clone(), value.into());
+        self.binding_types.insert(name, entity_type.into());
+    }
+
+    /// Get entity type for a binding
+    pub fn get_binding_type(&self, name: &str) -> Option<&str> {
+        self.binding_types.get(name).map(|s| s.as_str())
+    }
+
+    /// Check if a binding's type matches expected type
+    ///
+    /// Supports:
+    /// - Exact match: "cbu" matches "cbu"
+    /// - Base type match: "entity" matches "entity.proper_person"
+    /// - Subtype match: "entity.proper_person" matches "entity.proper_person"
+    pub fn binding_matches_type(&self, name: &str, expected: &str) -> bool {
+        match self.get_binding_type(name) {
+            None => false,
+            Some(actual) => {
+                if actual == expected {
+                    return true;
+                }
+                // Check if expected is base type (e.g., "entity" matches "entity.proper_person")
+                if actual.starts_with(&format!("{}.", expected)) {
+                    return true;
+                }
+                // Check if expected has subtype that matches
+                if expected.starts_with(&format!("{}.", actual)) {
+                    return true;
+                }
+                false
+            }
+        }
     }
 }
 
@@ -228,7 +354,6 @@ impl TemplateExpander {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     fn sample_template() -> TemplateDefinition {
         serde_yaml::from_str(

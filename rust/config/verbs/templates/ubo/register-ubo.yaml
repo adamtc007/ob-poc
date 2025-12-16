@@ -1,0 +1,99 @@
+template: register-ubo
+version: 1
+
+primary_entity:
+  type: cbu
+  param: cbu_name
+  description: CBU for UBO registration
+
+metadata:
+  name: Register UBO
+  summary: Register an identified beneficial owner
+
+  description: |
+    Registers a natural person as a beneficial owner after
+    ownership analysis has identified them. This creates the
+    formal UBO determination record.
+
+  when_to_use:
+    - UBO has been identified through ownership tracing
+    - Workflow blocker shows "ubo_not_registered"
+    - Manual UBO determination completed
+
+  when_not_to_use:
+    - UBO already registered
+    - Ownership chain not yet traced
+
+  effects:
+    - UBO registered in registry
+    - Links to ownership chain
+    - May trigger additional KYC requirements
+
+  next_steps:
+    - Verify UBO identity
+    - Collect UBO-specific documents
+    - Run enhanced screening if required
+
+tags:
+  - ubo
+  - registration
+  - compliance
+
+workflow_context:
+  applicable_workflows:
+    - kyc_onboarding
+  applicable_states:
+    - UBO_DETERMINATION
+  resolves_blockers:
+    - ubo_not_registered
+
+params:
+  cbu_name:
+    type: string
+    required: true
+    source: session
+    description: CBU name
+
+  subject_name:
+    type: string
+    required: true
+    prompt: "Subject entity name (the entity being analyzed)"
+
+  ubo_person_name:
+    type: string
+    required: true
+    prompt: "UBO person name (natural person who is the UBO)"
+
+  qualifying_reason:
+    type: enum
+    required: true
+    enum_values:
+      - OWNERSHIP_25PCT
+      - CONTROL
+      - SENIOR_MANAGEMENT
+      - OTHER
+    prompt: "Reason for UBO qualification"
+
+  ownership_percentage:
+    type: number
+    required: false
+    prompt: "Ownership percentage if applicable"
+
+body: |
+  (ubo.register-ubo
+    :cbu-id "$cbu_name"
+    :subject-entity-id "$subject_name"
+    :ubo-person-id "$ubo_person_name"
+    :qualifying-reason "$qualifying_reason"
+    :ownership-percentage $ownership_percentage
+    :workflow-type "ONBOARDING"
+    :as @ubo)
+
+outputs:
+  ubo:
+    type: entity_ref
+    description: Created UBO registration ID
+
+related_templates:
+  - trace-chains
+  - add-ownership

@@ -1,0 +1,63 @@
+template: trace-chains
+version: 1
+
+primary_entity:
+  type: cbu
+  param: cbu_name
+  description: CBU to trace ownership chains for
+
+metadata:
+  name: Trace Ownership Chains
+  summary: Trace all ownership chains to natural persons
+
+  description: |
+    Analyzes the ownership structure of a CBU to identify
+    all ownership chains leading to natural persons. This
+    is the first step in UBO determination.
+
+  when_to_use:
+    - Starting UBO determination
+    - Ownership structure has been documented
+    - Workflow blocker shows "ubo_not_traced"
+
+  when_not_to_use:
+    - Ownership not yet documented
+    - Chains already traced
+
+  effects:
+    - Ownership chains calculated
+    - Potential UBOs identified
+    - Control relationships included
+
+  next_steps:
+    - Review identified chains
+    - Register qualifying UBOs
+    - Verify UBO identities
+
+tags:
+  - ubo
+  - analysis
+  - ownership
+
+workflow_context:
+  applicable_workflows:
+    - kyc_onboarding
+  applicable_states:
+    - UBO_DETERMINATION
+  resolves_blockers:
+    - ubo_not_traced
+
+params:
+  cbu_name:
+    type: string
+    required: true
+    source: session
+    description: CBU name to analyze
+
+body: |
+  (ubo.trace-chains
+    :cbu-id "$cbu_name")
+
+related_templates:
+  - add-ownership
+  - register-ubo

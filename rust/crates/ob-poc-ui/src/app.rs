@@ -7,8 +7,8 @@
 
 use crate::api;
 use crate::panels::{
-    ast_panel, chat_panel, dsl_editor_panel, entity_detail_panel, results_panel, toolbar,
-    ToolbarAction,
+    ast_panel, chat_panel, dsl_editor_panel, entity_detail_panel, repl_panel, results_panel,
+    toolbar, ToolbarAction,
 };
 use crate::state::{AppState, AsyncState, LayoutMode, PanelState, TextBuffers};
 use ob_poc_graph::{CbuGraphWidget, ViewMode};
@@ -33,12 +33,14 @@ impl App {
             graph_data: None,
             validation_result: None,
             execution: None,
+            resolution: None,
             messages: Vec::new(),
             cbu_list: Vec::new(),
             buffers: TextBuffers::default(),
             view_mode: ViewMode::KycUbo,
             panels: PanelState::default(),
             selected_entity_id: None,
+            resolution_ui: crate::state::ResolutionPanelUi::default(),
             graph_widget: CbuGraphWidget::new(),
             async_state: Arc::new(Mutex::new(AsyncState::default())),
             ctx: Some(cc.egui_ctx.clone()),
@@ -234,9 +236,8 @@ impl App {
 
     /// Render layout:
     /// - Top 50%: Graph (full width)
-    /// - Bottom left 25%: Chat
-    /// - Bottom right top: DSL Editor
-    /// - Bottom right bottom: Results/AST
+    /// - Bottom left 60%: Unified REPL (chat + resolution + DSL)
+    /// - Bottom right 40%: Results/AST/Entity tabs
     fn render_four_panel(&mut self, ui: &mut egui::Ui) {
         let available = ui.available_size();
         let top_height = available.y * 0.5;
@@ -258,69 +259,57 @@ impl App {
         ui.horizontal(|ui| {
             ui.set_height(bottom_height);
 
-            // Chat panel (left, 50% width)
+            // Unified REPL panel (left, 60% width) - chat + resolution + DSL
             ui.vertical(|ui| {
-                ui.set_width(available.x * 0.5 - 4.0);
+                ui.set_width(available.x * 0.6 - 4.0);
                 egui::Frame::default()
                     .inner_margin(8.0)
                     .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
                     .show(ui, |ui| {
-                        chat_panel(ui, &mut self.state);
+                        repl_panel(ui, &mut self.state);
                     });
             });
 
             ui.separator();
 
-            // Right side (50% width) - DSL on top, Results on bottom
+            // Right side (40% width) - Results/AST/Entity tabs
             ui.vertical(|ui| {
-                ui.set_width(available.x * 0.5 - 4.0);
-                let panel_height = (bottom_height - 4.0) / 2.0;
+                ui.set_width(available.x * 0.4 - 4.0);
 
-                // DSL Editor (top half of right side)
-                ui.allocate_ui(egui::vec2(ui.available_width(), panel_height), |ui| {
-                    egui::Frame::default()
-                        .inner_margin(8.0)
-                        .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
-                        .show(ui, |ui| {
-                            dsl_editor_panel(ui, &mut self.state);
-                        });
+                // Tab bar
+                ui.horizontal(|ui| {
+                    if ui
+                        .selectable_label(self.state.panels.show_ast, "AST")
+                        .clicked()
+                    {
+                        self.state.panels.show_ast = true;
+                        self.state.panels.show_results = false;
+                        self.state.panels.show_entity_detail = false;
+                    }
+                    if ui
+                        .selectable_label(self.state.panels.show_results, "Results")
+                        .clicked()
+                    {
+                        self.state.panels.show_ast = false;
+                        self.state.panels.show_results = true;
+                        self.state.panels.show_entity_detail = false;
+                    }
+                    if ui
+                        .selectable_label(self.state.panels.show_entity_detail, "Entity")
+                        .clicked()
+                    {
+                        self.state.panels.show_ast = false;
+                        self.state.panels.show_results = false;
+                        self.state.panels.show_entity_detail = true;
+                    }
                 });
 
                 ui.separator();
 
-                // Results/AST/Entity Detail (bottom half of right side)
-                ui.allocate_ui(egui::vec2(ui.available_width(), panel_height), |ui| {
-                    // Tab bar
-                    ui.horizontal(|ui| {
-                        if ui
-                            .selectable_label(self.state.panels.show_ast, "AST")
-                            .clicked()
-                        {
-                            self.state.panels.show_ast = true;
-                            self.state.panels.show_results = false;
-                            self.state.panels.show_entity_detail = false;
-                        }
-                        if ui
-                            .selectable_label(self.state.panels.show_results, "Results")
-                            .clicked()
-                        {
-                            self.state.panels.show_ast = false;
-                            self.state.panels.show_results = true;
-                            self.state.panels.show_entity_detail = false;
-                        }
-                        if ui
-                            .selectable_label(self.state.panels.show_entity_detail, "Entity")
-                            .clicked()
-                        {
-                            self.state.panels.show_ast = false;
-                            self.state.panels.show_results = false;
-                            self.state.panels.show_entity_detail = true;
-                        }
-                    });
-
-                    ui.separator();
-
-                    egui::Frame::default().inner_margin(8.0).show(ui, |ui| {
+                egui::Frame::default()
+                    .inner_margin(8.0)
+                    .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
+                    .show(ui, |ui| {
                         if self.state.panels.show_ast {
                             ast_panel(ui, &mut self.state);
                         } else if self.state.panels.show_results {
@@ -329,7 +318,6 @@ impl App {
                             entity_detail_panel(ui, &mut self.state);
                         }
                     });
-                });
             });
         });
     }
@@ -809,5 +797,200 @@ impl AppState {
                 ctx.request_repaint();
             }
         });
+    }
+
+    // =========================================================================
+    // Resolution Methods
+    // =========================================================================
+
+    /// Start entity resolution for current session's DSL
+    pub fn start_resolution(&mut self) {
+        let Some(session_id) = self.session_id else {
+            web_sys::console::warn_1(&"start_resolution: no session_id".into());
+            return;
+        };
+
+        {
+            let mut state = self.async_state.lock().unwrap();
+            state.loading_resolution = true;
+        }
+
+        let async_state = Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+
+        spawn_local(async move {
+            let result = api::start_resolution(session_id).await;
+            if let Ok(mut state) = async_state.lock() {
+                state.pending_resolution = Some(result);
+                state.loading_resolution = false;
+            }
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+    }
+
+    /// Search for entity matches for a specific ref
+    pub fn search_resolution(&mut self, ref_id: &str) {
+        let Some(session_id) = self.session_id else {
+            return;
+        };
+
+        let query = self.resolution_ui.search_query.clone();
+        let discriminators = self.resolution_ui.discriminator_values.clone();
+        let ref_id = ref_id.to_string();
+
+        {
+            let mut state = self.async_state.lock().unwrap();
+            state.searching_resolution = true;
+        }
+
+        let async_state = Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+
+        spawn_local(async move {
+            let result = api::search_resolution(session_id, &ref_id, &query, discriminators).await;
+            if let Ok(mut state) = async_state.lock() {
+                state.pending_resolution_search = Some(result);
+                state.searching_resolution = false;
+            }
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+    }
+
+    /// Select an entity for a ref
+    pub fn select_resolution(&mut self, ref_id: &str, resolved_key: &str) {
+        let Some(session_id) = self.session_id else {
+            return;
+        };
+
+        let ref_id = ref_id.to_string();
+        let resolved_key = resolved_key.to_string();
+
+        {
+            let mut state = self.async_state.lock().unwrap();
+            state.loading_resolution = true;
+        }
+
+        let async_state = Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+
+        spawn_local(async move {
+            let result = api::select_resolution(session_id, &ref_id, &resolved_key).await;
+            if let Ok(mut state) = async_state.lock() {
+                match result {
+                    Ok(response) => {
+                        state.pending_resolution = Some(Ok(response.session));
+                    }
+                    Err(e) => {
+                        state.pending_resolution = Some(Err(e));
+                    }
+                }
+                state.loading_resolution = false;
+            }
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+
+        // Clear selection UI state
+        self.resolution_ui.selected_ref_id = None;
+        self.resolution_ui.search_results = None;
+    }
+
+    /// Confirm all high-confidence resolutions
+    pub fn confirm_all_resolutions(&mut self) {
+        let Some(session_id) = self.session_id else {
+            return;
+        };
+
+        {
+            let mut state = self.async_state.lock().unwrap();
+            state.loading_resolution = true;
+        }
+
+        let async_state = Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+
+        spawn_local(async move {
+            let result = api::confirm_all_resolutions(session_id, Some(0.8)).await;
+            if let Ok(mut state) = async_state.lock() {
+                state.pending_resolution = Some(result);
+                state.loading_resolution = false;
+            }
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+    }
+
+    /// Commit resolutions to AST
+    pub fn commit_resolution(&mut self) {
+        let Some(session_id) = self.session_id else {
+            return;
+        };
+
+        {
+            let mut state = self.async_state.lock().unwrap();
+            state.loading_resolution = true;
+        }
+
+        let async_state = Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+
+        spawn_local(async move {
+            let result = api::commit_resolution(session_id).await;
+            if let Ok(mut state) = async_state.lock() {
+                state.loading_resolution = false;
+                match result {
+                    Ok(commit_response) => {
+                        if commit_response.success {
+                            // Clear resolution state on successful commit
+                            // The session will be refetched to get updated DSL
+                        } else {
+                            state.last_error = Some(commit_response.message);
+                        }
+                    }
+                    Err(e) => {
+                        state.last_error = Some(format!("Commit failed: {}", e));
+                    }
+                }
+            }
+            // Refetch session to get updated DSL
+            let session_result = api::get_session(session_id).await;
+            if let Ok(mut state) = async_state.lock() {
+                state.pending_session = Some(session_result);
+            }
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+
+        // Clear resolution UI state
+        self.resolution = None;
+        self.resolution_ui = crate::state::ResolutionPanelUi::default();
+    }
+
+    /// Cancel resolution session
+    pub fn cancel_resolution(&mut self) {
+        let Some(session_id) = self.session_id else {
+            return;
+        };
+
+        let async_state = Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+
+        spawn_local(async move {
+            let _ = api::cancel_resolution(session_id).await;
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+
+        // Clear resolution state immediately
+        self.resolution = None;
+        self.resolution_ui = crate::state::ResolutionPanelUi::default();
     }
 }

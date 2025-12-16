@@ -889,6 +889,28 @@ impl DslExecutor {
                 // RequireRef is validation-only, no execution needed
                 None
             }
+
+            Op::GenericCrud { verb, args, .. } => {
+                // GenericCrud ops are executed via the generic executor
+                // Parse verb into domain.verb format
+                let parts: Vec<&str> = verb.split('.').collect();
+                if parts.len() != 2 {
+                    bail!("Invalid verb format for GenericCrud: {}", verb);
+                }
+                let (domain, verb_name) = (parts[0], parts[1]);
+
+                // Convert args HashMap to the format expected by build_verb_call
+                let attrs: HashMap<String, serde_json::Value> =
+                    args.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+
+                let vc = self.build_verb_call(domain, verb_name, &attrs)?;
+                let result = self.execute_verb(&vc, ctx).await?;
+
+                match result {
+                    ExecutionResult::Uuid(id) => Some(id),
+                    _ => None,
+                }
+            }
         };
 
         Ok(OpExecutionResult {

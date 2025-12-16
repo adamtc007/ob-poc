@@ -1,0 +1,113 @@
+template: catalog-document
+version: 1
+
+primary_entity:
+  type: cbu
+  param: cbu_name
+  description: CBU for document cataloging
+
+metadata:
+  name: Catalog Document
+  summary: Catalog a received document and link to entity
+
+  description: |
+    Catalogs a document that has been received for an entity.
+    This creates a record in the document catalog and optionally
+    triggers extraction of data from the document.
+
+    Commonly used for identity documents (passports, IDs),
+    corporate documents (certificates, registers), and
+    financial documents (statements, tax returns).
+
+  when_to_use:
+    - Document has been received/uploaded
+    - Workflow blocker shows "missing_document:TYPE"
+    - User says "I have the passport for X"
+
+  when_not_to_use:
+    - Document not yet received (use document.request)
+    - Just need to verify existing document
+
+  effects:
+    - Document cataloged in system
+    - Linked to entity
+    - Document request status updated if applicable
+    - Extraction queued if configured
+
+  next_steps:
+    - Extract data from document
+    - Verify document authenticity
+    - Check remaining document requirements
+
+tags:
+  - document
+  - catalog
+  - kyc
+  - evidence
+
+workflow_context:
+  applicable_workflows:
+    - kyc_case
+    - kyc_onboarding
+  applicable_states:
+    - DOCUMENT_COLLECTION
+    - ENTITY_COLLECTION
+    - VERIFICATION
+  resolves_blockers:
+    - missing_document
+
+params:
+  cbu_name:
+    type: string
+    required: true
+    source: session
+    description: CBU name
+
+  entity_name:
+    type: string
+    required: true
+    prompt: "Entity name this document belongs to"
+
+  doc_type:
+    type: enum
+    required: true
+    enum_values:
+      - PASSPORT
+      - NATIONAL_ID
+      - DRIVERS_LICENSE
+      - PROOF_OF_ADDRESS
+      - CERT_OF_INCORPORATION
+      - REGISTER_OF_DIRECTORS
+      - REGISTER_OF_SHAREHOLDERS
+      - BANK_STATEMENT
+      - TAX_RETURN
+      - UBO_DECLARATION
+    prompt: "Document type"
+
+  title:
+    type: string
+    required: true
+    prompt: "Document title/description"
+    example: "John Smith UK Passport"
+
+  storage_key:
+    type: string
+    required: false
+    prompt: "Storage location/reference"
+
+body: |
+  (document.catalog
+    :cbu-id "$cbu_name"
+    :entity-id "$entity_name"
+    :doc-type "$doc_type"
+    :title "$title"
+    :storage-key "$storage_key"
+    :as @document)
+
+outputs:
+  document_id:
+    type: uuid
+    description: Created document catalog ID
+
+related_templates:
+  - request-documents

@@ -1,0 +1,96 @@
+template: add-ownership
+version: 1
+
+primary_entity:
+  type: cbu
+  param: cbu_name
+  description: CBU context for ownership chain
+
+metadata:
+  name: Add Ownership Relationship
+  summary: Record ownership relationship between entities
+
+  description: |
+    Records that one entity owns a percentage of another entity.
+    This builds the ownership chain used for UBO determination.
+
+  when_to_use:
+    - Building ownership structure
+    - Workflow blocker shows "incomplete_ownership"
+    - Documenting corporate structure
+
+  when_not_to_use:
+    - Ownership already recorded
+    - Updating existing ownership (use ubo.update-ownership)
+
+  effects:
+    - Ownership relationship recorded
+    - May trigger UBO recalculation
+
+  next_steps:
+    - Continue building ownership chain
+    - Trace chains to natural persons
+    - Register identified UBOs
+
+tags:
+  - ubo
+  - ownership
+  - structure
+
+workflow_context:
+  applicable_workflows:
+    - kyc_onboarding
+  applicable_states:
+    - UBO_DETERMINATION
+    - ENTITY_COLLECTION
+  resolves_blockers:
+    - incomplete_ownership
+
+params:
+  cbu_name:
+    type: string
+    required: true
+    source: session
+    description: CBU name for context
+
+  owner_name:
+    type: string
+    required: true
+    prompt: "Owner entity name"
+
+  owned_name:
+    type: string
+    required: true
+    prompt: "Owned entity name"
+
+  percentage:
+    type: number
+    required: true
+    prompt: "Ownership percentage (0-100)"
+    example: "25.5"
+
+  ownership_type:
+    type: enum
+    required: false
+    default: "DIRECT"
+    enum_values:
+      - DIRECT
+      - INDIRECT
+      - BENEFICIAL
+
+body: |
+  (ubo.add-ownership
+    :owner-entity-id "$owner_name"
+    :owned-entity-id "$owned_name"
+    :percentage $percentage
+    :ownership-type "$ownership_type"
+    :as @ownership)
+
+outputs:
+  ownership:
+    type: entity_ref
+    description: Created ownership relationship ID
+
+related_templates:
+  - trace-chains
+  - register-ubo

@@ -1,0 +1,105 @@
+template: request-documents
+version: 1
+
+primary_entity:
+  type: kyc_case
+  param: case_name
+  description: KYC case containing the workstream
+
+metadata:
+  name: Request Documents
+  summary: Create document request for an entity workstream
+
+  description: |
+    Creates a document request record for a required document
+    from an entity. This tracks what documents are needed
+    and their collection status.
+
+    Document requirements are often driven by:
+    - Role (directors need ID, UBOs need source of wealth)
+    - Risk level (high risk needs more documentation)
+    - Jurisdiction requirements
+
+  when_to_use:
+    - Starting document collection for an entity
+    - Workflow blocker shows document requirements
+    - Analyst determines additional docs needed
+
+  when_not_to_use:
+    - Documents already requested
+    - Documents already received
+
+  effects:
+    - Document request created
+    - Request status set to REQUIRED
+    - Workstream updated with pending request
+
+  next_steps:
+    - Send request to client
+    - Catalog documents when received
+    - Track outstanding requests
+
+tags:
+  - document
+  - request
+  - collection
+  - kyc
+
+workflow_context:
+  applicable_workflows:
+    - kyc_case
+    - kyc_onboarding
+  applicable_states:
+    - DOCUMENT_COLLECTION
+    - ENTITY_COLLECTION
+  resolves_blockers:
+    - docs_not_requested
+
+params:
+  case_name:
+    type: string
+    required: true
+    source: session
+    description: KYC case name
+
+  workstream_name:
+    type: string
+    required: true
+    prompt: "Entity workstream name or entity name"
+
+  doc_type:
+    type: string
+    required: true
+    prompt: "Document type to request"
+    example: "PASSPORT"
+
+  due_date:
+    type: date
+    required: false
+    prompt: "Due date for document"
+
+  priority:
+    type: enum
+    required: false
+    default: "NORMAL"
+    enum_values:
+      - LOW
+      - NORMAL
+      - HIGH
+      - URGENT
+
+body: |
+  (doc-request.create
+    :workstream-id "$workstream_name"
+    :doc-type "$doc_type"
+    :due-date "$due_date"
+    :priority "$priority"
+    :as @doc-request)
+
+outputs:
+  request_id:
+    type: uuid
+    description: Created document request ID
+
+related_templates:
+  - catalog-document

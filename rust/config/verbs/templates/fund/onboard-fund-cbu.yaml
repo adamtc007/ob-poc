@@ -1,0 +1,62 @@
+template: onboard-fund-cbu
+version: 1
+
+metadata:
+  name: Onboard Fund as CBU
+  summary: Create CBU for a fund entity with shared ManCo and IM
+  description: |
+    Creates a CBU with the fund's name, then assigns:
+    - The fund entity as ASSET_OWNER
+    - A shared ManCo entity as MANAGEMENT_COMPANY
+    - A shared IM entity as INVESTMENT_MANAGER
+
+    This template is designed for bulk execution where many fund CBUs
+    share the same ManCo and IM.
+  when_to_use:
+    - Bulk onboarding fund entities as CBUs
+    - Setting up fund structure with shared service providers
+  effects:
+    - New CBU created with fund name
+    - ASSET_OWNER role assigned to fund entity
+    - MANAGEMENT_COMPANY role assigned to ManCo
+    - INVESTMENT_MANAGER role assigned to IM
+
+tags:
+  - fund
+  - cbu
+  - bulk
+  - onboarding
+
+params:
+  fund_name:
+    type: string
+    required: true
+    prompt: "Fund name (becomes CBU name)"
+  fund_entity_id:
+    type: uuid
+    required: true
+    prompt: "Fund entity UUID"
+  manco_name:
+    type: string
+    required: true
+    prompt: "Management Company name"
+  im_name:
+    type: string
+    required: true
+    prompt: "Investment Manager name"
+  jurisdiction:
+    type: string
+    required: false
+    default: "LU"
+    prompt: "Jurisdiction code"
+
+body: |
+  (cbu.ensure :name "$fund_name" :jurisdiction "$jurisdiction" :client-type "FUND" :as @cbu)
+  (cbu.assign-role :cbu-id @cbu :entity-id "$fund_entity_id" :role "ASSET_OWNER")
+  (cbu.assign-role :cbu-id @cbu :entity-id "$manco_name" :role "MANAGEMENT_COMPANY")
+  (cbu.assign-role :cbu-id @cbu :entity-id "$im_name" :role "INVESTMENT_MANAGER")
+
+outputs:
+  cbu:
+    type: cbu_ref
+    description: Created CBU ID

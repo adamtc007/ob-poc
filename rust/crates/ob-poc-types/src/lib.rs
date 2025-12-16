@@ -6,39 +6,32 @@
 //!
 //! ```text
 //! ┌──────────────────┐         ┌──────────────────┐
-//! │  Rust Server     │  JSON   │  TypeScript      │
-//! │  (Axum)          │ ◄─────► │  (HTML panels)   │
+//! │  Rust Server     │  JSON   │  WASM UI         │
+//! │  (Axum)          │ ◄─────► │  (egui)          │
 //! └──────────────────┘         └──────────────────┘
-//!          │
-//!          │ JSON
-//!          ▼
-//! ┌──────────────────┐
-//! │  Rust WASM       │
-//! │  (Graph)         │
-//! └──────────────────┘
-//!
-//! Plus: TS ◄──CustomEvent──► WASM (just entity IDs)
 //! ```
 //!
 //! ## Rules
 //!
 //! 1. All API types live here - no inline struct definitions in handlers
-//! 2. Use `#[derive(TS)]` for TypeScript generation
-//! 3. Tagged enums only: `#[serde(tag = "type")]`
-//! 4. CustomEvent payloads: just UUIDs as strings
+//! 2. Tagged enums only: `#[serde(tag = "type")]`
+//! 3. UUIDs as strings for JSON compatibility
+
+pub mod resolution;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use ts_rs::TS;
 use uuid::Uuid;
+
+// Re-export resolution types for convenience
+pub use resolution::*;
 
 // ============================================================================
 // SESSION API
 // ============================================================================
 
 /// Request to create a new session
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateSessionRequest {
     #[serde(default)]
     pub domain_hint: Option<String>,
@@ -46,19 +39,16 @@ pub struct CreateSessionRequest {
 
 /// Response after creating a session
 /// NOTE: Accepts flexible types to handle server's native types
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateSessionResponse {
     /// Session ID - server sends UUID, we accept any string-serializable value
     #[serde(deserialize_with = "deserialize_uuid_or_string")]
     pub session_id: String,
     /// State - server sends enum, we accept anything
     #[serde(default)]
-    #[ts(type = "unknown")]
     pub state: serde_json::Value,
     /// Created at - server sends DateTime, we accept any
     #[serde(default)]
-    #[ts(type = "unknown")]
     pub created_at: serde_json::Value,
 }
 
@@ -91,8 +81,7 @@ where
 }
 
 /// Bound entity info for session state
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BoundEntityInfo {
     pub id: String,          // UUID as string
     pub name: String,        // Display name
@@ -101,49 +90,34 @@ pub struct BoundEntityInfo {
 
 /// Session state response
 /// NOTE: Accepts flexible types to handle server's native types
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionStateResponse {
     #[serde(deserialize_with = "deserialize_uuid_or_string")]
     pub session_id: String,
     #[serde(default)]
-    #[ts(type = "unknown")]
     pub state: serde_json::Value,
     #[serde(default)]
     pub message_count: usize,
     #[serde(default)]
     pub can_execute: bool,
     #[serde(default)]
-    #[ts(optional)]
     pub dsl_source: Option<String>,
     /// Active CBU for this session (if set via bind)
     #[serde(default)]
-    #[ts(optional)]
     pub active_cbu: Option<BoundEntityInfo>,
     /// Named bindings available in the session (name -> entity info)
     #[serde(default)]
-    #[ts(type = "Record<string, unknown>")]
     pub bindings: serde_json::Value,
     // Extra fields from server
     #[serde(default)]
-    #[ts(optional)]
-    #[ts(type = "unknown")]
     pub pending_intents: Option<serde_json::Value>,
     #[serde(default)]
-    #[ts(optional)]
-    #[ts(type = "unknown")]
     pub assembled_dsl: Option<serde_json::Value>,
     #[serde(default)]
-    #[ts(optional)]
-    #[ts(type = "unknown")]
     pub combined_dsl: Option<serde_json::Value>,
     #[serde(default)]
-    #[ts(optional)]
-    #[ts(type = "unknown")]
     pub context: Option<serde_json::Value>,
     #[serde(default)]
-    #[ts(optional)]
-    #[ts(type = "unknown")]
     pub messages: Option<serde_json::Value>,
 }
 
@@ -152,8 +126,7 @@ pub struct SessionStateResponse {
 // ============================================================================
 
 /// Chat request from user
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatRequest {
     pub message: String,
     #[serde(default)]
@@ -162,51 +135,36 @@ pub struct ChatRequest {
 
 /// Chat response from agent
 /// NOTE: Fields use #[serde(default)] to be flexible with server response
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatResponse {
     pub message: String,
     #[serde(default)]
     pub can_execute: bool,
     #[serde(default)]
-    #[ts(optional)]
     pub dsl_source: Option<String>,
     /// AST - accepts any JSON since server sends different format
     #[serde(default)]
-    #[ts(optional)]
-    #[ts(type = "unknown")]
     pub ast: Option<serde_json::Value>,
     /// Session state - accepts any JSON (server sends enum, we accept anything)
     #[serde(default)]
-    #[ts(type = "unknown")]
     pub session_state: serde_json::Value,
     /// UI commands to execute (show CBU, highlight entity, etc.)
     #[serde(default)]
-    #[ts(optional)]
     pub commands: Option<Vec<AgentCommand>>,
     // Extra fields from server that we ignore but must accept
     #[serde(default)]
-    #[ts(optional)]
-    #[ts(type = "unknown")]
     pub intents: Option<serde_json::Value>,
     #[serde(default)]
-    #[ts(optional)]
-    #[ts(type = "unknown")]
     pub validation_results: Option<serde_json::Value>,
     #[serde(default)]
-    #[ts(optional)]
-    #[ts(type = "unknown")]
     pub assembled_dsl: Option<serde_json::Value>,
     #[serde(default)]
-    #[ts(optional)]
-    #[ts(type = "unknown")]
     pub bindings: Option<serde_json::Value>,
 }
 
-/// SSE stream event - MUST use tagged enum for TypeScript discrimination
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+/// SSE stream event - tagged enum for discrimination
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-#[ts(export)]
 pub enum ChatStreamEvent {
     /// Text chunk from agent
     Chunk { content: String },
@@ -225,9 +183,8 @@ pub enum ChatStreamEvent {
 /// Commands the agent can issue to the UI
 /// This is the canonical vocabulary for agent → UI communication.
 /// The LLM maps natural language ("run it", "undo that") to these commands.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case")]
-#[ts(export)]
 pub enum AgentCommand {
     // =========================================================================
     // REPL Commands
@@ -261,49 +218,39 @@ pub enum AgentCommand {
 // ============================================================================
 
 /// Request to execute DSL
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecuteRequest {
     #[serde(default)]
     pub dsl: Option<String>,
 }
 
 /// Response from DSL execution
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecuteResponse {
     pub success: bool,
     pub results: Vec<ExecuteResult>,
     pub errors: Vec<String>,
     /// New session state after execution (accept any JSON)
     #[serde(default)]
-    #[ts(type = "unknown")]
     pub new_state: serde_json::Value,
     #[serde(default)]
-    #[ts(optional)]
     pub bindings: Option<std::collections::HashMap<String, String>>, // name -> UUID (as string)
 }
 
 /// Individual statement execution result
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecuteResult {
     pub statement_index: usize,
     #[serde(default)]
-    #[ts(optional)]
     pub dsl: Option<String>,
     pub success: bool,
     pub message: String,
     #[serde(default)]
-    #[ts(optional)]
     pub entity_id: Option<String>,
     #[serde(default)]
-    #[ts(optional)]
     pub entity_type: Option<String>,
     /// Query result data (for cbu.show, cbu.list, etc.)
     #[serde(default)]
-    #[ts(optional)]
-    #[ts(type = "unknown")]
     pub result: Option<serde_json::Value>,
 }
 
@@ -312,16 +259,13 @@ pub struct ExecuteResult {
 // ============================================================================
 
 /// CBU summary for list views
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CbuSummary {
     pub cbu_id: String,
     pub name: String,
     #[serde(default)]
-    #[ts(optional)]
     pub jurisdiction: Option<String>,
     #[serde(default)]
-    #[ts(optional)]
     pub client_type: Option<String>,
 }
 
@@ -330,31 +274,26 @@ pub struct CbuSummary {
 // ============================================================================
 
 /// Full CBU graph for visualization
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CbuGraphResponse {
     pub cbu_id: String,
     pub label: String,
     #[serde(default)]
-    #[ts(optional)]
     pub cbu_category: Option<String>,
     #[serde(default)]
-    #[ts(optional)]
     pub jurisdiction: Option<String>,
     pub nodes: Vec<GraphNode>,
     pub edges: Vec<GraphEdge>,
 }
 
 /// Node in the CBU graph
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphNode {
     pub id: String,
     pub node_type: String,
     pub layer: String,
     pub label: String,
     #[serde(default)]
-    #[ts(optional)]
     pub sublabel: Option<String>,
     pub status: String,
     #[serde(default)]
@@ -362,43 +301,33 @@ pub struct GraphNode {
     #[serde(default)]
     pub role_categories: Vec<String>,
     #[serde(default)]
-    #[ts(optional)]
     pub primary_role: Option<String>,
     #[serde(default)]
-    #[ts(optional)]
     pub jurisdiction: Option<String>,
     #[serde(default)]
-    #[ts(optional)]
     pub ownership_pct: Option<f64>,
     /// Role priority for layout ordering
     #[serde(default)]
-    #[ts(optional)]
     pub role_priority: Option<i32>,
-    /// Additional node data (JSON blob) - skipped in TS, use `any` in TypeScript
+    /// Additional node data (JSON blob)
     #[serde(default)]
-    #[ts(optional)]
-    #[ts(type = "Record<string, unknown> | null")]
     pub data: Option<serde_json::Value>,
     /// Server-computed X position
     #[serde(default)]
-    #[ts(optional)]
     pub x: Option<f64>,
     /// Server-computed Y position
     #[serde(default)]
-    #[ts(optional)]
     pub y: Option<f64>,
 }
 
 /// Edge in the CBU graph
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphEdge {
     pub id: String,
     pub source: String,
     pub target: String,
     pub edge_type: String,
     #[serde(default)]
-    #[ts(optional)]
     pub label: Option<String>,
 }
 
@@ -407,12 +336,10 @@ pub struct GraphEdge {
 // ============================================================================
 
 /// DSL source response
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DslResponse {
     pub source: String,
     #[serde(default)]
-    #[ts(optional)]
     pub session_id: Option<String>,
 }
 
@@ -421,51 +348,43 @@ pub struct DslResponse {
 // ============================================================================
 
 /// AST response containing all statements
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AstResponse {
     pub statements: Vec<AstStatement>,
 }
 
 /// A single AST statement (VerbCall or Comment)
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-#[ts(export)]
 pub enum AstStatement {
     VerbCall {
         domain: String,
         verb: String,
         arguments: Vec<AstArgument>,
         #[serde(default)]
-        #[ts(optional)]
         binding: Option<String>,
         #[serde(default)]
-        #[ts(optional)]
         span: Option<AstSpan>,
     },
     Comment {
         text: String,
         #[serde(default)]
-        #[ts(optional)]
         span: Option<AstSpan>,
     },
 }
 
 /// AST argument (key-value pair)
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AstArgument {
     pub key: String,
     pub value: AstValue,
     #[serde(default)]
-    #[ts(optional)]
     pub span: Option<AstSpan>,
 }
 
 /// AST value types
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-#[ts(export)]
 pub enum AstValue {
     /// String literal
     String { value: String },
@@ -480,7 +399,6 @@ pub enum AstValue {
         entity_type: String,
         search_key: String,
         #[serde(default)]
-        #[ts(optional)]
         resolved_key: Option<String>,
     },
     /// List of values
@@ -492,63 +410,54 @@ pub enum AstValue {
 }
 
 /// Map entry for AST Map values
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AstMapEntry {
     pub key: String,
     pub value: AstValue,
 }
 
 /// Source location span
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AstSpan {
     pub start: usize,
     pub end: usize,
     #[serde(default)]
-    #[ts(optional)]
     pub start_line: Option<u32>,
     #[serde(default)]
-    #[ts(optional)]
     pub end_line: Option<u32>,
 }
 
 // ============================================================================
-// CUSTOM EVENT PAYLOADS (TS ↔ WASM)
+// EVENT PAYLOADS
 // Keep these dead simple - just IDs
 // ============================================================================
 
-/// Event from TypeScript to WASM: load a CBU
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+/// Event: load a CBU
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoadCbuEvent {
     pub cbu_id: String,
 }
 
-/// Event from TypeScript to WASM: focus an entity
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+/// Event: focus an entity
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FocusEntityEvent {
     pub entity_id: String,
 }
 
-/// Event from TypeScript to WASM: change view mode
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+/// Event: change view mode
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SetViewModeEvent {
     pub view_mode: String, // "KYC_UBO", "SERVICE_DELIVERY", etc.
 }
 
-/// Event from WASM to TypeScript: entity selected
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+/// Event: entity selected
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntitySelectedEvent {
     pub entity_id: String,
 }
 
-/// Event from WASM to TypeScript: CBU changed
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+/// Event: CBU changed
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CbuChangedEvent {
     pub cbu_id: String,
 }
@@ -558,8 +467,7 @@ pub struct CbuChangedEvent {
 // ============================================================================
 
 /// Disambiguation request - sent when user input is ambiguous
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DisambiguationRequest {
     /// Unique ID for this disambiguation request
     pub request_id: String,
@@ -570,9 +478,8 @@ pub struct DisambiguationRequest {
 }
 
 /// A single ambiguous item needing resolution
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-#[ts(export)]
 pub enum DisambiguationItem {
     /// Multiple entities match a search term
     EntityMatch {
@@ -593,8 +500,7 @@ pub enum DisambiguationItem {
 }
 
 /// A matching entity for disambiguation
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntityMatch {
     /// Entity UUID
     pub entity_id: String,
@@ -604,21 +510,17 @@ pub struct EntityMatch {
     pub entity_type: String,
     /// Jurisdiction code
     #[serde(default)]
-    #[ts(optional)]
     pub jurisdiction: Option<String>,
     /// Additional context (roles, etc.)
     #[serde(default)]
-    #[ts(optional)]
     pub context: Option<String>,
     /// Match score (0.0 - 1.0)
     #[serde(default)]
-    #[ts(optional)]
     pub score: Option<f64>,
 }
 
 /// A possible interpretation of ambiguous text
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Interpretation {
     /// Interpretation ID
     pub id: String,
@@ -628,13 +530,11 @@ pub struct Interpretation {
     pub description: String,
     /// How this affects the generated DSL
     #[serde(default)]
-    #[ts(optional)]
     pub effect: Option<String>,
 }
 
 /// User's disambiguation response
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DisambiguationResponse {
     /// The request ID being responded to
     pub request_id: String,
@@ -643,9 +543,8 @@ pub struct DisambiguationResponse {
 }
 
 /// A single disambiguation selection
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-#[ts(export)]
 pub enum DisambiguationSelection {
     /// Selected entity for an EntityMatch
     Entity { param: String, entity_id: String },
@@ -657,8 +556,7 @@ pub enum DisambiguationSelection {
 }
 
 /// Extended chat response that can include disambiguation
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatResponseV2 {
     /// Agent message
     pub message: String,
@@ -670,19 +568,16 @@ pub struct ChatResponseV2 {
 }
 
 /// Chat response payload - either ready DSL or needs disambiguation
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
-#[ts(export)]
 pub enum ChatPayload {
     /// DSL is ready (no ambiguity or already resolved)
     Ready {
         dsl_source: String,
         #[serde(default)]
-        #[ts(optional)]
         ast: Option<Vec<AstStatement>>,
         can_execute: bool,
         #[serde(default)]
-        #[ts(optional)]
         commands: Option<Vec<AgentCommand>>,
     },
     /// Needs user disambiguation before generating DSL
@@ -692,7 +587,6 @@ pub enum ChatPayload {
     /// Just a message, no DSL
     Message {
         #[serde(default)]
-        #[ts(optional)]
         commands: Option<Vec<AgentCommand>>,
     },
 }
@@ -702,8 +596,7 @@ pub enum ChatPayload {
 // ============================================================================
 
 /// A single match from entity search
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntitySearchMatch {
     /// Primary key (UUID or code)
     pub value: String,
@@ -711,15 +604,13 @@ pub struct EntitySearchMatch {
     pub display: String,
     /// Additional context
     #[serde(default)]
-    #[ts(optional)]
     pub detail: Option<String>,
     /// Relevance score
     pub score: f32,
 }
 
 /// Response from entity search
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntitySearchResponse {
     pub matches: Vec<EntitySearchMatch>,
     pub total: usize,
@@ -731,12 +622,11 @@ pub struct EntitySearchResponse {
 // ============================================================================
 
 /// Request to set a binding in a session (matches agent_routes.rs SetBindingRequest)
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SetBindingRequest {
     /// Binding name (without @)
     pub name: String,
-    /// UUID to bind (as string for TS compat)
+    /// UUID to bind (as string)
     pub id: String,
     /// Entity type (e.g., "cbu", "entity", "case")
     pub entity_type: String,
@@ -745,8 +635,7 @@ pub struct SetBindingRequest {
 }
 
 /// Response from setting a binding (matches agent_routes.rs SetBindingResponse)
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SetBindingResponse {
     pub success: bool,
     pub binding_name: String,
@@ -758,37 +647,108 @@ pub struct SetBindingResponse {
 // ============================================================================
 
 /// Request to validate DSL
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValidateDslRequest {
     pub dsl: String,
 }
 
 /// Validation error with location info
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValidationError {
     #[serde(default)]
-    #[ts(optional)]
     pub line: Option<usize>,
     #[serde(default)]
-    #[ts(optional)]
     pub column: Option<usize>,
     pub message: String,
     #[serde(default)]
-    #[ts(optional)]
     pub suggestion: Option<String>,
 }
 
 /// Response from /api/agent/validate (matches server's ValidationResult)
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValidateDslResponse {
     pub valid: bool,
     #[serde(default)]
     pub errors: Vec<ValidationError>,
     #[serde(default)]
     pub warnings: Vec<String>,
+}
+
+// ============================================================================
+// DSL DISPLAY SEGMENTS (for rich rendering with inline binding info)
+// ============================================================================
+
+/// A segment of DSL text for rich rendering
+/// The UI receives pre-segmented DSL and renders each segment appropriately
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum DslDisplaySegment {
+    /// Plain text (keywords, punctuation, literals)
+    Text { content: String },
+
+    /// A binding reference (@symbol) with resolved info
+    Binding {
+        /// The symbol name (without @)
+        symbol: String,
+        /// Resolved display name (e.g., "Apex Capital")
+        display_name: Option<String>,
+        /// Entity type (e.g., "cbu", "proper_person")
+        entity_type: Option<String>,
+        /// Resolved UUID (if resolved)
+        entity_id: Option<String>,
+        /// Whether this binding is editable/clickable
+        editable: bool,
+        /// Byte offset in source for click handling
+        source_offset: usize,
+    },
+
+    /// An unresolved entity reference that needs resolution
+    UnresolvedRef {
+        /// The search/display value from DSL
+        search_value: String,
+        /// Expected entity type from verb schema
+        entity_type: String,
+        /// Argument name (e.g., ":cbu-id")
+        arg_name: String,
+        /// Reference ID for resolution API
+        ref_id: String,
+        /// Byte offset in source
+        source_offset: usize,
+    },
+
+    /// A comment
+    Comment { content: String },
+
+    /// Newline/whitespace (preserved for layout)
+    Whitespace { content: String },
+}
+
+/// Enriched DSL for display - raw source plus segmented view
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnrichedDsl {
+    /// Raw DSL source (for editing mode)
+    pub source: String,
+    /// Segmented view for rich rendering
+    pub segments: Vec<DslDisplaySegment>,
+    /// Summary of bindings used
+    pub binding_summary: Vec<BindingSummary>,
+    /// Whether all references are resolved
+    pub fully_resolved: bool,
+}
+
+/// Summary of a binding for the context panel
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BindingSummary {
+    /// Symbol name (without @)
+    pub symbol: String,
+    /// Display name
+    pub display_name: String,
+    /// Entity type
+    pub entity_type: String,
+    /// UUID
+    pub entity_id: String,
+    /// Is this the active/primary binding (e.g., active_cbu)
+    pub is_primary: bool,
 }
 
 // ============================================================================

@@ -239,6 +239,12 @@ fn group_into_phases(ops: &[Op]) -> Vec<ExecutionPhase> {
             Op::Materialize { .. } => phase_materialize.op_indices.push(idx),
 
             Op::RequireRef { .. } => {} // No-op, skip
+
+            Op::GenericCrud { .. } => {
+                // GenericCrud ops go in the entities phase by default
+                // They could be refined based on verb domain if needed
+                phase_entities.op_indices.push(idx)
+            }
         }
     }
 

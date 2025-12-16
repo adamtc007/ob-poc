@@ -13,7 +13,10 @@
 //! - Caching entities locally
 
 use ob_poc_graph::{CbuGraphData, CbuGraphWidget, ViewMode};
-use ob_poc_types::{CbuSummary, ExecuteResponse, SessionStateResponse, ValidateDslResponse};
+use ob_poc_types::{
+    CbuSummary, ExecuteResponse, ResolutionSearchResponse, ResolutionSessionResponse,
+    SessionStateResponse, ValidateDslResponse,
+};
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
@@ -68,6 +71,10 @@ pub struct AppState {
     /// Last execution result
     pub execution: Option<ExecuteResponse>,
 
+    /// Resolution session (entity resolution workflow)
+    /// Set via start_resolution(), never modified directly
+    pub resolution: Option<ResolutionSessionResponse>,
+
     /// Chat messages (accumulated from ChatResponse)
     pub messages: Vec<ChatMessage>,
 
@@ -89,6 +96,9 @@ pub struct AppState {
 
     /// Selected entity in graph (for detail panel)
     pub selected_entity_id: Option<String>,
+
+    /// Resolution panel UI state
+    pub resolution_ui: ResolutionPanelUi,
 
     /// Graph widget (owns camera, input state - rendering only)
     pub graph_widget: CbuGraphWidget,
@@ -112,6 +122,7 @@ impl Default for AppState {
             graph_data: None,
             validation_result: None,
             execution: None,
+            resolution: None,
             messages: Vec::new(),
             cbu_list: Vec::new(),
 
@@ -120,6 +131,7 @@ impl Default for AppState {
             view_mode: ViewMode::KycUbo,
             panels: PanelState::default(),
             selected_entity_id: None,
+            resolution_ui: ResolutionPanelUi::default(),
             graph_widget: CbuGraphWidget::new(),
 
             // Async coordination
@@ -193,6 +205,27 @@ pub enum LayoutMode {
 }
 
 // =============================================================================
+// RESOLUTION PANEL UI STATE
+// =============================================================================
+
+/// Resolution panel UI-only state (not persisted, not synced)
+#[derive(Default, Clone)]
+pub struct ResolutionPanelUi {
+    /// Currently selected ref_id for resolution
+    pub selected_ref_id: Option<String>,
+    /// Search query for current ref
+    pub search_query: String,
+    /// Search results from last search
+    pub search_results: Option<ResolutionSearchResponse>,
+    /// Expanded discriminator section
+    pub show_discriminators: bool,
+    /// Discriminator values being edited
+    pub discriminator_values: std::collections::HashMap<String, String>,
+    /// Show resolution panel (modal/overlay)
+    pub show_panel: bool,
+}
+
+// =============================================================================
 // ASYNC STATE - Coordination for spawn_local operations
 // =============================================================================
 
@@ -217,6 +250,8 @@ pub struct AsyncState {
     pub pending_execution: Option<Result<ExecuteResponse, String>>,
     pub pending_cbu_list: Option<Result<Vec<CbuSummary>, String>>,
     pub pending_chat: Option<Result<ChatMessage, String>>,
+    pub pending_resolution: Option<Result<ResolutionSessionResponse, String>>,
+    pub pending_resolution_search: Option<Result<ResolutionSearchResponse, String>>,
 
     // Command triggers (from agent commands)
     pub pending_execute: Option<Uuid>, // Session ID to execute
@@ -232,6 +267,8 @@ pub struct AsyncState {
     pub loading_graph: bool,
     pub loading_chat: bool,
     pub executing: bool,
+    pub loading_resolution: bool,
+    pub searching_resolution: bool,
 
     // Chat focus tracking - set when chat completes to refocus input
     pub chat_just_finished: bool,
@@ -337,6 +374,32 @@ impl AppState {
             match result {
                 Ok(list) => self.cbu_list = list,
                 Err(e) => state.last_error = Some(e),
+            }
+        }
+
+        // Process resolution session
+        if let Some(result) = state.pending_resolution.take() {
+            state.loading_resolution = false;
+            match result {
+                Ok(resolution) => {
+                    // Auto-show panel when resolution starts
+                    if !resolution.unresolved.is_empty() {
+                        self.resolution_ui.show_panel = true;
+                    }
+                    self.resolution = Some(resolution);
+                }
+                Err(e) => state.last_error = Some(format!("Resolution failed: {}", e)),
+            }
+        }
+
+        // Process resolution search results
+        if let Some(result) = state.pending_resolution_search.take() {
+            state.searching_resolution = false;
+            match result {
+                Ok(search_result) => {
+                    self.resolution_ui.search_results = Some(search_result);
+                }
+                Err(e) => state.last_error = Some(format!("Resolution search failed: {}", e)),
             }
         }
     }

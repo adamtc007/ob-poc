@@ -21,8 +21,11 @@ use crate::state::AppState;
 // Import API routers from main ob-poc crate
 use ob_poc::api::{
     create_agent_router_with_sessions, create_attribute_router, create_dsl_viewer_router,
-    create_entity_router, create_session_store,
+    create_entity_router, create_resolution_router, create_session_store,
 };
+
+// Import resolution store from services
+use ob_poc::services::create_resolution_store;
 
 // EntityGateway for entity resolution
 use entity_gateway::{
@@ -35,7 +38,7 @@ use entity_gateway::{
 };
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize logging
     tracing_subscriber::registry()
         .with(
@@ -51,11 +54,19 @@ async fn main() {
     let database_url =
         std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".to_string());
 
-    let pool = sqlx::PgPool::connect(&database_url)
-        .await
-        .expect("Failed to connect to database");
-
-    tracing::info!("Database connection established");
+    let pool = match sqlx::PgPool::connect(&database_url).await {
+        Ok(p) => {
+            tracing::info!("Database connection established");
+            p
+        }
+        Err(e) => {
+            tracing::error!("Failed to connect to database at {}: {}", database_url, e);
+            tracing::error!(
+                "Please check DATABASE_URL environment variable and ensure PostgreSQL is running"
+            );
+            return Err(format!("Database connection failed: {}", e).into());
+        }
+    };
 
     // =========================================================================
     // Start embedded EntityGateway gRPC service
@@ -148,10 +159,21 @@ async fn main() {
         });
 
         let grpc_service = EntityGatewayService::new(registry);
+        // Default gRPC address - validated at compile time
+        const DEFAULT_GRPC_ADDR: &str = "[::]:50051";
         let grpc_addr: SocketAddr = std::env::var("ENTITY_GATEWAY_ADDR")
-            .unwrap_or_else(|_| "[::]:50051".to_string())
+            .unwrap_or_else(|_| DEFAULT_GRPC_ADDR.to_string())
             .parse()
-            .unwrap_or_else(|_| "[::]:50051".parse().unwrap());
+            .unwrap_or_else(|e| {
+                tracing::warn!(
+                    "Invalid ENTITY_GATEWAY_ADDR, using default {}: {}",
+                    DEFAULT_GRPC_ADDR,
+                    e
+                );
+                DEFAULT_GRPC_ADDR
+                    .parse()
+                    .expect("default gRPC address is valid")
+            });
 
         tokio::spawn(async move {
             tracing::info!("EntityGateway gRPC listening on {}", grpc_addr);
@@ -169,6 +191,9 @@ async fn main() {
 
     // Create single shared session store for agent routers
     let sessions = create_session_store();
+
+    // Create resolution store for entity reference resolution
+    let resolution_store = create_resolution_store();
 
     // Create shared state for CBU/graph endpoints
     let state = AppState::new(pool.clone());
@@ -190,10 +215,14 @@ async fn main() {
 
     // Build stateless API router (from main ob-poc crate) with SHARED session store
     let api_router: Router<()> = Router::new()
-        .merge(create_agent_router_with_sessions(pool.clone(), sessions))
+        .merge(create_agent_router_with_sessions(
+            pool.clone(),
+            sessions.clone(),
+        ))
         .merge(create_attribute_router(pool.clone()))
         .merge(create_entity_router())
-        .merge(create_dsl_viewer_router(pool));
+        .merge(create_dsl_viewer_router(pool.clone()))
+        .merge(create_resolution_router(sessions, resolution_store));
 
     // Build main app router with state
     // Session routes (including /bind) now share the same session store via create_agent_router_with_sessions
@@ -233,11 +262,31 @@ async fn main() {
     tracing::info!("  /api/cbu              - List CBUs");
     tracing::info!("  /api/cbu/:id/graph    - Get CBU graph");
     tracing::info!("  /api/session          - Session management");
+    tracing::info!("  /api/session/:id/resolution/* - Entity resolution");
     tracing::info!("  /api/agent/*          - DSL generation");
     tracing::info!("  /api/entity/search    - Entity search");
     tracing::info!("  /api/dsl/*            - DSL viewer");
     tracing::info!("");
 
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    let listener = match tokio::net::TcpListener::bind(addr).await {
+        Ok(l) => l,
+        Err(e) => {
+            tracing::error!("Failed to bind to {}: {}", addr, e);
+            if e.kind() == std::io::ErrorKind::AddrInUse {
+                tracing::error!(
+                    "Port {} is already in use. Try: lsof -ti:{} | xargs kill -9",
+                    port,
+                    port
+                );
+            }
+            return Err(format!("Failed to bind to {}: {}", addr, e).into());
+        }
+    };
+
+    if let Err(e) = axum::serve(listener, app).await {
+        tracing::error!("Server error: {}", e);
+        return Err(format!("Server error: {}", e).into());
+    }
+
+    Ok(())
 }

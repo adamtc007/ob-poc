@@ -2,10 +2,14 @@
 //!
 //! This replaces the static STANDARD_VERBS array with a dynamic
 //! registry that can be reloaded at runtime.
+//!
+//! Also loads templates from config/verbs/templates/ as first-class
+//! language constructs (macros that expand to DSL statements).
 
 #[cfg(feature = "database")]
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::{Arc, OnceLock};
 use tokio::sync::RwLock;
 use tracing::{info, warn};
@@ -14,6 +18,7 @@ use tracing::{info, warn};
 use sqlx::PgPool;
 
 use super::config::types::*;
+use crate::templates::{TemplateDefinition, TemplateRegistry};
 
 // =============================================================================
 // RUNTIME VERB DEFINITION
@@ -104,15 +109,45 @@ pub struct RuntimeReturn {
 // =============================================================================
 
 /// Runtime verb registry - can be hot-reloaded
+///
+/// Contains both verbs and templates, loaded at startup from:
+/// - config/verbs/*.yaml (verb definitions)
+/// - config/verbs/templates/**/*.yaml (template definitions)
 pub struct RuntimeVerbRegistry {
     verbs: HashMap<String, RuntimeVerb>,
     by_domain: HashMap<String, Vec<String>>,
     domains: Vec<String>,
+    /// Template registry (macros that expand to DSL statements)
+    templates: TemplateRegistry,
 }
 
 impl RuntimeVerbRegistry {
     /// Build registry from configuration
     pub fn from_config(config: &VerbsConfig) -> Self {
+        Self::from_config_with_templates(config, TemplateRegistry::new())
+    }
+
+    /// Build registry from configuration with template directory
+    pub fn from_config_and_templates_dir(config: &VerbsConfig, templates_dir: &Path) -> Self {
+        let templates = match TemplateRegistry::load_from_dir(templates_dir) {
+            Ok(registry) => {
+                info!(
+                    "Loaded {} templates from {:?}",
+                    registry.len(),
+                    templates_dir
+                );
+                registry
+            }
+            Err(e) => {
+                warn!("Failed to load templates from {:?}: {}", templates_dir, e);
+                TemplateRegistry::new()
+            }
+        };
+        Self::from_config_with_templates(config, templates)
+    }
+
+    /// Build registry from configuration with pre-loaded templates
+    pub fn from_config_with_templates(config: &VerbsConfig, templates: TemplateRegistry) -> Self {
         let mut verbs = HashMap::new();
         let mut by_domain: HashMap<String, Vec<String>> = HashMap::new();
 
@@ -145,6 +180,7 @@ impl RuntimeVerbRegistry {
             verbs,
             by_domain,
             domains,
+            templates,
         }
     }
 
@@ -428,6 +464,54 @@ impl RuntimeVerbRegistry {
     }
 
     // =========================================================================
+    // TEMPLATE METHODS
+    // =========================================================================
+
+    /// Get the template registry
+    pub fn templates(&self) -> &TemplateRegistry {
+        &self.templates
+    }
+
+    /// Get a template by ID
+    pub fn get_template(&self, id: &str) -> Option<&TemplateDefinition> {
+        self.templates.get(id)
+    }
+
+    /// Find templates by tag
+    pub fn find_templates_by_tag(&self, tag: &str) -> Vec<&TemplateDefinition> {
+        self.templates.find_by_tag(tag)
+    }
+
+    /// Find templates that resolve a blocker
+    pub fn find_templates_by_blocker(&self, blocker_type: &str) -> Vec<&TemplateDefinition> {
+        self.templates.find_by_blocker(blocker_type)
+    }
+
+    /// Find templates for a workflow state
+    pub fn find_templates_by_workflow_state(
+        &self,
+        workflow: &str,
+        state: &str,
+    ) -> Vec<&TemplateDefinition> {
+        self.templates.find_by_workflow_state(workflow, state)
+    }
+
+    /// Search templates by text
+    pub fn search_templates(&self, query: &str) -> Vec<&TemplateDefinition> {
+        self.templates.search(query)
+    }
+
+    /// List all templates
+    pub fn list_templates(&self) -> Vec<&TemplateDefinition> {
+        self.templates.list()
+    }
+
+    /// Get template count
+    pub fn template_count(&self) -> usize {
+        self.templates.len()
+    }
+
+    // =========================================================================
     // DATAFLOW METHODS
     // =========================================================================
 
@@ -501,8 +585,8 @@ static RUNTIME_REGISTRY: OnceLock<RuntimeVerbRegistry> = OnceLock::new();
 
 /// Get or initialize the global runtime verb registry
 ///
-/// Loads from config/verbs.yaml on first access. Returns an empty registry
-/// if loading fails (with warning logged).
+/// Loads from config/verbs/*.yaml and config/verbs/templates/**/*.yaml on first access.
+/// Returns an empty registry if loading fails (with warning logged).
 pub fn runtime_registry() -> &'static RuntimeVerbRegistry {
     RUNTIME_REGISTRY.get_or_init(|| {
         use super::config::ConfigLoader;
@@ -510,11 +594,15 @@ pub fn runtime_registry() -> &'static RuntimeVerbRegistry {
         let loader = ConfigLoader::from_env();
         match loader.load_verbs() {
             Ok(config) => {
-                let registry = RuntimeVerbRegistry::from_config(&config);
+                // Load templates from config/verbs/templates/
+                let templates_dir = loader.config_dir().join("templates");
+                let registry =
+                    RuntimeVerbRegistry::from_config_and_templates_dir(&config, &templates_dir);
                 info!(
-                    "Loaded runtime verb registry: {} verbs across {} domains",
+                    "Loaded runtime registry: {} verbs across {} domains, {} templates",
                     registry.len(),
-                    registry.domains().len()
+                    registry.domains().len(),
+                    registry.template_count()
                 );
                 registry
             }
@@ -524,6 +612,7 @@ pub fn runtime_registry() -> &'static RuntimeVerbRegistry {
                     verbs: HashMap::new(),
                     by_domain: HashMap::new(),
                     domains: vec![],
+                    templates: TemplateRegistry::new(),
                 }
             }
         }
@@ -684,5 +773,61 @@ mod tests {
             RuntimeVerbRegistry::transform_name("unchanged", None),
             "unchanged"
         );
+    }
+
+    #[test]
+    fn test_load_templates_from_directory() {
+        use std::path::Path;
+
+        // Load from actual config directory
+        let templates_dir = Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/config/verbs/templates"
+        ));
+
+        if templates_dir.exists() {
+            let config = create_test_config();
+            let registry =
+                RuntimeVerbRegistry::from_config_and_templates_dir(&config, templates_dir);
+
+            // Should have loaded templates
+            assert!(
+                registry.template_count() > 0,
+                "Should have loaded templates"
+            );
+
+            // Check specific templates exist
+            assert!(
+                registry.get_template("onboard-director").is_some(),
+                "Should have onboard-director template"
+            );
+            assert!(
+                registry.get_template("create-kyc-case").is_some(),
+                "Should have create-kyc-case template"
+            );
+
+            // Check template search works
+            let director_templates = registry.find_templates_by_tag("director");
+            assert!(
+                !director_templates.is_empty(),
+                "Should find templates by tag"
+            );
+
+            // Check primary_entity
+            let template = registry.get_template("onboard-director").unwrap();
+            assert!(
+                template.primary_entity.is_some(),
+                "Template should have primary_entity"
+            );
+            assert!(
+                template.is_cbu_scoped(),
+                "onboard-director should be CBU scoped"
+            );
+
+            println!("Loaded {} templates", registry.template_count());
+            for t in registry.list_templates() {
+                println!("  - {} ({})", t.template, t.metadata.summary);
+            }
+        }
     }
 }
