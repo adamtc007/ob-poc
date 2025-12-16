@@ -8,7 +8,7 @@
 use crate::api;
 use crate::panels::{
     ast_panel, chat_panel, dsl_editor_panel, entity_detail_panel, repl_panel, results_panel,
-    toolbar, ToolbarAction,
+    toolbar, DslEditorAction, ToolbarAction,
 };
 use crate::state::{AppState, AsyncState, LayoutMode, PanelState, TextBuffers};
 use ob_poc_graph::{CbuGraphWidget, ViewMode};
@@ -242,9 +242,29 @@ impl App {
             self.state.set_view_mode(mode);
         }
 
+        if let Some(layout) = action.change_layout {
+            self.state.panels.layout = layout;
+        }
+
         if action.dismiss_error {
             if let Ok(mut async_state) = self.state.async_state.lock() {
                 async_state.last_error = None;
+            }
+        }
+    }
+
+    /// Handle DSL editor actions
+    fn handle_dsl_editor_action(&mut self, action: DslEditorAction) {
+        match action {
+            DslEditorAction::None => {}
+            DslEditorAction::Clear => {
+                self.state.clear_dsl();
+            }
+            DslEditorAction::Validate => {
+                self.state.validate_dsl();
+            }
+            DslEditorAction::Execute => {
+                self.state.execute_dsl();
             }
         }
     }
@@ -339,11 +359,13 @@ impl App {
 
     /// Render editor-focused layout (large editor, small side panels)
     fn render_editor_focus(&mut self, ui: &mut egui::Ui) {
+        let mut dsl_action = DslEditorAction::None;
+
         ui.horizontal(|ui| {
             // Editor (70% width)
             ui.vertical(|ui| {
                 ui.set_width(ui.available_width() * 0.7);
-                dsl_editor_panel(ui, &mut self.state);
+                dsl_action = dsl_editor_panel(ui, &mut self.state);
             });
 
             ui.separator();
@@ -360,10 +382,15 @@ impl App {
                 });
             });
         });
+
+        // Handle action after render
+        self.handle_dsl_editor_action(dsl_action);
     }
 
     /// Render graph-focused layout (large graph, small side panels)
     fn render_graph_focus(&mut self, ui: &mut egui::Ui) {
+        let mut dsl_action = DslEditorAction::None;
+
         ui.horizontal(|ui| {
             // Graph (70% width)
             ui.vertical(|ui| {
@@ -381,10 +408,13 @@ impl App {
                 });
                 ui.separator();
                 egui::Frame::default().inner_margin(8.0).show(ui, |ui| {
-                    dsl_editor_panel(ui, &mut self.state);
+                    dsl_action = dsl_editor_panel(ui, &mut self.state);
                 });
             });
         });
+
+        // Handle action after render
+        self.handle_dsl_editor_action(dsl_action);
     }
 }
 
@@ -713,6 +743,13 @@ impl AppState {
                 ctx.request_repaint();
             }
         });
+    }
+
+    /// Clear DSL editor
+    pub fn clear_dsl(&mut self) {
+        self.buffers.dsl_editor.clear();
+        self.buffers.dsl_dirty = false;
+        self.validation_result = None;
     }
 
     /// Validate DSL

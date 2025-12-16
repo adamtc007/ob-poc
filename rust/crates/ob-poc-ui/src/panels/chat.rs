@@ -7,14 +7,27 @@ use crate::state::{AppState, ChatMessage, MessageRole};
 use egui::{Color32, RichText, ScrollArea, TextEdit, Ui};
 
 pub fn chat_panel(ui: &mut Ui, state: &mut AppState) {
+    // Rule 3: Single lock, extract all needed data, then render
+    let (loading_chat, should_focus) = {
+        let mut guard = match state.async_state.lock() {
+            Ok(g) => g,
+            Err(_) => return, // Poisoned lock, skip rendering
+        };
+        let loading = guard.loading_chat;
+        let focus = !guard.loading_chat && guard.chat_just_finished;
+        if focus {
+            guard.chat_just_finished = false;
+        }
+        (loading, focus)
+    };
+    // Lock released here
+
     ui.vertical(|ui| {
         // Header
         ui.horizontal(|ui| {
             ui.heading("Agent Chat");
-            if let Ok(async_state) = state.async_state.lock() {
-                if async_state.loading_chat {
-                    ui.spinner();
-                }
+            if loading_chat {
+                ui.spinner();
             }
         });
 
@@ -43,17 +56,9 @@ pub fn chat_panel(ui: &mut Ui, state: &mut AppState) {
         // Input area
         let chat_input_id = egui::Id::new("chat_input");
 
-        // Request focus on chat input after agent responds (loading just finished)
-        let should_focus = state
-            .async_state
-            .lock()
-            .map(|s| !s.loading_chat && s.chat_just_finished)
-            .unwrap_or(false);
+        // Request focus on chat input after agent responds
         if should_focus {
             ui.memory_mut(|mem| mem.request_focus(chat_input_id));
-            if let Ok(mut s) = state.async_state.lock() {
-                s.chat_just_finished = false;
-            }
         }
 
         ui.horizontal(|ui| {
@@ -67,12 +72,7 @@ pub fn chat_panel(ui: &mut Ui, state: &mut AppState) {
             let send_shortcut =
                 response.response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
 
-            let can_send = !state.buffers.chat_input.trim().is_empty()
-                && state
-                    .async_state
-                    .lock()
-                    .map(|s| !s.loading_chat)
-                    .unwrap_or(true);
+            let can_send = !state.buffers.chat_input.trim().is_empty() && !loading_chat;
 
             // Add button with hover text showing session state for debugging
             let button = ui

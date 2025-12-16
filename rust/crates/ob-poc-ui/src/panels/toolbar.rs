@@ -17,6 +17,8 @@ pub struct ToolbarAction {
     pub select_cbu: Option<(Uuid, String)>,
     /// User changed view mode
     pub change_view_mode: Option<ViewMode>,
+    /// User changed layout mode
+    pub change_layout: Option<LayoutMode>,
     /// User dismissed error
     pub dismiss_error: bool,
 }
@@ -85,19 +87,19 @@ pub fn toolbar(ui: &mut Ui, state: &mut AppState) -> ToolbarAction {
             .selectable_label(state.panels.layout == LayoutMode::FourPanel, "4-Panel")
             .clicked()
         {
-            state.panels.layout = LayoutMode::FourPanel;
+            action.change_layout = Some(LayoutMode::FourPanel);
         }
         if ui
             .selectable_label(state.panels.layout == LayoutMode::EditorFocus, "Editor")
             .clicked()
         {
-            state.panels.layout = LayoutMode::EditorFocus;
+            action.change_layout = Some(LayoutMode::EditorFocus);
         }
         if ui
             .selectable_label(state.panels.layout == LayoutMode::GraphFocus, "Graph")
             .clicked()
         {
-            state.panels.layout = LayoutMode::GraphFocus;
+            action.change_layout = Some(LayoutMode::GraphFocus);
         }
 
         // Spacer - push remaining items to the right

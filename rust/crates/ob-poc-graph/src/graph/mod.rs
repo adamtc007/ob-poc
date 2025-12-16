@@ -405,27 +405,23 @@ impl CbuGraphWidget {
         self.render_chrome(&painter, graph, screen_rect);
 
         // Render focus card if a node is focused
-        let mut should_clear_focus = false;
-        let mut navigate_to: Option<String> = None;
-
+        // Rule 2: Handle returned action AFTER rendering, not via callbacks
         if let Some(ref focus_id) = self.input_state.focused_node {
             if let Some(node) = graph.get_node(focus_id) {
                 let card_data = focus_card::build_focus_card_data(node, graph);
-                focus_card::render_focus_card(
-                    ui.ctx(),
-                    &card_data,
-                    &mut || should_clear_focus = true,
-                    &mut |entity_id| navigate_to = Some(entity_id.to_string()),
-                );
-            }
-        }
+                let action = focus_card::render_focus_card(ui.ctx(), &card_data);
 
-        // Handle focus card actions after rendering
-        if should_clear_focus {
-            self.input_state.clear_focus();
-        }
-        if let Some(entity_id) = navigate_to {
-            self.focus_node(&entity_id);
+                // Handle action AFTER rendering completes (Rule 2)
+                match action {
+                    focus_card::FocusCardAction::Close => {
+                        self.input_state.clear_focus();
+                    }
+                    focus_card::FocusCardAction::Navigate(entity_id) => {
+                        self.focus_node(&entity_id);
+                    }
+                    focus_card::FocusCardAction::None => {}
+                }
+            }
         }
 
         // Request repaint if animating or needs update

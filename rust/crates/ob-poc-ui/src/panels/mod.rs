@@ -14,7 +14,7 @@ mod toolbar;
 
 pub use ast::ast_panel;
 pub use chat::chat_panel;
-pub use dsl_editor::dsl_editor_panel;
+pub use dsl_editor::{dsl_editor_panel, DslEditorAction};
 pub use entity_detail::entity_detail_panel;
 pub use repl::repl_panel;
 pub use results::results_panel;

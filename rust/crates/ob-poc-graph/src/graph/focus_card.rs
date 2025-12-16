@@ -1,6 +1,11 @@
 //! Focus card panel - shows entity details when focused
 //!
 //! Displays a floating panel with entity information when a node is clicked.
+//!
+//! # Pattern: Return values, not callbacks (EGUI-RULES Rule 2)
+//!
+//! Instead of taking callback closures, `render_focus_card` returns a
+//! `FocusCardAction` that the caller handles after rendering.
 
 #![allow(dead_code)]
 
@@ -8,6 +13,22 @@ use egui::{Align2, Color32, RichText, Ui, Vec2};
 
 use super::colors::{kyc_status_color, risk_color, role_color, KycStatus, RiskRating};
 use super::types::{EntityType, LayoutGraph, LayoutNode, PrimaryRole};
+
+// =============================================================================
+// FOCUS CARD ACTION (Rule 2: Return values, not callbacks)
+// =============================================================================
+
+/// Action returned from focus card rendering
+#[derive(Debug, Clone, Default)]
+pub enum FocusCardAction {
+    /// No action taken
+    #[default]
+    None,
+    /// User clicked close button
+    Close,
+    /// User clicked to navigate to another entity
+    Navigate(String),
+}
 
 // =============================================================================
 // FOCUS CARD DATA
@@ -95,16 +116,16 @@ pub fn build_focus_card_data(node: &LayoutNode, graph: &LayoutGraph) -> FocusCar
 }
 
 // =============================================================================
-// RENDER FOCUS CARD
+// RENDER FOCUS CARD (Rule 2: Returns action, no callbacks)
 // =============================================================================
 
 /// Render the focus card as an egui::Window
-pub fn render_focus_card(
-    ctx: &egui::Context,
-    data: &FocusCardData,
-    on_close: &mut dyn FnMut(),
-    on_navigate: &mut dyn FnMut(&str),
-) {
+///
+/// Returns a `FocusCardAction` indicating what the user did.
+/// The caller handles the action AFTER rendering completes.
+pub fn render_focus_card(ctx: &egui::Context, data: &FocusCardData) -> FocusCardAction {
+    let mut action = FocusCardAction::None;
+
     egui::Window::new("Entity Details")
         .id(egui::Id::new("focus_card"))
         .default_size([280.0, 350.0])
@@ -112,17 +133,17 @@ pub fn render_focus_card(
         .collapsible(true)
         .resizable(true)
         .show(ctx, |ui| {
-            render_focus_card_content(ui, data, on_close, on_navigate);
+            action = render_focus_card_content(ui, data);
         });
+
+    action
 }
 
 /// Render the content of the focus card
-fn render_focus_card_content(
-    ui: &mut Ui,
-    data: &FocusCardData,
-    on_close: &mut dyn FnMut(),
-    on_navigate: &mut dyn FnMut(&str),
-) {
+/// Returns action if user clicked something actionable
+fn render_focus_card_content(ui: &mut Ui, data: &FocusCardData) -> FocusCardAction {
+    let mut action = FocusCardAction::None;
+
     // Header
     ui.horizontal(|ui| {
         ui.heading(&data.name);
@@ -196,7 +217,7 @@ fn render_focus_card_content(
                         for conn in &data.connected_entities {
                             ui.horizontal(|ui| {
                                 if ui.link(&conn.name).clicked() {
-                                    on_navigate(&conn.entity_id);
+                                    action = FocusCardAction::Navigate(conn.entity_id.clone());
                                 }
                             });
                             ui.label(
@@ -217,10 +238,12 @@ fn render_focus_card_content(
     // Actions
     ui.horizontal(|ui| {
         if ui.button("Close").clicked() {
-            on_close();
+            action = FocusCardAction::Close;
         }
         // Future: Add more actions like "View Full Details", "Edit", etc.
     });
+
+    action
 }
 
 // =============================================================================

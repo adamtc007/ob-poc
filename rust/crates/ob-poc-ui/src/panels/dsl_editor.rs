@@ -2,11 +2,34 @@
 //!
 //! Text editor for DSL with syntax highlighting, validation, and execution.
 //! The DSL text is stored in state.buffers.dsl_editor (the ONLY local mutable state).
+//!
+//! # Pattern: Return values, not callbacks (EGUI-RULES Rule 2)
+//!
+//! Returns `DslEditorAction` for the caller to handle after rendering.
 
 use crate::state::AppState;
 use egui::{Color32, RichText, ScrollArea, TextEdit, Ui};
 
-pub fn dsl_editor_panel(ui: &mut Ui, state: &mut AppState) {
+// =============================================================================
+// DSL EDITOR ACTION (Rule 2: Return values, not callbacks)
+// =============================================================================
+
+/// Action returned from DSL editor panel
+#[derive(Debug, Clone, Default)]
+pub enum DslEditorAction {
+    /// No action taken
+    #[default]
+    None,
+    /// User clicked Clear button
+    Clear,
+    /// User clicked Validate button
+    Validate,
+    /// User clicked Execute button
+    Execute,
+}
+
+pub fn dsl_editor_panel(ui: &mut Ui, state: &mut AppState) -> DslEditorAction {
+    let mut action = DslEditorAction::None;
     ui.vertical(|ui| {
         // Header with actions
         ui.horizontal(|ui| {
@@ -24,23 +47,22 @@ pub fn dsl_editor_panel(ui: &mut Ui, state: &mut AppState) {
                     .map(|s| s.executing)
                     .unwrap_or(false);
 
+                // Rule 2: Return action instead of mutating state directly
                 if ui
                     .add_enabled(!executing, egui::Button::new("Execute"))
                     .clicked()
                 {
-                    state.execute_dsl();
+                    action = DslEditorAction::Execute;
                 }
 
                 // Validate button
                 if ui.button("Validate").clicked() {
-                    state.validate_dsl();
+                    action = DslEditorAction::Validate;
                 }
 
                 // Clear button
                 if ui.button("Clear").clicked() {
-                    state.buffers.dsl_editor.clear();
-                    state.buffers.dsl_dirty = true;
-                    state.validation_result = None;
+                    action = DslEditorAction::Clear;
                 }
             });
         });
@@ -109,4 +131,6 @@ pub fn dsl_editor_panel(ui: &mut Ui, state: &mut AppState) {
             }
         });
     });
+
+    action
 }

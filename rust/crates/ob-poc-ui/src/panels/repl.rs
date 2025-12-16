@@ -321,6 +321,13 @@ fn render_unresolved_ref(ui: &mut Ui, state: &mut AppState, unresolved: &Unresol
 }
 
 fn render_match_selection(ui: &mut Ui, state: &mut AppState, unresolved: &UnresolvedRefResponse) {
+    // Rule 3: Extract async state before rendering
+    let searching_resolution = state
+        .async_state
+        .lock()
+        .map(|s| s.searching_resolution)
+        .unwrap_or(false);
+
     // Search input
     ui.horizontal(|ui| {
         ui.label("Search:");
@@ -334,10 +341,8 @@ fn render_match_selection(ui: &mut Ui, state: &mut AppState, unresolved: &Unreso
             state.search_resolution(&unresolved.ref_id);
         }
 
-        if let Ok(async_state) = state.async_state.lock() {
-            if async_state.searching_resolution {
-                ui.spinner();
-            }
+        if searching_resolution {
+            ui.spinner();
         }
     });
 
@@ -529,17 +534,24 @@ fn render_dsl_section(ui: &mut Ui, state: &mut AppState) {
 fn render_input_area(ui: &mut Ui, state: &mut AppState) {
     let chat_input_id = egui::Id::new("repl_chat_input");
 
-    // Request focus after agent responds
-    let should_focus = state
-        .async_state
-        .lock()
-        .map(|s| !s.loading_chat && s.chat_just_finished)
-        .unwrap_or(false);
+    // Rule 3: Single lock, extract all needed data, then render
+    let (should_focus, is_loading) = {
+        let mut guard = match state.async_state.lock() {
+            Ok(g) => g,
+            Err(_) => return, // Poisoned lock, skip rendering
+        };
+        let focus = !guard.loading_chat && guard.chat_just_finished;
+        let loading = guard.loading_chat || guard.executing;
+        if focus {
+            guard.chat_just_finished = false;
+        }
+        (focus, loading)
+    };
+    // Lock released here
+
+    // Now render using extracted data
     if should_focus {
         ui.memory_mut(|mem| mem.request_focus(chat_input_id));
-        if let Ok(mut s) = state.async_state.lock() {
-            s.chat_just_finished = false;
-        }
     }
 
     ui.horizontal(|ui| {
@@ -552,12 +564,6 @@ fn render_input_area(ui: &mut Ui, state: &mut AppState) {
 
         let enter_pressed =
             response.response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
-
-        let is_loading = state
-            .async_state
-            .lock()
-            .map(|s| s.loading_chat || s.executing)
-            .unwrap_or(false);
 
         let can_send = !state.buffers.chat_input.trim().is_empty() && !is_loading;
         let can_execute = state
