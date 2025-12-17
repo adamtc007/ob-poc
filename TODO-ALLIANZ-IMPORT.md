@@ -1,5 +1,19 @@
 # TODO: Allianz Fund Data Import
 
+## ⚠️ SEE ALSO
+
+**For Agent Template Batch Execution:** See `TODO-ALLIANZ-BATCH-IMPORT.md`
+
+That TODO covers:
+- Gap remediation for template/batch system
+- Entity seeding from scraped data
+- Batch execution test harness
+- Full integration testing
+
+**This file** covers the scraping side - getting the data from Allianz websites.
+
+---
+
 ## Current State
 
 **Data Already Scraped** (as of 2025-12-16):

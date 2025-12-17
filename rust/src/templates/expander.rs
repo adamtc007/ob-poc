@@ -251,6 +251,10 @@ impl TemplateExpander {
             }
         }
 
+        // Final pass: substitute any remaining dotted property access patterns
+        // like $fund_entity.name that were passed as explicit params
+        dsl = Self::substitute_all_params(&dsl, explicit_params);
+
         let outputs = template.outputs.keys().cloned().collect();
 
         ExpansionResult {
@@ -263,6 +267,8 @@ impl TemplateExpander {
     }
 
     /// Substitute a parameter in the DSL text
+    ///
+    /// Handles both simple params ($param) and dotted property access ($param.property)
     fn substitute_param(dsl: &str, name: &str, value: &str) -> String {
         let mut result = dsl.to_string();
 
@@ -270,7 +276,82 @@ impl TemplateExpander {
         result = result.replace(&format!("\"${}\"", name), &format!("\"{}\"", value));
 
         // Handle $param (unquoted - for enum values, numbers, etc.)
-        result = result.replace(&format!("${}", name), value);
+        // Use word boundary check to avoid partial matches
+        // e.g., don't replace $fund when we have $fund_entity
+        let pattern = format!("${}", name);
+        let mut new_result = String::new();
+        let mut last_end = 0;
+
+        for (start, _) in result.match_indices(&pattern) {
+            // Check if this is a complete token (not followed by alphanumeric or underscore)
+            let after_pattern = start + pattern.len();
+            let next_char = result[after_pattern..].chars().next();
+
+            // If followed by a dot, this is a property access - skip
+            // If followed by alphanumeric/underscore, this is a different variable - skip
+            let is_property_access = next_char == Some('.');
+            let is_longer_name = next_char
+                .map(|c| c.is_alphanumeric() || c == '_')
+                .unwrap_or(false);
+
+            if !is_property_access && !is_longer_name {
+                new_result.push_str(&result[last_end..start]);
+                new_result.push_str(value);
+                last_end = after_pattern;
+            }
+        }
+        new_result.push_str(&result[last_end..]);
+
+        if !new_result.is_empty() {
+            result = new_result;
+        }
+
+        result
+    }
+
+    /// Substitute all parameters including dotted property access
+    ///
+    /// Call this after processing individual params to handle $param.property patterns
+    fn substitute_all_params(dsl: &str, explicit_params: &HashMap<String, String>) -> String {
+        let mut result = dsl.to_string();
+
+        // Sort by key length descending to substitute longer keys first
+        // This prevents $fund from matching in $fund_entity.name
+        let mut sorted_keys: Vec<_> = explicit_params.keys().collect();
+        sorted_keys.sort_by(|a, b| b.len().cmp(&a.len()));
+
+        for key in sorted_keys {
+            if let Some(value) = explicit_params.get(key) {
+                // Handle "$key" (quoted)
+                result = result.replace(&format!("\"${}\"", key), &format!("\"{}\"", value));
+
+                // Handle $key (unquoted) - but only if not followed by more identifier chars
+                let pattern = format!("${}", key);
+                let mut new_result = String::new();
+                let mut last_end = 0;
+
+                for (start, _) in result.match_indices(&pattern) {
+                    let after_pattern = start + pattern.len();
+                    let next_char = result[after_pattern..].chars().next();
+
+                    // Only substitute if this is the complete token
+                    let is_longer = next_char
+                        .map(|c| c.is_alphanumeric() || c == '_' || c == '.')
+                        .unwrap_or(false);
+
+                    if !is_longer {
+                        new_result.push_str(&result[last_end..start]);
+                        new_result.push_str(value);
+                        last_end = after_pattern;
+                    }
+                }
+                new_result.push_str(&result[last_end..]);
+
+                if !new_result.is_empty() {
+                    result = new_result;
+                }
+            }
+        }
 
         result
     }

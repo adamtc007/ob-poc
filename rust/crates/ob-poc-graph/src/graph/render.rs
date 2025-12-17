@@ -6,12 +6,13 @@
 use super::camera::Camera2D;
 use super::colors::edge_color;
 use super::edges::{
-    curve_strength_for_edge, render_arrow_head, render_bezier_edge, render_edge_label,
-    should_show_edge_label, EdgeCurve,
+    curve_strength_for_edge, parallel_edge_offset, render_arrow_head, render_bezier_edge,
+    render_edge_label, should_show_edge_label, EdgeCurve,
 };
 use super::lod::{render_node_at_lod, DetailLevel};
 use super::types::*;
 use egui::{Color32, FontId, Pos2, Rect, Stroke, Vec2};
+use std::collections::HashMap;
 
 // =============================================================================
 // RENDER CONSTANTS
@@ -56,10 +57,24 @@ impl GraphRenderer {
         screen_rect: Rect,
         focused_node: Option<&str>,
     ) {
+        // Build parallel edge index: for each (source, target) pair, track edge indices
+        // This allows us to offset edges that share the same endpoints
+        let parallel_info = self.compute_parallel_edge_info(&graph.edges);
+
         // Render edges first (below nodes)
-        for edge in &graph.edges {
+        for (i, edge) in graph.edges.iter().enumerate() {
             let in_focus = self.is_edge_in_focus(edge, focused_node, graph);
-            self.render_edge(painter, edge, graph, camera, screen_rect, in_focus);
+            let (edge_index, total_parallel) = parallel_info.get(&i).copied().unwrap_or((0, 1));
+            self.render_edge_with_offset(
+                painter,
+                edge,
+                graph,
+                camera,
+                screen_rect,
+                in_focus,
+                edge_index,
+                total_parallel,
+            );
         }
 
         // Render nodes
@@ -141,8 +156,38 @@ impl GraphRenderer {
         );
     }
 
-    /// Render a single edge
-    fn render_edge(
+    /// Compute parallel edge info: maps edge index to (index_among_parallels, total_parallels)
+    ///
+    /// When multiple edges connect the same source/target pair, they need different
+    /// curve offsets to be visually distinguishable.
+    fn compute_parallel_edge_info(&self, edges: &[LayoutEdge]) -> HashMap<usize, (usize, usize)> {
+        // Group edges by (source, target) pair - order matters, so we normalize
+        let mut edge_groups: HashMap<(String, String), Vec<usize>> = HashMap::new();
+
+        for (i, edge) in edges.iter().enumerate() {
+            // Use ordered pair so A->B and B->A are treated as same pair
+            let key = if edge.source_id <= edge.target_id {
+                (edge.source_id.clone(), edge.target_id.clone())
+            } else {
+                (edge.target_id.clone(), edge.source_id.clone())
+            };
+            edge_groups.entry(key).or_default().push(i);
+        }
+
+        // Build result map: edge_index -> (index_in_group, group_size)
+        let mut result = HashMap::new();
+        for (_key, indices) in edge_groups {
+            let total = indices.len();
+            for (group_idx, edge_idx) in indices.into_iter().enumerate() {
+                result.insert(edge_idx, (group_idx, total));
+            }
+        }
+
+        result
+    }
+
+    /// Render a single edge with offset for parallel edges
+    fn render_edge_with_offset(
         &self,
         painter: &egui::Painter,
         edge: &LayoutEdge,
@@ -150,6 +195,8 @@ impl GraphRenderer {
         camera: &Camera2D,
         screen_rect: Rect,
         in_focus: bool,
+        edge_index: usize,
+        total_parallel: usize,
     ) {
         let Some(source_node) = graph.get_node(&edge.source_id) else {
             return;
@@ -173,8 +220,9 @@ impl GraphRenderer {
         let width = edge.style.width * camera.zoom;
 
         if self.use_bezier_edges {
-            // Use bezier curves
-            let curve_strength = curve_strength_for_edge(edge.edge_type, None);
+            // Use bezier curves with offset for parallel edges
+            let base_strength = curve_strength_for_edge(edge.edge_type, None);
+            let curve_strength = parallel_edge_offset(edge_index, total_parallel, base_strength);
             let curve = EdgeCurve::new(source_bottom, target_top, curve_strength);
 
             // Render curve

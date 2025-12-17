@@ -179,14 +179,16 @@ impl CbuGraphBuilder {
                 });
             }
 
-            // Add edge with primary role as label
-            graph.add_edge(GraphEdge {
-                id: format!("{}->{}", self.cbu_id, entity_id),
-                source: self.cbu_id.to_string(),
-                target: entity_id,
-                edge_type: EdgeType::HasRole,
-                label: ent.primary_role,
-            });
+            // Add one edge per role (entity may have multiple roles)
+            for role in &ent.roles {
+                graph.add_edge(GraphEdge {
+                    id: format!("{}->{}:{}", self.cbu_id, entity_id, role),
+                    source: self.cbu_id.to_string(),
+                    target: entity_id.clone(),
+                    edge_type: EdgeType::HasRole,
+                    label: Some(role.clone()),
+                });
+            }
         }
 
         Ok(())

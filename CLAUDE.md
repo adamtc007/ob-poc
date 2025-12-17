@@ -1426,6 +1426,113 @@ cargo x ci                  # Full pipeline: fmt, clippy, test, build
 | `dsl-tests` | Run DSL test scenarios via `tests/scenarios/run_tests.sh` |
 | `ci` | Full CI pipeline: format check, clippy, tests, build |
 | `pre-commit` | Fast pre-commit hook: format, clippy, unit tests |
+| `batch-import` | Import Allianz funds as CBUs using template pipeline |
+| `batch-clean` | Delete Allianz CBUs via cascade delete DSL verb |
+
+## Allianz Batch Import Test Case
+
+This is a **real-world production test** of the full DSL template → execution pipeline using 177 Luxembourg-domiciled Allianz funds.
+
+### Overview
+
+The test validates the complete onboarding pipeline:
+1. **Template expansion** - `onboard-fund-cbu.yaml` template with shared + batch params
+2. **DSL generation** - Template → DSL source text with parameter substitution
+3. **DSL execution** - Parse → Compile → Execute via GenericCrudExecutor
+4. **Role assignment** - Each CBU gets 3 roles: ASSET_OWNER, MANAGEMENT_COMPANY, INVESTMENT_MANAGER
+5. **Cascade delete** - Full cleanup via `cbu.delete-cascade` plugin handler
+
+### Data Source
+
+Scraped from Allianz Global Investors Luxembourg fund registry:
+- **Source file**: `scrapers/allianz/output/allianz-lu-2025-12-17.json`
+- **Seed SQL**: `data/allianzgi_seed/seed.sql`
+- **Entity count**: 178 entities (177 funds + 1 ManCo)
+
+### Commands
+
+```bash
+cd rust/
+
+# Full import cycle (177 funds → 177 CBUs with roles)
+cargo x batch-import
+
+# Limited test run
+cargo x batch-import --limit 5
+
+# Dry run - show DSL without executing
+cargo x batch-import --dry-run --verbose
+
+# Clean all Allianz CBUs
+cargo x batch-clean
+
+# Clean with limit
+cargo x batch-clean --limit 10
+
+# Dry run cleanup
+cargo x batch-clean --dry-run
+```
+
+### Performance Results
+
+| Operation | Count | Time | Rate |
+|-----------|-------|------|------|
+| Full import | 177 CBUs | 1.64s | 108 CBUs/sec |
+| Full cleanup | 177 CBUs | ~3s | ~60 CBUs/sec |
+
+### What Gets Created
+
+For each Allianz fund entity, the template creates:
+
+```clojure
+;; 1. CBU with fund name and jurisdiction
+(cbu.ensure :name "$fund_entity.name" :jurisdiction "LU" :client-type "fund" :as @cbu)
+
+;; 2. ASSET_OWNER role (fund owns itself)
+(cbu.assign-role :cbu-id @cbu :entity-id "$fund_entity" :role "ASSET_OWNER")
+
+;; 3. MANAGEMENT_COMPANY role (shared ManCo)
+(cbu.assign-role :cbu-id @cbu :entity-id "$manco_entity" :role "MANAGEMENT_COMPANY")
+
+;; 4. INVESTMENT_MANAGER role (shared IM)
+(cbu.assign-role :cbu-id @cbu :entity-id "$im_entity" :role "INVESTMENT_MANAGER")
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/src/bin/batch_test_harness.rs` | CLI for batch template execution |
+| `rust/config/verbs/templates/fund/onboard-fund-cbu.yaml` | Template definition |
+| `rust/src/templates/expander.rs` | Template param substitution (including `$param.property`) |
+| `rust/src/dsl_v2/custom_ops/cbu_ops.rs` | `cbu.delete-cascade` handler |
+| `data/allianzgi_seed/seed.sql` | Entity seed data |
+
+### Verification Queries
+
+After import:
+```sql
+-- Count CBUs created
+SELECT COUNT(*) FROM "ob-poc".cbus WHERE name ILIKE 'Allianz%';
+-- Expected: 177
+
+-- Check role distribution
+SELECT r.name, COUNT(*) 
+FROM "ob-poc".cbu_entity_roles cer
+JOIN "ob-poc".roles r ON cer.role_id = r.role_id
+JOIN "ob-poc".cbus c ON cer.cbu_id = c.cbu_id
+WHERE c.name ILIKE 'Allianz%'
+GROUP BY r.name;
+-- Expected: ASSET_OWNER=177, MANAGEMENT_COMPANY=177, INVESTMENT_MANAGER=177
+```
+
+### Why This Test Matters
+
+1. **Real data scale** - 177 entities is realistic for a fund manager's book
+2. **Template pipeline validation** - Proves template → DSL → execution works end-to-end
+3. **No direct DB access** - All operations go through DSL verbs (YAML-driven)
+4. **Repeatable** - Clean + reimport cycle validates idempotency
+5. **Performance baseline** - ~100 CBUs/sec is the benchmark for batch operations
 
 ### Manual Commands (Legacy)
 
@@ -1733,6 +1840,36 @@ curl -X POST http://localhost:3000/api/agent/generate-with-tools \
 Claude will:
 1. Call `lookup_cbu` with "Apex Capital" to verify it exists
 2. Generate DSL using the confirmed CBU name
+
+### Batch Operations Endpoint
+
+The `/api/batch/add-products` endpoint provides server-side DSL generation for bulk operations. This is the "flexible macro" pattern - agent issues high-level commands, server handles deterministic DSL generation.
+
+**When to use batch endpoints vs templates:**
+- **Templates:** Complex multi-step workflows with business logic, needs human review
+- **Batch endpoints:** Deterministic, repetitive operations (single verb × N items)
+
+**Example:**
+```bash
+curl -X POST http://localhost:3000/api/batch/add-products \
+  -H "Content-Type: application/json" \
+  -d '{"cbu_ids": ["uuid1", "uuid2", ...], "products": ["CUSTODY", "FUND_ACCOUNTING"]}'
+```
+
+**Response:**
+```json
+{
+  "total_operations": 354,
+  "success_count": 354,
+  "failure_count": 0,
+  "duration_ms": 638,
+  "results": [{"cbu_id": "...", "product": "CUSTODY", "success": true, "services_added": 19}, ...]
+}
+```
+
+**Performance:** 354 operations in ~640ms (vs ~15 minutes with sequential LLM calls).
+
+The server generates DSL like `(cbu.add-product :cbu-id "uuid" :product "CODE")` for each combination, executes via the standard DSL pipeline, and returns aggregated results.
 
 ### Session Management Architecture
 

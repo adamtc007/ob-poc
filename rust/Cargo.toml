@@ -105,6 +105,11 @@ name = "dsl_api"
 path = "src/bin/dsl_api.rs"
 required-features = ["server"]
 
+[[bin]]
+name = "batch_test_harness"
+path = "src/bin/batch_test_harness.rs"
+required-features = ["database", "cli"]
+
 # Features for conditional compilation
 [features]
 default = ["server"]  # Enable for sqlx prepare; use --no-default-features to disable

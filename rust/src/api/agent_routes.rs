@@ -64,6 +64,41 @@ pub struct GenerateDslResponse {
     pub error: Option<String>,
 }
 
+// ============================================================================
+// Batch Operations Request/Response Types
+// ============================================================================
+
+/// Request to add products to multiple CBUs (server-side DSL generation)
+#[derive(Debug, Deserialize)]
+pub struct BatchAddProductsRequest {
+    /// CBU IDs to add products to
+    pub cbu_ids: Vec<Uuid>,
+    /// Product codes to add (e.g., ["CUSTODY", "FUND_ACCOUNTING"])
+    pub products: Vec<String>,
+}
+
+/// Result of adding a product to a single CBU
+#[derive(Debug, Serialize)]
+pub struct BatchProductResult {
+    pub cbu_id: Uuid,
+    pub product: String,
+    pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub services_added: Option<i32>,
+}
+
+/// Response from batch add products
+#[derive(Debug, Serialize)]
+pub struct BatchAddProductsResponse {
+    pub total_operations: usize,
+    pub success_count: usize,
+    pub failure_count: usize,
+    pub duration_ms: u64,
+    pub results: Vec<BatchProductResult>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ValidationResult {
     pub valid: bool,
@@ -335,6 +370,8 @@ pub fn create_agent_router_with_sessions(pool: PgPool, sessions: SessionStore) -
         )
         // Direct DSL execution (no session required)
         .route("/execute", post(direct_execute_dsl))
+        // Batch operations (server-side DSL generation, no LLM)
+        .route("/api/batch/add-products", post(batch_add_products))
         .with_state(state)
 }
 
@@ -3565,6 +3602,113 @@ async fn direct_execute_dsl(
             })
         }
     }
+}
+
+// ============================================================================
+// Batch Operations Handlers
+// ============================================================================
+
+/// POST /api/batch/add-products - Add products to multiple CBUs
+/// Server-side DSL generation and execution (no LLM needed)
+async fn batch_add_products(
+    State(state): State<AgentState>,
+    Json(req): Json<BatchAddProductsRequest>,
+) -> Json<BatchAddProductsResponse> {
+    use std::time::Instant;
+
+    let start = Instant::now();
+    let mut results = Vec::new();
+    let mut success_count = 0;
+    let mut failure_count = 0;
+
+    let executor = DslExecutor::new(state.pool.clone());
+
+    // Process each CBU × product combination
+    for cbu_id in &req.cbu_ids {
+        for product in &req.products {
+            // Generate DSL server-side (deterministic, no LLM)
+            let dsl = format!(
+                r#"(cbu.add-product :cbu-id "{}" :product "{}")"#,
+                cbu_id, product
+            );
+
+            // Parse and execute
+            match parse_program(&dsl) {
+                Ok(program) => {
+                    let plan = match compile(&program) {
+                        Ok(p) => p,
+                        Err(e) => {
+                            failure_count += 1;
+                            results.push(BatchProductResult {
+                                cbu_id: *cbu_id,
+                                product: product.clone(),
+                                success: false,
+                                error: Some(format!("Compile error: {}", e)),
+                                services_added: None,
+                            });
+                            continue;
+                        }
+                    };
+
+                    let mut ctx = ExecutionContext::new();
+                    match executor.execute_plan(&plan, &mut ctx).await {
+                        Ok(exec_results) => {
+                            // Count services added from the result
+                            let services_added = exec_results
+                                .iter()
+                                .filter_map(|r| {
+                                    if let DslV2Result::Affected(n) = r {
+                                        Some(*n as i32)
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .sum();
+
+                            success_count += 1;
+                            results.push(BatchProductResult {
+                                cbu_id: *cbu_id,
+                                product: product.clone(),
+                                success: true,
+                                error: None,
+                                services_added: Some(services_added),
+                            });
+                        }
+                        Err(e) => {
+                            failure_count += 1;
+                            results.push(BatchProductResult {
+                                cbu_id: *cbu_id,
+                                product: product.clone(),
+                                success: false,
+                                error: Some(format!("Execution error: {}", e)),
+                                services_added: None,
+                            });
+                        }
+                    }
+                }
+                Err(e) => {
+                    failure_count += 1;
+                    results.push(BatchProductResult {
+                        cbu_id: *cbu_id,
+                        product: product.clone(),
+                        success: false,
+                        error: Some(format!("Parse error: {:?}", e)),
+                        services_added: None,
+                    });
+                }
+            }
+        }
+    }
+
+    let duration_ms = start.elapsed().as_millis() as u64;
+
+    Json(BatchAddProductsResponse {
+        total_operations: results.len(),
+        success_count,
+        failure_count,
+        duration_ms,
+        results,
+    })
 }
 
 #[cfg(test)]

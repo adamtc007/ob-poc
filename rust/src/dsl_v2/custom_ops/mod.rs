@@ -117,6 +117,7 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(CbuAddProductOp));
         registry.register(Arc::new(CbuShowOp));
         registry.register(Arc::new(CbuDecideOp));
+        registry.register(Arc::new(CbuDeleteCascadeOp));
 
         // NOTE: delivery.record, delivery.complete, delivery.fail are now CRUD verbs
         // defined in config/verbs/delivery.yaml - no plugin needed
@@ -3238,6 +3239,608 @@ impl CustomOperation for DocumentExtractObservationsOp {
     }
 }
 
+// ============================================================================
+// CBU Delete Cascade Operation
+// ============================================================================
+
+/// Delete a CBU and all related data with cascade
+///
+/// Rationale: Requires ordered deletion across 25+ dependent tables in multiple
+/// schemas (ob-poc, kyc, custody). Also handles entity deletion with shared-entity
+/// check - entities linked to multiple CBUs are preserved.
+///
+/// WARNING: This is a destructive operation. Use with caution.
+pub struct CbuDeleteCascadeOp;
+
+#[async_trait]
+impl CustomOperation for CbuDeleteCascadeOp {
+    fn domain(&self) -> &'static str {
+        "cbu"
+    }
+    fn verb(&self) -> &'static str {
+        "delete-cascade"
+    }
+    fn rationale(&self) -> &'static str {
+        "Requires ordered deletion across 25+ tables with FK dependencies and shared-entity check"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use uuid::Uuid;
+
+        // Get CBU ID
+        let cbu_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "cbu-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else if let Some(uuid_val) = a.value.as_uuid() {
+                    Some(uuid_val)
+                } else if let Some(str_val) = a.value.as_string() {
+                    Uuid::parse_str(str_val).ok()
+                } else {
+                    None
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing or invalid cbu-id argument"))?;
+
+        // Get delete-entities flag (default true)
+        let delete_entities = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "delete-entities")
+            .and_then(|a| a.value.as_boolean())
+            .unwrap_or(true);
+
+        // Verify CBU exists
+        let cbu = sqlx::query!(
+            r#"SELECT name FROM "ob-poc".cbus WHERE cbu_id = $1"#,
+            cbu_id
+        )
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("CBU not found: {}", cbu_id))?;
+
+        let cbu_name = cbu.name;
+
+        // Track deletion counts
+        let mut deleted_counts: std::collections::HashMap<String, i64> =
+            std::collections::HashMap::new();
+
+        // Begin transaction
+        let mut tx = pool.begin().await?;
+
+        // =====================================================================
+        // Phase 1: Delete from kyc schema tables
+        // =====================================================================
+
+        // kyc.screenings (via workstreams via cases)
+        let result = sqlx::query(
+            r#"DELETE FROM kyc.screenings WHERE workstream_id IN (
+                SELECT workstream_id FROM kyc.entity_workstreams WHERE case_id IN (
+                    SELECT case_id FROM kyc.cases WHERE cbu_id = $1
+                )
+            )"#,
+        )
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await?;
+        deleted_counts.insert("kyc.screenings".to_string(), result.rows_affected() as i64);
+
+        // kyc.doc_requests (via workstreams)
+        let result = sqlx::query(
+            r#"DELETE FROM kyc.doc_requests WHERE workstream_id IN (
+                SELECT workstream_id FROM kyc.entity_workstreams WHERE case_id IN (
+                    SELECT case_id FROM kyc.cases WHERE cbu_id = $1
+                )
+            )"#,
+        )
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await?;
+        deleted_counts.insert(
+            "kyc.doc_requests".to_string(),
+            result.rows_affected() as i64,
+        );
+
+        // kyc.red_flags
+        let result = sqlx::query(
+            r#"DELETE FROM kyc.red_flags WHERE case_id IN (
+                SELECT case_id FROM kyc.cases WHERE cbu_id = $1
+            )"#,
+        )
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await?;
+        deleted_counts.insert("kyc.red_flags".to_string(), result.rows_affected() as i64);
+
+        // kyc.case_events
+        let result = sqlx::query(
+            r#"DELETE FROM kyc.case_events WHERE case_id IN (
+                SELECT case_id FROM kyc.cases WHERE cbu_id = $1
+            )"#,
+        )
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await?;
+        deleted_counts.insert("kyc.case_events".to_string(), result.rows_affected() as i64);
+
+        // kyc.entity_workstreams
+        let result = sqlx::query(
+            r#"DELETE FROM kyc.entity_workstreams WHERE case_id IN (
+                SELECT case_id FROM kyc.cases WHERE cbu_id = $1
+            )"#,
+        )
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await?;
+        deleted_counts.insert(
+            "kyc.entity_workstreams".to_string(),
+            result.rows_affected() as i64,
+        );
+
+        // kyc.cases
+        let result = sqlx::query(r#"DELETE FROM kyc.cases WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .execute(&mut *tx)
+            .await?;
+        deleted_counts.insert("kyc.cases".to_string(), result.rows_affected() as i64);
+
+        // kyc.share_classes
+        let result = sqlx::query(r#"DELETE FROM kyc.share_classes WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .execute(&mut *tx)
+            .await?;
+        deleted_counts.insert(
+            "kyc.share_classes".to_string(),
+            result.rows_affected() as i64,
+        );
+
+        // =====================================================================
+        // Phase 2: Delete from custody schema tables
+        // =====================================================================
+
+        // custody.ssi_booking_rules
+        let result = sqlx::query(r#"DELETE FROM custody.ssi_booking_rules WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .execute(&mut *tx)
+            .await?;
+        deleted_counts.insert(
+            "custody.ssi_booking_rules".to_string(),
+            result.rows_affected() as i64,
+        );
+
+        // custody.cbu_ssi_agent_override (via cbu_ssi)
+        let result = sqlx::query(
+            r#"DELETE FROM custody.cbu_ssi_agent_override WHERE ssi_id IN (
+                SELECT ssi_id FROM custody.cbu_ssi WHERE cbu_id = $1
+            )"#,
+        )
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await?;
+        deleted_counts.insert(
+            "custody.cbu_ssi_agent_override".to_string(),
+            result.rows_affected() as i64,
+        );
+
+        // custody.cbu_ssi
+        let result = sqlx::query(r#"DELETE FROM custody.cbu_ssi WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .execute(&mut *tx)
+            .await?;
+        deleted_counts.insert("custody.cbu_ssi".to_string(), result.rows_affected() as i64);
+
+        // custody.cbu_instrument_universe
+        let result =
+            sqlx::query(r#"DELETE FROM custody.cbu_instrument_universe WHERE cbu_id = $1"#)
+                .bind(cbu_id)
+                .execute(&mut *tx)
+                .await?;
+        deleted_counts.insert(
+            "custody.cbu_instrument_universe".to_string(),
+            result.rows_affected() as i64,
+        );
+
+        // custody.csa_agreements (via isda_agreements)
+        let result = sqlx::query(
+            r#"DELETE FROM custody.csa_agreements WHERE isda_id IN (
+                SELECT isda_id FROM custody.isda_agreements WHERE cbu_id = $1
+            )"#,
+        )
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await?;
+        deleted_counts.insert(
+            "custody.csa_agreements".to_string(),
+            result.rows_affected() as i64,
+        );
+
+        // custody.isda_product_coverage (via isda_agreements)
+        let result = sqlx::query(
+            r#"DELETE FROM custody.isda_product_coverage WHERE isda_id IN (
+                SELECT isda_id FROM custody.isda_agreements WHERE cbu_id = $1
+            )"#,
+        )
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await?;
+        deleted_counts.insert(
+            "custody.isda_product_coverage".to_string(),
+            result.rows_affected() as i64,
+        );
+
+        // custody.isda_agreements
+        let result = sqlx::query(r#"DELETE FROM custody.isda_agreements WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .execute(&mut *tx)
+            .await?;
+        deleted_counts.insert(
+            "custody.isda_agreements".to_string(),
+            result.rows_affected() as i64,
+        );
+
+        // =====================================================================
+        // Phase 3: Delete from ob-poc schema tables (CBU-dependent)
+        // =====================================================================
+
+        // resource_instance_attributes (via cbu_resource_instances)
+        let result = sqlx::query(
+            r#"DELETE FROM "ob-poc".resource_instance_attributes WHERE instance_id IN (
+                SELECT instance_id FROM "ob-poc".cbu_resource_instances WHERE cbu_id = $1
+            )"#,
+        )
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await?;
+        deleted_counts.insert(
+            "resource_instance_attributes".to_string(),
+            result.rows_affected() as i64,
+        );
+
+        // resource_instance_dependencies (via cbu_resource_instances)
+        let result = sqlx::query(
+            r#"DELETE FROM "ob-poc".resource_instance_dependencies WHERE instance_id IN (
+                SELECT instance_id FROM "ob-poc".cbu_resource_instances WHERE cbu_id = $1
+            ) OR depends_on_instance_id IN (
+                SELECT instance_id FROM "ob-poc".cbu_resource_instances WHERE cbu_id = $1
+            )"#,
+        )
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await?;
+        deleted_counts.insert(
+            "resource_instance_dependencies".to_string(),
+            result.rows_affected() as i64,
+        );
+
+        // cbu_resource_instances
+        let result =
+            sqlx::query(r#"DELETE FROM "ob-poc".cbu_resource_instances WHERE cbu_id = $1"#)
+                .bind(cbu_id)
+                .execute(&mut *tx)
+                .await?;
+        deleted_counts.insert(
+            "cbu_resource_instances".to_string(),
+            result.rows_affected() as i64,
+        );
+
+        // service_delivery_map
+        let result = sqlx::query(r#"DELETE FROM "ob-poc".service_delivery_map WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .execute(&mut *tx)
+            .await?;
+        deleted_counts.insert(
+            "service_delivery_map".to_string(),
+            result.rows_affected() as i64,
+        );
+
+        // cbu_evidence
+        let result = sqlx::query(r#"DELETE FROM "ob-poc".cbu_evidence WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .execute(&mut *tx)
+            .await?;
+        deleted_counts.insert("cbu_evidence".to_string(), result.rows_affected() as i64);
+
+        // ubo_evidence (via ubo_registry)
+        let result = sqlx::query(
+            r#"DELETE FROM "ob-poc".ubo_evidence WHERE ubo_id IN (
+                SELECT ubo_id FROM "ob-poc".ubo_registry WHERE cbu_id = $1
+            )"#,
+        )
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await?;
+        deleted_counts.insert("ubo_evidence".to_string(), result.rows_affected() as i64);
+
+        // ubo_registry
+        let result = sqlx::query(r#"DELETE FROM "ob-poc".ubo_registry WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .execute(&mut *tx)
+            .await?;
+        deleted_counts.insert("ubo_registry".to_string(), result.rows_affected() as i64);
+
+        // ubo_snapshots
+        let result = sqlx::query(r#"DELETE FROM "ob-poc".ubo_snapshots WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .execute(&mut *tx)
+            .await?;
+        deleted_counts.insert("ubo_snapshots".to_string(), result.rows_affected() as i64);
+
+        // case_evaluation_snapshots (via kyc.cases - already deleted cases but snapshot may remain)
+        // Note: FK may reference deleted case, so we use cbu_id directly
+        let result = sqlx::query(
+            r#"DELETE FROM "ob-poc".case_evaluation_snapshots WHERE case_id IN (
+                SELECT case_id FROM kyc.cases WHERE cbu_id = $1
+            )"#,
+        )
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await
+        .unwrap_or_else(|_| sqlx::postgres::PgQueryResult::default());
+        deleted_counts.insert(
+            "case_evaluation_snapshots".to_string(),
+            result.rows_affected() as i64,
+        );
+
+        // kyc_investigations
+        let result = sqlx::query(r#"DELETE FROM "ob-poc".kyc_investigations WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .execute(&mut *tx)
+            .await?;
+        deleted_counts.insert(
+            "kyc_investigations".to_string(),
+            result.rows_affected() as i64,
+        );
+
+        // kyc_decisions
+        let result = sqlx::query(r#"DELETE FROM "ob-poc".kyc_decisions WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .execute(&mut *tx)
+            .await?;
+        deleted_counts.insert("kyc_decisions".to_string(), result.rows_affected() as i64);
+
+        // screenings (legacy ob-poc schema)
+        let result = sqlx::query(
+            r#"DELETE FROM "ob-poc".screenings WHERE investigation_id IN (
+            SELECT investigation_id FROM "ob-poc".kyc_investigations WHERE cbu_id = $1
+        )"#,
+        )
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await
+        .unwrap_or_else(|_| sqlx::postgres::PgQueryResult::default());
+        deleted_counts.insert("screenings".to_string(), result.rows_affected() as i64);
+
+        // document_catalog
+        let result = sqlx::query(r#"DELETE FROM "ob-poc".document_catalog WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .execute(&mut *tx)
+            .await?;
+        deleted_counts.insert(
+            "document_catalog".to_string(),
+            result.rows_affected() as i64,
+        );
+
+        // client_allegations
+        let result = sqlx::query(r#"DELETE FROM "ob-poc".client_allegations WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .execute(&mut *tx)
+            .await?;
+        deleted_counts.insert(
+            "client_allegations".to_string(),
+            result.rows_affected() as i64,
+        );
+
+        // cbu_trading_profiles
+        let result = sqlx::query(r#"DELETE FROM "ob-poc".cbu_trading_profiles WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .execute(&mut *tx)
+            .await?;
+        deleted_counts.insert(
+            "cbu_trading_profiles".to_string(),
+            result.rows_affected() as i64,
+        );
+
+        // cbu_layout_overrides
+        let result = sqlx::query(r#"DELETE FROM "ob-poc".cbu_layout_overrides WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .execute(&mut *tx)
+            .await?;
+        deleted_counts.insert(
+            "cbu_layout_overrides".to_string(),
+            result.rows_affected() as i64,
+        );
+
+        // cbu_change_log
+        let result = sqlx::query(r#"DELETE FROM "ob-poc".cbu_change_log WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .execute(&mut *tx)
+            .await?;
+        deleted_counts.insert("cbu_change_log".to_string(), result.rows_affected() as i64);
+
+        // =====================================================================
+        // Phase 4: Handle entities (with shared-entity check)
+        // =====================================================================
+
+        let mut entities_deleted: i64 = 0;
+        let mut entities_preserved: i64 = 0;
+
+        if delete_entities {
+            // Get entities linked ONLY to this CBU (not shared with other CBUs)
+            let exclusive_entities: Vec<Uuid> = sqlx::query_scalar(
+                r#"SELECT entity_id FROM "ob-poc".cbu_entity_roles
+                   WHERE cbu_id = $1
+                   AND entity_id NOT IN (
+                       SELECT entity_id FROM "ob-poc".cbu_entity_roles
+                       WHERE cbu_id != $1
+                   )"#,
+            )
+            .bind(cbu_id)
+            .fetch_all(&mut *tx)
+            .await?;
+
+            // Count entities that are shared (preserved)
+            let shared_count: Option<i64> = sqlx::query_scalar(
+                r#"SELECT COUNT(DISTINCT entity_id)::bigint FROM "ob-poc".cbu_entity_roles
+                   WHERE cbu_id = $1
+                   AND entity_id IN (
+                       SELECT entity_id FROM "ob-poc".cbu_entity_roles
+                       WHERE cbu_id != $1
+                   )"#,
+            )
+            .bind(cbu_id)
+            .fetch_one(&mut *tx)
+            .await?;
+            entities_preserved = shared_count.unwrap_or(0);
+
+            // Delete entity extension table records for exclusive entities
+            for entity_id in &exclusive_entities {
+                // Delete from all extension tables (ignore errors for tables that don't have the entity)
+                let _ = sqlx::query(
+                    r#"DELETE FROM "ob-poc".entity_proper_persons WHERE entity_id = $1"#,
+                )
+                .bind(entity_id)
+                .execute(&mut *tx)
+                .await;
+                let _ = sqlx::query(
+                    r#"DELETE FROM "ob-poc".entity_limited_companies WHERE entity_id = $1"#,
+                )
+                .bind(entity_id)
+                .execute(&mut *tx)
+                .await;
+                let _ =
+                    sqlx::query(r#"DELETE FROM "ob-poc".entity_partnerships WHERE entity_id = $1"#)
+                        .bind(entity_id)
+                        .execute(&mut *tx)
+                        .await;
+                let _ = sqlx::query(r#"DELETE FROM "ob-poc".entity_trusts WHERE entity_id = $1"#)
+                    .bind(entity_id)
+                    .execute(&mut *tx)
+                    .await;
+                let _ = sqlx::query(r#"DELETE FROM "ob-poc".entity_funds WHERE entity_id = $1"#)
+                    .bind(entity_id)
+                    .execute(&mut *tx)
+                    .await;
+                let _ = sqlx::query(
+                    r#"DELETE FROM "ob-poc".entity_share_classes WHERE entity_id = $1"#,
+                )
+                .bind(entity_id)
+                .execute(&mut *tx)
+                .await;
+                let _ = sqlx::query(r#"DELETE FROM "ob-poc".entity_manco WHERE entity_id = $1"#)
+                    .bind(entity_id)
+                    .execute(&mut *tx)
+                    .await;
+
+                // Delete from entity_kyc_status
+                let _ =
+                    sqlx::query(r#"DELETE FROM "ob-poc".entity_kyc_status WHERE entity_id = $1"#)
+                        .bind(entity_id)
+                        .execute(&mut *tx)
+                        .await;
+
+                // Delete from ownership_relationships (both sides)
+                let _ = sqlx::query(
+                    r#"DELETE FROM "ob-poc".ownership_relationships
+                       WHERE owner_entity_id = $1 OR owned_entity_id = $1"#,
+                )
+                .bind(entity_id)
+                .execute(&mut *tx)
+                .await;
+
+                // Delete from control_relationships (both sides)
+                let _ = sqlx::query(
+                    r#"DELETE FROM "ob-poc".control_relationships
+                       WHERE controller_entity_id = $1 OR controlled_entity_id = $1"#,
+                )
+                .bind(entity_id)
+                .execute(&mut *tx)
+                .await;
+
+                // Delete attribute_observations for this entity
+                let _ = sqlx::query(
+                    r#"DELETE FROM "ob-poc".attribute_observations WHERE entity_id = $1"#,
+                )
+                .bind(entity_id)
+                .execute(&mut *tx)
+                .await;
+
+                // Delete from base entities table
+                let _ = sqlx::query(r#"DELETE FROM "ob-poc".entities WHERE entity_id = $1"#)
+                    .bind(entity_id)
+                    .execute(&mut *tx)
+                    .await;
+            }
+
+            entities_deleted = exclusive_entities.len() as i64;
+        }
+
+        // Delete cbu_entity_roles (always - removes role links even for preserved entities)
+        let result = sqlx::query(r#"DELETE FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .execute(&mut *tx)
+            .await?;
+        deleted_counts.insert(
+            "cbu_entity_roles".to_string(),
+            result.rows_affected() as i64,
+        );
+
+        // =====================================================================
+        // Phase 5: Delete the CBU itself
+        // =====================================================================
+
+        let result = sqlx::query(r#"DELETE FROM "ob-poc".cbus WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .execute(&mut *tx)
+            .await?;
+        deleted_counts.insert("cbus".to_string(), result.rows_affected() as i64);
+
+        // Commit transaction
+        tx.commit().await?;
+
+        // Build summary
+        let total_deleted: i64 = deleted_counts.values().sum();
+
+        tracing::info!(
+            cbu_id = %cbu_id,
+            cbu_name = %cbu_name,
+            total_deleted = total_deleted,
+            entities_deleted = entities_deleted,
+            entities_preserved = entities_preserved,
+            "cbu.delete-cascade completed"
+        );
+
+        Ok(ExecutionResult::Record(serde_json::json!({
+            "cbu_id": cbu_id,
+            "cbu_name": cbu_name,
+            "deleted": true,
+            "total_records_deleted": total_deleted,
+            "entities_deleted": entities_deleted,
+            "entities_preserved_shared": entities_preserved,
+            "by_table": deleted_counts
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(serde_json::json!({
+            "error": "Database required for cbu.delete-cascade"
+        })))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3266,6 +3869,7 @@ mod tests {
         // CBU operations
         assert!(registry.has("cbu", "add-product"));
         assert!(registry.has("cbu", "show"));
+        assert!(registry.has("cbu", "delete-cascade"));
     }
 
     #[test]
@@ -3274,9 +3878,9 @@ mod tests {
         let ops = registry.list();
         // 7 original (entity-create, doc-catalog, doc-extract, ubo-calculate, 3 screening)
         // + 6 resource + 4 custody + 4 observation + 1 doc-extract-observations
-        // + 3 threshold + 3 rfi + 7 ubo-analysis + 3 cbu (add-product, show, decide) = 39
-        // + 5 trading-profile (import, get-active, activate, materialize, validate) = 44
-        // + 6 isda/subcustodian (isda.create, etc.) = 50
-        assert_eq!(ops.len(), 50);
+        // + 3 threshold + 3 rfi + 7 ubo-analysis + 4 cbu (add-product, show, decide, delete-cascade) = 40
+        // + 5 trading-profile (import, get-active, activate, materialize, validate) = 45
+        // + 6 isda/subcustodian (isda.create, etc.) = 51
+        assert_eq!(ops.len(), 51);
     }
 }

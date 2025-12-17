@@ -9,6 +9,8 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use xshell::{cmd, Shell};
 
+mod seed_allianz;
+
 #[derive(Parser)]
 #[command(name = "xtask")]
 #[command(about = "ob-poc development automation")]
@@ -104,6 +106,67 @@ enum Command {
         #[arg(long)]
         release: bool,
     },
+
+    /// Seed Allianz test data from scraped JSON
+    SeedAllianz {
+        /// Path to scraped JSON file (default: scrapers/allianz/output/allianz-lu-*.json)
+        #[arg(long)]
+        file: Option<std::path::PathBuf>,
+
+        /// Only seed first N funds (for testing)
+        #[arg(long)]
+        limit: Option<usize>,
+
+        /// Skip cleaning existing Allianz data
+        #[arg(long)]
+        no_clean: bool,
+
+        /// Dry run - show what would be done without making changes
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Clean all Allianz test data from the database
+    CleanAllianz {
+        /// Dry run - show what would be deleted without making changes
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Run batch import test using onboard-fund-cbu template
+    BatchImport {
+        /// Limit number of funds to process (default: all)
+        #[arg(long)]
+        limit: Option<usize>,
+
+        /// Dry run - expand templates but don't execute
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Show expanded DSL for each entity
+        #[arg(long)]
+        verbose: bool,
+
+        /// Products to add via agent after CBU creation (comma-separated codes)
+        /// Example: --add-products "CUSTODY,FUND_ACCOUNTING"
+        #[arg(long)]
+        add_products: Option<String>,
+
+        /// Agent API URL for DSL generation (default: http://localhost:3000)
+        #[arg(long, default_value = "http://localhost:3000")]
+        agent_url: String,
+    },
+
+    /// Clean CBUs created by batch import (using cbu.delete-cascade DSL verb)
+    BatchClean {
+        /// Limit number of CBUs to delete (default: all)
+        #[arg(long)]
+        limit: Option<usize>,
+
+        /// Dry run - show what would be deleted without making changes
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -133,6 +196,30 @@ fn main() -> Result<()> {
             no_run,
         } => deploy(&sh, release, port, skip_wasm, no_run),
         Command::Wasm { release } => build_wasm(&sh, release),
+        Command::SeedAllianz {
+            file,
+            limit,
+            no_clean,
+            dry_run,
+        } => {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(seed_allianz::seed_allianz(file, limit, no_clean, dry_run))
+        }
+        Command::CleanAllianz { dry_run } => {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(seed_allianz::clean_allianz(dry_run))
+        }
+        Command::BatchImport {
+            limit,
+            dry_run,
+            verbose,
+            add_products,
+            agent_url,
+        } => batch_import(&sh, limit, dry_run, verbose, add_products, agent_url),
+        Command::BatchClean { limit, dry_run } => {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(batch_clean(limit, dry_run))
+        }
     }
 }
 
@@ -463,5 +550,218 @@ fn deploy(sh: &Shell, release: bool, port: u16, skip_wasm: bool, no_run: bool) -
     sh.set_var("SERVER_PORT", &port_str);
     cmd!(sh, "{bin_path_str}").run()?;
 
+    Ok(())
+}
+
+fn batch_import(
+    sh: &Shell,
+    limit: Option<usize>,
+    dry_run: bool,
+    verbose: bool,
+    add_products: Option<String>,
+    agent_url: String,
+) -> Result<()> {
+    println!("===========================================");
+    println!("  Batch Import: Allianz Funds → CBUs");
+    println!("===========================================\n");
+
+    // Build the batch_test_harness binary
+    println!("Building batch_test_harness...");
+    cmd!(
+        sh,
+        "cargo build --features database,cli --bin batch_test_harness"
+    )
+    .run()
+    .context("Failed to build batch_test_harness")?;
+
+    // Construct arguments - use std::process::Command to properly handle args with spaces
+    let mut cmd = std::process::Command::new("./target/debug/batch_test_harness");
+    cmd.args([
+        "--template",
+        "onboard-fund-cbu",
+        "--fund-query",
+        "--shared",
+        "manco_entity=Allianz Global Investors GmbH",
+        "--shared",
+        "im_entity=Allianz Global Investors GmbH",
+        "--shared",
+        "jurisdiction=LU",
+        "--continue-on-error",
+    ]);
+
+    if let Some(n) = limit {
+        cmd.args(["--limit", &n.to_string()]);
+    }
+
+    if dry_run {
+        cmd.arg("--dry-run");
+    }
+
+    if verbose {
+        cmd.arg("--verbose");
+    }
+
+    // Phase 2: Agent-generated product addition
+    if let Some(ref products) = add_products {
+        cmd.args(["--add-products", products]);
+        cmd.args(["--agent-url", &agent_url]);
+    }
+
+    // Run the harness
+    let status = cmd.status().context("Failed to run batch_test_harness")?;
+
+    if !status.success() {
+        anyhow::bail!(
+            "batch_test_harness failed with exit code: {:?}",
+            status.code()
+        );
+    }
+
+    Ok(())
+}
+
+async fn batch_clean(limit: Option<usize>, dry_run: bool) -> Result<()> {
+    use sqlx::PgPool;
+
+    println!("===========================================");
+    println!("  Batch Clean: Delete Allianz CBUs via DSL");
+    println!("===========================================\n");
+
+    let database_url =
+        std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".to_string());
+    let pool = PgPool::connect(&database_url).await?;
+
+    // Get Allianz CBUs
+    let query = r#"
+        SELECT cbu_id, name
+        FROM "ob-poc".cbus
+        WHERE name ILIKE 'Allianz%'
+        ORDER BY name
+    "#;
+
+    let cbus: Vec<(uuid::Uuid, String)> = sqlx::query_as(query).fetch_all(&pool).await?;
+
+    let cbus: Vec<_> = if let Some(n) = limit {
+        cbus.into_iter().take(n).collect()
+    } else {
+        cbus
+    };
+
+    println!("Found {} Allianz CBUs to delete\n", cbus.len());
+
+    if cbus.is_empty() {
+        println!("Nothing to clean.");
+        return Ok(());
+    }
+
+    if dry_run {
+        println!("DRY RUN - would delete:");
+        for (id, name) in &cbus {
+            println!("  {} - {}", id, name);
+        }
+        println!("\nRun without --dry-run to actually delete.");
+        return Ok(());
+    }
+
+    // Delete each CBU using the cbu.delete-cascade DSL verb
+    let mut success_count = 0;
+    let mut fail_count = 0;
+
+    for (i, (cbu_id, name)) in cbus.iter().enumerate() {
+        print!("[{}/{}] Deleting {}... ", i + 1, cbus.len(), name);
+
+        let dsl = format!(r#"(cbu.delete-cascade :cbu-id "{}" :force true)"#, cbu_id);
+
+        match execute_dsl_simple(&dsl, &pool).await {
+            Ok(_) => {
+                println!("OK");
+                success_count += 1;
+            }
+            Err(e) => {
+                println!("FAILED: {}", e);
+                fail_count += 1;
+            }
+        }
+    }
+
+    println!("\n===========================================");
+    println!("  Batch Clean Summary");
+    println!("===========================================");
+    println!("Success: {}", success_count);
+    println!("Failed:  {}", fail_count);
+
+    Ok(())
+}
+
+async fn execute_dsl_simple(dsl: &str, pool: &sqlx::PgPool) -> Result<()> {
+    // Note: We can't use DslExecutor here because xtask can't depend on ob_poc
+    // (would create circular dependency). So we implement the cascade delete directly.
+    // This mirrors the logic in CbuDeleteCascadeOp.
+
+    // Extract the UUID from the DSL
+    let uuid_start = dsl.find('"').unwrap() + 1;
+    let uuid_end = dsl[uuid_start..].find('"').unwrap() + uuid_start;
+    let cbu_id: uuid::Uuid = dsl[uuid_start..uuid_end].parse()?;
+
+    // Execute cascade delete directly (same logic as CbuDeleteCascadeOp)
+    let mut tx = pool.begin().await?;
+
+    // Phase 1: KYC schema
+    sqlx::query(r#"DELETE FROM kyc.screenings WHERE workstream_id IN (SELECT workstream_id FROM kyc.entity_workstreams WHERE case_id IN (SELECT case_id FROM kyc.cases WHERE cbu_id = $1))"#)
+        .bind(cbu_id).execute(&mut *tx).await?;
+    sqlx::query(r#"DELETE FROM kyc.doc_requests WHERE workstream_id IN (SELECT workstream_id FROM kyc.entity_workstreams WHERE case_id IN (SELECT case_id FROM kyc.cases WHERE cbu_id = $1))"#)
+        .bind(cbu_id).execute(&mut *tx).await?;
+    sqlx::query(r#"DELETE FROM kyc.case_events WHERE case_id IN (SELECT case_id FROM kyc.cases WHERE cbu_id = $1)"#)
+        .bind(cbu_id).execute(&mut *tx).await?;
+    sqlx::query(r#"DELETE FROM kyc.red_flags WHERE case_id IN (SELECT case_id FROM kyc.cases WHERE cbu_id = $1)"#)
+        .bind(cbu_id).execute(&mut *tx).await?;
+    sqlx::query(r#"DELETE FROM kyc.entity_workstreams WHERE case_id IN (SELECT case_id FROM kyc.cases WHERE cbu_id = $1)"#)
+        .bind(cbu_id).execute(&mut *tx).await?;
+    sqlx::query(r#"DELETE FROM kyc.cases WHERE cbu_id = $1"#)
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await?;
+
+    // Phase 2: Custody schema
+    sqlx::query(r#"DELETE FROM custody.ssi_booking_rules WHERE cbu_id = $1"#)
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query(r#"DELETE FROM custody.cbu_ssi_agent_override WHERE ssi_id IN (SELECT ssi_id FROM custody.cbu_ssi WHERE cbu_id = $1)"#)
+        .bind(cbu_id).execute(&mut *tx).await?;
+    sqlx::query(r#"DELETE FROM custody.cbu_ssi WHERE cbu_id = $1"#)
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query(r#"DELETE FROM custody.cbu_instrument_universe WHERE cbu_id = $1"#)
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await?;
+
+    // Phase 3: ob-poc schema
+    sqlx::query(r#"DELETE FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1"#)
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query(r#"DELETE FROM "ob-poc".document_catalog WHERE cbu_id = $1"#)
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query(r#"DELETE FROM "ob-poc".cbu_resource_instances WHERE cbu_id = $1"#)
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query(r#"DELETE FROM "ob-poc".service_delivery_map WHERE cbu_id = $1"#)
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await?;
+
+    // Phase 4: Delete CBU itself
+    sqlx::query(r#"DELETE FROM "ob-poc".cbus WHERE cbu_id = $1"#)
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await?;
+
+    tx.commit().await?;
     Ok(())
 }

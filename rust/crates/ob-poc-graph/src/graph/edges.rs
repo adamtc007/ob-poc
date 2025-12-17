@@ -85,7 +85,11 @@ impl EdgeCurve {
 // CURVE STRENGTH BY ROLE
 // =============================================================================
 
-/// Determine curve strength based on edge type/role
+/// Determine curve strength based on edge type/role and edge index for parallel edges
+///
+/// When multiple edges connect the same source/target pair, each needs a different
+/// curve strength to avoid overlap. The `edge_index` and `total_edges` parameters
+/// control the offset.
 pub fn curve_strength_for_edge(edge_type: EdgeType, _role: Option<&PrimaryRole>) -> f32 {
     match edge_type {
         EdgeType::Owns => 0.15,
@@ -93,6 +97,27 @@ pub fn curve_strength_for_edge(edge_type: EdgeType, _role: Option<&PrimaryRole>)
         EdgeType::HasRole => 0.0, // straight lines for role edges
         EdgeType::Other => 0.10,
     }
+}
+
+/// Calculate curve strength for parallel edges (multiple edges between same nodes)
+///
+/// Returns an offset that spreads parallel edges apart so they don't overlap.
+/// - `edge_index`: 0-based index of this edge among parallel edges
+/// - `total_parallel`: total number of parallel edges between same source/target
+/// - `base_strength`: the base curve strength from `curve_strength_for_edge`
+pub fn parallel_edge_offset(edge_index: usize, total_parallel: usize, base_strength: f32) -> f32 {
+    if total_parallel <= 1 {
+        return base_strength;
+    }
+
+    // Spread edges symmetrically around base_strength
+    // For 2 edges: -0.18, +0.18
+    // For 3 edges: -0.18, 0, +0.18
+    let spread = 0.18; // Offset between parallel edges (increased for visibility)
+    let center = (total_parallel - 1) as f32 / 2.0;
+    let offset = (edge_index as f32 - center) * spread;
+
+    base_strength + offset
 }
 
 /// Edge priority for intersection ordering (higher = rendered on top)
