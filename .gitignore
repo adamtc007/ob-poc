@@ -342,3 +342,15 @@ uuid-*.tar.gz
 **/full_clippy_output.txt
 clippy_output.txt
 test_output.txt
+
+# ==============================================================================
+# Scraper output and data files
+# ==============================================================================
+
+# Scraper output directories (generated data)
+scraper/data/
+scrapers/output/
+scrapers/*/output/
+
+# Package lock files (npm)
+**/package-lock.json
