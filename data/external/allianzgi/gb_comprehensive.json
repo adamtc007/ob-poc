@@ -1,0 +1,5702 @@
+{
+  "metadata": {
+    "source": "GB",
+    "sourceName": "United Kingdom",
+    "scrapedAt": "2025-12-16T22:35:34.658Z",
+    "fundCount": 70,
+    "shareClassCount": 242,
+    "managementCompany": {
+      "name": "Allianz Global Investors UK Limited",
+      "jurisdiction": "GB",
+      "regulator": "FCA"
+    }
+  },
+  "funds": [
+    {
+      "fundName": "Allianz Income and Growth",
+      "fundId": "118",
+      "assetClass": "Multi Asset",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 6",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1050568937",
+          "wkn": null,
+          "shareClassName": "P (H2-EUR)",
+          "currency": "EUR",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 8.92,
+            "oneYear": 7.56,
+            "threeYear": 10.2,
+            "fiveYear": 4.35
+          },
+          "_fundId": "118",
+          "_shareClassId": "1566",
+          "_detailSlug": "allianz-income-and-growth-p-h2-eur-eur"
+        },
+        {
+          "isin": "LU0758899339",
+          "wkn": null,
+          "shareClassName": "PM (H2-GBP)",
+          "currency": "GBP",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 10.83,
+            "oneYear": 9.6,
+            "threeYear": 11.86,
+            "fiveYear": 5.71
+          },
+          "_fundId": "118",
+          "_shareClassId": "1825",
+          "_detailSlug": "allianz-income-and-growth-pm-h2-gbp-gbp"
+        },
+        {
+          "isin": "LU1056556225",
+          "wkn": null,
+          "shareClassName": "PM (USD)",
+          "currency": "USD",
+          "nav": 833.28,
+          "navDate": "16/12/2025",
+          "launchDate": "05/05/2014",
+          "performance": {
+            "ytd": 11.03,
+            "oneYear": 9.82,
+            "threeYear": 12.52,
+            "fiveYear": 6.42
+          },
+          "_fundId": "118",
+          "_shareClassId": "1555",
+          "_detailSlug": "allianz-income-and-growth-pm-usd"
+        },
+        {
+          "isin": "LU1269171986",
+          "wkn": null,
+          "shareClassName": "PT (USD)",
+          "currency": "USD",
+          "nav": 2,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 11.03,
+            "oneYear": 9.82,
+            "threeYear": 12.51,
+            "fiveYear": 6.42
+          },
+          "_fundId": "118",
+          "_shareClassId": "4268",
+          "_detailSlug": "allianz-income-and-growth-pt-usd"
+        },
+        {
+          "isin": "LU1136180780",
+          "wkn": null,
+          "shareClassName": "RM (H2-GBP)",
+          "currency": "GBP",
+          "nav": 97.12,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 10.73,
+            "oneYear": 9.49,
+            "threeYear": 11.87,
+            "fiveYear": 5.7
+          },
+          "_fundId": "118",
+          "_shareClassId": "1356",
+          "_detailSlug": "allianz-income-and-growth-rm-h2-gbp-gbp"
+        },
+        {
+          "isin": "LU1255915826",
+          "wkn": null,
+          "shareClassName": "RM (USD)",
+          "currency": "USD",
+          "nav": 10.4979,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 10.97,
+            "oneYear": 9.75,
+            "threeYear": 12.45,
+            "fiveYear": 6.36
+          },
+          "_fundId": "118",
+          "_shareClassId": "1042",
+          "_detailSlug": "allianz-income-and-growth-rm-usd"
+        },
+        {
+          "isin": "LU0766462104",
+          "wkn": null,
+          "shareClassName": "A (H2-EUR)",
+          "currency": "EUR",
+          "nav": 113.83,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 8.34,
+            "oneYear": 6.92,
+            "threeYear": 9.59,
+            "fiveYear": 3.77
+          },
+          "_fundId": "118",
+          "_shareClassId": "221",
+          "_detailSlug": "allianz-income-and-growth-a-h2-eur-eur"
+        },
+        {
+          "isin": "LU1291192091",
+          "wkn": null,
+          "shareClassName": "RT (H2-EUR)",
+          "currency": "EUR",
+          "nav": 203.69,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 8.86,
+            "oneYear": 7.51,
+            "threeYear": 10.15,
+            "fiveYear": 4.31
+          },
+          "_fundId": "118",
+          "_shareClassId": "1037",
+          "_detailSlug": "allianz-income-and-growth-rt-h2-eur-eur"
+        },
+        {
+          "isin": "LU0964807845",
+          "wkn": null,
+          "shareClassName": "A (USD)",
+          "currency": "USD",
+          "nav": 12.7714,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 10.36,
+            "oneYear": 9.1,
+            "threeYear": 11.77,
+            "fiveYear": 5.71
+          },
+          "_fundId": "118",
+          "_shareClassId": "1730",
+          "_detailSlug": "allianz-income-and-growth-a-usd"
+        },
+        {
+          "isin": "LU1255915586",
+          "wkn": null,
+          "shareClassName": "RT (USD)",
+          "currency": "USD",
+          "nav": 23.4733,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 10.97,
+            "oneYear": 9.75,
+            "threeYear": 12.45,
+            "fiveYear": 6.35
+          },
+          "_fundId": "118",
+          "_shareClassId": "1079",
+          "_detailSlug": "allianz-income-and-growth-rt-usd"
+        },
+        {
+          "isin": "LU0820562113",
+          "wkn": null,
+          "shareClassName": "AM (H2-CAD)",
+          "currency": "CAD",
+          "nav": 7.4134,
+          "navDate": "16/12/2025",
+          "launchDate": "05/02/2013",
+          "performance": {
+            "ytd": 8.56,
+            "oneYear": 7.22,
+            "threeYear": 10.54,
+            "fiveYear": 4.79
+          },
+          "_fundId": "118",
+          "_shareClassId": "1838",
+          "_detailSlug": "allianz-income-and-growth-am-h2-cad-cad"
+        },
+        {
+          "isin": "LU0913601281",
+          "wkn": null,
+          "shareClassName": "AM (H2-EUR)",
+          "currency": "EUR",
+          "nav": 7.9219,
+          "navDate": "16/12/2025",
+          "launchDate": "05/02/2013",
+          "performance": {
+            "ytd": 8.33,
+            "oneYear": 6.92,
+            "threeYear": 9.63,
+            "fiveYear": 3.77
+          },
+          "_fundId": "118",
+          "_shareClassId": "1842",
+          "_detailSlug": "allianz-income-and-growth-am-h2-eur-eur"
+        },
+        {
+          "isin": "LU0820562386",
+          "wkn": null,
+          "shareClassName": "AM (H2-GBP)",
+          "currency": "GBP",
+          "nav": 7.7096,
+          "navDate": "16/12/2025",
+          "launchDate": "05/02/2013",
+          "performance": {
+            "ytd": 10.17,
+            "oneYear": 8.88,
+            "threeYear": 11.21,
+            "fiveYear": 5.1
+          },
+          "_fundId": "118",
+          "_shareClassId": "1837",
+          "_detailSlug": "allianz-income-and-growth-am-h2-gbp-gbp"
+        },
+        {
+          "isin": "LU0820561818",
+          "wkn": null,
+          "shareClassName": "AM (USD)",
+          "currency": "USD",
+          "nav": 8.402,
+          "navDate": "16/12/2025",
+          "launchDate": "10/16/2012",
+          "performance": {
+            "ytd": 10.36,
+            "oneYear": 9.1,
+            "threeYear": 11.76,
+            "fiveYear": 5.71
+          },
+          "_fundId": "118",
+          "_shareClassId": "2377",
+          "_detailSlug": "allianz-income-and-growth-am-usd"
+        },
+        {
+          "isin": "LU1551013342",
+          "wkn": null,
+          "shareClassName": "AMg2 (USD)",
+          "currency": "USD",
+          "nav": 12.8467,
+          "navDate": "16/12/2025",
+          "launchDate": "02/15/2017",
+          "performance": {
+            "ytd": 10.36,
+            "oneYear": 9.1,
+            "threeYear": 11.76,
+            "fiveYear": 5.72
+          },
+          "_fundId": "118",
+          "_shareClassId": "4247",
+          "_detailSlug": "allianz-income-and-growth-amg2-usd"
+        },
+        {
+          "isin": "LU1070113664",
+          "wkn": null,
+          "shareClassName": "AT (H2-EUR)",
+          "currency": "EUR",
+          "nav": 172.1,
+          "navDate": "16/12/2025",
+          "launchDate": "08/12/2014",
+          "performance": {
+            "ytd": 8.32,
+            "oneYear": 6.9,
+            "threeYear": 9.55,
+            "fiveYear": 3.73
+          },
+          "_fundId": "118",
+          "_shareClassId": "1418",
+          "_detailSlug": "allianz-income-and-growth-at-h2-eur-eur"
+        },
+        {
+          "isin": "LU0689472784",
+          "wkn": null,
+          "shareClassName": "AT (USD)",
+          "currency": "USD",
+          "nav": 28.8287,
+          "navDate": "16/12/2025",
+          "launchDate": "11/18/2011",
+          "performance": {
+            "ytd": 10.36,
+            "oneYear": 9.1,
+            "threeYear": 11.78,
+            "fiveYear": 5.71
+          },
+          "_fundId": "118",
+          "_shareClassId": "292",
+          "_detailSlug": "allianz-income-and-growth-at-usd"
+        },
+        {
+          "isin": "LU1627332817",
+          "wkn": null,
+          "shareClassName": "CT (USD)",
+          "currency": "USD",
+          "nav": 17.4314,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 9.61,
+            "oneYear": 8.28,
+            "threeYear": 10.93,
+            "fiveYear": 4.93
+          },
+          "_fundId": "118",
+          "_shareClassId": "4398",
+          "_detailSlug": "allianz-income-and-growth-ct-usd"
+        },
+        {
+          "isin": "LU0685222696",
+          "wkn": null,
+          "shareClassName": "IT (USD)",
+          "currency": "USD",
+          "nav": 2,
+          "navDate": "16/12/2025",
+          "launchDate": "08/27/2013",
+          "performance": {
+            "ytd": 11.07,
+            "oneYear": 9.86,
+            "threeYear": 12.56,
+            "fiveYear": 6.46
+          },
+          "_fundId": "118",
+          "_shareClassId": "1741",
+          "_detailSlug": "allianz-income-and-growth-it-usd"
+        },
+        {
+          "isin": "LU1015032169",
+          "wkn": null,
+          "shareClassName": "P (EUR)",
+          "currency": "EUR",
+          "nav": 2,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 0.03,
+            "oneYear": 0.26,
+            "threeYear": 8.48,
+            "fiveYear": 7.17
+          },
+          "_fundId": "118",
+          "_shareClassId": "1683",
+          "_detailSlug": "allianz-income-and-growth-p-eur"
+        }
+      ],
+      "_detailSlug": "allianz-income-and-growth-p-h2-eur-eur",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Europe Equity Growth",
+      "fundId": "9",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU0256839191",
+          "wkn": null,
+          "shareClassName": "A (EUR)",
+          "currency": "EUR",
+          "nav": 318.02,
+          "navDate": "16/12/2025",
+          "launchDate": "10/16/2006",
+          "performance": {
+            "ytd": -3.7,
+            "oneYear": -4.51,
+            "threeYear": 6.6,
+            "fiveYear": 3.57
+          },
+          "_fundId": "9",
+          "_shareClassId": "173",
+          "_detailSlug": "allianz-europe-equity-growth-a-eur"
+        },
+        {
+          "isin": "LU0264555375",
+          "wkn": null,
+          "shareClassName": "A (GBP)",
+          "currency": "GBP",
+          "nav": 418.22,
+          "navDate": "16/12/2025",
+          "launchDate": "08/03/2009",
+          "performance": {
+            "ytd": 2.16,
+            "oneYear": 0.45,
+            "threeYear": 7.47,
+            "fiveYear": 3.11
+          },
+          "_fundId": "9",
+          "_shareClassId": "1928",
+          "_detailSlug": "allianz-europe-equity-growth-a-gbp"
+        },
+        {
+          "isin": "LU0256839274",
+          "wkn": null,
+          "shareClassName": "AT (EUR)",
+          "currency": "EUR",
+          "nav": 348.24,
+          "navDate": "16/12/2025",
+          "launchDate": "10/16/2006",
+          "performance": {
+            "ytd": -3.7,
+            "oneYear": -4.52,
+            "threeYear": 6.6,
+            "fiveYear": 3.57
+          },
+          "_fundId": "9",
+          "_shareClassId": "175",
+          "_detailSlug": "allianz-europe-equity-growth-at-eur"
+        },
+        {
+          "isin": "LU0857590862",
+          "wkn": null,
+          "shareClassName": "AT (H2-USD)",
+          "currency": "USD",
+          "nav": 26.7009,
+          "navDate": "16/12/2025",
+          "launchDate": "12/06/2012",
+          "performance": {
+            "ytd": -2.13,
+            "oneYear": -2.54,
+            "threeYear": 8.99,
+            "fiveYear": 5.82
+          },
+          "_fundId": "9",
+          "_shareClassId": "1886",
+          "_detailSlug": "allianz-europe-equity-growth-at-h2-usd-usd"
+        },
+        {
+          "isin": "LU0256881474",
+          "wkn": null,
+          "shareClassName": "P (EUR)",
+          "currency": "EUR",
+          "nav": 2,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": -3.01,
+            "oneYear": -3.71,
+            "threeYear": 7.51,
+            "fiveYear": 4.45
+          },
+          "_fundId": "9",
+          "_shareClassId": "234",
+          "_detailSlug": "allianz-europe-equity-growth-p-eur"
+        },
+        {
+          "isin": "LU0604763499",
+          "wkn": null,
+          "shareClassName": "P (GBP)",
+          "currency": "GBP",
+          "nav": 2,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 2.92,
+            "oneYear": 1.29,
+            "threeYear": 8.28,
+            "fiveYear": 3.93
+          },
+          "_fundId": "9",
+          "_shareClassId": "287",
+          "_detailSlug": "allianz-europe-equity-growth-p-gbp"
+        },
+        {
+          "isin": "LU0256881631",
+          "wkn": null,
+          "shareClassName": "PT (EUR)",
+          "currency": "EUR",
+          "nav": 2,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": -3.01,
+            "oneYear": -3.7,
+            "threeYear": 7.51,
+            "fiveYear": 4.45
+          },
+          "_fundId": "9",
+          "_shareClassId": "1734",
+          "_detailSlug": "allianz-europe-equity-growth-pt-eur"
+        },
+        {
+          "isin": "LU1645746105",
+          "wkn": null,
+          "shareClassName": "RT (EUR)",
+          "currency": "EUR",
+          "nav": 149.5,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": -3.09,
+            "oneYear": -3.8,
+            "threeYear": 7.41,
+            "fiveYear": 4.35
+          },
+          "_fundId": "9",
+          "_shareClassId": "4631",
+          "_detailSlug": "allianz-europe-equity-growth-rt-eur"
+        },
+        {
+          "isin": "LU0256883504",
+          "wkn": null,
+          "shareClassName": "WT (EUR)",
+          "currency": "EUR",
+          "nav": 3,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": -2.74,
+            "oneYear": -3.37,
+            "threeYear": 7.88,
+            "fiveYear": 4.81
+          },
+          "_fundId": "9",
+          "_shareClassId": "1068",
+          "_detailSlug": "allianz-europe-equity-growth-wt-eur"
+        }
+      ],
+      "_detailSlug": "allianz-europe-equity-growth-a-eur",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Strategic Bond Fund",
+      "fundId": "302",
+      "assetClass": "Fixed Income",
+      "legalStructure": "OEIC",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Not applicable",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "GB00B06T9362",
+          "wkn": null,
+          "shareClassName": "C (Inc) (GBP)",
+          "currency": "GBp",
+          "nav": 130.47,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 5.24,
+            "oneYear": 4.43,
+            "threeYear": -1.64,
+            "fiveYear": -5.89
+          },
+          "_fundId": "302",
+          "_shareClassId": "937",
+          "_detailSlug": "allianz-strategic-bond-fund-c-inc-gbp"
+        },
+        {
+          "isin": "GB00BJ1DZT42",
+          "wkn": null,
+          "shareClassName": "I (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 102.18,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 5.51,
+            "oneYear": 4.74,
+            "threeYear": -1.37,
+            "fiveYear": -5.67
+          },
+          "_fundId": "302",
+          "_shareClassId": "5288",
+          "_detailSlug": "allianz-strategic-bond-fund-i-acc-gbp"
+        },
+        {
+          "isin": "GB00BYT2QW81",
+          "wkn": null,
+          "shareClassName": "I (Inc) (GBP)",
+          "currency": "GBp",
+          "nav": 84.15,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 5.52,
+            "oneYear": 4.74,
+            "threeYear": -1.36,
+            "fiveYear": -5.66
+          },
+          "_fundId": "302",
+          "_shareClassId": "632",
+          "_detailSlug": "allianz-strategic-bond-fund-i-inc-gbp"
+        },
+        {
+          "isin": "GB0031383408",
+          "wkn": null,
+          "shareClassName": "A (Inc) (GBP)",
+          "currency": "GBp",
+          "nav": 130.16,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 4.74,
+            "oneYear": 3.82,
+            "threeYear": -2.22,
+            "fiveYear": -6.46
+          },
+          "_fundId": "302",
+          "_shareClassId": "598",
+          "_detailSlug": "allianz-strategic-bond-fund-a-inc-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-strategic-bond-fund-c-inc-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Best Styles US Equity",
+      "fundId": "137",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1428085952",
+          "wkn": null,
+          "shareClassName": "AT (USD)",
+          "currency": "USD",
+          "nav": 33.4035,
+          "navDate": "16/12/2025",
+          "launchDate": "06/22/2016",
+          "performance": {
+            "ytd": 14.6,
+            "oneYear": 19.16,
+            "threeYear": 21.46,
+            "fiveYear": 16.18
+          },
+          "_fundId": "137",
+          "_shareClassId": "626",
+          "_detailSlug": "allianz-best-styles-us-equity-at-usd"
+        }
+      ],
+      "_detailSlug": "allianz-best-styles-us-equity-at-usd",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Oriental Income",
+      "fundId": "464",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 6",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU0348786764",
+          "wkn": null,
+          "shareClassName": "IT (USD)",
+          "currency": "USD",
+          "nav": 345.19,
+          "navDate": "16/12/2025",
+          "launchDate": "10/03/2008",
+          "performance": {
+            "ytd": 32.26,
+            "oneYear": 24.06,
+            "threeYear": 20.91,
+            "fiveYear": 9.89
+          },
+          "_fundId": "464",
+          "_shareClassId": "2535",
+          "_detailSlug": "allianz-oriental-income-it-usd"
+        },
+        {
+          "isin": "LU0348786921",
+          "wkn": null,
+          "shareClassName": "P (USD)",
+          "currency": "USD",
+          "nav": 270.14,
+          "navDate": "16/12/2025",
+          "launchDate": "10/03/2008",
+          "performance": {
+            "ytd": 32.22,
+            "oneYear": 24.01,
+            "threeYear": 20.86,
+            "fiveYear": 9.85
+          },
+          "_fundId": "464",
+          "_shareClassId": "2542",
+          "_detailSlug": "allianz-oriental-income-p-usd"
+        },
+        {
+          "isin": "LU1254141416",
+          "wkn": null,
+          "shareClassName": "RT (EUR)",
+          "currency": "EUR",
+          "nav": 275.79,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 19.02,
+            "oneYear": 16.43,
+            "threeYear": 14.8,
+            "fiveYear": 9.93
+          },
+          "_fundId": "464",
+          "_shareClassId": "1031",
+          "_detailSlug": "allianz-oriental-income-rt-eur"
+        },
+        {
+          "isin": "LU0348783233",
+          "wkn": null,
+          "shareClassName": "A (USD)",
+          "currency": "USD",
+          "nav": 248.5,
+          "navDate": "16/12/2025",
+          "launchDate": "10/03/2008",
+          "performance": {
+            "ytd": 31.28,
+            "oneYear": 22.96,
+            "threeYear": 19.84,
+            "fiveYear": 8.91
+          },
+          "_fundId": "464",
+          "_shareClassId": "2545",
+          "_detailSlug": "allianz-oriental-income-a-usd"
+        },
+        {
+          "isin": "LU0348784397",
+          "wkn": null,
+          "shareClassName": "AT (USD)",
+          "currency": "USD",
+          "nav": 290.11,
+          "navDate": "16/12/2025",
+          "launchDate": "10/03/2008",
+          "performance": {
+            "ytd": 31.29,
+            "oneYear": 22.96,
+            "threeYear": 19.84,
+            "fiveYear": 8.91
+          },
+          "_fundId": "464",
+          "_shareClassId": "2543",
+          "_detailSlug": "allianz-oriental-income-at-usd"
+        }
+      ],
+      "_detailSlug": "allianz-oriental-income-it-usd",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Global Diversified Credit",
+      "fundId": "167",
+      "assetClass": "Fixed Income",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU2685898723",
+          "wkn": null,
+          "shareClassName": "WT (H2-GBP)",
+          "currency": "GBP",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 5.91,
+            "oneYear": 6.89,
+            "threeYear": null,
+            "fiveYear": null
+          },
+          "_fundId": "167",
+          "_shareClassId": "6913",
+          "_detailSlug": "allianz-global-diversified-credit-wt-h2-gbp-gbp"
+        },
+        {
+          "isin": "LU2685898640",
+          "wkn": null,
+          "shareClassName": "W (H2-GBP)",
+          "currency": "GBP",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 5.9,
+            "oneYear": 6.88,
+            "threeYear": null,
+            "fiveYear": null
+          },
+          "_fundId": "167",
+          "_shareClassId": "6914",
+          "_detailSlug": "allianz-global-diversified-credit-w-h2-gbp-gbp"
+        },
+        {
+          "isin": "LU1480269551",
+          "wkn": null,
+          "shareClassName": "IT (USD)",
+          "currency": "USD",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": "10/31/2016",
+          "performance": {
+            "ytd": 5.86,
+            "oneYear": 6.81,
+            "threeYear": 7.52,
+            "fiveYear": 3.87
+          },
+          "_fundId": "167",
+          "_shareClassId": "361",
+          "_detailSlug": "allianz-global-diversified-credit-it-usd"
+        }
+      ],
+      "_detailSlug": "allianz-global-diversified-credit-wt-h2-gbp-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Japan Equity",
+      "fundId": "324",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1078006381",
+          "wkn": null,
+          "shareClassName": "WT (EUR)",
+          "currency": "EUR",
+          "nav": 2,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 10.92,
+            "oneYear": 16.5,
+            "threeYear": 14.64,
+            "fiveYear": 11.1
+          },
+          "_fundId": "324",
+          "_shareClassId": "1503",
+          "_detailSlug": "allianz-japan-equity-wt-eur"
+        },
+        {
+          "isin": "LU0348751388",
+          "wkn": null,
+          "shareClassName": "A (USD)",
+          "currency": "USD",
+          "nav": 31.2207,
+          "navDate": "16/12/2025",
+          "launchDate": "10/03/2008",
+          "performance": {
+            "ytd": 21.5,
+            "oneYear": 22.12,
+            "threeYear": 18.73,
+            "fiveYear": 9.46
+          },
+          "_fundId": "324",
+          "_shareClassId": "2556",
+          "_detailSlug": "allianz-japan-equity-a-usd"
+        }
+      ],
+      "_detailSlug": "allianz-japan-equity-wt-eur",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Dynamic Asian High Yield Bond",
+      "fundId": "179",
+      "assetClass": "Fixed Income",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 6",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1706852537",
+          "wkn": null,
+          "shareClassName": "P (H2-EUR)",
+          "currency": "EUR",
+          "nav": 350.77,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 8.64,
+            "oneYear": 8.46,
+            "threeYear": 13.7,
+            "fiveYear": -5.44
+          },
+          "_fundId": "179",
+          "_shareClassId": "4821",
+          "_detailSlug": "allianz-dynamic-asian-high-yield-bond-p-h2-eur-eur"
+        },
+        {
+          "isin": "LU1923143488",
+          "wkn": null,
+          "shareClassName": "RT (USD)",
+          "currency": "USD",
+          "nav": 8.5913,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 10.51,
+            "oneYear": 10.57,
+            "threeYear": 16.03,
+            "fiveYear": -3.77
+          },
+          "_fundId": "179",
+          "_shareClassId": "5174",
+          "_detailSlug": "allianz-dynamic-asian-high-yield-bond-rt-usd"
+        },
+        {
+          "isin": "LU1282649901",
+          "wkn": null,
+          "shareClassName": "AMg (USD)",
+          "currency": "USD",
+          "nav": 4.3046,
+          "navDate": "16/12/2025",
+          "launchDate": "09/25/2015",
+          "performance": {
+            "ytd": 9.94,
+            "oneYear": 9.89,
+            "threeYear": 15.33,
+            "fiveYear": -4.37
+          },
+          "_fundId": "179",
+          "_shareClassId": "977",
+          "_detailSlug": "allianz-dynamic-asian-high-yield-bond-amg-usd"
+        }
+      ],
+      "_detailSlug": "allianz-dynamic-asian-high-yield-bond-p-h2-eur-eur",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz US Equity Fund",
+      "fundId": "95",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 6",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1992127297",
+          "wkn": null,
+          "shareClassName": "IT (USD)",
+          "currency": "USD",
+          "nav": 2,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 12.62,
+            "oneYear": 16.33,
+            "threeYear": 23.06,
+            "fiveYear": 14.45
+          },
+          "_fundId": "95",
+          "_shareClassId": "5684",
+          "_detailSlug": "allianz-us-equity-fund-it-usd"
+        },
+        {
+          "isin": "LU0256863902",
+          "wkn": null,
+          "shareClassName": "AT (USD)",
+          "currency": "USD",
+          "nav": 39.3424,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 11.79,
+            "oneYear": 15.3,
+            "threeYear": 21.97,
+            "fiveYear": 13.44
+          },
+          "_fundId": "95",
+          "_shareClassId": "274",
+          "_detailSlug": "allianz-us-equity-fund-at-usd"
+        },
+        {
+          "isin": "LU1992127024",
+          "wkn": null,
+          "shareClassName": "C2 (USD)",
+          "currency": "USD",
+          "nav": 19.5318,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 11.79,
+            "oneYear": 15.3,
+            "threeYear": 21.98,
+            "fiveYear": 13.43
+          },
+          "_fundId": "95",
+          "_shareClassId": "5604",
+          "_detailSlug": "allianz-us-equity-fund-c2-usd"
+        }
+      ],
+      "_detailSlug": "allianz-us-equity-fund-it-usd",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz UK Listed Opportunities Fund",
+      "fundId": "458",
+      "assetClass": "Equity",
+      "legalStructure": "OEIC",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Not applicable",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "GB00B8BB9445",
+          "wkn": null,
+          "shareClassName": "C (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 217.1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 9.55,
+            "oneYear": 8.52,
+            "threeYear": 7.53,
+            "fiveYear": 13.39
+          },
+          "_fundId": "458",
+          "_shareClassId": "1847",
+          "_detailSlug": "allianz-uk-listed-opportunities-fund-c-acc-gbp"
+        },
+        {
+          "isin": "GB00BNVT3L81",
+          "wkn": null,
+          "shareClassName": "E (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 116.13,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 9.97,
+            "oneYear": 9.03,
+            "threeYear": 8.03,
+            "fiveYear": null
+          },
+          "_fundId": "458",
+          "_shareClassId": "6443",
+          "_detailSlug": "allianz-uk-listed-opportunities-fund-e-acc-gbp"
+        },
+        {
+          "isin": "GB00BKS9NH61",
+          "wkn": null,
+          "shareClassName": "E (Inc) (GBP)",
+          "currency": "GBP",
+          "nav": 102.96,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 10,
+            "oneYear": 9.05,
+            "threeYear": null,
+            "fiveYear": null
+          },
+          "_fundId": "458",
+          "_shareClassId": "6806",
+          "_detailSlug": "allianz-uk-listed-opportunities-fund-e-inc-gbp"
+        },
+        {
+          "isin": "GB00BNVT3K74",
+          "wkn": null,
+          "shareClassName": "I (Acc) (EUR)",
+          "currency": "EUX",
+          "nav": 111.59,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 3.61,
+            "oneYear": 3.6,
+            "threeYear": 7.14,
+            "fiveYear": null
+          },
+          "_fundId": "458",
+          "_shareClassId": "6444",
+          "_detailSlug": "allianz-uk-listed-opportunities-fund-i-acc-eur"
+        },
+        {
+          "isin": "GB00BF13KT15",
+          "wkn": null,
+          "shareClassName": "I (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 170.29,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 9.82,
+            "oneYear": 8.85,
+            "threeYear": 7.84,
+            "fiveYear": 13.72
+          },
+          "_fundId": "458",
+          "_shareClassId": "4386",
+          "_detailSlug": "allianz-uk-listed-opportunities-fund-i-acc-gbp"
+        },
+        {
+          "isin": "GB00BYZQQN57",
+          "wkn": null,
+          "shareClassName": "O (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 151.75,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 10.13,
+            "oneYear": 9.21,
+            "threeYear": 8.2,
+            "fiveYear": 13.39
+          },
+          "_fundId": "458",
+          "_shareClassId": "4980",
+          "_detailSlug": "allianz-uk-listed-opportunities-fund-o-acc-gbp"
+        },
+        {
+          "isin": "GB00BYMV9C39",
+          "wkn": null,
+          "shareClassName": "Y (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 9,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 9.95,
+            "oneYear": 9,
+            "threeYear": 7.98,
+            "fiveYear": 13.9
+          },
+          "_fundId": "458",
+          "_shareClassId": "4261",
+          "_detailSlug": "allianz-uk-listed-opportunities-fund-y-acc-gbp"
+        },
+        {
+          "isin": "GB0031383515",
+          "wkn": null,
+          "shareClassName": "A (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 8,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 9.12,
+            "oneYear": 8.02,
+            "threeYear": 7.02,
+            "fiveYear": 12.99
+          },
+          "_fundId": "458",
+          "_shareClassId": "944",
+          "_detailSlug": "allianz-uk-listed-opportunities-fund-a-acc-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-uk-listed-opportunities-fund-c-acc-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz China A-Shares",
+      "fundId": "2091",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1997246811",
+          "wkn": null,
+          "shareClassName": "PT (USD)",
+          "currency": "USD",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 36.12,
+            "oneYear": 32.86,
+            "threeYear": 9.12,
+            "fiveYear": -2.27
+          },
+          "_fundId": "2091",
+          "_shareClassId": "5563",
+          "_detailSlug": "allianz-china-a-shares-pt-usd"
+        },
+        {
+          "isin": "LU1997245508",
+          "wkn": null,
+          "shareClassName": "RT (USD)",
+          "currency": "USD",
+          "nav": 14.4063,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 36.01,
+            "oneYear": 32.73,
+            "threeYear": 9,
+            "fiveYear": -2.37
+          },
+          "_fundId": "2091",
+          "_shareClassId": "5565",
+          "_detailSlug": "allianz-china-a-shares-rt-usd"
+        },
+        {
+          "isin": "LU1997245680",
+          "wkn": null,
+          "shareClassName": "W (USD)",
+          "currency": "USD",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 36.57,
+            "oneYear": 33.38,
+            "threeYear": 9.54,
+            "fiveYear": -1.89
+          },
+          "_fundId": "2091",
+          "_shareClassId": "5566",
+          "_detailSlug": "allianz-china-a-shares-w-usd"
+        },
+        {
+          "isin": "LU1997245763",
+          "wkn": null,
+          "shareClassName": "W7 (USD)",
+          "currency": "USD",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 36.92,
+            "oneYear": 33.79,
+            "threeYear": 9.83,
+            "fiveYear": -1.68
+          },
+          "_fundId": "2091",
+          "_shareClassId": "5567",
+          "_detailSlug": "allianz-china-a-shares-w7-usd"
+        },
+        {
+          "isin": "LU1997245847",
+          "wkn": null,
+          "shareClassName": "WT (GBP)",
+          "currency": "GBP",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 30.47,
+            "oneYear": 32.06,
+            "threeYear": 4.92,
+            "fiveYear": -2.14
+          },
+          "_fundId": "2091",
+          "_shareClassId": "5568",
+          "_detailSlug": "allianz-china-a-shares-wt-gbp"
+        },
+        {
+          "isin": "LU1997245177",
+          "wkn": null,
+          "shareClassName": "AT (USD)",
+          "currency": "USD",
+          "nav": 13.6587,
+          "navDate": "16/12/2025",
+          "launchDate": "10/23/2019",
+          "performance": {
+            "ytd": 35.03,
+            "oneYear": 31.58,
+            "threeYear": 8.06,
+            "fiveYear": -3.21
+          },
+          "_fundId": "2091",
+          "_shareClassId": "5562",
+          "_detailSlug": "allianz-china-a-shares-at-usd"
+        },
+        {
+          "isin": "LU2257586540",
+          "wkn": null,
+          "shareClassName": "CT (USD)",
+          "currency": "USD",
+          "nav": 7.502,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 34.18,
+            "oneYear": 30.59,
+            "threeYear": 7.25,
+            "fiveYear": null
+          },
+          "_fundId": "2091",
+          "_shareClassId": "6137",
+          "_detailSlug": "allianz-china-a-shares-ct-usd"
+        },
+        {
+          "isin": "LU1997245250",
+          "wkn": null,
+          "shareClassName": "IT (USD)",
+          "currency": "USD",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 36.17,
+            "oneYear": 32.91,
+            "threeYear": 9.16,
+            "fiveYear": -2.23
+          },
+          "_fundId": "2091",
+          "_shareClassId": "5560",
+          "_detailSlug": "allianz-china-a-shares-it-usd"
+        },
+        {
+          "isin": "LU1997245334",
+          "wkn": null,
+          "shareClassName": "P (EUR)",
+          "currency": "EUR",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 22.51,
+            "oneYear": 24.72,
+            "threeYear": 3.74,
+            "fiveYear": -2.05
+          },
+          "_fundId": "2091",
+          "_shareClassId": "5561",
+          "_detailSlug": "allianz-china-a-shares-p-eur"
+        },
+        {
+          "isin": "LU2093580772",
+          "wkn": null,
+          "shareClassName": "PT (GBP)",
+          "currency": "GBP",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 29.97,
+            "oneYear": 31.28,
+            "threeYear": 4.52,
+            "fiveYear": -2.32
+          },
+          "_fundId": "2091",
+          "_shareClassId": "5706",
+          "_detailSlug": "allianz-china-a-shares-pt-gbp"
+        },
+        {
+          "isin": "LU2083965363",
+          "wkn": null,
+          "shareClassName": "P2 (USD)",
+          "currency": "USD",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 36.52,
+            "oneYear": 33.32,
+            "threeYear": 9.5,
+            "fiveYear": -1.93
+          },
+          "_fundId": "2091",
+          "_shareClassId": "5675",
+          "_detailSlug": "allianz-china-a-shares-p2-usd"
+        }
+      ],
+      "_detailSlug": "allianz-china-a-shares-pt-usd",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz All China Equity",
+      "fundId": "1939",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1851368685",
+          "wkn": null,
+          "shareClassName": "P2 (USD)",
+          "currency": "USD",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 41.73,
+            "oneYear": 38.32,
+            "threeYear": 16.7,
+            "fiveYear": -1.86
+          },
+          "_fundId": "1939",
+          "_shareClassId": "5046",
+          "_detailSlug": "allianz-all-china-equity-p2-usd"
+        },
+        {
+          "isin": "LU2105731603",
+          "wkn": null,
+          "shareClassName": "PT (GBP)",
+          "currency": "GBP",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 34.92,
+            "oneYear": 36.01,
+            "threeYear": 11.5,
+            "fiveYear": -2.5
+          },
+          "_fundId": "1939",
+          "_shareClassId": "5718",
+          "_detailSlug": "allianz-all-china-equity-pt-gbp"
+        },
+        {
+          "isin": "LU1835929800",
+          "wkn": null,
+          "shareClassName": "PT (USD)",
+          "currency": "USD",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 41.29,
+            "oneYear": 37.81,
+            "threeYear": 16.28,
+            "fiveYear": -2.21
+          },
+          "_fundId": "1939",
+          "_shareClassId": "5040",
+          "_detailSlug": "allianz-all-china-equity-pt-usd"
+        },
+        {
+          "isin": "LU1720050555",
+          "wkn": null,
+          "shareClassName": "RT (USD)",
+          "currency": "USD",
+          "nav": 14.1538,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 41.17,
+            "oneYear": 37.67,
+            "threeYear": 16.16,
+            "fiveYear": -2.3
+          },
+          "_fundId": "1939",
+          "_shareClassId": "5018",
+          "_detailSlug": "allianz-all-china-equity-rt-usd"
+        },
+        {
+          "isin": "LU1835930212",
+          "wkn": null,
+          "shareClassName": "W (EUR)",
+          "currency": "EUR",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 27.76,
+            "oneYear": 30.03,
+            "threeYear": 11.04,
+            "fiveYear": -1.68
+          },
+          "_fundId": "1939",
+          "_shareClassId": "5025",
+          "_detailSlug": "allianz-all-china-equity-w-eur"
+        },
+        {
+          "isin": "LU2264183349",
+          "wkn": null,
+          "shareClassName": "W6 (GBP)",
+          "currency": "GBP",
+          "nav": 79.83,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 35.4,
+            "oneYear": 36.61,
+            "threeYear": 11.84,
+            "fiveYear": -2.04
+          },
+          "_fundId": "1939",
+          "_shareClassId": "6156",
+          "_detailSlug": "allianz-all-china-equity-w6-gbp"
+        },
+        {
+          "isin": "LU2309373897",
+          "wkn": null,
+          "shareClassName": "WT (EUR)",
+          "currency": "EUR",
+          "nav": 800.35,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 27.5,
+            "oneYear": 29.68,
+            "threeYear": 10.87,
+            "fiveYear": -1.81
+          },
+          "_fundId": "1939",
+          "_shareClassId": "6291",
+          "_detailSlug": "allianz-all-china-equity-wt-eur"
+        },
+        {
+          "isin": "LU1835929719",
+          "wkn": null,
+          "shareClassName": "WT (GBP)",
+          "currency": "GBP",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 35.05,
+            "oneYear": 36.3,
+            "threeYear": 11.7,
+            "fiveYear": -2.2
+          },
+          "_fundId": "1939",
+          "_shareClassId": "5020",
+          "_detailSlug": "allianz-all-china-equity-wt-gbp"
+        },
+        {
+          "isin": "LU1720048575",
+          "wkn": null,
+          "shareClassName": "WT (USD)",
+          "currency": "USD",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 41.75,
+            "oneYear": 38.35,
+            "threeYear": 16.74,
+            "fiveYear": -1.83
+          },
+          "_fundId": "1939",
+          "_shareClassId": "4811",
+          "_detailSlug": "allianz-all-china-equity-wt-usd"
+        },
+        {
+          "isin": "LU2199565925",
+          "wkn": null,
+          "shareClassName": "WT6 (GBP)",
+          "currency": "GBP",
+          "nav": 89.28,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 35.23,
+            "oneYear": 36.48,
+            "threeYear": 11.72,
+            "fiveYear": -2.18
+          },
+          "_fundId": "1939",
+          "_shareClassId": "5980",
+          "_detailSlug": "allianz-all-china-equity-wt6-gbp"
+        },
+        {
+          "isin": "LU1946895437",
+          "wkn": null,
+          "shareClassName": "P (EUR)",
+          "currency": "EUR",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 27.06,
+            "oneYear": 29.22,
+            "threeYear": 10.36,
+            "fiveYear": -2.1
+          },
+          "_fundId": "1939",
+          "_shareClassId": "5231",
+          "_detailSlug": "allianz-all-china-equity-p-eur"
+        },
+        {
+          "isin": "LU1946895353",
+          "wkn": null,
+          "shareClassName": "A (EUR)",
+          "currency": "EUR",
+          "nav": 136.09,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 26.07,
+            "oneYear": 28.03,
+            "threeYear": 9.44,
+            "fiveYear": -3
+          },
+          "_fundId": "1939",
+          "_shareClassId": "5229",
+          "_detailSlug": "allianz-all-china-equity-a-eur"
+        },
+        {
+          "isin": "LU1961090484",
+          "wkn": null,
+          "shareClassName": "A (USD)",
+          "currency": "USD",
+          "nav": 11.9795,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 40.16,
+            "oneYear": 36.48,
+            "threeYear": 15.18,
+            "fiveYear": -3.15
+          },
+          "_fundId": "1939",
+          "_shareClassId": "5606",
+          "_detailSlug": "allianz-all-china-equity-a-usd"
+        },
+        {
+          "isin": "LU1946895510",
+          "wkn": null,
+          "shareClassName": "AT (H2-EUR)",
+          "currency": "EUR",
+          "nav": 124.1,
+          "navDate": "16/12/2025",
+          "launchDate": "12/05/2017",
+          "performance": {
+            "ytd": 37.05,
+            "oneYear": 32.09,
+            "threeYear": 12,
+            "fiveYear": -5.41
+          },
+          "_fundId": "1939",
+          "_shareClassId": "5230",
+          "_detailSlug": "allianz-all-china-equity-at-h2-eur-eur"
+        }
+      ],
+      "_detailSlug": "allianz-all-china-equity-p2-usd",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Global Floating Rate Notes Plus",
+      "fundId": "1948",
+      "assetClass": "Fixed Income",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1865151887",
+          "wkn": null,
+          "shareClassName": "P (H2-GBP)",
+          "currency": "GBP",
+          "nav": 978.23,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 3.98,
+            "oneYear": 5.02,
+            "threeYear": 6.63,
+            "fiveYear": 3.98
+          },
+          "_fundId": "1948",
+          "_shareClassId": "5107",
+          "_detailSlug": "allianz-global-floating-rate-notes-plus-p-h2-gbp-gbp"
+        },
+        {
+          "isin": "LU1740659344",
+          "wkn": null,
+          "shareClassName": "RT (USD)",
+          "currency": "USD",
+          "nav": 12.8253,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 4.05,
+            "oneYear": 5.08,
+            "threeYear": 6.97,
+            "fiveYear": 4.26
+          },
+          "_fundId": "1948",
+          "_shareClassId": "5045",
+          "_detailSlug": "allianz-global-floating-rate-notes-plus-rt-usd"
+        },
+        {
+          "isin": "LU1846711825",
+          "wkn": null,
+          "shareClassName": "W (H2-GBP)",
+          "currency": "GBP",
+          "nav": 971.67,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 4.14,
+            "oneYear": 5.2,
+            "threeYear": 6.74,
+            "fiveYear": 4.01
+          },
+          "_fundId": "1948",
+          "_shareClassId": "5039",
+          "_detailSlug": "allianz-global-floating-rate-notes-plus-w-h2-gbp-gbp"
+        },
+        {
+          "isin": "LU3084417842",
+          "wkn": null,
+          "shareClassName": "CT (USD)",
+          "currency": "USD",
+          "nav": 10.2073,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": null,
+            "oneYear": null,
+            "threeYear": null,
+            "fiveYear": null
+          },
+          "_fundId": "1948",
+          "_shareClassId": "7396",
+          "_detailSlug": "allianz-global-floating-rate-notes-plus-ct-usd"
+        },
+        {
+          "isin": "LU1740659856",
+          "wkn": null,
+          "shareClassName": "IT (USD)",
+          "currency": "USD",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": "02/07/2018",
+          "performance": {
+            "ytd": 4.12,
+            "oneYear": 5.17,
+            "threeYear": 7.06,
+            "fiveYear": 4.34
+          },
+          "_fundId": "1948",
+          "_shareClassId": "4895",
+          "_detailSlug": "allianz-global-floating-rate-notes-plus-it-usd"
+        }
+      ],
+      "_detailSlug": "allianz-global-floating-rate-notes-plus-p-h2-gbp-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz China A Opportunities",
+      "fundId": "2262",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU2282082051",
+          "wkn": null,
+          "shareClassName": "WT (USD)",
+          "currency": "USD",
+          "nav": 712.9,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 36.13,
+            "oneYear": 33.58,
+            "threeYear": 10.04,
+            "fiveYear": null
+          },
+          "_fundId": "2262",
+          "_shareClassId": "6191",
+          "_detailSlug": "allianz-china-a-opportunities-wt-usd"
+        }
+      ],
+      "_detailSlug": "allianz-china-a-opportunities-wt-usd",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz US Short Duration High Income Bond",
+      "fundId": "169",
+      "assetClass": "Fixed Income",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1363153740",
+          "wkn": null,
+          "shareClassName": "AT (USD)",
+          "currency": "USD",
+          "nav": 14.542,
+          "navDate": "16/12/2025",
+          "launchDate": "03/08/2016",
+          "performance": {
+            "ytd": -0.82,
+            "oneYear": 0.15,
+            "threeYear": 6.67,
+            "fiveYear": 3.93
+          },
+          "_fundId": "169",
+          "_shareClassId": "696",
+          "_detailSlug": "allianz-us-short-duration-high-income-bond-at-usd"
+        },
+        {
+          "isin": "LU1282651717",
+          "wkn": null,
+          "shareClassName": "P (H2-EUR)",
+          "currency": "EUR",
+          "nav": 750.78,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": -2.18,
+            "oneYear": -1.31,
+            "threeYear": 5.22,
+            "fiveYear": 2.78
+          },
+          "_fundId": "169",
+          "_shareClassId": "4339",
+          "_detailSlug": "allianz-us-short-duration-high-income-bond-p-h2-eur-eur"
+        },
+        {
+          "isin": "LU1322973550",
+          "wkn": null,
+          "shareClassName": "P (USD)",
+          "currency": "USD",
+          "nav": 930.05,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": -0.28,
+            "oneYear": 0.74,
+            "threeYear": 7.3,
+            "fiveYear": 4.55
+          },
+          "_fundId": "169",
+          "_shareClassId": "823",
+          "_detailSlug": "allianz-us-short-duration-high-income-bond-p-usd"
+        },
+        {
+          "isin": "LU1349983426",
+          "wkn": null,
+          "shareClassName": "PM (USD)",
+          "currency": "USD",
+          "nav": 979.12,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": -0.28,
+            "oneYear": 0.75,
+            "threeYear": 7.3,
+            "fiveYear": 4.55
+          },
+          "_fundId": "169",
+          "_shareClassId": "795",
+          "_detailSlug": "allianz-us-short-duration-high-income-bond-pm-usd"
+        },
+        {
+          "isin": "LU1597343661",
+          "wkn": null,
+          "shareClassName": "PT (H2-CHF)",
+          "currency": "CHF",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": -4,
+            "oneYear": -3.37,
+            "threeYear": 2.87,
+            "fiveYear": 1.31
+          },
+          "_fundId": "169",
+          "_shareClassId": "4372",
+          "_detailSlug": "allianz-us-short-duration-high-income-bond-pt-h2-chf-chf"
+        },
+        {
+          "isin": "LU1389837904",
+          "wkn": null,
+          "shareClassName": "PT (USD)",
+          "currency": "USD",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": -0.28,
+            "oneYear": 0.74,
+            "threeYear": 7.29,
+            "fiveYear": 4.54
+          },
+          "_fundId": "169",
+          "_shareClassId": "4403",
+          "_detailSlug": "allianz-us-short-duration-high-income-bond-pt-usd"
+        },
+        {
+          "isin": "LU1377965386",
+          "wkn": null,
+          "shareClassName": "R (H2-EUR)",
+          "currency": "EUR",
+          "nav": 75.65,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": -2.26,
+            "oneYear": -1.41,
+            "threeYear": 5.19,
+            "fiveYear": 2.73
+          },
+          "_fundId": "169",
+          "_shareClassId": "655",
+          "_detailSlug": "allianz-us-short-duration-high-income-bond-r-h2-eur-eur"
+        },
+        {
+          "isin": "LU1685826841",
+          "wkn": null,
+          "shareClassName": "R (USD)",
+          "currency": "USD",
+          "nav": 9.0759,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": -0.32,
+            "oneYear": 0.71,
+            "threeYear": 7.24,
+            "fiveYear": 4.5
+          },
+          "_fundId": "169",
+          "_shareClassId": "4699",
+          "_detailSlug": "allianz-us-short-duration-high-income-bond-r-usd"
+        },
+        {
+          "isin": "LU1377965469",
+          "wkn": null,
+          "shareClassName": "RT (H2-EUR)",
+          "currency": "EUR",
+          "nav": 125.85,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": -2.21,
+            "oneYear": -1.34,
+            "threeYear": 5.12,
+            "fiveYear": 2.66
+          },
+          "_fundId": "169",
+          "_shareClassId": "654",
+          "_detailSlug": "allianz-us-short-duration-high-income-bond-rt-h2-eur-eur"
+        }
+      ],
+      "_detailSlug": "allianz-us-short-duration-high-income-bond-at-usd",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Best Styles Global Equity",
+      "fundId": "138",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 6",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1093406939",
+          "wkn": null,
+          "shareClassName": "IT (USD)",
+          "currency": "USD",
+          "nav": 3,
+          "navDate": "16/12/2025",
+          "launchDate": "03/11/2016",
+          "performance": {
+            "ytd": 19.4,
+            "oneYear": 22.68,
+            "threeYear": 24.42,
+            "fiveYear": 17.78
+          },
+          "_fundId": "138",
+          "_shareClassId": "692",
+          "_detailSlug": "allianz-best-styles-global-equity-it-usd"
+        }
+      ],
+      "_detailSlug": "allianz-best-styles-global-equity-it-usd",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Global Artificial Intelligence",
+      "fundId": "1790",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1548497426",
+          "wkn": null,
+          "shareClassName": "AT (USD)",
+          "currency": "USD",
+          "nav": 33.7835,
+          "navDate": "16/12/2025",
+          "launchDate": "03/31/2017",
+          "performance": {
+            "ytd": 17.72,
+            "oneYear": 25.78,
+            "threeYear": 22.36,
+            "fiveYear": 8.83
+          },
+          "_fundId": "1790",
+          "_shareClassId": "4332",
+          "_detailSlug": "allianz-global-artificial-intelligence-at-usd"
+        },
+        {
+          "isin": "LU1602091867",
+          "wkn": null,
+          "shareClassName": "CT (EUR)",
+          "currency": "EUR",
+          "nav": 288.37,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 5.29,
+            "oneYear": 17.2,
+            "threeYear": 15.45,
+            "fiveYear": 8.2
+          },
+          "_fundId": "1790",
+          "_shareClassId": "4379",
+          "_detailSlug": "allianz-global-artificial-intelligence-ct-eur"
+        },
+        {
+          "isin": "LU1970681679",
+          "wkn": null,
+          "shareClassName": "P (EUR)",
+          "currency": "EUR",
+          "nav": 2,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 6.77,
+            "oneYear": 19.16,
+            "threeYear": 17.46,
+            "fiveYear": 10.14
+          },
+          "_fundId": "1790",
+          "_shareClassId": "5291",
+          "_detailSlug": "allianz-global-artificial-intelligence-p-eur"
+        },
+        {
+          "isin": "LU2481593080",
+          "wkn": null,
+          "shareClassName": "P (USD)",
+          "currency": "USD",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 18.67,
+            "oneYear": 27.01,
+            "threeYear": 23.53,
+            "fiveYear": null
+          },
+          "_fundId": "1790",
+          "_shareClassId": "6642",
+          "_detailSlug": "allianz-global-artificial-intelligence-p-usd"
+        },
+        {
+          "isin": "LU1597246385",
+          "wkn": null,
+          "shareClassName": "PT (GBP)",
+          "currency": "GBP",
+          "nav": 3,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 13.37,
+            "oneYear": 25.45,
+            "threeYear": 18.41,
+            "fiveYear": 9.59
+          },
+          "_fundId": "1790",
+          "_shareClassId": "4349",
+          "_detailSlug": "allianz-global-artificial-intelligence-pt-gbp"
+        },
+        {
+          "isin": "LU1597246542",
+          "wkn": null,
+          "shareClassName": "PT (H2-CHF)",
+          "currency": "CHF",
+          "nav": 2,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 14.45,
+            "oneYear": 21.81,
+            "threeYear": 18.34,
+            "fiveYear": 6.07
+          },
+          "_fundId": "1790",
+          "_shareClassId": "4351",
+          "_detailSlug": "allianz-global-artificial-intelligence-pt-h2-chf-chf"
+        },
+        {
+          "isin": "LU1579353134",
+          "wkn": null,
+          "shareClassName": "PT (H2-GBP)",
+          "currency": "GBP",
+          "nav": 3,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 18.21,
+            "oneYear": 26.43,
+            "threeYear": 22.53,
+            "fiveYear": 8.71
+          },
+          "_fundId": "1790",
+          "_shareClassId": "4335",
+          "_detailSlug": "allianz-global-artificial-intelligence-pt-h2-gbp-gbp"
+        },
+        {
+          "isin": "LU1677195205",
+          "wkn": null,
+          "shareClassName": "R (EUR)",
+          "currency": "EUR",
+          "nav": 290.46,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 6.7,
+            "oneYear": 19.11,
+            "threeYear": 17.24,
+            "fiveYear": 9.89
+          },
+          "_fundId": "1790",
+          "_shareClassId": "4701",
+          "_detailSlug": "allianz-global-artificial-intelligence-r-eur"
+        },
+        {
+          "isin": "LU1597246039",
+          "wkn": null,
+          "shareClassName": "RT (EUR)",
+          "currency": "EUR",
+          "nav": 335.57,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 6.77,
+            "oneYear": 19.17,
+            "threeYear": 17.45,
+            "fiveYear": 10.03
+          },
+          "_fundId": "1790",
+          "_shareClassId": "4350",
+          "_detailSlug": "allianz-global-artificial-intelligence-rt-eur"
+        },
+        {
+          "isin": "LU1677195031",
+          "wkn": null,
+          "shareClassName": "RT (H2-EUR)",
+          "currency": "EUR",
+          "nav": 250.86,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 16.39,
+            "oneYear": 24.25,
+            "threeYear": 20.71,
+            "fiveYear": 7.31
+          },
+          "_fundId": "1790",
+          "_shareClassId": "4702",
+          "_detailSlug": "allianz-global-artificial-intelligence-rt-h2-eur-eur"
+        },
+        {
+          "isin": "LU1548497772",
+          "wkn": null,
+          "shareClassName": "AT (H2-EUR)",
+          "currency": "EUR",
+          "nav": 274.31,
+          "navDate": "16/12/2025",
+          "launchDate": "03/31/2017",
+          "performance": {
+            "ytd": 15.57,
+            "oneYear": 23.15,
+            "threeYear": 19.67,
+            "fiveYear": 6.37
+          },
+          "_fundId": "1790",
+          "_shareClassId": "4336",
+          "_detailSlug": "allianz-global-artificial-intelligence-at-h2-eur-eur"
+        },
+        {
+          "isin": "LU1698898050",
+          "wkn": null,
+          "shareClassName": "RT (USD)",
+          "currency": "USD",
+          "nav": 30.3387,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 18.57,
+            "oneYear": 26.88,
+            "threeYear": 23.45,
+            "fiveYear": 9.78
+          },
+          "_fundId": "1790",
+          "_shareClassId": "4773",
+          "_detailSlug": "allianz-global-artificial-intelligence-rt-usd"
+        },
+        {
+          "isin": "LU1548497699",
+          "wkn": null,
+          "shareClassName": "AT (EUR)",
+          "currency": "EUR",
+          "nav": 308.15,
+          "navDate": "16/12/2025",
+          "launchDate": "05/02/2017",
+          "performance": {
+            "ytd": 5.93,
+            "oneYear": 18.05,
+            "threeYear": 16.31,
+            "fiveYear": 9.03
+          },
+          "_fundId": "1790",
+          "_shareClassId": "4356",
+          "_detailSlug": "allianz-global-artificial-intelligence-at-eur"
+        }
+      ],
+      "_detailSlug": "allianz-global-artificial-intelligence-at-usd",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Best Styles Global AC Equity Fund",
+      "fundId": "402",
+      "assetClass": "Equity",
+      "legalStructure": "OEIC",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Not applicable",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "GB00BYQ91X80",
+          "wkn": null,
+          "shareClassName": "C (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 348.08,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 19.09,
+            "oneYear": 24.05,
+            "threeYear": 20.34,
+            "fiveYear": 18.25
+          },
+          "_fundId": "402",
+          "_shareClassId": "824",
+          "_detailSlug": "allianz-best-styles-global-ac-equity-fund-c-acc-gbp"
+        },
+        {
+          "isin": "GB00BYQ91V66",
+          "wkn": null,
+          "shareClassName": "I (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 351.4,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 19.18,
+            "oneYear": 24.16,
+            "threeYear": 20.44,
+            "fiveYear": 18.37
+          },
+          "_fundId": "402",
+          "_shareClassId": "827",
+          "_detailSlug": "allianz-best-styles-global-ac-equity-fund-i-acc-gbp"
+        },
+        {
+          "isin": "GB00BYZQV963",
+          "wkn": null,
+          "shareClassName": "O (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 243.7,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 18.58,
+            "oneYear": 23.55,
+            "threeYear": 20.25,
+            "fiveYear": 18.29
+          },
+          "_fundId": "402",
+          "_shareClassId": "4978",
+          "_detailSlug": "allianz-best-styles-global-ac-equity-fund-o-acc-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-best-styles-global-ac-equity-fund-c-acc-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz RiskMaster Growth Multi Asset Fund",
+      "fundId": "114",
+      "assetClass": "Multi Asset",
+      "legalStructure": "OEIC",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Not applicable",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "GB00BYMVBC71",
+          "wkn": null,
+          "shareClassName": "Y (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 8,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 17.16,
+            "oneYear": 18.41,
+            "threeYear": 13.86,
+            "fiveYear": 10.19
+          },
+          "_fundId": "114",
+          "_shareClassId": "4264",
+          "_detailSlug": "allianz-riskmaster-growth-multi-asset-fund-y-acc-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-riskmaster-growth-multi-asset-fund-y-acc-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Floating Rate Notes Plus",
+      "fundId": "146",
+      "assetClass": "Fixed Income",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1089088741",
+          "wkn": null,
+          "shareClassName": "AT (EUR)",
+          "currency": "EUR",
+          "nav": 107.82,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 1.97,
+            "oneYear": 2.48,
+            "threeYear": 3.19,
+            "fiveYear": 1.69
+          },
+          "_fundId": "146",
+          "_shareClassId": "501",
+          "_detailSlug": "allianz-floating-rate-notes-plus-at-eur"
+        }
+      ],
+      "_detailSlug": "allianz-floating-rate-notes-plus-at-eur",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Cyber Security",
+      "fundId": "2265",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU2455351473",
+          "wkn": null,
+          "shareClassName": "AT (H2-SGD)",
+          "currency": "SGD",
+          "nav": 13.4327,
+          "navDate": "16/12/2025",
+          "launchDate": "04/25/2022",
+          "performance": {
+            "ytd": 17.28,
+            "oneYear": 28.91,
+            "threeYear": 22.79,
+            "fiveYear": null
+          },
+          "_fundId": "2265",
+          "_shareClassId": "6597",
+          "_detailSlug": "allianz-cyber-security-at-h2-sgd-sgd"
+        },
+        {
+          "isin": "LU2286300806",
+          "wkn": null,
+          "shareClassName": "AT (USD)",
+          "currency": "USD",
+          "nav": 12.6941,
+          "navDate": "16/12/2025",
+          "launchDate": "02/09/2021",
+          "performance": {
+            "ytd": 19.76,
+            "oneYear": 32.02,
+            "threeYear": 25.26,
+            "fiveYear": null
+          },
+          "_fundId": "2265",
+          "_shareClassId": "6215",
+          "_detailSlug": "allianz-cyber-security-at-usd"
+        },
+        {
+          "isin": "LU2286301523",
+          "wkn": null,
+          "shareClassName": "P (EUR)",
+          "currency": "EUR",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 9.09,
+            "oneYear": 25.41,
+            "threeYear": 20.1,
+            "fiveYear": null
+          },
+          "_fundId": "2265",
+          "_shareClassId": "6221",
+          "_detailSlug": "allianz-cyber-security-p-eur"
+        },
+        {
+          "isin": "LU2286301283",
+          "wkn": null,
+          "shareClassName": "RT (USD)",
+          "currency": "USD",
+          "nav": 13.2278,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 20.63,
+            "oneYear": 33.17,
+            "threeYear": 26.35,
+            "fiveYear": null
+          },
+          "_fundId": "2265",
+          "_shareClassId": "6217",
+          "_detailSlug": "allianz-cyber-security-rt-usd"
+        }
+      ],
+      "_detailSlug": "allianz-cyber-security-at-h2-sgd-sgd",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Euro Credit SRI",
+      "fundId": "180",
+      "assetClass": "Fixed Income",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1136108757",
+          "wkn": null,
+          "shareClassName": "WT (EUR)",
+          "currency": "EUR",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 2.81,
+            "oneYear": 4.12,
+            "threeYear": 7.54,
+            "fiveYear": 0.1
+          },
+          "_fundId": "180",
+          "_shareClassId": "5015",
+          "_detailSlug": "allianz-euro-credit-sri-wt-eur"
+        }
+      ],
+      "_detailSlug": "allianz-euro-credit-sri-wt-eur",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz RiskMaster Moderate Multi Asset Fund",
+      "fundId": "115",
+      "assetClass": "Multi Asset",
+      "legalStructure": "OEIC",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Not applicable",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "GB00BYMVB948",
+          "wkn": null,
+          "shareClassName": "Y (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 7,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 15.2,
+            "oneYear": 16,
+            "threeYear": 11.79,
+            "fiveYear": 7.79
+          },
+          "_fundId": "115",
+          "_shareClassId": "4263",
+          "_detailSlug": "allianz-riskmaster-moderate-multi-asset-fund-y-acc-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-riskmaster-moderate-multi-asset-fund-y-acc-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Green Bond",
+      "fundId": "148",
+      "assetClass": "Fixed Income",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 9",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1896600654",
+          "wkn": null,
+          "shareClassName": "AT (H2-USD)",
+          "currency": "USD",
+          "nav": 10.6085,
+          "navDate": "16/12/2025",
+          "launchDate": "11/02/2018",
+          "performance": {
+            "ytd": 3.98,
+            "oneYear": 4.99,
+            "threeYear": 5.95,
+            "fiveYear": -1.61
+          },
+          "_fundId": "148",
+          "_shareClassId": "5142",
+          "_detailSlug": "allianz-green-bond-at-h2-usd-usd"
+        },
+        {
+          "isin": "LU1522997029",
+          "wkn": null,
+          "shareClassName": "AT3 (H2-SEK)",
+          "currency": "SEK",
+          "nav": 945.81,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 2.05,
+            "oneYear": 2.68,
+            "threeYear": 3.85,
+            "fiveYear": -3
+          },
+          "_fundId": "148",
+          "_shareClassId": "330",
+          "_detailSlug": "allianz-green-bond-at3-h2-sek-sek"
+        },
+        {
+          "isin": "LU1896600738",
+          "wkn": null,
+          "shareClassName": "IT (H2-USD)",
+          "currency": "USD",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": "11/02/2018",
+          "performance": {
+            "ytd": 4.39,
+            "oneYear": 5.44,
+            "threeYear": 6.42,
+            "fiveYear": -1.11
+          },
+          "_fundId": "148",
+          "_shareClassId": "5141",
+          "_detailSlug": "allianz-green-bond-it-h2-usd-usd"
+        },
+        {
+          "isin": "LU1566179385",
+          "wkn": null,
+          "shareClassName": "P2 (H2-GBP)",
+          "currency": "GBP",
+          "nav": 957.13,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 4.23,
+            "oneYear": 5.3,
+            "threeYear": 6,
+            "fiveYear": -1.5
+          },
+          "_fundId": "148",
+          "_shareClassId": "4269",
+          "_detailSlug": "allianz-green-bond-p2-h2-gbp-gbp"
+        },
+        {
+          "isin": "LU1451583626",
+          "wkn": null,
+          "shareClassName": "PT (EUR)",
+          "currency": "EUR",
+          "nav": 933.29,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 2.35,
+            "oneYear": 3.09,
+            "threeYear": 4.17,
+            "fiveYear": -2.91
+          },
+          "_fundId": "148",
+          "_shareClassId": "512",
+          "_detailSlug": "allianz-green-bond-pt-eur"
+        },
+        {
+          "isin": "LU1629891547",
+          "wkn": null,
+          "shareClassName": "PT (H2-CHF)",
+          "currency": "CHF",
+          "nav": 863.1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 0.42,
+            "oneYear": 0.71,
+            "threeYear": 1.79,
+            "fiveYear": -4.36
+          },
+          "_fundId": "148",
+          "_shareClassId": "4603",
+          "_detailSlug": "allianz-green-bond-pt-h2-chf-chf"
+        },
+        {
+          "isin": "LU2002517253",
+          "wkn": null,
+          "shareClassName": "PT (H2-USD)",
+          "currency": "USD",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 4.29,
+            "oneYear": 5.35,
+            "threeYear": 6.4,
+            "fiveYear": -1.12
+          },
+          "_fundId": "148",
+          "_shareClassId": "5338",
+          "_detailSlug": "allianz-green-bond-pt-h2-usd-usd"
+        },
+        {
+          "isin": "LU2153615435",
+          "wkn": null,
+          "shareClassName": "PT2 (H2-GBP)",
+          "currency": "GBP",
+          "nav": 97.5,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 4.25,
+            "oneYear": 5.33,
+            "threeYear": 6.03,
+            "fiveYear": -1.45
+          },
+          "_fundId": "148",
+          "_shareClassId": "5785",
+          "_detailSlug": "allianz-green-bond-pt2-h2-gbp-gbp"
+        },
+        {
+          "isin": "LU1297616101",
+          "wkn": null,
+          "shareClassName": "W (EUR)",
+          "currency": "EUR",
+          "nav": 875.94,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 2.54,
+            "oneYear": 3.32,
+            "threeYear": 4.4,
+            "fiveYear": -2.7
+          },
+          "_fundId": "148",
+          "_shareClassId": "842",
+          "_detailSlug": "allianz-green-bond-w-eur"
+        }
+      ],
+      "_detailSlug": "allianz-green-bond-at-h2-usd-usd",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Emerging Markets Short Duration Bond",
+      "fundId": "183",
+      "assetClass": "Fixed Income",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 6",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1602090620",
+          "wkn": null,
+          "shareClassName": "WT (H2-EUR)",
+          "currency": "EUR",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 5.05,
+            "oneYear": 5.09,
+            "threeYear": 7.14,
+            "fiveYear": 1.29
+          },
+          "_fundId": "183",
+          "_shareClassId": "4368",
+          "_detailSlug": "allianz-emerging-markets-short-duration-bond-wt-h2-eur-eur"
+        }
+      ],
+      "_detailSlug": "allianz-emerging-markets-short-duration-bond-wt-h2-eur-eur",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz RiskMaster Conservative Multi Asset Fund",
+      "fundId": "117",
+      "assetClass": "Multi Asset",
+      "legalStructure": "OEIC",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Not applicable",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "GB00BYMVB724",
+          "wkn": null,
+          "shareClassName": "Y (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 6,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 12.61,
+            "oneYear": 12.91,
+            "threeYear": 9.36,
+            "fiveYear": 5.02
+          },
+          "_fundId": "117",
+          "_shareClassId": "4262",
+          "_detailSlug": "allianz-riskmaster-conservative-multi-asset-fund-y-acc-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-riskmaster-conservative-multi-asset-fund-y-acc-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Gilt Yield Fund",
+      "fundId": "303",
+      "assetClass": "Fixed Income",
+      "legalStructure": "OEIC",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Not applicable",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "GB0031383390",
+          "wkn": null,
+          "shareClassName": "I (Inc) (GBP)",
+          "currency": "GBp",
+          "nav": 138.27,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 4.42,
+            "oneYear": 3.24,
+            "threeYear": 0.85,
+            "fiveYear": -5.8
+          },
+          "_fundId": "303",
+          "_shareClassId": "599",
+          "_detailSlug": "allianz-gilt-yield-fund-i-inc-gbp"
+        },
+        {
+          "isin": "GB00BPDZWX38",
+          "wkn": null,
+          "shareClassName": "Z (Inc) (GBP)",
+          "currency": "GBp",
+          "nav": 96.09,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 4.53,
+            "oneYear": 3.38,
+            "threeYear": null,
+            "fiveYear": null
+          },
+          "_fundId": "303",
+          "_shareClassId": "7152",
+          "_detailSlug": "allianz-gilt-yield-fund-z-inc-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-gilt-yield-fund-i-inc-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Europe Equity Growth Select",
+      "fundId": "200",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1173934883",
+          "wkn": null,
+          "shareClassName": "RT (EUR)",
+          "currency": "EUR",
+          "nav": 170.81,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": -3.63,
+            "oneYear": -4.05,
+            "threeYear": 7.19,
+            "fiveYear": 5.17
+          },
+          "_fundId": "200",
+          "_shareClassId": "1248",
+          "_detailSlug": "allianz-europe-equity-growth-select-rt-eur"
+        },
+        {
+          "isin": "LU0920783023",
+          "wkn": null,
+          "shareClassName": "WT (EUR)",
+          "currency": "EUR",
+          "nav": 2,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": -3.29,
+            "oneYear": -3.63,
+            "threeYear": 7.67,
+            "fiveYear": 5.64
+          },
+          "_fundId": "200",
+          "_shareClassId": "1834",
+          "_detailSlug": "allianz-europe-equity-growth-select-wt-eur"
+        }
+      ],
+      "_detailSlug": "allianz-europe-equity-growth-select-rt-eur",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Global Water",
+      "fundId": "1980",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU2226248511",
+          "wkn": null,
+          "shareClassName": "A (EUR)",
+          "currency": "EUR",
+          "nav": 132.73,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": -3.58,
+            "oneYear": -5.28,
+            "threeYear": 4.32,
+            "fiveYear": 6.71
+          },
+          "_fundId": "1980",
+          "_shareClassId": "6063",
+          "_detailSlug": "allianz-global-water-a-eur"
+        },
+        {
+          "isin": "LU2257996012",
+          "wkn": null,
+          "shareClassName": "AT4 (USD)",
+          "currency": "USD",
+          "nav": 13.031,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 7.47,
+            "oneYear": 1.46,
+            "threeYear": 10.33,
+            "fiveYear": null
+          },
+          "_fundId": "1980",
+          "_shareClassId": "6143",
+          "_detailSlug": "allianz-global-water-at4-usd"
+        },
+        {
+          "isin": "LU2354776960",
+          "wkn": null,
+          "shareClassName": "WT (GBP)",
+          "currency": "GBP",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 3.49,
+            "oneYear": 0.98,
+            "threeYear": 6.58,
+            "fiveYear": null
+          },
+          "_fundId": "1980",
+          "_shareClassId": "6375",
+          "_detailSlug": "allianz-global-water-wt-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-global-water-a-eur",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Emerging Markets Select Bond",
+      "fundId": "557",
+      "assetClass": "Fixed Income",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 6",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU2223787966",
+          "wkn": null,
+          "shareClassName": "AT (USD)",
+          "currency": "USD",
+          "nav": 11.8247,
+          "navDate": "16/12/2025",
+          "launchDate": "10/16/2020",
+          "performance": {
+            "ytd": 12.53,
+            "oneYear": 11.63,
+            "threeYear": 12.6,
+            "fiveYear": 3.18
+          },
+          "_fundId": "557",
+          "_shareClassId": "6096",
+          "_detailSlug": "allianz-emerging-markets-select-bond-at-usd"
+        },
+        {
+          "isin": "LU2582816919",
+          "wkn": null,
+          "shareClassName": "W (H2-GBP)",
+          "currency": "GBP",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 13.17,
+            "oneYear": 12.38,
+            "threeYear": null,
+            "fiveYear": null
+          },
+          "_fundId": "557",
+          "_shareClassId": "6758",
+          "_detailSlug": "allianz-emerging-markets-select-bond-w-h2-gbp-gbp"
+        },
+        {
+          "isin": "LU2859871647",
+          "wkn": null,
+          "shareClassName": "WQ (H2-GBP)",
+          "currency": "GBP",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 13.19,
+            "oneYear": 12.39,
+            "threeYear": null,
+            "fiveYear": null
+          },
+          "_fundId": "557",
+          "_shareClassId": "7134",
+          "_detailSlug": "allianz-emerging-markets-select-bond-wq-h2-gbp-gbp"
+        },
+        {
+          "isin": "LU2582817057",
+          "wkn": null,
+          "shareClassName": "WT (H2-GBP)",
+          "currency": "GBP",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 13.21,
+            "oneYear": 12.37,
+            "threeYear": null,
+            "fiveYear": null
+          },
+          "_fundId": "557",
+          "_shareClassId": "6759",
+          "_detailSlug": "allianz-emerging-markets-select-bond-wt-h2-gbp-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-emerging-markets-select-bond-at-usd",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Total Return Asian Equity",
+      "fundId": "405",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU0348814566",
+          "wkn": null,
+          "shareClassName": "A (EUR)",
+          "currency": "EUR",
+          "nav": 145.29,
+          "navDate": "16/12/2025",
+          "launchDate": "06/05/2015",
+          "performance": {
+            "ytd": 17.76,
+            "oneYear": 18.26,
+            "threeYear": 12.53,
+            "fiveYear": 1.32
+          },
+          "_fundId": "405",
+          "_shareClassId": "1211",
+          "_detailSlug": "allianz-total-return-asian-equity-a-eur"
+        },
+        {
+          "isin": "LU0348814723",
+          "wkn": null,
+          "shareClassName": "A (USD)",
+          "currency": "USD",
+          "nav": 40.8562,
+          "navDate": "16/12/2025",
+          "launchDate": "10/03/2008",
+          "performance": {
+            "ytd": 30.84,
+            "oneYear": 25.97,
+            "threeYear": 18.37,
+            "fiveYear": 1.15
+          },
+          "_fundId": "405",
+          "_shareClassId": "2553",
+          "_detailSlug": "allianz-total-return-asian-equity-a-usd"
+        },
+        {
+          "isin": "LU0348816934",
+          "wkn": null,
+          "shareClassName": "AT (USD)",
+          "currency": "USD",
+          "nav": 49.9113,
+          "navDate": "16/12/2025",
+          "launchDate": "10/03/2008",
+          "performance": {
+            "ytd": 30.84,
+            "oneYear": 25.97,
+            "threeYear": 18.37,
+            "fiveYear": 1.15
+          },
+          "_fundId": "405",
+          "_shareClassId": "2539",
+          "_detailSlug": "allianz-total-return-asian-equity-at-usd"
+        }
+      ],
+      "_detailSlug": "allianz-total-return-asian-equity-a-eur",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Total Return Asian Equity Fund",
+      "fundId": "306",
+      "assetClass": "Equity",
+      "legalStructure": "OEIC",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Not applicable",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "GB0031384257",
+          "wkn": null,
+          "shareClassName": "A (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 25.65,
+            "oneYear": 25.5,
+            "threeYear": 14.38,
+            "fiveYear": 1.61
+          },
+          "_fundId": "306",
+          "_shareClassId": "947",
+          "_detailSlug": "allianz-total-return-asian-equity-fund-a-acc-gbp"
+        },
+        {
+          "isin": "GB00BVYJ2G95",
+          "wkn": null,
+          "shareClassName": "C (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 247.16,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 26.41,
+            "oneYear": 26.41,
+            "threeYear": 15.32,
+            "fiveYear": 2.42
+          },
+          "_fundId": "306",
+          "_shareClassId": "1249",
+          "_detailSlug": "allianz-total-return-asian-equity-fund-c-acc-gbp"
+        },
+        {
+          "isin": "GB00B1FRQV53",
+          "wkn": null,
+          "shareClassName": "C (Inc) (GBP)",
+          "currency": "GBp",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 26.45,
+            "oneYear": 26.45,
+            "threeYear": 15.36,
+            "fiveYear": 2.45
+          },
+          "_fundId": "306",
+          "_shareClassId": "603",
+          "_detailSlug": "allianz-total-return-asian-equity-fund-c-inc-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-total-return-asian-equity-fund-a-acc-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Continental European Fund",
+      "fundId": "124",
+      "assetClass": "Equity",
+      "legalStructure": "OEIC",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Not applicable",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "GB0031382988",
+          "wkn": null,
+          "shareClassName": "A (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 4.15,
+            "oneYear": 1.96,
+            "threeYear": 8.1,
+            "fiveYear": 3.31
+          },
+          "_fundId": "124",
+          "_shareClassId": "940",
+          "_detailSlug": "allianz-continental-european-fund-a-acc-gbp"
+        },
+        {
+          "isin": "GB00B3Q8YX99",
+          "wkn": null,
+          "shareClassName": "C (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 324.06,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 4.81,
+            "oneYear": 2.73,
+            "threeYear": 8.92,
+            "fiveYear": 4.06
+          },
+          "_fundId": "124",
+          "_shareClassId": "237",
+          "_detailSlug": "allianz-continental-european-fund-c-acc-gbp"
+        },
+        {
+          "isin": "GB00BYQ02F07",
+          "wkn": null,
+          "shareClassName": "S (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 225.3,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 5.08,
+            "oneYear": 3.05,
+            "threeYear": 9.25,
+            "fiveYear": 4.38
+          },
+          "_fundId": "124",
+          "_shareClassId": "817",
+          "_detailSlug": "allianz-continental-european-fund-s-acc-gbp"
+        },
+        {
+          "isin": "GB00BNRKB778",
+          "wkn": null,
+          "shareClassName": "S (Inc) (EUR)",
+          "currency": "EUX",
+          "nav": 100.63,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": -2.7,
+            "oneYear": -4.1,
+            "threeYear": 7.6,
+            "fiveYear": null
+          },
+          "_fundId": "124",
+          "_shareClassId": "6288",
+          "_detailSlug": "allianz-continental-european-fund-s-inc-eur"
+        },
+        {
+          "isin": "GB00BMW0MF04",
+          "wkn": null,
+          "shareClassName": "S (Inc) (GBP)",
+          "currency": "GBp",
+          "nav": 115.44,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 5.06,
+            "oneYear": 3.02,
+            "threeYear": 9.24,
+            "fiveYear": 4.38
+          },
+          "_fundId": "124",
+          "_shareClassId": "5991",
+          "_detailSlug": "allianz-continental-european-fund-s-inc-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-continental-european-fund-a-acc-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz UK Government Bond",
+      "fundId": "2333",
+      "assetClass": "Fixed Income",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 6",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU2462158473",
+          "wkn": null,
+          "shareClassName": "W (GBP)",
+          "currency": "GBP",
+          "nav": 761.34,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 4.6,
+            "oneYear": 3.35,
+            "threeYear": 0.81,
+            "fiveYear": null
+          },
+          "_fundId": "2333",
+          "_shareClassId": "6603",
+          "_detailSlug": "allianz-uk-government-bond-w-gbp"
+        },
+        {
+          "isin": "LU2735508793",
+          "wkn": null,
+          "shareClassName": "W8 (GBP)",
+          "currency": "GBP",
+          "nav": 947.14,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 4.7,
+            "oneYear": 3.47,
+            "threeYear": null,
+            "fiveYear": null
+          },
+          "_fundId": "2333",
+          "_shareClassId": "6949",
+          "_detailSlug": "allianz-uk-government-bond-w8-gbp"
+        },
+        {
+          "isin": "LU2735508876",
+          "wkn": null,
+          "shareClassName": "WT8 (GBP)",
+          "currency": "GBP",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 4.7,
+            "oneYear": 3.47,
+            "threeYear": null,
+            "fiveYear": null
+          },
+          "_fundId": "2333",
+          "_shareClassId": "6948",
+          "_detailSlug": "allianz-uk-government-bond-wt8-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-uk-government-bond-w-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Emerging Markets Equity",
+      "fundId": "201",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 6",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1143268446",
+          "wkn": null,
+          "shareClassName": "I (USD)",
+          "currency": "USD",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": "01/20/2015",
+          "performance": {
+            "ytd": 28.96,
+            "oneYear": 27.05,
+            "threeYear": 23.22,
+            "fiveYear": 9.3
+          },
+          "_fundId": "201",
+          "_shareClassId": "1377",
+          "_detailSlug": "allianz-emerging-markets-equity-i-usd"
+        }
+      ],
+      "_detailSlug": "allianz-emerging-markets-equity-i-usd",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Emerging Markets SRI Bond",
+      "fundId": "2009",
+      "assetClass": "Fixed Income",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU2276587115",
+          "wkn": null,
+          "shareClassName": "W (EUR)",
+          "currency": "EUR",
+          "nav": 869.55,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 0.71,
+            "oneYear": 3.54,
+            "threeYear": 4.84,
+            "fiveYear": null
+          },
+          "_fundId": "2009",
+          "_shareClassId": "6185",
+          "_detailSlug": "allianz-emerging-markets-sri-bond-w-eur"
+        }
+      ],
+      "_detailSlug": "allianz-emerging-markets-sri-bond-w-eur",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz UK Listed Equity Income Fund",
+      "fundId": "459",
+      "assetClass": "Equity",
+      "legalStructure": "OEIC",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Not applicable",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "GB0031383952",
+          "wkn": null,
+          "shareClassName": "A (Inc) (GBP)",
+          "currency": "GBp",
+          "nav": 348.06,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 12.23,
+            "oneYear": 12.16,
+            "threeYear": 10.31,
+            "fiveYear": 14.42
+          },
+          "_fundId": "459",
+          "_shareClassId": "945",
+          "_detailSlug": "allianz-uk-listed-equity-income-fund-a-inc-gbp"
+        },
+        {
+          "isin": "GB00BP5X3981",
+          "wkn": null,
+          "shareClassName": "C (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 134.07,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 12.79,
+            "oneYear": 12.84,
+            "threeYear": 10.97,
+            "fiveYear": null
+          },
+          "_fundId": "459",
+          "_shareClassId": "6425",
+          "_detailSlug": "allianz-uk-listed-equity-income-fund-c-acc-gbp"
+        },
+        {
+          "isin": "GB00B82ZGC20",
+          "wkn": null,
+          "shareClassName": "C (Inc) (GBP)",
+          "currency": "GBp",
+          "nav": 132.83,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 12.82,
+            "oneYear": 12.87,
+            "threeYear": 10.98,
+            "fiveYear": 15.13
+          },
+          "_fundId": "459",
+          "_shareClassId": "1894",
+          "_detailSlug": "allianz-uk-listed-equity-income-fund-c-inc-gbp"
+        },
+        {
+          "isin": "GB00BMH6XK58",
+          "wkn": null,
+          "shareClassName": "E (Inc) (GBP)",
+          "currency": "GBp",
+          "nav": 126.75,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 13.14,
+            "oneYear": 13.26,
+            "threeYear": 11.36,
+            "fiveYear": null
+          },
+          "_fundId": "459",
+          "_shareClassId": "6187",
+          "_detailSlug": "allianz-uk-listed-equity-income-fund-e-inc-gbp"
+        },
+        {
+          "isin": "GB00BNVT3M98",
+          "wkn": null,
+          "shareClassName": "W (Inc) (EUR)",
+          "currency": "EUX",
+          "nav": 106.03,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 6.5,
+            "oneYear": 7.51,
+            "threeYear": 10.37,
+            "fiveYear": null
+          },
+          "_fundId": "459",
+          "_shareClassId": "6445",
+          "_detailSlug": "allianz-uk-listed-equity-income-fund-w-inc-eur"
+        },
+        {
+          "isin": "GB00BMH6XL65",
+          "wkn": null,
+          "shareClassName": "W (Inc) (GBP)",
+          "currency": "GBp",
+          "nav": 126.51,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 13.04,
+            "oneYear": 13.13,
+            "threeYear": 11.24,
+            "fiveYear": null
+          },
+          "_fundId": "459",
+          "_shareClassId": "6186",
+          "_detailSlug": "allianz-uk-listed-equity-income-fund-w-inc-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-uk-listed-equity-income-fund-a-inc-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Emerging Markets Sovereign Bond",
+      "fundId": "2093",
+      "assetClass": "Fixed Income",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU2582816836",
+          "wkn": null,
+          "shareClassName": "WT (H2-GBP)",
+          "currency": "GBP",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 12.26,
+            "oneYear": 12.34,
+            "threeYear": null,
+            "fiveYear": null
+          },
+          "_fundId": "2093",
+          "_shareClassId": "6757",
+          "_detailSlug": "allianz-emerging-markets-sovereign-bond-wt-h2-gbp-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-emerging-markets-sovereign-bond-wt-h2-gbp-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Emerging Markets Equity Fund",
+      "fundId": "309",
+      "assetClass": "Equity",
+      "legalStructure": "OEIC",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Not applicable",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "GB00B0WDH725",
+          "wkn": null,
+          "shareClassName": "A (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 322.99,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 23.04,
+            "oneYear": 25.25,
+            "threeYear": 17.78,
+            "fiveYear": 7.8
+          },
+          "_fundId": "309",
+          "_shareClassId": "952",
+          "_detailSlug": "allianz-emerging-markets-equity-fund-a-acc-gbp"
+        },
+        {
+          "isin": "GB00B0WDH832",
+          "wkn": null,
+          "shareClassName": "C (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 378.52,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 23.94,
+            "oneYear": 26.34,
+            "threeYear": 18.81,
+            "fiveYear": 8.74
+          },
+          "_fundId": "309",
+          "_shareClassId": "607",
+          "_detailSlug": "allianz-emerging-markets-equity-fund-c-acc-gbp"
+        },
+        {
+          "isin": "GB00BYZQV633",
+          "wkn": null,
+          "shareClassName": "O (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 155.98,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 24.74,
+            "oneYear": 27.18,
+            "threeYear": 18.93,
+            "fiveYear": 8.89
+          },
+          "_fundId": "309",
+          "_shareClassId": "4979",
+          "_detailSlug": "allianz-emerging-markets-equity-fund-o-acc-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-emerging-markets-equity-fund-a-acc-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Emerging Markets Corporate Bond",
+      "fundId": "2010",
+      "assetClass": "Fixed Income",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1974909183",
+          "wkn": null,
+          "shareClassName": "WT (USD)",
+          "currency": "USD",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 7.7,
+            "oneYear": 7.41,
+            "threeYear": 8.88,
+            "fiveYear": 2.39
+          },
+          "_fundId": "2010",
+          "_shareClassId": "5303",
+          "_detailSlug": "allianz-emerging-markets-corporate-bond-wt-usd"
+        }
+      ],
+      "_detailSlug": "allianz-emerging-markets-corporate-bond-wt-usd",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Thematica",
+      "fundId": "203",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1479563717",
+          "wkn": null,
+          "shareClassName": "A (EUR)",
+          "currency": "EUR",
+          "nav": 202.64,
+          "navDate": "16/12/2025",
+          "launchDate": "12/08/2016",
+          "performance": {
+            "ytd": 2.3,
+            "oneYear": 4.06,
+            "threeYear": 6.14,
+            "fiveYear": 6.56
+          },
+          "_fundId": "203",
+          "_shareClassId": "406",
+          "_detailSlug": "allianz-thematica-a-eur"
+        },
+        {
+          "isin": "LU1974910355",
+          "wkn": null,
+          "shareClassName": "AMg (USD)",
+          "currency": "USD",
+          "nav": 12.9869,
+          "navDate": "16/12/2025",
+          "launchDate": "04/15/2019",
+          "performance": {
+            "ytd": 13.49,
+            "oneYear": 10.85,
+            "threeYear": 11.64,
+            "fiveYear": 6.38
+          },
+          "_fundId": "203",
+          "_shareClassId": "5289",
+          "_detailSlug": "allianz-thematica-amg-usd"
+        },
+        {
+          "isin": "LU1917777945",
+          "wkn": null,
+          "shareClassName": "AT (USD)",
+          "currency": "USD",
+          "nav": 180.37,
+          "navDate": "16/12/2025",
+          "launchDate": "01/25/2019",
+          "performance": {
+            "ytd": 13.49,
+            "oneYear": 10.85,
+            "threeYear": 11.65,
+            "fiveYear": 6.38
+          },
+          "_fundId": "203",
+          "_shareClassId": "5205",
+          "_detailSlug": "allianz-thematica-at-usd"
+        },
+        {
+          "isin": "LU2384383738",
+          "wkn": null,
+          "shareClassName": "PT (USD)",
+          "currency": "USD",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 14.27,
+            "oneYear": 11.77,
+            "threeYear": 12.53,
+            "fiveYear": 7.36
+          },
+          "_fundId": "203",
+          "_shareClassId": "6427",
+          "_detailSlug": "allianz-thematica-pt-usd"
+        },
+        {
+          "isin": "LU2009012159",
+          "wkn": null,
+          "shareClassName": "RT (EUR)",
+          "currency": "EUR",
+          "nav": 168.63,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 2.89,
+            "oneYear": 4.78,
+            "threeYear": 6.91,
+            "fiveYear": 7.31
+          },
+          "_fundId": "203",
+          "_shareClassId": "5375",
+          "_detailSlug": "allianz-thematica-rt-eur"
+        },
+        {
+          "isin": "LU2009012233",
+          "wkn": null,
+          "shareClassName": "RT (USD)",
+          "currency": "USD",
+          "nav": 174.12,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 14.18,
+            "oneYear": 11.66,
+            "threeYear": 12.46,
+            "fiveYear": 7.15
+          },
+          "_fundId": "203",
+          "_shareClassId": "5377",
+          "_detailSlug": "allianz-thematica-rt-usd"
+        }
+      ],
+      "_detailSlug": "allianz-thematica-a-eur",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Strategic Bond",
+      "fundId": "2095",
+      "assetClass": "Fixed Income",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 6",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU2060905887",
+          "wkn": null,
+          "shareClassName": "W (H2-GBP)",
+          "currency": "GBP",
+          "nav": 841.85,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 5.44,
+            "oneYear": 4.7,
+            "threeYear": -1.91,
+            "fiveYear": -5.73
+          },
+          "_fundId": "2095",
+          "_shareClassId": "5600",
+          "_detailSlug": "allianz-strategic-bond-w-h2-gbp-gbp"
+        },
+        {
+          "isin": "LU2201842932",
+          "wkn": null,
+          "shareClassName": "W6 (H2-EUR)",
+          "currency": "EUR",
+          "nav": 61.51,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 3.6,
+            "oneYear": 2.62,
+            "threeYear": -3.58,
+            "fiveYear": -7.07
+          },
+          "_fundId": "2095",
+          "_shareClassId": "5982",
+          "_detailSlug": "allianz-strategic-bond-w6-h2-eur-eur"
+        },
+        {
+          "isin": "LU2208987417",
+          "wkn": null,
+          "shareClassName": "W6 (H2-GBP)",
+          "currency": "GBP",
+          "nav": 65.97,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 5.43,
+            "oneYear": 4.64,
+            "threeYear": -1.93,
+            "fiveYear": -5.71
+          },
+          "_fundId": "2095",
+          "_shareClassId": "6003",
+          "_detailSlug": "allianz-strategic-bond-w6-h2-gbp-gbp"
+        },
+        {
+          "isin": "LU2201842858",
+          "wkn": null,
+          "shareClassName": "W6 (USD)",
+          "currency": "USD",
+          "nav": 69.18,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 5.57,
+            "oneYear": 4.86,
+            "threeYear": -1.39,
+            "fiveYear": -5.28
+          },
+          "_fundId": "2095",
+          "_shareClassId": "5981",
+          "_detailSlug": "allianz-strategic-bond-w6-usd"
+        },
+        {
+          "isin": "LU2073791589",
+          "wkn": null,
+          "shareClassName": "WT9 (H2-EUR)",
+          "currency": "EUR",
+          "nav": 88,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 3.68,
+            "oneYear": 2.74,
+            "threeYear": -3.48,
+            "fiveYear": -6.98
+          },
+          "_fundId": "2095",
+          "_shareClassId": "5629",
+          "_detailSlug": "allianz-strategic-bond-wt9-h2-eur-eur"
+        }
+      ],
+      "_detailSlug": "allianz-strategic-bond-w-h2-gbp-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Strategy 15",
+      "fundId": "409",
+      "assetClass": "Multi Asset",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU2696137269",
+          "wkn": null,
+          "shareClassName": "AT (EUR)",
+          "currency": "EUR",
+          "nav": 111.55,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 2.83,
+            "oneYear": 3.64,
+            "threeYear": null,
+            "fiveYear": null
+          },
+          "_fundId": "409",
+          "_shareClassId": "6909",
+          "_detailSlug": "allianz-strategy-15-at-eur"
+        },
+        {
+          "isin": "LU2105731785",
+          "wkn": null,
+          "shareClassName": "AT (H-USD)",
+          "currency": "USD",
+          "nav": 107.28,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 4.42,
+            "oneYear": 5.46,
+            "threeYear": 5.51,
+            "fiveYear": 1.55
+          },
+          "_fundId": "409",
+          "_shareClassId": "5740",
+          "_detailSlug": "allianz-strategy-15-at-h-usd-usd"
+        },
+        {
+          "isin": "LU2064238111",
+          "wkn": null,
+          "shareClassName": "C2 (EUR)",
+          "currency": "EUR",
+          "nav": 92.28,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 3.04,
+            "oneYear": 3.9,
+            "threeYear": 3.94,
+            "fiveYear": 0.33
+          },
+          "_fundId": "409",
+          "_shareClassId": "5547",
+          "_detailSlug": "allianz-strategy-15-c2-eur"
+        },
+        {
+          "isin": "LU0398560267",
+          "wkn": null,
+          "shareClassName": "CT (EUR)",
+          "currency": "EUR",
+          "nav": 161.1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 2.6,
+            "oneYear": 3.37,
+            "threeYear": 3.41,
+            "fiveYear": -0.18
+          },
+          "_fundId": "409",
+          "_shareClassId": "2524",
+          "_detailSlug": "allianz-strategy-15-ct-eur"
+        },
+        {
+          "isin": "LU0882150443",
+          "wkn": null,
+          "shareClassName": "IT (EUR)",
+          "currency": "EUR",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 2.61,
+            "oneYear": 3.37,
+            "threeYear": 3.41,
+            "fiveYear": -0.18
+          },
+          "_fundId": "409",
+          "_shareClassId": "864",
+          "_detailSlug": "allianz-strategy-15-it-eur"
+        },
+        {
+          "isin": "LU1673098791",
+          "wkn": null,
+          "shareClassName": "RT (EUR)",
+          "currency": "EUR",
+          "nav": 108.92,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 3.16,
+            "oneYear": 4.04,
+            "threeYear": 4.09,
+            "fiveYear": 0.47
+          },
+          "_fundId": "409",
+          "_shareClassId": "4713",
+          "_detailSlug": "allianz-strategy-15-rt-eur"
+        },
+        {
+          "isin": "LU0398560341",
+          "wkn": null,
+          "shareClassName": "W (EUR)",
+          "currency": "EUR",
+          "nav": 948.47,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 3.38,
+            "oneYear": 4.3,
+            "threeYear": 4.35,
+            "fiveYear": 0.72
+          },
+          "_fundId": "409",
+          "_shareClassId": "1225",
+          "_detailSlug": "allianz-strategy-15-w-eur"
+        },
+        {
+          "isin": "LU0398560424",
+          "wkn": null,
+          "shareClassName": "WT (EUR)",
+          "currency": "EUR",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 3.38,
+            "oneYear": 4.3,
+            "threeYear": 4.35,
+            "fiveYear": 0.72
+          },
+          "_fundId": "409",
+          "_shareClassId": "1085",
+          "_detailSlug": "allianz-strategy-15-wt-eur"
+        }
+      ],
+      "_detailSlug": "allianz-strategy-15-at-eur",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Global Multi Sector Credit Fund",
+      "fundId": "2041",
+      "assetClass": "Fixed Income",
+      "legalStructure": "OEIC",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Not applicable",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "GB00BJJQ5060",
+          "wkn": null,
+          "shareClassName": "W (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 6.23,
+            "oneYear": 7.18,
+            "threeYear": 7.67,
+            "fiveYear": 3.9
+          },
+          "_fundId": "2041",
+          "_shareClassId": "5321",
+          "_detailSlug": "allianz-global-multi-sector-credit-fund-w-acc-gbp"
+        },
+        {
+          "isin": "GB00BJJQDK21",
+          "wkn": null,
+          "shareClassName": "W (Inc) (GBP)",
+          "currency": "GBp",
+          "nav": 958.57,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 6.23,
+            "oneYear": 7.18,
+            "threeYear": 7.67,
+            "fiveYear": 3.89
+          },
+          "_fundId": "2041",
+          "_shareClassId": "5322",
+          "_detailSlug": "allianz-global-multi-sector-credit-fund-w-inc-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-global-multi-sector-credit-fund-w-acc-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz India Equity",
+      "fundId": "815",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU2799987156",
+          "wkn": null,
+          "shareClassName": "WT (GBP)",
+          "currency": "GBP",
+          "nav": 990.45,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": -13.04,
+            "oneYear": -7.37,
+            "threeYear": 9.52,
+            "fiveYear": 15.01
+          },
+          "_fundId": "815",
+          "_shareClassId": "7042",
+          "_detailSlug": "allianz-india-equity-wt-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-india-equity-wt-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Global Opportunistic Bond",
+      "fundId": "170",
+      "assetClass": "Fixed Income",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 6",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU3078580704",
+          "wkn": null,
+          "shareClassName": "CMg3 (USD)",
+          "currency": "USD",
+          "nav": 10.0289,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": null,
+            "oneYear": null,
+            "threeYear": null,
+            "fiveYear": null
+          },
+          "_fundId": "170",
+          "_shareClassId": "7393",
+          "_detailSlug": "allianz-global-opportunistic-bond-cmg3-usd"
+        },
+        {
+          "isin": "LU3078580886",
+          "wkn": null,
+          "shareClassName": "CMgi3 (H2-SGD)",
+          "currency": "SGD",
+          "nav": 9.91,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": null,
+            "oneYear": null,
+            "threeYear": null,
+            "fiveYear": null
+          },
+          "_fundId": "170",
+          "_shareClassId": "7394",
+          "_detailSlug": "allianz-global-opportunistic-bond-cmgi3-h2-sgd-sgd"
+        },
+        {
+          "isin": "LU1293643356",
+          "wkn": null,
+          "shareClassName": "W (USD)",
+          "currency": "USD",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 7.68,
+            "oneYear": 7.45,
+            "threeYear": 5.52,
+            "fiveYear": 1.73
+          },
+          "_fundId": "170",
+          "_shareClassId": "873",
+          "_detailSlug": "allianz-global-opportunistic-bond-w-usd"
+        }
+      ],
+      "_detailSlug": "allianz-global-opportunistic-bond-cmg3-usd",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Thematica Fund",
+      "fundId": "2339",
+      "assetClass": "Equity",
+      "legalStructure": "OEIC",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Not applicable",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "GB00BMV5S813",
+          "wkn": null,
+          "shareClassName": "C (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 113.43,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 9.61,
+            "oneYear": 10.22,
+            "threeYear": 8.33,
+            "fiveYear": 7.09
+          },
+          "_fundId": "2339",
+          "_shareClassId": "6622",
+          "_detailSlug": "allianz-thematica-fund-c-acc-gbp"
+        },
+        {
+          "isin": "GB00BMV5S706",
+          "wkn": null,
+          "shareClassName": "E (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 114.92,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 9.94,
+            "oneYear": 10.59,
+            "threeYear": 8.72,
+            "fiveYear": 7.47
+          },
+          "_fundId": "2339",
+          "_shareClassId": "6623",
+          "_detailSlug": "allianz-thematica-fund-e-acc-gbp"
+        },
+        {
+          "isin": "GB00BMV5S920",
+          "wkn": null,
+          "shareClassName": "W (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 113.78,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 9.68,
+            "oneYear": 10.3,
+            "threeYear": 8.42,
+            "fiveYear": 7.17
+          },
+          "_fundId": "2339",
+          "_shareClassId": "6624",
+          "_detailSlug": "allianz-thematica-fund-w-acc-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-thematica-fund-c-acc-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Global Hi-Tech Growth",
+      "fundId": "836",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1864046377",
+          "wkn": null,
+          "shareClassName": "IT (USD)",
+          "currency": "USD",
+          "nav": 3,
+          "navDate": "16/12/2025",
+          "launchDate": "08/20/2018",
+          "performance": {
+            "ytd": 25.42,
+            "oneYear": 32.62,
+            "threeYear": 30.63,
+            "fiveYear": 17.23
+          },
+          "_fundId": "836",
+          "_shareClassId": "5093",
+          "_detailSlug": "allianz-global-hi-tech-growth-it-usd"
+        },
+        {
+          "isin": "LU3029383422",
+          "wkn": null,
+          "shareClassName": "PT (GBP)",
+          "currency": "GBP",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": null,
+            "oneYear": null,
+            "threeYear": null,
+            "fiveYear": null
+          },
+          "_fundId": "836",
+          "_shareClassId": "7341",
+          "_detailSlug": "allianz-global-hi-tech-growth-pt-gbp"
+        },
+        {
+          "isin": "LU2976284617",
+          "wkn": null,
+          "shareClassName": "WT (GBP)",
+          "currency": "GBP",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": null,
+            "oneYear": null,
+            "threeYear": null,
+            "fiveYear": null
+          },
+          "_fundId": "836",
+          "_shareClassId": "7302",
+          "_detailSlug": "allianz-global-hi-tech-growth-wt-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-global-hi-tech-growth-it-usd",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Treasury Short Term Plus Euro",
+      "fundId": "47",
+      "assetClass": "Fixed Income",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU0178431259",
+          "wkn": null,
+          "shareClassName": "A (EUR)",
+          "currency": "EUR",
+          "nav": 94.21,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 2.51,
+            "oneYear": 3.07,
+            "threeYear": 3.6,
+            "fiveYear": 1.46
+          },
+          "_fundId": "47",
+          "_shareClassId": "430",
+          "_detailSlug": "allianz-treasury-short-term-plus-euro-a-eur"
+        }
+      ],
+      "_detailSlug": "allianz-treasury-short-term-plus-euro-a-eur",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Index-Linked Gilt Fund",
+      "fundId": "1947",
+      "assetClass": "Fixed Income",
+      "legalStructure": "OEIC",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Not applicable",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "GB00BDD4M812",
+          "wkn": null,
+          "shareClassName": "E (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 77.06,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 0.69,
+            "oneYear": -3.75,
+            "threeYear": -3.46,
+            "fiveYear": -9.34
+          },
+          "_fundId": "1947",
+          "_shareClassId": "4882",
+          "_detailSlug": "allianz-index-linked-gilt-fund-e-acc-gbp"
+        },
+        {
+          "isin": "GB00BDD4M929",
+          "wkn": null,
+          "shareClassName": "E (Inc) (GBP)",
+          "currency": "GBp",
+          "nav": 72.8,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 0.69,
+            "oneYear": -3.75,
+            "threeYear": -3.76,
+            "fiveYear": -9.36
+          },
+          "_fundId": "1947",
+          "_shareClassId": "4883",
+          "_detailSlug": "allianz-index-linked-gilt-fund-e-inc-gbp"
+        },
+        {
+          "isin": "GB00BDD4M697",
+          "wkn": null,
+          "shareClassName": "W (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 76.46,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 0.61,
+            "oneYear": -3.85,
+            "threeYear": -3.56,
+            "fiveYear": -9.43
+          },
+          "_fundId": "1947",
+          "_shareClassId": "4880",
+          "_detailSlug": "allianz-index-linked-gilt-fund-w-acc-gbp"
+        },
+        {
+          "isin": "GB00BDD4M705",
+          "wkn": null,
+          "shareClassName": "W (Inc) (GBP)",
+          "currency": "GBp",
+          "nav": 72.21,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 0.6,
+            "oneYear": -3.85,
+            "threeYear": -4.09,
+            "fiveYear": -9.45
+          },
+          "_fundId": "1947",
+          "_shareClassId": "4881",
+          "_detailSlug": "allianz-index-linked-gilt-fund-w-inc-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-index-linked-gilt-fund-e-acc-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Global Sustainability",
+      "fundId": "321",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU0158827195",
+          "wkn": null,
+          "shareClassName": "A (EUR)",
+          "currency": "EUR",
+          "nav": 45.7213,
+          "navDate": "16/12/2025",
+          "launchDate": "01/02/2003",
+          "performance": {
+            "ytd": 2.24,
+            "oneYear": 3.53,
+            "threeYear": 9.05,
+            "fiveYear": 10.23
+          },
+          "_fundId": "321",
+          "_shareClassId": "2050",
+          "_detailSlug": "allianz-global-sustainability-a-eur"
+        },
+        {
+          "isin": "LU1629891208",
+          "wkn": null,
+          "shareClassName": "IT (USD)",
+          "currency": "USD",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": "07/13/2020",
+          "performance": {
+            "ytd": 13.61,
+            "oneYear": 10.49,
+            "threeYear": 15.34,
+            "fiveYear": 10.97
+          },
+          "_fundId": "321",
+          "_shareClassId": "5959",
+          "_detailSlug": "allianz-global-sustainability-it-usd"
+        },
+        {
+          "isin": "LU1173935773",
+          "wkn": null,
+          "shareClassName": "RT (EUR)",
+          "currency": "EUR",
+          "nav": 237.86,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 2.88,
+            "oneYear": 4.32,
+            "threeYear": 9.86,
+            "fiveYear": 11.06
+          },
+          "_fundId": "321",
+          "_shareClassId": "1227",
+          "_detailSlug": "allianz-global-sustainability-rt-eur"
+        },
+        {
+          "isin": "LU1428085879",
+          "wkn": null,
+          "shareClassName": "WT (GBP)",
+          "currency": "GBP",
+          "nav": 2,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 9.64,
+            "oneYear": 10.3,
+            "threeYear": 11.27,
+            "fiveYear": 11.07
+          },
+          "_fundId": "321",
+          "_shareClassId": "711",
+          "_detailSlug": "allianz-global-sustainability-wt-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-global-sustainability-a-eur",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz European Equity Dividend",
+      "fundId": "133",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU0971552913",
+          "wkn": null,
+          "shareClassName": "AM (EUR)",
+          "currency": "EUR",
+          "nav": 10.8452,
+          "navDate": "16/12/2025",
+          "launchDate": "10/02/2013",
+          "performance": {
+            "ytd": 11.45,
+            "oneYear": 10.66,
+            "threeYear": 13.58,
+            "fiveYear": 11.99
+          },
+          "_fundId": "133",
+          "_shareClassId": "1729",
+          "_detailSlug": "allianz-european-equity-dividend-am-eur"
+        },
+        {
+          "isin": "LU0414045822",
+          "wkn": null,
+          "shareClassName": "AT (EUR)",
+          "currency": "EUR",
+          "nav": 390.6,
+          "navDate": "16/12/2025",
+          "launchDate": "03/10/2009",
+          "performance": {
+            "ytd": 11.44,
+            "oneYear": 10.66,
+            "threeYear": 13.57,
+            "fiveYear": 12
+          },
+          "_fundId": "133",
+          "_shareClassId": "2501",
+          "_detailSlug": "allianz-european-equity-dividend-at-eur"
+        },
+        {
+          "isin": "LU0857590946",
+          "wkn": null,
+          "shareClassName": "P (EUR)",
+          "currency": "EUR",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 12.24,
+            "oneYear": 11.6,
+            "threeYear": 14.54,
+            "fiveYear": 12.95
+          },
+          "_fundId": "133",
+          "_shareClassId": "1690",
+          "_detailSlug": "allianz-european-equity-dividend-p-eur"
+        }
+      ],
+      "_detailSlug": "allianz-european-equity-dividend-am-eur",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz GEM Equity High Dividend",
+      "fundId": "67",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 6",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1282651048",
+          "wkn": null,
+          "shareClassName": "AMg (USD)",
+          "currency": "USD",
+          "nav": 14.9308,
+          "navDate": "16/12/2025",
+          "launchDate": "10/06/2015",
+          "performance": {
+            "ytd": 26.51,
+            "oneYear": 24.36,
+            "threeYear": 22.24,
+            "fiveYear": 9.82
+          },
+          "_fundId": "67",
+          "_shareClassId": "966",
+          "_detailSlug": "allianz-gem-equity-high-dividend-amg-usd"
+        },
+        {
+          "isin": "LU0293313325",
+          "wkn": null,
+          "shareClassName": "AT (EUR)",
+          "currency": "EUR",
+          "nav": 172.98,
+          "navDate": "16/12/2025",
+          "launchDate": "06/15/2007",
+          "performance": {
+            "ytd": 14.07,
+            "oneYear": 16.77,
+            "threeYear": 16.16,
+            "fiveYear": 9.99
+          },
+          "_fundId": "67",
+          "_shareClassId": "106",
+          "_detailSlug": "allianz-gem-equity-high-dividend-at-eur"
+        },
+        {
+          "isin": "LU0293314216",
+          "wkn": null,
+          "shareClassName": "AT (USD)",
+          "currency": "USD",
+          "nav": 11.8264,
+          "navDate": "16/12/2025",
+          "launchDate": "02/25/2008",
+          "performance": {
+            "ytd": 26.59,
+            "oneYear": 24.44,
+            "threeYear": 22.22,
+            "fiveYear": 9.88
+          },
+          "_fundId": "67",
+          "_shareClassId": "2602",
+          "_detailSlug": "allianz-gem-equity-high-dividend-at-usd"
+        }
+      ],
+      "_detailSlug": "allianz-gem-equity-high-dividend-amg-usd",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Global Credit",
+      "fundId": "173",
+      "assetClass": "Fixed Income",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1803246583",
+          "wkn": null,
+          "shareClassName": "WT (USD)",
+          "currency": "USD",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 9.13,
+            "oneYear": 7.89,
+            "threeYear": 9.16,
+            "fiveYear": 0.53
+          },
+          "_fundId": "173",
+          "_shareClassId": "4974",
+          "_detailSlug": "allianz-global-credit-wt-usd"
+        }
+      ],
+      "_detailSlug": "allianz-global-credit-wt-usd",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Global High Yield",
+      "fundId": "149",
+      "assetClass": "Fixed Income",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1480271961",
+          "wkn": null,
+          "shareClassName": "IT (USD)",
+          "currency": "USD",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 7.07,
+            "oneYear": 7.56,
+            "threeYear": 10.07,
+            "fiveYear": 4.81
+          },
+          "_fundId": "149",
+          "_shareClassId": "359",
+          "_detailSlug": "allianz-global-high-yield-it-usd"
+        },
+        {
+          "isin": "LU1504570844",
+          "wkn": null,
+          "shareClassName": "WT (H2-EUR)",
+          "currency": "EUR",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 5.44,
+            "oneYear": 5.67,
+            "threeYear": 8.05,
+            "fiveYear": 3.18
+          },
+          "_fundId": "149",
+          "_shareClassId": "364",
+          "_detailSlug": "allianz-global-high-yield-wt-h2-eur-eur"
+        }
+      ],
+      "_detailSlug": "allianz-global-high-yield-it-usd",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Global Dividend",
+      "fundId": "462",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU2278554956",
+          "wkn": null,
+          "shareClassName": "WT (H-EUR)",
+          "currency": "EUR",
+          "nav": 2,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 13.33,
+            "oneYear": 13.68,
+            "threeYear": 14.74,
+            "fiveYear": null
+          },
+          "_fundId": "462",
+          "_shareClassId": "6132",
+          "_detailSlug": "allianz-global-dividend-wt-h-eur-eur"
+        }
+      ],
+      "_detailSlug": "allianz-global-dividend-wt-h-eur-eur",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Multi Asset Long / Short",
+      "fundId": "174",
+      "assetClass": "Multi Asset",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 6",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1953143655",
+          "wkn": null,
+          "shareClassName": "IT3 (H2-GBP)",
+          "currency": "GBP",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 1.92,
+            "oneYear": 2.65,
+            "threeYear": 0.1,
+            "fiveYear": 6.12
+          },
+          "_fundId": "174",
+          "_shareClassId": "5260",
+          "_detailSlug": "allianz-multi-asset-long-short-it3-h2-gbp-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-multi-asset-long-short-it3-h2-gbp-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz US Investment Grade Credit",
+      "fundId": "2368",
+      "assetClass": "Fixed Income",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU2593587442",
+          "wkn": null,
+          "shareClassName": "RT (USD)",
+          "currency": "USD",
+          "nav": 11.4746,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 6.76,
+            "oneYear": 6.76,
+            "threeYear": 7.91,
+            "fiveYear": 0.51
+          },
+          "_fundId": "2368",
+          "_shareClassId": "6779",
+          "_detailSlug": "allianz-us-investment-grade-credit-rt-usd"
+        },
+        {
+          "isin": "LU3063731379",
+          "wkn": null,
+          "shareClassName": "W (H6-EUR)",
+          "currency": "EUR",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": null,
+            "oneYear": null,
+            "threeYear": null,
+            "fiveYear": null
+          },
+          "_fundId": "2368",
+          "_shareClassId": "7390",
+          "_detailSlug": "allianz-us-investment-grade-credit-w-eur"
+        },
+        {
+          "isin": "LU3063731452",
+          "wkn": null,
+          "shareClassName": "W (H6-JPY)",
+          "currency": "JPY",
+          "nav": 206,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": null,
+            "oneYear": null,
+            "threeYear": null,
+            "fiveYear": null
+          },
+          "_fundId": "2368",
+          "_shareClassId": "7389",
+          "_detailSlug": "allianz-us-investment-grade-credit-w-jpy"
+        }
+      ],
+      "_detailSlug": "allianz-us-investment-grade-credit-rt-usd",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.657Z"
+    },
+    {
+      "fundName": "Allianz Best Styles Euroland Equity",
+      "fundId": "69",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 6",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1794554805",
+          "wkn": null,
+          "shareClassName": "WT (EUR)",
+          "currency": "EUR",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 23.08,
+            "oneYear": 24.33,
+            "threeYear": 18.99,
+            "fiveYear": 16.01
+          },
+          "_fundId": "69",
+          "_shareClassId": "4934",
+          "_detailSlug": "allianz-best-styles-euroland-equity-wt-eur"
+        }
+      ],
+      "_detailSlug": "allianz-best-styles-euroland-equity-wt-eur",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.658Z"
+    },
+    {
+      "fundName": "Allianz China A-Shares Equity Fund",
+      "fundId": "2245",
+      "assetClass": "Equity",
+      "legalStructure": "OEIC",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Not applicable",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "GB00BMG9ZZ41",
+          "wkn": null,
+          "shareClassName": "W (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 94.37,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 29.89,
+            "oneYear": 31.56,
+            "threeYear": 5.09,
+            "fiveYear": -2.22
+          },
+          "_fundId": "2245",
+          "_shareClassId": "5975",
+          "_detailSlug": "allianz-china-a-shares-equity-fund-w-acc-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-china-a-shares-equity-fund-w-acc-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.658Z"
+    },
+    {
+      "fundName": "Allianz Global Small Cap Equity",
+      "fundId": "248",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 6",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1030382433",
+          "wkn": null,
+          "shareClassName": "PT2 (GBP)",
+          "currency": "GBP",
+          "nav": 2,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 5.05,
+            "oneYear": 8.51,
+            "threeYear": 9.39,
+            "fiveYear": 8.28
+          },
+          "_fundId": "248",
+          "_shareClassId": "1673",
+          "_detailSlug": "allianz-global-small-cap-equity-pt2-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-global-small-cap-equity-pt2-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.658Z"
+    },
+    {
+      "fundName": "Allianz Technology Trust PLC",
+      "fundId": "1132",
+      "assetClass": "Equity",
+      "legalStructure": "UK Investment Company",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Not applicable",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "GB00BNG2M159",
+          "wkn": null,
+          "shareClassName": "Ordinary (GBP)",
+          "currency": "GBp",
+          "nav": null,
+          "navDate": null,
+          "launchDate": null,
+          "performance": {
+            "ytd": null,
+            "oneYear": null,
+            "threeYear": null,
+            "fiveYear": null
+          },
+          "_fundId": "1132",
+          "_shareClassId": "6349",
+          "_detailSlug": "allianz-technology-trust-plc-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-technology-trust-plc-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.658Z"
+    },
+    {
+      "fundName": "Allianz Food Security",
+      "fundId": "2249",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU2211817601",
+          "wkn": null,
+          "shareClassName": "AT (EUR)",
+          "currency": "EUR",
+          "nav": 77.25,
+          "navDate": "16/12/2025",
+          "launchDate": "10/06/2020",
+          "performance": {
+            "ytd": -11.84,
+            "oneYear": -12.27,
+            "threeYear": -5.4,
+            "fiveYear": -4.02
+          },
+          "_fundId": "2249",
+          "_shareClassId": "6033",
+          "_detailSlug": "allianz-food-security-at-eur"
+        },
+        {
+          "isin": "LU2354777182",
+          "wkn": null,
+          "shareClassName": "WT (GBP)",
+          "currency": "GBP",
+          "nav": 687.61,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": -5.41,
+            "oneYear": -6.49,
+            "threeYear": -3.45,
+            "fiveYear": null
+          },
+          "_fundId": "2249",
+          "_shareClassId": "6378",
+          "_detailSlug": "allianz-food-security-wt-gbp"
+        },
+        {
+          "isin": "LU2211817866",
+          "wkn": null,
+          "shareClassName": "AT (USD)",
+          "currency": "USD",
+          "nav": 7.7185,
+          "navDate": "16/12/2025",
+          "launchDate": "10/06/2020",
+          "performance": {
+            "ytd": -2,
+            "oneYear": -6.49,
+            "threeYear": -0.46,
+            "fiveYear": -4.15
+          },
+          "_fundId": "2249",
+          "_shareClassId": "6034",
+          "_detailSlug": "allianz-food-security-at-usd"
+        },
+        {
+          "isin": "LU2215374161",
+          "wkn": null,
+          "shareClassName": "P (GBP)",
+          "currency": "GBP",
+          "nav": 755.97,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": -5.71,
+            "oneYear": -6.83,
+            "threeYear": -3.87,
+            "fiveYear": -3.65
+          },
+          "_fundId": "2249",
+          "_shareClassId": "6041",
+          "_detailSlug": "allianz-food-security-p-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-food-security-at-eur",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.658Z"
+    },
+    {
+      "fundName": "Allianz US Large Cap Value",
+      "fundId": "2376",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU2938600926",
+          "wkn": null,
+          "shareClassName": "WT (EUR)",
+          "currency": "EUR",
+          "nav": 947.55,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": -3.48,
+            "oneYear": 0.54,
+            "threeYear": 6.56,
+            "fiveYear": 15.62
+          },
+          "_fundId": "2376",
+          "_shareClassId": "7266",
+          "_detailSlug": "allianz-us-large-cap-value-wt-eur"
+        },
+        {
+          "isin": "LU2988684580",
+          "wkn": null,
+          "shareClassName": "W (GBP)",
+          "currency": "GBP",
+          "nav": 984.79,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 2.03,
+            "oneYear": 4.2,
+            "threeYear": 7.25,
+            "fiveYear": 14.96
+          },
+          "_fundId": "2376",
+          "_shareClassId": "7303",
+          "_detailSlug": "allianz-us-large-cap-value-w-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-us-large-cap-value-wt-eur",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.658Z"
+    },
+    {
+      "fundName": "Allianz Best Styles Global AC Equity",
+      "fundId": "253",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 6",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU1505875812",
+          "wkn": null,
+          "shareClassName": "WT (EUR)",
+          "currency": "EUR",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 11.48,
+            "oneYear": 17.7,
+            "threeYear": 18.72,
+            "fiveYear": 18.34
+          },
+          "_fundId": "253",
+          "_shareClassId": "7274",
+          "_detailSlug": "allianz-best-styles-global-ac-equity-wt-eur"
+        }
+      ],
+      "_detailSlug": "allianz-best-styles-global-ac-equity-wt-eur",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.658Z"
+    },
+    {
+      "fundName": "Allianz Legacy Builder Fund",
+      "fundId": "2435",
+      "assetClass": "Multi Asset",
+      "legalStructure": "OEIC",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Not applicable",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "GB00BRJQH739",
+          "wkn": null,
+          "shareClassName": "C (Acc) (GBP)",
+          "currency": "GBp",
+          "nav": 113.03,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": 11.11,
+            "oneYear": 12.47,
+            "threeYear": null,
+            "fiveYear": null
+          },
+          "_fundId": "2435",
+          "_shareClassId": "7137",
+          "_detailSlug": "allianz-legacy-builder-fund-c-acc-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-legacy-builder-fund-c-acc-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.658Z"
+    },
+    {
+      "fundName": "The Brunner Investment Trust PLC",
+      "fundId": "1133",
+      "assetClass": "Equity",
+      "legalStructure": "UK Investment Company",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Not applicable",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "GB0001490001",
+          "wkn": null,
+          "shareClassName": "Ordinary (GBP)",
+          "currency": "GBp",
+          "nav": null,
+          "navDate": null,
+          "launchDate": null,
+          "performance": {
+            "ytd": null,
+            "oneYear": null,
+            "threeYear": null,
+            "fiveYear": null
+          },
+          "_fundId": "1133",
+          "_shareClassId": "2360",
+          "_detailSlug": "the-brunner-investment-trust-plc-ordinary-gbp"
+        }
+      ],
+      "_detailSlug": "the-brunner-investment-trust-plc-ordinary-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.658Z"
+    },
+    {
+      "fundName": "Allianz Best Styles US Small Cap Equity",
+      "fundId": "2454",
+      "assetClass": "Equity",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 8",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU3027984783",
+          "wkn": null,
+          "shareClassName": "WT (USD)",
+          "currency": "USD",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": null,
+            "oneYear": null,
+            "threeYear": null,
+            "fiveYear": null
+          },
+          "_fundId": "2454",
+          "_shareClassId": "7387",
+          "_detailSlug": "allianz-best-styles-us-small-cap-equity-wt-usd"
+        }
+      ],
+      "_detailSlug": "allianz-best-styles-us-small-cap-equity-wt-usd",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.658Z"
+    },
+    {
+      "fundName": "Allianz Volatility Strategy Fund",
+      "fundId": "1914",
+      "assetClass": "Multi Asset",
+      "legalStructure": "SICAV",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Article 6",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "LU2602447521",
+          "wkn": null,
+          "shareClassName": "I (H2-GBP)",
+          "currency": "GBP",
+          "nav": 1,
+          "navDate": "16/12/2025",
+          "launchDate": null,
+          "performance": {
+            "ytd": -2.11,
+            "oneYear": -0.76,
+            "threeYear": null,
+            "fiveYear": null
+          },
+          "_fundId": "1914",
+          "_shareClassId": "6770",
+          "_detailSlug": "allianz-volatility-strategy-fund-i-h2-gbp-gbp"
+        }
+      ],
+      "_detailSlug": "allianz-volatility-strategy-fund-i-h2-gbp-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.658Z"
+    },
+    {
+      "fundName": "The Merchants Trust PLC",
+      "fundId": "1134",
+      "assetClass": "Equity",
+      "legalStructure": "UK Investment Company",
+      "jurisdiction": "GB",
+      "sfdrCategory": "Not applicable",
+      "morningstarRating": null,
+      "managementCompany": {
+        "name": "Allianz Global Investors UK Limited",
+        "jurisdiction": "GB",
+        "regulator": "FCA"
+      },
+      "shareClasses": [
+        {
+          "isin": "GB0005800072",
+          "wkn": null,
+          "shareClassName": "Ordinary (GBP)",
+          "currency": "GBp",
+          "nav": null,
+          "navDate": null,
+          "launchDate": null,
+          "performance": {
+            "ytd": null,
+            "oneYear": null,
+            "threeYear": null,
+            "fiveYear": null
+          },
+          "_fundId": "1134",
+          "_shareClassId": "2361",
+          "_detailSlug": "the-merchants-trust-plc-ordinary-gbp"
+        }
+      ],
+      "_detailSlug": "the-merchants-trust-plc-ordinary-gbp",
+      "_source": "GB",
+      "_scrapedAt": "2025-12-16T22:35:34.658Z"
+    }
+  ]
+}

@@ -1358,13 +1358,10 @@ impl AgentService {
             explanation
         };
 
-        // Auto-execute if DSL is valid and ready
+        // Set can_execute flag but do NOT auto-execute
+        // User must explicitly type "run"/"execute" or click Execute button
         let can_execute = session.can_execute() && all_valid;
-        let commands = if can_execute && combined_dsl.is_some() {
-            Some(vec![AgentCommand::Execute])
-        } else {
-            None
-        };
+        let commands: Option<Vec<AgentCommand>> = None;
 
         Ok(AgentChatResponse {
             message,

@@ -2,6 +2,17 @@
   "name": "allianzgi_seed",
   "version": "1.0.0",
   "type": "module",
+  "scripts": {
+    "scrape": "node scrape-allianzgi.mjs",
+    "scrape:lu": "node scrape-allianzgi.mjs --region LU",
+    "scrape:ie": "node scrape-allianzgi.mjs --region IE",
+    "scrape:gb": "node scrape-allianzgi.mjs --region GB",
+    "scrape:de": "node scrape-allianzgi.mjs --region DE",
+    "scrape:ch": "node scrape-allianzgi.mjs --region CH",
+    "scrape:details": "node scrape-allianzgi.mjs --details",
+    "scrape:lu:details": "node scrape-allianzgi.mjs --region LU --details",
+    "download-old": "node download-allianzgi-funds.mjs"
+  },
   "dependencies": {
     "playwright": "^1.57.0"
   }
