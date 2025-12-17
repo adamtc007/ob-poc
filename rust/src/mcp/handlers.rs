@@ -15,6 +15,7 @@ use tokio::sync::Mutex;
 use tonic::transport::Channel;
 use uuid::Uuid;
 
+use crate::api::session::SessionStore;
 use crate::database::generation_log_repository::{
     CompileResult, GenerationAttempt, GenerationLogRepository, LintResult, ParseResult,
 };
@@ -25,23 +26,45 @@ use crate::dsl_v2::{
 
 use super::protocol::ToolCallResult;
 
-/// Tool handlers with database access and EntityGateway client
+/// Tool handlers with database access, EntityGateway client, and UI session store
 pub struct ToolHandlers {
     pool: PgPool,
     generation_log: GenerationLogRepository,
     repo: VisualizationRepository,
     /// EntityGateway client for all entity lookups (lazy-initialized)
     gateway_client: Arc<Mutex<Option<EntityGatewayClient<Channel>>>>,
+    /// UI session store - shared with web server for template batch operations
+    sessions: Option<SessionStore>,
 }
 
 impl ToolHandlers {
+    /// Create handlers without session store (standalone MCP mode)
     pub fn new(pool: PgPool) -> Self {
         Self {
             generation_log: GenerationLogRepository::new(pool.clone()),
             repo: VisualizationRepository::new(pool.clone()),
             pool,
             gateway_client: Arc::new(Mutex::new(None)),
+            sessions: None,
         }
+    }
+
+    /// Create handlers with UI session store (integrated mode)
+    pub fn with_sessions(pool: PgPool, sessions: SessionStore) -> Self {
+        Self {
+            generation_log: GenerationLogRepository::new(pool.clone()),
+            repo: VisualizationRepository::new(pool.clone()),
+            pool,
+            gateway_client: Arc::new(Mutex::new(None)),
+            sessions: Some(sessions),
+        }
+    }
+
+    /// Get the session store, or error if not configured
+    fn require_sessions(&self) -> Result<&SessionStore> {
+        self.sessions.as_ref().ok_or_else(|| {
+            anyhow!("Session store not configured. Batch operations require integrated mode.")
+        })
     }
 
     /// Get or create EntityGateway client
@@ -128,6 +151,16 @@ impl ToolHandlers {
             "template_list" => self.template_list(args),
             "template_get" => self.template_get(args),
             "template_expand" => self.template_expand(args),
+            // Template batch execution tools
+            "batch_start" => self.batch_start(args).await,
+            "batch_add_entities" => self.batch_add_entities(args).await,
+            "batch_confirm_keyset" => self.batch_confirm_keyset(args).await,
+            "batch_set_scalar" => self.batch_set_scalar(args).await,
+            "batch_get_state" => self.batch_get_state(args).await,
+            "batch_expand_current" => self.batch_expand_current(args).await,
+            "batch_record_result" => self.batch_record_result(args).await,
+            "batch_skip_current" => self.batch_skip_current(args).await,
+            "batch_cancel" => self.batch_cancel(args).await,
             _ => Err(anyhow!("Unknown tool: {}", name)),
         }
     }
@@ -1686,6 +1719,605 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
             })).collect::<Vec<_>>(),
             "prompt": prompt,
             "outputs": result.outputs
+        }))
+    }
+
+    // =========================================================================
+    // Template Batch Execution Handlers
+    // =========================================================================
+    //
+    // These handlers operate on the UI SessionStore (self.sessions).
+    // The SessionStore is the SINGLE SOURCE OF TRUTH for session state.
+    // egui and all other consumers access the same store.
+
+    /// Start a template batch execution session
+    async fn batch_start(&self, args: Value) -> Result<Value> {
+        use crate::api::session::{
+            SessionMode, TemplateExecutionContext, TemplateParamKeySet, TemplatePhase,
+        };
+        use crate::templates::TemplateRegistry;
+        use std::path::Path;
+
+        let sessions = self.require_sessions()?;
+
+        let session_id = args["session_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("session_id required"))?;
+        let session_uuid =
+            Uuid::parse_str(session_id).map_err(|_| anyhow!("Invalid session_id"))?;
+
+        let template_id = args["template_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("template_id required"))?;
+
+        // Load template
+        let config_dir = std::env::var("DSL_CONFIG_DIR").unwrap_or_else(|_| "config".to_string());
+        let templates_path = Path::new(&config_dir).join("verbs/templates");
+
+        let registry = TemplateRegistry::load_from_dir(&templates_path)
+            .map_err(|e| anyhow!("Failed to load templates: {}", e))?;
+
+        let template = registry
+            .get(template_id)
+            .ok_or_else(|| anyhow!("Template not found: {}", template_id))?;
+
+        // Extract entity dependencies from template
+        let entity_deps = template.entity_dependency_summary();
+
+        // Initialize key sets from template params
+        let mut key_sets = std::collections::HashMap::new();
+
+        for param_info in &entity_deps.batch_params {
+            key_sets.insert(
+                param_info.param_name.clone(),
+                TemplateParamKeySet {
+                    param_name: param_info.param_name.clone(),
+                    entity_type: param_info.entity_type.clone(),
+                    cardinality: "batch".to_string(),
+                    entities: Vec::new(),
+                    is_complete: false,
+                    filter_description: String::new(),
+                },
+            );
+        }
+
+        for param_info in &entity_deps.shared_params {
+            key_sets.insert(
+                param_info.param_name.clone(),
+                TemplateParamKeySet {
+                    param_name: param_info.param_name.clone(),
+                    entity_type: param_info.entity_type.clone(),
+                    cardinality: "shared".to_string(),
+                    entities: Vec::new(),
+                    is_complete: false,
+                    filter_description: String::new(),
+                },
+            );
+        }
+
+        // Update UI session state
+        {
+            let mut sessions_guard = sessions.write().await;
+            let session = sessions_guard
+                .get_mut(&session_uuid)
+                .ok_or_else(|| anyhow!("Session not found: {}", session_uuid))?;
+
+            session.context.template_execution = TemplateExecutionContext {
+                template_id: Some(template_id.to_string()),
+                phase: TemplatePhase::CollectingSharedParams,
+                key_sets,
+                scalar_params: std::collections::HashMap::new(),
+                current_batch_index: 0,
+                batch_results: Vec::new(),
+                auto_execute: false,
+            };
+            session.context.mode = SessionMode::TemplateExpansion;
+        }
+
+        // Return template info and params to collect
+        Ok(json!({
+            "success": true,
+            "template_id": template_id,
+            "template_name": template.metadata.name,
+            "summary": template.metadata.summary,
+            "phase": "collecting_shared_params",
+            "params_to_collect": {
+                "batch": entity_deps.batch_params.iter().map(|p| json!({
+                    "param_name": p.param_name,
+                    "entity_type": p.entity_type,
+                    "prompt": p.prompt,
+                    "role_hint": p.role_hint
+                })).collect::<Vec<_>>(),
+                "shared": entity_deps.shared_params.iter().map(|p| json!({
+                    "param_name": p.param_name,
+                    "entity_type": p.entity_type,
+                    "prompt": p.prompt,
+                    "role_hint": p.role_hint
+                })).collect::<Vec<_>>()
+            }
+        }))
+    }
+
+    /// Add entities to a parameter's key set
+    async fn batch_add_entities(&self, args: Value) -> Result<Value> {
+        use crate::api::session::ResolvedEntityRef;
+
+        let sessions = self.require_sessions()?;
+
+        let session_id = args["session_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("session_id required"))?;
+        let session_uuid =
+            Uuid::parse_str(session_id).map_err(|_| anyhow!("Invalid session_id"))?;
+
+        let param_name = args["param_name"]
+            .as_str()
+            .ok_or_else(|| anyhow!("param_name required"))?;
+
+        let entities = args["entities"]
+            .as_array()
+            .ok_or_else(|| anyhow!("entities array required"))?;
+
+        let filter_description = args["filter_description"]
+            .as_str()
+            .unwrap_or("")
+            .to_string();
+
+        // Parse entities
+        let resolved_entities: Vec<ResolvedEntityRef> = entities
+            .iter()
+            .filter_map(|e| {
+                let entity_id = e["entity_id"]
+                    .as_str()
+                    .and_then(|s| Uuid::parse_str(s).ok())?;
+                let display_name = e["display_name"].as_str()?.to_string();
+                let entity_type = e["entity_type"].as_str()?.to_string();
+                let metadata = e.get("metadata").cloned().unwrap_or(json!(null));
+
+                Some(ResolvedEntityRef {
+                    entity_type,
+                    display_name,
+                    entity_id,
+                    metadata,
+                })
+            })
+            .collect();
+
+        if resolved_entities.is_empty() {
+            return Err(anyhow!("No valid entities provided"));
+        }
+
+        let added_count = resolved_entities.len();
+
+        // Update UI session
+        {
+            let mut sessions_guard = sessions.write().await;
+            let session = sessions_guard
+                .get_mut(&session_uuid)
+                .ok_or_else(|| anyhow!("Session not found: {}", session_uuid))?;
+
+            let key_set = session
+                .context
+                .template_execution
+                .key_sets
+                .get_mut(param_name)
+                .ok_or_else(|| anyhow!("Key set not found for param: {}", param_name))?;
+
+            key_set.entities.extend(resolved_entities.clone());
+            if !filter_description.is_empty() {
+                key_set.filter_description = filter_description;
+            }
+        }
+
+        Ok(json!({
+            "success": true,
+            "param_name": param_name,
+            "added_count": added_count,
+            "entities": resolved_entities.iter().map(|e| json!({
+                "entity_id": e.entity_id.to_string(),
+                "display_name": e.display_name,
+                "entity_type": e.entity_type
+            })).collect::<Vec<_>>()
+        }))
+    }
+
+    /// Mark a key set as complete
+    async fn batch_confirm_keyset(&self, args: Value) -> Result<Value> {
+        use crate::api::session::TemplatePhase;
+
+        let sessions = self.require_sessions()?;
+
+        let session_id = args["session_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("session_id required"))?;
+        let session_uuid =
+            Uuid::parse_str(session_id).map_err(|_| anyhow!("Invalid session_id"))?;
+
+        let param_name = args["param_name"]
+            .as_str()
+            .ok_or_else(|| anyhow!("param_name required"))?;
+
+        let (all_complete, phase) = {
+            let mut sessions_guard = sessions.write().await;
+            let session = sessions_guard
+                .get_mut(&session_uuid)
+                .ok_or_else(|| anyhow!("Session not found: {}", session_uuid))?;
+
+            let ctx = &mut session.context.template_execution;
+
+            let key_set = ctx
+                .key_sets
+                .get_mut(param_name)
+                .ok_or_else(|| anyhow!("Key set not found for param: {}", param_name))?;
+
+            if key_set.entities.is_empty() {
+                return Err(anyhow!("Cannot confirm empty key set: {}", param_name));
+            }
+
+            key_set.is_complete = true;
+
+            // Check if all key sets are complete
+            let all_complete = ctx.key_sets.values().all(|ks| ks.is_complete);
+
+            // Auto-advance phase if all complete
+            if all_complete {
+                ctx.phase = TemplatePhase::ReviewingKeySets;
+            }
+
+            (all_complete, ctx.phase.clone())
+        };
+
+        Ok(json!({
+            "success": true,
+            "param_name": param_name,
+            "all_key_sets_complete": all_complete,
+            "phase": format!("{:?}", phase).to_lowercase()
+        }))
+    }
+
+    /// Set a scalar parameter value
+    async fn batch_set_scalar(&self, args: Value) -> Result<Value> {
+        let sessions = self.require_sessions()?;
+
+        let session_id = args["session_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("session_id required"))?;
+        let session_uuid =
+            Uuid::parse_str(session_id).map_err(|_| anyhow!("Invalid session_id"))?;
+
+        let param_name = args["param_name"]
+            .as_str()
+            .ok_or_else(|| anyhow!("param_name required"))?;
+
+        let value = args["value"]
+            .as_str()
+            .ok_or_else(|| anyhow!("value required"))?;
+
+        {
+            let mut sessions_guard = sessions.write().await;
+            let session = sessions_guard
+                .get_mut(&session_uuid)
+                .ok_or_else(|| anyhow!("Session not found: {}", session_uuid))?;
+
+            session
+                .context
+                .template_execution
+                .scalar_params
+                .insert(param_name.to_string(), value.to_string());
+        }
+
+        Ok(json!({
+            "success": true,
+            "param_name": param_name,
+            "value": value
+        }))
+    }
+
+    /// Get current template execution state
+    async fn batch_get_state(&self, args: Value) -> Result<Value> {
+        let sessions = self.require_sessions()?;
+
+        let session_id = args["session_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("session_id required"))?;
+        let session_uuid =
+            Uuid::parse_str(session_id).map_err(|_| anyhow!("Invalid session_id"))?;
+
+        let context = {
+            let sessions_guard = sessions.read().await;
+            let session = sessions_guard
+                .get(&session_uuid)
+                .ok_or_else(|| anyhow!("Session not found: {}", session_uuid))?;
+
+            session.context.template_execution.clone()
+        };
+
+        Ok(json!({
+            "template_id": context.template_id,
+            "phase": format!("{:?}", context.phase).to_lowercase(),
+            "key_sets": context.key_sets.iter().map(|(name, ks)| {
+                json!({
+                    "param_name": name,
+                    "entity_type": ks.entity_type,
+                    "cardinality": ks.cardinality,
+                    "entity_count": ks.entities.len(),
+                    "is_complete": ks.is_complete,
+                    "entities": ks.entities.iter().map(|e| json!({
+                        "entity_id": e.entity_id.to_string(),
+                        "display_name": e.display_name
+                    })).collect::<Vec<_>>()
+                })
+            }).collect::<Vec<_>>(),
+            "scalar_params": context.scalar_params,
+            "current_batch_index": context.current_batch_index,
+            "batch_size": context.batch_size(),
+            "progress": context.progress_string(),
+            "batch_results": context.batch_results.iter().map(|r| json!({
+                "index": r.index,
+                "source_entity": r.source_entity.display_name,
+                "success": r.success,
+                "created_id": r.created_id.map(|id| id.to_string()),
+                "error": r.error
+            })).collect::<Vec<_>>(),
+            "is_active": context.is_active()
+        }))
+    }
+
+    /// Expand template for current batch item
+    async fn batch_expand_current(&self, args: Value) -> Result<Value> {
+        use crate::templates::{ExpansionContext, TemplateExpander, TemplateRegistry};
+        use std::path::Path;
+
+        let sessions = self.require_sessions()?;
+
+        let session_id = args["session_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("session_id required"))?;
+        let session_uuid =
+            Uuid::parse_str(session_id).map_err(|_| anyhow!("Invalid session_id"))?;
+
+        // Get template context from UI session
+        let context = {
+            let sessions_guard = sessions.read().await;
+            let session = sessions_guard
+                .get(&session_uuid)
+                .ok_or_else(|| anyhow!("Session not found: {}", session_uuid))?;
+
+            session.context.template_execution.clone()
+        };
+
+        let template_id = context
+            .template_id
+            .as_ref()
+            .ok_or_else(|| anyhow!("No template set"))?;
+
+        // Load template
+        let config_dir = std::env::var("DSL_CONFIG_DIR").unwrap_or_else(|_| "config".to_string());
+        let templates_path = Path::new(&config_dir).join("verbs/templates");
+
+        let registry = TemplateRegistry::load_from_dir(&templates_path)
+            .map_err(|e| anyhow!("Failed to load templates: {}", e))?;
+
+        let template = registry
+            .get(template_id)
+            .ok_or_else(|| anyhow!("Template not found: {}", template_id))?;
+
+        // Build params from context
+        let mut params = std::collections::HashMap::new();
+
+        // Add current batch entity
+        if let Some(batch_entity) = context.current_batch_entity() {
+            // Find the batch param name
+            if let Some((param_name, _)) = context
+                .key_sets
+                .iter()
+                .find(|(_, ks)| ks.cardinality == "batch")
+            {
+                params.insert(param_name.clone(), batch_entity.entity_id.to_string());
+                // Also add .name for display
+                params.insert(
+                    format!("{}.name", param_name),
+                    batch_entity.display_name.clone(),
+                );
+            }
+        }
+
+        // Add shared entities
+        for (param_name, entity) in context.shared_entities() {
+            params.insert(param_name.to_string(), entity.entity_id.to_string());
+            params.insert(format!("{}.name", param_name), entity.display_name.clone());
+        }
+
+        // Add scalar params
+        for (name, value) in &context.scalar_params {
+            params.insert(name.clone(), value.clone());
+        }
+
+        // Expand template
+        let expansion_ctx = ExpansionContext::new();
+        let result = TemplateExpander::expand(template, &params, &expansion_ctx);
+
+        Ok(json!({
+            "dsl": result.dsl,
+            "complete": result.missing_params.is_empty(),
+            "batch_index": context.current_batch_index,
+            "batch_size": context.batch_size(),
+            "current_entity": context.current_batch_entity().map(|e| json!({
+                "entity_id": e.entity_id.to_string(),
+                "display_name": e.display_name,
+                "entity_type": e.entity_type
+            })),
+            "missing_params": result.missing_params.iter().map(|p| p.name.clone()).collect::<Vec<_>>()
+        }))
+    }
+
+    /// Record result from executing current batch item
+    async fn batch_record_result(&self, args: Value) -> Result<Value> {
+        use crate::api::session::{BatchItemResult, TemplatePhase};
+
+        let sessions = self.require_sessions()?;
+
+        let session_id = args["session_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("session_id required"))?;
+        let session_uuid =
+            Uuid::parse_str(session_id).map_err(|_| anyhow!("Invalid session_id"))?;
+
+        let success = args["success"]
+            .as_bool()
+            .ok_or_else(|| anyhow!("success required"))?;
+
+        let created_id = args["created_id"]
+            .as_str()
+            .and_then(|s| Uuid::parse_str(s).ok());
+
+        let error = args["error"].as_str().map(|s| s.to_string());
+
+        let executed_dsl = args["executed_dsl"].as_str().map(|s| s.to_string());
+
+        let (has_more, new_index, phase) = {
+            let mut sessions_guard = sessions.write().await;
+            let session = sessions_guard
+                .get_mut(&session_uuid)
+                .ok_or_else(|| anyhow!("Session not found: {}", session_uuid))?;
+
+            let ctx = &mut session.context.template_execution;
+            let index = ctx.current_batch_index;
+
+            // Get the current batch entity
+            let source_entity = ctx
+                .current_batch_entity()
+                .cloned()
+                .ok_or_else(|| anyhow!("No current batch entity"))?;
+
+            // Record result
+            ctx.batch_results.push(BatchItemResult {
+                index,
+                source_entity,
+                success,
+                created_id,
+                error: error.clone(),
+                executed_dsl,
+            });
+
+            // Advance to next item
+            let has_more = ctx.advance();
+
+            // Update phase if complete
+            if !has_more {
+                ctx.phase = TemplatePhase::Complete;
+            }
+
+            (has_more, ctx.current_batch_index, ctx.phase.clone())
+        };
+
+        Ok(json!({
+            "success": true,
+            "recorded_success": success,
+            "has_more_items": has_more,
+            "next_index": new_index,
+            "phase": format!("{:?}", phase).to_lowercase(),
+            "created_id": created_id.map(|id| id.to_string()),
+            "error": error
+        }))
+    }
+
+    /// Skip current batch item
+    async fn batch_skip_current(&self, args: Value) -> Result<Value> {
+        use crate::api::session::{BatchItemResult, TemplatePhase};
+
+        let sessions = self.require_sessions()?;
+
+        let session_id = args["session_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("session_id required"))?;
+        let session_uuid =
+            Uuid::parse_str(session_id).map_err(|_| anyhow!("Invalid session_id"))?;
+
+        let reason = args["reason"].as_str().unwrap_or("User skipped");
+
+        let (has_more, new_index, phase) = {
+            let mut sessions_guard = sessions.write().await;
+            let session = sessions_guard
+                .get_mut(&session_uuid)
+                .ok_or_else(|| anyhow!("Session not found: {}", session_uuid))?;
+
+            let ctx = &mut session.context.template_execution;
+            let index = ctx.current_batch_index;
+
+            // Get the current batch entity
+            let source_entity = ctx
+                .current_batch_entity()
+                .cloned()
+                .ok_or_else(|| anyhow!("No current batch entity"))?;
+
+            // Record skip as failed result
+            ctx.batch_results.push(BatchItemResult {
+                index,
+                source_entity,
+                success: false,
+                created_id: None,
+                error: Some(format!("Skipped: {}", reason)),
+                executed_dsl: None,
+            });
+
+            // Advance to next item
+            let has_more = ctx.advance();
+
+            // Update phase if complete
+            if !has_more {
+                ctx.phase = TemplatePhase::Complete;
+            }
+
+            (has_more, ctx.current_batch_index, ctx.phase.clone())
+        };
+
+        Ok(json!({
+            "success": true,
+            "skipped": true,
+            "has_more_items": has_more,
+            "next_index": new_index,
+            "phase": format!("{:?}", phase).to_lowercase()
+        }))
+    }
+
+    /// Cancel batch operation
+    async fn batch_cancel(&self, args: Value) -> Result<Value> {
+        use crate::api::session::SessionMode;
+
+        let sessions = self.require_sessions()?;
+
+        let session_id = args["session_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("session_id required"))?;
+        let session_uuid =
+            Uuid::parse_str(session_id).map_err(|_| anyhow!("Invalid session_id"))?;
+
+        let (completed_count, failed_count, pending_count) = {
+            let mut sessions_guard = sessions.write().await;
+            let session = sessions_guard
+                .get_mut(&session_uuid)
+                .ok_or_else(|| anyhow!("Session not found: {}", session_uuid))?;
+
+            let ctx = &session.context.template_execution;
+            let completed = ctx.batch_results.iter().filter(|r| r.success).count();
+            let failed = ctx.batch_results.iter().filter(|r| !r.success).count();
+            let total = ctx.batch_size();
+            let pending = total.saturating_sub(completed + failed);
+
+            // Reset template execution state
+            session.context.template_execution.reset();
+            session.context.mode = SessionMode::Chat;
+
+            (completed, failed, pending)
+        };
+
+        Ok(json!({
+            "success": true,
+            "cancelled": true,
+            "completed_count": completed_count,
+            "skipped_count": failed_count,
+            "abandoned_count": pending_count
         }))
     }
 }

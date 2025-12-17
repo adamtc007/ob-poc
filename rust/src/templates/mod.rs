@@ -37,7 +37,8 @@ pub mod harness;
 mod registry;
 
 pub use definition::{
-    OutputDefinition, ParamDefinition, TemplateDefinition, TemplateMetadata, WorkflowContext,
+    EntityDependencySummary, EntityParamInfo, OutputDefinition, ParamCardinality, ParamDefinition,
+    PrimaryEntity, PrimaryEntityType, TemplateDefinition, TemplateMetadata, WorkflowContext,
 };
 pub use error::TemplateError;
 pub use expander::{ExpansionContext, ExpansionResult, MissingParam, TemplateExpander};

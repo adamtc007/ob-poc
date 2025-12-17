@@ -1,7 +1,14 @@
 //! MCP Session Management
 //!
-//! Manages conversation state with binding persistence across DSL executions.
-//! Sessions are stored in-memory with a simple HashMap.
+//! This module provides session helpers for MCP tool handlers.
+//!
+//! IMPORTANT: The UI SessionStore (api/session.rs) is the SINGLE SOURCE OF TRUTH.
+//! MCP tools must access that store via ToolHandlers.sessions, NOT maintain
+//! separate state here. This is critical for egui compliance (EGUI-RULES.md).
+//!
+//! The legacy Session/SESSIONS static below is for standalone MCP mode only
+//! (e.g., Claude Desktop without web UI). For integrated mode, use the
+//! SessionStore passed to ToolHandlers::with_sessions().
 
 use std::collections::HashMap;
 use std::sync::{LazyLock, RwLock};
@@ -10,7 +17,7 @@ use uuid::Uuid;
 
 use super::types::{BindingInfo, SessionAction, SessionState};
 
-/// Session data stored in memory
+/// Session data stored in memory (legacy - for standalone MCP mode only)
 #[derive(Debug, Clone)]
 pub struct Session {
     /// Bindings: name → (uuid, entity_type)
@@ -93,7 +100,7 @@ impl Default for Session {
     }
 }
 
-/// In-memory session store
+/// In-memory session store (legacy - for standalone MCP mode only)
 static SESSIONS: LazyLock<RwLock<HashMap<String, Session>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 

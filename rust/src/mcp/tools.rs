@@ -542,5 +542,263 @@ Use this to generate DSL from templates, then review/edit before execution."#.in
                 "required": ["template_id"]
             }),
         },
+        // =====================================================================
+        // Template Batch Execution Tools
+        // Agent's working memory for template-driven bulk operations
+        // =====================================================================
+        Tool {
+            name: "batch_start".into(),
+            description: r#"Start a template batch execution session.
+
+Call this when user wants bulk operations like "onboard all Allianz funds as CBUs".
+This:
+1. Sets session mode to TemplateExpansion
+2. Loads template definition with entity dependencies
+3. Returns the params you need to collect (batch vs shared)
+
+Next steps:
+- Use entity_search to find entities for each param
+- Use batch_add_entities to add them to key sets
+- Use batch_confirm_keyset when a param's entities are complete"#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Session ID"
+                    },
+                    "template_id": {
+                        "type": "string",
+                        "description": "Template to use (e.g., onboard-fund-cbu)"
+                    }
+                },
+                "required": ["session_id", "template_id"]
+            }),
+        },
+        Tool {
+            name: "batch_add_entities".into(),
+            description: r#"Add resolved entities to a template parameter's key set.
+
+Use after searching with entity_search. Adds entities to the working set
+for a specific parameter.
+
+For batch params: Add multiple entities (these are what we iterate over)
+For shared params: Add single entity (same for all batch items)"#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Session ID"
+                    },
+                    "param_name": {
+                        "type": "string",
+                        "description": "Parameter name from template (e.g., fund_entity, manco_entity)"
+                    },
+                    "entities": {
+                        "type": "array",
+                        "description": "Entities to add",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "entity_id": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "description": "Entity UUID"
+                                },
+                                "display_name": {
+                                    "type": "string",
+                                    "description": "Display name"
+                                },
+                                "entity_type": {
+                                    "type": "string",
+                                    "description": "Entity type (fund, limited_company, etc.)"
+                                }
+                            },
+                            "required": ["entity_id", "display_name", "entity_type"]
+                        }
+                    },
+                    "filter_description": {
+                        "type": "string",
+                        "description": "How these entities were found (for audit trail)"
+                    }
+                },
+                "required": ["session_id", "param_name", "entities"]
+            }),
+        },
+        Tool {
+            name: "batch_confirm_keyset".into(),
+            description: r#"Mark a parameter's key set as complete.
+
+Call after user confirms the entity list for a parameter.
+Once all required key sets are confirmed, session moves to ReviewingKeySets phase."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Session ID"
+                    },
+                    "param_name": {
+                        "type": "string",
+                        "description": "Parameter name to confirm"
+                    }
+                },
+                "required": ["session_id", "param_name"]
+            }),
+        },
+        Tool {
+            name: "batch_set_scalar".into(),
+            description: r#"Set a scalar (non-entity) parameter value.
+
+For parameters like jurisdiction, dates, or other simple values
+that aren't entity references."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Session ID"
+                    },
+                    "param_name": {
+                        "type": "string",
+                        "description": "Parameter name"
+                    },
+                    "value": {
+                        "type": "string",
+                        "description": "Parameter value"
+                    }
+                },
+                "required": ["session_id", "param_name", "value"]
+            }),
+        },
+        Tool {
+            name: "batch_get_state".into(),
+            description: r#"Get current template execution state.
+
+Returns:
+- phase: Current phase (SelectingTemplate, CollectingSharedParams, etc.)
+- template_id: Template being used
+- key_sets: Collected entities per parameter
+- scalar_params: Scalar values set
+- current_batch_index: Which item is being processed
+- batch_results: Results from processed items
+- progress: "5/15 complete" style summary
+
+Use this to resume batch operations or display progress."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Session ID"
+                    }
+                },
+                "required": ["session_id"]
+            }),
+        },
+        Tool {
+            name: "batch_expand_current".into(),
+            description: r#"Expand template for the current batch item.
+
+Uses:
+- Current batch item from the batch key set
+- Shared entities from shared key sets
+- Scalar params
+
+Returns DSL source text ready for user review.
+Does NOT execute - user must confirm first."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Session ID"
+                    }
+                },
+                "required": ["session_id"]
+            }),
+        },
+        Tool {
+            name: "batch_record_result".into(),
+            description: r#"Record result after executing current batch item.
+
+Call after DSL execution completes (success or failure).
+Automatically advances to next pending item if success."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Session ID"
+                    },
+                    "success": {
+                        "type": "boolean",
+                        "description": "Whether execution succeeded"
+                    },
+                    "created_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "ID of created entity (e.g., new CBU)"
+                    },
+                    "error": {
+                        "type": "string",
+                        "description": "Error message if failed"
+                    },
+                    "executed_dsl": {
+                        "type": "string",
+                        "description": "The DSL that was executed"
+                    }
+                },
+                "required": ["session_id", "success"]
+            }),
+        },
+        Tool {
+            name: "batch_skip_current".into(),
+            description: r#"Skip the current batch item.
+
+Marks current item as skipped and advances to next.
+Use when user wants to skip an item without executing."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Session ID"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Why the item was skipped"
+                    }
+                },
+                "required": ["session_id"]
+            }),
+        },
+        Tool {
+            name: "batch_cancel".into(),
+            description: r#"Cancel the batch operation.
+
+Resets template execution context and returns to Chat mode.
+Completed items remain executed, pending items are abandoned."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Session ID"
+                    }
+                },
+                "required": ["session_id"]
+            }),
+        },
     ]
 }

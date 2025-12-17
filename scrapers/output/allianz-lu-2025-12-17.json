@@ -1,0 +1,378 @@
+{
+  "metadata": {
+    "scrapedAt": "2025-12-17T08:22:28.145Z",
+    "jurisdiction": "LU",
+    "jurisdictionName": "Luxembourg",
+    "manco": {
+      "name": "Allianz Global Investors GmbH",
+      "jurisdiction": "DE",
+      "branch": "Allianz Global Investors GmbH, Luxembourg Branch",
+      "regNumber": "B-159495",
+      "regulator": "CSSF",
+      "address": "Bockenheimer Landstrasse 42-44, 60323 Frankfurt/M, Germany"
+    },
+    "depositary": {
+      "name": "State Street Bank International GmbH, Luxembourg Branch",
+      "jurisdiction": "LU"
+    },
+    "sourceUrl": "https://regulatory.allianzgi.com/en-gb/b2c/luxemburg-en/funds/mutual-funds",
+    "fundCount": 3,
+    "shareClassCount": 5
+  },
+  "umbrellas": [
+    {
+      "name": "AEVN CDO Fund",
+      "legalStructure": "SICAV",
+      "jurisdiction": "LU",
+      "funds": [
+        {
+          "umbrella": "AEVN CDO Fund",
+          "name": "AEVN CDO - Cofonds",
+          "assetClass": "Fixed Income",
+          "sfdrCategory": "Article 6",
+          "shareClasses": [
+            {
+              "isin": "LU0305077207",
+              "type": "",
+              "currency": "EUR",
+              "nav": "69.3100",
+              "navDate": "28/11/2025",
+              "detailLink": "https://regulatory.allianzgi.com/en-gb/b2c/luxemburg-en/funds/mutual-funds/aevn-cdo-cofonds-eur"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Allianz Global Investors Fund",
+      "legalStructure": "SICAV",
+      "jurisdiction": "LU",
+      "funds": [
+        {
+          "umbrella": "Allianz Global Investors Fund",
+          "name": "Allianz ActiveInvest Balanced",
+          "assetClass": "Multi Asset",
+          "sfdrCategory": "Article 6",
+          "shareClasses": [
+            {
+              "isin": "LU2208987508",
+              "type": "",
+              "currency": "EUR",
+              "nav": "118.8600",
+              "navDate": "16/12/2025",
+              "detailLink": "https://regulatory.allianzgi.com/en-gb/b2c/luxemburg-en/funds/mutual-funds/allianz-activeinvest-balanced-ct-eur"
+            },
+            {
+              "isin": "LU2025540597",
+              "type": "",
+              "currency": "EUR",
+              "nav": "1308.2400",
+              "navDate": "16/12/2025",
+              "detailLink": "https://regulatory.allianzgi.com/en-gb/b2c/luxemburg-en/funds/mutual-funds/allianz-activeinvest-balanced-wt-eur"
+            }
+          ]
+        },
+        {
+          "umbrella": "Allianz Global Investors Fund",
+          "name": "Allianz ActiveInvest Defensive",
+          "assetClass": "Multi Asset",
+          "sfdrCategory": "Article 6",
+          "shareClasses": [
+            {
+              "isin": "LU2208987763",
+              "type": "",
+              "currency": "EUR",
+              "nav": "109.5600",
+              "navDate": "16/12/2025",
+              "detailLink": "https://regulatory.allianzgi.com/en-gb/b2c/luxemburg-en/funds/mutual-funds/allianz-activeinvest-defensive-ct-eur"
+            },
+            {
+              "isin": "LU2025540324",
+              "type": "",
+              "currency": "EUR",
+              "nav": "1155.1000",
+              "navDate": "16/12/2025",
+              "detailLink": "https://regulatory.allianzgi.com/en-gb/b2c/luxemburg-en/funds/mutual-funds/allianz-activeinvest-defensive-wt-eur"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "funds": [
+    {
+      "umbrella": "AEVN CDO Fund",
+      "name": "AEVN CDO - Cofonds",
+      "assetClass": "Fixed Income",
+      "sfdrCategory": "Article 6",
+      "shareClasses": [
+        {
+          "isin": "LU0305077207",
+          "type": "",
+          "currency": "EUR",
+          "nav": "69.3100",
+          "navDate": "28/11/2025",
+          "detailLink": "https://regulatory.allianzgi.com/en-gb/b2c/luxemburg-en/funds/mutual-funds/aevn-cdo-cofonds-eur"
+        }
+      ]
+    },
+    {
+      "umbrella": "Allianz Global Investors Fund",
+      "name": "Allianz ActiveInvest Balanced",
+      "assetClass": "Multi Asset",
+      "sfdrCategory": "Article 6",
+      "shareClasses": [
+        {
+          "isin": "LU2208987508",
+          "type": "",
+          "currency": "EUR",
+          "nav": "118.8600",
+          "navDate": "16/12/2025",
+          "detailLink": "https://regulatory.allianzgi.com/en-gb/b2c/luxemburg-en/funds/mutual-funds/allianz-activeinvest-balanced-ct-eur"
+        },
+        {
+          "isin": "LU2025540597",
+          "type": "",
+          "currency": "EUR",
+          "nav": "1308.2400",
+          "navDate": "16/12/2025",
+          "detailLink": "https://regulatory.allianzgi.com/en-gb/b2c/luxemburg-en/funds/mutual-funds/allianz-activeinvest-balanced-wt-eur"
+        }
+      ]
+    },
+    {
+      "umbrella": "Allianz Global Investors Fund",
+      "name": "Allianz ActiveInvest Defensive",
+      "assetClass": "Multi Asset",
+      "sfdrCategory": "Article 6",
+      "shareClasses": [
+        {
+          "isin": "LU2208987763",
+          "type": "",
+          "currency": "EUR",
+          "nav": "109.5600",
+          "navDate": "16/12/2025",
+          "detailLink": "https://regulatory.allianzgi.com/en-gb/b2c/luxemburg-en/funds/mutual-funds/allianz-activeinvest-defensive-ct-eur"
+        },
+        {
+          "isin": "LU2025540324",
+          "type": "",
+          "currency": "EUR",
+          "nav": "1155.1000",
+          "navDate": "16/12/2025",
+          "detailLink": "https://regulatory.allianzgi.com/en-gb/b2c/luxemburg-en/funds/mutual-funds/allianz-activeinvest-defensive-wt-eur"
+        }
+      ]
+    }
+  ],
+  "shareClasses": [],
+  "documents": [],
+  "errors": [],
+  "rawEntries": [
+    {
+      "_rowIndex": 0,
+      "name": "AEVN CDO - Cofonds",
+      "isin": "LU0305077207",
+      "shareClassType": "",
+      "shareClassCount": 1,
+      "currency": "EUR",
+      "assetClass": "Fixed Income",
+      "sfdrCategory": "Article 6",
+      "nav": "69.3100",
+      "navDate": "28/11/2025",
+      "detailLink": "https://regulatory.allianzgi.com/en-gb/b2c/luxemburg-en/funds/mutual-funds/aevn-cdo-cofonds-eur",
+      "investmentObjective": "",
+      "sustainabilityIndicator": "",
+      "ter": "",
+      "inceptionDate": "",
+      "benchmark": "",
+      "documents": [
+        {
+          "type": "OTHER",
+          "url": "https://regulatory.allianzgi.com/-/media/allianzgi/eu/regulatory/global-order-execution-policy.pdf?rev=-1",
+          "text": "Best execution policy"
+        },
+        {
+          "type": "OTHER",
+          "url": "https://regulatory.allianzgi.com/-/media/allianzgi/eu/regulatory/global-order-execution-policy.pdf?rev=-1",
+          "text": "View All"
+        },
+        {
+          "type": "OTHER",
+          "url": "https://regulatory.allianzgi.com/-/media/allianzgi/eu/regulatory/global-order-execution-policy.pdf?rev=-1",
+          "text": "Best execution policy"
+        },
+        {
+          "type": "OTHER",
+          "url": "https://regulatory.allianzgi.com/-/media/allianzgi/eu/regulatory/global-order-execution-policy.pdf?rev=-1",
+          "text": "View All"
+        }
+      ],
+      "shareClasses": []
+    },
+    {
+      "_rowIndex": 1,
+      "name": "Allianz ActiveInvest Balanced",
+      "isin": "LU2208987508",
+      "shareClassType": "",
+      "shareClassCount": 2,
+      "currency": "EUR",
+      "assetClass": "Multi Asset",
+      "sfdrCategory": "Article 6",
+      "nav": "118.8600",
+      "navDate": "16/12/2025",
+      "detailLink": "https://regulatory.allianzgi.com/en-gb/b2c/luxemburg-en/funds/mutual-funds/allianz-activeinvest-balanced-ct-eur",
+      "investmentObjective": "",
+      "sustainabilityIndicator": "",
+      "ter": "",
+      "inceptionDate": "",
+      "benchmark": "",
+      "documents": [
+        {
+          "type": "OTHER",
+          "url": "https://regulatory.allianzgi.com/-/media/allianzgi/eu/regulatory/global-order-execution-policy.pdf?rev=-1",
+          "text": "Best execution policy"
+        },
+        {
+          "type": "OTHER",
+          "url": "https://regulatory.allianzgi.com/-/media/allianzgi/eu/regulatory/global-order-execution-policy.pdf?rev=-1",
+          "text": "View All"
+        },
+        {
+          "type": "OTHER",
+          "url": "https://regulatory.allianzgi.com/-/media/allianzgi/eu/regulatory/global-order-execution-policy.pdf?rev=-1",
+          "text": "Best execution policy"
+        },
+        {
+          "type": "OTHER",
+          "url": "https://regulatory.allianzgi.com/-/media/allianzgi/eu/regulatory/global-order-execution-policy.pdf?rev=-1",
+          "text": "View All"
+        }
+      ],
+      "shareClasses": []
+    },
+    {
+      "_rowIndex": 2,
+      "name": "Allianz ActiveInvest Balanced",
+      "isin": "LU2025540597",
+      "shareClassType": "",
+      "shareClassCount": 2,
+      "currency": "EUR",
+      "assetClass": "Multi Asset",
+      "sfdrCategory": "Article 6",
+      "nav": "1308.2400",
+      "navDate": "16/12/2025",
+      "detailLink": "https://regulatory.allianzgi.com/en-gb/b2c/luxemburg-en/funds/mutual-funds/allianz-activeinvest-balanced-wt-eur",
+      "investmentObjective": "",
+      "sustainabilityIndicator": "",
+      "ter": "",
+      "inceptionDate": "",
+      "benchmark": "",
+      "documents": [
+        {
+          "type": "OTHER",
+          "url": "https://regulatory.allianzgi.com/-/media/allianzgi/eu/regulatory/global-order-execution-policy.pdf?rev=-1",
+          "text": "Best execution policy"
+        },
+        {
+          "type": "OTHER",
+          "url": "https://regulatory.allianzgi.com/-/media/allianzgi/eu/regulatory/global-order-execution-policy.pdf?rev=-1",
+          "text": "View All"
+        },
+        {
+          "type": "OTHER",
+          "url": "https://regulatory.allianzgi.com/-/media/allianzgi/eu/regulatory/global-order-execution-policy.pdf?rev=-1",
+          "text": "Best execution policy"
+        },
+        {
+          "type": "OTHER",
+          "url": "https://regulatory.allianzgi.com/-/media/allianzgi/eu/regulatory/global-order-execution-policy.pdf?rev=-1",
+          "text": "View All"
+        }
+      ],
+      "shareClasses": []
+    },
+    {
+      "_rowIndex": 3,
+      "name": "Allianz ActiveInvest Defensive",
+      "isin": "LU2208987763",
+      "shareClassType": "",
+      "shareClassCount": 2,
+      "currency": "EUR",
+      "assetClass": "Multi Asset",
+      "sfdrCategory": "Article 6",
+      "nav": "109.5600",
+      "navDate": "16/12/2025",
+      "detailLink": "https://regulatory.allianzgi.com/en-gb/b2c/luxemburg-en/funds/mutual-funds/allianz-activeinvest-defensive-ct-eur",
+      "investmentObjective": "",
+      "sustainabilityIndicator": "",
+      "ter": "",
+      "inceptionDate": "",
+      "benchmark": "",
+      "documents": [
+        {
+          "type": "OTHER",
+          "url": "https://regulatory.allianzgi.com/-/media/allianzgi/eu/regulatory/global-order-execution-policy.pdf?rev=-1",
+          "text": "Best execution policy"
+        },
+        {
+          "type": "OTHER",
+          "url": "https://regulatory.allianzgi.com/-/media/allianzgi/eu/regulatory/global-order-execution-policy.pdf?rev=-1",
+          "text": "View All"
+        },
+        {
+          "type": "OTHER",
+          "url": "https://regulatory.allianzgi.com/-/media/allianzgi/eu/regulatory/global-order-execution-policy.pdf?rev=-1",
+          "text": "Best execution policy"
+        },
+        {
+          "type": "OTHER",
+          "url": "https://regulatory.allianzgi.com/-/media/allianzgi/eu/regulatory/global-order-execution-policy.pdf?rev=-1",
+          "text": "View All"
+        }
+      ],
+      "shareClasses": []
+    },
+    {
+      "_rowIndex": 4,
+      "name": "Allianz ActiveInvest Defensive",
+      "isin": "LU2025540324",
+      "shareClassType": "",
+      "shareClassCount": 2,
+      "currency": "EUR",
+      "assetClass": "Multi Asset",
+      "sfdrCategory": "Article 6",
+      "nav": "1155.1000",
+      "navDate": "16/12/2025",
+      "detailLink": "https://regulatory.allianzgi.com/en-gb/b2c/luxemburg-en/funds/mutual-funds/allianz-activeinvest-defensive-wt-eur",
+      "investmentObjective": "",
+      "sustainabilityIndicator": "",
+      "ter": "",
+      "inceptionDate": "",
+      "benchmark": "",
+      "documents": [
+        {
+          "type": "OTHER",
+          "url": "https://regulatory.allianzgi.com/-/media/allianzgi/eu/regulatory/global-order-execution-policy.pdf?rev=-1",
+          "text": "Best execution policy"
+        },
+        {
+          "type": "OTHER",
+          "url": "https://regulatory.allianzgi.com/-/media/allianzgi/eu/regulatory/global-order-execution-policy.pdf?rev=-1",
+          "text": "View All"
+        },
+        {
+          "type": "OTHER",
+          "url": "https://regulatory.allianzgi.com/-/media/allianzgi/eu/regulatory/global-order-execution-policy.pdf?rev=-1",
+          "text": "Best execution policy"
+        },
+        {
+          "type": "OTHER",
+          "url": "https://regulatory.allianzgi.com/-/media/allianzgi/eu/regulatory/global-order-execution-policy.pdf?rev=-1",
+          "text": "View All"
+        }
+      ],
+      "shareClasses": []
+    }
+  ]
+}

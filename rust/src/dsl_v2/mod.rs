@@ -118,7 +118,7 @@ pub use planning_facade::{
 #[cfg(feature = "database")]
 pub use ref_resolver::RefResolver;
 pub use repl_session::{ExecutedBlock, ReplSession};
-pub use runtime_registry::{runtime_registry, RuntimeVerbRegistry};
+pub use runtime_registry::{runtime_registry, runtime_registry_arc, RuntimeVerbRegistry};
 pub use semantic_context::SemanticContextStore;
 #[cfg(feature = "database")]
 pub use semantic_validator::{validate_dsl, validate_dsl_with_csg, SemanticValidator};

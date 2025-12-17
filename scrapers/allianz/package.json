@@ -1,0 +1,17 @@
+{
+  "name": "allianz-fund-scraper",
+  "version": "1.0.0",
+  "description": "Scrape Allianz Global Investors fund data for ob-poc import",
+  "main": "scrape.js",
+  "type": "module",
+  "scripts": {
+    "scrape": "node scrape.js",
+    "scrape:lu": "node scrape.js --jurisdiction=lu",
+    "scrape:ie": "node scrape.js --jurisdiction=ie",
+    "scrape:de": "node scrape.js --jurisdiction=de"
+  },
+  "dependencies": {
+    "playwright": "^1.40.0",
+    "commander": "^11.1.0"
+  }
+}

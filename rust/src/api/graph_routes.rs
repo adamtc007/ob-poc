@@ -32,12 +32,15 @@ pub struct GraphQuery {
 }
 
 /// GET /api/cbu/{cbu_id}/graph?view_mode=KYC_UBO&orientation=VERTICAL
-/// Returns graph data with server-computed layout positions
+///
+/// Returns graph data with server-computed layout positions.
+///
 /// View mode determines which nodes are included and how they're arranged:
 /// - KYC_UBO: CBU + entities (by role category) + KYC/UBO layers
 /// - SERVICE_DELIVERY: CBU + products + services + resources (no entities)
 /// - CUSTODY: CBU + custody layer (markets, SSIs, rules)
 /// - PRODUCTS_ONLY: CBU + products only
+///
 /// Orientation determines flow direction: VERTICAL (top-to-bottom) or HORIZONTAL (left-to-right)
 pub async fn get_cbu_graph(
     State(pool): State<PgPool>,

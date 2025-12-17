@@ -917,32 +917,79 @@ impl GenericCrudExecutor {
         crud: &RuntimeCrudConfig,
         args: &HashMap<String, JsonValue>,
     ) -> Result<GenericExecutionResult> {
-        let key_col = crud
-            .key
-            .as_deref()
-            .ok_or_else(|| anyhow!("Delete requires key column in config"))?;
+        // If key is specified, use single-key delete (backward compatible)
+        // Otherwise, use ALL maps_to columns as compound WHERE conditions
+        if let Some(key_col) = crud.key.as_deref() {
+            // Single key delete
+            let key_arg = verb
+                .args
+                .iter()
+                .find(|a| a.maps_to.as_deref() == Some(key_col))
+                .ok_or_else(|| anyhow!("Key argument not found in verb definition"))?;
 
-        // Find the key argument
-        let key_arg = verb
-            .args
-            .iter()
-            .find(|a| a.maps_to.as_deref() == Some(key_col))
-            .ok_or_else(|| anyhow!("Key argument not found in verb definition"))?;
+            let key_value = args
+                .get(&key_arg.name)
+                .ok_or_else(|| anyhow!("Missing key argument: {}", key_arg.name))?;
 
-        let key_value = args
-            .get(&key_arg.name)
-            .ok_or_else(|| anyhow!("Missing key argument: {}", key_arg.name))?;
+            let sql = format!(
+                r#"DELETE FROM "{}"."{}" WHERE "{}" = $1"#,
+                crud.schema, crud.table, key_col
+            );
 
-        let sql = format!(
-            r#"DELETE FROM "{}"."{}" WHERE "{}" = $1"#,
-            crud.schema, crud.table, key_col
-        );
+            debug!("DELETE SQL: {}", sql);
 
-        debug!("DELETE SQL: {}", sql);
+            let sql_val = self.json_to_sql_value(key_value, key_arg)?;
+            let affected = self.execute_non_query(&sql, &[sql_val]).await?;
+            Ok(GenericExecutionResult::Affected(affected))
+        } else {
+            // Compound delete - use ALL maps_to columns as WHERE conditions
+            let mut where_clauses = Vec::new();
+            let mut bind_values: Vec<SqlValue> = Vec::new();
+            let mut idx = 1;
 
-        let sql_val = self.json_to_sql_value(key_value, key_arg)?;
-        let affected = self.execute_non_query(&sql, &[sql_val]).await?;
-        Ok(GenericExecutionResult::Affected(affected))
+            for arg_def in &verb.args {
+                if let Some(col) = &arg_def.maps_to {
+                    if let Some(value) = args.get(&arg_def.name) {
+                        where_clauses.push(format!("\"{}\" = ${}", col, idx));
+
+                        // Handle lookup args - resolve name/code to UUID/ID
+                        // But if value is already a valid UUID, use it directly
+                        if arg_def.lookup.is_some() && arg_def.arg_type == ArgType::Uuid {
+                            let str_val = value.as_str().ok_or_else(|| {
+                                anyhow!("Expected string for lookup {}", arg_def.name)
+                            })?;
+                            // Check if it's already a UUID
+                            if let Ok(uuid) = Uuid::parse_str(str_val) {
+                                bind_values.push(SqlValue::Uuid(uuid));
+                            } else {
+                                // It's a name/code that needs resolution
+                                let resolved_id = self.resolve_lookup(arg_def, str_val).await?;
+                                bind_values.push(SqlValue::Uuid(resolved_id));
+                            }
+                        } else {
+                            bind_values.push(self.json_to_sql_value(value, arg_def)?);
+                        }
+                        idx += 1;
+                    }
+                }
+            }
+
+            if where_clauses.is_empty() {
+                bail!("Delete requires at least one WHERE condition (maps_to columns)");
+            }
+
+            let sql = format!(
+                r#"DELETE FROM "{}"."{}" WHERE {}"#,
+                crud.schema,
+                crud.table,
+                where_clauses.join(" AND ")
+            );
+
+            debug!("DELETE SQL (compound): {}", sql);
+
+            let affected = self.execute_non_query(&sql, &bind_values).await?;
+            Ok(GenericExecutionResult::Affected(affected))
+        }
     }
 
     // =========================================================================

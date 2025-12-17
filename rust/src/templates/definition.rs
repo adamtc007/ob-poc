@@ -148,6 +148,19 @@ pub struct WorkflowContext {
     pub resolves_blockers: Vec<String>,
 }
 
+/// Cardinality for entity_ref parameters in batch operations
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ParamCardinality {
+    /// Single value, same for all batch items (e.g., shared ManCo)
+    #[default]
+    Shared,
+    /// One value per batch item - this is what we iterate over
+    Batch,
+    /// Created by the template itself (output binding)
+    Output,
+}
+
 /// Parameter definition
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParamDefinition {
@@ -186,6 +199,33 @@ pub struct ParamDefinition {
     /// Enum values if param_type is "enum"
     #[serde(default)]
     pub enum_values: Option<Vec<String>>,
+
+    // =========================================================================
+    // Entity Reference Fields (for param_type = "entity_ref")
+    // These define the schema for LookupRef triplet expansion
+    // =========================================================================
+    /// Entity type for entity_ref params (e.g., "fund", "limited_company", "proper_person")
+    /// This becomes the first part of the LookupRef triplet: (entity_type search_key uuid)
+    #[serde(default)]
+    pub entity_type: Option<String>,
+
+    /// Search key pattern for entity resolution
+    /// Can be simple column name ("name") or s-expression ("(name (jurisdiction :selectivity 0.8))")
+    /// Used by EntityGateway to resolve the entity
+    #[serde(default)]
+    pub search_key: Option<String>,
+
+    /// Cardinality for batch operations
+    /// - shared: Same entity for all batch items (e.g., ManCo serving all funds)
+    /// - batch: One entity per batch item (this is what we iterate over)
+    /// - output: Created by template execution (bound via :as @name)
+    #[serde(default)]
+    pub cardinality: ParamCardinality,
+
+    /// Role hint for context-aware entity search (e.g., "MANAGEMENT_COMPANY", "DIRECTOR")
+    /// Helps agent narrow search to entities likely to have this role
+    #[serde(default)]
+    pub role_hint: Option<String>,
 }
 
 /// Output definition
@@ -267,6 +307,138 @@ impl TemplateDefinition {
     pub fn is_kyc_case_scoped(&self) -> bool {
         matches!(self.primary_entity_type(), Some(PrimaryEntityType::KycCase))
     }
+
+    // =========================================================================
+    // Entity Dependency Extraction (for batch template expansion)
+    // =========================================================================
+
+    /// Get all entity_ref params that need to be resolved for template expansion
+    /// Returns params with entity_type set, grouped by cardinality
+    pub fn entity_ref_params(&self) -> Vec<(&String, &ParamDefinition)> {
+        self.params
+            .iter()
+            .filter(|(_, p)| p.entity_type.is_some())
+            .collect()
+    }
+
+    /// Get batch-cardinality entity_ref params - these define what we iterate over
+    /// For "create CBUs for each fund", returns the fund param
+    pub fn batch_entity_params(&self) -> Vec<(&String, &ParamDefinition)> {
+        self.params
+            .iter()
+            .filter(|(_, p)| {
+                p.entity_type.is_some() && matches!(p.cardinality, ParamCardinality::Batch)
+            })
+            .collect()
+    }
+
+    /// Get shared-cardinality entity_ref params - same value for all batch items
+    /// For "all funds share this ManCo", returns the manco param
+    pub fn shared_entity_params(&self) -> Vec<(&String, &ParamDefinition)> {
+        self.params
+            .iter()
+            .filter(|(_, p)| {
+                p.entity_type.is_some() && matches!(p.cardinality, ParamCardinality::Shared)
+            })
+            .collect()
+    }
+
+    /// Get output entity_ref params - entities created by template execution
+    pub fn output_entity_params(&self) -> Vec<(&String, &ParamDefinition)> {
+        self.params
+            .iter()
+            .filter(|(_, p)| {
+                p.entity_type.is_some() && matches!(p.cardinality, ParamCardinality::Output)
+            })
+            .collect()
+    }
+
+    /// Get the primary batch entity type (what we iterate over)
+    /// Returns None if template doesn't have batch params
+    pub fn batch_entity_type(&self) -> Option<&str> {
+        self.batch_entity_params()
+            .first()
+            .and_then(|(_, p)| p.entity_type.as_deref())
+    }
+
+    /// Get entity types required for template expansion (excluding outputs)
+    /// Useful for agent to know what searches are needed
+    pub fn required_entity_types(&self) -> Vec<&str> {
+        self.params
+            .values()
+            .filter(|p| {
+                p.entity_type.is_some() && !matches!(p.cardinality, ParamCardinality::Output)
+            })
+            .filter_map(|p| p.entity_type.as_deref())
+            .collect()
+    }
+
+    /// Build entity dependency summary for agent context
+    /// Returns structured info about what entities the template needs
+    pub fn entity_dependency_summary(&self) -> EntityDependencySummary {
+        EntityDependencySummary {
+            batch_params: self
+                .batch_entity_params()
+                .into_iter()
+                .map(|(name, def)| EntityParamInfo {
+                    param_name: name.clone(),
+                    entity_type: def.entity_type.clone().unwrap_or_default(),
+                    search_key: def.search_key.clone(),
+                    role_hint: def.role_hint.clone(),
+                    prompt: def.prompt.clone(),
+                })
+                .collect(),
+            shared_params: self
+                .shared_entity_params()
+                .into_iter()
+                .map(|(name, def)| EntityParamInfo {
+                    param_name: name.clone(),
+                    entity_type: def.entity_type.clone().unwrap_or_default(),
+                    search_key: def.search_key.clone(),
+                    role_hint: def.role_hint.clone(),
+                    prompt: def.prompt.clone(),
+                })
+                .collect(),
+            output_params: self
+                .output_entity_params()
+                .into_iter()
+                .map(|(name, def)| EntityParamInfo {
+                    param_name: name.clone(),
+                    entity_type: def.entity_type.clone().unwrap_or_default(),
+                    search_key: def.search_key.clone(),
+                    role_hint: def.role_hint.clone(),
+                    prompt: def.prompt.clone(),
+                })
+                .collect(),
+        }
+    }
+}
+
+/// Summary of entity dependencies for a template
+/// Used by agent to understand what entities need to be collected
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntityDependencySummary {
+    /// Params we iterate over (one per batch item)
+    pub batch_params: Vec<EntityParamInfo>,
+    /// Params shared across all batch items
+    pub shared_params: Vec<EntityParamInfo>,
+    /// Params created as outputs
+    pub output_params: Vec<EntityParamInfo>,
+}
+
+/// Info about an entity_ref parameter
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntityParamInfo {
+    /// Parameter name in template
+    pub param_name: String,
+    /// Entity type (fund, limited_company, proper_person, etc.)
+    pub entity_type: String,
+    /// Search key pattern for resolution
+    pub search_key: Option<String>,
+    /// Role hint for context-aware search
+    pub role_hint: Option<String>,
+    /// Human prompt for collection
+    pub prompt: Option<String>,
 }
 
 #[cfg(test)]
@@ -412,5 +584,169 @@ outputs:
             PrimaryEntityType::OnboardingRequest.pk_column(),
             "request_id"
         );
+    }
+
+    /// Template with entity_ref params for batch operations
+    const BATCH_TEMPLATE: &str = r#"
+template: onboard-fund-cbu
+version: 1
+
+primary_entity:
+  type: cbu
+  param: cbu_id
+  description: CBU created from fund entity
+
+metadata:
+  name: Onboard Fund CBU
+  summary: Create CBU for each fund entity with ManCo role assignment
+  when_to_use:
+    - Bulk onboarding of fund entities as CBUs
+  effects:
+    - CBU created for fund
+    - ManCo assigned MANAGEMENT_COMPANY role
+
+tags:
+  - bulk
+  - fund
+  - cbu
+
+params:
+  fund_entity:
+    type: entity_ref
+    required: true
+    entity_type: fund
+    search_key: name
+    cardinality: batch
+    prompt: "Fund entity to onboard"
+  manco_entity:
+    type: entity_ref
+    required: true
+    entity_type: limited_company
+    search_key: name
+    cardinality: shared
+    role_hint: MANAGEMENT_COMPANY
+    prompt: "Management company for all funds"
+  jurisdiction:
+    type: string
+    required: true
+    default: "LU"
+  created_cbu:
+    type: cbu_ref
+    entity_type: cbu
+    cardinality: output
+
+body: |
+  (cbu.ensure
+    :name "$fund_entity.name"
+    :jurisdiction "$jurisdiction"
+    :client-type "FUND"
+    :as @cbu)
+  (cbu.assign-role
+    :cbu-id @cbu
+    :entity-id "$manco_entity"
+    :role "MANAGEMENT_COMPANY")
+
+outputs:
+  cbu:
+    type: cbu_ref
+    description: Created CBU
+    binding: cbu
+"#;
+
+    #[test]
+    fn test_entity_ref_params() {
+        let template: TemplateDefinition = serde_yaml::from_str(BATCH_TEMPLATE).unwrap();
+
+        // Should have 3 entity_ref params (fund, manco, created_cbu)
+        let entity_refs = template.entity_ref_params();
+        assert_eq!(entity_refs.len(), 3);
+    }
+
+    #[test]
+    fn test_batch_entity_params() {
+        let template: TemplateDefinition = serde_yaml::from_str(BATCH_TEMPLATE).unwrap();
+
+        // fund_entity is the batch param
+        let batch_params = template.batch_entity_params();
+        assert_eq!(batch_params.len(), 1);
+
+        let (name, def) = batch_params[0];
+        assert_eq!(name, "fund_entity");
+        assert_eq!(def.entity_type.as_deref(), Some("fund"));
+        assert_eq!(def.search_key.as_deref(), Some("name"));
+        assert!(matches!(def.cardinality, super::ParamCardinality::Batch));
+    }
+
+    #[test]
+    fn test_shared_entity_params() {
+        let template: TemplateDefinition = serde_yaml::from_str(BATCH_TEMPLATE).unwrap();
+
+        // manco_entity is shared across all batch items
+        let shared_params = template.shared_entity_params();
+        assert_eq!(shared_params.len(), 1);
+
+        let (name, def) = shared_params[0];
+        assert_eq!(name, "manco_entity");
+        assert_eq!(def.entity_type.as_deref(), Some("limited_company"));
+        assert_eq!(def.role_hint.as_deref(), Some("MANAGEMENT_COMPANY"));
+    }
+
+    #[test]
+    fn test_output_entity_params() {
+        let template: TemplateDefinition = serde_yaml::from_str(BATCH_TEMPLATE).unwrap();
+
+        // created_cbu is an output
+        let output_params = template.output_entity_params();
+        assert_eq!(output_params.len(), 1);
+
+        let (name, def) = output_params[0];
+        assert_eq!(name, "created_cbu");
+        assert_eq!(def.entity_type.as_deref(), Some("cbu"));
+        assert!(matches!(def.cardinality, super::ParamCardinality::Output));
+    }
+
+    #[test]
+    fn test_batch_entity_type() {
+        let template: TemplateDefinition = serde_yaml::from_str(BATCH_TEMPLATE).unwrap();
+
+        // Primary batch entity type is "fund"
+        assert_eq!(template.batch_entity_type(), Some("fund"));
+    }
+
+    #[test]
+    fn test_required_entity_types() {
+        let template: TemplateDefinition = serde_yaml::from_str(BATCH_TEMPLATE).unwrap();
+
+        // Required entity types (excluding outputs): fund, limited_company
+        let required = template.required_entity_types();
+        assert_eq!(required.len(), 2);
+        assert!(required.contains(&"fund"));
+        assert!(required.contains(&"limited_company"));
+        // Output cbu should NOT be included
+        assert!(!required.contains(&"cbu"));
+    }
+
+    #[test]
+    fn test_entity_dependency_summary() {
+        let template: TemplateDefinition = serde_yaml::from_str(BATCH_TEMPLATE).unwrap();
+
+        let summary = template.entity_dependency_summary();
+
+        // Should have structured breakdown
+        assert_eq!(summary.batch_params.len(), 1);
+        assert_eq!(summary.shared_params.len(), 1);
+        assert_eq!(summary.output_params.len(), 1);
+
+        // Check batch param info
+        let batch = &summary.batch_params[0];
+        assert_eq!(batch.param_name, "fund_entity");
+        assert_eq!(batch.entity_type, "fund");
+        assert_eq!(batch.search_key.as_deref(), Some("name"));
+
+        // Check shared param info
+        let shared = &summary.shared_params[0];
+        assert_eq!(shared.param_name, "manco_entity");
+        assert_eq!(shared.entity_type, "limited_company");
+        assert_eq!(shared.role_hint.as_deref(), Some("MANAGEMENT_COMPANY"));
     }
 }

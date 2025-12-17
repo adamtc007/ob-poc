@@ -94,6 +94,12 @@ pub struct BoundEntityInfo {
 pub struct SessionStateResponse {
     #[serde(deserialize_with = "deserialize_uuid_or_string")]
     pub session_id: String,
+    /// Entity type this session operates on ("cbu", "kyc_case", "onboarding", "bulk", etc.)
+    #[serde(default)]
+    pub entity_type: String,
+    /// Entity ID this session operates on (None if creating new or bulk mode)
+    #[serde(default)]
+    pub entity_id: Option<String>,
     #[serde(default)]
     pub state: serde_json::Value,
     #[serde(default)]

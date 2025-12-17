@@ -112,7 +112,7 @@ use crate::dsl_v2::ref_resolver::ResolveResult;
 use crate::dsl_v2::semantic_validator::SemanticValidator;
 use crate::dsl_v2::validation::{RefType, Severity, ValidationContext, ValidationRequest};
 use crate::dsl_v2::verb_registry::registry;
-use crate::dsl_v2::{parse_program, Statement};
+use crate::dsl_v2::Statement;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::collections::HashMap;
@@ -1113,8 +1113,13 @@ impl AgentService {
             }));
         }
 
-        // Delete/remove command - search for matching statement
-        if matches!(words[0], "delete" | "remove") && words.len() > 1 {
+        // Delete/remove command - search for matching statement in buffer
+        // Only intercept if there ARE statements in the buffer to remove
+        // Otherwise, pass through to LLM for DSL generation (e.g., "remove product from cbu")
+        if matches!(words[0], "delete" | "remove")
+            && words.len() > 1
+            && !session.assembled_dsl.is_empty()
+        {
             let search_term = words[1..].join(" ");
 
             // Find statement containing the search term (case-insensitive)
@@ -1156,39 +1161,9 @@ impl AgentService {
                     disambiguation: None,
                     commands: None,
                 }));
-            } else {
-                // No match - list available statements
-                let available: Vec<String> = session
-                    .assembled_dsl
-                    .iter()
-                    .enumerate()
-                    .map(|(i, stmt)| {
-                        let first_line = stmt.lines().next().unwrap_or(stmt);
-                        let short = if first_line.len() > 50 {
-                            format!("{}...", &first_line[..50])
-                        } else {
-                            first_line.to_string()
-                        };
-                        format!("{}. {}", i + 1, short)
-                    })
-                    .collect();
-
-                return Ok(Some(AgentChatResponse {
-                    message: format!(
-                        "No statement matching '{}'. Available:\n{}",
-                        search_term,
-                        available.join("\n")
-                    ),
-                    intents: vec![],
-                    validation_results: vec![],
-                    session_state: session.state.clone(),
-                    can_execute: !session.assembled_dsl.is_empty(),
-                    dsl_source: None,
-                    ast: None,
-                    disambiguation: None,
-                    commands: None,
-                }));
             }
+            // No match found in buffer - fall through to LLM for DSL generation
+            // This allows "remove fund accounting" to generate cbu.remove-product DSL
         }
 
         // Not a DSL command
@@ -1323,15 +1298,51 @@ impl AgentService {
     ) -> Result<AgentChatResponse, String> {
         let all_valid = validation_results.iter().all(|v| v.valid);
 
-        // Parse to AST
-        let ast: Option<Vec<Statement>> = dsl
-            .as_ref()
-            .and_then(|src| parse_program(src).ok().map(|prog| prog.statements));
+        // Parse to AST and compile to ExecutionPlan (includes DAG toposort)
+        // Single pipeline: Parse → Compile (with toposort) → Ready for execution
+        let (ast, plan, was_reordered): (
+            Option<Vec<Statement>>,
+            Option<crate::dsl_v2::execution_plan::ExecutionPlan>,
+            bool,
+        ) = if let Some(ref src) = dsl {
+            use crate::dsl_v2::{compile, parse_program};
+            match parse_program(src) {
+                Ok(program) => {
+                    let statements = program.statements.clone();
+                    match compile(&program) {
+                        Ok(exec_plan) => {
+                            // Check if reordering occurred by comparing statement order
+                            let was_reordered = exec_plan.steps.len() > 1
+                                && exec_plan.steps.windows(2).any(|w| {
+                                    // If step N references step N+1's binding, reorder happened
+                                    w[0].injections.iter().any(|inj| inj.from_step > 0)
+                                });
+                            (Some(statements), Some(exec_plan), was_reordered)
+                        }
+                        Err(e) => {
+                            tracing::warn!("Compile error (will retry at execution): {}", e);
+                            (Some(statements), None, false)
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("Parse error (will retry at execution): {}", e);
+                    (None, None, false)
+                }
+            }
+        } else {
+            (None, None, false)
+        };
 
         // Update session - accumulate DSL incrementally
         if let Some(ref dsl_source) = dsl {
             if let Some(ref ast_statements) = ast {
-                session.set_pending_dsl(dsl_source.clone(), ast_statements.clone());
+                session.set_pending_dsl(
+                    dsl_source.clone(),
+                    ast_statements.clone(),
+                    plan.clone(),
+                    was_reordered,
+                );
             }
             // Push to accumulated DSL (incremental REPL)
             session.assembled_dsl.push(dsl_source.clone());
@@ -1440,6 +1451,11 @@ Each intent represents a single DSL verb call with:
 3. If @cbu is available in session context, use it for cbu-id parameters
 4. For sequences of new entities, use @result_N references where N is the sequence number
 5. Check for ambiguity before generating intents - ask for clarification if needed
+6. Recognize REMOVAL intent: words like "remove", "delete", "drop", "unlink", "take off", "unassign" indicate removal operations
+   - "remove [product]" / "delete [product]" / "unlink [product]" → cbu.remove-product
+   - "remove [entity] as [role]" / "unassign [role]" → cbu.remove-role
+   - "delete [entity]" → entity.delete
+   - "end ownership" → ubo.end-ownership
 
 {domain_knowledge}
 
@@ -1468,6 +1484,20 @@ Intent: {{
 User: "Add custody product to the fund" (with @cbu in session)
 Intent: {{
   "verb": "cbu.add-product",
+  "params": {{"product": "CUSTODY"}},
+  "refs": {{"cbu-id": "@cbu"}}
+}}
+
+User: "Remove fund accounting" (with @cbu in session)
+Intent: {{
+  "verb": "cbu.remove-product",
+  "params": {{"product": "FUND_ACCOUNTING"}},
+  "refs": {{"cbu-id": "@cbu"}}
+}}
+
+User: "Delete the custody product" (with @cbu in session)
+Intent: {{
+  "verb": "cbu.remove-product",
   "params": {{"product": "CUSTODY"}},
   "refs": {{"cbu-id": "@cbu"}}
 }}

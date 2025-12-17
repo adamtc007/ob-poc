@@ -4267,6 +4267,57 @@ Templates are pre-built DSL patterns for common multi-step operations. They capt
 - Returns `missing_params` with prompts if required params not provided
 - Returns reviewable/editable DSL source text
 
+### Batch Execution Tools
+
+Batch tools enable template-driven iteration over entity sets. They operate on the **shared UI SessionStore** - the single source of truth for all session state.
+
+| Tool | Description |
+|------|-------------|
+| `batch_start` | Start batch mode with a template, initialize key sets |
+| `batch_add_entities` | Add resolved entities to a parameter's key set |
+| `batch_confirm_keyset` | Mark a key set as complete, advance phase |
+| `batch_set_scalar` | Set a scalar (non-entity) parameter value |
+| `batch_get_state` | Get current batch execution state |
+| `batch_expand_current` | Expand template for current batch item |
+| `batch_record_result` | Record success/failure for current item, advance index |
+| `batch_skip_current` | Skip current item with reason |
+| `batch_cancel` | Cancel batch execution, return to chat mode |
+
+**Architecture:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              UI Server Session (api/session.rs)                  │
+│              SessionStore = Arc<RwLock<HashMap<Uuid, AgentSession>>>
+│              - AgentSession.context.template_execution           │
+│              - AgentSession.context.mode                         │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+          ┌───────────────────┼───────────────────┐
+          ▼                   ▼                   ▼
+┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
+│   Web API Routes │ │    MCP Tools     │ │     egui UI      │
+│ state.sessions   │ │ self.sessions    │ │ fetch from API   │
+└──────────────────┘ └──────────────────┘ └──────────────────┘
+```
+
+**Usage Modes:**
+
+| Mode | Constructor | Batch Tools |
+|------|-------------|-------------|
+| Standalone MCP (Claude Desktop) | `ToolHandlers::new(pool)` | Error - no session store |
+| Integrated (web server) | `ToolHandlers::with_sessions(pool, sessions)` | Full functionality |
+
+**Batch Workflow:**
+1. Agent selects template based on user intent
+2. `batch_start` initializes template context in session
+3. Agent collects entities via `batch_add_entities` (batch params iterate, shared params are constant)
+4. `batch_confirm_keyset` marks each param complete
+5. `batch_expand_current` generates DSL for current batch item
+6. User reviews/edits DSL, then executes
+7. `batch_record_result` tracks outcome, advances to next item
+8. Repeat until all items processed or `batch_cancel`
+
 ## Template System
 
 Templates capture domain lifecycle patterns - chained verb sequences that accomplish business goals. They serve as prompt enhancement for agent DSL generation.

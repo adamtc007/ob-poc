@@ -262,6 +262,7 @@ pub struct AgentState {
     pub sessions: SessionStore,
     pub generation_log: Arc<GenerationLogRepository>,
     pub session_repo: Arc<crate::database::SessionRepository>,
+    pub dsl_repo: Arc<crate::database::DslRepository>,
     /// Centralized agent service for chat/disambiguation
     pub agent_service: Arc<crate::api::agent_service::AgentService>,
 }
@@ -276,6 +277,7 @@ impl AgentState {
         let dsl_v2_executor = Arc::new(DslExecutor::new(pool.clone()));
         let generation_log = Arc::new(GenerationLogRepository::new(pool.clone()));
         let session_repo = Arc::new(crate::database::SessionRepository::new(pool.clone()));
+        let dsl_repo = Arc::new(crate::database::DslRepository::new(pool.clone()));
         let agent_service = Arc::new(crate::api::agent_service::AgentService::with_pool(
             pool.clone(),
         ));
@@ -285,6 +287,7 @@ impl AgentState {
             sessions,
             generation_log,
             session_repo,
+            dsl_repo,
             agent_service,
         }
     }
@@ -411,6 +414,8 @@ async fn get_session(
 
     Json(SessionStateResponse {
         session_id,
+        entity_type: session.entity_type.clone(),
+        entity_id: session.entity_id,
         state: session.state.clone(),
         message_count: session.messages.len(),
         pending_intents: session.pending_intents.clone(),
@@ -601,21 +606,42 @@ async fn execute_session_dsl(
         (session.context.clone(), session.state.clone(), user_intent)
     };
 
-    // Get DSL to execute - either from request or pending in session
-    let dsl = if let Some(ref req) = req {
-        if let Some(ref dsl_str) = req.dsl {
-            dsl_str.clone()
-        } else {
-            // Request provided but dsl is None - use session's assembled_dsl
-            let sessions = state.sessions.read().await;
-            let session = sessions.get(&session_id).ok_or(StatusCode::NOT_FOUND)?;
-            session.assembled_dsl.join("\n")
-        }
-    } else {
-        // No request body (null) - use session's assembled_dsl
+    // Get DSL and check for pre-compiled plan in session
+    // If DSL matches session.pending.source, use the pre-compiled plan
+    // Otherwise run full pipeline (DSL was edited externally)
+    let (dsl, precompiled_plan, cached_ast) = {
         let sessions = state.sessions.read().await;
         let session = sessions.get(&session_id).ok_or(StatusCode::NOT_FOUND)?;
-        session.assembled_dsl.join("\n")
+
+        // Determine DSL source
+        let dsl_source = if let Some(ref req) = req {
+            if let Some(ref dsl_str) = req.dsl {
+                dsl_str.clone()
+            } else {
+                session.assembled_dsl.join("\n")
+            }
+        } else {
+            session.assembled_dsl.join("\n")
+        };
+
+        // Check if we have a pre-compiled plan that matches this DSL
+        let (plan, ast) = session
+            .pending
+            .as_ref()
+            .and_then(|pending| {
+                if pending.source == dsl_source && pending.plan.is_some() {
+                    tracing::debug!("[EXEC] Using pre-compiled plan from session.pending");
+                    Some((pending.plan.clone(), Some(pending.ast.clone())))
+                } else {
+                    tracing::debug!(
+                        "[EXEC] DSL changed or no pre-compiled plan, will run full pipeline"
+                    );
+                    None
+                }
+            })
+            .unwrap_or((None, None));
+
+        (dsl_source, plan, ast)
     };
 
     if dsl.is_empty() {
@@ -669,94 +695,29 @@ async fn execute_session_dsl(
     }
 
     // =========================================================================
-    // PARSE DSL
+    // GET OR BUILD EXECUTION PLAN
+    // If we have a pre-compiled plan (DSL unchanged), use it directly.
+    // Otherwise run full pipeline: Parse → Validate → Compile
+    // Returns (plan, ast_for_persistence) - AST needed for dsl_instances table
     // =========================================================================
-    let program = match parse_program(&dsl) {
-        Ok(p) => p,
-        Err(e) => {
-            let parse_error = format!("Parse error: {}", e);
-
-            // Log failed attempt
-            if let Some(lid) = log_id {
-                let attempt = GenerationAttempt {
-                    attempt: 1,
-                    timestamp: chrono::Utc::now(),
-                    prompt_template: None,
-                    prompt_text: String::new(),
-                    raw_response: String::new(),
-                    extracted_dsl: Some(dsl.clone()),
-                    parse_result: ParseResult {
-                        success: false,
-                        error: Some(parse_error.clone()),
-                    },
-                    lint_result: LintResult {
-                        valid: false,
-                        errors: vec![],
-                        warnings: vec![],
-                    },
-                    compile_result: CompileResult {
-                        success: false,
-                        error: None,
-                        step_count: 0,
-                    },
-                    latency_ms: Some(start_time.elapsed().as_millis() as i32),
-                    input_tokens: None,
-                    output_tokens: None,
-                };
-                let _ = state.generation_log.add_attempt(lid, &attempt).await;
-                let _ = state.generation_log.mark_failed(lid).await;
-            }
-
-            return Ok(Json(ExecuteResponse {
-                success: false,
-                results: Vec::new(),
-                errors: vec![parse_error],
-                new_state: current_state,
-                bindings: None,
-            }));
-        }
-    };
-
-    // =========================================================================
-    // CSG VALIDATION (includes dataflow)
-    // =========================================================================
-    tracing::debug!("[EXEC] Starting CSG validation");
-    tracing::debug!(
-        "[EXEC] Validation known_symbols: {:?}",
-        context.named_refs.keys().collect::<Vec<_>>()
-    );
-    let validator_result = async {
-        let v = SemanticValidator::new(state.pool.clone()).await?;
-        v.with_csg_linter().await
-    }
-    .await;
-
-    if let Ok(mut validator) = validator_result {
-        use crate::dsl_v2::validation::{Severity, ValidationContext, ValidationRequest};
-        let request = ValidationRequest {
-            source: dsl.clone(),
-            context: ValidationContext::default().with_known_symbols(context.named_refs.clone()),
-        };
-        tracing::debug!(
-            "[EXEC] ValidationRequest.context.known_symbols: {:?}",
-            request.context.known_symbols
+    let (plan, ast_for_persistence): (
+        crate::dsl_v2::execution_plan::ExecutionPlan,
+        Option<Vec<crate::dsl_v2::Statement>>,
+    ) = if let Some(cached_plan) = precompiled_plan {
+        tracing::info!(
+            "[EXEC] Using pre-compiled execution plan ({} steps)",
+            cached_plan.len()
         );
-        if let crate::dsl_v2::validation::ValidationResult::Err(diagnostics) =
-            validator.validate(&request).await
-        {
-            tracing::debug!(
-                "[EXEC] Validation returned {} diagnostics",
-                diagnostics.len()
-            );
-            for diag in &diagnostics {
-                tracing::debug!("[EXEC] Diagnostic: [{:?}] {}", diag.severity, diag.message);
-            }
-            let csg_errors: Vec<String> = diagnostics
-                .iter()
-                .filter(|d| d.severity == Severity::Error)
-                .map(|d| format!("[{}] {}", d.code.as_str(), d.message))
-                .collect();
-            if !csg_errors.is_empty() {
+        (cached_plan, cached_ast)
+    } else {
+        tracing::info!("[EXEC] Running full pipeline: parse → validate → compile");
+
+        // PARSE DSL
+        let program = match parse_program(&dsl) {
+            Ok(p) => p,
+            Err(e) => {
+                let parse_error = format!("Parse error: {}", e);
+
                 // Log failed attempt
                 if let Some(lid) = log_id {
                     let attempt = GenerationAttempt {
@@ -767,12 +728,12 @@ async fn execute_session_dsl(
                         raw_response: String::new(),
                         extracted_dsl: Some(dsl.clone()),
                         parse_result: ParseResult {
-                            success: true,
-                            error: None,
+                            success: false,
+                            error: Some(parse_error.clone()),
                         },
                         lint_result: LintResult {
                             valid: false,
-                            errors: csg_errors.clone(),
+                            errors: vec![],
                             warnings: vec![],
                         },
                         compile_result: CompileResult {
@@ -791,60 +752,141 @@ async fn execute_session_dsl(
                 return Ok(Json(ExecuteResponse {
                     success: false,
                     results: Vec::new(),
-                    errors: csg_errors,
+                    errors: vec![parse_error],
                     new_state: current_state,
                     bindings: None,
                 }));
             }
+        };
+
+        // CSG VALIDATION (includes dataflow)
+        tracing::debug!("[EXEC] Starting CSG validation");
+        tracing::debug!(
+            "[EXEC] Validation known_symbols: {:?}",
+            context.named_refs.keys().collect::<Vec<_>>()
+        );
+        let validator_result = async {
+            let v = SemanticValidator::new(state.pool.clone()).await?;
+            v.with_csg_linter().await
         }
-    }
+        .await;
 
-    // =========================================================================
-    // COMPILE (includes lint)
-    // =========================================================================
-    let plan = match compile(&program) {
-        Ok(p) => p,
-        Err(e) => {
-            let compile_error = format!("Compile error: {}", e);
+        if let Ok(mut validator) = validator_result {
+            use crate::dsl_v2::validation::{Severity, ValidationContext, ValidationRequest};
+            let request = ValidationRequest {
+                source: dsl.clone(),
+                context: ValidationContext::default()
+                    .with_known_symbols(context.named_refs.clone()),
+            };
+            tracing::debug!(
+                "[EXEC] ValidationRequest.context.known_symbols: {:?}",
+                request.context.known_symbols
+            );
+            if let crate::dsl_v2::validation::ValidationResult::Err(diagnostics) =
+                validator.validate(&request).await
+            {
+                tracing::debug!(
+                    "[EXEC] Validation returned {} diagnostics",
+                    diagnostics.len()
+                );
+                for diag in &diagnostics {
+                    tracing::debug!("[EXEC] Diagnostic: [{:?}] {}", diag.severity, diag.message);
+                }
+                let csg_errors: Vec<String> = diagnostics
+                    .iter()
+                    .filter(|d| d.severity == Severity::Error)
+                    .map(|d| format!("[{}] {}", d.code.as_str(), d.message))
+                    .collect();
+                if !csg_errors.is_empty() {
+                    // Log failed attempt
+                    if let Some(lid) = log_id {
+                        let attempt = GenerationAttempt {
+                            attempt: 1,
+                            timestamp: chrono::Utc::now(),
+                            prompt_template: None,
+                            prompt_text: String::new(),
+                            raw_response: String::new(),
+                            extracted_dsl: Some(dsl.clone()),
+                            parse_result: ParseResult {
+                                success: true,
+                                error: None,
+                            },
+                            lint_result: LintResult {
+                                valid: false,
+                                errors: csg_errors.clone(),
+                                warnings: vec![],
+                            },
+                            compile_result: CompileResult {
+                                success: false,
+                                error: None,
+                                step_count: 0,
+                            },
+                            latency_ms: Some(start_time.elapsed().as_millis() as i32),
+                            input_tokens: None,
+                            output_tokens: None,
+                        };
+                        let _ = state.generation_log.add_attempt(lid, &attempt).await;
+                        let _ = state.generation_log.mark_failed(lid).await;
+                    }
 
-            // Log failed attempt
-            if let Some(lid) = log_id {
-                let attempt = GenerationAttempt {
-                    attempt: 1,
-                    timestamp: chrono::Utc::now(),
-                    prompt_template: None,
-                    prompt_text: String::new(),
-                    raw_response: String::new(),
-                    extracted_dsl: Some(dsl.clone()),
-                    parse_result: ParseResult {
-                        success: true,
-                        error: None,
-                    },
-                    lint_result: LintResult {
-                        valid: false,
-                        errors: vec![compile_error.clone()],
-                        warnings: vec![],
-                    },
-                    compile_result: CompileResult {
+                    return Ok(Json(ExecuteResponse {
                         success: false,
-                        error: Some(compile_error.clone()),
-                        step_count: 0,
-                    },
-                    latency_ms: Some(start_time.elapsed().as_millis() as i32),
-                    input_tokens: None,
-                    output_tokens: None,
-                };
-                let _ = state.generation_log.add_attempt(lid, &attempt).await;
-                let _ = state.generation_log.mark_failed(lid).await;
+                        results: Vec::new(),
+                        errors: csg_errors,
+                        new_state: current_state,
+                        bindings: None,
+                    }));
+                }
             }
+        }
 
-            return Ok(Json(ExecuteResponse {
-                success: false,
-                results: Vec::new(),
-                errors: vec![compile_error],
-                new_state: current_state,
-                bindings: None,
-            }));
+        // COMPILE (includes DAG toposort)
+        // Capture statements for AST persistence before consuming program
+        let statements = program.statements.clone();
+        match compile(&program) {
+            Ok(p) => (p, Some(statements)),
+            Err(e) => {
+                let compile_error = format!("Compile error: {}", e);
+
+                // Log failed attempt
+                if let Some(lid) = log_id {
+                    let attempt = GenerationAttempt {
+                        attempt: 1,
+                        timestamp: chrono::Utc::now(),
+                        prompt_template: None,
+                        prompt_text: String::new(),
+                        raw_response: String::new(),
+                        extracted_dsl: Some(dsl.clone()),
+                        parse_result: ParseResult {
+                            success: true,
+                            error: None,
+                        },
+                        lint_result: LintResult {
+                            valid: false,
+                            errors: vec![compile_error.clone()],
+                            warnings: vec![],
+                        },
+                        compile_result: CompileResult {
+                            success: false,
+                            error: Some(compile_error.clone()),
+                            step_count: 0,
+                        },
+                        latency_ms: Some(start_time.elapsed().as_millis() as i32),
+                        input_tokens: None,
+                        output_tokens: None,
+                    };
+                    let _ = state.generation_log.add_attempt(lid, &attempt).await;
+                    let _ = state.generation_log.mark_failed(lid).await;
+                }
+
+                return Ok(Json(ExecuteResponse {
+                    success: false,
+                    results: Vec::new(),
+                    errors: vec![compile_error],
+                    new_state: current_state,
+                    bindings: None,
+                }));
+            }
         }
     };
 
@@ -876,6 +918,32 @@ async fn execute_session_dsl(
                                 context.cbu_ids.push(*uuid);
                                 // Also add cbu_id alias so LLM can use @cbu_id
                                 context.named_refs.insert("cbu_id".to_string(), *uuid);
+
+                                // AUTO-PROMOTE: Set newly created CBU as active_cbu for session context
+                                // This ensures subsequent operations use this CBU without explicit bind
+                                let cbu_display_name = step
+                                    .verb_call
+                                    .arguments
+                                    .iter()
+                                    .find(|arg| arg.key == "name")
+                                    .and_then(|arg| {
+                                        if let crate::dsl_v2::ast::AstNode::Literal(
+                                            crate::dsl_v2::ast::Literal::String(s),
+                                        ) = &arg.value
+                                        {
+                                            Some(s.clone())
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                    .unwrap_or_else(|| format!("CBU-{}", &uuid.to_string()[..8]));
+
+                                tracing::info!(
+                                    "[EXEC] Auto-promoting new CBU to active_cbu: {} ({})",
+                                    cbu_display_name,
+                                    uuid
+                                );
+                                context.set_active_cbu(*uuid, &cbu_display_name);
                             }
                             // Add entity_id alias for entity.* verbs
                             if step.verb_call.domain == "entity" {
@@ -1060,12 +1128,20 @@ async fn execute_session_dsl(
     // =========================================================================
     if all_success {
         let session_repo = state.session_repo.clone();
+        let dsl_repo = state.dsl_repo.clone();
         let dsl_clone = dsl.clone();
+        let dsl_for_instance = dsl.clone();
         let bindings_clone = bindings_map.clone();
         let cbu_id = context.last_cbu_id;
         let domains = crate::database::extract_domains(&dsl_clone);
         let primary_domain = crate::database::detect_domain(&dsl_clone);
+        let primary_domain_for_instance = primary_domain.clone();
         let execution_ms = start_time.elapsed().as_millis() as i32;
+
+        // Serialize AST to JSON for dsl_instances persistence
+        let ast_json = ast_for_persistence
+            .as_ref()
+            .and_then(|ast| serde_json::to_value(ast).ok());
 
         // Persist snapshot asynchronously (simple insert, ~1-5ms)
         tokio::spawn(async move {
@@ -1100,6 +1176,34 @@ async fn execute_session_dsl(
                     session_id,
                     e
                 );
+            }
+        });
+
+        // Persist DSL instance (confirmed DSL/AST pair) asynchronously
+        let business_ref = format!("session-{}-{}", session_id, chrono::Utc::now().timestamp());
+        let domain_name = primary_domain_for_instance.unwrap_or_else(|| "unknown".to_string());
+        tokio::spawn(async move {
+            match dsl_repo
+                .save_execution(
+                    &dsl_for_instance,
+                    &domain_name,
+                    &business_ref,
+                    cbu_id,
+                    &ast_json.unwrap_or(serde_json::Value::Null),
+                )
+                .await
+            {
+                Ok(result) => {
+                    tracing::info!(
+                        "Persisted DSL instance: id={}, version={}, ref={}",
+                        result.instance_id,
+                        result.version,
+                        result.business_reference
+                    );
+                }
+                Err(e) => {
+                    tracing::error!("Failed to persist DSL instance: {}", e);
+                }
             }
         });
     } else {
@@ -1154,6 +1258,21 @@ async fn execute_session_dsl(
                 "[EXEC] Saving context to session, named_refs: {:?}",
                 context.named_refs
             );
+
+            // AUTO-UPDATE SESSION ENTITY_ID: If this is a "cbu" session and we just created
+            // the first CBU, update the session's primary entity_id to match
+            if session.entity_type == "cbu"
+                && session.entity_id.is_none()
+                && context.active_cbu.is_some()
+            {
+                let cbu_id = context.active_cbu.as_ref().unwrap().id;
+                tracing::info!(
+                    "[EXEC] Auto-setting session.entity_id to newly created CBU: {}",
+                    cbu_id
+                );
+                session.set_entity_id(cbu_id);
+            }
+
             session.context = context;
             tracing::debug!(
                 "[EXEC] Session context after save, named_refs: {:?}",
@@ -1213,6 +1332,8 @@ async fn clear_session_dsl(
 
     Ok(Json(SessionStateResponse {
         session_id,
+        entity_type: session.entity_type.clone(),
+        entity_id: session.entity_id,
         state: session.state.clone(),
         message_count: session.messages.len(),
         pending_intents: session.pending_intents.clone(),

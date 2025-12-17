@@ -1,0 +1,23 @@
+{
+  "name": "allianz-fund-scraper",
+  "version": "1.0.0",
+  "description": "Scrape Allianz fund data from CSSF and regulatory.allianzgi.com",
+  "type": "module",
+  "scripts": {
+    "cssf": "node src/cssf-download.js",
+    "allianz": "node src/allianz-scraper.js",
+    "allianz-api": "node src/allianz-api.js",
+    "scrape": "node src/main.js",
+    "test": "node src/test-connection.js"
+  },
+  "dependencies": {
+    "playwright": "^1.40.0",
+    "csv-parse": "^5.5.0",
+    "csv-stringify": "^6.4.0",
+    "adm-zip": "^0.5.10",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  }
+}

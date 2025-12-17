@@ -619,6 +619,48 @@ pub fn runtime_registry() -> &'static RuntimeVerbRegistry {
     })
 }
 
+/// Global Arc-wrapped registry for use with PlanningInput
+static RUNTIME_REGISTRY_ARC: OnceLock<Arc<RuntimeVerbRegistry>> = OnceLock::new();
+
+/// Get an Arc-wrapped runtime verb registry for use with PlanningInput
+///
+/// This loads a fresh registry (not sharing the static reference) wrapped in Arc.
+/// Use this when you need `Arc<RuntimeVerbRegistry>` for planning operations.
+pub fn runtime_registry_arc() -> Arc<RuntimeVerbRegistry> {
+    RUNTIME_REGISTRY_ARC
+        .get_or_init(|| {
+            use super::config::ConfigLoader;
+
+            let loader = ConfigLoader::from_env();
+            match loader.load_verbs() {
+                Ok(config) => {
+                    let templates_dir = loader.config_dir().join("templates");
+                    let registry =
+                        RuntimeVerbRegistry::from_config_and_templates_dir(&config, &templates_dir);
+                    info!(
+                        "Loaded Arc runtime registry: {} verbs, {} templates",
+                        registry.len(),
+                        registry.template_count()
+                    );
+                    Arc::new(registry)
+                }
+                Err(e) => {
+                    warn!(
+                        "Failed to load verbs.yaml for Arc registry, using empty: {}",
+                        e
+                    );
+                    Arc::new(RuntimeVerbRegistry {
+                        verbs: HashMap::new(),
+                        by_domain: HashMap::new(),
+                        domains: vec![],
+                        templates: TemplateRegistry::new(),
+                    })
+                }
+            }
+        })
+        .clone()
+}
+
 // =============================================================================
 // THREAD-SAFE WRAPPER
 // =============================================================================

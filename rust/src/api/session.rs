@@ -14,6 +14,23 @@ use tokio::sync::RwLock;
 use uuid::Uuid;
 
 // ============================================================================
+// Session Mode - What kind of interaction is happening
+// ============================================================================
+
+/// Session mode - determines how the session processes user input
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum SessionMode {
+    /// Normal chat mode - agent generates DSL from natural language
+    #[default]
+    Chat,
+    /// Template expansion mode - agent is collecting params for a template
+    TemplateExpansion,
+    /// Batch execution mode - iterating over a key set, expanding template per item
+    BatchExecution,
+}
+
+// ============================================================================
 // Session State Machine
 // ============================================================================
 
@@ -85,6 +102,10 @@ pub struct PendingDsl {
     pub source: String,
     /// Parsed AST statements
     pub ast: Vec<Statement>,
+    /// Compiled execution plan (toposorted, ready to run)
+    /// This is the VerbCall-based plan that the executor expects
+    #[serde(skip)]
+    pub plan: Option<crate::dsl_v2::execution_plan::ExecutionPlan>,
     /// Current status
     pub status: DslStatus,
     /// When this was created
@@ -93,6 +114,8 @@ pub struct PendingDsl {
     pub error: Option<String>,
     /// Bindings that would be created if executed
     pub pending_bindings: HashMap<String, String>,
+    /// Whether statements were reordered for dependency resolution
+    pub was_reordered: bool,
 }
 
 // ============================================================================
@@ -183,8 +206,14 @@ impl AgentSession {
         self.updated_at = Utc::now();
     }
 
-    /// Set pending DSL (parsed and ready for user confirmation)
-    pub fn set_pending_dsl(&mut self, source: String, ast: Vec<Statement>) {
+    /// Set pending DSL (parsed, validated, and planned - ready for user confirmation)
+    pub fn set_pending_dsl(
+        &mut self,
+        source: String,
+        ast: Vec<Statement>,
+        plan: Option<crate::dsl_v2::execution_plan::ExecutionPlan>,
+        was_reordered: bool,
+    ) {
         let pending_bindings = ast
             .iter()
             .filter_map(|stmt| {
@@ -200,10 +229,12 @@ impl AgentSession {
             id: Uuid::new_v4(),
             source,
             ast,
+            plan,
             status: DslStatus::Draft,
             created_at: Utc::now(),
             error: None,
             pending_bindings,
+            was_reordered,
         });
         self.state = SessionState::ReadyToExecute;
         self.updated_at = Utc::now();
@@ -406,6 +437,307 @@ pub struct BoundEntity {
     pub display_name: String,
 }
 
+// ============================================================================
+// Batch Context - For bulk REPL operations
+// ============================================================================
+
+/// Status of a batch item
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum BatchItemStatus {
+    /// Not yet processed
+    #[default]
+    Pending,
+    /// Currently being processed (DSL in editor)
+    Active,
+    /// Successfully executed
+    Completed,
+    /// Skipped by user
+    Skipped,
+    /// Execution failed
+    Failed,
+}
+
+/// A single item in the batch working set
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchItem {
+    /// Source entity ID (e.g., fund entity that will become a CBU)
+    pub source_id: Uuid,
+    /// Display name for the item
+    pub name: String,
+    /// Source entity type (e.g., "fund", "entity")
+    pub source_type: String,
+    /// Additional metadata for display/context
+    #[serde(default)]
+    pub metadata: serde_json::Value,
+    /// Processing status
+    #[serde(default)]
+    pub status: BatchItemStatus,
+    /// Created entity ID after execution (e.g., the CBU ID)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created_id: Option<Uuid>,
+    /// Error message if failed
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+// ============================================================================
+// Template Key Set - Collected entity references for template expansion
+// ============================================================================
+
+/// A resolved entity reference for template expansion
+/// This is the LookupRef triplet: (entity_type, search_key, uuid)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResolvedEntityRef {
+    /// Entity type (e.g., "fund", "limited_company")
+    pub entity_type: String,
+    /// Human-readable search key / display name
+    pub display_name: String,
+    /// Resolved UUID from EntityGateway
+    pub entity_id: Uuid,
+    /// Optional metadata (jurisdiction, date, etc.)
+    #[serde(default, skip_serializing_if = "serde_json::Value::is_null")]
+    pub metadata: serde_json::Value,
+}
+
+/// Key set for a template parameter
+/// Captures what the agent has collected for a specific param
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TemplateParamKeySet {
+    /// Parameter name from template (e.g., "fund_entity", "manco_entity")
+    pub param_name: String,
+    /// Entity type expected (e.g., "fund", "limited_company")
+    pub entity_type: String,
+    /// Cardinality: "batch" (one per iteration) or "shared" (same for all)
+    pub cardinality: String,
+    /// The collected entities
+    pub entities: Vec<ResolvedEntityRef>,
+    /// Whether collection is complete (user confirmed)
+    #[serde(default)]
+    pub is_complete: bool,
+    /// Search/filter description used to find these (for audit)
+    #[serde(default)]
+    pub filter_description: String,
+}
+
+/// Agent's working memory for template-driven batch execution
+/// This is what the agent reads/writes across conversation turns
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TemplateExecutionContext {
+    /// Template being used
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub template_id: Option<String>,
+
+    /// Current phase of template execution
+    #[serde(default)]
+    pub phase: TemplatePhase,
+
+    /// Key sets collected for each template parameter
+    /// Key = param_name, Value = collected entities
+    #[serde(default)]
+    pub key_sets: HashMap<String, TemplateParamKeySet>,
+
+    /// Scalar params (non-entity values like jurisdiction, dates)
+    #[serde(default)]
+    pub scalar_params: HashMap<String, String>,
+
+    /// Which batch item is currently being processed (0-indexed)
+    #[serde(default)]
+    pub current_batch_index: usize,
+
+    /// Results from each batch item execution
+    #[serde(default)]
+    pub batch_results: Vec<BatchItemResult>,
+
+    /// Whether to auto-continue without prompting
+    #[serde(default)]
+    pub auto_execute: bool,
+}
+
+/// Phase of template execution workflow
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum TemplatePhase {
+    /// Agent is identifying which template to use
+    #[default]
+    SelectingTemplate,
+    /// Agent is collecting shared params (same for all batch items)
+    CollectingSharedParams,
+    /// Agent is collecting batch params (the iteration set)
+    CollectingBatchParams,
+    /// User is reviewing collected key sets before execution
+    ReviewingKeySets,
+    /// Executing batch items one by one
+    Executing,
+    /// All items processed
+    Complete,
+}
+
+/// Result from executing one batch item
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchItemResult {
+    /// Index in the batch
+    pub index: usize,
+    /// Source entity that was processed
+    pub source_entity: ResolvedEntityRef,
+    /// Whether execution succeeded
+    pub success: bool,
+    /// Created entity ID (e.g., the new CBU)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created_id: Option<Uuid>,
+    /// Error message if failed
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    /// The DSL that was executed
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub executed_dsl: Option<String>,
+}
+
+impl TemplateExecutionContext {
+    /// Check if all required key sets are complete
+    pub fn all_key_sets_complete(&self) -> bool {
+        self.key_sets.values().all(|ks| ks.is_complete)
+    }
+
+    /// Get the batch key set (the one we iterate over)
+    pub fn batch_key_set(&self) -> Option<&TemplateParamKeySet> {
+        self.key_sets.values().find(|ks| ks.cardinality == "batch")
+    }
+
+    /// Get count of batch items to process
+    pub fn batch_size(&self) -> usize {
+        self.batch_key_set()
+            .map(|ks| ks.entities.len())
+            .unwrap_or(0)
+    }
+
+    /// Get current batch item being processed
+    pub fn current_batch_entity(&self) -> Option<&ResolvedEntityRef> {
+        self.batch_key_set()
+            .and_then(|ks| ks.entities.get(self.current_batch_index))
+    }
+
+    /// Get shared entities (same for all batch items)
+    pub fn shared_entities(&self) -> Vec<(&str, &ResolvedEntityRef)> {
+        self.key_sets
+            .iter()
+            .filter(|(_, ks)| ks.cardinality == "shared")
+            .flat_map(|(name, ks)| ks.entities.first().map(|e| (name.as_str(), e)))
+            .collect()
+    }
+
+    /// Advance to next batch item, returns true if more to process
+    pub fn advance(&mut self) -> bool {
+        self.current_batch_index += 1;
+        self.current_batch_index < self.batch_size()
+    }
+
+    /// Get progress string like "3/10 complete"
+    pub fn progress_string(&self) -> String {
+        let total = self.batch_size();
+        let completed = self.batch_results.iter().filter(|r| r.success).count();
+        let failed = self.batch_results.iter().filter(|r| !r.success).count();
+        if failed > 0 {
+            format!("{}/{} complete, {} failed", completed, total, failed)
+        } else {
+            format!("{}/{} complete", completed, total)
+        }
+    }
+
+    /// Check if template execution is active
+    pub fn is_active(&self) -> bool {
+        self.template_id.is_some() && self.phase != TemplatePhase::Complete
+    }
+
+    /// Reset for a new template execution
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
+}
+
+/// Batch context for bulk REPL operations
+/// Holds the "working set" of entities the agent and user are processing
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct BatchContext {
+    /// Whether batch mode is active
+    #[serde(default)]
+    pub is_active: bool,
+    /// Source entity type we're iterating over (e.g., "fund")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_entity_type: Option<String>,
+    /// Filter criteria used to build the set (for display/audit)
+    #[serde(default)]
+    pub filter_description: String,
+    /// The batch working set - entities to process
+    #[serde(default)]
+    pub items: Vec<BatchItem>,
+    /// Current index in the batch (which item is active)
+    #[serde(default)]
+    pub current_index: usize,
+    /// Template being used for expansion
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub template_id: Option<String>,
+    /// Auto-continue mode (run all without prompting)
+    #[serde(default)]
+    pub auto_continue: bool,
+    /// Common bindings shared across all batch items (e.g., @manco, @im)
+    #[serde(default)]
+    pub shared_bindings: HashMap<String, BoundEntity>,
+}
+
+impl BatchContext {
+    /// Get the current batch item being processed
+    pub fn current_item(&self) -> Option<&BatchItem> {
+        self.items.get(self.current_index)
+    }
+
+    /// Get mutable reference to current batch item
+    pub fn current_item_mut(&mut self) -> Option<&mut BatchItem> {
+        self.items.get_mut(self.current_index)
+    }
+
+    /// Advance to next pending item, returns true if there's more to process
+    pub fn advance_to_next(&mut self) -> bool {
+        for i in (self.current_index + 1)..self.items.len() {
+            if self.items[i].status == BatchItemStatus::Pending {
+                self.current_index = i;
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Count items by status
+    pub fn count_by_status(&self) -> (usize, usize, usize, usize) {
+        let mut pending = 0;
+        let mut completed = 0;
+        let mut skipped = 0;
+        let mut failed = 0;
+        for item in &self.items {
+            match item.status {
+                BatchItemStatus::Pending | BatchItemStatus::Active => pending += 1,
+                BatchItemStatus::Completed => completed += 1,
+                BatchItemStatus::Skipped => skipped += 1,
+                BatchItemStatus::Failed => failed += 1,
+            }
+        }
+        (pending, completed, skipped, failed)
+    }
+
+    /// Get progress string like "5/15 complete"
+    pub fn progress_string(&self) -> String {
+        let (_pending, completed, skipped, failed) = self.count_by_status();
+        let total = self.items.len();
+        if failed > 0 {
+            format!("{}/{} complete, {} failed", completed, total, failed)
+        } else if skipped > 0 {
+            format!("{}/{} complete, {} skipped", completed, total, skipped)
+        } else {
+            format!("{}/{} complete", completed, total)
+        }
+    }
+}
+
 /// Context maintained across the session for reference resolution
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SessionContext {
@@ -450,6 +782,17 @@ pub struct SessionContext {
     /// Primary domain keys - the main identifiers for this onboarding session
     #[serde(default)]
     pub primary_keys: PrimaryDomainKeys,
+    /// Batch context for bulk REPL operations (legacy - use template_execution instead)
+    /// When active, session iterates over a set of entities (e.g., funds → CBUs)
+    #[serde(default)]
+    pub batch: BatchContext,
+    /// Current session mode - determines how input is processed
+    #[serde(default)]
+    pub mode: SessionMode,
+    /// Template execution context - agent's working memory for batch operations
+    /// This holds the key sets, template state, and execution progress
+    #[serde(default)]
+    pub template_execution: TemplateExecutionContext,
 }
 
 /// Primary domain keys tracked across the session
@@ -822,6 +1165,11 @@ pub struct ChatResponse {
 pub struct SessionStateResponse {
     /// Session ID
     pub session_id: Uuid,
+    /// Entity type this session operates on ("cbu", "kyc_case", "onboarding", "bulk", etc.)
+    pub entity_type: String,
+    /// Entity ID this session operates on (None if creating new or bulk mode)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entity_id: Option<Uuid>,
     /// Current state
     pub state: SessionState,
     /// Number of messages in the session

@@ -1,5 +1,10 @@
 template: onboard-fund-cbu
-version: 1
+version: 2
+
+primary_entity:
+  type: cbu
+  param: cbu
+  description: CBU created for the fund entity
 
 metadata:
   name: Onboard Fund as CBU
@@ -27,36 +32,79 @@ tags:
   - bulk
   - onboarding
 
+workflow_context:
+  applicable_workflows:
+    - fund_onboarding
+  resolves_blockers:
+    - missing_cbu_for_fund
+
 params:
-  fund_name:
-    type: string
+  # BATCH param - one fund per iteration
+  fund_entity:
+    type: entity_ref
     required: true
-    prompt: "Fund name (becomes CBU name)"
-  fund_entity_id:
-    type: uuid
+    entity_type: fund
+    search_key: name
+    cardinality: batch
+    prompt: "Fund entity to onboard as CBU"
+    description: "The fund entity that will become the ASSET_OWNER of the new CBU"
+
+  # SHARED params - same for all batch items
+  manco_entity:
+    type: entity_ref
     required: true
-    prompt: "Fund entity UUID"
-  manco_name:
-    type: string
+    entity_type: limited_company
+    search_key: name
+    cardinality: shared
+    role_hint: MANAGEMENT_COMPANY
+    prompt: "Management Company (shared across all funds)"
+    description: "ManCo entity assigned MANAGEMENT_COMPANY role on each CBU"
+
+  im_entity:
+    type: entity_ref
     required: true
-    prompt: "Management Company name"
-  im_name:
-    type: string
-    required: true
-    prompt: "Investment Manager name"
+    entity_type: limited_company
+    search_key: name
+    cardinality: shared
+    role_hint: INVESTMENT_MANAGER
+    prompt: "Investment Manager (shared across all funds)"
+    description: "IM entity assigned INVESTMENT_MANAGER role on each CBU"
+
   jurisdiction:
     type: string
     required: false
     default: "LU"
     prompt: "Jurisdiction code"
+    description: "Default jurisdiction for created CBUs"
+
+  # OUTPUT param - created by template
+  cbu:
+    type: cbu_ref
+    entity_type: cbu
+    cardinality: output
+    description: "The CBU created by this template"
 
 body: |
-  (cbu.ensure :name "$fund_name" :jurisdiction "$jurisdiction" :client-type "FUND" :as @cbu)
-  (cbu.assign-role :cbu-id @cbu :entity-id "$fund_entity_id" :role "ASSET_OWNER")
-  (cbu.assign-role :cbu-id @cbu :entity-id "$manco_name" :role "MANAGEMENT_COMPANY")
-  (cbu.assign-role :cbu-id @cbu :entity-id "$im_name" :role "INVESTMENT_MANAGER")
+  (cbu.ensure
+    :name "$fund_entity.name"
+    :jurisdiction "$jurisdiction"
+    :client-type "FUND"
+    :as @cbu)
+  (cbu.assign-role
+    :cbu-id @cbu
+    :entity-id "$fund_entity"
+    :role "ASSET_OWNER")
+  (cbu.assign-role
+    :cbu-id @cbu
+    :entity-id "$manco_entity"
+    :role "MANAGEMENT_COMPANY")
+  (cbu.assign-role
+    :cbu-id @cbu
+    :entity-id "$im_entity"
+    :role "INVESTMENT_MANAGER")
 
 outputs:
   cbu:
     type: cbu_ref
     description: Created CBU ID
+    binding: cbu
