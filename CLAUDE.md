@@ -406,16 +406,16 @@ pub enum MyEvent {
 
 ## Code Statistics
 
-As of 2025-12-11:
+As of 2025-12-17:
 
 | Language | Files | Lines |
 |----------|-------|-------|
-| Rust | 270+ | 200,000+ |
-| Go | 7 | ~1,500 |
-| YAML Config | 38 | 8,500+ |
-| **Total** | **315+** | **~210,000** |
-
-Note: Go code is now primarily for the animation CLI and test harness (go/cmd/animate, go/cmd/harness).
+| Rust | 238 | ~106,000 |
+| SQL | 11 | ~50,000 |
+| YAML Config | 74 | ~16,000 |
+| Markdown | 45 | ~25,000 |
+| TypeScript/JS | 16 | ~3,700 |
+| **Total** | **543** | **~200,000** |
 
 ### YAML-Driven Configuration
 
@@ -527,19 +527,6 @@ ob-poc/
 │   └── tests/
 │       ├── db_integration.rs       # Database integration tests
 │       └── scenarios/              # DSL test scenarios (8 valid, 5 error)
-├── go/
-│   ├── cmd/
-│   │   ├── web/main.go             # Web UI proxy server
-│   │   ├── harness/main.go         # Test harness
-│   │   └── animate/main.go         # Animation demo CLI
-│   ├── internal/
-│   │   ├── rustclient/             # Rust API client types
-│   │   ├── harness/                # Test harness logic
-│   │   └── animate/                # Animation runner
-│   └── scenarios/                  # YAML demo scenarios
-│       ├── fund_onboarding.yaml    # Fund + KYC demo (7 steps)
-│       ├── custody_setup.yaml      # Custody setup demo (8 steps)
-│       └── quick_test.yaml         # Fast test scenario (2 steps)
 ├── docs/
 │   └── DSL_TEST_SCENARIOS.md       # Test scenario documentation
 ├── schema_export.sql               # Full DDL for database rebuild
@@ -1708,91 +1695,6 @@ dsl_cli execute -f program.dsl --format json | jq '.success'
 # Get created bindings
 dsl_cli execute -f program.dsl --format json | jq '.bindings'
 ```
-
-## Go Animation CLI (animate)
-
-The `animate` CLI runs scripted demo scenarios against the agentic DSL API. It's written in Go for compile-time safety and clean scripting.
-
-### Build
-
-```bash
-cd go/
-go build -o bin/animate ./cmd/animate
-```
-
-### Usage
-
-```bash
-# Run a scenario
-./bin/animate -f scenarios/fund_onboarding.yaml
-
-# Fast mode (2x speed)
-./bin/animate -f scenarios/fund_onboarding.yaml --speed 2.0
-
-# Interactive (pause between steps)
-./bin/animate -f scenarios/fund_onboarding.yaml -i
-
-# List available scenarios
-./bin/animate --list scenarios/
-
-# No color output (for CI/logs)
-./bin/animate -f scenarios/quick_test.yaml --no-color
-```
-
-### Options
-
-| Flag | Description |
-|------|-------------|
-| `-f <file>` | Scenario YAML file to run |
-| `--list <dir>` | List scenarios in directory |
-| `--agent-url` | Rust agent API URL (default: http://127.0.0.1:3000) |
-| `--speed` | Speed multiplier (1.0 = normal, 2.0 = 2x faster) |
-| `-i` | Interactive mode (pause between steps) |
-| `--diff` | Highlight new DSL statements (default: true) |
-| `--no-color` | Disable color output |
-| `--stop-on-error` | Stop if a step fails |
-
-### Scenario YAML Schema
-
-```yaml
-name: "Fund Onboarding"
-description: "Complete fund setup with entities and KYC"
-typing_speed_ms: 25      # Simulated typing delay (0 = instant)
-pause_after_ms: 1500     # Default pause between steps
-cleanup_after: true      # Delete created CBUs after run
-
-steps:
-  - prompt: "Create a Luxembourg hedge fund called Apex Capital"
-    expect_verbs:        # Validate these verbs appear in generated DSL
-      - cbu.ensure
-    pause_after_ms: 2000 # Override default pause
-
-  - prompt: "Add John Smith as the portfolio manager"
-    expect_verbs:
-      - entity.create-proper-person
-      - cbu.assign-role
-    auto_execute: true   # Execute DSL after this step
-
-  - prompt: "Run PEP screening on John"
-    expect_verbs:
-      - case-screening.run
-    wait_for_key: true   # Wait for keypress before continuing
-```
-
-### Available Scenarios
-
-| Scenario | Steps | Description |
-|----------|-------|-------------|
-| `fund_onboarding.yaml` | 7 | Fund + entities + KYC case + screenings |
-| `custody_setup.yaml` | 8 | Universe + SSIs + booking rules |
-| `quick_test.yaml` | 2 | Fast test for CI |
-
-### Use Cases
-
-1. **Demos**: Show realistic onboarding flows with typing animation
-2. **E2E Testing**: Validate agent generates correct verbs for prompts
-3. **Regression**: `expect_verbs` catches when model output changes
-4. **Training**: Run scenarios to show how natural language maps to DSL
 
 ## API Endpoints
 
