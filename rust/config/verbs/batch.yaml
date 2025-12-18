@@ -1,0 +1,94 @@
+domains:
+  batch:
+    description: Batch execution control operations for DSL-native batch processing
+    verbs:
+      pause:
+        description: Pause the current batch execution
+        behavior: plugin
+        plugin:
+          handler: batch_pause
+        args: []
+        returns:
+          type: batch_control_result
+          description: Batch control result with status
+
+      resume:
+        description: Resume a paused batch execution
+        behavior: plugin
+        plugin:
+          handler: batch_resume
+        args: []
+        returns:
+          type: batch_control_result
+          description: Batch control result with status
+
+      continue:
+        description: Continue batch execution for N more items
+        behavior: plugin
+        plugin:
+          handler: batch_continue
+        args:
+          - name: count
+            type: integer
+            required: false
+            default: 1
+            description: Number of items to process before pausing again
+        returns:
+          type: batch_control_result
+          description: Batch control result with status
+
+      skip:
+        description: Skip the current batch item
+        behavior: plugin
+        plugin:
+          handler: batch_skip
+        args:
+          - name: reason
+            type: string
+            required: false
+            description: Reason for skipping the item
+        returns:
+          type: batch_control_result
+          description: Batch control result with status
+
+      abort:
+        description: Abort the current batch execution
+        behavior: plugin
+        plugin:
+          handler: batch_abort
+        args:
+          - name: reason
+            type: string
+            required: false
+            description: Reason for aborting
+        returns:
+          type: batch_control_result
+          description: Batch control result with status
+
+      status:
+        description: Get the current batch execution status
+        behavior: plugin
+        plugin:
+          handler: batch_status
+        args: []
+        returns:
+          type: batch_control_result
+          description: Batch status information
+
+      add-products:
+        description: Add products to multiple CBUs in bulk
+        behavior: plugin
+        plugin:
+          handler: batch_add_products
+        args:
+          - name: cbu-ids
+            type: string_list
+            required: true
+            description: List of CBU IDs to add products to
+          - name: products
+            type: string_list
+            required: true
+            description: List of product codes to add
+        returns:
+          type: batch_control_result
+          description: Result with success/failure counts

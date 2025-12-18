@@ -1,0 +1,523 @@
+# Enhanced Due Diligence Workflow
+# Extended convergence model for high-risk clients with additional verification requirements
+# Triggered when standard KYC identifies elevated risk factors
+
+workflow: enhanced_due_diligence
+version: 1
+description: Enhanced due diligence workflow with extended convergence requirements
+
+trigger:
+  event: kyc-case.escalated
+  conditions:
+    - field: escalation_reason
+      in: [HIGH_RISK, PEP_IDENTIFIED, SANCTIONS_PROXIMITY, ADVERSE_MEDIA, COMPLEX_STRUCTURE]
+
+states:
+  EDD_INITIATED:
+    description: Enhanced due diligence initiated
+    initial: true
+
+  EXTENDED_ALLEGATION:
+    description: Collecting extended ownership/control information
+
+  SOURCE_OF_WEALTH:
+    description: Verifying source of wealth
+
+  SOURCE_OF_FUNDS:
+    description: Verifying source of funds
+
+  EXTENDED_PROOF_COLLECTION:
+    description: Collecting additional documentary evidence
+
+  CORROBORATION:
+    description: Corroborating information from multiple sources
+
+  EXTENDED_VERIFICATION:
+    description: Enhanced verification with stricter tolerances
+
+  CONVERGENCE_CHECK:
+    description: Checking extended convergence requirements
+
+  SENIOR_ASSERTION:
+    description: Senior compliance officer assertions
+
+  EXTENDED_EVALUATION:
+    description: Extended risk evaluation with additional factors
+
+  COMMITTEE_REVIEW:
+    description: Risk committee review required
+
+  EDD_DECISION:
+    description: Final EDD decision
+    terminal: true
+
+  EDD_REJECTED:
+    description: EDD failed - cannot onboard
+    terminal: true
+
+  ONGOING_MONITORING:
+    description: Approved with enhanced ongoing monitoring
+    terminal: true
+
+transitions:
+  # Normal flow
+  - from: EDD_INITIATED
+    to: EXTENDED_ALLEGATION
+    auto: true
+    description: Begin extended data collection
+
+  - from: EXTENDED_ALLEGATION
+    to: SOURCE_OF_WEALTH
+    guard: extended_allegations_complete
+    description: Extended ownership data captured
+
+  - from: SOURCE_OF_WEALTH
+    to: SOURCE_OF_FUNDS
+    guard: sow_documented
+    description: Source of wealth documented
+
+  - from: SOURCE_OF_FUNDS
+    to: EXTENDED_PROOF_COLLECTION
+    guard: sof_documented
+    description: Source of funds documented
+
+  - from: EXTENDED_PROOF_COLLECTION
+    to: CORROBORATION
+    guard: extended_proofs_collected
+    description: Additional proofs collected
+
+  - from: CORROBORATION
+    to: EXTENDED_VERIFICATION
+    guard: corroboration_complete
+    description: Information corroborated
+
+  - from: EXTENDED_VERIFICATION
+    to: CONVERGENCE_CHECK
+    guard: extended_verification_complete
+    description: Extended verification complete
+
+  - from: CONVERGENCE_CHECK
+    to: SENIOR_ASSERTION
+    guard: extended_convergence_achieved
+    description: Extended convergence requirements met
+
+  - from: CONVERGENCE_CHECK
+    to: EXTENDED_ALLEGATION
+    guard: convergence_gap_identified
+    description: Gaps identified, collect more data
+
+  - from: SENIOR_ASSERTION
+    to: EXTENDED_EVALUATION
+    guard: senior_assertions_passed
+    description: Senior assertions passed
+
+  - from: SENIOR_ASSERTION
+    to: EDD_REJECTED
+    guard: senior_assertions_failed
+    manual: true
+    description: Senior assertions failed
+
+  - from: EXTENDED_EVALUATION
+    to: COMMITTEE_REVIEW
+    guard: committee_review_required
+    description: Risk level requires committee review
+
+  - from: EXTENDED_EVALUATION
+    to: EDD_DECISION
+    guard: evaluation_conclusive
+    description: Evaluation conclusive, proceed to decision
+
+  - from: COMMITTEE_REVIEW
+    to: EDD_DECISION
+    guard: committee_approved
+    manual: true
+    description: Committee approved
+
+  - from: COMMITTEE_REVIEW
+    to: EDD_REJECTED
+    guard: committee_rejected
+    manual: true
+    description: Committee rejected
+
+  - from: EDD_DECISION
+    to: ONGOING_MONITORING
+    guard: enhanced_monitoring_required
+    description: Approved with enhanced monitoring
+
+requirements:
+  EDD_INITIATED:
+    - type: standard_kyc_complete
+      description: Standard KYC workflow must be complete
+
+    - type: escalation_documented
+      description: Escalation reason documented
+
+  EXTENDED_ALLEGATION:
+    - type: extended_ownership_depth
+      min_depth: 5
+      description: Ownership traced to at least 5 levels
+
+    - type: control_relationships_mapped
+      description: All control relationships identified
+
+    - type: trust_roles_identified
+      description: All trust roles (settlor, protector, enforcer) identified
+
+  SOURCE_OF_WEALTH:
+    - type: sow_allegation_recorded
+      description: Source of wealth allegation recorded
+
+    - type: sow_documents_requested
+      description: SOW supporting documents requested
+
+    - type: wealth_accumulation_explained
+      description: Wealth accumulation history documented
+
+  SOURCE_OF_FUNDS:
+    - type: sof_allegation_recorded
+      description: Source of funds allegation recorded
+
+    - type: sof_documents_requested
+      description: SOF supporting documents requested
+
+    - type: transaction_rationale_documented
+      description: Transaction purpose and rationale documented
+
+  EXTENDED_PROOF_COLLECTION:
+    - type: dual_source_proofs
+      description: Key facts corroborated by two independent sources
+
+    - type: original_documents
+      description: Original or certified copies obtained
+
+    - type: recent_proofs
+      max_age_days: 90
+      description: All proofs less than 90 days old
+
+  CORROBORATION:
+    - type: independent_verification
+      description: Key facts verified through independent sources
+
+    - type: public_records_checked
+      description: Public records (company registry, court records) checked
+
+    - type: adverse_media_deep_search
+      description: Extended adverse media search completed
+
+  EXTENDED_VERIFICATION:
+    - type: stricter_tolerance
+      tolerance_percent: 0.5
+      description: Ownership percentages within 0.5% tolerance
+
+    - type: all_discrepancies_resolved
+      description: All discrepancies resolved or explained
+
+    - type: enhanced_screening_complete
+      description: Enhanced screening (PEP, sanctions, adverse media) complete
+
+  CONVERGENCE_CHECK:
+    - type: extended_convergence
+      min_proven_percentage: 100
+      description: 100% of edges must be proven
+
+    - type: no_alleged_edges
+      description: No edges in alleged state
+
+    - type: all_trust_roles_verified
+      description: All trust roles independently verified
+
+  SENIOR_ASSERTION:
+    - type: senior_sign_off
+      description: Senior compliance officer review required
+
+    - type: risk_acceptance
+      description: Risk acceptance documented if applicable
+
+  EXTENDED_EVALUATION:
+    - type: pep_risk_assessed
+      description: PEP risk fully assessed
+
+    - type: sanctions_proximity_assessed
+      description: Sanctions proximity risk assessed
+
+    - type: geographic_risk_assessed
+      description: Geographic risk factors assessed
+
+    - type: industry_risk_assessed
+      description: Industry/sector risk assessed
+
+  COMMITTEE_REVIEW:
+    - type: committee_pack_prepared
+      description: Committee review pack prepared
+
+    - type: risk_summary_prepared
+      description: Risk summary document prepared
+
+  EDD_DECISION:
+    - type: decision_documented
+      description: EDD decision fully documented
+
+    - type: conditions_documented
+      description: Any conditions or restrictions documented
+
+  ONGOING_MONITORING:
+    - type: monitoring_plan_created
+      description: Enhanced monitoring plan created
+
+    - type: review_frequency_set
+      description: Review frequency defined (typically 6-12 months)
+
+actions:
+  EDD_INITIATED:
+    - action: create_edd_case
+      verb: kyc-case.create
+      params:
+        case-type: ENHANCED_DUE_DILIGENCE
+      description: Create EDD case
+
+    - action: document_escalation
+      verb: kyc-case.add-note
+      description: Document escalation reason
+
+  EXTENDED_ALLEGATION:
+    - action: allege_deep_ownership
+      verb: ubo.allege
+      params:
+        depth: extended
+      description: Record extended ownership allegation
+
+    - action: allege_control
+      verb: ubo.allege
+      params:
+        edge-type: control
+      description: Record control relationship
+
+    - action: allege_trust_role
+      verb: ubo.allege
+      params:
+        edge-type: trust_role
+      description: Record trust role relationship
+
+  SOURCE_OF_WEALTH:
+    - action: record_sow_allegation
+      verb: allegation.record
+      params:
+        attribute: source_of_wealth
+      description: Record SOW allegation
+
+    - action: request_sow_docs
+      verb: doc-request.create
+      params:
+        doc-types: [TAX_RETURNS, AUDITED_ACCOUNTS, PROPERTY_DEEDS, INHERITANCE_DOCS]
+      description: Request SOW documents
+
+    - action: extract_sow_observations
+      verb: document.extract-to-observations
+      description: Extract SOW observations from documents
+
+  SOURCE_OF_FUNDS:
+    - action: record_sof_allegation
+      verb: allegation.record
+      params:
+        attribute: source_of_funds
+      description: Record SOF allegation
+
+    - action: request_sof_docs
+      verb: doc-request.create
+      params:
+        doc-types: [BANK_STATEMENTS, WIRE_CONFIRMATIONS, INVESTMENT_STATEMENTS]
+      description: Request SOF documents
+
+    - action: verify_sof
+      verb: observation.reconcile
+      description: Reconcile SOF observations
+
+  EXTENDED_PROOF_COLLECTION:
+    - action: request_certified_copies
+      verb: doc-request.create
+      params:
+        certification-required: true
+      description: Request certified document copies
+
+    - action: link_extended_proof
+      verb: ubo.link-proof
+      description: Link extended proof to edge
+
+    - action: request_corroborating_doc
+      verb: doc-request.create
+      params:
+        purpose: corroboration
+      description: Request corroborating document
+
+  CORROBORATION:
+    - action: verify_public_records
+      verb: observation.record
+      params:
+        source-type: PUBLIC_REGISTRY
+      description: Record public registry observation
+
+    - action: run_deep_media_search
+      verb: case-screening.run
+      params:
+        screening-type: ADVERSE_MEDIA_EXTENDED
+      description: Run extended adverse media search
+
+    - action: record_corroboration
+      verb: observation.record
+      params:
+        source-type: INDEPENDENT
+      description: Record independent corroboration
+
+  EXTENDED_VERIFICATION:
+    - action: verify_with_tolerance
+      verb: ubo.verify
+      params:
+        tolerance: 0.5
+      description: Verify with stricter tolerance
+
+    - action: resolve_discrepancy
+      verb: discrepancy.resolve
+      description: Resolve discrepancy
+
+    - action: run_enhanced_screening
+      verb: case-screening.run
+      params:
+        enhanced: true
+      description: Run enhanced screening
+
+  CONVERGENCE_CHECK:
+    - action: check_extended_status
+      verb: ubo.status
+      params:
+        mode: extended
+      description: Check extended convergence status
+
+    - action: identify_gaps
+      verb: ubo.status
+      params:
+        include-gaps: true
+      description: Identify convergence gaps
+
+  SENIOR_ASSERTION:
+    - action: assert_completeness
+      verb: ubo.assert
+      params:
+        assertion: extended_completeness
+        level: senior
+      description: Senior assertion on completeness
+
+    - action: assert_risk_acceptable
+      verb: ubo.assert
+      params:
+        assertion: risk_acceptable
+        level: senior
+      description: Senior assertion on risk acceptability
+
+    - action: document_sign_off
+      verb: kyc-case.add-note
+      params:
+        note-type: SENIOR_SIGN_OFF
+      description: Document senior sign-off
+
+  EXTENDED_EVALUATION:
+    - action: evaluate_extended
+      verb: ubo.evaluate
+      params:
+        mode: extended
+      description: Extended UBO evaluation
+
+    - action: calculate_composite_risk
+      verb: kyc-case.set-risk-rating
+      params:
+        include-factors: [PEP, SANCTIONS, GEOGRAPHIC, INDUSTRY, STRUCTURE]
+      description: Calculate composite risk score
+
+    - action: prepare_committee_pack
+      verb: kyc-case.add-note
+      params:
+        note-type: COMMITTEE_PACK
+      description: Prepare committee review pack
+
+  COMMITTEE_REVIEW:
+    - action: submit_to_committee
+      verb: kyc-case.escalate
+      params:
+        level: COMMITTEE
+      description: Submit to risk committee
+
+    - action: record_committee_decision
+      verb: kyc-case.add-note
+      params:
+        note-type: COMMITTEE_DECISION
+      description: Record committee decision
+
+  EDD_DECISION:
+    - action: record_edd_decision
+      verb: kyc.decision
+      params:
+        decision-type: EDD
+      description: Record EDD decision
+
+    - action: document_conditions
+      verb: kyc-case.add-note
+      params:
+        note-type: CONDITIONS
+      description: Document any conditions
+
+  EDD_REJECTED:
+    - action: document_rejection
+      verb: kyc.decision
+      params:
+        decision: REJECTED
+      description: Document rejection decision
+
+    - action: notify_stakeholders
+      verb: kyc-case.add-note
+      description: Document stakeholder notification
+
+  ONGOING_MONITORING:
+    - action: create_monitoring_plan
+      verb: ubo.schedule-review
+      params:
+        frequency: enhanced
+      description: Create enhanced monitoring plan
+
+    - action: set_triggers
+      verb: kyc-case.add-note
+      params:
+        note-type: MONITORING_TRIGGERS
+      description: Document monitoring triggers
+
+# Extended convergence thresholds for EDD
+convergence:
+  # 100% proven edges required
+  min_proven_percentage: 100
+
+  # Proofs must be less than 90 days old
+  max_proof_age_days: 90
+
+  # Stricter tolerance for percentages
+  ownership_tolerance_percent: 0.5
+
+  # Require dual-source corroboration
+  require_corroboration: true
+  min_corroboration_sources: 2
+
+  # Extended depth requirements
+  min_ownership_depth: 5
+
+  # Required assertions with senior sign-off
+  required_assertions:
+    - ownership_complete
+    - no_circular
+    - screening_done
+    - sow_verified
+    - sof_verified
+    - pep_assessed
+    - sanctions_assessed
+
+  # Senior-level assertions
+  senior_assertions:
+    - extended_completeness
+    - risk_acceptable
+    - structure_understood

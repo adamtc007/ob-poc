@@ -20,6 +20,8 @@ pub struct CbuGraphBuilder {
     include_ubo: bool,
     include_services: bool,
     include_entities: bool,
+    /// Optional role category filter for entities (e.g., "TRADING_EXECUTION", "OWNERSHIP_CONTROL")
+    entity_role_category_filter: Option<String>,
 }
 
 impl CbuGraphBuilder {
@@ -32,6 +34,7 @@ impl CbuGraphBuilder {
             include_ubo: false,
             include_services: false,
             include_entities: true, // Entities are loaded by default
+            entity_role_category_filter: None,
         }
     }
 
@@ -62,6 +65,13 @@ impl CbuGraphBuilder {
     /// Include core entities linked via cbu_entity_roles
     pub fn with_entities(mut self, include: bool) -> Self {
         self.include_entities = include;
+        self
+    }
+
+    /// Filter entities by role category (e.g., "TRADING_EXECUTION", "OWNERSHIP_CONTROL", "BOTH")
+    /// When set, only entities with at least one role in the specified category are included
+    pub fn with_entity_filter(mut self, role_category: Option<&str>) -> Self {
+        self.entity_role_category_filter = role_category.map(|s| s.to_string());
         self
     }
 
@@ -140,6 +150,7 @@ impl CbuGraphBuilder {
 
     /// Load entities linked to the CBU via cbu_entity_roles
     /// Now uses aggregated role data from v_cbu_entity_with_roles view
+    /// Optionally filters by role category when entity_role_category_filter is set
     async fn load_entities(
         &self,
         graph: &mut CbuGraph,
@@ -148,6 +159,18 @@ impl CbuGraphBuilder {
         let entities = repo.get_graph_entities(self.cbu_id).await?;
 
         for ent in entities {
+            // Apply role category filter if set
+            if let Some(ref filter_category) = self.entity_role_category_filter {
+                // Entity must have at least one role in the filter category
+                // role_categories contains the categories of all roles this entity has
+                let has_matching_category = ent
+                    .role_categories
+                    .iter()
+                    .any(|cat| cat == filter_category || cat == "BOTH");
+                if !has_matching_category {
+                    continue; // Skip this entity
+                }
+            }
             let entity_id = ent.entity_id.to_string();
 
             // Each entity appears once with all roles aggregated
@@ -670,121 +693,102 @@ impl CbuGraphBuilder {
         graph: &mut CbuGraph,
         repo: &VisualizationRepository,
     ) -> Result<()> {
-        // Load UBO registry entries for this CBU
-        let ubos = repo.get_ubos(self.cbu_id).await?;
+        // Load UBO edges from the unified ubo_edges table
+        // This replaces the legacy ubo_registry, ownership_relationships, and control_relationships queries
+        let edges = repo.get_ubo_edges(self.cbu_id).await?;
 
-        for ubo in &ubos {
-            // Add UBO person node if not already present
-            let ubo_id_str = ubo.ubo_proper_person_id.to_string();
-            if !graph.has_node(&ubo_id_str) {
-                let ubo_name = ubo
-                    .ubo_name
-                    .clone()
-                    .unwrap_or_else(|| "Unknown UBO".to_string());
-                let pct_str = ubo
-                    .ownership_percentage
-                    .as_ref()
-                    .map(|p| format!("{}%", p))
-                    .unwrap_or_else(|| "?%".to_string());
+        for edge in &edges {
+            let from_id = edge.from_entity_id.to_string();
+            let to_id = edge.to_entity_id.to_string();
+
+            // Add from_entity node if not present
+            if !graph.has_node(&from_id) {
+                // Determine sublabel based on edge type and category
+                let sublabel = match edge.edge_type.as_str() {
+                    "ownership" => edge.from_category.clone(),
+                    "control" => edge.control_role.clone().or(edge.from_category.clone()),
+                    "trust_role" => edge.trust_role.clone().or(edge.from_category.clone()),
+                    _ => edge.from_category.clone(),
+                };
+
                 graph.add_node(GraphNode {
-                    id: ubo_id_str.clone(),
+                    id: from_id.clone(),
                     node_type: NodeType::Entity,
                     layer: LayerType::Ubo,
-                    label: ubo_name,
-                    sublabel: Some(pct_str),
-                    status: match ubo.verification_status.as_deref() {
-                        Some("VERIFIED") => NodeStatus::Active,
-                        Some("PENDING") => NodeStatus::Pending,
-                        _ => NodeStatus::Draft,
+                    label: edge.from_name.clone(),
+                    sublabel,
+                    status: match edge.status.as_str() {
+                        "proven" => NodeStatus::Active,
+                        "pending" => NodeStatus::Pending,
+                        "disputed" => NodeStatus::Expired,
+                        _ => NodeStatus::Draft, // alleged
                     },
+                    entity_category: edge.from_category.clone(),
                     data: serde_json::json!({
-                        "ownership_percentage": ubo.ownership_percentage,
-                        "control_type": ubo.control_type,
-                        "verification_status": ubo.verification_status
+                        "entity_type": edge.from_type_code,
+                        "entity_category": edge.from_category
                     }),
                     ..Default::default()
                 });
             }
 
-            // Add ownership edge from subject to UBO
-            let subject_id_str = ubo.subject_entity_id.to_string();
-            let pct_label = ubo.ownership_percentage.as_ref().map(|p| format!("{}%", p));
-
-            graph.add_edge(GraphEdge {
-                id: ubo.ubo_id.to_string(),
-                source: subject_id_str,
-                target: ubo_id_str,
-                edge_type: EdgeType::Owns,
-                label: pct_label,
-            });
-        }
-
-        // Also load direct ownership relationships for chain visualization
-        let ownerships = repo.get_ownerships(self.cbu_id).await?;
-
-        for own in &ownerships {
-            let owner_id = own.owner_entity_id.to_string();
-            let owned_id = own.owned_entity_id.to_string();
-
-            // Add owner node if not present
-            if !graph.has_node(&owner_id) {
+            // Add to_entity node if not present
+            if !graph.has_node(&to_id) {
                 graph.add_node(GraphNode {
-                    id: owner_id.clone(),
+                    id: to_id.clone(),
                     node_type: NodeType::Entity,
                     layer: LayerType::Ubo,
-                    label: own
-                        .owner_name
-                        .clone()
-                        .unwrap_or_else(|| "Unknown".to_string()),
-                    sublabel: Some(own.ownership_type.clone()),
+                    label: edge.to_name.clone(),
+                    sublabel: edge.to_category.clone(),
                     status: NodeStatus::Active,
-                    data: serde_json::json!({}),
+                    entity_category: edge.to_category.clone(),
+                    data: serde_json::json!({
+                        "entity_type": edge.to_type_code,
+                        "entity_category": edge.to_category
+                    }),
                     ..Default::default()
                 });
             }
 
-            // Add ownership edge
-            let pct_label = Some(format!("{}%", own.ownership_percent));
+            // Determine edge type and label based on edge_type
+            let (graph_edge_type, label) = match edge.edge_type.as_str() {
+                "ownership" => {
+                    // Use proven_percentage if available, otherwise alleged_percentage
+                    let pct = edge
+                        .proven_percentage
+                        .as_ref()
+                        .or(edge.percentage.as_ref())
+                        .or(edge.alleged_percentage.as_ref());
+                    let label = pct.map(|p| format!("{}%", p));
+                    (EdgeType::Owns, label)
+                }
+                "control" => {
+                    let label = edge.control_role.clone();
+                    (EdgeType::Controls, label)
+                }
+                "trust_role" => {
+                    let label = edge.trust_role.clone();
+                    (EdgeType::Controls, label) // Use Controls for trust roles too
+                }
+                _ => (EdgeType::Owns, None),
+            };
+
+            // Add edge with status indicator in the label if not proven
+            let status_label = if edge.status != "proven" {
+                match &label {
+                    Some(l) => Some(format!("{} ({})", l, edge.status)),
+                    None => Some(format!("({})", edge.status)),
+                }
+            } else {
+                label
+            };
+
             graph.add_edge(GraphEdge {
-                id: own.ownership_id.to_string(),
-                source: owner_id,
-                target: owned_id,
-                edge_type: EdgeType::Owns,
-                label: pct_label,
-            });
-        }
-
-        // Load control relationships (non-ownership control like board, trustee, etc.)
-        let controls = repo.get_graph_controls(self.cbu_id).await?;
-
-        for ctrl in &controls {
-            let controller_id = ctrl.controller_entity_id.to_string();
-            let controlled_id = ctrl.controlled_entity_id.to_string();
-
-            // Add controller node if not present
-            if !graph.has_node(&controller_id) {
-                graph.add_node(GraphNode {
-                    id: controller_id.clone(),
-                    node_type: NodeType::Entity,
-                    layer: LayerType::Ubo,
-                    label: ctrl
-                        .controller_name
-                        .clone()
-                        .unwrap_or_else(|| "Unknown".to_string()),
-                    sublabel: Some(ctrl.control_type.clone()),
-                    status: NodeStatus::Active,
-                    data: serde_json::json!({}),
-                    ..Default::default()
-                });
-            }
-
-            // Add control edge
-            graph.add_edge(GraphEdge {
-                id: ctrl.control_id.to_string(),
-                source: controller_id,
-                target: controlled_id,
-                edge_type: EdgeType::Controls,
-                label: Some(ctrl.control_type.clone()),
+                id: edge.edge_id.to_string(),
+                source: from_id,
+                target: to_id,
+                edge_type: graph_edge_type,
+                label: status_label,
             });
         }
 

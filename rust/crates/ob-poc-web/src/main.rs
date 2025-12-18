@@ -232,6 +232,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
         // CBU API routes (custom implementations using AppState)
         .route("/api/cbu", get(routes::api::list_cbus))
+        .route("/api/cbu/search", get(routes::api::search_cbus))
         .route("/api/cbu/:id", get(routes::api::get_cbu))
         .route("/api/cbu/:id/graph", get(routes::api::get_cbu_graph))
         // SSE streaming for agent chat

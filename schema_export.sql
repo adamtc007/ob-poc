@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict VsfsqNgdOelmv5vuru8RW5SdDRlUpadG0p2lfDSjdJymJt7GFe6SkqXGQQBAygB
+\restrict vCo1ElCseAzuP64eEwzFWYYNUiVcoEOJUCNMpZpufbm05eIDyIRTs1CRo2bmuMb
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -1028,7 +1028,7 @@ CREATE FUNCTION "ob-poc".compute_ownership_chains(p_cbu_id uuid, p_target_entity
     AS $$
 WITH RECURSIVE ownership_chain AS (
     -- Base case: direct relationships from entities to CBU-linked entities
-    -- Combines both ownership and control in a single base case
+    -- Now uses entity_relationships with relationship_type discriminator
     SELECT
         ROW_NUMBER() OVER ()::INTEGER as chain_id,
         base.parent_entity_id as current_entity,
@@ -1042,47 +1042,27 @@ WITH RECURSIVE ownership_chain AS (
         ARRAY[base.rel_type] as rel_types,
         base.is_control as has_control
     FROM (
-        -- Ownership relationships
+        -- All relationships from entity_relationships (ownership, control, trust_role)
         SELECT
-            o.owner_entity_id as parent_entity_id,
-            o.owned_entity_id as child_entity_id,
+            r.from_entity_id as parent_entity_id,
+            r.to_entity_id as child_entity_id,
             COALESCE(e.name, 'Unknown')::text as entity_name,
-            o.ownership_percent::NUMERIC as ownership_pct,
+            r.percentage::NUMERIC as ownership_pct,
             et.type_code = 'proper_person' as is_person,
-            'OWNERSHIP'::text as rel_type,
-            false as is_control
-        FROM "ob-poc".ownership_relationships o
-        JOIN "ob-poc".entities e ON o.owner_entity_id = e.entity_id
+            UPPER(r.relationship_type)::text as rel_type,
+            r.relationship_type != 'ownership' as is_control
+        FROM "ob-poc".entity_relationships r
+        JOIN "ob-poc".entities e ON r.from_entity_id = e.entity_id
         JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
-        JOIN "ob-poc".cbu_entity_roles cer ON o.owned_entity_id = cer.entity_id
+        JOIN "ob-poc".cbu_entity_roles cer ON r.to_entity_id = cer.entity_id
         WHERE cer.cbu_id = p_cbu_id
-          AND (o.effective_to IS NULL OR o.effective_to > CURRENT_DATE)
-          AND (p_target_entity_id IS NULL OR o.owned_entity_id = p_target_entity_id)
-
-        UNION ALL
-
-        -- Control relationships
-        SELECT
-            c.controller_entity_id as parent_entity_id,
-            c.controlled_entity_id as child_entity_id,
-            COALESCE(e.name, 'Unknown')::text as entity_name,
-            NULL::NUMERIC as ownership_pct,
-            et.type_code = 'proper_person' as is_person,
-            c.control_type::text as rel_type,
-            true as is_control
-        FROM "ob-poc".control_relationships c
-        JOIN "ob-poc".entities e ON c.controller_entity_id = e.entity_id
-        JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
-        JOIN "ob-poc".cbu_entity_roles cer ON c.controlled_entity_id = cer.entity_id
-        WHERE cer.cbu_id = p_cbu_id
-          AND c.is_active = true
-          AND (c.effective_to IS NULL OR c.effective_to > CURRENT_DATE)
-          AND (p_target_entity_id IS NULL OR c.controlled_entity_id = p_target_entity_id)
+          AND (r.effective_to IS NULL OR r.effective_to > CURRENT_DATE)
+          AND (p_target_entity_id IS NULL OR r.to_entity_id = p_target_entity_id)
     ) base
 
     UNION ALL
 
-    -- Recursive case: follow chain upward using CROSS JOIN LATERAL
+    -- Recursive case: follow chain upward
     SELECT
         oc.chain_id,
         combined.parent_entity_id,
@@ -1101,58 +1081,38 @@ WITH RECURSIVE ownership_chain AS (
         oc.has_control OR combined.is_control
     FROM ownership_chain oc
     CROSS JOIN LATERAL (
-        -- Ownership relationships
         SELECT
-            o.owner_entity_id as parent_entity_id,
+            r.from_entity_id as parent_entity_id,
             COALESCE(e.name, 'Unknown')::text as entity_name,
-            o.ownership_percent::NUMERIC as ownership_pct,
+            r.percentage::NUMERIC as ownership_pct,
             et.type_code = 'proper_person' as is_person,
-            'OWNERSHIP'::text as rel_type,
-            false as is_control
-        FROM "ob-poc".ownership_relationships o
-        JOIN "ob-poc".entities e ON o.owner_entity_id = e.entity_id
+            UPPER(r.relationship_type)::text as rel_type,
+            r.relationship_type != 'ownership' as is_control
+        FROM "ob-poc".entity_relationships r
+        JOIN "ob-poc".entities e ON r.from_entity_id = e.entity_id
         JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
-        WHERE o.owned_entity_id = oc.current_entity
-          AND (o.effective_to IS NULL OR o.effective_to > CURRENT_DATE)
-          AND NOT o.owner_entity_id = ANY(oc.path)
-
-        UNION ALL
-
-        -- Control relationships
-        SELECT
-            c.controller_entity_id as parent_entity_id,
-            COALESCE(e.name, 'Unknown')::text as entity_name,
-            NULL::NUMERIC as ownership_pct,
-            et.type_code = 'proper_person' as is_person,
-            c.control_type::text as rel_type,
-            true as is_control
-        FROM "ob-poc".control_relationships c
-        JOIN "ob-poc".entities e ON c.controller_entity_id = e.entity_id
-        JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
-        WHERE c.controlled_entity_id = oc.current_entity
-          AND c.is_active = true
-          AND (c.effective_to IS NULL OR c.effective_to > CURRENT_DATE)
-          AND NOT c.controller_entity_id = ANY(oc.path)
+        WHERE r.to_entity_id = oc.current_entity
+          AND (r.effective_to IS NULL OR r.effective_to > CURRENT_DATE)
+          AND NOT r.from_entity_id = ANY(oc.path)
     ) combined
     WHERE oc.depth < p_max_depth
+      AND NOT oc.owner_is_person
 )
 SELECT
-    chain_id,
-    current_entity as ubo_person_id,
-    names[array_length(names, 1)] as ubo_name,
-    path as path_entities,
-    names as path_names,
-    percentages as ownership_percentages,
-    effective_pct as effective_ownership,
-    depth as chain_depth,
-    owner_is_person as is_complete,
-    rel_types as relationship_types,
-    has_control as has_control_path
-FROM ownership_chain
-WHERE owner_is_person = true
-ORDER BY
-    CASE WHEN effective_pct IS NOT NULL THEN effective_pct ELSE 0 END DESC,
-    chain_id;
+    oc.chain_id,
+    oc.current_entity as ubo_person_id,
+    oc.names[array_upper(oc.names, 1)] as ubo_name,
+    oc.path as path_entities,
+    oc.names as path_names,
+    oc.percentages as ownership_percentages,
+    oc.effective_pct as effective_ownership,
+    oc.depth as chain_depth,
+    oc.owner_is_person as is_complete,
+    oc.rel_types as relationship_types,
+    oc.has_control as has_control_path
+FROM ownership_chain oc
+WHERE oc.owner_is_person = true
+   OR oc.depth = p_max_depth;
 $$;
 
 
@@ -1301,6 +1261,32 @@ BEGIN
     RETURN NEW;
 END;
 $$;
+
+
+--
+-- Name: is_natural_person(uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".is_natural_person(entity_id uuid) RETURNS boolean
+    LANGUAGE plpgsql STABLE
+    AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1
+        FROM "ob-poc".entities e
+        JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
+        WHERE e.entity_id = is_natural_person.entity_id
+          AND et.entity_category = 'PERSON'
+    );
+END;
+$$;
+
+
+--
+-- Name: FUNCTION is_natural_person(entity_id uuid); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".is_natural_person(entity_id uuid) IS 'Returns true if entity is a natural person (PERSON category)';
 
 
 --
@@ -1601,10 +1587,52 @@ $$;
 
 
 --
+-- Name: update_proofs_timestamp(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".update_proofs_timestamp() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: update_timestamp(); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
 CREATE FUNCTION "ob-poc".update_timestamp() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: update_ubo_edges_timestamp(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".update_ubo_edges_timestamp() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: update_workflow_timestamp(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".update_workflow_timestamp() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -3008,6 +3036,49 @@ COMMENT ON TABLE "ob-poc".cbu_change_log IS 'Audit trail of all CBU changes';
 
 
 --
+-- Name: cbu_relationship_verification; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".cbu_relationship_verification (
+    verification_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cbu_id uuid NOT NULL,
+    relationship_id uuid NOT NULL,
+    alleged_percentage numeric(5,2),
+    alleged_at timestamp with time zone,
+    alleged_by uuid,
+    allegation_source character varying(100),
+    proof_document_id uuid,
+    observed_percentage numeric(5,2),
+    status character varying(20) DEFAULT 'unverified'::character varying NOT NULL,
+    discrepancy_notes text,
+    resolved_at timestamp with time zone,
+    resolved_by uuid,
+    resolution_notes text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT chk_crv_status CHECK (((status)::text = ANY ((ARRAY['unverified'::character varying, 'alleged'::character varying, 'pending'::character varying, 'proven'::character varying, 'disputed'::character varying, 'waived'::character varying])::text[])))
+);
+
+
+--
+-- Name: cbu_convergence_status; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".cbu_convergence_status AS
+ SELECT cbu_id,
+    count(*) AS total_relationships,
+    count(*) FILTER (WHERE ((status)::text = 'proven'::text)) AS proven_count,
+    count(*) FILTER (WHERE ((status)::text = 'alleged'::text)) AS alleged_count,
+    count(*) FILTER (WHERE ((status)::text = 'pending'::text)) AS pending_count,
+    count(*) FILTER (WHERE ((status)::text = 'disputed'::text)) AS disputed_count,
+    count(*) FILTER (WHERE ((status)::text = 'unverified'::text)) AS unverified_count,
+    count(*) FILTER (WHERE ((status)::text = 'waived'::text)) AS waived_count,
+    (count(*) FILTER (WHERE ((status)::text = ANY ((ARRAY['proven'::character varying, 'waived'::character varying])::text[]))) = count(*)) AS is_converged
+   FROM "ob-poc".cbu_relationship_verification
+  GROUP BY cbu_id;
+
+
+--
 -- Name: cbu_creation_log; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -3078,6 +3149,119 @@ CREATE TABLE "ob-poc".cbu_layout_overrides (
     sizes jsonb DEFAULT '[]'::jsonb NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+
+--
+-- Name: entities; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".entities (
+    entity_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    entity_type_id uuid NOT NULL,
+    external_id character varying(255),
+    name character varying(255) NOT NULL,
+    created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text)
+);
+
+
+--
+-- Name: entity_relationships; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".entity_relationships (
+    relationship_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    from_entity_id uuid NOT NULL,
+    to_entity_id uuid NOT NULL,
+    relationship_type character varying(30) NOT NULL,
+    percentage numeric(5,2),
+    ownership_type character varying(30),
+    control_type character varying(30),
+    trust_role character varying(30),
+    interest_type character varying(20),
+    effective_from date,
+    effective_to date,
+    source character varying(100),
+    source_document_ref character varying(255),
+    notes text,
+    created_at timestamp with time zone DEFAULT now(),
+    created_by uuid,
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT chk_er_no_self_reference CHECK ((from_entity_id <> to_entity_id)),
+    CONSTRAINT chk_er_ownership_has_percentage CHECK ((((relationship_type)::text <> 'ownership'::text) OR (percentage IS NOT NULL))),
+    CONSTRAINT chk_er_relationship_type CHECK (((relationship_type)::text = ANY ((ARRAY['ownership'::character varying, 'control'::character varying, 'trust_role'::character varying, 'employment'::character varying, 'management'::character varying])::text[]))),
+    CONSTRAINT chk_er_temporal_valid CHECK (((effective_to IS NULL) OR (effective_from IS NULL) OR (effective_from <= effective_to)))
+);
+
+
+--
+-- Name: entity_types; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".entity_types (
+    entity_type_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name character varying(255) NOT NULL,
+    description text,
+    table_name character varying(255) NOT NULL,
+    created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    type_code character varying(100),
+    semantic_context jsonb DEFAULT '{}'::jsonb,
+    parent_type_id uuid,
+    type_hierarchy_path text[],
+    embedding public.vector(768),
+    embedding_model character varying(100),
+    embedding_updated_at timestamp with time zone,
+    entity_category character varying(20)
+);
+
+
+--
+-- Name: COLUMN entity_types.semantic_context; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".entity_types.semantic_context IS 'Rich semantic metadata: category, parent_type, synonyms[], typical_documents[], typical_attributes[]';
+
+
+--
+-- Name: COLUMN entity_types.type_hierarchy_path; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".entity_types.type_hierarchy_path IS 'Materialized path for efficient ancestor queries, e.g., ["ENTITY", "LEGAL_ENTITY", "LIMITED_COMPANY"]';
+
+
+--
+-- Name: cbu_ownership_graph; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".cbu_ownership_graph AS
+ SELECT v.cbu_id,
+    r.relationship_id,
+    r.from_entity_id,
+    e_from.name AS from_entity_name,
+    et_from.entity_category AS from_entity_category,
+    r.to_entity_id,
+    e_to.name AS to_entity_name,
+    et_to.entity_category AS to_entity_category,
+    r.relationship_type,
+    r.percentage,
+    r.ownership_type,
+    r.control_type,
+    r.trust_role,
+    r.interest_type,
+    v.status AS verification_status,
+    v.alleged_percentage,
+    v.observed_percentage,
+    v.proof_document_id,
+    r.effective_from,
+    r.effective_to
+   FROM ((((("ob-poc".entity_relationships r
+     JOIN "ob-poc".cbu_relationship_verification v ON ((v.relationship_id = r.relationship_id)))
+     LEFT JOIN "ob-poc".entities e_from ON ((e_from.entity_id = r.from_entity_id)))
+     LEFT JOIN "ob-poc".entity_types et_from ON ((et_from.entity_type_id = e_from.entity_type_id)))
+     LEFT JOIN "ob-poc".entities e_to ON ((e_to.entity_id = r.to_entity_id)))
+     LEFT JOIN "ob-poc".entity_types et_to ON ((et_to.entity_type_id = e_to.entity_type_id)))
+  WHERE ((r.effective_to IS NULL) OR (r.effective_to > CURRENT_DATE));
 
 
 --
@@ -3187,8 +3371,7 @@ CREATE TABLE "ob-poc".cbus (
     cbu_category character varying(50),
     product_id uuid,
     status character varying(30) DEFAULT 'DISCOVERED'::character varying,
-    CONSTRAINT cbus_category_check CHECK (((cbu_category IS NULL) OR ((cbu_category)::text = ANY ((ARRAY['FUND_MANDATE'::character varying, 'CORPORATE_GROUP'::character varying, 'INSTITUTIONAL_ACCOUNT'::character varying, 'RETAIL_CLIENT'::character varying, 'FAMILY_TRUST'::character varying, 'CORRESPONDENT_BANK'::character varying])::text[])))),
-    CONSTRAINT chk_cbu_category CHECK (((cbu_category IS NULL) OR ((cbu_category)::text = ANY ((ARRAY['FUND_MANDATE'::character varying, 'CORPORATE_GROUP'::character varying, 'INSTITUTIONAL_ACCOUNT'::character varying, 'RETAIL_CLIENT'::character varying, 'INTERNAL_TEST'::character varying, 'CORRESPONDENT_BANK'::character varying])::text[])))),
+    CONSTRAINT chk_cbu_category CHECK (((cbu_category IS NULL) OR ((cbu_category)::text = ANY ((ARRAY['FUND_MANDATE'::character varying, 'CORPORATE_GROUP'::character varying, 'INSTITUTIONAL_ACCOUNT'::character varying, 'RETAIL_CLIENT'::character varying, 'FAMILY_TRUST'::character varying, 'CORRESPONDENT_BANK'::character varying, 'INTERNAL_TEST'::character varying])::text[])))),
     CONSTRAINT chk_cbu_status CHECK (((status)::text = ANY ((ARRAY['DISCOVERED'::character varying, 'VALIDATION_PENDING'::character varying, 'VALIDATED'::character varying, 'UPDATE_PENDING_PROOF'::character varying, 'VALIDATION_FAILED'::character varying])::text[])))
 );
 
@@ -3225,7 +3408,7 @@ COMMENT ON COLUMN "ob-poc".cbus.commercial_client_entity_id IS 'Head office enti
 -- Name: COLUMN cbus.cbu_category; Type: COMMENT; Schema: ob-poc; Owner: -
 --
 
-COMMENT ON COLUMN "ob-poc".cbus.cbu_category IS 'Template discriminator for visualization layout: FUND_MANDATE, CORPORATE_GROUP, INSTITUTIONAL_ACCOUNT, RETAIL_CLIENT, FAMILY_TRUST, CORRESPONDENT_BANK';
+COMMENT ON COLUMN "ob-poc".cbus.cbu_category IS 'Template discriminator for visualization layout: FUND_MANDATE, CORPORATE_GROUP, INSTITUTIONAL_ACCOUNT, RETAIL_CLIENT, FAMILY_TRUST, CORRESPONDENT_BANK, INTERNAL_TEST';
 
 
 --
@@ -3277,26 +3460,6 @@ CREATE TABLE "ob-poc".client_types (
     is_active boolean DEFAULT true,
     display_order integer DEFAULT 0,
     CONSTRAINT client_type_code_uppercase CHECK (((code)::text = upper((code)::text)))
-);
-
-
---
--- Name: control_relationships; Type: TABLE; Schema: ob-poc; Owner: -
---
-
-CREATE TABLE "ob-poc".control_relationships (
-    control_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    controller_entity_id uuid NOT NULL,
-    controlled_entity_id uuid NOT NULL,
-    control_type text NOT NULL,
-    control_percentage numeric(5,2),
-    control_description text,
-    evidence_doc_id uuid,
-    effective_from date DEFAULT CURRENT_DATE NOT NULL,
-    effective_to date,
-    is_active boolean DEFAULT true,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
 );
 
 
@@ -4013,20 +4176,6 @@ CREATE TABLE "ob-poc".dsl_snapshots (
 
 
 --
--- Name: entities; Type: TABLE; Schema: ob-poc; Owner: -
---
-
-CREATE TABLE "ob-poc".entities (
-    entity_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    entity_type_id uuid NOT NULL,
-    external_id character varying(255),
-    name character varying(255) NOT NULL,
-    created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
-    updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text)
-);
-
-
---
 -- Name: entity_crud_rules; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -4158,6 +4307,32 @@ CREATE TABLE "ob-poc".entity_proper_persons (
     search_name text GENERATED ALWAYS AS ((((COALESCE(first_name, ''::character varying))::text || ' '::text) || (COALESCE(last_name, ''::character varying))::text)) STORED,
     entity_id uuid
 );
+
+
+--
+-- Name: entity_relationships_current; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".entity_relationships_current AS
+ SELECT relationship_id,
+    from_entity_id,
+    to_entity_id,
+    relationship_type,
+    percentage,
+    ownership_type,
+    control_type,
+    trust_role,
+    interest_type,
+    effective_from,
+    effective_to,
+    source,
+    source_document_ref,
+    notes,
+    created_at,
+    created_by,
+    updated_at
+   FROM "ob-poc".entity_relationships
+  WHERE ((effective_to IS NULL) OR (effective_to > CURRENT_DATE));
 
 
 --
@@ -4324,42 +4499,6 @@ COMMENT ON COLUMN "ob-poc".entity_type_dependencies.priority IS 'Ordering hint w
 
 
 --
--- Name: entity_types; Type: TABLE; Schema: ob-poc; Owner: -
---
-
-CREATE TABLE "ob-poc".entity_types (
-    entity_type_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    name character varying(255) NOT NULL,
-    description text,
-    table_name character varying(255) NOT NULL,
-    created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
-    updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
-    type_code character varying(100),
-    semantic_context jsonb DEFAULT '{}'::jsonb,
-    parent_type_id uuid,
-    type_hierarchy_path text[],
-    embedding public.vector(768),
-    embedding_model character varying(100),
-    embedding_updated_at timestamp with time zone,
-    entity_category character varying(20)
-);
-
-
---
--- Name: COLUMN entity_types.semantic_context; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".entity_types.semantic_context IS 'Rich semantic metadata: category, parent_type, synonyms[], typical_documents[], typical_attributes[]';
-
-
---
--- Name: COLUMN entity_types.type_hierarchy_path; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".entity_types.type_hierarchy_path IS 'Materialized path for efficient ancestor queries, e.g., ["ENTITY", "LEGAL_ENTITY", "LIMITED_COMPANY"]';
-
-
---
 -- Name: entity_validation_rules; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -4470,6 +4609,35 @@ CREATE VIEW "ob-poc".jurisdictions AS
     region,
     regulatory_framework AS description
    FROM "ob-poc".master_jurisdictions;
+
+
+--
+-- Name: kyc_decisions; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".kyc_decisions (
+    decision_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cbu_id uuid NOT NULL,
+    case_id uuid,
+    status character varying(20) NOT NULL,
+    conditions text,
+    review_interval interval,
+    next_review_date date,
+    evaluation_snapshot jsonb,
+    decided_by uuid NOT NULL,
+    decided_at timestamp with time zone DEFAULT now(),
+    decision_rationale text,
+    dsl_execution_id uuid,
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT kyc_decisions_status_check CHECK (((status)::text = ANY ((ARRAY['CLEARED'::character varying, 'REJECTED'::character varying, 'CONDITIONAL'::character varying, 'PENDING_REVIEW'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE kyc_decisions; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".kyc_decisions IS 'Final KYC decisions with complete evaluation snapshot';
 
 
 --
@@ -4639,37 +4807,6 @@ CREATE TABLE "ob-poc".onboarding_tasks (
 
 
 --
--- Name: ownership_relationships; Type: TABLE; Schema: ob-poc; Owner: -
---
-
-CREATE TABLE "ob-poc".ownership_relationships (
-    ownership_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    owner_entity_id uuid NOT NULL,
-    owned_entity_id uuid NOT NULL,
-    ownership_type character varying(30) NOT NULL,
-    ownership_percent numeric(5,2) NOT NULL,
-    effective_from date DEFAULT CURRENT_DATE,
-    effective_to date,
-    evidence_doc_id uuid,
-    notes text,
-    created_by character varying(255) DEFAULT 'system'::character varying,
-    created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
-    updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
-    CONSTRAINT ownership_not_self CHECK ((owner_entity_id <> owned_entity_id)),
-    CONSTRAINT ownership_relationships_ownership_percent_check CHECK (((ownership_percent >= (0)::numeric) AND (ownership_percent <= (100)::numeric))),
-    CONSTRAINT ownership_relationships_ownership_type_check CHECK (((ownership_type)::text = ANY (ARRAY[('DIRECT'::character varying)::text, ('INDIRECT'::character varying)::text, ('BENEFICIAL'::character varying)::text]))),
-    CONSTRAINT ownership_temporal CHECK (((effective_to IS NULL) OR (effective_to > effective_from)))
-);
-
-
---
--- Name: TABLE ownership_relationships; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON TABLE "ob-poc".ownership_relationships IS 'Tracks ownership relationships between entities for UBO analysis (OWNERSHIP crud_asset)';
-
-
---
 -- Name: product_services; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -4700,6 +4837,36 @@ CREATE TABLE "ob-poc".products (
     is_active boolean DEFAULT true,
     metadata jsonb
 );
+
+
+--
+-- Name: proofs; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".proofs (
+    proof_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cbu_id uuid NOT NULL,
+    document_id uuid,
+    proof_type character varying(50) NOT NULL,
+    valid_from date,
+    valid_until date,
+    status character varying(20) DEFAULT 'pending'::character varying NOT NULL,
+    marked_dirty_at timestamp with time zone,
+    dirty_reason character varying(100),
+    uploaded_by uuid,
+    uploaded_at timestamp with time zone DEFAULT now(),
+    verified_by uuid,
+    verified_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE proofs; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".proofs IS 'Evidence documents that prove ownership/control assertions';
 
 
 --
@@ -5233,6 +5400,55 @@ CREATE TABLE "ob-poc".trust_parties (
 
 
 --
+-- Name: ubo_assertion_log; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".ubo_assertion_log (
+    log_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cbu_id uuid NOT NULL,
+    case_id uuid,
+    dsl_execution_id uuid,
+    assertion_type character varying(50) NOT NULL,
+    expected_value boolean NOT NULL,
+    actual_value boolean NOT NULL,
+    passed boolean NOT NULL,
+    failure_details jsonb,
+    asserted_at timestamp with time zone DEFAULT now(),
+    asserted_by uuid
+);
+
+
+--
+-- Name: TABLE ubo_assertion_log; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".ubo_assertion_log IS 'Audit log of all KYC assertions (declarative gates)';
+
+
+--
+-- Name: ubo_convergence_status; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".ubo_convergence_status AS
+ SELECT cbu_id,
+    count(*) AS total_edges,
+    count(*) FILTER (WHERE ((status)::text = 'proven'::text)) AS proven_edges,
+    count(*) FILTER (WHERE ((status)::text = 'alleged'::text)) AS alleged_edges,
+    count(*) FILTER (WHERE ((status)::text = 'pending'::text)) AS pending_edges,
+    count(*) FILTER (WHERE ((status)::text = 'disputed'::text)) AS disputed_edges,
+    (count(*) FILTER (WHERE ((status)::text = 'proven'::text)) = count(*)) AS is_converged
+   FROM "ob-poc".cbu_relationship_verification
+  GROUP BY cbu_id;
+
+
+--
+-- Name: VIEW ubo_convergence_status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".ubo_convergence_status IS 'Computed convergence status per CBU from cbu_relationship_verification';
+
+
+--
 -- Name: ubo_evidence; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -5262,6 +5478,66 @@ CREATE TABLE "ob-poc".ubo_evidence (
 --
 
 COMMENT ON TABLE "ob-poc".ubo_evidence IS 'Evidence documents and attestations supporting UBO determinations';
+
+
+--
+-- Name: ubo_expired_proofs; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".ubo_expired_proofs AS
+ SELECT v.cbu_id,
+    v.proof_document_id AS proof_id,
+    d.document_type_code AS proof_type,
+    d.status AS doc_status,
+    v.verification_id AS edge_id,
+    r.from_entity_id,
+    r.to_entity_id,
+    r.relationship_type AS edge_type
+   FROM (("ob-poc".cbu_relationship_verification v
+     JOIN "ob-poc".entity_relationships r ON ((v.relationship_id = r.relationship_id)))
+     JOIN "ob-poc".document_catalog d ON ((v.proof_document_id = d.doc_id)))
+  WHERE (((d.status)::text <> ALL ((ARRAY['active'::character varying, 'valid'::character varying])::text[])) OR ((v.status)::text = 'disputed'::text));
+
+
+--
+-- Name: VIEW ubo_expired_proofs; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".ubo_expired_proofs IS 'Relationship verifications with invalid or expired proof documents';
+
+
+--
+-- Name: ubo_missing_proofs; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".ubo_missing_proofs AS
+ SELECT v.cbu_id,
+    v.verification_id AS edge_id,
+    r.from_entity_id,
+    f.name AS from_entity_name,
+    r.to_entity_id,
+    t.name AS to_entity_name,
+    r.relationship_type AS edge_type,
+    v.status,
+    v.alleged_percentage,
+        CASE
+            WHEN ((r.relationship_type)::text = 'ownership'::text) THEN 'shareholder_register'::text
+            WHEN ((r.relationship_type)::text = 'control'::text) THEN 'board_resolution'::text
+            WHEN ((r.relationship_type)::text = 'trust_role'::text) THEN 'trust_deed'::text
+            ELSE NULL::text
+        END AS required_proof_type
+   FROM ((("ob-poc".cbu_relationship_verification v
+     JOIN "ob-poc".entity_relationships r ON ((v.relationship_id = r.relationship_id)))
+     JOIN "ob-poc".entities f ON ((f.entity_id = r.from_entity_id)))
+     JOIN "ob-poc".entities t ON ((t.entity_id = r.to_entity_id)))
+  WHERE (((v.status)::text = ANY ((ARRAY['alleged'::character varying, 'pending'::character varying, 'unverified'::character varying])::text[])) AND (v.proof_document_id IS NULL));
+
+
+--
+-- Name: VIEW ubo_missing_proofs; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".ubo_missing_proofs IS 'Relationship verifications missing proof documents';
 
 
 --
@@ -5309,7 +5585,7 @@ CREATE TABLE "ob-poc".ubo_registry (
 -- Name: TABLE ubo_registry; Type: COMMENT; Schema: ob-poc; Owner: -
 --
 
-COMMENT ON TABLE "ob-poc".ubo_registry IS 'UBO identification results with proper entity referential integrity';
+COMMENT ON TABLE "ob-poc".ubo_registry IS 'DEPRECATED: UBO status now derived from ubo_edges + entity_workstreams';
 
 
 --
@@ -5930,6 +6206,49 @@ CREATE VIEW "ob-poc".v_open_discrepancies AS
 
 
 --
+-- Name: v_ubo_candidates; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_ubo_candidates AS
+ WITH RECURSIVE ownership_chain AS (
+         SELECT v.cbu_id,
+            r.to_entity_id AS target_entity_id,
+            r.from_entity_id AS owner_entity_id,
+            (COALESCE(v.observed_percentage, v.alleged_percentage, r.percentage))::numeric AS effective_percentage,
+            1 AS depth,
+            ARRAY[r.to_entity_id, r.from_entity_id] AS path
+           FROM ("ob-poc".entity_relationships r
+             JOIN "ob-poc".cbu_relationship_verification v ON ((v.relationship_id = r.relationship_id)))
+          WHERE (((r.relationship_type)::text = 'ownership'::text) AND ((v.status)::text = ANY ((ARRAY['proven'::character varying, 'alleged'::character varying, 'pending'::character varying])::text[])) AND ((r.effective_to IS NULL) OR (r.effective_to > CURRENT_DATE)))
+        UNION ALL
+         SELECT oc_1.cbu_id,
+            oc_1.target_entity_id,
+            r.from_entity_id AS owner_entity_id,
+            ((oc_1.effective_percentage * (COALESCE(v.observed_percentage, v.alleged_percentage, r.percentage))::numeric) / (100)::numeric) AS effective_percentage,
+            (oc_1.depth + 1),
+            (oc_1.path || r.from_entity_id)
+           FROM ((((ownership_chain oc_1
+             JOIN "ob-poc".entities e_1 ON ((e_1.entity_id = oc_1.owner_entity_id)))
+             JOIN "ob-poc".entity_types et_1 ON ((et_1.entity_type_id = e_1.entity_type_id)))
+             JOIN "ob-poc".entity_relationships r ON ((r.to_entity_id = oc_1.owner_entity_id)))
+             JOIN "ob-poc".cbu_relationship_verification v ON (((v.relationship_id = r.relationship_id) AND (v.cbu_id = oc_1.cbu_id))))
+          WHERE (((et_1.entity_category)::text = 'SHELL'::text) AND ((r.relationship_type)::text = 'ownership'::text) AND ((v.status)::text = ANY ((ARRAY['proven'::character varying, 'alleged'::character varying, 'pending'::character varying])::text[])) AND ((r.effective_to IS NULL) OR (r.effective_to > CURRENT_DATE)) AND (oc_1.depth < 10) AND (NOT (r.from_entity_id = ANY (oc_1.path))))
+        )
+ SELECT oc.cbu_id,
+    oc.owner_entity_id AS entity_id,
+    e.name AS entity_name,
+    et.entity_category,
+    et.name AS entity_type_name,
+    sum(oc.effective_percentage) AS total_effective_percentage,
+    ((et.entity_category)::text = 'PERSON'::text) AS is_natural_person,
+    (((et.entity_category)::text = 'PERSON'::text) AND (sum(oc.effective_percentage) >= (25)::numeric)) AS is_ubo
+   FROM ((ownership_chain oc
+     JOIN "ob-poc".entities e ON ((e.entity_id = oc.owner_entity_id)))
+     JOIN "ob-poc".entity_types et ON ((et.entity_type_id = e.entity_type_id)))
+  GROUP BY oc.cbu_id, oc.owner_entity_id, e.name, et.entity_category, et.name;
+
+
+--
 -- Name: v_ubo_evidence_summary; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
@@ -5961,6 +6280,136 @@ CREATE VIEW "ob-poc".v_ubo_evidence_summary AS
 --
 
 COMMENT ON VIEW "ob-poc".v_ubo_evidence_summary IS 'Summary view of UBO records with evidence status';
+
+
+--
+-- Name: workflow_definitions; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".workflow_definitions (
+    workflow_id character varying(100) NOT NULL,
+    version integer NOT NULL,
+    description text,
+    definition_json jsonb NOT NULL,
+    content_hash character varying(64) NOT NULL,
+    loaded_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE workflow_definitions; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".workflow_definitions IS 'Cached workflow definitions loaded from YAML files on startup';
+
+
+--
+-- Name: v_workflow_summary; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_workflow_summary AS
+ SELECT workflow_id,
+    version,
+    description,
+    jsonb_object_keys((definition_json -> 'states'::text)) AS state_count,
+    jsonb_array_length((definition_json -> 'transitions'::text)) AS transition_count,
+    loaded_at
+   FROM "ob-poc".workflow_definitions;
+
+
+--
+-- Name: workflow_audit_log; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".workflow_audit_log (
+    log_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    instance_id uuid NOT NULL,
+    from_state character varying(100),
+    to_state character varying(100) NOT NULL,
+    transition_type character varying(20) DEFAULT 'auto'::character varying NOT NULL,
+    transitioned_at timestamp with time zone DEFAULT now() NOT NULL,
+    transitioned_by character varying(255),
+    reason text,
+    blockers_at_transition jsonb,
+    guard_results jsonb
+);
+
+
+--
+-- Name: TABLE workflow_audit_log; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".workflow_audit_log IS 'Audit trail of all workflow state transitions';
+
+
+--
+-- Name: workflow_instances; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".workflow_instances (
+    instance_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    workflow_id character varying(100) NOT NULL,
+    version integer DEFAULT 1 NOT NULL,
+    subject_type character varying(50) NOT NULL,
+    subject_id uuid NOT NULL,
+    current_state character varying(100) NOT NULL,
+    state_entered_at timestamp with time zone DEFAULT now() NOT NULL,
+    history jsonb DEFAULT '[]'::jsonb NOT NULL,
+    blockers jsonb DEFAULT '[]'::jsonb NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_by character varying(255)
+);
+
+
+--
+-- Name: TABLE workflow_instances; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".workflow_instances IS 'Running workflow instances for KYC/onboarding orchestration';
+
+
+--
+-- Name: COLUMN workflow_instances.workflow_id; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".workflow_instances.workflow_id IS 'Workflow definition ID (e.g., kyc_onboarding)';
+
+
+--
+-- Name: COLUMN workflow_instances.subject_type; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".workflow_instances.subject_type IS 'Type of entity this workflow is for (cbu, entity, case)';
+
+
+--
+-- Name: COLUMN workflow_instances.subject_id; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".workflow_instances.subject_id IS 'UUID of the subject entity';
+
+
+--
+-- Name: COLUMN workflow_instances.current_state; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".workflow_instances.current_state IS 'Current state in the workflow state machine';
+
+
+--
+-- Name: COLUMN workflow_instances.history; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".workflow_instances.history IS 'JSON array of StateTransition records';
+
+
+--
+-- Name: COLUMN workflow_instances.blockers; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".workflow_instances.blockers IS 'JSON array of current Blocker records';
 
 
 --
@@ -6877,6 +7326,22 @@ ALTER TABLE ONLY "ob-poc".cbu_layout_overrides
 
 
 --
+-- Name: cbu_relationship_verification cbu_relationship_verification_cbu_id_relationship_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_relationship_verification
+    ADD CONSTRAINT cbu_relationship_verification_cbu_id_relationship_id_key UNIQUE (cbu_id, relationship_id);
+
+
+--
+-- Name: cbu_relationship_verification cbu_relationship_verification_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_relationship_verification
+    ADD CONSTRAINT cbu_relationship_verification_pkey PRIMARY KEY (verification_id);
+
+
+--
 -- Name: cbu_resource_instances cbu_resource_instances_cbu_id_resource_type_id_instance_ide_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -6954,22 +7419,6 @@ ALTER TABLE ONLY "ob-poc".client_allegations
 
 ALTER TABLE ONLY "ob-poc".client_types
     ADD CONSTRAINT client_types_pkey PRIMARY KEY (code);
-
-
---
--- Name: control_relationships control_relationships_controller_entity_id_controlled_entit_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
---
-
-ALTER TABLE ONLY "ob-poc".control_relationships
-    ADD CONSTRAINT control_relationships_controller_entity_id_controlled_entit_key UNIQUE (controller_entity_id, controlled_entity_id, control_type, effective_from);
-
-
---
--- Name: control_relationships control_relationships_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
---
-
-ALTER TABLE ONLY "ob-poc".control_relationships
-    ADD CONSTRAINT control_relationships_pkey PRIMARY KEY (control_id);
 
 
 --
@@ -7293,6 +7742,14 @@ ALTER TABLE ONLY "ob-poc".entity_proper_persons
 
 
 --
+-- Name: entity_relationships entity_relationships_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_relationships
+    ADD CONSTRAINT entity_relationships_pkey PRIMARY KEY (relationship_id);
+
+
+--
 -- Name: entity_share_classes entity_share_classes_isin_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -7389,6 +7846,14 @@ ALTER TABLE ONLY "ob-poc".fund_structure
 
 
 --
+-- Name: kyc_decisions kyc_decisions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".kyc_decisions
+    ADD CONSTRAINT kyc_decisions_pkey PRIMARY KEY (decision_id);
+
+
+--
 -- Name: master_entity_xref master_entity_xref_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -7461,14 +7926,6 @@ ALTER TABLE ONLY "ob-poc".onboarding_tasks
 
 
 --
--- Name: ownership_relationships ownership_relationships_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
---
-
-ALTER TABLE ONLY "ob-poc".ownership_relationships
-    ADD CONSTRAINT ownership_relationships_pkey PRIMARY KEY (ownership_id);
-
-
---
 -- Name: service_resource_types prod_resources_resource_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -7506,6 +7963,14 @@ ALTER TABLE ONLY "ob-poc".products
 
 ALTER TABLE ONLY "ob-poc".products
     ADD CONSTRAINT products_product_code_key UNIQUE (product_code);
+
+
+--
+-- Name: proofs proofs_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".proofs
+    ADD CONSTRAINT proofs_pkey PRIMARY KEY (proof_id);
 
 
 --
@@ -7845,6 +8310,14 @@ ALTER TABLE ONLY "ob-poc".trust_parties
 
 
 --
+-- Name: ubo_assertion_log ubo_assertion_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".ubo_assertion_log
+    ADD CONSTRAINT ubo_assertion_log_pkey PRIMARY KEY (log_id);
+
+
+--
 -- Name: ubo_evidence ubo_evidence_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -7906,6 +8379,46 @@ ALTER TABLE ONLY "ob-poc".document_attribute_links
 
 ALTER TABLE ONLY "ob-poc".redflag_score_config
     ADD CONSTRAINT uq_redflag_severity UNIQUE (severity);
+
+
+--
+-- Name: workflow_instances uq_workflow_subject; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".workflow_instances
+    ADD CONSTRAINT uq_workflow_subject UNIQUE (workflow_id, subject_type, subject_id);
+
+
+--
+-- Name: workflow_definitions uq_workflow_version; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".workflow_definitions
+    ADD CONSTRAINT uq_workflow_version UNIQUE (workflow_id, version);
+
+
+--
+-- Name: workflow_audit_log workflow_audit_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".workflow_audit_log
+    ADD CONSTRAINT workflow_audit_log_pkey PRIMARY KEY (log_id);
+
+
+--
+-- Name: workflow_definitions workflow_definitions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".workflow_definitions
+    ADD CONSTRAINT workflow_definitions_pkey PRIMARY KEY (workflow_id);
+
+
+--
+-- Name: workflow_instances workflow_instances_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".workflow_instances
+    ADD CONSTRAINT workflow_instances_pkey PRIMARY KEY (instance_id);
 
 
 --
@@ -8377,6 +8890,27 @@ CREATE INDEX idx_alleg_workstream ON "ob-poc".client_allegations USING btree (wo
 
 
 --
+-- Name: idx_assertion_log_case; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_assertion_log_case ON "ob-poc".ubo_assertion_log USING btree (case_id);
+
+
+--
+-- Name: idx_assertion_log_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_assertion_log_cbu ON "ob-poc".ubo_assertion_log USING btree (cbu_id);
+
+
+--
+-- Name: idx_assertion_log_type; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_assertion_log_type ON "ob-poc".ubo_assertion_log USING btree (assertion_type, passed);
+
+
+--
 -- Name: idx_attr_uuid; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -8451,6 +8985,13 @@ CREATE INDEX idx_attribute_values_typed_entity ON "ob-poc".attribute_values_type
 --
 
 CREATE INDEX idx_attribute_values_typed_entity_attribute ON "ob-poc".attribute_values_typed USING btree (entity_id, attribute_id);
+
+
+--
+-- Name: idx_audit_instance; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_audit_instance ON "ob-poc".workflow_audit_log USING btree (instance_id, transitioned_at DESC);
 
 
 --
@@ -8552,6 +9093,27 @@ CREATE INDEX idx_cbu_name_trgm ON "ob-poc".cbus USING gin (name public.gin_trgm_
 
 
 --
+-- Name: idx_cbu_rel_verif_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_rel_verif_cbu ON "ob-poc".cbu_relationship_verification USING btree (cbu_id);
+
+
+--
+-- Name: idx_cbu_rel_verif_rel; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_rel_verif_rel ON "ob-poc".cbu_relationship_verification USING btree (relationship_id);
+
+
+--
+-- Name: idx_cbu_rel_verif_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_rel_verif_status ON "ob-poc".cbu_relationship_verification USING btree (cbu_id, status);
+
+
+--
 -- Name: idx_cbus_embedding; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -8605,20 +9167,6 @@ CREATE INDEX idx_companies_name_trgm ON "ob-poc".entity_limited_companies USING 
 --
 
 CREATE INDEX idx_companies_reg_number ON "ob-poc".entity_limited_companies USING btree (registration_number);
-
-
---
--- Name: idx_control_controlled; Type: INDEX; Schema: ob-poc; Owner: -
---
-
-CREATE INDEX idx_control_controlled ON "ob-poc".control_relationships USING btree (controlled_entity_id);
-
-
---
--- Name: idx_control_controller; Type: INDEX; Schema: ob-poc; Owner: -
---
-
-CREATE INDEX idx_control_controller ON "ob-poc".control_relationships USING btree (controller_entity_id);
 
 
 --
@@ -9224,6 +9772,48 @@ CREATE INDEX idx_entity_funds_parent ON "ob-poc".entity_funds USING btree (paren
 
 
 --
+-- Name: idx_entity_rel_from; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_rel_from ON "ob-poc".entity_relationships USING btree (from_entity_id);
+
+
+--
+-- Name: idx_entity_rel_temporal; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_rel_temporal ON "ob-poc".entity_relationships USING btree (effective_from, effective_to);
+
+
+--
+-- Name: idx_entity_rel_to; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_rel_to ON "ob-poc".entity_relationships USING btree (to_entity_id);
+
+
+--
+-- Name: idx_entity_rel_type; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_rel_type ON "ob-poc".entity_relationships USING btree (relationship_type);
+
+
+--
+-- Name: idx_entity_rel_unique_active; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_entity_rel_unique_active ON "ob-poc".entity_relationships USING btree (from_entity_id, to_entity_id, relationship_type) WHERE (effective_to IS NULL);
+
+
+--
+-- Name: idx_entity_rel_unique_historical; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_entity_rel_unique_historical ON "ob-poc".entity_relationships USING btree (from_entity_id, to_entity_id, relationship_type, effective_to) WHERE (effective_to IS NOT NULL);
+
+
+--
 -- Name: idx_entity_types_embedding; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -9368,6 +9958,34 @@ CREATE INDEX idx_gen_log_session ON "ob-poc".dsl_generation_log USING btree (ses
 --
 
 CREATE INDEX idx_gen_log_success ON "ob-poc".dsl_generation_log USING btree (success) WHERE (success = true);
+
+
+--
+-- Name: idx_kyc_decisions_case; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_kyc_decisions_case ON "ob-poc".kyc_decisions USING btree (case_id);
+
+
+--
+-- Name: idx_kyc_decisions_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_kyc_decisions_cbu ON "ob-poc".kyc_decisions USING btree (cbu_id);
+
+
+--
+-- Name: idx_kyc_decisions_review; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_kyc_decisions_review ON "ob-poc".kyc_decisions USING btree (next_review_date) WHERE ((status)::text = 'CLEARED'::text);
+
+
+--
+-- Name: idx_kyc_decisions_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_kyc_decisions_status ON "ob-poc".kyc_decisions USING btree (status);
 
 
 --
@@ -9532,27 +10150,6 @@ CREATE INDEX idx_option_choices_def ON "ob-poc".service_option_choices USING btr
 
 
 --
--- Name: idx_ownership_owned; Type: INDEX; Schema: ob-poc; Owner: -
---
-
-CREATE INDEX idx_ownership_owned ON "ob-poc".ownership_relationships USING btree (owned_entity_id);
-
-
---
--- Name: idx_ownership_owner; Type: INDEX; Schema: ob-poc; Owner: -
---
-
-CREATE INDEX idx_ownership_owner ON "ob-poc".ownership_relationships USING btree (owner_entity_id);
-
-
---
--- Name: idx_ownership_type; Type: INDEX; Schema: ob-poc; Owner: -
---
-
-CREATE INDEX idx_ownership_type ON "ob-poc".ownership_relationships USING btree (ownership_type);
-
-
---
 -- Name: idx_partnerships_entity_id; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -9613,6 +10210,27 @@ CREATE INDEX idx_products_name ON "ob-poc".products USING btree (name);
 --
 
 CREATE INDEX idx_products_product_code ON "ob-poc".products USING btree (product_code);
+
+
+--
+-- Name: idx_proofs_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_proofs_cbu ON "ob-poc".proofs USING btree (cbu_id);
+
+
+--
+-- Name: idx_proofs_document; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_proofs_document ON "ob-poc".proofs USING btree (document_id) WHERE (document_id IS NOT NULL);
+
+
+--
+-- Name: idx_proofs_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_proofs_status ON "ob-poc".proofs USING btree (cbu_id, status);
 
 
 --
@@ -10036,6 +10654,34 @@ CREATE INDEX idx_values_attr_uuid ON "ob-poc".attribute_values_typed USING btree
 
 
 --
+-- Name: idx_workflow_defs_loaded; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_workflow_defs_loaded ON "ob-poc".workflow_definitions USING btree (loaded_at DESC);
+
+
+--
+-- Name: idx_workflow_state; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_workflow_state ON "ob-poc".workflow_instances USING btree (workflow_id, current_state);
+
+
+--
+-- Name: idx_workflow_subject; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_workflow_subject ON "ob-poc".workflow_instances USING btree (subject_type, subject_id);
+
+
+--
+-- Name: idx_workflow_updated; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_workflow_updated ON "ob-poc".workflow_instances USING btree (updated_at DESC);
+
+
+--
 -- Name: idx_business_attrs_entity; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -10209,6 +10855,13 @@ CREATE TRIGGER trg_entity_deps_updated_at BEFORE UPDATE ON "ob-poc".entity_type_
 
 
 --
+-- Name: proofs trg_proofs_updated; Type: TRIGGER; Schema: ob-poc; Owner: -
+--
+
+CREATE TRIGGER trg_proofs_updated BEFORE UPDATE ON "ob-poc".proofs FOR EACH ROW EXECUTE FUNCTION "ob-poc".update_proofs_timestamp();
+
+
+--
 -- Name: service_delivery_map trg_sdm_updated; Type: TRIGGER; Schema: ob-poc; Owner: -
 --
 
@@ -10227,6 +10880,13 @@ CREATE TRIGGER trg_sync_commercial_client AFTER INSERT OR UPDATE OF commercial_c
 --
 
 CREATE TRIGGER trg_ubo_status_transition BEFORE UPDATE ON "ob-poc".ubo_registry FOR EACH ROW EXECUTE FUNCTION "ob-poc".validate_ubo_status_transition();
+
+
+--
+-- Name: workflow_instances trg_workflow_updated; Type: TRIGGER; Schema: ob-poc; Owner: -
+--
+
+CREATE TRIGGER trg_workflow_updated BEFORE UPDATE ON "ob-poc".workflow_instances FOR EACH ROW EXECUTE FUNCTION "ob-poc".update_workflow_timestamp();
 
 
 --
@@ -10849,6 +11509,30 @@ ALTER TABLE ONLY "ob-poc".cbu_evidence
 
 
 --
+-- Name: cbu_relationship_verification cbu_relationship_verification_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_relationship_verification
+    ADD CONSTRAINT cbu_relationship_verification_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id);
+
+
+--
+-- Name: cbu_relationship_verification cbu_relationship_verification_proof_document_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_relationship_verification
+    ADD CONSTRAINT cbu_relationship_verification_proof_document_id_fkey FOREIGN KEY (proof_document_id) REFERENCES "ob-poc".document_catalog(doc_id);
+
+
+--
+-- Name: cbu_relationship_verification cbu_relationship_verification_relationship_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_relationship_verification
+    ADD CONSTRAINT cbu_relationship_verification_relationship_id_fkey FOREIGN KEY (relationship_id) REFERENCES "ob-poc".entity_relationships(relationship_id);
+
+
+--
 -- Name: cbu_resource_instances cbu_resource_instances_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -10950,30 +11634,6 @@ ALTER TABLE ONLY "ob-poc".client_allegations
 
 ALTER TABLE ONLY "ob-poc".client_allegations
     ADD CONSTRAINT client_allegations_workstream_id_fkey FOREIGN KEY (workstream_id) REFERENCES kyc.entity_workstreams(workstream_id);
-
-
---
--- Name: control_relationships control_relationships_controlled_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
---
-
-ALTER TABLE ONLY "ob-poc".control_relationships
-    ADD CONSTRAINT control_relationships_controlled_entity_id_fkey FOREIGN KEY (controlled_entity_id) REFERENCES "ob-poc".entities(entity_id);
-
-
---
--- Name: control_relationships control_relationships_controller_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
---
-
-ALTER TABLE ONLY "ob-poc".control_relationships
-    ADD CONSTRAINT control_relationships_controller_entity_id_fkey FOREIGN KEY (controller_entity_id) REFERENCES "ob-poc".entities(entity_id);
-
-
---
--- Name: control_relationships control_relationships_evidence_doc_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
---
-
-ALTER TABLE ONLY "ob-poc".control_relationships
-    ADD CONSTRAINT control_relationships_evidence_doc_id_fkey FOREIGN KEY (evidence_doc_id) REFERENCES "ob-poc".document_catalog(doc_id);
 
 
 --
@@ -11217,6 +11877,22 @@ ALTER TABLE ONLY "ob-poc".entity_proper_persons
 
 
 --
+-- Name: entity_relationships entity_relationships_from_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_relationships
+    ADD CONSTRAINT entity_relationships_from_entity_id_fkey FOREIGN KEY (from_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: entity_relationships entity_relationships_to_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_relationships
+    ADD CONSTRAINT entity_relationships_to_entity_id_fkey FOREIGN KEY (to_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
 -- Name: entity_share_classes entity_share_classes_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -11393,6 +12069,22 @@ ALTER TABLE ONLY "ob-poc".fund_structure
 
 
 --
+-- Name: kyc_decisions kyc_decisions_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".kyc_decisions
+    ADD CONSTRAINT kyc_decisions_case_id_fkey FOREIGN KEY (case_id) REFERENCES kyc.cases(case_id);
+
+
+--
+-- Name: kyc_decisions kyc_decisions_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".kyc_decisions
+    ADD CONSTRAINT kyc_decisions_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
 -- Name: master_entity_xref master_entity_xref_jurisdiction_code_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -11521,30 +12213,6 @@ ALTER TABLE ONLY "ob-poc".onboarding_tasks
 
 
 --
--- Name: ownership_relationships ownership_relationships_evidence_doc_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
---
-
-ALTER TABLE ONLY "ob-poc".ownership_relationships
-    ADD CONSTRAINT ownership_relationships_evidence_doc_id_fkey FOREIGN KEY (evidence_doc_id) REFERENCES "ob-poc".document_catalog(doc_id);
-
-
---
--- Name: ownership_relationships ownership_relationships_owned_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
---
-
-ALTER TABLE ONLY "ob-poc".ownership_relationships
-    ADD CONSTRAINT ownership_relationships_owned_entity_id_fkey FOREIGN KEY (owned_entity_id) REFERENCES "ob-poc".entities(entity_id);
-
-
---
--- Name: ownership_relationships ownership_relationships_owner_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
---
-
-ALTER TABLE ONLY "ob-poc".ownership_relationships
-    ADD CONSTRAINT ownership_relationships_owner_entity_id_fkey FOREIGN KEY (owner_entity_id) REFERENCES "ob-poc".entities(entity_id);
-
-
---
 -- Name: product_services product_services_product_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -11558,6 +12226,22 @@ ALTER TABLE ONLY "ob-poc".product_services
 
 ALTER TABLE ONLY "ob-poc".product_services
     ADD CONSTRAINT product_services_service_id_fkey FOREIGN KEY (service_id) REFERENCES "ob-poc".services(service_id) ON DELETE CASCADE;
+
+
+--
+-- Name: proofs proofs_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".proofs
+    ADD CONSTRAINT proofs_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
+-- Name: proofs proofs_document_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".proofs
+    ADD CONSTRAINT proofs_document_id_fkey FOREIGN KEY (document_id) REFERENCES "ob-poc".document_catalog(doc_id);
 
 
 --
@@ -11745,6 +12429,22 @@ ALTER TABLE ONLY "ob-poc".trust_parties
 
 
 --
+-- Name: ubo_assertion_log ubo_assertion_log_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".ubo_assertion_log
+    ADD CONSTRAINT ubo_assertion_log_case_id_fkey FOREIGN KEY (case_id) REFERENCES kyc.cases(case_id);
+
+
+--
+-- Name: ubo_assertion_log ubo_assertion_log_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".ubo_assertion_log
+    ADD CONSTRAINT ubo_assertion_log_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
 -- Name: ubo_evidence ubo_evidence_document_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -11857,6 +12557,14 @@ ALTER TABLE ONLY "ob-poc".ubo_snapshots
 
 
 --
+-- Name: workflow_audit_log workflow_audit_log_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".workflow_audit_log
+    ADD CONSTRAINT workflow_audit_log_instance_id_fkey FOREIGN KEY (instance_id) REFERENCES "ob-poc".workflow_instances(instance_id) ON DELETE CASCADE;
+
+
+--
 -- Name: business_attributes business_attributes_domain_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -11932,5 +12640,5 @@ ALTER TABLE ONLY public.rules
 -- PostgreSQL database dump complete
 --
 
-\unrestrict VsfsqNgdOelmv5vuru8RW5SdDRlUpadG0p2lfDSjdJymJt7GFe6SkqXGQQBAygB
+\unrestrict vCo1ElCseAzuP64eEwzFWYYNUiVcoEOJUCNMpZpufbm05eIDyIRTs1CRo2bmuMb
 

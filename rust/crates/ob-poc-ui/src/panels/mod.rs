@@ -5,6 +5,7 @@
 //! They do NOT own state - all state is in AppState.
 
 mod ast;
+mod cbu_search;
 mod chat;
 mod dsl_editor;
 mod entity_detail;
@@ -13,9 +14,10 @@ mod results;
 mod toolbar;
 
 pub use ast::ast_panel;
+pub use cbu_search::{cbu_search_modal, CbuSearchAction, CbuSearchData};
 pub use chat::chat_panel;
 pub use dsl_editor::{dsl_editor_panel, DslEditorAction};
 pub use entity_detail::entity_detail_panel;
 pub use repl::repl_panel;
 pub use results::results_panel;
-pub use toolbar::{toolbar, ToolbarAction};
+pub use toolbar::{toolbar, ToolbarAction, ToolbarData};

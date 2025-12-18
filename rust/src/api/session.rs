@@ -6,6 +6,7 @@
 
 use super::intent::VerbIntent;
 use crate::dsl_v2::ast::{Program, Statement};
+use crate::dsl_v2::batch_executor::BatchResultAccumulator;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -738,6 +739,264 @@ impl BatchContext {
     }
 }
 
+// ============================================================================
+// Active Batch State - For DSL-native template.batch pause/resume
+// ============================================================================
+
+/// Status of a DSL-native batch execution
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum BatchStatus {
+    /// Batch is actively running
+    #[default]
+    Running,
+    /// Batch is paused (can resume)
+    Paused,
+    /// Batch completed successfully
+    Completed,
+    /// Batch failed (cannot resume)
+    Failed,
+    /// Batch was aborted by user
+    Aborted,
+}
+
+/// Active batch execution state for pause/resume support
+///
+/// This is the session-persisted state for DSL-native `template.batch` execution.
+/// Unlike `TemplateExecutionContext` which is for agent-driven conversational batch,
+/// this is for programmatic batch execution that can be paused/resumed.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActiveBatchState {
+    /// Template being executed
+    pub template_id: String,
+
+    /// Source query that generated the item list (for audit/retry)
+    pub source_query: String,
+
+    /// Bind parameter name (e.g., "fund_entity")
+    pub bind_param: String,
+
+    /// Shared parameters (same for all iterations)
+    pub shared_params: HashMap<String, String>,
+
+    /// Resolved shared bindings (e.g., @manco -> UUID)
+    pub shared_bindings: HashMap<String, Uuid>,
+
+    /// Total items to process
+    pub total_items: usize,
+
+    /// Current position (0-indexed, next item to process)
+    pub current_index: usize,
+
+    /// Remaining items to process: (entity_id, display_name)
+    pub remaining_items: Vec<(Uuid, String)>,
+
+    /// Accumulated results so far
+    #[serde(skip)]
+    pub results: BatchResultAccumulator,
+
+    /// Error handling mode: "continue", "stop", "rollback"
+    pub on_error: String,
+
+    /// Current batch status
+    pub status: BatchStatus,
+
+    /// When batch started
+    pub started_at: DateTime<Utc>,
+
+    /// When batch was paused (if paused)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub paused_at: Option<DateTime<Utc>>,
+
+    /// When batch completed/failed/aborted
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ended_at: Option<DateTime<Utc>>,
+
+    /// Error message if status is Failed
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+impl Default for ActiveBatchState {
+    fn default() -> Self {
+        Self {
+            template_id: String::new(),
+            source_query: String::new(),
+            bind_param: String::new(),
+            shared_params: HashMap::new(),
+            shared_bindings: HashMap::new(),
+            total_items: 0,
+            current_index: 0,
+            remaining_items: Vec::new(),
+            results: BatchResultAccumulator::default(),
+            on_error: "continue".to_string(),
+            status: BatchStatus::Running,
+            started_at: Utc::now(),
+            paused_at: None,
+            ended_at: None,
+            error: None,
+        }
+    }
+}
+
+impl ActiveBatchState {
+    /// Create a new active batch state
+    pub fn new(
+        template_id: impl Into<String>,
+        source_query: impl Into<String>,
+        bind_param: impl Into<String>,
+        items: Vec<(Uuid, String)>,
+        shared_params: HashMap<String, String>,
+        on_error: impl Into<String>,
+    ) -> Self {
+        Self {
+            template_id: template_id.into(),
+            source_query: source_query.into(),
+            bind_param: bind_param.into(),
+            total_items: items.len(),
+            remaining_items: items,
+            shared_params,
+            on_error: on_error.into(),
+            started_at: Utc::now(),
+            ..Default::default()
+        }
+    }
+
+    /// Pause the batch execution
+    pub fn pause(&mut self) {
+        if self.status == BatchStatus::Running {
+            self.status = BatchStatus::Paused;
+            self.paused_at = Some(Utc::now());
+        }
+    }
+
+    /// Resume the batch execution
+    pub fn resume(&mut self) {
+        if self.status == BatchStatus::Paused {
+            self.status = BatchStatus::Running;
+            self.paused_at = None;
+        }
+    }
+
+    /// Mark batch as completed
+    pub fn complete(&mut self) {
+        self.status = BatchStatus::Completed;
+        self.ended_at = Some(Utc::now());
+    }
+
+    /// Mark batch as failed
+    pub fn fail(&mut self, error: impl Into<String>) {
+        self.status = BatchStatus::Failed;
+        self.ended_at = Some(Utc::now());
+        self.error = Some(error.into());
+    }
+
+    /// Abort the batch
+    pub fn abort(&mut self) {
+        self.status = BatchStatus::Aborted;
+        self.ended_at = Some(Utc::now());
+    }
+
+    /// Get the next item to process
+    pub fn next_item(&self) -> Option<&(Uuid, String)> {
+        self.remaining_items.first()
+    }
+
+    /// Advance to next item, returning the item that was processed
+    pub fn advance(&mut self) -> Option<(Uuid, String)> {
+        if !self.remaining_items.is_empty() {
+            self.current_index += 1;
+            Some(self.remaining_items.remove(0))
+        } else {
+            None
+        }
+    }
+
+    /// Skip the current item
+    pub fn skip_current(&mut self) -> Option<(Uuid, String)> {
+        self.advance()
+    }
+
+    /// Check if batch can continue
+    pub fn can_continue(&self) -> bool {
+        self.status == BatchStatus::Running && !self.remaining_items.is_empty()
+    }
+
+    /// Check if batch is in a terminal state
+    pub fn is_terminal(&self) -> bool {
+        matches!(
+            self.status,
+            BatchStatus::Completed | BatchStatus::Failed | BatchStatus::Aborted
+        )
+    }
+
+    /// Get progress as (processed, total, success, failed)
+    pub fn progress(&self) -> (usize, usize, usize, usize) {
+        (
+            self.current_index,
+            self.total_items,
+            self.results.success_count,
+            self.results.failure_count,
+        )
+    }
+
+    /// Get progress string like "47/205 (45 success, 2 failed)"
+    pub fn progress_string(&self) -> String {
+        let (processed, total, success, failed) = self.progress();
+        if failed > 0 {
+            format!(
+                "{}/{} ({} success, {} failed)",
+                processed, total, success, failed
+            )
+        } else {
+            format!("{}/{} complete", processed, total)
+        }
+    }
+
+    /// Get elapsed time since start
+    pub fn elapsed(&self) -> chrono::Duration {
+        let end = self.ended_at.unwrap_or_else(Utc::now);
+        end - self.started_at
+    }
+
+    /// Get elapsed time as human-readable string
+    pub fn elapsed_string(&self) -> String {
+        let elapsed = self.elapsed();
+        let secs = elapsed.num_seconds();
+        if secs < 60 {
+            format!("{}s", secs)
+        } else if secs < 3600 {
+            format!("{:02}:{:02}", secs / 60, secs % 60)
+        } else {
+            format!(
+                "{:02}:{:02}:{:02}",
+                secs / 3600,
+                (secs % 3600) / 60,
+                secs % 60
+            )
+        }
+    }
+
+    /// Get status summary for batch.status verb
+    pub fn status_summary(&self) -> serde_json::Value {
+        serde_json::json!({
+            "template": self.template_id,
+            "status": self.status,
+            "progress": {
+                "current": self.current_index,
+                "total": self.total_items,
+                "success": self.results.success_count,
+                "failed": self.results.failure_count,
+                "remaining": self.remaining_items.len(),
+            },
+            "current_item": self.next_item().map(|(_, name)| name.clone()),
+            "elapsed": self.elapsed_string(),
+            "on_error": self.on_error,
+            "error": self.error,
+        })
+    }
+}
+
 /// Context maintained across the session for reference resolution
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SessionContext {
@@ -793,6 +1052,11 @@ pub struct SessionContext {
     /// This holds the key sets, template state, and execution progress
     #[serde(default)]
     pub template_execution: TemplateExecutionContext,
+
+    /// Active DSL-native batch execution state (for template.batch pause/resume)
+    /// This is separate from template_execution which is for conversational batch
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active_batch: Option<ActiveBatchState>,
 }
 
 /// Primary domain keys tracked across the session

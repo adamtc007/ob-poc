@@ -516,10 +516,11 @@ impl RequirementEvaluator {
     ) -> Result<Vec<Blocker>, WorkflowError> {
         let total: Option<rust_decimal::Decimal> = sqlx::query_scalar(
             r#"
-            SELECT SUM(ownership_percent) FROM "ob-poc".ownership_relationships o
-            JOIN "ob-poc".cbu_entity_roles cer ON o.owned_entity_id = cer.entity_id
+            SELECT SUM(r.percentage) FROM "ob-poc".entity_relationships r
+            JOIN "ob-poc".cbu_entity_roles cer ON r.to_entity_id = cer.entity_id
             WHERE cer.cbu_id = $1
-            AND (o.effective_to IS NULL OR o.effective_to > CURRENT_DATE)
+            AND r.relationship_type = 'ownership'
+            AND (r.effective_to IS NULL OR r.effective_to > CURRENT_DATE)
             "#,
         )
         .bind(cbu_id)
@@ -769,11 +770,12 @@ impl RequirementEvaluator {
         let exists: bool = sqlx::query_scalar(
             r#"
             SELECT EXISTS(
-                SELECT 1 FROM "ob-poc".ownership_relationships o
-                JOIN "ob-poc".cbu_entity_roles cer ON o.owned_entity_id = cer.entity_id
+                SELECT 1 FROM "ob-poc".entity_relationships r
+                JOIN "ob-poc".cbu_entity_roles cer ON r.to_entity_id = cer.entity_id
                 WHERE cer.cbu_id = $1
-                AND o.ownership_type = $2
-                AND (o.effective_to IS NULL OR o.effective_to > CURRENT_DATE)
+                AND r.relationship_type = 'ownership'
+                AND r.ownership_type = $2
+                AND (r.effective_to IS NULL OR r.effective_to > CURRENT_DATE)
             )
             "#,
         )
@@ -968,19 +970,21 @@ impl RequirementEvaluator {
         let unresolved: Vec<(Uuid, Option<i32>)> = sqlx::query_as(
             r#"
             WITH RECURSIVE chain AS (
-                SELECT o.owner_entity_id, o.owned_entity_id, 1 as depth
-                FROM "ob-poc".ownership_relationships o
-                JOIN "ob-poc".cbu_entity_roles cer ON o.owned_entity_id = cer.entity_id
+                SELECT r.from_entity_id as owner_entity_id, r.to_entity_id as owned_entity_id, 1 as depth
+                FROM "ob-poc".entity_relationships r
+                JOIN "ob-poc".cbu_entity_roles cer ON r.to_entity_id = cer.entity_id
                 WHERE cer.cbu_id = $1
-                AND (o.effective_to IS NULL OR o.effective_to > CURRENT_DATE)
+                AND r.relationship_type = 'ownership'
+                AND (r.effective_to IS NULL OR r.effective_to > CURRENT_DATE)
 
                 UNION ALL
 
-                SELECT o.owner_entity_id, c.owned_entity_id, c.depth + 1
-                FROM "ob-poc".ownership_relationships o
-                JOIN chain c ON o.owned_entity_id = c.owner_entity_id
+                SELECT r.from_entity_id, c.owned_entity_id, c.depth + 1
+                FROM "ob-poc".entity_relationships r
+                JOIN chain c ON r.to_entity_id = c.owner_entity_id
                 WHERE c.depth < 10
-                AND (o.effective_to IS NULL OR o.effective_to > CURRENT_DATE)
+                AND r.relationship_type = 'ownership'
+                AND (r.effective_to IS NULL OR r.effective_to > CURRENT_DATE)
             )
             SELECT DISTINCT c.owner_entity_id, c.depth
             FROM chain c
@@ -988,9 +992,10 @@ impl RequirementEvaluator {
             JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
             WHERE et.entity_category = 'SHELL'
             AND NOT EXISTS (
-                SELECT 1 FROM "ob-poc".ownership_relationships o2
-                WHERE o2.owned_entity_id = c.owner_entity_id
-                AND (o2.effective_to IS NULL OR o2.effective_to > CURRENT_DATE)
+                SELECT 1 FROM "ob-poc".entity_relationships r2
+                WHERE r2.to_entity_id = c.owner_entity_id
+                AND r2.relationship_type = 'ownership'
+                AND (r2.effective_to IS NULL OR r2.effective_to > CURRENT_DATE)
             )
             "#,
         )

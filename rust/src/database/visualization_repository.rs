@@ -336,6 +336,30 @@ pub struct ScreeningView {
     pub entity_name: Option<String>,
 }
 
+/// UBO edge from entity_relationships + cbu_relationship_verification tables
+/// This is the new unified ownership/control model with separated structure and verification
+#[derive(Debug, Clone)]
+pub struct UboEdgeView {
+    pub edge_id: Uuid,
+    pub cbu_id: Uuid,
+    pub from_entity_id: Uuid,
+    pub to_entity_id: Uuid,
+    pub edge_type: String,
+    pub percentage: Option<bigdecimal::BigDecimal>,
+    pub control_role: Option<String>,
+    pub trust_role: Option<String>,
+    pub status: String,
+    pub alleged_percentage: Option<bigdecimal::BigDecimal>,
+    pub proven_percentage: Option<bigdecimal::BigDecimal>,
+    pub from_name: String,
+    pub to_name: String,
+    pub from_type_code: Option<String>,
+    pub to_type_code: Option<String>,
+    pub from_category: Option<String>,
+    pub to_category: Option<String>,
+}
+
+/// UBO registry entries (legacy - prefer UboEdgeView)
 #[derive(Debug, Clone)]
 pub struct UboView {
     pub ubo_id: Uuid,
@@ -1396,7 +1420,66 @@ impl VisualizationRepository {
     // GRAPH QUERIES - UBO LAYER
     // =========================================================================
 
-    /// Get UBO registry entries for a CBU
+    /// Get UBO edges for a CBU from entity_relationships + cbu_relationship_verification
+    /// This is the primary source of truth for ownership/control chains with status workflow
+    pub async fn get_ubo_edges(&self, cbu_id: Uuid) -> Result<Vec<UboEdgeView>> {
+        let rows = sqlx::query!(
+            r#"SELECT
+                r.relationship_id as edge_id,
+                v.cbu_id,
+                r.from_entity_id,
+                r.to_entity_id,
+                r.relationship_type as edge_type,
+                r.percentage,
+                r.control_type as control_role,
+                r.trust_role,
+                v.status as "status!",
+                v.alleged_percentage,
+                v.observed_percentage as proven_percentage,
+                from_e.name as "from_name!",
+                to_e.name as "to_name!",
+                from_et.type_code as "from_type_code?",
+                to_et.type_code as "to_type_code?",
+                from_et.entity_category as "from_category?",
+                to_et.entity_category as "to_category?"
+               FROM "ob-poc".entity_relationships r
+               JOIN "ob-poc".cbu_relationship_verification v ON v.relationship_id = r.relationship_id
+               JOIN "ob-poc".entities from_e ON r.from_entity_id = from_e.entity_id
+               JOIN "ob-poc".entities to_e ON r.to_entity_id = to_e.entity_id
+               JOIN "ob-poc".entity_types from_et ON from_e.entity_type_id = from_et.entity_type_id
+               JOIN "ob-poc".entity_types to_et ON to_e.entity_type_id = to_et.entity_type_id
+               WHERE v.cbu_id = $1
+               ORDER BY r.relationship_type, from_e.name"#,
+            cbu_id
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| UboEdgeView {
+                edge_id: r.edge_id,
+                cbu_id: r.cbu_id,
+                from_entity_id: r.from_entity_id,
+                to_entity_id: r.to_entity_id,
+                edge_type: r.edge_type,
+                percentage: r.percentage,
+                control_role: r.control_role,
+                trust_role: r.trust_role,
+                status: r.status,
+                alleged_percentage: r.alleged_percentage,
+                proven_percentage: r.proven_percentage,
+                from_name: r.from_name,
+                to_name: r.to_name,
+                from_type_code: r.from_type_code,
+                to_type_code: r.to_type_code,
+                from_category: r.from_category,
+                to_category: r.to_category,
+            })
+            .collect())
+    }
+
+    /// Get UBO registry entries for a CBU (legacy - prefer get_ubo_edges)
     pub async fn get_ubos(&self, cbu_id: Uuid) -> Result<Vec<UboView>> {
         let rows = sqlx::query!(
             r#"SELECT
@@ -1434,26 +1517,27 @@ impl VisualizationRepository {
             .collect())
     }
 
-    /// Get ownership relationships for a CBU
+    /// Get ownership relationships for a CBU from entity_relationships
     pub async fn get_ownerships(&self, cbu_id: Uuid) -> Result<Vec<OwnershipView>> {
         let rows = sqlx::query!(
             r#"SELECT
-                o.ownership_id as "ownership_id!",
-                o.owner_entity_id as "owner_entity_id!",
-                o.owned_entity_id as "owned_entity_id!",
-                o.ownership_type as "ownership_type!",
-                o.ownership_percent as "ownership_percent!",
+                r.relationship_id as "ownership_id!",
+                r.from_entity_id as "owner_entity_id!",
+                r.to_entity_id as "owned_entity_id!",
+                COALESCE(r.source, 'direct') as "ownership_type!",
+                COALESCE(r.percentage, 0) as "ownership_percent!",
                 owner.name as "owner_name?",
                 owned.name as "owned_name?"
-               FROM "ob-poc".ownership_relationships o
-               LEFT JOIN "ob-poc".entities owner ON owner.entity_id = o.owner_entity_id
-               LEFT JOIN "ob-poc".entities owned ON owned.entity_id = o.owned_entity_id
-               WHERE o.owned_entity_id IN (
+               FROM "ob-poc".entity_relationships r
+               LEFT JOIN "ob-poc".entities owner ON owner.entity_id = r.from_entity_id
+               LEFT JOIN "ob-poc".entities owned ON owned.entity_id = r.to_entity_id
+               WHERE r.relationship_type = 'ownership'
+               AND (r.to_entity_id IN (
                    SELECT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1
                )
-               OR o.owner_entity_id IN (
+               OR r.from_entity_id IN (
                    SELECT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1
-               )"#,
+               ))"#,
             cbu_id
         )
         .fetch_all(&self.pool)
@@ -1473,11 +1557,44 @@ impl VisualizationRepository {
             .collect())
     }
 
-    /// Get control relationships for a CBU (placeholder - control_relationships removed)
-    pub async fn get_graph_controls(&self, _cbu_id: Uuid) -> Result<Vec<ControlView>> {
-        // control_relationships table was removed in schema cleanup
-        // Control relationships are now tracked via ubo domain (ubo.add-control verb)
-        Ok(Vec::new())
+    /// Get control relationships for a CBU from entity_relationships
+    pub async fn get_graph_controls(&self, cbu_id: Uuid) -> Result<Vec<ControlView>> {
+        let rows = sqlx::query!(
+            r#"SELECT
+                r.relationship_id as "control_id!",
+                r.from_entity_id as "controller_entity_id!",
+                r.to_entity_id as "controlled_entity_id!",
+                COALESCE(r.control_type, 'control') as "control_type!",
+                controller.name as "controller_name?",
+                controlled.name as "controlled_name?"
+               FROM "ob-poc".entity_relationships r
+               LEFT JOIN "ob-poc".entities controller ON controller.entity_id = r.from_entity_id
+               LEFT JOIN "ob-poc".entities controlled ON controlled.entity_id = r.to_entity_id
+               WHERE r.relationship_type = 'control'
+               AND (r.to_entity_id IN (
+                   SELECT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1
+               )
+               OR r.from_entity_id IN (
+                   SELECT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1
+               ))"#,
+            cbu_id
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| ControlView {
+                control_id: r.control_id,
+                controller_entity_id: r.controller_entity_id,
+                controlled_entity_id: r.controlled_entity_id,
+                control_type: r.control_type,
+                description: None,
+                is_active: Some(true),
+                controller_name: r.controller_name,
+                controlled_name: r.controlled_name,
+            })
+            .collect())
     }
 
     // =========================================================================

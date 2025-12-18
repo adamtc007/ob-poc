@@ -1,0 +1,340 @@
+# KYC Convergence Workflow
+# Implements the convergence model: allegations -> proofs -> observations -> verification -> decision
+# This workflow ensures all ownership/control claims are backed by documentary evidence
+
+workflow: kyc_convergence
+version: 1
+description: KYC convergence workflow - evidence-based ownership verification
+
+trigger:
+  event: kyc-case.created
+  conditions:
+    - field: case_type
+      in: [INITIAL, PERIODIC_REVIEW, TRIGGER_EVENT]
+
+states:
+  INTAKE:
+    description: Initial data gathering - collecting client allegations
+    initial: true
+
+  ALLEGATION_COMPLETE:
+    description: All ownership/control allegations captured in graph
+
+  PROOF_COLLECTION:
+    description: Collecting documentary proofs for each edge
+
+  OBSERVATION_EXTRACTION:
+    description: Extracting observations from proofs
+
+  VERIFICATION:
+    description: Comparing observations to allegations
+
+  CONVERGENCE_CHECK:
+    description: Checking if graph has converged (all edges proven)
+
+  ASSERTION_GATE:
+    description: Running assertion checks before evaluation
+
+  EVALUATION:
+    description: Evaluating UBO structure for decision
+
+  DECISION:
+    description: Final KYC decision
+    terminal: true
+
+  REMEDIATION:
+    description: Graph not converged - needs additional proofs
+
+  BLOCKED:
+    description: Cannot proceed - material discrepancies found
+    terminal: true
+
+transitions:
+  # Normal flow
+  - from: INTAKE
+    to: ALLEGATION_COMPLETE
+    guard: allegations_complete
+    description: All ownership allegations captured
+
+  - from: ALLEGATION_COMPLETE
+    to: PROOF_COLLECTION
+    auto: true
+    description: Begin collecting proofs
+
+  - from: PROOF_COLLECTION
+    to: OBSERVATION_EXTRACTION
+    guard: proofs_linked
+    description: All edges have linked proofs
+
+  - from: OBSERVATION_EXTRACTION
+    to: VERIFICATION
+    guard: observations_extracted
+    description: Observations extracted from all proofs
+
+  - from: VERIFICATION
+    to: CONVERGENCE_CHECK
+    guard: verification_complete
+    description: All observations compared to allegations
+
+  - from: CONVERGENCE_CHECK
+    to: ASSERTION_GATE
+    guard: graph_converged
+    description: Graph has converged - all edges proven
+
+  - from: CONVERGENCE_CHECK
+    to: REMEDIATION
+    guard: graph_not_converged
+    description: Graph has not converged - needs remediation
+
+  - from: REMEDIATION
+    to: PROOF_COLLECTION
+    manual: true
+    description: Additional proofs obtained, retry collection
+
+  - from: ASSERTION_GATE
+    to: EVALUATION
+    guard: assertions_passed
+    description: All assertions passed
+
+  - from: ASSERTION_GATE
+    to: BLOCKED
+    guard: assertions_failed
+    description: Critical assertion failed
+
+  - from: EVALUATION
+    to: DECISION
+    guard: evaluation_complete
+    description: Evaluation complete, ready for decision
+
+  # Error paths
+  - from: VERIFICATION
+    to: BLOCKED
+    guard: material_discrepancy
+    description: Material discrepancy found between allegation and proof
+
+  - from: REMEDIATION
+    to: BLOCKED
+    manual: true
+    description: Cannot obtain required proofs
+
+requirements:
+  INTAKE:
+    - type: cbu_exists
+      description: CBU must exist
+
+    - type: case_created
+      description: KYC case must be created
+
+  ALLEGATION_COMPLETE:
+    - type: ownership_sum_100
+      description: Total ownership allegations must sum to 100%
+
+    - type: all_entities_alleged
+      description: All linked entities have ownership/control allegations
+
+    - type: ubo_graph_built
+      description: UBO graph has been constructed from allegations
+
+  PROOF_COLLECTION:
+    - type: all_edges_have_proofs
+      description: Every edge in the graph has at least one linked proof
+
+    - type: proofs_not_expired
+      description: All proofs are within validity period
+
+  OBSERVATION_EXTRACTION:
+    - type: all_proofs_have_observations
+      description: Observations extracted from all linked proofs
+
+  VERIFICATION:
+    - type: all_observations_compared
+      description: All observations compared to corresponding allegations
+
+    - type: no_pending_verifications
+      description: No verification tasks pending
+
+  CONVERGENCE_CHECK:
+    - type: convergence_status_checked
+      description: Graph convergence status evaluated
+
+  ASSERTION_GATE:
+    - type: ownership_completeness
+      assertion: ownership_complete
+      description: Ownership chains trace to natural persons
+
+    - type: no_circular_ownership
+      assertion: no_circular
+      description: No circular ownership detected
+
+    - type: screening_complete
+      assertion: screening_done
+      description: All UBOs have been screened
+
+  EVALUATION:
+    - type: risk_factors_assessed
+      description: All risk factors evaluated
+
+    - type: ubo_register_populated
+      description: UBO register contains verified entries
+
+  DECISION:
+    - type: decision_recorded
+      description: KYC decision recorded with rationale
+
+    - type: audit_trail_complete
+      description: Full audit trail of convergence process
+
+actions:
+  INTAKE:
+    - action: create_case
+      verb: kyc-case.create
+      description: Create KYC case
+
+    - action: allege_ownership
+      verb: ubo.allege
+      description: Record ownership allegation
+
+    - action: allege_control
+      verb: ubo.allege
+      params:
+        edge-type: control
+      description: Record control allegation
+
+  ALLEGATION_COMPLETE:
+    - action: verify_graph
+      verb: ubo.status
+      description: Get current graph status
+
+    - action: list_missing_proofs
+      verb: ubo.status
+      params:
+        include-missing: true
+      description: List edges needing proofs
+
+  PROOF_COLLECTION:
+    - action: catalog_document
+      verb: document.catalog
+      description: Catalog a document
+
+    - action: link_proof
+      verb: ubo.link-proof
+      description: Link document as proof for edge
+
+    - action: request_document
+      verb: doc-request.create
+      description: Request missing document
+
+  OBSERVATION_EXTRACTION:
+    - action: extract_observations
+      verb: document.extract-to-observations
+      description: Extract observations from document
+
+    - action: record_observation
+      verb: observation.record-from-document
+      description: Record specific observation
+
+  VERIFICATION:
+    - action: verify_edge
+      verb: ubo.verify
+      description: Verify edge against observations
+
+    - action: record_discrepancy
+      verb: discrepancy.record
+      description: Record discrepancy between allegation and observation
+
+    - action: resolve_discrepancy
+      verb: discrepancy.resolve
+      description: Resolve a discrepancy
+
+  CONVERGENCE_CHECK:
+    - action: check_status
+      verb: ubo.status
+      description: Get convergence status
+
+    - action: list_unproven
+      verb: ubo.status
+      params:
+        filter: unproven
+      description: List unproven edges
+
+  REMEDIATION:
+    - action: mark_dirty
+      verb: ubo.mark-dirty
+      description: Mark proof for re-verification
+
+    - action: request_replacement
+      verb: doc-request.create
+      description: Request replacement document
+
+    - action: update_allegation
+      verb: ubo.allege
+      params:
+        mode: update
+      description: Update allegation based on new evidence
+
+  ASSERTION_GATE:
+    - action: assert_completeness
+      verb: ubo.assert
+      params:
+        assertion: ownership_complete
+      description: Assert ownership completeness
+
+    - action: assert_no_circular
+      verb: ubo.assert
+      params:
+        assertion: no_circular
+      description: Assert no circular ownership
+
+    - action: assert_screening
+      verb: ubo.assert
+      params:
+        assertion: screening_done
+      description: Assert all screenings complete
+
+  EVALUATION:
+    - action: evaluate
+      verb: ubo.evaluate
+      description: Evaluate UBO structure
+
+    - action: traverse
+      verb: ubo.traverse
+      description: Get full ownership graph
+
+    - action: set_risk_rating
+      verb: kyc-case.set-risk-rating
+      description: Set risk rating based on evaluation
+
+  DECISION:
+    - action: record_decision
+      verb: kyc.decision
+      description: Record final KYC decision
+
+    - action: schedule_review
+      verb: ubo.schedule-review
+      description: Schedule next periodic review
+
+  BLOCKED:
+    - action: document_block
+      verb: kyc-case.add-note
+      description: Document reason for block
+
+    - action: escalate
+      verb: kyc-case.escalate
+      description: Escalate blocked case
+
+# Convergence thresholds
+convergence:
+  # Minimum percentage of proven edges for convergence
+  min_proven_percentage: 100
+
+  # Maximum age of proofs in days
+  max_proof_age_days: 365
+
+  # Tolerance for ownership percentage discrepancy
+  ownership_tolerance_percent: 1.0
+
+  # Required assertions before evaluation
+  required_assertions:
+    - ownership_complete
+    - no_circular
+    - screening_done

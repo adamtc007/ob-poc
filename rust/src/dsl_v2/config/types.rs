@@ -312,6 +312,10 @@ pub enum ArgType {
     Json,
     Lookup,
     StringList,
+    /// Map of key-value pairs (for template params, etc.)
+    Map,
+    /// Symbol reference (@binding)
+    SymbolRef,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -895,6 +899,13 @@ pub enum ReturnTypeConfig {
     RecordSet,
     Affected,
     Void,
+    /// Custom operation return types
+    EntityQueryResult,
+    TemplateInvokeResult,
+    TemplateBatchResult,
+    BatchControlResult,
+    /// Alias for TemplateBatchResult (used in YAML)
+    BatchResult,
 }
 
 // =============================================================================

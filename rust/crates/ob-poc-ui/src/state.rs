@@ -100,6 +100,9 @@ pub struct AppState {
     /// Resolution panel UI state
     pub resolution_ui: ResolutionPanelUi,
 
+    /// CBU search modal UI state
+    pub cbu_search_ui: CbuSearchUi,
+
     /// Graph widget (owns camera, input state - rendering only)
     pub graph_widget: CbuGraphWidget,
 
@@ -132,6 +135,7 @@ impl Default for AppState {
             panels: PanelState::default(),
             selected_entity_id: None,
             resolution_ui: ResolutionPanelUi::default(),
+            cbu_search_ui: CbuSearchUi::default(),
             graph_widget: CbuGraphWidget::new(),
 
             // Async coordination
@@ -225,6 +229,19 @@ pub struct ResolutionPanelUi {
     pub show_panel: bool,
 }
 
+/// CBU search modal UI state
+#[derive(Default, Clone)]
+pub struct CbuSearchUi {
+    /// Whether the search modal is open
+    pub open: bool,
+    /// Current search query
+    pub query: String,
+    /// Search results (from EntityGateway fuzzy search)
+    pub results: Option<crate::api::CbuSearchResponse>,
+    /// Whether a search is in progress
+    pub searching: bool,
+}
+
 // =============================================================================
 // ASYNC STATE - Coordination for spawn_local operations
 // =============================================================================
@@ -252,6 +269,7 @@ pub struct AsyncState {
     pub pending_chat: Option<Result<ChatMessage, String>>,
     pub pending_resolution: Option<Result<ResolutionSessionResponse, String>>,
     pub pending_resolution_search: Option<Result<ResolutionSearchResponse, String>>,
+    pub pending_cbu_search: Option<Result<crate::api::CbuSearchResponse, String>>,
 
     // Command triggers (from agent commands)
     pub pending_execute: Option<Uuid>, // Session ID to execute
@@ -411,6 +429,17 @@ impl AppState {
                     self.resolution_ui.search_results = Some(search_result);
                 }
                 Err(e) => state.last_error = Some(format!("Resolution search failed: {}", e)),
+            }
+        }
+
+        // Process CBU search results
+        if let Some(result) = state.pending_cbu_search.take() {
+            self.cbu_search_ui.searching = false;
+            match result {
+                Ok(search_result) => {
+                    self.cbu_search_ui.results = Some(search_result);
+                }
+                Err(e) => state.last_error = Some(format!("CBU search failed: {}", e)),
             }
         }
     }

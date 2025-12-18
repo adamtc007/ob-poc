@@ -26,6 +26,8 @@
 
 pub mod applicability_rules;
 pub mod ast;
+#[cfg(feature = "database")]
+pub mod batch_executor;
 pub mod binding_context;
 pub mod compiler;
 pub mod config;
@@ -68,6 +70,10 @@ pub use applicability_rules::{ApplicabilityRules, AttributeApplicability, Docume
 pub use ast::{
     count_entity_refs, Argument, AstNode, EntityRefStats, Literal, Program, Span, Statement,
     VerbCall,
+};
+#[cfg(feature = "database")]
+pub use batch_executor::{
+    BatchExecutionResult, BatchExecutor, BatchResultAccumulator, OnErrorMode,
 };
 pub use binding_context::{BindingContext, BindingInfo};
 pub use compiler::{compile_to_ops, CompileError as OpCompileError, CompiledProgram};

@@ -997,6 +997,50 @@ async fn execute_session_dsl(
                     DslV2Result::Affected(_) | DslV2Result::Void => {
                         // No special handling needed
                     }
+                    DslV2Result::EntityQuery(query_result) => {
+                        // Entity query result for batch operations
+                        result_data = Some(serde_json::json!({
+                            "items": query_result.items.iter().map(|(id, name)| {
+                                serde_json::json!({"id": id.to_string(), "name": name})
+                            }).collect::<Vec<serde_json::Value>>(),
+                            "entity_type": query_result.entity_type,
+                            "total_count": query_result.total_count,
+                        }));
+                    }
+                    DslV2Result::TemplateInvoked(invoke_result) => {
+                        // Template invocation result
+                        entity_id = invoke_result.primary_entity_id;
+                        result_data = Some(serde_json::json!({
+                            "template_id": invoke_result.template_id,
+                            "statements_executed": invoke_result.statements_executed,
+                            "outputs": invoke_result.outputs.iter().map(|(k, v)| {
+                                (k.clone(), v.to_string())
+                            }).collect::<std::collections::HashMap<String, String>>(),
+                            "primary_entity_id": invoke_result.primary_entity_id.map(|id| id.to_string()),
+                        }));
+                    }
+                    DslV2Result::TemplateBatch(batch_result) => {
+                        // Template batch execution result
+                        entity_id = batch_result.primary_entity_ids.first().copied();
+                        result_data = Some(serde_json::json!({
+                            "template_id": batch_result.template_id,
+                            "total_items": batch_result.total_items,
+                            "success_count": batch_result.success_count,
+                            "failure_count": batch_result.failure_count,
+                            "primary_entity_ids": batch_result.primary_entity_ids.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
+                            "primary_entity_type": batch_result.primary_entity_type,
+                            "aborted": batch_result.aborted,
+                        }));
+                    }
+                    DslV2Result::BatchControl(control_result) => {
+                        // Batch control operation result
+                        result_data = Some(serde_json::json!({
+                            "operation": control_result.operation,
+                            "success": control_result.success,
+                            "status": control_result.status,
+                            "message": control_result.message,
+                        }));
+                    }
                 }
 
                 results.push(ExecutionResult {

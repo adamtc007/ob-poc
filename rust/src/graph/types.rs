@@ -270,6 +270,118 @@ impl CbuGraph {
             .retain(|e| kept_node_ids.contains(&e.source) && kept_node_ids.contains(&e.target));
     }
 
+    /// Filter graph to UBO/ownership edges only
+    /// Used for UBO_ONLY view mode - shows pure ownership/control graph
+    ///
+    /// Edge types kept:
+    /// - Owns (ownership relationships)
+    /// - Controls (control relationships from ubo_edges)
+    /// - HasRole WHERE role indicates control (DIRECTOR, CEO, UBO, SHAREHOLDER, etc.)
+    ///
+    /// Edge types removed:
+    /// - HasRole for trading/operational roles (CUSTODIAN, INVESTMENT_MANAGER, etc.)
+    /// - Delivers, RoutesTo, etc. (service delivery edges)
+    pub fn filter_to_ubo_only(&mut self) {
+        // Roles that indicate ownership or control (from OWNERSHIP_CONTROL category)
+        let control_roles = [
+            "DIRECTOR",
+            "NOMINEE_DIRECTOR",
+            "INDEPENDENT_TRUSTEE",
+            "INTERESTED_TRUSTEE",
+            "UBO",
+            "BENEFICIAL_OWNER",
+            "SHAREHOLDER",
+            "SETTLOR",
+            "TRUSTEE",
+            "BENEFICIARY",
+            "PROTECTOR",
+            "GENERAL_PARTNER",
+            "LIMITED_PARTNER",
+            "MANAGING_PARTNER",
+            "ASSET_OWNER",
+            "AUTHORIZED_SIGNATORY",
+            "CHIEF_COMPLIANCE_OFFICER",
+            "CONDUCTING_OFFICER",
+            "CORPORATE_SECRETARY",
+            "HOLDING_COMPANY",
+            "SUBSIDIARY",
+            "SPONSOR",
+            "MANCO",
+            "MANAGEMENT_COMPANY",
+            // Dual-purpose roles
+            "PRINCIPAL",
+            "COMMERCIAL_CLIENT",
+        ];
+
+        // Keep ownership, control, and control-indicating role edges
+        self.edges.retain(|e| match e.edge_type {
+            EdgeType::Owns | EdgeType::Controls => true,
+            EdgeType::HasRole => {
+                // Keep role edge if it's a control-indicating role
+                e.label
+                    .as_ref()
+                    .map(|role| control_roles.contains(&role.as_str()))
+                    .unwrap_or(false)
+            }
+            _ => false,
+        });
+
+        // Collect node IDs that are still connected after edge filtering
+        let connected_node_ids: std::collections::HashSet<String> = self
+            .edges
+            .iter()
+            .flat_map(|e| [e.source.clone(), e.target.clone()])
+            .collect();
+
+        // Keep CBU (root) and any entity connected via ownership/control/role
+        self.nodes
+            .retain(|n| matches!(n.node_type, NodeType::Cbu) || connected_node_ids.contains(&n.id));
+    }
+
+    /// Filter entities to trading execution roles only (removes ownership/control roles)
+    /// Used for SERVICE_DELIVERY view mode
+    /// Keeps entities with role_category: TRADING_EXECUTION, FUND_OPERATIONS, DISTRIBUTION, etc.
+    /// Removes entities with only OWNERSHIP_CONTROL roles
+    pub fn filter_to_trading_entities(&mut self) {
+        // Categories considered "trading" for service delivery view
+        let trading_categories = [
+            "TRADING_EXECUTION",
+            "FUND_OPERATIONS",
+            "DISTRIBUTION",
+            "FINANCING",
+            "INVESTMENT",
+            "BOTH", // Dual-purpose roles like PRINCIPAL
+        ];
+
+        // Find entity nodes that have at least one trading role
+        let trading_entity_ids: std::collections::HashSet<String> = self
+            .nodes
+            .iter()
+            .filter(|n| {
+                n.node_type == NodeType::Entity
+                    && n.role_categories
+                        .iter()
+                        .any(|cat| trading_categories.contains(&cat.as_str()))
+            })
+            .map(|n| n.id.clone())
+            .collect();
+
+        // Remove entities that don't have trading roles
+        self.nodes
+            .retain(|n| n.node_type != NodeType::Entity || trading_entity_ids.contains(&n.id));
+
+        // Remove edges to/from removed entities
+        self.edges.retain(|e| {
+            // Keep edge if it's not a HasRole edge OR if the entity is a trading entity
+            if e.edge_type != EdgeType::HasRole {
+                true
+            } else {
+                // For HasRole edges, keep only if target is a trading entity
+                trading_entity_ids.contains(&e.target)
+            }
+        });
+    }
+
     /// Build layer information for UI rendering
     pub fn build_layer_info(&mut self) {
         self.layers = vec![

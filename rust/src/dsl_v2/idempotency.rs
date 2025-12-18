@@ -153,6 +153,62 @@ impl IdempotencyManager {
                 ("recordset", None, Some(JsonValue::Array(arr.clone())), None)
             }
             ExecutionResult::Void => ("void", None, None, None),
+            ExecutionResult::EntityQuery(query_result) => {
+                // Serialize entity query result as JSON for idempotency caching
+                let json = serde_json::json!({
+                    "items": query_result.items.iter().map(|(id, name)| {
+                        serde_json::json!({"id": id.to_string(), "name": name})
+                    }).collect::<Vec<_>>(),
+                    "entity_type": query_result.entity_type,
+                    "total_count": query_result.total_count,
+                });
+                ("entity_query", None, Some(json), None)
+            }
+            ExecutionResult::TemplateInvoked(invoke_result) => {
+                // Serialize template invoke result as JSON
+                let json = serde_json::json!({
+                    "template_id": invoke_result.template_id,
+                    "statements_executed": invoke_result.statements_executed,
+                    "outputs": invoke_result.outputs.iter().map(|(k, v)| {
+                        (k.clone(), v.to_string())
+                    }).collect::<HashMap<String, String>>(),
+                    "primary_entity_id": invoke_result.primary_entity_id.map(|id| id.to_string()),
+                });
+                (
+                    "template_invoked",
+                    invoke_result.primary_entity_id,
+                    Some(json),
+                    None,
+                )
+            }
+            ExecutionResult::TemplateBatch(batch_result) => {
+                // Serialize template batch result as JSON
+                let json = serde_json::json!({
+                    "template_id": batch_result.template_id,
+                    "total_items": batch_result.total_items,
+                    "success_count": batch_result.success_count,
+                    "failure_count": batch_result.failure_count,
+                    "primary_entity_ids": batch_result.primary_entity_ids.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
+                    "primary_entity_type": batch_result.primary_entity_type,
+                    "aborted": batch_result.aborted,
+                });
+                (
+                    "template_batch",
+                    batch_result.primary_entity_ids.first().copied(),
+                    Some(json),
+                    None,
+                )
+            }
+            ExecutionResult::BatchControl(control_result) => {
+                // Serialize batch control result as JSON
+                let json = serde_json::json!({
+                    "operation": control_result.operation,
+                    "success": control_result.success,
+                    "status": control_result.status,
+                    "message": control_result.message,
+                });
+                ("batch_control", None, Some(json), None)
+            }
         };
 
         sqlx::query(

@@ -475,3 +475,31 @@ domains:
             default: 0
         returns:
           type: record_set
+
+      query:
+        description: Query entities for batch template iteration (returns entity refs, not records)
+        behavior: plugin
+        plugin:
+          handler: entity_query
+        args:
+          - name: type
+            type: string
+            required: false
+            description: Entity type filter (fund, proper_person, limited_company, etc.)
+          - name: name-like
+            type: string
+            required: false
+            description: Name pattern for ILIKE search (supports % wildcards)
+          - name: jurisdiction
+            type: string
+            required: false
+            description: Jurisdiction code filter
+          - name: limit
+            type: integer
+            required: false
+            default: 1000
+            description: Maximum number of results
+        returns:
+          type: entity_query_result
+          description: List of (entity_id, name) tuples for batch iteration
+          capture: true

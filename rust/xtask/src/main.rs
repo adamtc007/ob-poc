@@ -10,6 +10,7 @@ use clap::{Parser, Subcommand};
 use xshell::{cmd, Shell};
 
 mod seed_allianz;
+mod ubo_test;
 
 #[derive(Parser)]
 #[command(name = "xtask")]
@@ -167,6 +168,17 @@ enum Command {
         #[arg(long)]
         dry_run: bool,
     },
+
+    /// Run UBO convergence test harness
+    UboTest {
+        /// Test command: scenario-1, scenario-2, scenario-3, all, clean, seed
+        #[arg(default_value = "all")]
+        command: String,
+
+        /// Show verbose output
+        #[arg(long, short)]
+        verbose: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -219,6 +231,10 @@ fn main() -> Result<()> {
         Command::BatchClean { limit, dry_run } => {
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(batch_clean(limit, dry_run))
+        }
+        Command::UboTest { command, verbose } => {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(ubo_test::run_ubo_test(&command, verbose))
         }
     }
 }

@@ -117,12 +117,13 @@ impl CustomOperation for UboDiscoverOwnerOp {
             "REGISTRY" => {
                 // Look for existing ownership relationships
                 let rels = sqlx::query!(
-                    r#"SELECT or2.ownership_id, or2.owner_entity_id, e.name as owner_name,
-                              or2.ownership_percent, or2.ownership_type
-                       FROM "ob-poc".ownership_relationships or2
-                       JOIN "ob-poc".entities e ON e.entity_id = or2.owner_entity_id
-                       WHERE or2.owned_entity_id = $1
-                       AND (or2.effective_to IS NULL OR or2.effective_to > CURRENT_DATE)"#,
+                    r#"SELECT r.relationship_id as ownership_id, r.from_entity_id as owner_entity_id,
+                              e.name as owner_name, r.percentage as ownership_percent, r.ownership_type
+                       FROM "ob-poc".entity_relationships r
+                       JOIN "ob-poc".entities e ON e.entity_id = r.from_entity_id
+                       WHERE r.to_entity_id = $1
+                       AND r.relationship_type = 'ownership'
+                       AND (r.effective_to IS NULL OR r.effective_to > CURRENT_DATE)"#,
                     entity_id
                 )
                 .fetch_all(pool)
@@ -444,36 +445,37 @@ impl CustomOperation for UboInferChainOp {
                     combined.ownership_pct
                 FROM upward_chain uc
                 CROSS JOIN LATERAL (
-                    -- Ownership relationships
+                    -- Ownership relationships (from entity_relationships)
                     SELECT
-                        orel.owner_entity_id as parent_entity_id,
+                        r.from_entity_id as parent_entity_id,
                         e.name::text as entity_name,
                         et.type_code::text as entity_type,
                         'OWNERSHIP'::text as rel_type,
-                        orel.ownership_percent as ownership_pct
-                    FROM "ob-poc".ownership_relationships orel
-                    JOIN "ob-poc".entities e ON e.entity_id = orel.owner_entity_id
+                        r.percentage as ownership_pct
+                    FROM "ob-poc".entity_relationships r
+                    JOIN "ob-poc".entities e ON e.entity_id = r.from_entity_id
                     JOIN "ob-poc".entity_types et ON et.entity_type_id = e.entity_type_id
-                    WHERE orel.owned_entity_id = uc.entity_id
-                    AND NOT orel.owner_entity_id = ANY(uc.path)
-                    AND (orel.effective_to IS NULL OR orel.effective_to > CURRENT_DATE)
+                    WHERE r.to_entity_id = uc.entity_id
+                    AND r.relationship_type = 'ownership'
+                    AND NOT r.from_entity_id = ANY(uc.path)
+                    AND (r.effective_to IS NULL OR r.effective_to > CURRENT_DATE)
 
                     UNION ALL
 
-                    -- Control relationships
+                    -- Control relationships (from entity_relationships)
                     SELECT
-                        crel.controller_entity_id as parent_entity_id,
+                        r.from_entity_id as parent_entity_id,
                         e.name::text as entity_name,
                         et.type_code::text as entity_type,
-                        crel.control_type::text as rel_type,
+                        COALESCE(r.control_type, 'control')::text as rel_type,
                         NULL::numeric as ownership_pct
-                    FROM "ob-poc".control_relationships crel
-                    JOIN "ob-poc".entities e ON e.entity_id = crel.controller_entity_id
+                    FROM "ob-poc".entity_relationships r
+                    JOIN "ob-poc".entities e ON e.entity_id = r.from_entity_id
                     JOIN "ob-poc".entity_types et ON et.entity_type_id = e.entity_type_id
-                    WHERE crel.controlled_entity_id = uc.entity_id
-                    AND NOT crel.controller_entity_id = ANY(uc.path)
-                    AND crel.is_active = true
-                    AND (crel.effective_to IS NULL OR crel.effective_to > CURRENT_DATE)
+                    WHERE r.to_entity_id = uc.entity_id
+                    AND r.relationship_type = 'control'
+                    AND NOT r.from_entity_id = ANY(uc.path)
+                    AND (r.effective_to IS NULL OR r.effective_to > CURRENT_DATE)
                 ) combined
                 WHERE uc.depth < $2
             )

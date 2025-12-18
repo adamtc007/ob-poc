@@ -7,14 +7,14 @@ domains:
         behavior: crud
         crud:
           operation: insert
-          table: ownership_relationships
+          table: entity_relationships
           schema: ob-poc
-          returning: ownership_id
+          returning: relationship_id
         args:
           - name: owner-entity-id
             type: uuid
             required: true
-            maps_to: owner_entity_id
+            maps_to: from_entity_id
             lookup:
               table: entities
               entity_type: entity
@@ -24,7 +24,7 @@ domains:
           - name: owned-entity-id
             type: uuid
             required: true
-            maps_to: owned_entity_id
+            maps_to: to_entity_id
             lookup:
               table: entities
               entity_type: entity
@@ -34,7 +34,7 @@ domains:
           - name: percentage
             type: decimal
             required: true
-            maps_to: ownership_percent
+            maps_to: percentage
           - name: ownership-type
             type: string
             required: true
@@ -50,7 +50,7 @@ domains:
           - name: evidence-doc-id
             type: uuid
             required: false
-            maps_to: evidence_doc_id
+            maps_to: source_document_id
             lookup:
               table: document_catalog
               entity_type: document
@@ -61,32 +61,35 @@ domains:
             type: string
             required: false
             maps_to: notes
+        defaults:
+          relationship_type: OWNERSHIP
+          source: DSL
         returns:
           type: uuid
-          name: ownership_id
+          name: relationship_id
           capture: true
       update-ownership:
         description: Update ownership percentage or end date
         behavior: crud
         crud:
           operation: update
-          table: ownership_relationships
+          table: entity_relationships
           schema: ob-poc
-          key: ownership_id
+          key: relationship_id
         args:
-          - name: ownership-id
+          - name: relationship-id
             type: uuid
             required: true
-            maps_to: ownership_id
+            maps_to: relationship_id
             lookup:
-              table: ownership_relationships
+              table: entity_relationships
               schema: ob-poc
-              search_key: ownership_id
-              primary_key: ownership_id
+              search_key: relationship_id
+              primary_key: relationship_id
           - name: percentage
             type: decimal
             required: false
-            maps_to: ownership_percent
+            maps_to: percentage
           - name: effective-to
             type: date
             required: false
@@ -102,19 +105,19 @@ domains:
         behavior: crud
         crud:
           operation: update
-          table: ownership_relationships
+          table: entity_relationships
           schema: ob-poc
-          key: ownership_id
+          key: relationship_id
         args:
-          - name: ownership-id
+          - name: relationship-id
             type: uuid
             required: true
-            maps_to: ownership_id
+            maps_to: relationship_id
             lookup:
-              table: ownership_relationships
+              table: entity_relationships
               schema: ob-poc
-              search_key: ownership_id
-              primary_key: ownership_id
+              search_key: relationship_id
+              primary_key: relationship_id
           - name: effective-to
             type: date
             required: true
@@ -126,14 +129,16 @@ domains:
         behavior: crud
         crud:
           operation: list_by_fk
-          table: ownership_relationships
+          table: entity_relationships_current
           schema: ob-poc
-          fk_col: owned_entity_id
+          fk_col: to_entity_id
+          filter:
+            relationship_type: OWNERSHIP
         args:
           - name: entity-id
             type: uuid
             required: true
-            maps_to: owned_entity_id
+            maps_to: to_entity_id
             lookup:
               table: entities
               entity_type: entity
@@ -147,14 +152,16 @@ domains:
         behavior: crud
         crud:
           operation: list_by_fk
-          table: ownership_relationships
+          table: entity_relationships_current
           schema: ob-poc
-          fk_col: owner_entity_id
+          fk_col: from_entity_id
+          filter:
+            relationship_type: OWNERSHIP
         args:
           - name: entity-id
             type: uuid
             required: true
-            maps_to: owner_entity_id
+            maps_to: from_entity_id
             lookup:
               table: entities
               entity_type: entity
@@ -163,8 +170,11 @@ domains:
               primary_key: entity_id
         returns:
           type: record_set
+      # DEPRECATED: Use ubo.allege instead. UBO registration is now handled through
+      # the convergence model: allege relationship → link proof → verify.
+      # The v_ubo_candidates view automatically identifies UBOs based on ownership ≥25%.
       register-ubo:
-        description: Register a UBO determination for a CBU
+        description: "[DEPRECATED] Register a UBO determination - use ubo.allege instead"
         behavior: crud
         crud:
           operation: upsert
@@ -239,8 +249,10 @@ domains:
           type: uuid
           name: ubo_id
           capture: true
+      # DEPRECATED: Use ubo.verify instead (plugin behavior).
+      # The new verify operates on cbu_relationship_verification records.
       verify-ubo:
-        description: Mark a UBO as verified
+        description: "[DEPRECATED] Mark a UBO as verified - use ubo.verify instead"
         behavior: crud
         crud:
           operation: update
@@ -282,11 +294,11 @@ domains:
         returns:
           type: affected
       list-ubos:
-        description: List UBOs for a CBU
+        description: List UBO candidates for a CBU (natural persons with ≥25% ownership)
         behavior: crud
         crud:
           operation: list_by_fk
-          table: ubo_registry
+          table: v_ubo_candidates
           schema: ob-poc
           fk_col: cbu_id
         args:
@@ -299,24 +311,23 @@ domains:
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
-          - name: verification-status
-            type: string
-            required: false
-            maps_to: verification_status
         returns:
           type: record_set
       list-by-subject:
-        description: List UBOs for a subject entity
+        description: List ownership relationships where entity is the owned party
         behavior: crud
         crud:
           operation: list_by_fk
-          table: ubo_registry
+          table: entity_relationships_current
           schema: ob-poc
-          fk_col: subject_entity_id
+          fk_col: to_entity_id
+          filter:
+            relationship_type: OWNERSHIP
         args:
           - name: subject-entity-id
             type: uuid
             required: true
+            maps_to: to_entity_id
             lookup:
               table: entities
               entity_type: entity
@@ -353,8 +364,11 @@ domains:
             default: 25.0
         returns:
           type: record_set
+      # DEPRECATED: With the new convergence model, ownership changes are handled by
+      # ending the old relationship (ubo.end-ownership) and creating a new one (ubo.add-ownership).
+      # Verification status is tracked per-CBU in cbu_relationship_verification.
       supersede-ubo:
-        description: Supersede a UBO determination when ownership changes
+        description: "[DEPRECATED] Supersede a UBO determination - use end-ownership + add-ownership instead"
         behavior: crud
         crud:
           operation: update
@@ -391,8 +405,11 @@ domains:
             maps_to: closed_reason
         returns:
           type: affected
+      # DEPRECATED: With the new convergence model, UBO status is determined by
+      # the v_ubo_candidates view (natural persons with ≥25% ownership).
+      # To remove someone as UBO, end their ownership relationship.
       close-ubo:
-        description: Close a UBO record (no longer a UBO)
+        description: "[DEPRECATED] Close a UBO record - use end-ownership instead"
         behavior: crud
         crud:
           operation: update

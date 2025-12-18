@@ -237,9 +237,41 @@ pub async fn get_cbu_graph(cbu_id: Uuid, view_mode: ViewMode) -> Result<CbuGraph
 // CBU API
 // =============================================================================
 
-/// List all CBUs
+/// List all CBUs (limited to 50 for initial load)
 pub async fn list_cbus() -> Result<Vec<CbuSummary>, String> {
     get("/api/cbu").await
+}
+
+/// Search CBUs using EntityGateway fuzzy search
+/// Returns matches with scores for ranking
+pub async fn search_cbus(query: &str, limit: u32) -> Result<CbuSearchResponse, String> {
+    let encoded = js_sys::encode_uri_component(query);
+    get(&format!(
+        "/api/entity/search?type=cbu&q={}&limit={}",
+        encoded, limit
+    ))
+    .await
+}
+
+/// CBU search response from entity search API
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct CbuSearchResponse {
+    pub matches: Vec<CbuSearchMatch>,
+    pub total: usize,
+    pub truncated: bool,
+}
+
+/// Individual CBU match from fuzzy search
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct CbuSearchMatch {
+    /// CBU UUID
+    pub value: String,
+    /// Display name
+    pub display: String,
+    /// Additional context (e.g., jurisdiction)
+    pub detail: Option<String>,
+    /// Relevance score 0.0-1.0
+    pub score: f32,
 }
 
 // =============================================================================

@@ -1,0 +1,58 @@
+domains:
+  template:
+    description: Template invocation and batch execution operations
+    verbs:
+      invoke:
+        description: Invoke a single template with parameters
+        behavior: plugin
+        plugin:
+          handler: template_invoke
+        args:
+          - name: id
+            type: string
+            required: true
+            description: Template ID to invoke
+          - name: params
+            type: map
+            required: false
+            description: Explicit parameters for template expansion
+        returns:
+          type: template_invoke_result
+          description: Template invocation result with outputs
+          capture: true
+
+      batch:
+        description: Execute template in batch over query results
+        behavior: plugin
+        plugin:
+          handler: template_batch
+        args:
+          - name: id
+            type: string
+            required: true
+            description: Template ID to invoke for each item
+          - name: source
+            type: symbol_ref
+            required: true
+            description: Binding from entity.query result
+          - name: bind-as
+            type: string
+            required: true
+            description: Parameter name to bind each item to
+          - name: shared
+            type: map
+            required: false
+            description: Shared parameters constant across all iterations
+          - name: on-error
+            type: string
+            required: false
+            default: continue
+            description: Error handling mode (continue, stop, rollback)
+          - name: limit
+            type: integer
+            required: false
+            description: Maximum number of items to process
+        returns:
+          type: batch_result
+          description: Batch execution result with accumulated outputs
+          capture: true

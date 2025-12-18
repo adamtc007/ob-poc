@@ -54,7 +54,7 @@ pub async fn get_cbu_graph(
     // Load layers based on view_mode - server does the filtering
     let mut graph = match view_mode {
         ViewMode::KycUbo => {
-            // KYC/UBO view: entities + KYC + UBO layers, no services
+            // KYC/UBO view: entities (via roles) + KYC + UBO layers, no services
             CbuGraphBuilder::new(cbu_id)
                 .with_custody(false)
                 .with_kyc(true)
@@ -63,14 +63,28 @@ pub async fn get_cbu_graph(
                 .build(&repo)
                 .await
         }
+        ViewMode::UboOnly => {
+            // UBO Only view: pure ownership/control graph - no roles, no products
+            // Load entities via roles (to get all potential UBO entities) plus UBO layer
+            // Then filter to ownership/control edges only
+            CbuGraphBuilder::new(cbu_id)
+                .with_custody(false)
+                .with_kyc(false)
+                .with_ubo(true)
+                .with_services(false)
+                .with_entities(true) // Load entities so UBO layer can reference them
+                .build(&repo)
+                .await
+        }
         ViewMode::ServiceDelivery => {
-            // Service Delivery view: products + services + resources, no entities/KYC/UBO
+            // Service Delivery view: products + services + resources + trading entities
+            // Load all entities, then filter to trading roles
             CbuGraphBuilder::new(cbu_id)
                 .with_custody(false)
                 .with_kyc(false)
                 .with_ubo(false)
                 .with_services(true)
-                .with_entities(false) // Skip entity loading
+                .with_entities(true)
                 .build(&repo)
                 .await
         }
@@ -88,9 +102,23 @@ pub async fn get_cbu_graph(
     }
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    // For PRODUCTS_ONLY, filter out services and resources after loading
-    if view_mode == ViewMode::ProductsOnly {
-        graph.filter_to_products_only();
+    // Apply view-mode specific filtering after loading
+    match view_mode {
+        ViewMode::UboOnly => {
+            // Remove role edges, keep only ownership/control edges
+            graph.filter_to_ubo_only();
+        }
+        ViewMode::ServiceDelivery => {
+            // Filter entities to trading roles only
+            graph.filter_to_trading_entities();
+        }
+        ViewMode::ProductsOnly => {
+            // Keep only CBU and Product nodes
+            graph.filter_to_products_only();
+        }
+        ViewMode::KycUbo => {
+            // No additional filtering needed - shows full KYC/UBO structure
+        }
     }
 
     // Apply server-side layout based on view mode and orientation

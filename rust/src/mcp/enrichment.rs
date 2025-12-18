@@ -132,14 +132,15 @@ impl EntityEnricher {
         let ownership = sqlx::query!(
             r#"
             SELECT
-                o.owner_entity_id as "entity_id!: Uuid",
+                r.from_entity_id as "entity_id!: Uuid",
                 e.name as owned_name,
-                o.ownership_percent,
-                o.ownership_type
-            FROM "ob-poc".ownership_relationships o
-            JOIN "ob-poc".entities e ON o.owned_entity_id = e.entity_id
-            WHERE o.owner_entity_id = ANY($1)
-            AND (o.effective_to IS NULL OR o.effective_to > CURRENT_DATE)
+                r.percentage as ownership_percent,
+                r.ownership_type
+            FROM "ob-poc".entity_relationships r
+            JOIN "ob-poc".entities e ON r.to_entity_id = e.entity_id
+            WHERE r.from_entity_id = ANY($1)
+            AND r.relationship_type = 'ownership'
+            AND (r.effective_to IS NULL OR r.effective_to > CURRENT_DATE)
             "#,
             ids
         )
@@ -150,7 +151,10 @@ impl EntityEnricher {
             if let Some(ctx) = results.get_mut(&own_row.entity_id) {
                 ctx.ownership.push(OwnershipContext {
                     owned_name: own_row.owned_name,
-                    percentage: own_row.ownership_percent.to_string().parse().unwrap_or(0.0),
+                    percentage: own_row
+                        .ownership_percent
+                        .map(|p| p.to_string().parse().unwrap_or(0.0))
+                        .unwrap_or(0.0),
                     ownership_type: own_row.ownership_type.clone(),
                 });
             }

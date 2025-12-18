@@ -403,10 +403,11 @@ impl GuardEvaluator {
         // Check ownership totals to approximately 100%
         let total_ownership: Option<rust_decimal::Decimal> = sqlx::query_scalar(
             r#"
-            SELECT SUM(ownership_percent) FROM "ob-poc".ownership_relationships o
-            JOIN "ob-poc".cbu_entity_roles cer ON o.owned_entity_id = cer.entity_id
+            SELECT SUM(r.percentage) FROM "ob-poc".entity_relationships r
+            JOIN "ob-poc".cbu_entity_roles cer ON r.to_entity_id = cer.entity_id
             WHERE cer.cbu_id = $1
-            AND (o.effective_to IS NULL OR o.effective_to > CURRENT_DATE)
+            AND r.relationship_type = 'ownership'
+            AND (r.effective_to IS NULL OR r.effective_to > CURRENT_DATE)
             "#,
         )
         .bind(cbu_id)

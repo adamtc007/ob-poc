@@ -59,13 +59,33 @@ pub enum ExecutionResult {
     Affected(u64),
     /// No result (void operation)
     Void,
+    /// Entity query result for batch iteration (entity.query verb)
+    EntityQuery(super::custom_ops::entity_query::EntityQueryResult),
+    /// Template invocation result (template.invoke verb)
+    TemplateInvoked(super::custom_ops::template_ops::TemplateInvokeResult),
+    /// Template batch execution result (template.batch verb)
+    TemplateBatch(super::custom_ops::template_ops::TemplateBatchResult),
+    /// Batch control operation result (batch.pause, batch.resume, etc.)
+    BatchControl(super::custom_ops::batch_control_ops::BatchControlResult),
 }
 
 /// Execution context holding state during DSL execution
+///
+/// Supports parent/child hierarchy for batch execution where each iteration
+/// has its own symbol scope but can read from parent (shared) bindings.
 #[derive(Debug)]
 pub struct ExecutionContext {
-    /// Symbol table for @reference resolution
+    /// Symbol table for @reference resolution (local scope)
     pub symbols: HashMap<String, Uuid>,
+    /// Symbol types - maps binding name to entity type (e.g., "cbu" -> "cbu")
+    pub symbol_types: HashMap<String, String>,
+    /// Parent symbols (read-only, inherited from parent context)
+    /// Used in batch execution where shared bindings are accessible to all iterations
+    pub parent_symbols: HashMap<String, Uuid>,
+    /// Parent symbol types
+    pub parent_symbol_types: HashMap<String, String>,
+    /// Batch iteration index (None if not in batch context)
+    pub batch_index: Option<usize>,
     /// Audit user for tracking
     pub audit_user: Option<String>,
     /// Transaction ID for grouping operations
@@ -80,6 +100,10 @@ impl Default for ExecutionContext {
     fn default() -> Self {
         Self {
             symbols: HashMap::new(),
+            symbol_types: HashMap::new(),
+            parent_symbols: HashMap::new(),
+            parent_symbol_types: HashMap::new(),
+            batch_index: None,
             audit_user: None,
             transaction_id: None,
             execution_id: Uuid::new_v4(),
@@ -106,9 +130,80 @@ impl ExecutionContext {
         self.symbols.insert(name.to_string(), value);
     }
 
-    /// Resolve a symbol reference
+    /// Bind a symbol with its entity type
+    pub fn bind_typed(&mut self, name: &str, value: Uuid, entity_type: &str) {
+        self.symbols.insert(name.to_string(), value);
+        self.symbol_types
+            .insert(name.to_string(), entity_type.to_string());
+    }
+
+    /// Resolve a symbol reference, checking local scope first then parent
     pub fn resolve(&self, name: &str) -> Option<Uuid> {
-        self.symbols.get(name).copied()
+        // 1. Check local symbols first
+        if let Some(pk) = self.symbols.get(name) {
+            return Some(*pk);
+        }
+        // 2. Fall back to parent symbols
+        if let Some(pk) = self.parent_symbols.get(name) {
+            return Some(*pk);
+        }
+        None
+    }
+
+    /// Get the entity type for a binding
+    pub fn get_binding_type(&self, name: &str) -> Option<&str> {
+        // Check local first, then parent
+        self.symbol_types
+            .get(name)
+            .or_else(|| self.parent_symbol_types.get(name))
+            .map(|s| s.as_str())
+    }
+
+    /// Get all effective bindings (local + parent, local wins on conflict)
+    pub fn effective_symbols(&self) -> HashMap<String, Uuid> {
+        let mut result = self.parent_symbols.clone();
+        result.extend(self.symbols.clone());
+        result
+    }
+
+    /// Get all effective symbol types
+    pub fn effective_symbol_types(&self) -> HashMap<String, String> {
+        let mut result = self.parent_symbol_types.clone();
+        result.extend(self.symbol_types.clone());
+        result
+    }
+
+    /// Get all bindings as string map (for template expansion)
+    pub fn all_bindings_as_strings(&self) -> HashMap<String, String> {
+        self.effective_symbols()
+            .iter()
+            .map(|(k, v)| (k.clone(), v.to_string()))
+            .collect()
+    }
+
+    /// Create a child context for a batch iteration
+    ///
+    /// The child has:
+    /// - Fresh local symbols (empty)
+    /// - Parent symbols inherited from this context's effective symbols
+    /// - Same execution_id and other settings
+    pub fn child_for_iteration(&self, index: usize) -> Self {
+        Self {
+            symbols: HashMap::new(),
+            symbol_types: HashMap::new(),
+            parent_symbols: self.effective_symbols(),
+            parent_symbol_types: self.effective_symbol_types(),
+            batch_index: Some(index),
+            audit_user: self.audit_user.clone(),
+            transaction_id: self.transaction_id,
+            execution_id: self.execution_id,
+            idempotency_enabled: self.idempotency_enabled,
+        }
+    }
+
+    /// Check if we're currently in a batch iteration
+    pub fn is_batch_iteration(&self) -> bool {
+        self.batch_index.is_some()
     }
 
     /// Set the audit user
@@ -120,6 +215,18 @@ impl ExecutionContext {
     /// Disable idempotency checking (for testing or forced re-execution)
     pub fn without_idempotency(mut self) -> Self {
         self.idempotency_enabled = false;
+        self
+    }
+
+    /// Set parent symbols (for batch execution setup)
+    pub fn with_parent_symbols(mut self, symbols: HashMap<String, Uuid>) -> Self {
+        self.parent_symbols = symbols;
+        self
+    }
+
+    /// Set parent symbol types
+    pub fn with_parent_symbol_types(mut self, types: HashMap<String, String>) -> Self {
+        self.parent_symbol_types = types;
         self
     }
 }

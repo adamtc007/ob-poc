@@ -4,7 +4,7 @@
 //! This module only contains CBU listing and graph visualization endpoints.
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     Json,
 };
@@ -14,17 +14,81 @@ use ob_poc_types::CbuSummary;
 
 use crate::state::AppState;
 
+/// Query parameters for CBU search
+#[derive(Debug, serde::Deserialize)]
+pub struct CbuSearchQuery {
+    /// Search query (matches against name, case-insensitive)
+    pub q: Option<String>,
+    /// Maximum results to return (default 20)
+    pub limit: Option<i64>,
+}
+
 // =============================================================================
 // CBU
 // =============================================================================
 
 pub async fn list_cbus(State(state): State<AppState>) -> Result<Json<Vec<CbuSummary>>, StatusCode> {
     let rows = sqlx::query_as::<_, (Uuid, String, Option<String>, Option<String>)>(
-        r#"SELECT cbu_id, name, jurisdiction, client_type FROM "ob-poc".cbus ORDER BY name LIMIT 100"#
+        r#"SELECT cbu_id, name, jurisdiction, client_type FROM "ob-poc".cbus ORDER BY name LIMIT 50"#
     )
     .fetch_all(&state.pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let cbus: Vec<CbuSummary> = rows
+        .into_iter()
+        .map(|(cbu_id, name, jurisdiction, client_type)| CbuSummary {
+            cbu_id: cbu_id.to_string(),
+            name,
+            jurisdiction,
+            client_type,
+        })
+        .collect();
+
+    Ok(Json(cbus))
+}
+
+/// Search CBUs by name (case-insensitive, trigram similarity)
+pub async fn search_cbus(
+    State(state): State<AppState>,
+    Query(params): Query<CbuSearchQuery>,
+) -> Result<Json<Vec<CbuSummary>>, StatusCode> {
+    let query = params.q.unwrap_or_default();
+    let limit = params.limit.unwrap_or(20).min(100);
+
+    let rows = if query.is_empty() {
+        // No query - return recent/popular CBUs
+        sqlx::query_as::<_, (Uuid, String, Option<String>, Option<String>)>(
+            r#"SELECT cbu_id, name, jurisdiction, client_type
+               FROM "ob-poc".cbus
+               ORDER BY updated_at DESC NULLS LAST, name
+               LIMIT $1"#,
+        )
+        .bind(limit)
+        .fetch_all(&state.pool)
+        .await
+    } else {
+        // Search by name using ILIKE for prefix/contains match
+        // Uses pg_trgm index if available for better performance
+        sqlx::query_as::<_, (Uuid, String, Option<String>, Option<String>)>(
+            r#"SELECT cbu_id, name, jurisdiction, client_type
+               FROM "ob-poc".cbus
+               WHERE name ILIKE $1
+               ORDER BY
+                   CASE WHEN name ILIKE $2 THEN 0 ELSE 1 END,  -- Prefix matches first
+                   name
+               LIMIT $3"#,
+        )
+        .bind(format!("%{}%", query)) // Contains match
+        .bind(format!("{}%", query)) // Prefix match (for ordering)
+        .bind(limit)
+        .fetch_all(&state.pool)
+        .await
+    }
+    .map_err(|e| {
+        tracing::error!("CBU search error: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     let cbus: Vec<CbuSummary> = rows
         .into_iter()
@@ -97,14 +161,25 @@ pub async fn get_cbu_graph(
                 .build(&repo)
                 .await
         }
+        ViewMode::UboOnly => {
+            // UBO Only view: pure ownership/control graph
+            CbuGraphBuilder::new(cbu_id)
+                .with_custody(false)
+                .with_kyc(false)
+                .with_ubo(true)
+                .with_services(false)
+                .with_entities(true)
+                .build(&repo)
+                .await
+        }
         ViewMode::ServiceDelivery => {
-            // Service Delivery view: products + services + resources, no entities/KYC/UBO
+            // Service Delivery view: products + services + resources + trading entities
             CbuGraphBuilder::new(cbu_id)
                 .with_custody(false)
                 .with_kyc(false)
                 .with_ubo(false)
                 .with_services(true)
-                .with_entities(false)
+                .with_entities(true)
                 .build(&repo)
                 .await
         }
@@ -125,9 +200,20 @@ pub async fn get_cbu_graph(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    // For PRODUCTS_ONLY, filter out services and resources after loading
-    if view_mode == ViewMode::ProductsOnly {
-        graph.filter_to_products_only();
+    // Apply view-mode specific filtering after loading
+    match view_mode {
+        ViewMode::UboOnly => {
+            graph.filter_to_ubo_only();
+        }
+        ViewMode::ServiceDelivery => {
+            graph.filter_to_trading_entities();
+        }
+        ViewMode::ProductsOnly => {
+            graph.filter_to_products_only();
+        }
+        ViewMode::KycUbo => {
+            // No additional filtering
+        }
     }
 
     // Apply server-side layout (computes x/y positions)

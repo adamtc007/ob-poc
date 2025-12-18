@@ -2,20 +2,19 @@ domains:
   control:
     description: Control relationships (distinct from ownership) - voting rights, board control, veto powers
     verbs:
-
       add:
         description: Add a control relationship between entities
         behavior: crud
         crud:
           operation: insert
-          table: control_relationships
+          table: entity_relationships
           schema: ob-poc
-          returning: control_id
+          returning: relationship_id
         args:
           - name: controller-entity-id
             type: uuid
             required: true
-            maps_to: controller_entity_id
+            maps_to: from_entity_id
             lookup:
               table: entities
               entity_type: entity
@@ -25,7 +24,7 @@ domains:
           - name: controlled-entity-id
             type: uuid
             required: true
-            maps_to: controlled_entity_id
+            maps_to: to_entity_id
             lookup:
               table: entities
               entity_type: entity
@@ -46,12 +45,12 @@ domains:
           - name: control-percentage
             type: decimal
             required: false
-            maps_to: control_percentage
+            maps_to: percentage
             description: Control percentage (may differ from ownership %)
           - name: description
             type: string
             required: false
-            maps_to: control_description
+            maps_to: notes
           - name: effective-from
             type: date
             required: false
@@ -59,16 +58,19 @@ domains:
           - name: evidence-doc-id
             type: uuid
             required: false
-            maps_to: evidence_doc_id
+            maps_to: source_document_id
             lookup:
               table: document_catalog
               entity_type: document
               schema: ob-poc
               search_key: document_name
               primary_key: doc_id
+        defaults:
+          relationship_type: CONTROL
+          source: DSL
         returns:
           type: uuid
-          name: control_id
+          name: relationship_id
           capture: true
 
       end:
@@ -76,14 +78,19 @@ domains:
         behavior: crud
         crud:
           operation: update
-          table: control_relationships
+          table: entity_relationships
           schema: ob-poc
-          key: control_id
+          key: relationship_id
         args:
-          - name: control-id
+          - name: relationship-id
             type: uuid
             required: true
-            maps_to: control_id
+            maps_to: relationship_id
+            lookup:
+              table: entity_relationships
+              schema: ob-poc
+              search_key: relationship_id
+              primary_key: relationship_id
           - name: effective-to
             type: date
             required: true
@@ -96,14 +103,16 @@ domains:
         behavior: crud
         crud:
           operation: list_by_fk
-          table: control_relationships
+          table: entity_relationships_current
           schema: ob-poc
-          fk_col: controlled_entity_id
+          fk_col: to_entity_id
+          filter:
+            relationship_type: CONTROL
         args:
           - name: entity-id
             type: uuid
             required: true
-            maps_to: controlled_entity_id
+            maps_to: to_entity_id
             lookup:
               table: entities
               entity_type: entity
@@ -118,14 +127,16 @@ domains:
         behavior: crud
         crud:
           operation: list_by_fk
-          table: control_relationships
+          table: entity_relationships_current
           schema: ob-poc
-          fk_col: controller_entity_id
+          fk_col: from_entity_id
+          filter:
+            relationship_type: CONTROL
         args:
           - name: entity-id
             type: uuid
             required: true
-            maps_to: controller_entity_id
+            maps_to: from_entity_id
             lookup:
               table: entities
               entity_type: entity

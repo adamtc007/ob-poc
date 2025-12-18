@@ -2568,6 +2568,83 @@ The KYC case management and UBO domains manage entity-level investigations, scre
 
 > **Note**: Screenings are now managed via the KYC Case model. Use `kyc-case.create` → `entity-workstream.create` → `case-screening.run` instead of the legacy `screening.*` verbs.
 
+### UBO Graph Architecture
+
+The UBO system uses a **clean separation** between structural graph data and KYC workflow state:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                 entity_relationships (ob-poc schema)             │
+│  STRUCTURAL GRAPH - Facts about the world (CBU-agnostic)         │
+│  - Ownership relationships (A owns X% of B)                      │
+│  - Control relationships (A controls B via board/voting)         │
+│  - Trust roles (settlor, protector, beneficiary)                │
+│  - Columns: from_entity_id, to_entity_id, relationship_type,    │
+│             percentage, effective_to                             │
+│  - Used by: UBO, Onboarding, Trading, Visualization             │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              │ FK reference
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│           cbu_relationship_verification (ob-poc schema)          │
+│  KYC VERIFICATION STATE - Per-CBU verification workflow          │
+│  - cbu_id + relationship_id (unique per CBU)                    │
+│  - alleged_percentage, observed_percentage                       │
+│  - proof_document_id → document_catalog                         │
+│  - status: unverified → alleged → pending → proven/disputed     │
+│  - Used by: KYC convergence workflow                            │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              │ Separate concern
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                entity_workstreams (kyc schema)                   │
+│  KYC CASE STATE - Per-entity investigation within a case         │
+│  - is_ubo: boolean (derived from graph analysis)                │
+│  - ownership_percentage: computed from chains                   │
+│  - risk_rating: from screening/assessment                       │
+│  - status: PENDING → COLLECT → VERIFY → SCREEN → COMPLETE       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key Tables:**
+
+| Table | Schema | Purpose |
+|-------|--------|---------|
+| `entity_relationships` | ob-poc | Structural graph - ownership/control/trust relationships |
+| `cbu_relationship_verification` | ob-poc | CBU-specific verification state for relationships |
+| `entity_workstreams` | kyc | Per-entity KYC workflow state within a case |
+| `proofs` | ob-poc | Evidence documents linked to verification |
+
+**Convergence Model (cbu_relationship_verification.status):**
+
+| Status | Meaning |
+|--------|---------|
+| `unverified` | Relationship exists, not yet part of KYC |
+| `alleged` | Client claims this relationship exists |
+| `pending` | Proof document linked, awaiting verification |
+| `proven` | Verified by authoritative source |
+| `disputed` | Conflicting evidence found |
+| `waived` | Verification waived with justification |
+
+**Key Design Principle:** Relationships are facts about the world (in `entity_relationships`). Verification is CBU-specific (in `cbu_relationship_verification`). This allows the same relationship to have different verification status across different CBUs.
+
+**UBO Verb Pattern:**
+```clojure
+;; 1. Add ownership (creates structural relationship)
+(ubo.add-ownership :owner-entity-id @person :owned-entity-id @fund :percentage 60)
+
+;; 2. Allege for CBU context (creates verification record with status=alleged)
+(ubo.allege :cbu-id @cbu :relationship-id @rel :percentage 60)
+
+;; 3. Link proof document (status → pending)
+(ubo.link-proof :verification-id @verif :proof-id @doc)
+
+;; 4. Verify the relationship (status → proven)
+(ubo.verify :verification-id @verif)
+```
+
 ### UBO Verbs
 
 **Note:** UBO chain tracing operations (`ubo.trace-chains`, `ubo.infer-chain`) now include **control relationships** alongside ownership relationships. This aligns with AML/KYC regulatory guidance where a person may be a beneficial owner through control (voting rights, board control, veto powers) even without direct ownership percentage.
@@ -2707,8 +2784,8 @@ CBU (artificial focal point)
 | Table | From | To | Purpose |
 |-------|------|-----|---------|
 | `cbu_entity_roles` | CBU | Entity | Assigns functional roles within CBU context |
-| `ownership_relationships` | Entity | Entity | Ownership chains (SHELL→SHELL or SHELL→PERSON) |
-| `control_relationships` | Entity | Entity | Non-ownership control (board control, voting rights) |
+| `entity_relationships` | Entity | Entity | Ownership, control, trust_role relationships (unified table) |
+| `cbu_relationship_verification` | CBU | Relationship | CBU-specific verification state for relationships |
 
 ### Role Categories
 
@@ -3158,21 +3235,38 @@ Fund-of-Funds investment relationships.
 | investment_date | date | |
 | redemption_date | date | NULL = still invested |
 
-### control_relationships
+### entity_relationships
 
-Control relationships separate from ownership (voting rights, board control, veto powers).
+Unified table for all entity-to-entity relationships (ownership, control, trust roles).
 
 | Column | Type | Description |
 |--------|------|-------------|
-| control_id | uuid | Primary key |
-| controller_entity_id | uuid | Who controls |
-| controlled_entity_id | uuid | Who is controlled |
-| control_type | text | VOTING_RIGHTS, BOARD_APPOINTMENT, VETO_POWER, MANAGEMENT_CONTROL, RESERVED_MATTERS |
-| control_percentage | decimal | May differ from ownership % |
-| control_description | text | |
-| evidence_doc_id | uuid | FK to document_catalog |
-| effective_from | date | |
-| effective_to | date | |
+| relationship_id | uuid | Primary key |
+| from_entity_id | uuid | Owner/controller entity |
+| to_entity_id | uuid | Owned/controlled entity |
+| relationship_type | varchar(30) | 'ownership', 'control', 'trust_role' |
+| percentage | decimal(5,2) | Ownership percentage (NULL for non-ownership) |
+| control_type | varchar(30) | For control: board_member, executive, voting_rights, etc. |
+| trust_role | varchar(30) | For trust: settlor, trustee, beneficiary, protector |
+| effective_from | date | Start date |
+| effective_to | date | End date (NULL = active) |
+| source | varchar(100) | Data source reference |
+
+### cbu_relationship_verification
+
+CBU-specific verification state for relationships (KYC convergence workflow).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| verification_id | uuid | Primary key |
+| cbu_id | uuid | FK to cbus |
+| relationship_id | uuid | FK to entity_relationships |
+| alleged_percentage | decimal(5,2) | What client claims |
+| observed_percentage | decimal(5,2) | What proof shows |
+| proof_document_id | uuid | FK to document_catalog |
+| status | varchar(20) | unverified, alleged, pending, proven, disputed, waived |
+| discrepancy_notes | text | Notes on conflicts |
+| resolved_at | timestamptz | When resolved |
 
 ### delegation_relationships
 
@@ -3333,25 +3427,6 @@ Per-entity KYC status within a CBU context.
 | updated_at | timestamptz | | now() | |
 
 **Unique constraint**: (entity_id, cbu_id)
-
-### control_relationships
-
-Non-ownership control links between entities.
-
-| Column | Type | Nullable | Default | Description |
-|--------|------|----------|---------|-------------|
-| control_id | uuid | NOT NULL | gen_random_uuid() | Primary key |
-| controller_entity_id | uuid | NOT NULL | | FK to entities (who controls) |
-| controlled_entity_id | uuid | NOT NULL | | FK to entities (who is controlled) |
-| control_type | varchar(50) | NOT NULL | | BOARD_CONTROL, VOTING_RIGHTS, VETO_POWER, MANAGEMENT, TRUSTEE, PROTECTOR, OTHER |
-| description | text | | | Description of control mechanism |
-| effective_from | date | | | Start date |
-| effective_to | date | | | End date |
-| is_active | boolean | | true | Active record |
-| evidence_doc_id | uuid | | | FK to document_catalog |
-| created_at | timestamptz | | now() | |
-| updated_at | timestamptz | | now() | |
-
 
 ## Observation Model (KYC Evidence)
 
@@ -3975,7 +4050,7 @@ Subscription, redemption, and transfer transactions.
 | Attributes | 5 | attribute_registry, attribute_values_typed, attribute_dictionary, attribute_observations, client_allegations |
 | Evidence/Proofs | 4 | cbu_evidence, ubo_evidence, ubo_snapshots, ubo_snapshot_comparisons |
 | Decision Support | 3 | case_decision_thresholds, case_evaluation_snapshots, redflag_score_config |
-| UBO | 3 | ubo_registry, ownership_relationships, control_relationships |
+| UBO | 3 | ubo_registry, entity_relationships, cbu_relationship_verification |
 | Thresholds | 4 | threshold_factors, threshold_requirements, requirement_acceptable_docs, screening_requirements |
 | Other | 32 | Various support tables |
 | **ob-poc Total** | **83** | |

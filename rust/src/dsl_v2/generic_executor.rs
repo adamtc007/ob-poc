@@ -2131,6 +2131,18 @@ impl GenericCrudExecutor {
                     .collect();
                 Ok(SqlValue::StringArray(strings))
             }
+            ArgType::Map => {
+                // Maps are passed as JSON objects
+                Ok(SqlValue::Json(value.clone()))
+            }
+            ArgType::SymbolRef => {
+                // Symbol refs should have been resolved to UUIDs by the executor
+                let s = value
+                    .as_str()
+                    .ok_or_else(|| anyhow!("Expected UUID string for symbol ref {}", arg.name))?;
+                let uuid = Uuid::parse_str(s)?;
+                Ok(SqlValue::Uuid(uuid))
+            }
         }
     }
 

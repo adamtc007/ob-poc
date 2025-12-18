@@ -7,10 +7,11 @@
 
 use crate::api;
 use crate::panels::{
-    ast_panel, chat_panel, dsl_editor_panel, entity_detail_panel, repl_panel, results_panel,
-    toolbar, DslEditorAction, ToolbarAction,
+    ast_panel, cbu_search_modal, chat_panel, dsl_editor_panel, entity_detail_panel, repl_panel,
+    results_panel, toolbar, CbuSearchAction, CbuSearchData, DslEditorAction, ToolbarAction,
+    ToolbarData,
 };
-use crate::state::{AppState, AsyncState, LayoutMode, PanelState, TextBuffers};
+use crate::state::{AppState, AsyncState, CbuSearchUi, LayoutMode, PanelState, TextBuffers};
 use ob_poc_graph::{CbuGraphWidget, ViewMode};
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
@@ -41,6 +42,7 @@ impl App {
             panels: PanelState::default(),
             selected_entity_id: None,
             resolution_ui: crate::state::ResolutionPanelUi::default(),
+            cbu_search_ui: CbuSearchUi::default(),
             graph_widget: CbuGraphWidget::new(),
             async_state: Arc::new(Mutex::new(AsyncState::default())),
             ctx: Some(cc.egui_ctx.clone()),
@@ -201,16 +203,69 @@ impl eframe::App for App {
         }
 
         // =================================================================
-        // STEP 3: Render UI and handle actions
+        // STEP 3: Extract data for rendering (Rule 3: short lock, then render)
+        // =================================================================
+
+        // Extract toolbar data (Rule 3: short lock, extract, release, then render)
+        let toolbar_data = {
+            let last_error = self
+                .state
+                .async_state
+                .lock()
+                .ok()
+                .and_then(|s| s.last_error.clone());
+
+            ToolbarData {
+                current_cbu_name: self
+                    .state
+                    .session
+                    .as_ref()
+                    .and_then(|s| s.active_cbu.as_ref())
+                    .map(|c| c.name.clone()),
+                view_mode: self.state.view_mode,
+                layout: self.state.panels.layout,
+                last_error,
+                is_loading: self.state.is_loading(),
+            }
+        };
+
+        // Extract CBU search modal data
+        let cbu_search_data = CbuSearchData {
+            open: self.state.cbu_search_ui.open,
+            results: self
+                .state
+                .cbu_search_ui
+                .results
+                .as_ref()
+                .map(|r| r.matches.as_slice()),
+            searching: self.state.cbu_search_ui.searching,
+            truncated: self
+                .state
+                .cbu_search_ui
+                .results
+                .as_ref()
+                .map(|r| r.truncated)
+                .unwrap_or(false),
+        };
+
+        // =================================================================
+        // STEP 4: Render UI and collect actions
         // =================================================================
 
         // Top toolbar - returns actions
         let toolbar_action = egui::TopBottomPanel::top("toolbar")
-            .show(ctx, |ui| toolbar(ui, &mut self.state))
+            .show(ctx, |ui| toolbar(ui, &toolbar_data))
             .inner;
 
-        // Handle toolbar actions
+        // CBU search modal - returns actions
+        let cbu_search_action =
+            cbu_search_modal(ctx, &mut self.state.cbu_search_ui.query, &cbu_search_data);
+
+        // =================================================================
+        // STEP 5: Handle actions AFTER rendering (Rule 2: actions return values)
+        // =================================================================
         self.handle_toolbar_action(toolbar_action);
+        self.handle_cbu_search_action(cbu_search_action);
 
         // Main content area
         egui::CentralPanel::default().show(ctx, |ui| match self.state.panels.layout {
@@ -220,7 +275,7 @@ impl eframe::App for App {
         });
 
         // =================================================================
-        // STEP 4: Request repaint if async operations in progress
+        // STEP 6: Request repaint if async operations in progress
         // =================================================================
         if self.state.is_loading() {
             ctx.request_repaint_after(std::time::Duration::from_millis(100));
@@ -235,10 +290,13 @@ impl App {
             self.state.select_cbu(cbu_id, &name);
         }
 
+        if action.open_cbu_search {
+            self.state.cbu_search_ui.open = true;
+            self.state.cbu_search_ui.query.clear();
+            self.state.cbu_search_ui.results = None;
+        }
+
         if let Some(mode) = action.change_view_mode {
-            web_sys::console::log_1(
-                &format!("handle_toolbar_action: changing view mode to {:?}", mode).into(),
-            );
             self.state.set_view_mode(mode);
         }
 
@@ -249,6 +307,31 @@ impl App {
         if action.dismiss_error {
             if let Ok(mut async_state) = self.state.async_state.lock() {
                 async_state.last_error = None;
+            }
+        }
+    }
+
+    /// Handle CBU search modal actions
+    fn handle_cbu_search_action(&mut self, action: Option<CbuSearchAction>) {
+        let Some(action) = action else { return };
+
+        match action {
+            CbuSearchAction::Search { query } => {
+                self.state.search_cbus(&query);
+            }
+            CbuSearchAction::Select { id, name } => {
+                // Close modal
+                self.state.cbu_search_ui.open = false;
+                self.state.cbu_search_ui.results = None;
+
+                // Select the CBU
+                if let Ok(uuid) = Uuid::parse_str(&id) {
+                    self.state.select_cbu(uuid, &name);
+                }
+            }
+            CbuSearchAction::Close => {
+                self.state.cbu_search_ui.open = false;
+                self.state.cbu_search_ui.results = None;
             }
         }
     }
@@ -1021,5 +1104,32 @@ impl AppState {
         // Clear resolution state immediately
         self.resolution = None;
         self.resolution_ui = crate::state::ResolutionPanelUi::default();
+    }
+
+    // =========================================================================
+    // CBU Search Methods
+    // =========================================================================
+
+    /// Search CBUs using EntityGateway fuzzy search
+    pub fn search_cbus(&mut self, query: &str) {
+        if query.len() < 2 {
+            return;
+        }
+
+        self.cbu_search_ui.searching = true;
+
+        let query = query.to_string();
+        let async_state = Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+
+        spawn_local(async move {
+            let result = api::search_cbus(&query, 15).await;
+            if let Ok(mut state) = async_state.lock() {
+                state.pending_cbu_search = Some(result);
+            }
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
     }
 }

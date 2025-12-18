@@ -8,18 +8,23 @@ use super::types::{CbuGraph, GraphNode, NodeType};
 /// View modes determine which layers are visible and how they're laid out
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ViewMode {
-    /// KYC/UBO view: Entity hierarchy by role priority, ownership chains
+    /// KYC/UBO view: Entity hierarchy by role priority, ownership chains, KYC status
     #[default]
     KycUbo,
+    /// UBO Only view: Pure ownership/control graph - no roles, no products
+    /// Shows: CBU → ownership_relationships → control_relationships → natural persons
+    UboOnly,
     /// Products Only view: CBU → Products (simple, clean view)
     ProductsOnly,
-    /// Service Delivery view: Products → Services → Resources tree (detailed, for onboarding)
+    /// Service Delivery view: Products → Services → Resources + Trading entities
+    /// Shows: CBU → Products → Services → Resources, plus entities with TRADING_EXECUTION roles
     ServiceDelivery,
 }
 
 impl ViewMode {
     pub fn parse(s: &str) -> Self {
         match s.to_uppercase().as_str() {
+            "UBO_ONLY" | "UBO" | "OWNERSHIP" => ViewMode::UboOnly,
             "PRODUCTS_ONLY" | "PRODUCTS" => ViewMode::ProductsOnly,
             "SERVICE_DELIVERY" | "SERVICES" => ViewMode::ServiceDelivery,
             _ => ViewMode::KycUbo, // Default
@@ -29,6 +34,7 @@ impl ViewMode {
     pub fn as_str(&self) -> &'static str {
         match self {
             ViewMode::KycUbo => "KYC_UBO",
+            ViewMode::UboOnly => "UBO_ONLY",
             ViewMode::ProductsOnly => "PRODUCTS_ONLY",
             ViewMode::ServiceDelivery => "SERVICE_DELIVERY",
         }
@@ -135,6 +141,8 @@ impl LayoutEngine {
         match (self.view_mode, self.orientation) {
             (ViewMode::KycUbo, Orientation::Vertical) => self.layout_kyc_ubo_vertical(graph),
             (ViewMode::KycUbo, Orientation::Horizontal) => self.layout_kyc_ubo_horizontal(graph),
+            (ViewMode::UboOnly, Orientation::Vertical) => self.layout_ubo_only_vertical(graph),
+            (ViewMode::UboOnly, Orientation::Horizontal) => self.layout_ubo_only_horizontal(graph),
             (ViewMode::ProductsOnly, Orientation::Vertical) => {
                 self.layout_products_only_vertical(graph)
             }
@@ -233,6 +241,85 @@ impl LayoutEngine {
 
         // Other nodes (KYC, documents) - place at bottom
         self.layout_tier_centered(&mut graph.nodes, &other, 5, center_x);
+    }
+
+    /// UBO Only layout (VERTICAL): Pure ownership/control graph
+    ///
+    /// Shows ownership chains from CBU's subject entities up to natural person UBOs.
+    /// No role-based connections, no products/services.
+    ///
+    /// ```text
+    /// Tier 0: CBU (center)
+    /// Tier 1: Direct owned entities (SHELL left, PERSON right)
+    /// Tier 2: Intermediate owners (SHELL left, PERSON right)
+    /// Tier 3+: Ultimate beneficial owners (natural persons, right side)
+    /// ```
+    fn layout_ubo_only_vertical(&self, graph: &mut CbuGraph) {
+        let center_x = self.config.canvas_width / 2.0;
+
+        // Collect nodes - in UBO view, entities come from ownership graph
+        // We tier by entity_category (SHELL vs PERSON) since ownership flows upward
+        let mut tier_0: Vec<usize> = Vec::new(); // CBU
+        let mut shells: Vec<usize> = Vec::new(); // SHELL entities (intermediate)
+        let mut persons: Vec<usize> = Vec::new(); // PERSON entities (UBOs)
+
+        for (idx, node) in graph.nodes.iter().enumerate() {
+            match node.node_type {
+                NodeType::Cbu => tier_0.push(idx),
+                NodeType::Entity => {
+                    if node.entity_category.as_deref() == Some("PERSON") {
+                        persons.push(idx);
+                    } else {
+                        shells.push(idx);
+                    }
+                }
+                // Skip all other node types in UBO view
+                _ => {}
+            }
+        }
+
+        // Layout: CBU at top, shells below left, persons below right
+        self.layout_tier_centered(&mut graph.nodes, &tier_0, 0, center_x);
+
+        // Tier 1: Shell entities (ownership intermediaries) - left side
+        let tier_1_y = self.config.tier_spacing_y;
+        self.layout_tier_left(&mut graph.nodes, &shells, 1, tier_1_y);
+
+        // Tier 2: Person entities (UBOs) - right side
+        let tier_2_y = 2.0 * self.config.tier_spacing_y;
+        self.layout_tier_right(&mut graph.nodes, &persons, 2, tier_2_y);
+    }
+
+    /// UBO Only layout (HORIZONTAL): Pure ownership/control graph
+    fn layout_ubo_only_horizontal(&self, graph: &mut CbuGraph) {
+        let center_y = 300.0;
+
+        let mut tier_0: Vec<usize> = Vec::new(); // CBU
+        let mut shells: Vec<usize> = Vec::new(); // SHELL entities
+        let mut persons: Vec<usize> = Vec::new(); // PERSON entities
+
+        for (idx, node) in graph.nodes.iter().enumerate() {
+            match node.node_type {
+                NodeType::Cbu => tier_0.push(idx),
+                NodeType::Entity => {
+                    if node.entity_category.as_deref() == Some("PERSON") {
+                        persons.push(idx);
+                    } else {
+                        shells.push(idx);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        // Horizontal: CBU left, shells middle (top), persons right (bottom)
+        self.layout_tier_horizontal_centered(&mut graph.nodes, &tier_0, 0, center_y);
+
+        let tier_1_x = self.config.node_spacing_x + 100.0;
+        self.layout_tier_horizontal_top(&mut graph.nodes, &shells, 1, tier_1_x);
+
+        let tier_2_x = 2.0 * self.config.node_spacing_x + 100.0;
+        self.layout_tier_horizontal_bottom(&mut graph.nodes, &persons, 2, tier_2_x);
     }
 
     /// Products Only layout (VERTICAL): Simple CBU → Products view
