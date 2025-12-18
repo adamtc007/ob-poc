@@ -232,6 +232,7 @@ impl eframe::App for App {
         // Extract CBU search modal data
         let cbu_search_data = CbuSearchData {
             open: self.state.cbu_search_ui.open,
+            just_opened: self.state.cbu_search_ui.just_opened,
             results: self
                 .state
                 .cbu_search_ui
@@ -257,9 +258,14 @@ impl eframe::App for App {
             .show(ctx, |ui| toolbar(ui, &toolbar_data))
             .inner;
 
-        // CBU search modal - returns actions
-        let cbu_search_action =
+        // CBU search modal - returns actions and focus_consumed flag
+        let (cbu_search_action, focus_consumed) =
             cbu_search_modal(ctx, &mut self.state.cbu_search_ui.query, &cbu_search_data);
+
+        // Clear just_opened flag after focus is consumed
+        if focus_consumed {
+            self.state.cbu_search_ui.just_opened = false;
+        }
 
         // =================================================================
         // STEP 5: Handle actions AFTER rendering (Rule 2: actions return values)
@@ -272,6 +278,7 @@ impl eframe::App for App {
             LayoutMode::FourPanel => self.render_four_panel(ui),
             LayoutMode::EditorFocus => self.render_editor_focus(ui),
             LayoutMode::GraphFocus => self.render_graph_focus(ui),
+            LayoutMode::GraphFullSize => self.render_graph_full_size(ui),
         });
 
         // =================================================================
@@ -292,6 +299,7 @@ impl App {
 
         if action.open_cbu_search {
             self.state.cbu_search_ui.open = true;
+            self.state.cbu_search_ui.just_opened = true;
             self.state.cbu_search_ui.query.clear();
             self.state.cbu_search_ui.results = None;
         }
@@ -498,6 +506,16 @@ impl App {
 
         // Handle action after render
         self.handle_dsl_editor_action(dsl_action);
+    }
+
+    /// Render graph full size (graph only, full window)
+    fn render_graph_full_size(&mut self, ui: &mut egui::Ui) {
+        egui::Frame::default()
+            .inner_margin(0.0)
+            .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
+            .show(ui, |ui| {
+                self.state.graph_widget.ui(ui);
+            });
     }
 }
 

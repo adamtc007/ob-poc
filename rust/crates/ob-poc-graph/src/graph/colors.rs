@@ -206,6 +206,66 @@ pub fn edge_color(edge_type: EdgeType) -> Color32 {
 }
 
 // =============================================================================
+// VERIFICATION STATUS COLORS
+// =============================================================================
+
+/// Edge style based on verification status
+#[derive(Debug, Clone, Copy)]
+pub struct VerificationEdgeStyle {
+    pub color: Color32,
+    pub width_multiplier: f32,
+    pub dashed: bool,
+}
+
+/// Get edge style based on verification status
+/// - "proven": solid green, normal width
+/// - "alleged": dashed amber, normal width
+/// - "disputed": solid red, thicker
+/// - "pending": dashed gray, thinner
+/// - None: use default edge type color
+pub fn verification_edge_style(status: Option<&str>) -> Option<VerificationEdgeStyle> {
+    status.map(|s| match s.to_lowercase().as_str() {
+        "proven" => VerificationEdgeStyle {
+            color: Color32::from_rgb(34, 197, 94), // Green-500
+            width_multiplier: 1.0,
+            dashed: false,
+        },
+        "alleged" => VerificationEdgeStyle {
+            color: Color32::from_rgb(251, 191, 36), // Amber-400
+            width_multiplier: 1.0,
+            dashed: true,
+        },
+        "disputed" => VerificationEdgeStyle {
+            color: Color32::from_rgb(239, 68, 68), // Red-500
+            width_multiplier: 1.5,
+            dashed: false,
+        },
+        "pending" => VerificationEdgeStyle {
+            color: Color32::from_rgb(156, 163, 175), // Gray-400
+            width_multiplier: 0.8,
+            dashed: true,
+        },
+        _ => VerificationEdgeStyle {
+            color: Color32::from_rgb(107, 114, 128), // Gray-500
+            width_multiplier: 1.0,
+            dashed: false,
+        },
+    })
+}
+
+/// Get edge width based on ownership weight (0-100)
+/// Returns multiplier: 1.0 for 0%, up to 2.5 for 100%
+pub fn edge_width_for_weight(weight: Option<f32>) -> f32 {
+    match weight {
+        Some(w) => {
+            let clamped = w.clamp(0.0, 100.0);
+            1.0 + (clamped / 100.0) * 1.5 // 1.0 to 2.5
+        }
+        None => 1.0,
+    }
+}
+
+// =============================================================================
 // FOCUS COLORS
 // =============================================================================
 

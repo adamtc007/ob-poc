@@ -143,6 +143,13 @@ fn render_icon(painter: &egui::Painter, node: &LayoutNode, ctx: &RenderContext) 
         let badge_color = apply_opacity(Color32::from_rgb(76, 175, 80), ctx.opacity);
         painter.circle_filled(badge_pos, 5.0, badge_color);
     }
+
+    // Attention indicator (small dot for icon size)
+    if node.needs_attention {
+        let attention_pos = ctx.pos + Vec2::new(radius * 0.7, radius * 0.7);
+        let attention_color = apply_opacity(Color32::from_rgb(239, 68, 68), ctx.opacity);
+        painter.circle_filled(attention_pos, 4.0, attention_color);
+    }
 }
 
 /// Compact: Shape + truncated name
@@ -166,9 +173,14 @@ fn render_compact(painter: &egui::Painter, node: &LayoutNode, ctx: &RenderContex
     if !node.is_cbu_root {
         render_role_badge(painter, node, rect, ctx.opacity);
     }
+
+    // Attention indicator
+    if node.needs_attention {
+        render_attention_indicator(painter, rect, ctx.opacity);
+    }
 }
 
-/// Standard: Full name + role badge
+/// Standard: Full name + role badge + KYC completion bar
 fn render_standard(painter: &egui::Painter, node: &LayoutNode, ctx: &RenderContext) {
     let rect = ctx.rect();
     let border_width = if node.is_cbu_root { 3.0 } else { 2.0 };
@@ -176,10 +188,12 @@ fn render_standard(painter: &egui::Painter, node: &LayoutNode, ctx: &RenderConte
     painter.rect_filled(rect, 8.0, ctx.fill);
     painter.rect_stroke(rect, 8.0, Stroke::new(border_width, ctx.border));
 
-    // Label
+    // Label - shift up slightly if we have a KYC bar
+    let has_kyc_bar = node.kyc_completion.is_some();
+    let label_offset = if has_kyc_bar { 0.18 } else { 0.15 };
     let font_size = (ctx.size.y * 0.18).clamp(10.0, 13.0);
     painter.text(
-        ctx.pos - Vec2::new(0.0, ctx.size.y * 0.15),
+        ctx.pos - Vec2::new(0.0, ctx.size.y * label_offset),
         egui::Align2::CENTER_CENTER,
         &node.label,
         FontId::proportional(font_size),
@@ -189,8 +203,9 @@ fn render_standard(painter: &egui::Painter, node: &LayoutNode, ctx: &RenderConte
     // Sublabel
     if let Some(ref sublabel) = node.sublabel {
         let sublabel_color = apply_opacity(Color32::from_rgb(180, 180, 180), ctx.opacity);
+        let sublabel_offset = if has_kyc_bar { 0.08 } else { 0.12 };
         painter.text(
-            ctx.pos + Vec2::new(0.0, ctx.size.y * 0.12),
+            ctx.pos + Vec2::new(0.0, ctx.size.y * sublabel_offset),
             egui::Align2::CENTER_CENTER,
             sublabel,
             FontId::proportional(font_size * 0.8),
@@ -200,6 +215,13 @@ fn render_standard(painter: &egui::Painter, node: &LayoutNode, ctx: &RenderConte
 
     if !node.is_cbu_root {
         render_role_badge(painter, node, rect, ctx.opacity);
+    }
+
+    // Entity category indicator (top-left) - only if no jurisdiction
+    if node.jurisdiction.is_none() {
+        if let Some(ref category) = node.entity_category {
+            render_entity_category_indicator(painter, rect, category, ctx.opacity);
+        }
     }
 
     // Jurisdiction (top-left)
@@ -213,19 +235,56 @@ fn render_standard(painter: &egui::Painter, node: &LayoutNode, ctx: &RenderConte
             flag_color,
         );
     }
+
+    // KYC completion bar at bottom
+    if let Some(completion) = node.kyc_completion {
+        render_kyc_completion_bar(painter, rect, completion, ctx.opacity);
+    }
+
+    // Attention indicator
+    if node.needs_attention {
+        render_attention_indicator(painter, rect, ctx.opacity);
+    }
 }
 
-/// Expanded: All details inline
+/// Expanded: All details inline including verification summary
 fn render_expanded(painter: &egui::Painter, node: &LayoutNode, ctx: &RenderContext) {
     render_standard(painter, node, ctx);
 
-    // Additional details at bottom
+    let rect = ctx.rect();
+
+    // Verification summary (top-right area, below role badge)
+    if let Some(ref summary) = node.verification_summary {
+        if summary.total_edges > 0 {
+            let summary_text = format!("{}/{} proven", summary.proven_edges, summary.total_edges);
+            let summary_color = if summary.disputed_edges > 0 {
+                apply_opacity(Color32::from_rgb(239, 68, 68), ctx.opacity) // Red
+            } else if summary.proven_edges == summary.total_edges {
+                apply_opacity(Color32::from_rgb(34, 197, 94), ctx.opacity) // Green
+            } else {
+                apply_opacity(Color32::from_rgb(251, 191, 36), ctx.opacity) // Amber
+            };
+            painter.text(
+                rect.right_top() + Vec2::new(-5.0, 20.0),
+                egui::Align2::RIGHT_TOP,
+                summary_text,
+                FontId::proportional(8.0),
+                summary_color,
+            );
+        }
+    }
+
+    // Additional roles at bottom (shift up if KYC bar present)
     if node.all_roles.len() > 1 {
-        let rect = ctx.rect();
         let roles_text = node.all_roles.join(", ");
         let roles_color = apply_opacity(Color32::from_rgb(150, 150, 150), ctx.opacity);
+        let bottom_offset = if node.kyc_completion.is_some() {
+            14.0
+        } else {
+            8.0
+        };
         painter.text(
-            rect.center_bottom() - Vec2::new(0.0, 8.0),
+            rect.center_bottom() - Vec2::new(0.0, bottom_offset),
             egui::Align2::CENTER_BOTTOM,
             truncate_name(&roles_text, 30),
             FontId::proportional(8.0),
@@ -281,6 +340,98 @@ fn render_focus_ring(painter: &egui::Painter, ctx: &RenderContext) {
         rect,
         12.0,
         Stroke::new(2.0, Color32::from_rgb(59, 130, 246)),
+    );
+}
+
+/// Render a KYC completion progress bar at the bottom of the node
+fn render_kyc_completion_bar(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    completion: i32,
+    opacity: f32,
+) {
+    let bar_height = 4.0;
+    let bar_margin = 6.0;
+    let bar_width = rect.width() - bar_margin * 2.0;
+
+    // Background track
+    let track_rect = egui::Rect::from_min_size(
+        Pos2::new(rect.left() + bar_margin, rect.bottom() - bar_height - 4.0),
+        Vec2::new(bar_width, bar_height),
+    );
+    let track_color = apply_opacity(Color32::from_rgb(55, 65, 81), opacity);
+    painter.rect_filled(track_rect, bar_height / 2.0, track_color);
+
+    // Progress fill
+    let progress = (completion as f32 / 100.0).clamp(0.0, 1.0);
+    let fill_width = bar_width * progress;
+
+    if fill_width > 0.0 {
+        let fill_rect =
+            egui::Rect::from_min_size(track_rect.min, Vec2::new(fill_width, bar_height));
+
+        // Color based on completion level
+        let fill_color = if completion >= 80 {
+            apply_opacity(Color32::from_rgb(34, 197, 94), opacity) // Green
+        } else if completion >= 50 {
+            apply_opacity(Color32::from_rgb(251, 191, 36), opacity) // Amber
+        } else {
+            apply_opacity(Color32::from_rgb(239, 68, 68), opacity) // Red
+        };
+
+        painter.rect_filled(fill_rect, bar_height / 2.0, fill_color);
+    }
+}
+
+/// Render entity category indicator (PERSON = circle, SHELL = square) at top-left
+fn render_entity_category_indicator(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    category: &str,
+    opacity: f32,
+) {
+    let indicator_size = 8.0;
+    let indicator_pos = rect.left_top() + Vec2::new(8.0, 8.0);
+
+    let color = if category == "PERSON" {
+        apply_opacity(Color32::from_rgb(96, 165, 250), opacity) // Blue for person
+    } else {
+        apply_opacity(Color32::from_rgb(168, 85, 247), opacity) // Purple for shell
+    };
+
+    if category == "PERSON" {
+        painter.circle_filled(indicator_pos, indicator_size / 2.0, color);
+    } else {
+        let indicator_rect =
+            egui::Rect::from_center_size(indicator_pos, Vec2::splat(indicator_size));
+        painter.rect_filled(indicator_rect, 2.0, color);
+    }
+}
+
+/// Render attention indicator (exclamation badge) for nodes needing action
+fn render_attention_indicator(painter: &egui::Painter, rect: egui::Rect, opacity: f32) {
+    let badge_size = 16.0;
+    let badge_pos = rect.right_top() + Vec2::new(4.0, -4.0);
+
+    // Red circle background
+    let bg_color = apply_opacity(Color32::from_rgb(239, 68, 68), opacity);
+    painter.circle_filled(badge_pos, badge_size / 2.0, bg_color);
+
+    // White border
+    painter.circle_stroke(
+        badge_pos,
+        badge_size / 2.0,
+        Stroke::new(1.5, apply_opacity(Color32::WHITE, opacity)),
+    );
+
+    // Exclamation mark
+    let text_color = apply_opacity(Color32::WHITE, opacity);
+    painter.text(
+        badge_pos,
+        egui::Align2::CENTER_CENTER,
+        "!",
+        FontId::proportional(10.0),
+        text_color,
     );
 }
 

@@ -5,4 +5,28 @@
 
 pub mod graph;
 
-pub use graph::{CbuGraphData, CbuGraphWidget, GraphEdgeData, GraphNodeData, ViewMode};
+pub use graph::{
+    entity_matches_type,
+    get_entities_for_type,
+    render_type_browser,
+    // Astronomy view (universe/solar system transitions)
+    AstronomyView,
+    // Core graph types
+    CbuGraphData,
+    CbuGraphWidget,
+    // Ontology (type hierarchy browser)
+    EntityTypeOntology,
+    GraphEdgeData,
+    GraphNodeData,
+    NavigationEntry,
+    // Animation
+    SpringConfig,
+    SpringF32,
+    SpringVec2,
+    TaxonomyState,
+    TransitionAction,
+    TypeBrowserAction,
+    TypeNode,
+    ViewMode,
+    ViewTransition,
+};

@@ -324,6 +324,43 @@ pub struct GraphNode {
     /// Server-computed Y position
     #[serde(default)]
     pub y: Option<f64>,
+
+    // =========================================================================
+    // VISUAL HINTS - computed by server, used by renderer
+    // =========================================================================
+    /// Node importance score (0.0 - 1.0) - affects rendered size
+    /// CBU = 1.0, direct children = 0.8, deeper = decreasing
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub importance: Option<f32>,
+
+    /// Depth in ownership hierarchy (0 = root CBU, 1 = direct, 2+ = chain)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hierarchy_depth: Option<i32>,
+
+    /// KYC completion percentage (0-100) - affects fill pattern
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kyc_completion: Option<i32>,
+
+    /// Verification status summary for this entity's relationships
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verification_summary: Option<VerificationSummary>,
+
+    /// Whether this node needs attention (has issues/gaps)
+    #[serde(default)]
+    pub needs_attention: bool,
+
+    /// Entity category: PERSON or SHELL
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entity_category: Option<String>,
+}
+
+/// Verification status summary for entity relationships
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct VerificationSummary {
+    pub total_edges: i32,
+    pub proven_edges: i32,
+    pub alleged_edges: i32,
+    pub disputed_edges: i32,
 }
 
 /// Edge in the CBU graph
@@ -335,6 +372,18 @@ pub struct GraphEdge {
     pub edge_type: String,
     #[serde(default)]
     pub label: Option<String>,
+
+    // =========================================================================
+    // VISUAL HINTS
+    // =========================================================================
+    /// Ownership percentage (0-100) - affects edge thickness
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub weight: Option<f32>,
+
+    /// Verification status - affects line style
+    /// Values: "proven", "alleged", "disputed", "pending"
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verification_status: Option<String>,
 }
 
 // ============================================================================

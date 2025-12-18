@@ -152,7 +152,7 @@ impl InputHandler {
                         // Shift held = resize mode
                         if let Some(node) = graph.get_node_mut(node_id) {
                             if let Some(current_size) = state.resize_start_size {
-                                let delta_world = delta / camera.zoom;
+                                let delta_world = delta / camera.zoom();
                                 let mut new_size = current_size + delta_world;
                                 let min_size = egui::vec2(80.0, 50.0);
                                 new_size.x = new_size.x.max(min_size.x);
@@ -184,7 +184,7 @@ impl InputHandler {
                 } else if let Some(ref node_id) = state.resizing_node {
                     if let Some(node) = graph.get_node_mut(node_id) {
                         if let Some(current_size) = state.resize_start_size {
-                            let delta_world = delta / camera.zoom;
+                            let delta_world = delta / camera.zoom();
                             let mut new_size = current_size + delta_world;
                             let min_size = egui::vec2(80.0, 50.0);
                             new_size.x = new_size.x.max(min_size.x);
@@ -218,15 +218,26 @@ impl InputHandler {
             state.resize_start_size = None;
         }
 
-        // Handle scroll for zooming
-        let scroll_delta = response.ctx.input(|i| i.raw_scroll_delta);
-        #[cfg(target_arch = "wasm32")]
-        if scroll_delta.y != 0.0 {
-            web_sys::console::log_1(&format!("Scroll detected: {:?}", scroll_delta).into());
-        }
-        if scroll_delta.y != 0.0 {
-            let zoom_factor = 1.0 + scroll_delta.y * 0.001;
+        // Handle scroll for zooming (cursor-centered)
+        // Use smooth_scroll_delta for trackpad, raw_scroll_delta for mouse wheel
+        let scroll_delta = response.ctx.input(|i| {
+            // Prefer smooth scrolling if available (trackpad)
+            let smooth = i.smooth_scroll_delta;
+            if smooth.y.abs() > 0.001 {
+                smooth
+            } else {
+                i.raw_scroll_delta
+            }
+        });
+
+        if scroll_delta.y.abs() > 0.001 {
+            // Zoom sensitivity: larger values = faster zoom
+            // 0.002 works well for both mouse wheel and trackpad
+            let zoom_sensitivity = 0.002;
+            let zoom_factor = 1.0 + scroll_delta.y * zoom_sensitivity;
+
             if let Some(pos) = pointer_pos {
+                // zoom_at keeps the point under cursor stable
                 camera.zoom_at(zoom_factor, pos, screen_rect);
                 needs_repaint = true;
             }
@@ -263,19 +274,21 @@ impl InputHandler {
 
             // '+' or '=' to zoom in
             if i.key_pressed(egui::Key::Plus) || i.key_pressed(egui::Key::Equals) {
-                camera.target_zoom = (camera.target_zoom * 1.2).min(10.0);
+                let new_zoom = (camera.target_zoom() * 1.2).min(10.0);
+                camera.set_target_zoom(new_zoom);
                 needs_repaint = true;
             }
 
             // '-' to zoom out
             if i.key_pressed(egui::Key::Minus) {
-                camera.target_zoom = (camera.target_zoom / 1.2).max(0.1);
+                let new_zoom = (camera.target_zoom() / 1.2).max(0.1);
+                camera.set_target_zoom(new_zoom);
                 needs_repaint = true;
             }
 
             // '0' to reset zoom to 100%
             if i.key_pressed(egui::Key::Num0) {
-                camera.target_zoom = 1.0;
+                camera.set_target_zoom(1.0);
                 needs_repaint = true;
             }
 
@@ -292,21 +305,21 @@ impl InputHandler {
             }
 
             // Arrow keys for panning
-            let pan_speed = 50.0 / camera.zoom;
+            let pan_speed = 50.0 / camera.zoom();
             if i.key_down(egui::Key::ArrowLeft) {
-                camera.target_center.x -= pan_speed;
+                camera.offset_target_center(Vec2::new(-pan_speed, 0.0));
                 needs_repaint = true;
             }
             if i.key_down(egui::Key::ArrowRight) {
-                camera.target_center.x += pan_speed;
+                camera.offset_target_center(Vec2::new(pan_speed, 0.0));
                 needs_repaint = true;
             }
             if i.key_down(egui::Key::ArrowUp) {
-                camera.target_center.y -= pan_speed;
+                camera.offset_target_center(Vec2::new(0.0, -pan_speed));
                 needs_repaint = true;
             }
             if i.key_down(egui::Key::ArrowDown) {
-                camera.target_center.y += pan_speed;
+                camera.offset_target_center(Vec2::new(0.0, pan_speed));
                 needs_repaint = true;
             }
 

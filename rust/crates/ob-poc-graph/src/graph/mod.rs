@@ -32,6 +32,8 @@
 //! graph_widget.ui(ui);
 //! ```
 
+pub mod animation;
+pub mod astronomy;
 pub mod camera;
 pub mod colors;
 pub mod edges;
@@ -39,12 +41,19 @@ pub mod focus_card;
 pub mod input;
 pub mod layout;
 pub mod lod;
+pub mod ontology;
 pub mod render;
 pub mod types;
 
+pub use animation::{SpringConfig, SpringF32, SpringVec2};
+pub use astronomy::{AstronomyView, NavigationEntry, TransitionAction, ViewTransition};
 pub use camera::Camera2D;
 pub use input::{InputHandler, InputState};
 pub use layout::LayoutEngine;
+pub use ontology::{
+    entity_matches_type, get_entities_for_type, render_type_browser, EntityTypeOntology,
+    TaxonomyState, TypeBrowserAction, TypeNode,
+};
 pub use render::GraphRenderer;
 pub use types::*;
 
@@ -269,7 +278,7 @@ impl CbuGraphWidget {
             .and_then(|s| s.parse().ok())
             .unwrap_or_default();
 
-        let engine = LayoutEngine::new(category);
+        let engine = LayoutEngine::with_view_mode(category, self.view_mode);
         self.layout_graph = Some(engine.compute_layout(raw));
     }
 
@@ -432,9 +441,7 @@ impl CbuGraphWidget {
 
     /// Check if camera is still animating
     fn camera_is_animating(&self) -> bool {
-        let center_diff = (self.camera.center - self.camera.target_center).length();
-        let zoom_diff = (self.camera.zoom - self.camera.target_zoom).abs();
-        center_diff > 0.1 || zoom_diff > 0.001
+        self.camera.is_animating()
     }
 
     /// Render empty state when no graph is loaded
@@ -471,7 +478,7 @@ impl CbuGraphWidget {
         );
 
         // Zoom level in bottom-left
-        let zoom_text = format!("Zoom: {:.0}%", self.camera.zoom * 100.0);
+        let zoom_text = format!("Zoom: {:.0}%", self.camera.zoom() * 100.0);
         painter.text(
             screen_rect.left_bottom() + Vec2::new(10.0, -30.0),
             egui::Align2::LEFT_BOTTOM,

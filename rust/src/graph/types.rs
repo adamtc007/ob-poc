@@ -71,6 +71,24 @@ pub struct GraphNode {
     /// Layout tier (0 = top, higher = lower on screen)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub layout_tier: Option<i32>,
+
+    // =========================================================================
+    // VISUAL HINT FIELDS - computed by server-side builder for rendering
+    // =========================================================================
+    /// Node importance score (0.0 - 1.0) - affects rendered size
+    /// Computed based on role priority, UBO status, connection count
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub importance: Option<f32>,
+
+    /// KYC completion percentage (0-100) for progress bar rendering
+    /// Only set for Entity nodes with KYC status
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kyc_completion: Option<i32>,
+
+    /// Verification status for edge styling
+    /// Values: "proven", "pending", "alleged", "disputed"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verification_status: Option<String>,
 }
 
 /// Types of nodes in the graph
@@ -380,6 +398,69 @@ impl CbuGraph {
                 trading_entity_ids.contains(&e.target)
             }
         });
+    }
+
+    /// Compute visual hints (importance, kyc_completion, verification_status)
+    /// Call this after all nodes and edges are added
+    pub fn compute_visual_hints(&mut self) {
+        // Build edge count map for connectivity-based importance
+        let mut edge_counts: HashMap<String, usize> = HashMap::new();
+        for edge in &self.edges {
+            *edge_counts.entry(edge.source.clone()).or_insert(0) += 1;
+            *edge_counts.entry(edge.target.clone()).or_insert(0) += 1;
+        }
+
+        // Find max edge count for normalization
+        let max_edges = edge_counts.values().max().copied().unwrap_or(1) as f32;
+
+        for node in &mut self.nodes {
+            // Compute importance based on multiple factors
+            let mut importance: f32 = 0.5; // Base importance
+
+            // Factor 1: Node type priority
+            importance += match node.node_type {
+                NodeType::Cbu => 0.5,     // Root is always important
+                NodeType::Entity => 0.3,  // Entities are key
+                NodeType::Product => 0.2, // Products matter
+                NodeType::Isda => 0.15,   // ISDA agreements
+                NodeType::Ssi => 0.1,     // SSIs
+                _ => 0.0,
+            };
+
+            // Factor 2: Role priority (for entities)
+            if let Some(priority) = node.role_priority {
+                // Higher priority (lower number) = more important
+                // Priority ranges from ~10 (ownership) to ~100 (trading)
+                let priority_boost = ((100 - priority) as f32 / 100.0) * 0.2;
+                importance += priority_boost;
+            }
+
+            // Factor 3: UBO/ownership roles boost importance
+            if node
+                .role_categories
+                .contains(&"OWNERSHIP_CONTROL".to_string())
+            {
+                importance += 0.1;
+            }
+
+            // Factor 4: Connectivity (more connections = more important)
+            if let Some(&count) = edge_counts.get(&node.id) {
+                let connectivity_boost = (count as f32 / max_edges) * 0.15;
+                importance += connectivity_boost;
+            }
+
+            // Factor 5: Status affects importance (pending/draft less important)
+            match node.status {
+                NodeStatus::Active => {} // No change
+                NodeStatus::Pending => importance -= 0.1,
+                NodeStatus::Draft => importance -= 0.15,
+                NodeStatus::Suspended => importance -= 0.2,
+                NodeStatus::Expired => importance -= 0.25,
+            }
+
+            // Clamp to 0.0 - 1.0
+            node.importance = Some(importance.clamp(0.0, 1.0));
+        }
     }
 
     /// Build layer information for UI rendering

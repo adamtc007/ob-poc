@@ -25,6 +25,8 @@ pub enum CbuSearchAction {
 pub struct CbuSearchData<'a> {
     /// Whether the modal is open
     pub open: bool,
+    /// Whether the modal just opened (for auto-focus)
+    pub just_opened: bool,
     /// Search results from server (None = not yet searched)
     pub results: Option<&'a [CbuSearchMatch]>,
     /// Whether search is in progress
@@ -37,16 +39,18 @@ pub struct CbuSearchData<'a> {
 ///
 /// Returns an action if the user interacted, None otherwise.
 /// The caller handles the action (dispatch search, select CBU, close modal).
+/// Also returns whether focus was consumed (to clear just_opened flag).
 pub fn cbu_search_modal(
     ctx: &egui::Context,
     query_buffer: &mut String,
     data: &CbuSearchData<'_>,
-) -> Option<CbuSearchAction> {
+) -> (Option<CbuSearchAction>, bool) {
     if !data.open {
-        return None;
+        return (None, false);
     }
 
     let mut action: Option<CbuSearchAction> = None;
+    let mut focus_consumed = false;
 
     egui::Window::new("Search CBU")
         .collapsible(false)
@@ -54,19 +58,23 @@ pub fn cbu_search_modal(
         .default_size(Vec2::new(400.0, 350.0))
         .anchor(Align2::CENTER_CENTER, Vec2::ZERO)
         .show(ctx, |ui| {
-            action = render_modal_content(ui, query_buffer, data);
+            let (a, fc) = render_modal_content(ui, query_buffer, data);
+            action = a;
+            focus_consumed = fc;
         });
 
-    action
+    (action, focus_consumed)
 }
 
 /// Render the modal content
+/// Returns (action, focus_consumed)
 fn render_modal_content(
     ui: &mut Ui,
     query_buffer: &mut String,
     data: &CbuSearchData<'_>,
-) -> Option<CbuSearchAction> {
+) -> (Option<CbuSearchAction>, bool) {
     let mut action: Option<CbuSearchAction> = None;
+    let mut focus_consumed = false;
 
     // Search input row
     ui.horizontal(|ui| {
@@ -75,6 +83,12 @@ fn render_modal_content(
             .desired_width(280.0)
             .hint_text("Type CBU name...")
             .show(ui);
+
+        // Auto-focus when modal just opened
+        if data.just_opened {
+            response.response.request_focus();
+            focus_consumed = true;
+        }
 
         if response.response.changed() && query_buffer.len() >= 2 {
             action = Some(CbuSearchAction::Search {
@@ -139,7 +153,7 @@ fn render_modal_content(
         });
     });
 
-    action
+    (action, focus_consumed)
 }
 
 /// Render a single match row

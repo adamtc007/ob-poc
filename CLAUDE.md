@@ -619,6 +619,57 @@ The UI uses a **hybrid architecture**: HTML/TypeScript panels for text content, 
 | ubo | entity (UBO-specific) | Ownership chains, control relationships |
 | services | product, service, resource | Products → Services → Resource instances |
 
+### Graph Visualization Modules
+
+The graph visualization (`rust/crates/ob-poc-graph/`) includes several specialized modules:
+
+| Module | File | Description |
+|--------|------|-------------|
+| `animation` | `animation.rs` | Spring physics (SpringF32, SpringVec2) for smooth 60fps transitions |
+| `astronomy` | `astronomy.rs` | Universe ↔ Solar System view transitions with fade animations |
+| `ontology` | `ontology.rs` | Entity type hierarchy browser with expand/collapse |
+| `camera` | `camera.rs` | Camera2D with animated fly_to/zoom_to methods |
+| `input` | `input.rs` | Mouse/keyboard input handling, scroll-to-zoom |
+| `lod` | `lod.rs` | Level of detail rendering based on zoom level |
+
+### Entity Type Ontology Browser
+
+The `ontology` module provides a hierarchical view of entity types with counts:
+
+```
+ENTITY (root)
+├── SHELL (Legal Vehicles)
+│   ├── LIMITED_COMPANY, FUND, TRUST, PARTNERSHIP, LLC
+├── PERSON (Natural Persons)
+│   ├── PROPER_PERSON, UBO, CONTROL_PERSON
+└── SERVICE_LAYER (Services)
+    ├── PRODUCT, SERVICE, RESOURCE
+```
+
+**Key Types:**
+
+| Type | Description |
+|------|-------------|
+| `EntityTypeOntology` | Complete type hierarchy with root `TypeNode` |
+| `TypeNode` | Tree node with type_code, label, children, matching_entities, total_count |
+| `TaxonomyState` | Expand/collapse state with spring animations |
+| `TypeBrowserAction` | Actions: ToggleExpand, SelectType, FilterToType, ExpandAll, CollapseAll |
+
+**Usage:**
+```rust
+// Create ontology and populate from graph
+let mut ontology = EntityTypeOntology::new();
+ontology.populate_counts(&layout_graph);
+
+// Render browser (returns action, EGUI-RULES compliant)
+let action = render_type_browser(ui, &ontology, &taxonomy_state, max_height);
+match action {
+    TypeBrowserAction::SelectType { type_code } => { /* highlight entities */ }
+    TypeBrowserAction::FilterToType { type_code } => { /* filter view */ }
+    _ => {}
+}
+```
+
 ## egui State Management & Best Practices
 
 > **⛔ TL;DR:** Read `/EGUI-RULES.md` for the 5 non-negotiable rules in a short checklist format. This section explains the WHY. EGUI-RULES.md is the quick reference WHAT.

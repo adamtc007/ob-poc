@@ -4,7 +4,7 @@
 //! Uses LOD system for performance and bezier curves for edges.
 
 use super::camera::Camera2D;
-use super::colors::edge_color;
+use super::colors::{edge_color, edge_width_for_weight, verification_edge_style};
 use super::edges::{
     curve_strength_for_edge, parallel_edge_offset, render_arrow_head, render_bezier_edge,
     render_edge_label, should_show_edge_label, EdgeCurve,
@@ -102,7 +102,7 @@ impl GraphRenderer {
     ) {
         // Transform to screen coordinates
         let screen_pos = camera.world_to_screen(node.position, screen_rect);
-        let screen_size = node.size * camera.zoom;
+        let screen_size = node.size * camera.zoom();
 
         // Check if visible
         let node_rect = Rect::from_center_size(screen_pos, screen_size);
@@ -187,6 +187,7 @@ impl GraphRenderer {
     }
 
     /// Render a single edge with offset for parallel edges
+    #[allow(clippy::too_many_arguments)]
     fn render_edge_with_offset(
         &self,
         painter: &egui::Painter,
@@ -210,14 +211,25 @@ impl GraphRenderer {
         let target_pos = camera.world_to_screen(target_node.position, screen_rect);
 
         // Calculate edge attachment points (bottom of source, top of target)
-        let source_bottom = source_pos + Vec2::new(0.0, source_node.size.y * camera.zoom / 2.0);
-        let target_top = target_pos - Vec2::new(0.0, target_node.size.y * camera.zoom / 2.0);
+        let source_bottom = source_pos + Vec2::new(0.0, source_node.size.y * camera.zoom() / 2.0);
+        let target_top = target_pos - Vec2::new(0.0, target_node.size.y * camera.zoom() / 2.0);
 
         // Apply focus opacity
         let opacity = if in_focus { 1.0 } else { self.blur_opacity };
-        let base_color = edge_color(edge.edge_type);
+
+        // Determine edge styling based on verification status (if present) or edge type
+        let (base_color, is_dashed) =
+            if let Some(ver_style) = verification_edge_style(edge.verification_status.as_deref()) {
+                (ver_style.color, ver_style.dashed)
+            } else {
+                (edge_color(edge.edge_type), edge.style.dashed)
+            };
+
         let color = apply_opacity(base_color, opacity);
-        let width = edge.style.width * camera.zoom;
+
+        // Apply weight-based width multiplier (for ownership percentage)
+        let weight_multiplier = edge_width_for_weight(edge.weight);
+        let width = edge.style.width * camera.zoom() * weight_multiplier;
 
         if self.use_bezier_edges {
             // Use bezier curves with offset for parallel edges
@@ -226,25 +238,20 @@ impl GraphRenderer {
             let curve = EdgeCurve::new(source_bottom, target_top, curve_strength);
 
             // Render curve
-            render_bezier_edge(
-                painter,
-                &curve,
-                Stroke::new(width, color),
-                edge.style.dashed,
-            );
+            render_bezier_edge(painter, &curve, Stroke::new(width, color), is_dashed);
 
             // Render arrow at end
             let direction = curve.end_direction();
-            render_arrow_head(painter, target_top, direction, camera.zoom, color);
+            render_arrow_head(painter, target_top, direction, camera.zoom(), color);
 
             // Render label if present
-            if should_show_edge_label(edge.label.is_some(), camera.zoom) {
+            if should_show_edge_label(edge.label.is_some(), camera.zoom()) {
                 if let Some(ref label) = edge.label {
                     render_edge_label(
                         painter,
                         curve.midpoint(),
                         label,
-                        camera.zoom,
+                        camera.zoom(),
                         Color32::WHITE,
                         apply_opacity(Color32::from_rgb(80, 80, 80), opacity),
                     );
@@ -252,7 +259,7 @@ impl GraphRenderer {
             }
         } else {
             // Legacy straight line rendering
-            if edge.style.dashed {
+            if is_dashed {
                 self.draw_dashed_line(painter, source_bottom, target_top, color, width);
             } else {
                 painter.line_segment([source_bottom, target_top], Stroke::new(width, color));
@@ -260,7 +267,7 @@ impl GraphRenderer {
 
             // Draw arrow at target
             let direction = (target_top - source_bottom).normalized();
-            render_arrow_head(painter, target_top, direction, camera.zoom, color);
+            render_arrow_head(painter, target_top, direction, camera.zoom(), color);
 
             // Draw label if present
             if let Some(ref label) = edge.label {
@@ -270,10 +277,10 @@ impl GraphRenderer {
                 );
                 let label_color = apply_opacity(Color32::from_rgb(180, 180, 180), opacity);
                 painter.text(
-                    mid + Vec2::new(8.0 * camera.zoom, 0.0),
+                    mid + Vec2::new(8.0 * camera.zoom(), 0.0),
                     egui::Align2::LEFT_CENTER,
                     label,
-                    FontId::proportional(9.0 * camera.zoom),
+                    FontId::proportional(9.0 * camera.zoom()),
                     label_color,
                 );
             }
@@ -314,7 +321,7 @@ impl GraphRenderer {
         screen_rect: Rect,
     ) {
         let screen_pos = camera.world_to_screen(group.position, screen_rect);
-        let size = Vec2::new(140.0, 50.0) * camera.zoom;
+        let size = Vec2::new(140.0, 50.0) * camera.zoom();
         let rect = Rect::from_center_size(screen_pos, size);
 
         if !screen_rect.intersects(rect) {
@@ -324,10 +331,14 @@ impl GraphRenderer {
         // Draw collapsed group box
         let fill = Color32::from_rgb(55, 48, 23);
         let border = Color32::from_rgb(161, 98, 7);
-        let corner_radius = CORNER_RADIUS * camera.zoom;
+        let corner_radius = CORNER_RADIUS * camera.zoom();
 
         painter.rect_filled(rect, corner_radius, fill);
-        painter.rect_stroke(rect, corner_radius, Stroke::new(2.0 * camera.zoom, border));
+        painter.rect_stroke(
+            rect,
+            corner_radius,
+            Stroke::new(2.0 * camera.zoom(), border),
+        );
 
         // Draw investor count
         let text = format!("{} Investors", group.investor_count);
@@ -335,18 +346,18 @@ impl GraphRenderer {
             screen_pos,
             egui::Align2::CENTER_CENTER,
             text,
-            FontId::proportional(11.0 * camera.zoom),
+            FontId::proportional(11.0 * camera.zoom()),
             Color32::WHITE,
         );
 
         // Draw expand hint if zoomed in enough
-        if camera.zoom > 0.7 {
-            let hint_pos = Pos2::new(rect.right() - 8.0 * camera.zoom, rect.center().y);
+        if camera.zoom() > 0.7 {
+            let hint_pos = Pos2::new(rect.right() - 8.0 * camera.zoom(), rect.center().y);
             painter.text(
                 hint_pos,
                 egui::Align2::RIGHT_CENTER,
                 "+",
-                FontId::proportional(14.0 * camera.zoom),
+                FontId::proportional(14.0 * camera.zoom()),
                 Color32::from_rgb(200, 200, 200),
             );
         }

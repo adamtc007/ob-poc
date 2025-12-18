@@ -275,6 +275,42 @@ pub struct GraphNodeData {
     /// Server-computed y position (optional, client may recompute)
     #[serde(default)]
     pub y: Option<f64>,
+
+    // =========================================================================
+    // VISUAL HINTS - from server
+    // =========================================================================
+    /// Node importance score (0.0 - 1.0) - affects rendered size
+    #[serde(default)]
+    pub importance: Option<f32>,
+
+    /// Depth in ownership hierarchy
+    #[serde(default)]
+    pub hierarchy_depth: Option<i32>,
+
+    /// KYC completion percentage (0-100)
+    #[serde(default)]
+    pub kyc_completion: Option<i32>,
+
+    /// Verification summary
+    #[serde(default)]
+    pub verification_summary: Option<VerificationSummary>,
+
+    /// Whether this node needs attention
+    #[serde(default)]
+    pub needs_attention: bool,
+
+    /// Entity category: PERSON or SHELL
+    #[serde(default)]
+    pub entity_category: Option<String>,
+}
+
+/// Verification status summary for entity relationships
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct VerificationSummary {
+    pub total_edges: i32,
+    pub proven_edges: i32,
+    pub alleged_edges: i32,
+    pub disputed_edges: i32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -284,6 +320,17 @@ pub struct GraphEdgeData {
     pub target: String,
     pub edge_type: String,
     pub label: Option<String>,
+
+    // =========================================================================
+    // VISUAL HINTS
+    // =========================================================================
+    /// Ownership percentage (0-100) - affects edge thickness
+    #[serde(default)]
+    pub weight: Option<f32>,
+
+    /// Verification status - affects line style
+    #[serde(default)]
+    pub verification_status: Option<String>,
 }
 
 // =============================================================================
@@ -319,6 +366,27 @@ pub struct LayoutNode {
     pub is_cbu_root: bool,
     /// Visual style
     pub style: NodeStyle,
+
+    // =========================================================================
+    // VISUAL HINTS - from server, used for enhanced rendering
+    // =========================================================================
+    /// Node importance score (0.0 - 1.0) - affects rendered size
+    pub importance: f32,
+
+    /// Depth in ownership hierarchy (0 = root, 1+ = chain depth)
+    pub hierarchy_depth: i32,
+
+    /// KYC completion percentage (0-100) - affects fill pattern
+    pub kyc_completion: Option<i32>,
+
+    /// Verification summary for entity relationships
+    pub verification_summary: Option<VerificationSummary>,
+
+    /// Whether this node needs attention (has issues/gaps)
+    pub needs_attention: bool,
+
+    /// Entity category: "PERSON" or "SHELL"
+    pub entity_category: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -355,6 +423,16 @@ pub struct LayoutEdge {
     pub in_focus: bool,
     /// Visual style
     pub style: EdgeStyle,
+
+    // =========================================================================
+    // VISUAL HINTS
+    // =========================================================================
+    /// Ownership percentage (0-100) - affects edge thickness
+    pub weight: Option<f32>,
+
+    /// Verification status - affects line style
+    /// Values: "proven", "alleged", "disputed", "pending"
+    pub verification_status: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -593,6 +671,18 @@ impl From<ob_poc_types::GraphNode> for GraphNodeData {
             data: node.data.unwrap_or_default(),
             x: node.x,
             y: node.y,
+            // Visual hints
+            importance: node.importance,
+            hierarchy_depth: node.hierarchy_depth,
+            kyc_completion: node.kyc_completion,
+            verification_summary: node.verification_summary.map(|v| VerificationSummary {
+                total_edges: v.total_edges,
+                proven_edges: v.proven_edges,
+                alleged_edges: v.alleged_edges,
+                disputed_edges: v.disputed_edges,
+            }),
+            needs_attention: node.needs_attention,
+            entity_category: node.entity_category,
         }
     }
 }
@@ -605,6 +695,9 @@ impl From<ob_poc_types::GraphEdge> for GraphEdgeData {
             target: edge.target,
             edge_type: edge.edge_type,
             label: edge.label,
+            // Visual hints
+            weight: edge.weight,
+            verification_status: edge.verification_status,
         }
     }
 }

@@ -90,10 +90,10 @@ pub fn toolbar(ui: &mut Ui, data: &ToolbarData) -> ToolbarAction {
             action.change_layout = Some(LayoutMode::EditorFocus);
         }
         if ui
-            .selectable_label(data.layout == LayoutMode::GraphFocus, "Graph")
+            .selectable_label(data.layout == LayoutMode::GraphFullSize, "Graph")
             .clicked()
         {
-            action.change_layout = Some(LayoutMode::GraphFocus);
+            action.change_layout = Some(LayoutMode::GraphFullSize);
         }
 
         // Spacer - push remaining items to the right

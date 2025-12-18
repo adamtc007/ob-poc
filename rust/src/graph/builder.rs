@@ -141,8 +141,9 @@ impl CbuGraphBuilder {
             self.load_services_layer(&mut graph, repo).await?;
         }
 
-        // Compute final stats
+        // Compute final stats and visual hints
         graph.compute_stats();
+        graph.compute_visual_hints();
         graph.build_layer_info();
 
         Ok(graph)
@@ -575,8 +576,24 @@ impl CbuGraphBuilder {
         // Load entity KYC statuses for this CBU
         let statuses = repo.get_kyc_statuses(self.cbu_id).await?;
 
+        // Track entity KYC completions for updating entity nodes
+        let mut entity_kyc_completions: std::collections::HashMap<String, i32> =
+            std::collections::HashMap::new();
+
         for ks in statuses {
             let status_id = format!("kyc-status-{}", ks.status_id);
+            let entity_id_str = ks.entity_id.to_string();
+
+            // Map KYC status to completion percentage
+            let completion = match ks.kyc_status.as_deref() {
+                Some("APPROVED") => 100,
+                Some("PENDING_REVIEW") => 80,
+                Some("IN_PROGRESS") => 50,
+                Some("NOT_STARTED") => 0,
+                Some("REJECTED") | Some("EXPIRED") => 100, // Complete but failed
+                _ => 0,
+            };
+            entity_kyc_completions.insert(entity_id_str.clone(), completion);
 
             graph.add_node(GraphNode {
                 id: status_id.clone(),
@@ -607,6 +624,15 @@ impl CbuGraphBuilder {
                 edge_type: EdgeType::Validates,
                 label: None,
             });
+        }
+
+        // Update entity nodes with KYC completion
+        for node in &mut graph.nodes {
+            if node.node_type == NodeType::Entity {
+                if let Some(&completion) = entity_kyc_completions.get(&node.id) {
+                    node.kyc_completion = Some(completion);
+                }
+            }
         }
 
         // Load document requirements from investigations linked to this CBU
@@ -724,6 +750,7 @@ impl CbuGraphBuilder {
                         _ => NodeStatus::Draft, // alleged
                     },
                     entity_category: edge.from_category.clone(),
+                    verification_status: Some(edge.status.clone()),
                     data: serde_json::json!({
                         "entity_type": edge.from_type_code,
                         "entity_category": edge.from_category

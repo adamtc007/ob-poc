@@ -204,8 +204,9 @@ impl Default for PanelState {
 pub enum LayoutMode {
     #[default]
     FourPanel, // 2x2 grid
-    EditorFocus, // Large DSL editor + small panels
-    GraphFocus,  // Large graph + small panels
+    EditorFocus,   // Large DSL editor + small panels
+    GraphFocus,    // Large graph + small panels
+    GraphFullSize, // Graph only, full window
 }
 
 // =============================================================================
@@ -234,6 +235,8 @@ pub struct ResolutionPanelUi {
 pub struct CbuSearchUi {
     /// Whether the search modal is open
     pub open: bool,
+    /// Whether the modal just opened (for auto-focus)
+    pub just_opened: bool,
     /// Current search query
     pub query: String,
     /// Search results (from EntityGateway fuzzy search)
