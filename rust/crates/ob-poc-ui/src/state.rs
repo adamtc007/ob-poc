@@ -12,6 +12,8 @@
 //! - Callbacks for widget events (use return values)
 //! - Caching entities locally
 
+use crate::panels::ContainerBrowseState;
+use crate::tokens::TokenRegistry;
 use ob_poc_graph::{CbuGraphData, CbuGraphWidget, ViewMode};
 use ob_poc_types::{
     CbuSummary, ExecuteResponse, ResolutionSearchResponse, ResolutionSessionResponse,
@@ -103,6 +105,12 @@ pub struct AppState {
     /// CBU search modal UI state
     pub cbu_search_ui: CbuSearchUi,
 
+    /// Container browse panel state (slide-in panel for browsing container contents)
+    pub container_browse: ContainerBrowseState,
+
+    /// Token registry for visual configuration (loaded from YAML)
+    pub token_registry: TokenRegistry,
+
     /// Graph widget (owns camera, input state - rendering only)
     pub graph_widget: CbuGraphWidget,
 
@@ -136,6 +144,13 @@ impl Default for AppState {
             selected_entity_id: None,
             resolution_ui: ResolutionPanelUi::default(),
             cbu_search_ui: CbuSearchUi::default(),
+            container_browse: ContainerBrowseState::default(),
+            token_registry: TokenRegistry::load_defaults().unwrap_or_else(|e| {
+                web_sys::console::warn_1(
+                    &format!("Failed to load token config: {}, using defaults", e).into(),
+                );
+                TokenRegistry::new()
+            }),
             graph_widget: CbuGraphWidget::new(),
 
             // Async coordination

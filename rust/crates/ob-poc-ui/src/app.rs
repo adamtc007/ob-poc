@@ -7,9 +7,9 @@
 
 use crate::api;
 use crate::panels::{
-    ast_panel, cbu_search_modal, chat_panel, dsl_editor_panel, entity_detail_panel, repl_panel,
-    results_panel, toolbar, CbuSearchAction, CbuSearchData, DslEditorAction, ToolbarAction,
-    ToolbarData,
+    ast_panel, cbu_search_modal, chat_panel, container_browse_panel, dsl_editor_panel,
+    entity_detail_panel, repl_panel, results_panel, toolbar, CbuSearchAction, CbuSearchData,
+    ContainerBrowseAction, ContainerBrowseData, DslEditorAction, ToolbarAction, ToolbarData,
 };
 use crate::state::{AppState, AsyncState, CbuSearchUi, LayoutMode, PanelState, TextBuffers};
 use ob_poc_graph::{CbuGraphWidget, ViewMode};
@@ -43,6 +43,11 @@ impl App {
             selected_entity_id: None,
             resolution_ui: crate::state::ResolutionPanelUi::default(),
             cbu_search_ui: CbuSearchUi::default(),
+            container_browse: crate::panels::ContainerBrowseState::default(),
+            token_registry: crate::tokens::TokenRegistry::load_defaults().unwrap_or_else(|e| {
+                web_sys::console::warn_1(&format!("Failed to load token config: {}", e).into());
+                crate::tokens::TokenRegistry::new()
+            }),
             graph_widget: CbuGraphWidget::new(),
             async_state: Arc::new(Mutex::new(AsyncState::default())),
             ctx: Some(cc.egui_ctx.clone()),
@@ -202,6 +207,24 @@ impl eframe::App for App {
             self.state.selected_entity_id = Some(entity_id);
         }
 
+        // Handle container double-click -> open browse panel
+        if let Some(container_info) = self.state.graph_widget.take_container_action() {
+            web_sys::console::log_1(
+                &format!(
+                    "Container double-clicked: {} ({})",
+                    container_info.label, container_info.container_type
+                )
+                .into(),
+            );
+            self.state.container_browse.open_container(
+                container_info.container_id,
+                container_info.container_type,
+                container_info.label,
+                container_info.parent_key,
+                container_info.browse_nickname,
+            );
+        }
+
         // =================================================================
         // STEP 3: Extract data for rendering (Rule 3: short lock, then render)
         // =================================================================
@@ -272,6 +295,48 @@ impl eframe::App for App {
         // =================================================================
         self.handle_toolbar_action(toolbar_action);
         self.handle_cbu_search_action(cbu_search_action);
+
+        // Container browse panel (side panel, rendered before central)
+        // Extract owned copies to avoid borrow conflicts
+        let container_browse_action = if self.state.container_browse.open {
+            let cb = &self.state.container_browse;
+            let container_id = cb.container_id.clone();
+            let container_type = cb.container_type.clone();
+            let container_label = cb.container_label.clone();
+            let browse_nickname = cb.browse_nickname.clone();
+            let parent_key = cb.parent_key.clone();
+            let active_filters = cb.active_filters.clone();
+            let offset = cb.offset;
+            let limit = cb.limit;
+            let selected_idx = cb.selected_idx;
+
+            let container_browse_data = ContainerBrowseData {
+                open: true,
+                container_id: container_id.as_deref(),
+                container_type: container_type.as_deref(),
+                container_label: container_label.as_deref(),
+                browse_nickname: browse_nickname.as_deref(),
+                parent_key: parent_key.as_deref(),
+                active_filters: &active_filters,
+                available_facets: &[], // TODO: populate from server
+                offset,
+                limit,
+                total_count: 0, // TODO: populate from server
+                items: &[],     // TODO: populate from server
+                loading: false, // TODO: track loading state
+                error: None,
+                selected_idx,
+            };
+
+            container_browse_panel(
+                ctx,
+                &mut self.state.container_browse,
+                &container_browse_data,
+            )
+        } else {
+            None
+        };
+        self.handle_container_browse_action(container_browse_action);
 
         // Main content area
         egui::CentralPanel::default().show(ctx, |ui| match self.state.panels.layout {
@@ -356,6 +421,44 @@ impl App {
             }
             DslEditorAction::Execute => {
                 self.state.execute_dsl();
+            }
+        }
+    }
+
+    /// Handle container browse panel actions
+    fn handle_container_browse_action(&mut self, action: Option<ContainerBrowseAction>) {
+        let Some(action) = action else { return };
+
+        match action {
+            ContainerBrowseAction::Close => {
+                self.state.container_browse.close();
+            }
+            ContainerBrowseAction::Search {
+                query: _,
+                filters: _,
+                offset: _,
+                limit: _,
+            } => {
+                // TODO: Trigger search via EntityGateway
+                web_sys::console::log_1(
+                    &"ContainerBrowse: Search action (not yet implemented)".into(),
+                );
+            }
+            ContainerBrowseAction::PageChange { offset } => {
+                self.state.container_browse.offset = offset;
+                // TODO: Trigger refetch
+            }
+            ContainerBrowseAction::SelectItem { id } => {
+                web_sys::console::log_1(&format!("ContainerBrowse: Selected item {}", id).into());
+                // TODO: Highlight in graph or show detail
+            }
+            ContainerBrowseAction::OpenItem { id } => {
+                web_sys::console::log_1(&format!("ContainerBrowse: Open item {}", id).into());
+                // TODO: Navigate to entity detail
+            }
+            ContainerBrowseAction::FilterChange { field, value } => {
+                self.state.container_browse.set_filter(field, value);
+                // TODO: Trigger refetch
             }
         }
     }

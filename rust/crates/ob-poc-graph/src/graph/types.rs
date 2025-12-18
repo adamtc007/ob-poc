@@ -302,6 +302,29 @@ pub struct GraphNodeData {
     /// Entity category: PERSON or SHELL
     #[serde(default)]
     pub entity_category: Option<String>,
+
+    // =========================================================================
+    // CONTAINER FIELDS - for nodes that contain browseable children
+    // =========================================================================
+    /// Whether this node is a container (can be double-clicked to browse)
+    #[serde(default)]
+    pub is_container: bool,
+
+    /// Type of items this container holds (e.g., "investor_holding", "resource_instance")
+    #[serde(default)]
+    pub contains_type: Option<String>,
+
+    /// Number of child items (for badge display)
+    #[serde(default)]
+    pub child_count: Option<i64>,
+
+    /// EntityGateway nickname for searching children
+    #[serde(default)]
+    pub browse_nickname: Option<String>,
+
+    /// Parent key for scoped queries (e.g., cbu_id)
+    #[serde(default)]
+    pub parent_key: Option<String>,
 }
 
 /// Verification status summary for entity relationships
@@ -387,6 +410,24 @@ pub struct LayoutNode {
 
     /// Entity category: "PERSON" or "SHELL"
     pub entity_category: Option<String>,
+
+    // =========================================================================
+    // CONTAINER FIELDS - for nodes that contain browseable children
+    // =========================================================================
+    /// Whether this node is a container (can be double-clicked to browse)
+    pub is_container: bool,
+
+    /// Type of items this container holds (e.g., "investor_holding", "resource_instance")
+    pub contains_type: Option<String>,
+
+    /// Number of child items (for badge display)
+    pub child_count: Option<i64>,
+
+    /// EntityGateway nickname for searching children
+    pub browse_nickname: Option<String>,
+
+    /// Parent key for scoped queries (e.g., cbu_id)
+    pub parent_key: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -683,6 +724,12 @@ impl From<ob_poc_types::GraphNode> for GraphNodeData {
             }),
             needs_attention: node.needs_attention,
             entity_category: node.entity_category,
+            // Container fields
+            is_container: node.is_container,
+            contains_type: node.contains_type,
+            child_count: node.child_count,
+            browse_nickname: node.browse_nickname,
+            parent_key: node.parent_key,
         }
     }
 }

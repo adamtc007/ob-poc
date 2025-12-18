@@ -13,6 +13,7 @@ mod api;
 mod app;
 mod panels;
 pub mod state;
+pub mod tokens;
 mod widgets;
 
 pub use app::App;

@@ -89,6 +89,34 @@ pub struct GraphNode {
     /// Values: "proven", "pending", "alleged", "disputed"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verification_status: Option<String>,
+
+    // =========================================================================
+    // CONTAINER FIELDS - for nodes that contain browseable children
+    // =========================================================================
+    /// Is this node a container with browseable contents?
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub is_container: bool,
+
+    /// Entity type of children (e.g., "investor_holding", "service_resource")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contains_type: Option<String>,
+
+    /// Number of children (for badge display)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub child_count: Option<i64>,
+
+    /// EntityGateway nickname for browsing children
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub browse_nickname: Option<String>,
+
+    /// Parent key field name for scoped queries
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_key: Option<String>,
+}
+
+/// Helper for serde skip_serializing_if
+fn is_false(b: &bool) -> bool {
+    !*b
 }
 
 /// Types of nodes in the graph
@@ -121,6 +149,14 @@ pub enum NodeType {
     Product,
     Service,
     Resource,
+
+    // Container types (browseable via slide-in panel)
+    ShareClass,      // Contains investor holdings
+    ServiceInstance, // Contains resource instances
+
+    // Container item types (for detail views)
+    InvestorHolding,
+    ServiceResource,
 }
 
 /// Layer categories for organizing nodes

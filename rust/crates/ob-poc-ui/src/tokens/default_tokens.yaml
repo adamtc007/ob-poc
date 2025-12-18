@@ -1,0 +1,460 @@
+# Token Type Definitions
+# ======================
+# Defines visual appearance and behavior for each entity type.
+# This is the 2D/egui version - no 3D attributes.
+
+version: "1.0"
+
+# Aliases: map multiple entity types to one token definition
+aliases:
+  entity:
+    - proper_person
+    - limited_company
+    - partnership
+    - trust
+  investor:
+    - investor_holding
+    - shareholder
+
+tokens:
+  # ===========================================================================
+  # CBU - Client Business Unit
+  # ===========================================================================
+  - type_id: cbu
+    label: "CBU"
+    category: container
+    is_container: false
+
+    visual:
+      icon:
+        glyph: "🏢"
+        icon_name: "building"
+        fallback: "C"
+      base_color: [64, 156, 255, 255]
+      highlight_color: [100, 180, 255, 255]
+      status_colors:
+        ACTIVE: [77, 204, 102, 255]
+        DRAFT: [180, 180, 180, 255]
+        PENDING: [230, 179, 51, 255]
+        SUSPENDED: [230, 77, 77, 255]
+      base_size: 48.0
+
+    interactions:
+      on_hover:
+        tooltip:
+          template: "{name}\n{jurisdiction} | {status}"
+      on_click: select
+      on_double_click: open_detail
+      context_actions:
+        - action_id: view_graph
+          label: "View Graph"
+          icon: "git-branch"
+        - action_id: view_documents
+          label: "Documents"
+          icon: "folder"
+        - action_id: view_kyc
+          label: "KYC Status"
+          icon: "shield"
+
+    detail_template:
+      sections:
+        - title: "Overview"
+          fields:
+            - key: name
+              label: "Name"
+              format: text
+            - key: jurisdiction
+              label: "Jurisdiction"
+              format: text
+            - key: client_type
+              label: "Type"
+              format: text
+            - key: status
+              label: "Status"
+              format: status_badge
+      actions:
+        - action_id: edit
+          label: "Edit"
+          style: primary
+        - action_id: view_full
+          label: "Full Profile"
+          style: secondary
+
+  # ===========================================================================
+  # SHARE CLASS - Container for investors
+  # ===========================================================================
+  - type_id: share_class
+    label: "Share Class"
+    category: container
+    is_container: true
+    browse_nickname: "investor_holding"
+
+    visual:
+      icon:
+        glyph: "📊"
+        icon_name: "bar-chart"
+        fallback: "SC"
+      base_color: [77, 179, 128, 255]
+      highlight_color: [102, 204, 153, 255]
+      status_colors:
+        ACTIVE: [77, 204, 102, 255]
+        SOFT_CLOSED: [230, 179, 51, 255]
+        HARD_CLOSED: [230, 77, 77, 255]
+      base_size: 40.0
+
+    interactions:
+      on_hover:
+        tooltip:
+          template: "{share_class_code} ({currency})\n{investor_count} investors | {total_aum}"
+      on_click: select
+      on_double_click: open_container
+      context_actions:
+        - action_id: browse_investors
+          label: "Browse Investors"
+          icon: "users"
+        - action_id: view_summary
+          label: "View Summary"
+          icon: "pie-chart"
+
+    detail_template:
+      sections:
+        - title: "Share Class"
+          fields:
+            - key: share_class_code
+              label: "Code"
+              format: text
+            - key: share_class_name
+              label: "Name"
+              format: text
+            - key: currency
+              label: "Currency"
+              format: text
+            - key: status
+              label: "Status"
+              format: status_badge
+        - title: "Statistics"
+          fields:
+            - key: investor_count
+              label: "Investors"
+              format:
+                number:
+                  decimals: 0
+            - key: total_aum
+              label: "Total AUM"
+              format:
+                currency:
+                  symbol: "$"
+
+  # ===========================================================================
+  # INVESTOR HOLDING - Container item
+  # ===========================================================================
+  - type_id: investor_holding
+    label: "Investor"
+    category: container_item
+
+    visual:
+      icon:
+        glyph: "👤"
+        icon_name: "user"
+        fallback: "I"
+      base_color: [102, 153, 230, 255]
+      highlight_color: [128, 179, 255, 255]
+      status_colors:
+        VERIFIED: [77, 204, 102, 255]
+        PENDING: [230, 179, 51, 255]
+        IN_PROGRESS: [102, 179, 230, 255]
+        EXPIRED: [180, 180, 180, 255]
+        BLOCKED: [230, 77, 77, 255]
+      base_size: 32.0
+
+    interactions:
+      on_hover:
+        tooltip:
+          template: "{investor_name}\n{jurisdiction} | {investor_type}\n{holding_value} ({percentage}%)"
+      on_click: select
+      on_double_click: open_detail
+      context_actions:
+        - action_id: view_entity
+          label: "View Entity"
+          icon: "user"
+        - action_id: view_documents
+          label: "Documents"
+          icon: "folder"
+        - action_id: view_kyc
+          label: "KYC History"
+          icon: "shield"
+
+    detail_template:
+      sections:
+        - title: "Holding"
+          fields:
+            - key: holding_value
+              label: "Value"
+              format:
+                currency:
+                  symbol: "$"
+            - key: units
+              label: "Units"
+              format:
+                number:
+                  decimals: 2
+            - key: percentage
+              label: "% of Class"
+              format:
+                percent:
+                  decimals: 2
+            - key: acquisition_date
+              label: "Acquired"
+              format:
+                date:
+                  format: "%Y-%m-%d"
+        - title: "Investor"
+          collapsed: true
+          fields:
+            - key: investor_name
+              label: "Name"
+              format: text
+            - key: investor_type
+              label: "Type"
+              format: text
+            - key: jurisdiction
+              label: "Jurisdiction"
+              format: text
+            - key: kyc_status
+              label: "KYC Status"
+              format: status_badge
+      actions:
+        - action_id: view_entity
+          label: "View Entity"
+          style: primary
+
+  # ===========================================================================
+  # ENTITY - Legal/Natural persons
+  # ===========================================================================
+  - type_id: entity
+    label: "Entity"
+    category: entity
+
+    visual:
+      icon:
+        glyph: "🏛️"
+        icon_name: "landmark"
+        fallback: "E"
+      base_color: [128, 128, 179, 255]
+      highlight_color: [153, 153, 204, 255]
+      status_colors:
+        ACTIVE: [77, 204, 102, 255]
+        INACTIVE: [180, 180, 180, 255]
+      base_size: 36.0
+
+    interactions:
+      on_hover:
+        tooltip:
+          template: "{name}\n{entity_type} | {jurisdiction}"
+      on_click: select
+      on_double_click: open_detail
+      context_actions:
+        - action_id: view_profile
+          label: "View Profile"
+          icon: "user"
+        - action_id: view_documents
+          label: "Documents"
+          icon: "folder"
+        - action_id: view_relationships
+          label: "Relationships"
+          icon: "git-branch"
+
+    detail_template:
+      sections:
+        - title: "Entity"
+          fields:
+            - key: name
+              label: "Name"
+              format: text
+            - key: entity_type
+              label: "Type"
+              format: text
+            - key: jurisdiction
+              label: "Jurisdiction"
+              format: text
+            - key: registration_number
+              label: "Reg. Number"
+              format: text
+
+  # ===========================================================================
+  # PRODUCT - Service product container
+  # ===========================================================================
+  - type_id: product
+    label: "Product"
+    category: container
+    is_container: true
+    browse_nickname: "service"
+
+    visual:
+      icon:
+        glyph: "📦"
+        icon_name: "package"
+        fallback: "P"
+      base_color: [179, 128, 179, 255]
+      highlight_color: [204, 153, 204, 255]
+      status_colors:
+        ACTIVE: [77, 204, 102, 255]
+        PENDING: [230, 179, 51, 255]
+        INACTIVE: [180, 180, 180, 255]
+      base_size: 40.0
+
+    interactions:
+      on_hover:
+        tooltip:
+          template: "{product_name}\n{service_count} services"
+      on_click: select
+      on_double_click: open_container
+      context_actions:
+        - action_id: browse_services
+          label: "Browse Services"
+          icon: "list"
+        - action_id: view_config
+          label: "Configuration"
+          icon: "settings"
+
+  # ===========================================================================
+  # SERVICE - Service container for resources
+  # ===========================================================================
+  - type_id: service
+    label: "Service"
+    category: container
+    is_container: true
+    browse_nickname: "resource_instance"
+
+    visual:
+      icon:
+        glyph: "🔧"
+        icon_name: "tool"
+        fallback: "S"
+      base_color: [179, 153, 102, 255]
+      highlight_color: [204, 179, 128, 255]
+      status_colors:
+        ACTIVE: [77, 204, 102, 255]
+        PENDING: [230, 179, 51, 255]
+        INACTIVE: [180, 180, 180, 255]
+      base_size: 36.0
+
+    interactions:
+      on_hover:
+        tooltip:
+          template: "{service_name}\n{resource_count} resources"
+      on_click: select
+      on_double_click: open_container
+      context_actions:
+        - action_id: browse_resources
+          label: "Browse Resources"
+          icon: "list"
+        - action_id: view_sla
+          label: "SLA Details"
+          icon: "clock"
+
+  # ===========================================================================
+  # SERVICE RESOURCE - Container item for services
+  # ===========================================================================
+  - type_id: service_resource
+    label: "Resource"
+    category: container_item
+
+    visual:
+      icon:
+        glyph: "⚙️"
+        icon_name: "settings"
+        fallback: "R"
+      base_color: [179, 128, 102, 255]
+      highlight_color: [204, 153, 128, 255]
+      status_colors:
+        ACTIVE: [77, 204, 102, 255]
+        PENDING: [230, 179, 51, 255]
+        SUSPENDED: [230, 128, 77, 255]
+        DECOMMISSIONED: [180, 180, 180, 255]
+      base_size: 28.0
+
+    interactions:
+      on_hover:
+        tooltip:
+          template: "{resource_name}\n{resource_type_code} | {status}"
+      on_click: select
+      on_double_click: open_detail
+      context_actions:
+        - action_id: view_config
+          label: "View Config"
+          icon: "settings"
+        - action_id: view_logs
+          label: "Activity Log"
+          icon: "list"
+
+    detail_template:
+      sections:
+        - title: "Resource"
+          fields:
+            - key: resource_name
+              label: "Name"
+              format: text
+            - key: resource_type_code
+              label: "Type"
+              format: text
+            - key: resource_identifier
+              label: "Identifier"
+              format: text
+            - key: status
+              label: "Status"
+              format: status_badge
+
+  # ===========================================================================
+  # DOCUMENT
+  # ===========================================================================
+  - type_id: document
+    label: "Document"
+    category: document
+
+    visual:
+      icon:
+        glyph: "📄"
+        icon_name: "file-text"
+        fallback: "D"
+      base_color: [179, 179, 128, 255]
+      highlight_color: [204, 204, 153, 255]
+      status_colors:
+        VALID: [77, 204, 102, 255]
+        PENDING_REVIEW: [230, 179, 51, 255]
+        EXPIRED: [230, 77, 77, 255]
+        REJECTED: [180, 180, 180, 255]
+      base_size: 28.0
+
+    interactions:
+      on_hover:
+        tooltip:
+          template: "{document_type}\n{status} | {expiry_date}"
+      on_click: select
+      on_double_click: open_detail
+      context_actions:
+        - action_id: view_document
+          label: "View Document"
+          icon: "eye"
+        - action_id: download
+          label: "Download"
+          icon: "download"
+
+    detail_template:
+      sections:
+        - title: "Document"
+          fields:
+            - key: document_type
+              label: "Type"
+              format: text
+            - key: document_name
+              label: "Name"
+              format: text
+            - key: status
+              label: "Status"
+              format: status_badge
+            - key: expiry_date
+              label: "Expires"
+              format:
+                date:
+                  format: "%Y-%m-%d"

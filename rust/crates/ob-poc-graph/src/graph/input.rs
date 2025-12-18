@@ -31,6 +31,8 @@ pub struct InputState {
     /// Last pointer position for drag tracking
     #[allow(dead_code)]
     last_pointer_pos: Option<Pos2>,
+    /// Pending container open action (set on double-click of container node)
+    pub pending_container_open: Option<super::ContainerInfo>,
 }
 
 impl InputState {
@@ -55,6 +57,11 @@ impl InputState {
         } else {
             self.focused_node = Some(node_id.to_string());
         }
+    }
+
+    /// Take pending container open action (consumes it)
+    pub fn take_pending_container_open(&mut self) -> Option<super::ContainerInfo> {
+        self.pending_container_open.take()
     }
 }
 
@@ -119,21 +126,35 @@ impl InputHandler {
             }
         }
 
-        // Handle double-click to fit focused node or toggle investor group
+        // Handle double-click to open container, fit focused node, or toggle investor group
         if response.double_clicked() {
             if let Some(pos) = pointer_pos {
-                // Check if double-clicked on investor group
-                if let Some(_group_idx) =
+                // First check if double-clicked on a node
+                if let Some(node_id) = Self::hit_test_node(pos, graph, camera, screen_rect) {
+                    if let Some(node) = graph.get_node(&node_id) {
+                        // Check if this is a container node
+                        if node.is_container {
+                            // Set pending container open action
+                            state.pending_container_open = Some(super::ContainerInfo {
+                                container_id: node.id.clone(),
+                                container_type: node.contains_type.clone().unwrap_or_default(),
+                                label: node.label.clone(),
+                                parent_key: node.parent_key.clone(),
+                                browse_nickname: node.browse_nickname.clone(),
+                            });
+                            needs_repaint = true;
+                        } else {
+                            // Non-container node: pan to it
+                            camera.pan_to(node.position);
+                            needs_repaint = true;
+                        }
+                    }
+                } else if let Some(_group_idx) =
                     Self::hit_test_investor_group(pos, graph, camera, screen_rect)
                 {
                     // Note: Investor group toggling would need mutable graph access
                     // For now, just pan to the group
                     needs_repaint = true;
-                } else if let Some(ref focus_id) = state.focused_node {
-                    if let Some(node) = graph.get_node(focus_id) {
-                        camera.pan_to(node.position);
-                        needs_repaint = true;
-                    }
                 } else {
                     // Double-click on empty space - fit to all nodes
                     camera.fit_to_bounds(graph.bounds, screen_rect, 50.0);

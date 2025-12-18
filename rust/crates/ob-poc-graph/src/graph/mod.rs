@@ -101,6 +101,34 @@ impl ViewMode {
 use egui::{Color32, Rect, Sense, Vec2};
 
 // =============================================================================
+// GRAPH ACTIONS (returned from widget, handled by caller)
+// =============================================================================
+
+/// Actions returned from the graph widget for the caller to handle
+#[derive(Debug, Clone, Default)]
+pub struct GraphWidgetAction {
+    /// Container node was double-clicked (open browse panel)
+    pub open_container: Option<ContainerInfo>,
+    /// Entity was selected (update detail panel)
+    pub select_entity: Option<String>,
+}
+
+/// Information about a container node for the browse panel
+#[derive(Debug, Clone)]
+pub struct ContainerInfo {
+    /// Container node ID (e.g., share class ID)
+    pub container_id: String,
+    /// Container type (e.g., "share_class", "service_instance")
+    pub container_type: String,
+    /// Display label
+    pub label: String,
+    /// Parent key for scoped queries
+    pub parent_key: Option<String>,
+    /// EntityGateway nickname for searching children
+    pub browse_nickname: Option<String>,
+}
+
+// =============================================================================
 // GRAPH WIDGET
 // =============================================================================
 
@@ -323,6 +351,12 @@ impl CbuGraphWidget {
     pub fn selected_entity_changed(&mut self) -> Option<String> {
         // For now, just return the current focus - the JS bridge will track changes
         self.input_state.focused_node.clone()
+    }
+
+    /// Take pending container open action (consumes it)
+    /// Returns ContainerInfo if a container node was double-clicked
+    pub fn take_container_action(&mut self) -> Option<ContainerInfo> {
+        self.input_state.take_pending_container_open()
     }
 
     /// Fit camera to show all nodes

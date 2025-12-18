@@ -318,17 +318,43 @@ This optimization is transparent - validation semantics unchanged, just faster.
 
 > **📘 See also:** `EGUI.md` for the full egui/WASM refactoring brief and implementation guide.
 
-The web UI is split into two crates:
-- `rust/crates/ob-poc-web/` - Server-rendered HTML panels with embedded TypeScript
-- `rust/crates/ob-poc-graph/` - WASM-based interactive graph visualization
+The web UI is split into three crates:
+- `rust/crates/ob-poc-web/` - Axum server serving static files and API endpoints
+- `rust/crates/ob-poc-ui/` - Pure egui/WASM application (main UI)
+- `rust/crates/ob-poc-graph/` - Reusable graph widget (used by ob-poc-ui)
 
-The UI uses a 3-panel layout: Chat | DSL Editor | Results, with an optional graph panel.
+The UI uses a 4-panel layout with multiple layout modes (FourPanel, EditorFocus, GraphFocus, GraphFullSize).
 
 **Key features:**
 - 4 view modes: KYC_UBO, SERVICE_DELIVERY, CUSTODY, PRODUCTS_ONLY
-- Vertical/Horizontal layout orientation
+- Multiple layout orientations
 - Node drag/resize with layout persistence
 - Entity search and resolution via EntityGateway
+- YAML-driven token system for entity visual styling
+
+### Token System
+
+The UI uses a YAML-driven token configuration system for consistent entity visualization.
+
+**Module:** `rust/crates/ob-poc-ui/src/tokens/`
+
+| File | Purpose |
+|------|---------|
+| `types.rs` | Core types: TokenDefinition, TokenVisual, InteractionRules |
+| `registry.rs` | TokenRegistry with YAML loading and alias resolution |
+| `default_tokens.yaml` | Token definitions for all entity types |
+
+**Key concepts:**
+- **TokenDefinition**: Visual config (colors, icon, size) + interaction rules + detail template
+- **TokenRegistry**: Loads from embedded YAML, supports type aliases (e.g., `proper_person` → `entity`)
+- **TokenVisual**: 2D egui styling with status-based color mapping
+
+**Usage:**
+```rust
+// Get token definition for an entity type
+let token = state.token_registry.get("cbu");
+let color = token.visual.status_color32(Some("ACTIVE"));
+```
 
 ## Shared Types Crate (ob-poc-types)
 

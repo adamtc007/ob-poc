@@ -314,6 +314,12 @@ impl LayoutEngine {
                 verification_summary: hints.verification_summary,
                 needs_attention: hints.needs_attention,
                 entity_category: hints.entity_category,
+                // Container fields (from server graph data)
+                is_container: node.is_container,
+                contains_type: node.contains_type.clone(),
+                child_count: node.child_count,
+                browse_nickname: node.browse_nickname.clone(),
+                parent_key: node.parent_key.clone(),
             };
 
             graph.nodes.insert(node.id.clone(), layout_node);
@@ -492,6 +498,12 @@ impl LayoutEngine {
                 verification_summary: hints.verification_summary,
                 needs_attention: hints.needs_attention,
                 entity_category: hints.entity_category,
+                // Container fields
+                is_container: node.is_container,
+                contains_type: node.contains_type.clone(),
+                child_count: node.child_count,
+                browse_nickname: node.browse_nickname.clone(),
+                parent_key: node.parent_key.clone(),
             };
 
             graph.nodes.insert(node.id.clone(), layout_node);
@@ -541,6 +553,12 @@ impl LayoutEngine {
                 verification_summary: hints.verification_summary,
                 needs_attention: hints.needs_attention,
                 entity_category: hints.entity_category,
+                // Container fields
+                is_container: node.is_container,
+                contains_type: node.contains_type.clone(),
+                child_count: node.child_count,
+                browse_nickname: node.browse_nickname.clone(),
+                parent_key: node.parent_key.clone(),
             };
 
             graph.nodes.insert(node.id.clone(), layout_node);
@@ -633,6 +651,12 @@ impl LayoutEngine {
                     verification_summary: hints.verification_summary,
                     needs_attention: hints.needs_attention,
                     entity_category: hints.entity_category,
+                    // Container fields (products are not containers in template layout)
+                    is_container: false,
+                    contains_type: None,
+                    child_count: None,
+                    browse_nickname: None,
+                    parent_key: None,
                 };
                 graph.nodes.insert(product.id.clone(), layout_node);
 
@@ -680,6 +704,12 @@ impl LayoutEngine {
                             verification_summary: svc_hints.verification_summary,
                             needs_attention: svc_hints.needs_attention,
                             entity_category: svc_hints.entity_category,
+                            // Container fields (services are not containers in template layout)
+                            is_container: false,
+                            contains_type: None,
+                            child_count: None,
+                            browse_nickname: None,
+                            parent_key: None,
                         };
                         graph.nodes.insert(service.id.clone(), svc_node);
 
@@ -727,6 +757,12 @@ impl LayoutEngine {
                                     verification_summary: res_hints.verification_summary,
                                     needs_attention: res_hints.needs_attention,
                                     entity_category: res_hints.entity_category,
+                                    // Container fields (resources are not containers in template layout)
+                                    is_container: false,
+                                    contains_type: None,
+                                    child_count: None,
+                                    browse_nickname: None,
+                                    parent_key: None,
                                 };
                                 graph.nodes.insert(resource.id.clone(), res_node);
                             }
@@ -789,6 +825,12 @@ impl LayoutEngine {
                     verification_summary: hints.verification_summary,
                     needs_attention: hints.needs_attention,
                     entity_category: hints.entity_category,
+                    // Container fields
+                    is_container: false,
+                    contains_type: None,
+                    child_count: None,
+                    browse_nickname: None,
+                    parent_key: None,
                 };
                 graph.nodes.insert(service.id.clone(), layout_node);
             }
@@ -847,6 +889,12 @@ impl LayoutEngine {
                     verification_summary: hints.verification_summary,
                     needs_attention: hints.needs_attention,
                     entity_category: hints.entity_category,
+                    // Container fields
+                    is_container: false,
+                    contains_type: None,
+                    child_count: None,
+                    browse_nickname: None,
+                    parent_key: None,
                 };
                 graph.nodes.insert(resource.id.clone(), layout_node);
             }

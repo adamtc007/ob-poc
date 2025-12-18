@@ -352,6 +352,29 @@ pub struct GraphNode {
     /// Entity category: PERSON or SHELL
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entity_category: Option<String>,
+
+    // =========================================================================
+    // CONTAINER FIELDS - for nodes that contain browseable children
+    // =========================================================================
+    /// Whether this node is a container (can be double-clicked to browse)
+    #[serde(default)]
+    pub is_container: bool,
+
+    /// Type of items this container holds (e.g., "investor_holding", "resource_instance")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contains_type: Option<String>,
+
+    /// Number of child items (for badge display)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub child_count: Option<i64>,
+
+    /// EntityGateway nickname for searching children
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub browse_nickname: Option<String>,
+
+    /// Parent key for scoped queries (e.g., cbu_id)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_key: Option<String>,
 }
 
 /// Verification status summary for entity relationships
