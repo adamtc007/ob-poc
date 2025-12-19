@@ -9,6 +9,7 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use xshell::{cmd, Shell};
 
+mod gleif_import;
 mod seed_allianz;
 mod ubo_test;
 
@@ -179,6 +180,21 @@ enum Command {
         #[arg(long, short)]
         verbose: bool,
     },
+
+    /// Import funds from GLEIF API by search term
+    GleifImport {
+        /// Search term for GLEIF API (e.g., "Allianz Global Investors")
+        #[arg(long, short = 's')]
+        search: String,
+
+        /// Limit number of records to import
+        #[arg(long, short = 'l')]
+        limit: Option<usize>,
+
+        /// Dry run - show what would be imported
+        #[arg(long, short = 'n')]
+        dry_run: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -235,6 +251,14 @@ fn main() -> Result<()> {
         Command::UboTest { command, verbose } => {
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(ubo_test::run_ubo_test(&command, verbose))
+        }
+        Command::GleifImport {
+            search,
+            limit,
+            dry_run,
+        } => {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(gleif_import::gleif_import(&search, limit, dry_run))
         }
     }
 }

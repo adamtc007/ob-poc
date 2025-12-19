@@ -34,6 +34,8 @@ pub enum VerbBehavior {
     CustomOp,
     /// Composite operation (expands to multiple steps)
     Composite,
+    /// Graph query operation (GraphQueryExecutor)
+    GraphQuery,
 }
 
 /// Argument definition for unified verbs
@@ -151,6 +153,7 @@ impl UnifiedVerbRegistry {
             let (behavior, custom_op_id) = match &runtime_verb.behavior {
                 RuntimeBehavior::Crud(_) => (VerbBehavior::Crud, None),
                 RuntimeBehavior::Plugin(handler) => (VerbBehavior::CustomOp, Some(handler.clone())),
+                RuntimeBehavior::GraphQuery(_) => (VerbBehavior::GraphQuery, None),
             };
 
             let unified = UnifiedVerbDef {

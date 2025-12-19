@@ -45,6 +45,8 @@ pub mod gateway_resolver;
 #[cfg(feature = "database")]
 pub mod generic_executor;
 #[cfg(feature = "database")]
+pub mod graph_executor;
+#[cfg(feature = "database")]
 pub mod idempotency;
 pub mod intent;
 pub mod intent_extractor;

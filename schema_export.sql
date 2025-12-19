@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 0qqaAVBJu52cfsFGt7uRlqe11qqBo2QUoFyDgQ9eTj9cPnrNwQLgOimKPmiyohO
+\restrict IkFbxlxy6aJi8swHbfngTZL3v25iidSbEs0TtNCFvOgZUckfGJneXWOhagxXl7S
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -4227,7 +4227,19 @@ CREATE TABLE "ob-poc".entity_funds (
     financial_year_end character varying(5),
     investor_type text,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now(),
+    gleif_legal_form_id character varying(10),
+    gleif_registered_as character varying(100),
+    gleif_registered_at character varying(20),
+    gleif_category character varying(20),
+    gleif_status character varying(20),
+    gleif_corroboration_level character varying(30),
+    gleif_managing_lou character varying(20),
+    gleif_last_update timestamp with time zone,
+    legal_address_city character varying(100),
+    legal_address_country character varying(2),
+    hq_address_city character varying(100),
+    hq_address_country character varying(2)
 );
 
 
@@ -9758,6 +9770,13 @@ CREATE INDEX idx_entity_funds_jurisdiction ON "ob-poc".entity_funds USING btree 
 
 
 --
+-- Name: idx_entity_funds_lei; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_entity_funds_lei ON "ob-poc".entity_funds USING btree (lei) WHERE (lei IS NOT NULL);
+
+
+--
 -- Name: idx_entity_funds_master; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -12640,5 +12659,5 @@ ALTER TABLE ONLY public.rules
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 0qqaAVBJu52cfsFGt7uRlqe11qqBo2QUoFyDgQ9eTj9cPnrNwQLgOimKPmiyohO
+\unrestrict IkFbxlxy6aJi8swHbfngTZL3v25iidSbEs0TtNCFvOgZUckfGJneXWOhagxXl7S
 

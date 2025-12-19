@@ -1238,6 +1238,10 @@ async fn cmd_execute(
                                 ExecutionResult::RecordSet(rs) => serde_json::json!(rs),
                                 ExecutionResult::Affected(n) => serde_json::json!({"rows_affected": n}),
                                 ExecutionResult::Void => serde_json::json!(null),
+                                ExecutionResult::EntityQuery(eq) => serde_json::json!({"type": "entity_query", "count": eq.total_count}),
+                                ExecutionResult::TemplateInvoked(ti) => serde_json::json!({"type": "template_invoked", "template": ti.template_id}),
+                                ExecutionResult::TemplateBatch(tb) => serde_json::json!({"type": "template_batch", "total": tb.total_items, "success": tb.success_count}),
+                                ExecutionResult::BatchControl(_) => serde_json::json!({"type": "batch_control"}),
                             },
                         })
                     })
@@ -1613,6 +1617,10 @@ async fn cmd_generate(
                                     ExecutionResult::RecordSet(rs) => serde_json::json!(rs),
                                     ExecutionResult::Affected(n) => serde_json::json!({"rows_affected": n}),
                                     ExecutionResult::Void => serde_json::json!(null),
+                                    ExecutionResult::EntityQuery(eq) => serde_json::json!({"type": "entity_query", "count": eq.total_count}),
+                                    ExecutionResult::TemplateInvoked(ti) => serde_json::json!({"type": "template_invoked", "template": ti.template_id}),
+                                    ExecutionResult::TemplateBatch(tb) => serde_json::json!({"type": "template_batch", "total": tb.total_items, "success": tb.success_count}),
+                                    ExecutionResult::BatchControl(_) => serde_json::json!({"type": "batch_control"}),
                                 },
                             })
                         })

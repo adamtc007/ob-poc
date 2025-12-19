@@ -253,6 +253,13 @@ impl GenericCrudExecutor {
                     handler
                 ));
             }
+            RuntimeBehavior::GraphQuery(_) => {
+                return Err(anyhow!(
+                    "Verb {}.{} is a graph query, use GraphQueryExecutor",
+                    verb.domain,
+                    verb.verb
+                ));
+            }
         };
 
         tracing::debug!(

@@ -194,30 +194,192 @@ pub struct GraphEdge {
 }
 
 /// Types of edges representing relationships
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum EdgeType {
-    // Core
+    // =========================================================================
+    // CORE RELATIONSHIPS
+    // =========================================================================
+    /// Entity has a role within a CBU
     HasRole,
 
-    // Custody
-    RoutesTo,
-    Matches,
-    CoveredBy,
-    SecuredBy,
-    SettlesAt,
-
-    // KYC
-    Requires,
-    Validates,
-
-    // UBO
+    // =========================================================================
+    // OWNERSHIP & CONTROL (from entity_relationships table)
+    // =========================================================================
+    /// Direct or indirect ownership (percentage-based)
     Owns,
+    /// Control relationship (voting rights, board control, veto powers)
     Controls,
+    /// Trust relationship types
+    TrustSettlor,
+    TrustTrustee,
+    TrustBeneficiary,
+    TrustProtector,
 
-    // Services
+    // =========================================================================
+    // FUND STRUCTURE (from fund_structure, fund_investments tables)
+    // =========================================================================
+    /// Management company manages a fund
+    ManagedBy,
+    /// Administrator provides admin services
+    AdministeredBy,
+    /// Custodian provides custody services
+    CustodiedBy,
+    /// Entity uses a product
+    UsesProduct,
+    /// Feeder fund invests in master fund
+    FeederTo,
+    /// Fund of funds investment
+    InvestsIn,
+    /// Umbrella contains subfund
+    Contains,
+    /// Share class belongs to fund
+    ShareClassOf,
+
+    // =========================================================================
+    // CUSTODY & SETTLEMENT (from custody schema)
+    // =========================================================================
+    /// Booking rule routes to SSI
+    RoutesTo,
+    /// Booking rule matches universe entry
+    Matches,
+    /// ISDA covers product types
+    CoveredBy,
+    /// CSA secures ISDA
+    SecuredBy,
+    /// SSI settles at market/CSD
+    SettlesAt,
+    /// Subcustodian relationship
+    SubcustodianOf,
+
+    // =========================================================================
+    // KYC & DOCUMENTS
+    // =========================================================================
+    /// Document requirement
+    Requires,
+    /// Document validates attribute
+    Validates,
+    /// Allegation verified by observation
+    VerifiedBy,
+    /// Observation contradicts another
+    Contradicts,
+
+    // =========================================================================
+    // SERVICES & DELIVERY
+    // =========================================================================
+    /// Service delivers capability
     Delivers,
+    /// Resource belongs to service
     BelongsTo,
+    /// Service instance provisioned for CBU
+    ProvisionedFor,
+
+    // =========================================================================
+    // DELEGATION (from delegation_relationships table)
+    // =========================================================================
+    /// Delegation of authority/responsibility
+    DelegatesTo,
+}
+
+impl EdgeType {
+    /// Get the edge type from a relationship_type string (from entity_relationships table)
+    pub fn from_relationship_type(rel_type: &str) -> Option<Self> {
+        match rel_type.to_lowercase().as_str() {
+            "ownership" => Some(EdgeType::Owns),
+            "control" => Some(EdgeType::Controls),
+            "trust_settlor" | "settlor" => Some(EdgeType::TrustSettlor),
+            "trust_trustee" | "trustee" => Some(EdgeType::TrustTrustee),
+            "trust_beneficiary" | "beneficiary" => Some(EdgeType::TrustBeneficiary),
+            "trust_protector" | "protector" => Some(EdgeType::TrustProtector),
+            _ => None,
+        }
+    }
+
+    /// Get the edge type from a fund structure relationship type
+    pub fn from_fund_structure_type(rel_type: &str) -> Option<Self> {
+        match rel_type.to_lowercase().as_str() {
+            "contains" => Some(EdgeType::Contains),
+            "master_feeder" | "feeder_to" => Some(EdgeType::FeederTo),
+            "invests_in" => Some(EdgeType::InvestsIn),
+            _ => None,
+        }
+    }
+
+    /// Check if this edge type represents an ownership/control relationship
+    pub fn is_ownership_or_control(&self) -> bool {
+        matches!(
+            self,
+            EdgeType::Owns
+                | EdgeType::Controls
+                | EdgeType::TrustSettlor
+                | EdgeType::TrustTrustee
+                | EdgeType::TrustBeneficiary
+                | EdgeType::TrustProtector
+        )
+    }
+
+    /// Check if this edge type represents a fund structure relationship
+    pub fn is_fund_structure(&self) -> bool {
+        matches!(
+            self,
+            EdgeType::ManagedBy
+                | EdgeType::AdministeredBy
+                | EdgeType::CustodiedBy
+                | EdgeType::UsesProduct
+                | EdgeType::FeederTo
+                | EdgeType::InvestsIn
+                | EdgeType::Contains
+                | EdgeType::ShareClassOf
+        )
+    }
+
+    /// Check if this edge type represents a custody relationship
+    pub fn is_custody(&self) -> bool {
+        matches!(
+            self,
+            EdgeType::RoutesTo
+                | EdgeType::Matches
+                | EdgeType::CoveredBy
+                | EdgeType::SecuredBy
+                | EdgeType::SettlesAt
+                | EdgeType::SubcustodianOf
+        )
+    }
+
+    /// Get the display label for this edge type
+    pub fn display_label(&self) -> &'static str {
+        match self {
+            EdgeType::HasRole => "has role",
+            EdgeType::Owns => "owns",
+            EdgeType::Controls => "controls",
+            EdgeType::TrustSettlor => "settlor of",
+            EdgeType::TrustTrustee => "trustee of",
+            EdgeType::TrustBeneficiary => "beneficiary of",
+            EdgeType::TrustProtector => "protector of",
+            EdgeType::ManagedBy => "managed by",
+            EdgeType::AdministeredBy => "administered by",
+            EdgeType::CustodiedBy => "custodied by",
+            EdgeType::UsesProduct => "uses",
+            EdgeType::FeederTo => "feeds into",
+            EdgeType::InvestsIn => "invests in",
+            EdgeType::Contains => "contains",
+            EdgeType::ShareClassOf => "share class of",
+            EdgeType::RoutesTo => "routes to",
+            EdgeType::Matches => "matches",
+            EdgeType::CoveredBy => "covered by",
+            EdgeType::SecuredBy => "secured by",
+            EdgeType::SettlesAt => "settles at",
+            EdgeType::SubcustodianOf => "subcustodian of",
+            EdgeType::Requires => "requires",
+            EdgeType::Validates => "validates",
+            EdgeType::VerifiedBy => "verified by",
+            EdgeType::Contradicts => "contradicts",
+            EdgeType::Delivers => "delivers",
+            EdgeType::BelongsTo => "belongs to",
+            EdgeType::ProvisionedFor => "provisioned for",
+            EdgeType::DelegatesTo => "delegates to",
+        }
+    }
 }
 
 /// Information about a layer for UI rendering

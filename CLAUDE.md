@@ -645,6 +645,60 @@ The UI uses a **hybrid architecture**: HTML/TypeScript panels for text content, 
 | ubo | entity (UBO-specific) | Ownership chains, control relationships |
 | services | product, service, resource | Products → Services → Resource instances |
 
+### Graph DSL Domain
+
+The `graph.*` DSL verbs provide programmatic access to graph queries. Unlike CRUD verbs, graph verbs use `RuntimeBehavior::GraphQuery` and are executed by `GraphQueryExecutor`.
+
+**Architecture:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    DSL: (graph.view :cbu-id @cbu)               │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              GraphQueryExecutor (graph_executor.rs)              │
+│  Routes to GraphQueryEngine based on GraphQueryOperation        │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              GraphQueryEngine (query_engine.rs)                  │
+│  - execute_view, execute_focus, execute_filter                  │
+│  - execute_path, execute_ancestors, execute_descendants         │
+│  - execute_compare, execute_group_by, execute_find_connected    │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              GraphViewModel (view_model.rs)                      │
+│  UI-ready output: nodes, edges, groups, paths, stats            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key Files:**
+
+| File | Purpose |
+|------|---------|
+| `config/verbs/graph.yaml` | Graph verb definitions |
+| `src/dsl_v2/graph_executor.rs` | DSL → GraphQueryEngine bridge |
+| `src/graph/query_engine.rs` | Query execution (BFS/DFS, filtering) |
+| `src/graph/view_model.rs` | GraphViewModel, GraphFilter, GraphPath |
+| `src/graph/types.rs` | EdgeType, NodeType, LayerType enums |
+
+**EdgeType Categories:**
+
+| Category | Types |
+|----------|-------|
+| Core | HasRole |
+| Ownership & Control | Owns, Controls, TrustSettlor, TrustTrustee, TrustBeneficiary, TrustProtector |
+| Fund Structure | ManagedBy, AdministeredBy, CustodiedBy, UsesProduct, FeederTo, InvestsIn, Contains, ShareClassOf |
+| Custody | RoutesTo, Matches, CoveredBy, SecuredBy, SettlesAt, SubcustodianOf |
+| KYC | Requires, Validates, VerifiedBy, Contradicts |
+| Services | Delivers, BelongsTo, ProvisionedFor |
+| Delegation | DelegatesTo |
+
 ### Graph Visualization Modules
 
 The graph visualization (`rust/crates/ob-poc-graph/`) includes several specialized modules:
@@ -1505,6 +1559,7 @@ cargo x ci                  # Full pipeline: fmt, clippy, test, build
 | `pre-commit` | Fast pre-commit hook: format, clippy, unit tests |
 | `batch-import` | Import Allianz funds as CBUs using template pipeline |
 | `batch-clean` | Delete Allianz CBUs via cascade delete DSL verb |
+| `gleif-import` | Import funds from GLEIF API by search term (`--search`, `--limit`, `--dry-run`) |
 
 ## Allianz Batch Import Test Case
 
@@ -1548,6 +1603,34 @@ cargo x batch-clean --limit 10
 
 # Dry run cleanup
 cargo x batch-clean --dry-run
+
+# GLEIF API import (fetch funds from GLEIF by search term)
+cargo x gleif-import --search "Allianz Global Investors"
+
+# GLEIF import with limit
+cargo x gleif-import --search "Allianz Global Investors" --limit 10
+
+# GLEIF dry run
+cargo x gleif-import --search "Allianz Global Investors" --dry-run
+```
+
+### GLEIF Import
+
+The `gleif-import` command fetches fund data from the GLEIF API and imports into `entity_funds`:
+
+| Feature | Description |
+|---------|-------------|
+| API pagination | Fetches all pages (100 records per page) |
+| Upsert by LEI | Updates existing records, creates new ones |
+| Name matching | Matches existing entities by name to backfill LEI |
+| GLEIF metadata | Stores status, category, registration, addresses |
+
+**Example run:**
+```
+Fetched 334 records from GLEIF API
+Matched existing: 134
+Created new: 196
+Updated with GLEIF: 134
 ```
 
 ### Performance Results
@@ -3245,7 +3328,7 @@ Extension table for umbrella funds, sub-funds, standalone funds, master and feed
 | Column | Type | Description |
 |--------|------|-------------|
 | entity_id | uuid | PK, FK to entities |
-| lei | varchar(20) | Legal Entity Identifier |
+| lei | varchar(20) | Legal Entity Identifier (unique index) |
 | isin_base | varchar(12) | Base ISIN |
 | fund_structure_type | text | SICAV, ICAV, OEIC, VCC, UNIT_TRUST, FCP |
 | fund_type | text | UCITS, AIF, HEDGE_FUND, PRIVATE_EQUITY |
@@ -3255,6 +3338,18 @@ Extension table for umbrella funds, sub-funds, standalone funds, master and feed
 | jurisdiction | varchar(10) | Domicile |
 | base_currency | varchar(3) | |
 | investment_objective | text | |
+| gleif_legal_form_id | varchar(10) | ELF code (e.g., UDY2) |
+| gleif_registered_as | varchar(100) | Registry identifier |
+| gleif_registered_at | varchar(20) | Registration authority code |
+| gleif_category | varchar(20) | FUND, GENERAL, BRANCH, SOLE_PROPRIETOR |
+| gleif_status | varchar(20) | ACTIVE, INACTIVE |
+| gleif_corroboration_level | varchar(30) | FULLY_CORROBORATED, PARTIALLY_CORROBORATED |
+| gleif_managing_lou | varchar(20) | LEI of the Local Operating Unit |
+| gleif_last_update | timestamptz | Last update from GLEIF API |
+| legal_address_city | varchar(100) | Legal address city |
+| legal_address_country | varchar(2) | Legal address ISO country code |
+| hq_address_city | varchar(100) | HQ address city |
+| hq_address_country | varchar(2) | HQ address ISO country code |
 
 ### entity_share_classes (Share Classes)
 
@@ -5327,6 +5422,22 @@ Fund structure operations (umbrella, sub-fund, share class hierarchy)
 | `fund.ensure-umbrella` | Create or update an umbrella fund (idempotent by name) |
 | `fund.ensure-subfund` | Create or update a sub-fund/compartment (idempotent by name) |
 | `fund.ensure-share-class` | Create or update a share class (idempotent by ISIN) |
+
+### graph
+
+Graph visualization and traversal operations for CBU entity networks
+
+| Verb | Description |
+|------|-------------|
+| `graph.view` | Get full graph visualization for a CBU with view mode filtering |
+| `graph.focus` | Focus on a specific entity with configurable neighborhood depth |
+| `graph.filter` | Filter graph by node types, edge types, layers, or attributes |
+| `graph.group-by` | Group nodes by entity type, tier, role, or custom criteria |
+| `graph.path` | Find path(s) between two entities in the graph |
+| `graph.find-connected` | Find all entities connected to a given entity within depth |
+| `graph.ancestors` | Trace ownership/control chain upward to natural persons |
+| `graph.descendants` | Trace ownership/control chain downward from an entity |
+| `graph.compare` | Compare two graph snapshots to detect structural changes |
 
 ### holding
 

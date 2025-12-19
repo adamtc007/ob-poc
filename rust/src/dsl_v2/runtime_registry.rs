@@ -48,6 +48,8 @@ pub enum RuntimeBehavior {
     Crud(Box<RuntimeCrudConfig>),
     /// Plugin handler (Rust function)
     Plugin(String),
+    /// Graph query operation
+    GraphQuery(Box<RuntimeGraphQueryConfig>),
 }
 
 #[derive(Debug, Clone)]
@@ -83,6 +85,23 @@ pub struct RuntimeCrudConfig {
     pub extension_table_column: Option<String>,
     pub type_id_column: Option<String>,
 }
+
+/// Configuration for graph query operations
+#[derive(Debug, Clone)]
+pub struct RuntimeGraphQueryConfig {
+    /// The type of graph query operation
+    pub operation: GraphQueryOperation,
+    /// Root entity type for the query (e.g., "cbu", "entity")
+    pub root_type: Option<String>,
+    /// Edge types to include in traversal
+    pub edge_types: Vec<String>,
+    /// Maximum traversal depth
+    pub max_depth: u32,
+    /// Default view mode for visualization queries
+    pub default_view_mode: Option<String>,
+}
+
+use super::config::types::GraphQueryOperation;
 
 #[derive(Debug, Clone)]
 pub struct RuntimeArg {
@@ -349,6 +368,20 @@ impl RuntimeVerbRegistry {
                     domain, verb
                 );
                 RuntimeBehavior::Plugin(verb.replace('-', "_"))
+            }
+            (VerbBehavior::GraphQuery, _, _) => {
+                let graph_query = config.graph_query.as_ref();
+                RuntimeBehavior::GraphQuery(Box::new(RuntimeGraphQueryConfig {
+                    operation: graph_query
+                        .map(|g| g.operation)
+                        .unwrap_or(GraphQueryOperation::View),
+                    root_type: graph_query.and_then(|g| g.root_type.clone()),
+                    edge_types: graph_query
+                        .map(|g| g.edge_types.clone())
+                        .unwrap_or_default(),
+                    max_depth: graph_query.map(|g| g.max_depth).unwrap_or(10),
+                    default_view_mode: graph_query.and_then(|g| g.default_view_mode.clone()),
+                }))
             }
             _ => {
                 warn!(

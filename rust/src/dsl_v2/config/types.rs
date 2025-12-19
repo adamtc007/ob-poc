@@ -56,6 +56,8 @@ pub struct VerbConfig {
     #[serde(default)]
     pub handler: Option<String>,
     #[serde(default)]
+    pub graph_query: Option<GraphQueryConfig>,
+    #[serde(default)]
     pub args: Vec<ArgConfig>,
     #[serde(default)]
     pub returns: Option<ReturnsConfig>,
@@ -163,6 +165,8 @@ pub struct VerbLifecycle {
 pub enum VerbBehavior {
     Crud,
     Plugin,
+    /// Graph query operations - visualization, traversal, path-finding
+    GraphQuery,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -238,6 +242,57 @@ pub enum CrudOperation {
     SelectWithJoin,
     EntityCreate,
     EntityUpsert,
+}
+
+// =============================================================================
+// GRAPH QUERY CONFIG
+// =============================================================================
+
+/// Configuration for graph query operations
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GraphQueryConfig {
+    /// The type of graph query operation
+    pub operation: GraphQueryOperation,
+    /// Root entity type for the query (e.g., "cbu", "entity")
+    #[serde(default)]
+    pub root_type: Option<String>,
+    /// Edge types to include in traversal
+    #[serde(default)]
+    pub edge_types: Vec<String>,
+    /// Maximum traversal depth (default: 10)
+    #[serde(default = "default_max_depth")]
+    pub max_depth: u32,
+    /// Default view mode for visualization queries
+    #[serde(default)]
+    pub default_view_mode: Option<String>,
+}
+
+fn default_max_depth() -> u32 {
+    10
+}
+
+/// Types of graph query operations
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GraphQueryOperation {
+    /// Build full graph view from root entity
+    View,
+    /// Focus on a specific node with neighborhood
+    Focus,
+    /// Filter graph by criteria
+    Filter,
+    /// Group nodes by attribute
+    GroupBy,
+    /// Find shortest path between two nodes
+    Path,
+    /// Find all connected nodes from a starting point
+    FindConnected,
+    /// Compare two graph states (snapshots)
+    Compare,
+    /// Find all ancestors of a node (BFS upward)
+    Ancestors,
+    /// Find all descendants of a node (BFS downward)
+    Descendants,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -906,6 +961,10 @@ pub enum ReturnTypeConfig {
     BatchControlResult,
     /// Alias for TemplateBatchResult (used in YAML)
     BatchResult,
+    /// Graph query result - returns GraphViewModel
+    GraphResult,
+    /// Path query result - returns list of paths
+    PathResult,
 }
 
 // =============================================================================

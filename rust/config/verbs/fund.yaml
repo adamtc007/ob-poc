@@ -83,6 +83,48 @@ domains:
             required: false
             maps_to: financial_year_end
             description: "Month-day format, e.g., 12-31"
+          # GLEIF fields
+          - name: lei
+            type: string
+            required: false
+            maps_to: lei
+            description: Legal Entity Identifier (20 chars)
+          - name: gleif-status
+            type: string
+            required: false
+            maps_to: gleif_status
+            validation:
+              enum: [ACTIVE, INACTIVE, NULL]
+          - name: gleif-category
+            type: string
+            required: false
+            maps_to: gleif_category
+            validation:
+              enum: [FUND, GENERAL, BRANCH, SOLE_PROPRIETOR]
+          - name: gleif-legal-form-id
+            type: string
+            required: false
+            maps_to: gleif_legal_form_id
+            description: ELF code (e.g., UDY2)
+          - name: gleif-registered-as
+            type: string
+            required: false
+            maps_to: gleif_registered_as
+            description: Registry identifier
+          - name: gleif-registered-at
+            type: string
+            required: false
+            maps_to: gleif_registered_at
+            description: Registration authority code
+          - name: legal-address-city
+            type: string
+            required: false
+            maps_to: legal_address_city
+          - name: legal-address-country
+            type: string
+            required: false
+            maps_to: legal_address_country
+            description: ISO 2-letter country code
         returns:
           type: uuid
           name: entity_id
@@ -145,6 +187,28 @@ domains:
             required: false
             maps_to: isin_base
             description: Base ISIN (share classes will have variants)
+          # GLEIF fields
+          - name: lei
+            type: string
+            required: false
+            maps_to: lei
+            description: Legal Entity Identifier (20 chars)
+          - name: gleif-status
+            type: string
+            required: false
+            maps_to: gleif_status
+          - name: gleif-category
+            type: string
+            required: false
+            maps_to: gleif_category
+          - name: legal-address-city
+            type: string
+            required: false
+            maps_to: legal_address_city
+          - name: legal-address-country
+            type: string
+            required: false
+            maps_to: legal_address_country
         returns:
           type: uuid
           name: entity_id
@@ -280,6 +344,28 @@ domains:
             type: string
             required: true
             maps_to: base_currency
+          # GLEIF fields
+          - name: lei
+            type: string
+            required: false
+            maps_to: lei
+            description: Legal Entity Identifier (20 chars)
+          - name: gleif-status
+            type: string
+            required: false
+            maps_to: gleif_status
+          - name: gleif-category
+            type: string
+            required: false
+            maps_to: gleif_category
+          - name: legal-address-city
+            type: string
+            required: false
+            maps_to: legal_address_city
+          - name: legal-address-country
+            type: string
+            required: false
+            maps_to: legal_address_country
         returns:
           type: uuid
           name: entity_id
@@ -341,6 +427,40 @@ domains:
             type: string
             required: false
             maps_to: financial_year_end
+          # GLEIF fields
+          - name: lei
+            type: string
+            required: false
+            maps_to: lei
+            description: Legal Entity Identifier (20 chars)
+          - name: gleif-status
+            type: string
+            required: false
+            maps_to: gleif_status
+          - name: gleif-category
+            type: string
+            required: false
+            maps_to: gleif_category
+          - name: gleif-legal-form-id
+            type: string
+            required: false
+            maps_to: gleif_legal_form_id
+          - name: gleif-registered-as
+            type: string
+            required: false
+            maps_to: gleif_registered_as
+          - name: gleif-registered-at
+            type: string
+            required: false
+            maps_to: gleif_registered_at
+          - name: legal-address-city
+            type: string
+            required: false
+            maps_to: legal_address_city
+          - name: legal-address-country
+            type: string
+            required: false
+            maps_to: legal_address_country
         returns:
           type: uuid
           name: entity_id
@@ -400,6 +520,27 @@ domains:
             type: string
             required: false
             maps_to: isin_base
+          # GLEIF fields
+          - name: lei
+            type: string
+            required: false
+            maps_to: lei
+          - name: gleif-status
+            type: string
+            required: false
+            maps_to: gleif_status
+          - name: gleif-category
+            type: string
+            required: false
+            maps_to: gleif_category
+          - name: legal-address-city
+            type: string
+            required: false
+            maps_to: legal_address_city
+          - name: legal-address-country
+            type: string
+            required: false
+            maps_to: legal_address_country
         returns:
           type: uuid
           name: entity_id
@@ -508,6 +649,27 @@ domains:
             type: string
             required: true
             maps_to: base_currency
+          # GLEIF fields
+          - name: lei
+            type: string
+            required: false
+            maps_to: lei
+          - name: gleif-status
+            type: string
+            required: false
+            maps_to: gleif_status
+          - name: gleif-category
+            type: string
+            required: false
+            maps_to: gleif_category
+          - name: legal-address-city
+            type: string
+            required: false
+            maps_to: legal_address_city
+          - name: legal-address-country
+            type: string
+            required: false
+            maps_to: legal_address_country
         returns:
           type: uuid
           name: entity_id
@@ -569,6 +731,27 @@ domains:
                 - NON_US
                 - INSTITUTIONAL
                 - RETAIL
+          # GLEIF fields
+          - name: lei
+            type: string
+            required: false
+            maps_to: lei
+          - name: gleif-status
+            type: string
+            required: false
+            maps_to: gleif_status
+          - name: gleif-category
+            type: string
+            required: false
+            maps_to: gleif_category
+          - name: legal-address-city
+            type: string
+            required: false
+            maps_to: legal_address_city
+          - name: legal-address-country
+            type: string
+            required: false
+            maps_to: legal_address_country
         returns:
           type: uuid
           name: entity_id

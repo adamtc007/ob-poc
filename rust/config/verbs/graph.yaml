@@ -1,0 +1,373 @@
+# Graph DSL Domain
+#
+# This domain provides verbs for graph visualization and traversal.
+# These verbs do NOT modify data - they query and transform graph structures.
+#
+# Output: All verbs return GraphViewModel (see rust/src/graph/view_model.rs)
+
+version: "1.0"
+
+domains:
+  graph:
+    description: "Graph visualization and traversal operations"
+    verbs:
+      # =========================================================================
+      # VIEW OPERATIONS
+      # =========================================================================
+
+      view:
+        description: "Build full graph view from a CBU root"
+        behavior: graph_query
+        graph_query:
+          operation: view
+          root_type: cbu
+          max_depth: 10
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU to visualize"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+              resolution_mode: entity
+          - name: view-mode
+            type: string
+            required: false
+            default: "KYC_UBO"
+            valid_values:
+              - KYC_UBO
+              - UBO_ONLY
+              - SERVICE_DELIVERY
+              - CUSTODY
+              - PRODUCTS_ONLY
+            description: "View mode determining which layers and edges to include"
+          - name: max-depth
+            type: integer
+            required: false
+            default: 10
+            description: "Maximum traversal depth from root"
+        returns:
+          type: graph_result
+          capture: true
+
+      focus:
+        description: "Focus on a specific node with its immediate neighborhood"
+        behavior: graph_query
+        graph_query:
+          operation: focus
+          root_type: entity
+          max_depth: 2
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU context for the focus"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+              resolution_mode: entity
+          - name: entity-id
+            type: uuid
+            required: true
+            description: "Entity to focus on"
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+              resolution_mode: entity
+          - name: depth
+            type: integer
+            required: false
+            default: 2
+            description: "Depth of neighborhood to include"
+        returns:
+          type: graph_result
+          capture: true
+
+      # =========================================================================
+      # FILTER & GROUP OPERATIONS
+      # =========================================================================
+
+      filter:
+        description: "Filter graph by criteria (node types, layers, roles, etc.)"
+        behavior: graph_query
+        graph_query:
+          operation: filter
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU to filter"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+              resolution_mode: entity
+          - name: node-types
+            type: string_list
+            required: false
+            description: "Node types to include (entity, product, service, etc.)"
+          - name: edge-types
+            type: string_list
+            required: false
+            description: "Edge types to include (owns, controls, has_role, etc.)"
+          - name: layers
+            type: string_list
+            required: false
+            description: "Layers to include (core, ubo, kyc, services, custody)"
+          - name: role
+            type: string
+            required: false
+            description: "Filter to entities with this role"
+            lookup:
+              table: roles
+              schema: ob-poc
+              entity_type: role
+              search_key: name
+              primary_key: name
+          - name: jurisdiction
+            type: string
+            required: false
+            description: "Filter to entities in this jurisdiction"
+            lookup:
+              table: master_jurisdictions
+              schema: ob-poc
+              entity_type: jurisdiction
+              search_key: jurisdiction_code
+              primary_key: jurisdiction_code
+          - name: search
+            type: string
+            required: false
+            description: "Text search filter on node labels"
+        returns:
+          type: graph_result
+          capture: true
+
+      group-by:
+        description: "Group nodes by an attribute (jurisdiction, role, type, etc.)"
+        behavior: graph_query
+        graph_query:
+          operation: group_by
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU to group"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+              resolution_mode: entity
+          - name: group-by
+            type: string
+            required: true
+            valid_values:
+              - jurisdiction
+              - role
+              - layer
+              - type
+              - status
+              - entity_category
+            description: "Attribute to group nodes by"
+        returns:
+          type: graph_result
+          capture: true
+
+      # =========================================================================
+      # PATH & TRAVERSAL OPERATIONS
+      # =========================================================================
+
+      path:
+        description: "Find shortest path between two nodes"
+        behavior: graph_query
+        graph_query:
+          operation: path
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU context for path finding"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+              resolution_mode: entity
+          - name: from-entity-id
+            type: uuid
+            required: true
+            description: "Starting entity"
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+              resolution_mode: entity
+          - name: to-entity-id
+            type: uuid
+            required: true
+            description: "Target entity"
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+              resolution_mode: entity
+          - name: edge-types
+            type: string_list
+            required: false
+            description: "Restrict path to these edge types"
+        returns:
+          type: path_result
+          capture: true
+
+      find-connected:
+        description: "Find all nodes connected to a starting point within depth"
+        behavior: graph_query
+        graph_query:
+          operation: find_connected
+          max_depth: 5
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU context"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+              resolution_mode: entity
+          - name: entity-id
+            type: uuid
+            required: true
+            description: "Starting entity"
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+              resolution_mode: entity
+          - name: max-depth
+            type: integer
+            required: false
+            default: 5
+            description: "Maximum traversal depth"
+          - name: edge-types
+            type: string_list
+            required: false
+            description: "Restrict to these edge types"
+        returns:
+          type: graph_result
+          capture: true
+
+      ancestors:
+        description: "Find all ancestors (owners/controllers) of an entity"
+        behavior: graph_query
+        graph_query:
+          operation: ancestors
+          edge_types:
+            - owns
+            - controls
+          max_depth: 10
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            description: "Entity to trace upward from"
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+              resolution_mode: entity
+          - name: max-depth
+            type: integer
+            required: false
+            default: 10
+            description: "Maximum depth to traverse"
+        returns:
+          type: graph_result
+          capture: true
+
+      descendants:
+        description: "Find all descendants (owned/controlled entities) of an entity"
+        behavior: graph_query
+        graph_query:
+          operation: descendants
+          edge_types:
+            - owns
+            - controls
+          max_depth: 10
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            description: "Entity to trace downward from"
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+              resolution_mode: entity
+          - name: max-depth
+            type: integer
+            required: false
+            default: 10
+            description: "Maximum depth to traverse"
+        returns:
+          type: graph_result
+          capture: true
+
+      # =========================================================================
+      # COMPARISON OPERATIONS
+      # =========================================================================
+
+      compare:
+        description: "Compare two graph snapshots to find differences"
+        behavior: graph_query
+        graph_query:
+          operation: compare
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU to compare snapshots for"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+              resolution_mode: entity
+          - name: left-snapshot-id
+            type: uuid
+            required: true
+            description: "Left (before) snapshot ID"
+          - name: right-snapshot-id
+            type: uuid
+            required: true
+            description: "Right (after) snapshot ID"
+        returns:
+          type: graph_result
+          capture: true
