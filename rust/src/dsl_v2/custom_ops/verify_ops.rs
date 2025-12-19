@@ -92,8 +92,7 @@ impl CustomOperation for VerifyDetectPatternsOp {
             sqlx::query(
                 r#"INSERT INTO "ob-poc".detected_patterns
                    (cbu_id, case_id, pattern_type, severity, description, involved_entities, evidence)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7)
-                   ON CONFLICT DO NOTHING"#,
+                   VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
             )
             .bind(cbu_id)
             .bind(case_id)

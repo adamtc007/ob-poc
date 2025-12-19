@@ -360,6 +360,7 @@ pub struct Challenge {
 }
 
 /// Type of challenge
+/// Aligned with DB CHECK constraint: INCONSISTENCY, LOW_CONFIDENCE, MISSING_CORROBORATION, PATTERN_DETECTED, EVASION_SIGNAL, REGISTRY_MISMATCH
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ChallengeType {
@@ -373,10 +374,9 @@ pub enum ChallengeType {
     PatternDetected,
     /// Registry verification failed
     RegistryMismatch,
-    /// Evasion behavior detected
-    EvasionDetected,
-    /// Missing required information
-    MissingRequired,
+    /// Evasion behavior detected (stored as EVASION_SIGNAL in DB)
+    #[serde(rename = "EVASION_SIGNAL")]
+    EvasionSignal,
 }
 
 /// Severity of challenge
@@ -469,6 +469,7 @@ pub struct Escalation {
 }
 
 /// Escalation authority level
+/// Aligned with DB CHECK constraint: SENIOR_ANALYST, COMPLIANCE_OFFICER, MLRO, COMMITTEE
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum EscalationLevel {
@@ -480,8 +481,6 @@ pub enum EscalationLevel {
     Mlro,
     /// Risk committee
     Committee,
-    /// Board level
-    Board,
 }
 
 /// Escalation workflow status

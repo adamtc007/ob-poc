@@ -744,6 +744,7 @@ mod tests {
                 produces: None,
                 consumes: vec![],
                 lifecycle: None,
+                graph_query: None,
                 handler: None,
                 crud: Some(CrudConfig {
                     operation: CrudOperation::Insert,

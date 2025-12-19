@@ -200,7 +200,8 @@ pub struct GleifRegistration {
 
 /// Verifies entity information against external registries
 pub struct RegistryVerifier {
-    /// GLEIF API base URL
+    /// GLEIF API base URL (will be used when real API integration is implemented)
+    #[allow(dead_code)]
     gleif_base_url: String,
 }
 
@@ -294,7 +295,7 @@ impl RegistryVerifier {
         &self,
         entity_id: Uuid,
         name: &str,
-        jurisdiction: Option<&str>,
+        _jurisdiction: Option<&str>,
     ) -> RegistryCheckResult {
         // STUB: In production, this would call:
         // GET https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]={name}
@@ -325,7 +326,7 @@ impl RegistryVerifier {
         &self,
         entity_id: Uuid,
         company_number: &str,
-        claimed_name: Option<&str>,
+        _claimed_name: Option<&str>,
     ) -> RegistryCheckResult {
         // STUB: Would call Companies House API
         // GET https://api.company-information.service.gov.uk/company/{number}

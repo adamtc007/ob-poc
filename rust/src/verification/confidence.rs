@@ -299,6 +299,7 @@ impl ConfidenceCalculator {
         let pattern_penalty: f64 = patterns
             .iter()
             .map(|severity| match severity {
+                PatternSeverity::Info => 0.0, // Info patterns are informational, no penalty
                 PatternSeverity::Low => self.config.pattern_penalty_low,
                 PatternSeverity::Medium => self.config.pattern_penalty_medium,
                 PatternSeverity::High => self.config.pattern_penalty_high,
@@ -378,6 +379,8 @@ impl Default for ConfidenceCalculator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::verification::types::{Evidence, EvidenceSource};
+    use chrono::Duration;
     use uuid::Uuid;
 
     fn make_evidence(source: EvidenceSource, confidence: f64, authoritative: bool) -> Evidence {

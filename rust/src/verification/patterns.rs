@@ -70,9 +70,12 @@ impl std::fmt::Display for PatternType {
 }
 
 /// Severity of detected pattern
+/// Aligned with DB CHECK constraint: INFO, LOW, MEDIUM, HIGH, CRITICAL
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum PatternSeverity {
+    /// Informational only, no action required
+    Info,
     /// Minor concern, informational
     Low,
     /// Moderate concern, needs review
@@ -101,6 +104,7 @@ impl PatternSeverity {
     /// Convert to string representation
     pub fn as_str(&self) -> &'static str {
         match self {
+            PatternSeverity::Info => "INFO",
             PatternSeverity::Low => "LOW",
             PatternSeverity::Medium => "MEDIUM",
             PatternSeverity::High => "HIGH",
@@ -553,8 +557,7 @@ impl PatternDetector {
         )
         .bind(cbu_id)
         .bind(
-            self
-                .config
+            self.config
                 .nominee_role_indicators
                 .iter()
                 .cloned()
@@ -602,8 +605,7 @@ impl PatternDetector {
         )
         .bind(cbu_id)
         .bind(
-            self
-                .config
+            self.config
                 .opacity_jurisdictions
                 .iter()
                 .cloned()

@@ -6077,6 +6077,93 @@ The legacy `ResourceDependencyGraph` in `onboarding.rs` is deprecated. New code 
 | `graph.add_dependency()` | Use DB table `entity_type_dependencies` |
 | `graph.topological_sort()` | `topological_sort_unified(&instances)` |
 
+## Database Development Practices
+
+### ⛔ MANDATORY: SQLx Compile-Time Verification
+
+When making ANY database schema changes, you MUST reconcile the database schema with Rust types.
+
+**Why this matters:**
+
+SQLx performs compile-time verification against the actual PostgreSQL schema. This catches type mismatches, missing columns, and schema drift that would:
+- Compile fine in Java/Hibernate
+- Pass mocked unit tests
+- Fail at RUNTIME in production
+- Or worse: silently corrupt data
+
+**With SQLx + Rust, these errors are caught at COMPILE TIME - before any code runs.**
+
+### Verification Workflow
+
+After ANY schema change (new table, altered column, new index):
+
+```bash
+# 1. Apply your migration
+psql -d data_designer -f your_migration.sql
+
+# 2. Regenerate SQLx offline data
+cd rust
+cargo sqlx prepare --workspace
+
+# 3. Build and verify - this will catch mismatches
+cargo build
+
+# 4. Fix any type mismatches between:
+#    - PostgreSQL schema (source of truth)
+#    - SQLx query macros (query_as!, query!)
+#    - Rust struct definitions
+```
+
+### Common Mismatches to Watch For
+
+| PostgreSQL Type | Rust Type | Notes |
+|-----------------|-----------|-------|
+| `UUID` | `Uuid` (from uuid crate) | Not `String` |
+| `TIMESTAMPTZ` | `DateTime<Utc>` (from chrono) | Not `NaiveDateTime` |
+| `VARCHAR(n)` / `TEXT` | `String` | |
+| `INTEGER` | `i32` | Not `i64` |
+| `BIGINT` | `i64` | Not `i32` |
+| `NUMERIC` / `DECIMAL` | `BigDecimal` or `rust_decimal::Decimal` | Not `f64` for money |
+| `BOOLEAN` | `bool` | |
+| `JSONB` | `serde_json::Value` or typed struct | |
+| `column NULLABLE` | `Option<T>` | Missing `Option` = runtime panic |
+| `column NOT NULL` | `T` (not Option) | |
+
+### Evidence: This Works
+
+During development, SQLx compile-time checks discovered multiple type mismatches between the database schema and Rust code. Every error found would have:
+
+- ✅ Compiled in Java/Hibernate  
+- ✅ Passed mocked unit tests
+- ❌ Failed at runtime in production
+
+**This is not theoretical. This is concrete evidence that compile-time schema verification catches real bugs.**
+
+### Schema Change Checklist
+
+- [ ] Migration SQL written and reviewed
+- [ ] Migration applied to local database
+- [ ] `cargo sqlx prepare --workspace` run
+- [ ] `cargo build` passes (no type mismatches)
+- [ ] Relevant Rust structs updated if needed
+- [ ] Tests pass with real database (not mocks)
+
+### Why Not Hibernate/ORM?
+
+Traditional ORMs like Hibernate:
+- Validate schema at runtime (when first query runs)
+- Allow string column names that don't exist (`@Column(name = "ammount")` - typo compiles fine)
+- Type coercion can hide mismatches until production
+- Mocked tests bypass all schema validation
+
+SQLx:
+- Validates at compile time against real database
+- Typos in column names = compile error
+- Type mismatches = compile error
+- Cannot deploy code with schema drift
+
+**The "complexity" of Rust/SQLx pays for itself in correctness.**
+
 ## Agent Workflow (Conductor Mode)
 
 This repository uses a **conductor pattern** for agent interactions. The full contract is in `CONDUCTOR_MODE.md`. Key principles:

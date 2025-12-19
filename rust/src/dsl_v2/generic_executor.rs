@@ -161,6 +161,7 @@ enum SqlValue {
     Date(chrono::NaiveDate),
     Timestamp(chrono::DateTime<chrono::Utc>),
     StringArray(Vec<String>),
+    UuidArray(Vec<Uuid>),
     #[allow(dead_code)]
     Null,
 }
@@ -2084,6 +2085,21 @@ impl GenericCrudExecutor {
                 let uuid = Uuid::parse_str(s)?;
                 Ok(SqlValue::Uuid(uuid))
             }
+            ArgType::UuidArray => {
+                let arr = value
+                    .as_array()
+                    .ok_or_else(|| anyhow!("Expected array for {}", arg.name))?;
+                let uuids: Vec<Uuid> = arr
+                    .iter()
+                    .map(|v| {
+                        let s = v
+                            .as_str()
+                            .ok_or_else(|| anyhow!("Expected UUID string in array"))?;
+                        Uuid::parse_str(s).map_err(|e| anyhow!("Invalid UUID: {}", e))
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                Ok(SqlValue::UuidArray(uuids))
+            }
             ArgType::Integer => {
                 let n = value
                     .as_i64()
@@ -2405,6 +2421,7 @@ impl GenericCrudExecutor {
             SqlValue::Date(d) => query.bind(*d),
             SqlValue::Timestamp(t) => query.bind(*t),
             SqlValue::StringArray(arr) => query.bind(arr.clone()),
+            SqlValue::UuidArray(arr) => query.bind(arr.clone()),
             SqlValue::Null => query.bind(Option::<String>::None),
         }
     }

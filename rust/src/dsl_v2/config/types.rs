@@ -364,6 +364,9 @@ pub enum ArgType {
     Date,
     Timestamp,
     Uuid,
+    /// Array of UUIDs
+    #[serde(rename = "uuid_array")]
+    UuidArray,
     Json,
     Lookup,
     StringList,
