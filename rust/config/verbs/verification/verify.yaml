@@ -1,0 +1,653 @@
+domains:
+  verify:
+    description: Adversarial verification - challenge/response workflow, pattern detection, confidence assessment
+    verbs:
+      # ============================================
+      # Pattern Detection
+      # ============================================
+      detect-patterns:
+        description: Run adversarial pattern detection on CBU (circular ownership, layering, nominees, opacity)
+        behavior: plugin
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: case-id
+          type: uuid
+          required: false
+          lookup:
+            table: cases
+            entity_type: kyc_case
+            schema: kyc
+            search_key: case_id
+            primary_key: case_id
+        returns:
+          type: record_set
+          description: Detected patterns with severity and involved entities
+
+      detect-evasion:
+        description: Analyze doc_request history for evasion signals (delays, selective response, changing explanations)
+        behavior: plugin
+        args:
+        - name: case-id
+          type: uuid
+          required: true
+          lookup:
+            table: cases
+            entity_type: kyc_case
+            schema: kyc
+            search_key: case_id
+            primary_key: case_id
+        returns:
+          type: record
+          description: Evasion report with signals, severity, and recommendation
+
+      # ============================================
+      # Challenge Workflow
+      # ============================================
+      challenge:
+        description: Raise formal verification challenge requiring client response
+        behavior: crud
+        crud:
+          operation: insert
+          table: verification_challenges
+          schema: ob-poc
+          returning: challenge_id
+        emits_event: verify.challenge-raised
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+          maps_to: cbu_id
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: case-id
+          type: uuid
+          required: false
+          maps_to: case_id
+          lookup:
+            table: cases
+            entity_type: kyc_case
+            schema: kyc
+            search_key: case_id
+            primary_key: case_id
+        - name: entity-id
+          type: uuid
+          required: false
+          maps_to: entity_id
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        - name: allegation-id
+          type: uuid
+          required: false
+          maps_to: allegation_id
+          lookup:
+            table: client_allegations
+            entity_type: allegation
+            schema: ob-poc
+            search_key: allegation_id
+            primary_key: allegation_id
+        - name: observation-id
+          type: uuid
+          required: false
+          maps_to: observation_id
+          lookup:
+            table: attribute_observations
+            entity_type: observation
+            schema: ob-poc
+            search_key: observation_id
+            primary_key: observation_id
+        - name: challenge-type
+          type: string
+          required: true
+          maps_to: challenge_type
+          valid_values:
+          - INCONSISTENCY
+          - LOW_CONFIDENCE
+          - MISSING_CORROBORATION
+          - PATTERN_DETECTED
+          - EVASION_SIGNAL
+          - REGISTRY_MISMATCH
+        - name: reason
+          type: string
+          required: true
+          maps_to: challenge_reason
+        - name: severity
+          type: string
+          required: true
+          maps_to: severity
+          valid_values:
+          - INFO
+          - LOW
+          - MEDIUM
+          - HIGH
+          - CRITICAL
+        - name: raised-by
+          type: string
+          required: false
+          maps_to: raised_by
+        returns:
+          type: uuid
+          name: challenge_id
+          capture: true
+
+      respond-to-challenge:
+        description: Record client response to verification challenge
+        behavior: crud
+        crud:
+          operation: update
+          table: verification_challenges
+          schema: ob-poc
+          key: challenge_id
+          set_values:
+            status: RESPONDED
+            responded_at: now()
+        emits_event: verify.challenge-responded
+        args:
+        - name: challenge-id
+          type: uuid
+          required: true
+          maps_to: challenge_id
+          lookup:
+            table: verification_challenges
+            entity_type: verification_challenge
+            schema: ob-poc
+            search_key: challenge_id
+            primary_key: challenge_id
+        - name: response-text
+          type: string
+          required: true
+          maps_to: response_text
+        - name: evidence-ids
+          type: uuid_array
+          required: false
+          maps_to: response_evidence_ids
+        returns:
+          type: affected
+
+      resolve-challenge:
+        description: Resolve verification challenge (accept/reject/escalate)
+        behavior: crud
+        crud:
+          operation: update
+          table: verification_challenges
+          schema: ob-poc
+          key: challenge_id
+          set_values:
+            resolved_at: now()
+        emits_event: verify.challenge-resolved
+        args:
+        - name: challenge-id
+          type: uuid
+          required: true
+          maps_to: challenge_id
+          lookup:
+            table: verification_challenges
+            entity_type: verification_challenge
+            schema: ob-poc
+            search_key: challenge_id
+            primary_key: challenge_id
+        - name: resolution-type
+          type: string
+          required: true
+          maps_to: resolution_type
+          valid_values:
+          - ACCEPTED
+          - REJECTED
+          - WAIVED
+          - ESCALATED
+        - name: status
+          type: string
+          required: true
+          maps_to: status
+          valid_values:
+          - RESOLVED
+          - ESCALATED
+        - name: resolved-by
+          type: string
+          required: true
+          maps_to: resolved_by
+        - name: notes
+          type: string
+          required: false
+          maps_to: resolution_notes
+        returns:
+          type: affected
+
+      list-challenges:
+        description: List verification challenges for CBU or case
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: verification_challenges
+          schema: ob-poc
+          fk_col: cbu_id
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: status
+          type: string
+          required: false
+          maps_to: status
+          valid_values:
+          - OPEN
+          - RESPONDED
+          - RESOLVED
+          - ESCALATED
+        - name: severity
+          type: string
+          required: false
+          maps_to: severity
+        returns:
+          type: record_set
+
+      # ============================================
+      # Escalation Workflow
+      # ============================================
+      escalate:
+        description: Escalate verification issue to higher authority
+        behavior: crud
+        crud:
+          operation: insert
+          table: verification_escalations
+          schema: ob-poc
+          returning: escalation_id
+        emits_event: verify.escalated
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+          maps_to: cbu_id
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: case-id
+          type: uuid
+          required: false
+          maps_to: case_id
+          lookup:
+            table: cases
+            entity_type: kyc_case
+            schema: kyc
+            search_key: case_id
+            primary_key: case_id
+        - name: challenge-id
+          type: uuid
+          required: false
+          maps_to: challenge_id
+          lookup:
+            table: verification_challenges
+            entity_type: verification_challenge
+            schema: ob-poc
+            search_key: challenge_id
+            primary_key: challenge_id
+        - name: level
+          type: string
+          required: true
+          maps_to: escalation_level
+          valid_values:
+          - SENIOR_ANALYST
+          - COMPLIANCE_OFFICER
+          - MLRO
+          - COMMITTEE
+        - name: reason
+          type: string
+          required: true
+          maps_to: escalation_reason
+        - name: risk-indicators
+          type: json
+          required: false
+          maps_to: risk_indicators
+        - name: escalated-by
+          type: string
+          required: false
+          maps_to: escalated_by
+        returns:
+          type: uuid
+          name: escalation_id
+          capture: true
+
+      resolve-escalation:
+        description: Record escalation decision
+        behavior: crud
+        crud:
+          operation: update
+          table: verification_escalations
+          schema: ob-poc
+          key: escalation_id
+          set_values:
+            status: DECIDED
+            decided_at: now()
+        emits_event: verify.escalation-decided
+        args:
+        - name: escalation-id
+          type: uuid
+          required: true
+          maps_to: escalation_id
+          lookup:
+            table: verification_escalations
+            entity_type: verification_escalation
+            schema: ob-poc
+            search_key: escalation_id
+            primary_key: escalation_id
+        - name: decision
+          type: string
+          required: true
+          maps_to: decision
+          valid_values:
+          - APPROVE
+          - REJECT
+          - REQUIRE_MORE_INFO
+          - ESCALATE_FURTHER
+        - name: decided-by
+          type: string
+          required: true
+          maps_to: decided_by
+        - name: notes
+          type: string
+          required: false
+          maps_to: decision_notes
+        returns:
+          type: affected
+
+      list-escalations:
+        description: List escalations for CBU
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: verification_escalations
+          schema: ob-poc
+          fk_col: cbu_id
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: status
+          type: string
+          required: false
+          maps_to: status
+          valid_values:
+          - PENDING
+          - UNDER_REVIEW
+          - DECIDED
+        - name: level
+          type: string
+          required: false
+          maps_to: escalation_level
+        returns:
+          type: record_set
+
+      # ============================================
+      # Confidence & Status
+      # ============================================
+      calculate-confidence:
+        description: Aggregate confidence score across observations for entity/attribute
+        behavior: plugin
+        args:
+        - name: entity-id
+          type: uuid
+          required: true
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        - name: attribute
+          type: string
+          required: false
+          description: Specific attribute to calculate (omit for all attributes)
+        returns:
+          type: record
+          description: Confidence result with score, band, breakdown
+
+      get-status:
+        description: Get comprehensive verification status report for CBU
+        behavior: plugin
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        returns:
+          type: record
+          description: Full verification status with patterns, challenges, escalations, confidence
+
+      verify-against-registry:
+        description: Check entity against external registry (GLEIF, Companies House)
+        behavior: plugin
+        args:
+        - name: entity-id
+          type: uuid
+          required: true
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        - name: registry
+          type: string
+          required: true
+          valid_values:
+          - GLEIF
+          - COMPANIES_HOUSE
+          - SEC_EDGAR
+          - LUXEMBOURG_RCS
+        returns:
+          type: record
+          description: Registry check result with match status and field comparisons
+
+      assert:
+        description: Declarative gate - assert minimum confidence threshold for CBU/entity
+        behavior: plugin
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: entity-id
+          type: uuid
+          required: false
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        - name: min-confidence
+          type: number
+          required: true
+          description: Minimum confidence score required (0.0-1.0)
+        - name: fail-action
+          type: string
+          required: false
+          default: error
+          valid_values:
+          - error
+          - warn
+          - block
+          description: Action to take if assertion fails
+        returns:
+          type: record
+          description: Assertion result with pass/fail status and details
+
+      # ============================================
+      # Pattern CRUD (for manual pattern management)
+      # ============================================
+      record-pattern:
+        description: Manually record a detected pattern
+        behavior: crud
+        crud:
+          operation: insert
+          table: detected_patterns
+          schema: ob-poc
+          returning: pattern_id
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+          maps_to: cbu_id
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: case-id
+          type: uuid
+          required: false
+          maps_to: case_id
+          lookup:
+            table: cases
+            entity_type: kyc_case
+            schema: kyc
+            search_key: case_id
+            primary_key: case_id
+        - name: pattern-type
+          type: string
+          required: true
+          maps_to: pattern_type
+          valid_values:
+          - CIRCULAR_OWNERSHIP
+          - LAYERING
+          - NOMINEE_USAGE
+          - OPACITY_JURISDICTION
+          - REGISTRY_MISMATCH
+          - OWNERSHIP_GAPS
+          - RECENT_RESTRUCTURING
+          - ROLE_CONCENTRATION
+        - name: severity
+          type: string
+          required: true
+          maps_to: severity
+          valid_values:
+          - INFO
+          - LOW
+          - MEDIUM
+          - HIGH
+          - CRITICAL
+        - name: description
+          type: string
+          required: true
+          maps_to: description
+        - name: involved-entities
+          type: uuid_array
+          required: true
+          maps_to: involved_entities
+        - name: evidence
+          type: json
+          required: false
+          maps_to: evidence
+        returns:
+          type: uuid
+          name: pattern_id
+          capture: true
+
+      resolve-pattern:
+        description: Resolve or dismiss a detected pattern
+        behavior: crud
+        crud:
+          operation: update
+          table: detected_patterns
+          schema: ob-poc
+          key: pattern_id
+          set_values:
+            resolved_at: now()
+        args:
+        - name: pattern-id
+          type: uuid
+          required: true
+          maps_to: pattern_id
+          lookup:
+            table: detected_patterns
+            entity_type: detected_pattern
+            schema: ob-poc
+            search_key: pattern_id
+            primary_key: pattern_id
+        - name: status
+          type: string
+          required: true
+          maps_to: status
+          valid_values:
+          - RESOLVED
+          - FALSE_POSITIVE
+        - name: resolved-by
+          type: string
+          required: true
+          maps_to: resolved_by
+        - name: notes
+          type: string
+          required: false
+          maps_to: resolution_notes
+        returns:
+          type: affected
+
+      list-patterns:
+        description: List detected patterns for CBU
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: detected_patterns
+          schema: ob-poc
+          fk_col: cbu_id
+        args:
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: status
+          type: string
+          required: false
+          maps_to: status
+        - name: pattern-type
+          type: string
+          required: false
+          maps_to: pattern_type
+        returns:
+          type: record_set

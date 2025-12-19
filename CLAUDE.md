@@ -2264,6 +2264,141 @@ The KYC system includes a YAML-driven rules engine that automatically triggers a
 | rule_executions | Audit log of rule engine runs |
 
 
+## Adversarial Verification Module
+
+The verification module implements a game-theoretic "Trust But Verify → Distrust And Verify" model where every piece of information is treated as a CLAIM that must be VERIFIED. The standard: "Would this process catch a sophisticated liar?"
+
+### Architecture
+
+```
+rust/src/verification/
+├── mod.rs              # Module exports
+├── types.rs            # Claim, Evidence, Inconsistency types
+├── confidence.rs       # ConfidenceCalculator with weighted aggregation
+├── patterns.rs         # PatternDetector (circular ownership, layering, nominees)
+├── evasion.rs          # EvasionDetector (behavioral analysis)
+├── registry.rs         # GLEIF/Companies House verification stubs
+```
+
+### Confidence Calculation
+
+The `ConfidenceCalculator` aggregates evidence from multiple sources with weighted scoring:
+
+| Source Type | Base Weight | Description |
+|-------------|-------------|-------------|
+| GovernmentRegistry | 0.95 | Company house, LEI registry |
+| RegulatedEntity | 0.90 | Banks, regulated FIs |
+| AuditedFinancial | 0.85 | Audited financial statements |
+| Document | 0.70 | Extracted from documents |
+| ThirdParty | 0.60 | Third-party data providers |
+| Screening | 0.75 | Screening service results |
+| System | 0.80 | System-derived values |
+| Manual | 0.50 | Manual analyst entry |
+| Allegation | 0.30 | Client claims (low trust) |
+
+**Modifiers:**
+- Authoritative source bonus: +20%
+- Corroboration bonus: +10% per corroborating source (max +30%)
+- Recency decay: Exponential with 365-day half-life
+- Inconsistency penalty: -5% to -25% per inconsistency by severity
+- Pattern penalty: -5% to -40% per detected pattern by severity
+
+**Confidence Bands:**
+
+| Band | Score | Meaning |
+|------|-------|---------|
+| VERIFIED | ≥0.80 | High confidence, verified |
+| PROVISIONAL | ≥0.60 | Acceptable with caveats |
+| SUSPECT | ≥0.40 | Requires investigation |
+| REJECTED | <0.40 | Insufficient evidence |
+
+### Pattern Detection
+
+The `PatternDetector` identifies adversarial patterns in ownership structures:
+
+| Pattern | Detection Method | Severity |
+|---------|------------------|----------|
+| CircularOwnership | DFS cycle detection | CRITICAL |
+| Layering | Chain depth > 5 entities | HIGH |
+| NomineeUsage | Nominee/trustee role patterns | MEDIUM |
+| OpacityJurisdiction | BVI, Cayman, etc. | MEDIUM |
+| RegistryMismatch | GLEIF vs claims differ | HIGH |
+| OwnershipGaps | Ownership < 100% | MEDIUM |
+
+### Evasion Detection
+
+The `EvasionDetector` analyzes doc_request history for behavioral red flags:
+
+| Signal | Description | Severity |
+|--------|-------------|----------|
+| RepeatedDelays | Multiple deadline extensions | MEDIUM |
+| SelectiveResponse | Answers some, ignores others | HIGH |
+| DocumentQualityIssues | Blurry scans, partial docs | MEDIUM |
+| LowCompletionRate | < 50% document fulfillment | HIGH |
+| HighRejectionRate | > 30% documents rejected | HIGH |
+
+**Evasion Score Classification:**
+- < 0.3: LOW_RISK (proceed normally)
+- 0.3 - 0.6: MEDIUM_RISK (enhanced scrutiny)
+- 0.6 - 0.8: HIGH_RISK (escalate to senior analyst)
+- ≥ 0.8: CRITICAL_RISK (escalate to MLRO)
+
+### Database Tables
+
+| Table | Purpose |
+|-------|---------|
+| detected_patterns | Pattern detection audit trail |
+| verification_challenges | Challenge/response workflow |
+| verification_escalations | Risk-based escalation routing |
+
+### Verification Verbs
+
+| Verb | Type | Description |
+|------|------|-------------|
+| `verify.detect-patterns` | plugin | Run adversarial pattern detection on CBU |
+| `verify.detect-evasion` | plugin | Analyze doc_request history for evasion |
+| `verify.calculate-confidence` | plugin | Aggregate confidence for entity |
+| `verify.get-status` | plugin | Comprehensive verification status report |
+| `verify.verify-against-registry` | plugin | Check against GLEIF/Companies House |
+| `verify.assert` | plugin | Declarative confidence gate |
+| `verify.challenge` | crud | Raise formal challenge |
+| `verify.respond-to-challenge` | crud | Record client response |
+| `verify.resolve-challenge` | crud | Resolve challenge |
+| `verify.escalate` | crud | Route to higher authority |
+| `verify.resolve-escalation` | crud | Record escalation decision |
+| `verify.list-challenges` | crud | List challenges for CBU/case |
+
+### Example: Verification Flow
+
+```clojure
+;; 1. Run pattern detection on CBU
+(verify.detect-patterns :cbu-id @fund :case-id @case)
+
+;; 2. Analyze for evasion behavior
+(verify.detect-evasion :case-id @case)
+
+;; 3. Calculate confidence for an entity
+(verify.calculate-confidence :entity-id @director)
+
+;; 4. Get comprehensive status
+(verify.get-status :cbu-id @fund)
+
+;; 5. Verify against external registry
+(verify.verify-against-registry :entity-id @company :registry "GLEIF")
+
+;; 6. Assert minimum confidence gate
+(verify.assert :cbu-id @fund :min-confidence 0.70 :fail-action "block")
+
+;; 7. Raise a challenge if issues found
+(verify.challenge
+  :cbu-id @fund
+  :entity-id @director
+  :challenge-type "LOW_CONFIDENCE"
+  :reason "Confidence score 0.45 below threshold"
+  :severity "HIGH")
+```
+
+
 ## KYC Observation Model
 
 The observation model implements evidence-based KYC verification. Instead of storing a single "truth" per attribute, it captures multiple observations from various sources and reconciles them.
@@ -5667,6 +5802,26 @@ UBO ownership and control chain management
 | `ubo.trace-chains` | Trace all ownership chains to natural persons for a CBU |
 | `ubo.update-ownership` | Update ownership percentage or end date |
 | `ubo.verify-ubo` | Mark a UBO as verified |
+
+### verify
+
+Adversarial verification for KYC (game-theoretic "Distrust And Verify" model)
+
+| Verb | Description |
+|------|-------------|
+| `verify.assert` | Declarative confidence gate (blocks if below threshold) |
+| `verify.calculate-confidence` | Aggregate confidence for entity from observations |
+| `verify.challenge` | Raise formal verification challenge |
+| `verify.detect-evasion` | Analyze doc_request history for evasion signals |
+| `verify.detect-patterns` | Run adversarial pattern detection on CBU |
+| `verify.escalate` | Route challenge to higher authority |
+| `verify.get-status` | Comprehensive verification status report |
+| `verify.list-challenges` | List challenges for CBU/case |
+| `verify.list-escalations` | List escalations for CBU/case |
+| `verify.respond-to-challenge` | Record client response to challenge |
+| `verify.resolve-challenge` | Resolve challenge (accept/reject/waive) |
+| `verify.resolve-escalation` | Record escalation decision |
+| `verify.verify-against-registry` | Check entity against GLEIF/Companies House |
 
 ### Reference Data Domains
 

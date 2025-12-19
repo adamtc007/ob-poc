@@ -1,4 +1,4 @@
-# TODO: Adaptive Agent Model (Intent → End State → Gaps → Verbs)
+# TODO: Adversarial Agent Model (Game Theory / Trust But Verify)
 
 ## ⛔ MANDATORY FIRST STEP
 
@@ -11,2113 +11,2135 @@
 
 ---
 
-## Overview
+## Overview: The Game
 
-This is the **agentic orchestration layer**. The agent doesn't follow workflows - 
-it closes gaps between current state and a defined end state.
+This is NOT a workflow system. This is an **adversarial verification game**.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  THE MODEL                                                                  │
+│  THE GAME                                                                   │
 │                                                                             │
-│  USER INTENT          "Make CBU @fund KYC ready"                           │
-│       │                                                                     │
-│       ▼                                                                     │
-│  END STATE MODEL      What does "KYC ready" mean? (declarative)            │
-│       │                                                                     │
-│       ▼                                                                     │
-│  GAP ANALYSIS         Current state vs End state = Gaps                    │
-│       │                                                                     │
-│       ▼                                                                     │
-│  VERB SELECTION       Which verbs close which gaps?                        │
-│       │                                                                     │
-│       ▼                                                                     │
-│  EXECUTION            Agent executes verbs via DSL engine                  │
-│       │                                                                     │
-│       ▼                                                                     │
-│  RE-EVALUATION        New state → New gaps → Continue until done           │
-│       │                                                                     │
-│       ▼                                                                     │
-│  FEEDBACK CAPTURE     Execution data → Model learning                      │
+│  PLAYER 1: AGENT (BNY)                 PLAYER 2: CLIENT                    │
+│  ═════════════════════                 ════════════════                     │
 │                                                                             │
-│  Agent moves the chess pieces (verbs) on the CBU/UBO board.               │
+│  GOAL: Establish TRUE UBO              GOAL: Achieve KYC clearance         │
+│                                                                             │
+│  WIN: Verified truth, would            LEGITIMATE: Wins with truth         │
+│       catch a sophisticated liar       ADVERSARIAL: Wins with lies         │
+│                                                                             │
+│  LOSE: Accept unverified claims        ADVERSARIAL WINS: False clearance   │
+│        (even if client honest)                                             │
+│                                                                             │
+│  ───────────────────────────────────────────────────────────────────────   │
+│                                                                             │
+│  THE BOARD: CBU/UBO Graph                                                  │
+│                                                                             │
+│  Every node and edge has:                                                  │
+│  - CLAIMED state (what client says)                                        │
+│  - VERIFIED state (what we've proven)                                      │
+│  - CONFIDENCE score (how sure are we?)                                     │
+│  - EVIDENCE chain (what supports this?)                                    │
+│                                                                             │
+│  ───────────────────────────────────────────────────────────────────────   │
+│                                                                             │
+│  WINNING CONDITION:                                                         │
+│                                                                             │
+│  NOT: "All gaps closed" (checklist thinking)                               │
+│  BUT: "All claims verified with high confidence" (adversarial thinking)    │
+│                                                                             │
+│  Standard: WOULD THIS CATCH A SOPHISTICATED LIAR?                          │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Part 1: End State Model
-
-### 1.1 Core Concepts
+## Core Principle: Trust But Verify → Distrust And Verify
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  END STATE = Collection of REQUIREMENTS that must ALL be satisfied         │
+│  OLD THINKING                          NEW THINKING                         │
+│  ════════════                          ════════════                         │
 │                                                                             │
-│  REQUIREMENT = A condition that can be:                                    │
-│    • Evaluated (true/false/partial)                                        │
-│    • Explained (why not met)                                               │
-│    • Resolved (which verbs can fix it)                                     │
+│  Gap = "missing data"                  Gap = "unverified claim"            │
+│  Close gap = "get data"                Close gap = "verify claim"          │
+│  Done = "all data present"             Done = "all claims proven"          │
 │                                                                             │
-│  GAP = Requirement that is NOT satisfied                                   │
-│    • Has a type (what's missing)                                           │
-│    • Has context (why it matters)                                          │
-│    • Has resolution paths (how to fix)                                     │
+│  Agent fills forms                     Agent plays adversary               │
+│  Client provides info                  Client proves claims                │
+│  Trust by default                      Distrust by default                 │
+│                                                                             │
+│  Success = checklist complete          Success = truth established         │
+│  Failure = checklist incomplete        Failure = false claim accepted      │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 1.2 End State Definition Schema
+---
 
-**File:** `rust/config/end_states/schema.yaml`
+## Part 1: Claim & Verification Model
 
-```yaml
-# End State Definition Schema
-# 
-# An end state is a goal the agent works toward.
-# It's composed of requirements that can be evaluated against current state.
+### 1.1 Core Types
 
-end_state:
-  # Unique identifier
-  id: string
-  
-  # Human readable name
-  name: string
-  
-  # What entity type this applies to
-  entity_type: string  # cbu, entity, kyc_case, etc.
-  
-  # Description for agent context
-  description: string
-  
-  # Requirements that must be met
-  requirements:
-    - id: string
-      name: string
-      description: string
-      
-      # How to evaluate this requirement
-      evaluation:
-        # Query to run (returns data for evaluation)
-        query: dsl_expression
-        # Condition that must be true
-        condition: expression
-        # What to check
-        type: enum [exists, count, status, all_of, any_of, custom]
-      
-      # What gaps mean when not met
-      gap:
-        type: string
-        severity: enum [blocking, warning, info]
-        message_template: string
-      
-      # How to resolve this gap
-      resolution:
-        # Verbs that can address this gap
-        verbs: [verb_pattern]
-        # Prerequisites (other requirements that must be met first)
-        requires: [requirement_id]
-        # Can agent auto-resolve or needs human?
-        auto_resolve: boolean
-        # Hints for agent
-        strategy: string
+**File:** `rust/src/verification/types.rs`
 
-  # Sub-requirements that depend on entity type, jurisdiction, etc.
-  conditional_requirements:
-    - condition: expression
-      requirements: [requirement]
+```rust
+//! Verification Model Types
+//!
+//! Every piece of information is a CLAIM that must be VERIFIED.
+
+use uuid::Uuid;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+
+/// A claim about something - could be true or false
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Claim {
+    /// Unique claim ID
+    pub id: Uuid,
+    
+    /// What is being claimed
+    pub claim_type: ClaimType,
+    
+    /// Subject of the claim (entity, relationship, attribute)
+    pub subject_id: Uuid,
+    pub subject_type: String,
+    
+    /// The actual claim content
+    pub content: ClaimContent,
+    
+    /// Who made this claim
+    pub source: ClaimSource,
+    
+    /// When was it claimed
+    pub claimed_at: DateTime<Utc>,
+    
+    /// Current verification status
+    pub verification: VerificationStatus,
+    
+    /// Confidence score (0.0 - 1.0)
+    pub confidence: f32,
+    
+    /// Evidence supporting or refuting
+    pub evidence: Vec<Evidence>,
+    
+    /// Any inconsistencies detected
+    pub inconsistencies: Vec<Inconsistency>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ClaimType {
+    /// Entity exists with these attributes
+    EntityExists,
+    /// A owns B with X%
+    Ownership { percentage: f32 },
+    /// A controls B (director, officer)
+    Control { role: String },
+    /// Person identity
+    PersonIdentity,
+    /// Jurisdiction of entity
+    Jurisdiction,
+    /// Entity is regulated/listed (exemption claim)
+    RegulatoryStatus,
+    /// Document is authentic
+    DocumentAuthenticity,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClaimContent {
+    /// Structured claim data
+    pub data: serde_json::Value,
+    /// Human readable description
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClaimSource {
+    /// Source type
+    pub source_type: SourceType,
+    /// Specific source identifier
+    pub source_id: Option<String>,
+    /// Document reference if applicable
+    pub document_id: Option<Uuid>,
+    /// When was this source consulted
+    pub retrieved_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum SourceType {
+    /// Direct government registry API
+    GovernmentRegistry,
+    /// GLEIF LEI database
+    Gleif,
+    /// Stock exchange listing
+    ExchangeListing,
+    /// Regulatory filing (SEC, CSSF, etc.)
+    RegulatoryFiling,
+    /// Audited financial statements
+    AuditedFinancials,
+    /// Notarized document
+    NotarizedDocument,
+    /// Client-provided certified document
+    ClientCertified,
+    /// Client-provided uncertified document
+    ClientUncertified,
+    /// Verbal or email claim
+    VerbalClaim,
+    /// Screening provider
+    ScreeningProvider,
+    /// Internal system
+    InternalSystem,
+}
+
+impl SourceType {
+    /// Base confidence for this source type
+    pub fn base_confidence(&self) -> f32 {
+        match self {
+            Self::GovernmentRegistry => 0.95,
+            Self::Gleif => 0.90,
+            Self::ExchangeListing => 0.90,
+            Self::RegulatoryFiling => 0.85,
+            Self::AuditedFinancials => 0.80,
+            Self::NotarizedDocument => 0.75,
+            Self::ClientCertified => 0.60,
+            Self::ClientUncertified => 0.40,
+            Self::VerbalClaim => 0.20,
+            Self::ScreeningProvider => 0.85,
+            Self::InternalSystem => 0.70,
+        }
+    }
+    
+    /// Is this an independent source (not from client)?
+    pub fn is_independent(&self) -> bool {
+        match self {
+            Self::GovernmentRegistry => true,
+            Self::Gleif => true,
+            Self::ExchangeListing => true,
+            Self::RegulatoryFiling => true,
+            Self::AuditedFinancials => true,
+            Self::ScreeningProvider => true,
+            Self::NotarizedDocument => false, // Client obtained it
+            Self::ClientCertified => false,
+            Self::ClientUncertified => false,
+            Self::VerbalClaim => false,
+            Self::InternalSystem => true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerificationStatus {
+    /// Overall status
+    pub status: VerificationState,
+    /// When last verified
+    pub verified_at: Option<DateTime<Utc>>,
+    /// Who/what verified it
+    pub verified_by: Option<String>,
+    /// Verification method used
+    pub method: Option<VerificationMethod>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum VerificationState {
+    /// Claim made but not yet verified
+    Claimed,
+    /// Verification in progress
+    Verifying,
+    /// Verified by independent source(s)
+    Verified,
+    /// Multiple sources corroborate
+    Corroborated,
+    /// Could not verify (no source found)
+    Unverifiable,
+    /// Verification found inconsistencies
+    Disputed,
+    /// Verified as FALSE
+    Refuted,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum VerificationMethod {
+    /// Direct registry lookup
+    RegistryLookup,
+    /// GLEIF API check
+    GleifVerification,
+    /// Document examination
+    DocumentReview,
+    /// Cross-reference multiple sources
+    CrossReference,
+    /// Screening check
+    ScreeningCheck,
+    /// Human analyst review
+    HumanReview,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Evidence {
+    /// Evidence ID
+    pub id: Uuid,
+    /// Type of evidence
+    pub evidence_type: EvidenceType,
+    /// Source of this evidence
+    pub source: ClaimSource,
+    /// Does this support or refute the claim?
+    pub supports_claim: bool,
+    /// Confidence contribution
+    pub confidence_impact: f32,
+    /// Reference to document/data
+    pub reference: Option<String>,
+    /// When obtained
+    pub obtained_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum EvidenceType {
+    /// Official document
+    Document,
+    /// Registry record
+    RegistryRecord,
+    /// API response data
+    ApiData,
+    /// Screening result
+    ScreeningResult,
+    /// Corroborating claim from another source
+    Corroboration,
+    /// Human analyst note
+    AnalystNote,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Inconsistency {
+    /// What is inconsistent
+    pub description: String,
+    /// Conflicting sources
+    pub source_a: ClaimSource,
+    pub source_b: ClaimSource,
+    /// Value from source A
+    pub value_a: String,
+    /// Value from source B
+    pub value_b: String,
+    /// Severity
+    pub severity: InconsistencySeverity,
+    /// Is this resolved?
+    pub resolved: bool,
+    /// Resolution notes
+    pub resolution: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum InconsistencySeverity {
+    /// Minor discrepancy (e.g., spelling)
+    Minor,
+    /// Significant but explainable
+    Moderate,
+    /// Serious - needs investigation
+    Serious,
+    /// Critical - potential fraud indicator
+    Critical,
+}
 ```
 
-### 1.3 KYC Ready End State
+### 1.2 Confidence Calculator
 
-**File:** `rust/config/end_states/kyc_ready.yaml`
+**File:** `rust/src/verification/confidence.rs`
+
+```rust
+//! Confidence Score Calculator
+//!
+//! Calculates confidence scores for claims based on evidence and modifiers.
+
+use super::types::*;
+
+/// Calculate confidence score for a claim
+pub fn calculate_confidence(claim: &Claim) -> f32 {
+    // Start with source base confidence
+    let mut confidence = claim.source.source_type.base_confidence();
+    
+    // Apply evidence modifiers
+    for evidence in &claim.evidence {
+        if evidence.supports_claim {
+            confidence += evidence.confidence_impact;
+        } else {
+            confidence -= evidence.confidence_impact;
+        }
+    }
+    
+    // Apply corroboration bonus
+    let corroboration_count = count_independent_corroborations(claim);
+    if corroboration_count >= 2 {
+        confidence += 0.15;
+    } else if corroboration_count == 1 {
+        confidence += 0.08;
+    }
+    
+    // Apply inconsistency penalties
+    for inconsistency in &claim.inconsistencies {
+        if !inconsistency.resolved {
+            let penalty = match inconsistency.severity {
+                InconsistencySeverity::Minor => 0.05,
+                InconsistencySeverity::Moderate => 0.15,
+                InconsistencySeverity::Serious => 0.30,
+                InconsistencySeverity::Critical => 0.50,
+            };
+            confidence -= penalty;
+        }
+    }
+    
+    // Apply pattern detection penalties
+    // (These would come from pattern detection engine)
+    
+    // Clamp to valid range
+    confidence.clamp(0.0, 1.0)
+}
+
+fn count_independent_corroborations(claim: &Claim) -> usize {
+    claim.evidence.iter()
+        .filter(|e| e.supports_claim && e.source.source_type.is_independent())
+        .count()
+}
+
+/// Confidence thresholds
+pub mod thresholds {
+    /// Verified - high confidence, can proceed
+    pub const VERIFIED: f32 = 0.80;
+    /// Provisional - needs additional evidence
+    pub const PROVISIONAL: f32 = 0.60;
+    /// Unverified - actively challenge
+    pub const UNVERIFIED: f32 = 0.40;
+    /// Below this - escalate immediately
+    pub const SUSPECT: f32 = 0.40;
+}
+
+/// Get verification state from confidence score
+pub fn confidence_to_state(confidence: f32, has_inconsistencies: bool) -> VerificationState {
+    if has_inconsistencies {
+        return VerificationState::Disputed;
+    }
+    
+    if confidence >= thresholds::VERIFIED {
+        VerificationState::Verified
+    } else if confidence >= thresholds::PROVISIONAL {
+        VerificationState::Claimed // Needs more evidence
+    } else if confidence >= thresholds::SUSPECT {
+        VerificationState::Unverifiable
+    } else {
+        VerificationState::Disputed // Too low, treat as suspect
+    }
+}
+
+/// Confidence modifiers
+pub mod modifiers {
+    /// Multiple sources agree
+    pub const CORROBORATION_BONUS: f32 = 0.15;
+    /// Document less than 3 months old
+    pub const RECENT_DOCUMENT_BONUS: f32 = 0.05;
+    /// Known entity from existing relationship
+    pub const KNOWN_ENTITY_BONUS: f32 = 0.10;
+    
+    /// Inconsistency with other source
+    pub const INCONSISTENCY_PENALTY: f32 = 0.30;
+    /// High-risk jurisdiction
+    pub const HIGH_RISK_JURISDICTION_PENALTY: f32 = 0.15;
+    /// Document older than 12 months
+    pub const STALE_DOCUMENT_PENALTY: f32 = 0.10;
+    /// Nominee pattern detected
+    pub const NOMINEE_PATTERN_PENALTY: f32 = 0.25;
+    /// Evasion pattern detected
+    pub const EVASION_PATTERN_PENALTY: f32 = 0.40;
+}
+```
+
+### 1.3 Tasks - Claim & Verification Model
+
+- [ ] Create `rust/src/verification/` module
+- [ ] Create `rust/src/verification/types.rs`
+- [ ] Implement `Claim` struct with all fields
+- [ ] Implement `SourceType` with confidence values
+- [ ] Implement `VerificationState` enum
+- [ ] Create `rust/src/verification/confidence.rs`
+- [ ] Implement confidence calculator
+- [ ] Implement threshold checks
+- [ ] Unit tests for confidence calculation
+
+---
+
+## Part 2: Adversarial Detection
+
+### 2.1 Pattern Detection
+
+**File:** `rust/src/verification/patterns.rs`
+
+```rust
+//! Adversarial Pattern Detection
+//!
+//! Detects patterns that may indicate deception, evasion, or fraud.
+
+use uuid::Uuid;
+use super::types::*;
+
+/// Detected pattern that may indicate adversarial behavior
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DetectedPattern {
+    /// Pattern ID
+    pub id: Uuid,
+    /// Pattern type
+    pub pattern_type: PatternType,
+    /// Entities involved
+    pub entities: Vec<Uuid>,
+    /// Description
+    pub description: String,
+    /// Risk level
+    pub risk_level: RiskLevel,
+    /// Confidence that this is actually the pattern
+    pub detection_confidence: f32,
+    /// Recommended action
+    pub recommended_action: RecommendedAction,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum PatternType {
+    // Structural patterns
+    /// A owns B owns C owns A
+    CircularOwnership,
+    /// Long chain of single-entity ownership
+    LayeringStructure,
+    /// Multiple shell companies in opacity jurisdictions
+    ShellCompanyCluster,
+    /// Nominee directors/shareholders detected
+    NomineeUsage,
+    
+    // Behavioral patterns
+    /// Repeated delays on specific document requests
+    DocumentEvasion,
+    /// Providing incomplete information repeatedly
+    PartialDisclosure,
+    /// Changing story when challenged
+    InconsistentNarrative,
+    /// Unexplained complexity
+    UnnecessaryComplexity,
+    
+    // Data patterns
+    /// GLEIF says X, client says Y
+    RegistryMismatch,
+    /// Document dates don't align with claimed timeline
+    TimelineMismatch,
+    /// Same address/directors across unrelated entities
+    SuspiciousOverlap,
+    /// Documents appear altered
+    DocumentTampering,
+    
+    // Jurisdiction patterns
+    /// Heavy use of secrecy jurisdictions
+    OpacityJurisdictionUsage,
+    /// Structure splits across high-risk jurisdictions
+    JurisdictionShopping,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub enum RiskLevel {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RecommendedAction {
+    /// Note but continue
+    Monitor,
+    /// Request additional evidence
+    RequestEvidence { evidence_types: Vec<String> },
+    /// Challenge with specific questions
+    Challenge { questions: Vec<String> },
+    /// Escalate to human review
+    Escalate { reason: String },
+    /// Reject / cannot proceed
+    Reject { reason: String },
+}
+
+/// Pattern detection engine
+pub struct PatternDetector {
+    /// Known opacity jurisdictions
+    opacity_jurisdictions: Vec<String>,
+    /// Known nominee service providers
+    known_nominee_providers: Vec<String>,
+}
+
+impl PatternDetector {
+    pub fn new() -> Self {
+        Self {
+            opacity_jurisdictions: vec![
+                "VG".into(),  // British Virgin Islands
+                "KY".into(),  // Cayman Islands
+                "PA".into(),  // Panama
+                "SC".into(),  // Seychelles
+                "BZ".into(),  // Belize
+                "WS".into(),  // Samoa
+                "VU".into(),  // Vanuatu
+            ],
+            known_nominee_providers: vec![
+                // Would be populated from reference data
+            ],
+        }
+    }
+
+    /// Analyze CBU for adversarial patterns
+    pub async fn analyze_cbu(&self, cbu_id: Uuid, context: &Context) -> Vec<DetectedPattern> {
+        let mut patterns = Vec::new();
+        
+        // Get all entities and relationships
+        let graph = self.load_cbu_graph(cbu_id, context).await;
+        
+        // Check for circular ownership
+        if let Some(cycle) = self.detect_circular_ownership(&graph) {
+            patterns.push(DetectedPattern {
+                id: Uuid::new_v4(),
+                pattern_type: PatternType::CircularOwnership,
+                entities: cycle,
+                description: "Circular ownership detected - A owns B owns C owns A".into(),
+                risk_level: RiskLevel::Critical,
+                detection_confidence: 1.0,
+                recommended_action: RecommendedAction::Escalate {
+                    reason: "Circular ownership is a strong indicator of structure manipulation".into()
+                },
+            });
+        }
+        
+        // Check for layering
+        if let Some(chain) = self.detect_layering(&graph, 5) {
+            patterns.push(DetectedPattern {
+                id: Uuid::new_v4(),
+                pattern_type: PatternType::LayeringStructure,
+                entities: chain,
+                description: format!("Deep ownership chain ({} layers) with single-entity ownership", chain.len()),
+                risk_level: RiskLevel::High,
+                detection_confidence: 0.8,
+                recommended_action: RecommendedAction::Challenge {
+                    questions: vec![
+                        "What is the business purpose for this structure?".into(),
+                        "Why are intermediate entities necessary?".into(),
+                    ]
+                },
+            });
+        }
+        
+        // Check for opacity jurisdiction usage
+        let opacity_count = self.count_opacity_jurisdictions(&graph);
+        if opacity_count >= 2 {
+            patterns.push(DetectedPattern {
+                id: Uuid::new_v4(),
+                pattern_type: PatternType::OpacityJurisdictionUsage,
+                entities: self.entities_in_opacity_jurisdictions(&graph),
+                description: format!("{} entities in high-secrecy jurisdictions", opacity_count),
+                risk_level: if opacity_count >= 3 { RiskLevel::High } else { RiskLevel::Medium },
+                detection_confidence: 1.0,
+                recommended_action: RecommendedAction::RequestEvidence {
+                    evidence_types: vec![
+                        "Business rationale for jurisdiction selection".into(),
+                        "Source of funds documentation".into(),
+                    ]
+                },
+            });
+        }
+        
+        // Check for nominee patterns
+        patterns.extend(self.detect_nominee_patterns(&graph));
+        
+        // Check for registry mismatches
+        patterns.extend(self.detect_registry_mismatches(&graph).await);
+        
+        patterns
+    }
+
+    /// Detect circular ownership (A → B → C → A)
+    fn detect_circular_ownership(&self, graph: &CbuGraph) -> Option<Vec<Uuid>> {
+        // DFS with cycle detection
+        let mut visited = std::collections::HashSet::new();
+        let mut path = Vec::new();
+        
+        for entity_id in graph.entities.keys() {
+            if let Some(cycle) = self.dfs_cycle(graph, *entity_id, &mut visited, &mut path) {
+                return Some(cycle);
+            }
+        }
+        None
+    }
+
+    /// Detect layering (long single-owner chains)
+    fn detect_layering(&self, graph: &CbuGraph, min_depth: usize) -> Option<Vec<Uuid>> {
+        // Find chains where each entity has exactly one parent
+        for entity_id in graph.entities.keys() {
+            let chain = self.trace_single_owner_chain(graph, *entity_id);
+            if chain.len() >= min_depth {
+                return Some(chain);
+            }
+        }
+        None
+    }
+
+    /// Detect nominee usage patterns
+    fn detect_nominee_patterns(&self, graph: &CbuGraph) -> Vec<DetectedPattern> {
+        let mut patterns = Vec::new();
+        
+        for (entity_id, entity) in &graph.entities {
+            // Check for known nominee indicators
+            let nominee_indicators = vec![
+                entity.name.to_lowercase().contains("nominee"),
+                entity.name.to_lowercase().contains("trustee services"),
+                entity.name.to_lowercase().contains("corporate services"),
+                // Same director across multiple unrelated entities
+                self.shares_directors_with_unrelated(graph, *entity_id),
+                // Registered agent address (not real business address)
+                self.is_registered_agent_address(&entity.address),
+            ];
+            
+            let indicator_count = nominee_indicators.iter().filter(|&&x| x).count();
+            
+            if indicator_count >= 2 {
+                patterns.push(DetectedPattern {
+                    id: Uuid::new_v4(),
+                    pattern_type: PatternType::NomineeUsage,
+                    entities: vec![*entity_id],
+                    description: format!("{} nominee indicators detected", indicator_count),
+                    risk_level: RiskLevel::High,
+                    detection_confidence: 0.7 + (indicator_count as f32 * 0.1),
+                    recommended_action: RecommendedAction::Challenge {
+                        questions: vec![
+                            "Confirm whether nominee arrangements are in place".into(),
+                            "If nominees used, provide details of nominator/beneficial owner".into(),
+                            "Provide documentation of nominee arrangement".into(),
+                        ]
+                    },
+                });
+            }
+        }
+        
+        patterns
+    }
+
+    /// Detect mismatches between claimed data and registry data
+    async fn detect_registry_mismatches(&self, graph: &CbuGraph) -> Vec<DetectedPattern> {
+        let mut patterns = Vec::new();
+        
+        for (entity_id, entity) in &graph.entities {
+            // For each entity with an LEI, verify against GLEIF
+            if let Some(lei) = &entity.lei {
+                if let Some(gleif_data) = self.fetch_gleif(lei).await {
+                    // Check for mismatches
+                    if let Some(mismatch) = self.compare_to_gleif(entity, &gleif_data) {
+                        patterns.push(DetectedPattern {
+                            id: Uuid::new_v4(),
+                            pattern_type: PatternType::RegistryMismatch,
+                            entities: vec![*entity_id],
+                            description: mismatch.description,
+                            risk_level: mismatch.severity.into(),
+                            detection_confidence: 1.0, // Registry data is authoritative
+                            recommended_action: RecommendedAction::Challenge {
+                                questions: vec![
+                                    format!("GLEIF shows {}, but you claimed {}. Please explain.", 
+                                            mismatch.registry_value, mismatch.claimed_value),
+                                ]
+                            },
+                        });
+                    }
+                }
+            }
+        }
+        
+        patterns
+    }
+}
+```
+
+### 2.2 Evasion Detection
+
+**File:** `rust/src/verification/evasion.rs`
+
+```rust
+//! Evasion Behavior Detection
+//!
+//! Detects behavioral patterns that suggest the client is evading verification.
+
+/// Track document request history for evasion detection
+#[derive(Debug, Clone)]
+pub struct DocumentRequestHistory {
+    pub entity_id: Uuid,
+    pub document_type: String,
+    pub requests: Vec<DocumentRequest>,
+}
+
+#[derive(Debug, Clone)]
+pub struct DocumentRequest {
+    pub request_id: Uuid,
+    pub requested_at: DateTime<Utc>,
+    pub status: RequestStatus,
+    pub response: Option<RequestResponse>,
+}
+
+#[derive(Debug, Clone)]
+pub enum RequestStatus {
+    Pending,
+    Received,
+    Rejected,
+    Expired,
+}
+
+#[derive(Debug, Clone)]
+pub struct RequestResponse {
+    pub received_at: DateTime<Utc>,
+    pub document_id: Option<Uuid>,
+    pub rejection_reason: Option<String>,
+    pub delay_days: i32,
+}
+
+/// Evasion detector
+pub struct EvasionDetector;
+
+impl EvasionDetector {
+    /// Analyze request history for evasion patterns
+    pub fn analyze_request_history(
+        &self,
+        history: &[DocumentRequestHistory],
+    ) -> Vec<EvasionIndicator> {
+        let mut indicators = Vec::new();
+        
+        for doc_history in history {
+            // Check for repeated delays
+            let avg_delay = self.calculate_average_delay(&doc_history.requests);
+            if avg_delay > 14.0 {
+                indicators.push(EvasionIndicator {
+                    indicator_type: EvasionType::RepeatedDelays,
+                    entity_id: doc_history.entity_id,
+                    description: format!(
+                        "Average delay of {:.0} days for {} documents",
+                        avg_delay, doc_history.document_type
+                    ),
+                    severity: if avg_delay > 30.0 { RiskLevel::High } else { RiskLevel::Medium },
+                });
+            }
+            
+            // Check for repeated rejections / wrong documents
+            let rejection_rate = self.calculate_rejection_rate(&doc_history.requests);
+            if rejection_rate > 0.3 {
+                indicators.push(EvasionIndicator {
+                    indicator_type: EvasionType::RepeatedRejections,
+                    entity_id: doc_history.entity_id,
+                    description: format!(
+                        "{:.0}% of {} submissions rejected or wrong",
+                        rejection_rate * 100.0, doc_history.document_type
+                    ),
+                    severity: RiskLevel::Medium,
+                });
+            }
+            
+            // Check for expired documents being provided
+            // (Providing knowingly expired docs is potential evasion)
+        }
+        
+        // Check for selective non-response
+        // (Client responds quickly to some requests, delays others)
+        if let Some(selective) = self.detect_selective_response(history) {
+            indicators.push(selective);
+        }
+        
+        indicators
+    }
+    
+    /// Detect when client is quick on some docs but slow on others
+    fn detect_selective_response(
+        &self,
+        history: &[DocumentRequestHistory],
+    ) -> Option<EvasionIndicator> {
+        let delays: Vec<(String, f32)> = history.iter()
+            .map(|h| (h.document_type.clone(), self.calculate_average_delay(&h.requests)))
+            .collect();
+        
+        if delays.len() < 2 {
+            return None;
+        }
+        
+        let min_delay = delays.iter().map(|(_, d)| *d).fold(f32::INFINITY, f32::min);
+        let max_delay = delays.iter().map(|(_, d)| *d).fold(0.0f32, f32::max);
+        
+        // If variance is high, might be selective
+        if max_delay > min_delay * 3.0 && max_delay > 14.0 {
+            let slow_docs: Vec<&str> = delays.iter()
+                .filter(|(_, d)| *d > min_delay * 2.0)
+                .map(|(t, _)| t.as_str())
+                .collect();
+            
+            Some(EvasionIndicator {
+                indicator_type: EvasionType::SelectiveResponse,
+                entity_id: Uuid::nil(), // Applies to whole case
+                description: format!(
+                    "Client responds quickly to some requests but delays: {}",
+                    slow_docs.join(", ")
+                ),
+                severity: RiskLevel::Medium,
+            })
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EvasionIndicator {
+    pub indicator_type: EvasionType,
+    pub entity_id: Uuid,
+    pub description: String,
+    pub severity: RiskLevel,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum EvasionType {
+    RepeatedDelays,
+    RepeatedRejections,
+    SelectiveResponse,
+    ChangingExplanations,
+    ExpiredDocuments,
+    PartialDisclosure,
+}
+```
+
+### 2.3 Tasks - Adversarial Detection
+
+- [ ] Create `rust/src/verification/patterns.rs`
+- [ ] Implement `PatternDetector`
+- [ ] Implement circular ownership detection
+- [ ] Implement layering detection
+- [ ] Implement nominee pattern detection
+- [ ] Implement registry mismatch detection
+- [ ] Create `rust/src/verification/evasion.rs`
+- [ ] Implement `EvasionDetector`
+- [ ] Implement delay pattern detection
+- [ ] Implement selective response detection
+- [ ] Unit tests for pattern detection
+- [ ] Integration tests with real graph data
+
+---
+
+## Part 3: Verification DSL Verbs
+
+### 3.1 Verification Domain
+
+**File:** `rust/config/verbs/verify.yaml`
+
+```yaml
+domains:
+  verify:
+    description: Verification and corroboration verbs (adversarial model)
+    verbs:
+      # =======================================================================
+      # CLAIM MANAGEMENT
+      # =======================================================================
+      register-claim:
+        description: Register a new claim (something client asserts)
+        behavior: crud
+        crud:
+          operation: insert
+          table: claims
+          schema: ob-poc
+          returning: claim_id
+        args:
+          - name: entity
+            type: uuid
+            required: true
+            maps_to: subject_id
+          - name: claim-type
+            type: string
+            required: true
+            maps_to: claim_type
+            valid_values:
+              - entity_exists
+              - ownership
+              - control
+              - person_identity
+              - jurisdiction
+              - regulatory_status
+              - document_authenticity
+          - name: content
+            type: json
+            required: true
+            maps_to: claim_content
+          - name: source-type
+            type: string
+            required: true
+            maps_to: source_type
+            valid_values:
+              - government_registry
+              - gleif
+              - exchange_listing
+              - regulatory_filing
+              - audited_financials
+              - notarized_document
+              - client_certified
+              - client_uncertified
+              - verbal_claim
+          - name: source-document
+            type: uuid
+            required: false
+            maps_to: source_document_id
+        defaults:
+          verification_state: CLAIMED
+        returns:
+          type: uuid
+          name: claim_id
+
+      # =======================================================================
+      # VERIFICATION ACTIONS
+      # =======================================================================
+      verify-against-gleif:
+        description: Verify entity/ownership claim against GLEIF registry
+        behavior: plugin
+        plugin: verify_gleif
+        args:
+          - name: entity
+            type: uuid
+            required: true
+          - name: claim
+            type: uuid
+            required: false
+            description: Specific claim to verify, or verify all claims for entity
+        returns:
+          type: verification_result
+
+      verify-against-registry:
+        description: Verify claim against government/corporate registry
+        behavior: plugin
+        plugin: verify_registry
+        args:
+          - name: entity
+            type: uuid
+            required: true
+          - name: registry
+            type: string
+            required: true
+            valid_values:
+              - companies_house_uk
+              - handelsregister_de
+              - rcs_luxembourg
+              - cro_ireland
+              - sec_edgar
+          - name: claim
+            type: uuid
+            required: false
+        returns:
+          type: verification_result
+
+      verify-document:
+        description: Verify document authenticity and content
+        behavior: plugin
+        plugin: verify_document
+        args:
+          - name: document
+            type: uuid
+            required: true
+          - name: checks
+            type: string_array
+            required: false
+            default:
+              - format_valid
+              - not_expired
+              - issuer_verified
+              - content_matches_claim
+        returns:
+          type: verification_result
+
+      # =======================================================================
+      # CORROBORATION
+      # =======================================================================
+      corroborate:
+        description: Cross-reference claim across multiple sources
+        behavior: plugin
+        plugin: corroborate_claim
+        args:
+          - name: claim
+            type: uuid
+            required: true
+          - name: sources
+            type: string_array
+            required: true
+            description: Sources to check for corroboration
+        returns:
+          type: corroboration_result
+
+      check-consistency:
+        description: Check claim for consistency with other known facts
+        behavior: plugin
+        plugin: check_consistency
+        args:
+          - name: entity
+            type: uuid
+            required: true
+          - name: scope
+            type: string
+            required: false
+            default: all_claims
+            valid_values:
+              - all_claims
+              - ownership_only
+              - identity_only
+        returns:
+          type: consistency_report
+
+      # =======================================================================
+      # ADVERSARIAL DETECTION
+      # =======================================================================
+      detect-patterns:
+        description: Run adversarial pattern detection on CBU
+        behavior: plugin
+        plugin: detect_patterns
+        args:
+          - name: cbu
+            type: uuid
+            required: true
+          - name: patterns
+            type: string_array
+            required: false
+            description: Specific patterns to check, or all if not specified
+            valid_values:
+              - circular_ownership
+              - layering
+              - nominee_usage
+              - opacity_jurisdictions
+              - registry_mismatch
+              - all
+        returns:
+          type: pattern_detection_result
+
+      detect-evasion:
+        description: Analyze client behavior for evasion patterns
+        behavior: plugin
+        plugin: detect_evasion
+        args:
+          - name: cbu
+            type: uuid
+            required: true
+        returns:
+          type: evasion_detection_result
+
+      # =======================================================================
+      # CHALLENGE & ESCALATE
+      # =======================================================================
+      challenge:
+        description: Create a challenge requiring client response
+        behavior: crud
+        crud:
+          operation: insert
+          table: challenges
+          schema: ob-poc
+          returning: challenge_id
+        args:
+          - name: entity
+            type: uuid
+            required: true
+            maps_to: entity_id
+          - name: claim
+            type: uuid
+            required: false
+            maps_to: claim_id
+          - name: challenge-type
+            type: string
+            required: true
+            maps_to: challenge_type
+            valid_values:
+              - inconsistency
+              - missing_evidence
+              - suspicious_pattern
+              - expired_document
+              - registry_mismatch
+          - name: questions
+            type: string_array
+            required: true
+            maps_to: questions
+          - name: evidence-required
+            type: string_array
+            required: false
+            maps_to: evidence_required
+        returns:
+          type: uuid
+          name: challenge_id
+
+      escalate:
+        description: Escalate to human review with reason
+        behavior: crud
+        crud:
+          operation: insert
+          table: escalations
+          schema: ob-poc
+          returning: escalation_id
+        args:
+          - name: cbu
+            type: uuid
+            required: true
+            maps_to: cbu_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: reason
+          - name: risk-level
+            type: string
+            required: true
+            maps_to: risk_level
+            valid_values:
+              - medium
+              - high
+              - critical
+          - name: patterns-detected
+            type: uuid_array
+            required: false
+            maps_to: pattern_ids
+          - name: claims-disputed
+            type: uuid_array
+            required: false
+            maps_to: disputed_claim_ids
+        returns:
+          type: uuid
+          name: escalation_id
+
+      # =======================================================================
+      # CONFIDENCE & STATUS
+      # =======================================================================
+      recalculate-confidence:
+        description: Recalculate confidence score for claim(s)
+        behavior: plugin
+        plugin: recalculate_confidence
+        args:
+          - name: entity
+            type: uuid
+            required: false
+          - name: claim
+            type: uuid
+            required: false
+          - name: cbu
+            type: uuid
+            required: false
+            description: Recalculate all claims for CBU
+        returns:
+          type: confidence_update_result
+
+      get-verification-status:
+        description: Get verification status for entity or CBU
+        behavior: plugin
+        plugin: get_verification_status
+        args:
+          - name: entity
+            type: uuid
+            required: false
+          - name: cbu
+            type: uuid
+            required: false
+        returns:
+          type: verification_status_report
+```
+
+### 3.2 Tasks - Verification Verbs
+
+- [ ] Create `rust/config/verbs/verify.yaml`
+- [ ] Implement `verify_gleif` plugin
+- [ ] Implement `verify_registry` plugin
+- [ ] Implement `verify_document` plugin
+- [ ] Implement `corroborate_claim` plugin
+- [ ] Implement `check_consistency` plugin
+- [ ] Implement `detect_patterns` plugin
+- [ ] Implement `detect_evasion` plugin
+- [ ] Implement `recalculate_confidence` plugin
+- [ ] Create database tables for claims, challenges, escalations
+- [ ] Integration tests for verification flow
+
+---
+
+## Part 4: End State Model (Verification-Based)
+
+### 4.1 Verified KYC End State
+
+**File:** `rust/config/end_states/kyc_verified.yaml`
 
 ```yaml
 end_state:
-  id: kyc_ready
-  name: "KYC Ready"
+  id: kyc_verified
+  name: "KYC Verified"
   entity_type: cbu
   description: |
-    CBU has completed all KYC requirements and is ready for 
-    compliance decision. UBO chain verified, documents collected,
-    screening complete, risk assessed.
+    CBU has all claims VERIFIED (not just claimed) with high confidence.
+    This is an adversarial standard - would it catch a sophisticated liar?
 
+  # ===========================================================================
+  # VERIFICATION REQUIREMENTS (not just "data present")
+  # ===========================================================================
   requirements:
     # =========================================================================
-    # ENTITY FOUNDATION
+    # ENTITY VERIFICATION
     # =========================================================================
-    - id: entity_exists
-      name: "Entity Exists"
-      description: "CBU entity record exists with basic data"
-      evaluation:
-        type: exists
-        query: (entity.get :id $cbu_id)
-        condition: (not-nil? result)
-      gap:
-        type: missing_entity
-        severity: blocking
-        message_template: "CBU entity does not exist"
-      resolution:
-        verbs: [entity.create-*]
-        auto_resolve: false
-        strategy: "Entity must be created before any other work"
-
-    - id: jurisdiction_set
-      name: "Jurisdiction Set"
-      description: "CBU has jurisdiction assigned"
-      evaluation:
-        type: exists
-        query: (entity.get :id $cbu_id :field jurisdiction)
-        condition: (not-blank? result)
-      gap:
-        type: missing_jurisdiction
-        severity: blocking
-        message_template: "Jurisdiction not set for {cbu_name}"
-      resolution:
-        verbs: [entity.update]
-        auto_resolve: true
-        strategy: "Infer from ManCo location or fund domicile"
-
-    # =========================================================================
-    # UBO CHAIN - OWNERSHIP PRONG
-    # =========================================================================
-    - id: ubo_chain_exists
-      name: "UBO Chain Started"
-      description: "At least one ownership relationship exists"
-      evaluation:
-        type: count
-        query: (ubo.list-ownership :entity $cbu_id)
-        condition: (> count 0)
-      gap:
-        type: no_ubo_chain
-        severity: blocking
-        message_template: "No ownership chain defined for {cbu_name}"
-      resolution:
-        verbs: [ubo.add-ownership]
-        auto_resolve: true
-        strategy: "Search GLEIF for parent entities, add ownership links"
-
-    - id: ubo_chain_complete
-      name: "UBO Chain Complete"
-      description: "Ownership chain reaches natural persons or exemption"
+    - id: entity_verified
+      name: "Entity Identity Verified"
+      description: "Entity exists and identity verified against registry"
       evaluation:
         type: custom
-        query: (ubo.evaluate-chain :entity $cbu_id)
+        query: (verify.get-verification-status :entity $entity_id)
         condition: |
-          (or (= chain_status "COMPLETE")
-              (= chain_status "EXEMPTION_APPLIED"))
+          (and (= verification_state "VERIFIED")
+               (>= confidence 0.80))
       gap:
-        type: incomplete_ubo_chain
+        type: unverified_entity
         severity: blocking
-        message_template: |
-          UBO chain incomplete. {missing_count} entities need 
-          parent identification: {missing_entities}
+        message_template: "Entity identity not verified (confidence: {confidence}%)"
       resolution:
-        verbs: [ubo.add-ownership, ubo.apply-exemption]
-        requires: [ubo_chain_exists]
+        verbs: 
+          - verify.verify-against-gleif
+          - verify.verify-against-registry
         auto_resolve: true
         strategy: |
-          For each entity without parent:
-          1. Check if exemption applies (listed company, regulated fund)
-          2. Search GLEIF for parent
-          3. If natural person threshold reached, mark complete
-          4. If can't resolve, flag for human review
+          1. Check GLEIF for LEI
+          2. Check relevant corporate registry
+          3. Cross-reference registered name, jurisdiction, status
 
-    - id: ubo_chain_verified
-      name: "UBO Chain Verified"
-      description: "All ownership relationships have evidence"
+    # =========================================================================
+    # OWNERSHIP CHAIN VERIFICATION
+    # =========================================================================
+    - id: ownership_claims_registered
+      name: "Ownership Claims Registered"
+      description: "All ownership relationships recorded as claims"
       evaluation:
         type: all_of
-        query: (ubo.list-ownership :entity $cbu_id :include-evidence true)
-        condition: (all? ownership (has-evidence? ownership))
+        query: (ubo.list-ownership :entity $entity_id)
+        condition: (all? rel (claim-exists? rel))
+      gap:
+        type: unregistered_ownership
+        severity: blocking
+        message_template: "{count} ownership relationships not registered as claims"
+      resolution:
+        verbs: [verify.register-claim]
+        auto_resolve: true
+        strategy: "Register each ownership as a claim with source"
+
+    - id: ownership_claims_verified
+      name: "Ownership Claims Verified"
+      description: "All ownership claims verified against independent sources"
+      evaluation:
+        type: all_of
+        query: (verify.list-claims :entity $entity_id :type "ownership")
+        condition: |
+          (all? claim 
+            (and (>= confidence 0.80)
+                 (has-independent-source? claim)))
       gap:
         type: unverified_ownership
         severity: blocking
         message_template: |
-          {unverified_count} ownership relationships need evidence:
+          {count} ownership claims unverified or low confidence:
           {unverified_list}
       resolution:
-        verbs: [kyc.request-document, kyc.link-evidence]
-        requires: [ubo_chain_complete]
+        verbs:
+          - verify.verify-against-gleif
+          - verify.corroborate
+        requires: [ownership_claims_registered]
         auto_resolve: true
         strategy: |
           For each unverified ownership:
-          - Company: request share register, articles of association
-          - Trust: request trust deed
-          - Fund: request prospectus showing structure
+          1. Check GLEIF for parent relationship
+          2. Check corporate registry for shareholders
+          3. Request share register if no registry data
+          4. Cross-reference multiple sources
 
-    # =========================================================================
-    # UBO CHAIN - CONTROL PRONG
-    # =========================================================================
-    - id: control_persons_identified
-      name: "Control Persons Identified"
-      description: "Directors, officers, signatories identified"
+    - id: ownership_chain_complete
+      name: "Ownership Chain Complete to UBO"
+      description: "Chain reaches natural persons or valid exemption"
       evaluation:
         type: custom
-        query: (ubo.list-control-persons :entity $cbu_id)
+        query: (ubo.evaluate-chain :entity $entity_id)
         condition: |
-          (and (>= (count directors) 1)
-               (has-senior-management? result))
+          (and (or (= chain_status "COMPLETE_TO_PERSONS")
+                   (= chain_status "EXEMPTION_APPLIED"))
+               (all-verified? chain_claims))
       gap:
-        type: missing_control_persons
+        type: incomplete_ubo_chain
         severity: blocking
         message_template: |
-          Control persons not fully identified for {entity_name}.
-          Need: directors, senior management.
+          UBO chain incomplete or unverified at: {incomplete_entities}
       resolution:
-        verbs: [ubo.add-control, kyc.request-document]
+        verbs:
+          - verify.verify-against-gleif
+          - ubo.apply-exemption
+          - verify.challenge
+        requires: [ownership_claims_verified]
         auto_resolve: true
         strategy: |
-          1. Request register of directors from entity
-          2. Extract names from document
-          3. Create person entities
-          4. Link as control persons with roles
+          For each incomplete path:
+          1. Search GLEIF for parent
+          2. Check if exemption applies (listed, regulated)
+          3. If exemption, verify the exemption claim
+          4. If no exemption, continue chain to natural person
 
     # =========================================================================
-    # NATURAL PERSON VERIFICATION
+    # UBO PERSON VERIFICATION  
     # =========================================================================
-    - id: ubo_persons_created
-      name: "UBO Persons Created"
-      description: "All natural person UBOs have entity records"
+    - id: ubo_persons_identified
+      name: "UBO Persons Identified"
+      description: "All natural person UBOs identified"
       evaluation:
-        type: all_of
+        type: custom
         query: (ubo.list-natural-persons :cbu $cbu_id)
-        condition: (all? person (entity-exists? person))
+        condition: (>= (count persons) 1)
       gap:
-        type: missing_person_entity
+        type: no_ubo_persons
         severity: blocking
-        message_template: |
-          {count} natural persons need entity records created
+        message_template: "No natural person UBOs identified"
       resolution:
-        verbs: [entity.create-proper-person]
-        requires: [ubo_chain_complete, control_persons_identified]
-        auto_resolve: true
-        strategy: "Create entity for each identified natural person"
+        verbs: [entity.create-proper-person, ubo.add-ownership]
+        requires: [ownership_chain_complete]
+        auto_resolve: false
+        strategy: "Identify natural persons from ownership chain endpoints"
 
     - id: ubo_persons_verified
-      name: "UBO Persons Verified"
-      description: "All natural person UBOs have ID verification"
+      name: "UBO Person Identity Verified"
+      description: "All UBO persons identity verified with high confidence"
       evaluation:
         type: all_of
         query: (ubo.list-natural-persons :cbu $cbu_id :include-verification true)
-        condition: (all? person (verified? person))
+        condition: |
+          (all? person
+            (and (>= confidence 0.80)
+                 (has-id-verification? person)))
       gap:
-        type: unverified_persons
+        type: unverified_ubo_persons
         severity: blocking
         message_template: |
-          {count} persons need ID verification: {person_list}
+          {count} UBO persons not identity verified: {person_list}
       resolution:
-        verbs: [kyc.request-document]
-        requires: [ubo_persons_created]
+        verbs:
+          - kyc.request-document
+          - verify.verify-document
+        requires: [ubo_persons_identified]
         auto_resolve: true
         strategy: |
           For each unverified person:
-          - Request passport or national ID
-          - Request proof of address
+          1. Request passport or national ID
+          2. Verify document authenticity
+          3. Match document to claimed identity
+          4. Request proof of address
+          5. Verify address document
 
     # =========================================================================
-    # SCREENING
+    # CONTROL PRONG VERIFICATION
     # =========================================================================
-    - id: pep_screening_complete
-      name: "PEP Screening Complete"
-      description: "All natural persons screened for PEP status"
+    - id: control_persons_verified
+      name: "Control Persons Verified"
+      description: "Directors/officers identified and verified"
       evaluation:
-        type: all_of
-        query: (screening.list :cbu $cbu_id :type PEP)
+        type: custom
+        query: (ubo.list-control-persons :entity $cbu_id :include-verification true)
         condition: |
-          (all? person 
-            (and (screening-exists? person "PEP")
-                 (screening-current? person "PEP")))
+          (and (>= (count directors) 1)
+               (all? person (>= confidence 0.75)))
       gap:
-        type: missing_pep_screening
+        type: unverified_control_persons
         severity: blocking
-        message_template: "{count} persons need PEP screening"
+        message_template: "Control persons not identified or verified"
       resolution:
-        verbs: [screening.pep]
-        requires: [ubo_persons_created]
-        auto_resolve: true
-        strategy: "Run PEP screening for each natural person"
-
-    - id: sanctions_screening_complete
-      name: "Sanctions Screening Complete"
-      description: "All parties screened against sanctions lists"
-      evaluation:
-        type: all_of
-        query: (screening.list :cbu $cbu_id :type SANCTIONS)
-        condition: |
-          (all? party 
-            (and (screening-exists? party "SANCTIONS")
-                 (screening-current? party "SANCTIONS")))
-      gap:
-        type: missing_sanctions_screening
-        severity: blocking
-        message_template: "{count} parties need sanctions screening"
-      resolution:
-        verbs: [screening.sanctions]
-        requires: [ubo_persons_created]
-        auto_resolve: true
-        strategy: "Run sanctions screening for all parties"
-
-    - id: adverse_media_complete
-      name: "Adverse Media Complete"
-      description: "All parties screened for adverse media"
-      evaluation:
-        type: all_of
-        query: (screening.list :cbu $cbu_id :type ADVERSE_MEDIA)
-        condition: |
-          (all? party 
-            (and (screening-exists? party "ADVERSE_MEDIA")
-                 (screening-current? party "ADVERSE_MEDIA")))
-      gap:
-        type: missing_adverse_media
-        severity: warning
-        message_template: "{count} parties need adverse media screening"
-      resolution:
-        verbs: [screening.adverse-media]
-        requires: [ubo_persons_created]
-        auto_resolve: true
-        strategy: "Run adverse media screening for all parties"
-
-    - id: screening_hits_resolved
-      name: "Screening Hits Resolved"
-      description: "All screening hits reviewed and dispositioned"
-      evaluation:
-        type: all_of
-        query: (screening.list-hits :cbu $cbu_id :status OPEN)
-        condition: (= count 0)
-      gap:
-        type: unresolved_screening_hits
-        severity: blocking
-        message_template: |
-          {count} screening hits need review: {hit_summary}
-      resolution:
-        verbs: [screening.resolve-hit]
-        requires: [pep_screening_complete, sanctions_screening_complete]
-        auto_resolve: false
-        strategy: "Human review required for screening hits"
-
-    # =========================================================================
-    # DOCUMENTS
-    # =========================================================================
-    - id: required_docs_identified
-      name: "Required Documents Identified"
-      description: "Document checklist generated based on entity type"
-      evaluation:
-        type: exists
-        query: (kyc.get-doc-checklist :cbu $cbu_id)
-        condition: (not-empty? result)
-      gap:
-        type: no_doc_checklist
-        severity: blocking
-        message_template: "Document checklist not generated"
-      resolution:
-        verbs: [kyc.generate-checklist]
+        verbs:
+          - kyc.request-document
+          - verify.verify-against-registry
         auto_resolve: true
         strategy: |
-          Generate checklist based on:
-          - Entity type (fund, company, trust)
-          - Jurisdiction (LU, IE, DE, etc.)
-          - Risk rating
-          - Regulatory requirements
+          1. Request register of directors from entity
+          2. Verify against corporate registry
+          3. For each director, verify identity
 
-    - id: required_docs_requested
-      name: "Required Documents Requested"
-      description: "All required documents have been requested"
+    # =========================================================================
+    # ADVERSARIAL CHECKS
+    # =========================================================================
+    - id: no_critical_patterns
+      name: "No Critical Patterns Detected"
+      description: "No circular ownership, layering, or fraud indicators"
       evaluation:
-        type: all_of
-        query: (kyc.get-doc-checklist :cbu $cbu_id :include-status true)
+        type: custom
+        query: (verify.detect-patterns :cbu $cbu_id :patterns ["all"])
         condition: |
-          (all? doc 
-            (or (doc-collected? doc)
-                (doc-requested? doc)))
+          (not-any? pattern (= risk_level "CRITICAL"))
       gap:
-        type: docs_not_requested
+        type: critical_pattern_detected
+        severity: blocking
+        message_template: |
+          Critical pattern(s) detected: {pattern_descriptions}
+      resolution:
+        verbs: [verify.escalate]
+        auto_resolve: false
+        strategy: "Critical patterns require human review and cannot proceed"
+
+    - id: high_patterns_resolved
+      name: "High-Risk Patterns Addressed"
+      description: "High-risk patterns investigated and resolved"
+      evaluation:
+        type: custom
+        query: (verify.detect-patterns :cbu $cbu_id)
+        condition: |
+          (all? pattern
+            (or (!= risk_level "HIGH")
+                (resolved? pattern)))
+      gap:
+        type: unresolved_high_risk_pattern
+        severity: blocking
+        message_template: |
+          Unresolved high-risk pattern(s): {pattern_descriptions}
+      resolution:
+        verbs:
+          - verify.challenge
+          - verify.escalate
+        auto_resolve: false
+        strategy: |
+          For each high-risk pattern:
+          1. Challenge client for explanation
+          2. Request supporting evidence
+          3. If not satisfactorily explained, escalate
+
+    - id: no_inconsistencies
+      name: "No Unresolved Inconsistencies"
+      description: "All data inconsistencies investigated and resolved"
+      evaluation:
+        type: custom
+        query: (verify.check-consistency :cbu $cbu_id)
+        condition: |
+          (all? inconsistency (resolved? inconsistency))
+      gap:
+        type: unresolved_inconsistencies
+        severity: blocking
+        message_template: |
+          {count} unresolved data inconsistencies
+      resolution:
+        verbs: [verify.challenge]
+        auto_resolve: false
+        strategy: |
+          For each inconsistency:
+          1. Challenge client to explain
+          2. Determine which source is correct
+          3. Update claims with resolution
+
+    - id: no_evasion_patterns
+      name: "No Evasion Behavior Detected"
+      description: "Client not exhibiting evasion patterns"
+      evaluation:
+        type: custom
+        query: (verify.detect-evasion :cbu $cbu_id)
+        condition: |
+          (or (empty? indicators)
+              (all? ind (!= severity "HIGH")))
+      gap:
+        type: evasion_detected
         severity: warning
-        message_template: "{count} documents need to be requested"
+        message_template: |
+          Evasion indicators detected: {indicator_descriptions}
       resolution:
-        verbs: [kyc.request-document]
-        requires: [required_docs_identified]
+        verbs: [verify.escalate]
+        auto_resolve: false
+        strategy: "Evasion patterns require human assessment"
+
+    # =========================================================================
+    # SCREENING VERIFICATION
+    # =========================================================================
+    - id: screening_complete
+      name: "Screening Complete"
+      description: "All parties screened with no unresolved hits"
+      evaluation:
+        type: all_of
+        query: (screening.list :cbu $cbu_id)
+        condition: |
+          (and (all? party (screened? party))
+               (not-any? hit (and (open? hit) (not (false-positive? hit)))))
+      gap:
+        type: incomplete_screening
+        severity: blocking
+        message_template: "Screening incomplete or unresolved hits"
+      resolution:
+        verbs:
+          - screening.pep
+          - screening.sanctions
+          - screening.adverse-media
         auto_resolve: true
-        strategy: "Request each missing document from appropriate party"
-
-    - id: required_docs_collected
-      name: "Required Documents Collected"
-      description: "All required documents have been received"
-      evaluation:
-        type: all_of
-        query: (kyc.get-doc-checklist :cbu $cbu_id :include-status true)
-        condition: (all? doc (doc-collected? doc))
-      gap:
-        type: docs_outstanding
-        severity: blocking
-        message_template: |
-          {count} documents outstanding: {doc_list}
-      resolution:
-        verbs: [kyc.request-document, kyc.chase-document]
-        requires: [required_docs_requested]
-        auto_resolve: false
-        strategy: "Follow up on outstanding document requests"
-
-    - id: docs_validated
-      name: "Documents Validated"
-      description: "All collected documents pass validation"
-      evaluation:
-        type: all_of
-        query: (kyc.list-documents :cbu $cbu_id :include-validation true)
-        condition: (all? doc (doc-valid? doc))
-      gap:
-        type: invalid_documents
-        severity: blocking
-        message_template: |
-          {count} documents have validation issues: {issues}
-      resolution:
-        verbs: [kyc.reject-document, kyc.request-document]
-        requires: [required_docs_collected]
-        auto_resolve: false
-        strategy: "Review validation failures, request replacement docs"
+        strategy: "Screen all parties and resolve any hits"
 
     # =========================================================================
-    # RISK ASSESSMENT
+    # DOCUMENTATION
     # =========================================================================
-    - id: risk_factors_assessed
-      name: "Risk Factors Assessed"
-      description: "All risk factors evaluated"
+    - id: evidence_chain_complete
+      name: "Evidence Chain Complete"
+      description: "All verified claims have documented evidence trail"
       evaluation:
-        type: exists
-        query: (risk.get-assessment :cbu $cbu_id)
-        condition: (assessment-complete? result)
+        type: all_of
+        query: (verify.list-claims :cbu $cbu_id :verified-only true)
+        condition: |
+          (all? claim (has-evidence-chain? claim))
       gap:
-        type: risk_not_assessed
-        severity: blocking
-        message_template: "Risk assessment not complete"
+        type: missing_evidence_chain
+        severity: warning
+        message_template: |
+          {count} claims missing complete evidence chain
       resolution:
-        verbs: [risk.assess]
-        requires: 
-          - ubo_chain_complete
-          - screening_hits_resolved
+        verbs: [kyc.link-evidence]
+        auto_resolve: false
+        strategy: "Document evidence source for each verified claim"
+
+    # =========================================================================
+    # CONFIDENCE THRESHOLDS
+    # =========================================================================
+    - id: overall_confidence
+      name: "Overall Verification Confidence"
+      description: "Aggregate confidence meets threshold"
+      evaluation:
+        type: custom
+        query: (verify.get-verification-status :cbu $cbu_id)
+        condition: |
+          (>= overall_confidence 0.80)
+      gap:
+        type: low_overall_confidence
+        severity: blocking
+        message_template: |
+          Overall confidence {confidence}% below 80% threshold
+      resolution:
+        verbs: [verify.corroborate]
         auto_resolve: true
         strategy: |
-          Evaluate:
-          - Jurisdiction risk
-          - Entity type risk
-          - UBO structure complexity
-          - PEP exposure
-          - Industry risk
-
-    - id: risk_rating_assigned
-      name: "Risk Rating Assigned"
-      description: "Final risk rating calculated and assigned"
-      evaluation:
-        type: exists
-        query: (risk.get-rating :cbu $cbu_id)
-        condition: (not-nil? result)
-      gap:
-        type: no_risk_rating
-        severity: blocking
-        message_template: "Risk rating not assigned"
-      resolution:
-        verbs: [risk.assign-rating]
-        requires: [risk_factors_assessed]
-        auto_resolve: true
-        strategy: "Calculate rating from assessed factors"
-
-    # =========================================================================
-    # KYC CASE
-    # =========================================================================
-    - id: kyc_case_exists
-      name: "KYC Case Exists"
-      description: "KYC case record created"
-      evaluation:
-        type: exists
-        query: (kyc.get-case :cbu $cbu_id)
-        condition: (not-nil? result)
-      gap:
-        type: no_kyc_case
-        severity: blocking
-        message_template: "KYC case not created"
-      resolution:
-        verbs: [kyc.create-case]
-        auto_resolve: true
-        strategy: "Create KYC case for CBU"
-
-    - id: kyc_ready_for_decision
-      name: "Ready for KYC Decision"
-      description: "All prerequisites met for compliance decision"
-      evaluation:
-        type: all_of
-        query: null
-        condition: |
-          (and (met? ubo_chain_verified)
-               (met? ubo_persons_verified)
-               (met? screening_hits_resolved)
-               (met? docs_validated)
-               (met? risk_rating_assigned))
-      gap:
-        type: not_ready_for_decision
-        severity: info
-        message_template: "Prerequisites not complete for KYC decision"
-      resolution:
-        verbs: []
-        requires:
-          - ubo_chain_verified
-          - ubo_persons_verified
-          - screening_hits_resolved
-          - docs_validated
-          - risk_rating_assigned
-        auto_resolve: false
-        strategy: "Complete all prerequisites first"
-
-  # ===========================================================================
-  # CONDITIONAL REQUIREMENTS
-  # ===========================================================================
-  conditional_requirements:
-    # Luxembourg specific
-    - condition: (= jurisdiction "LU")
-      requirements:
-        - id: cssf_registration
-          name: "CSSF Registration"
-          description: "Luxembourg fund requires CSSF registration doc"
-          evaluation:
-            type: exists
-            query: (kyc.get-document :cbu $cbu_id :type "CSSF_REGISTRATION")
-            condition: (doc-collected? result)
-          gap:
-            type: missing_cssf_registration
-            severity: blocking
-            message_template: "CSSF registration document required for LU fund"
-          resolution:
-            verbs: [kyc.request-document]
-            auto_resolve: true
-            strategy: "Request CSSF registration from fund administrator"
-
-    # Ireland specific
-    - condition: (= jurisdiction "IE")
-      requirements:
-        - id: cbi_authorization
-          name: "CBI Authorization"
-          description: "Irish fund requires CBI authorization"
-          evaluation:
-            type: exists
-            query: (kyc.get-document :cbu $cbu_id :type "CBI_AUTHORIZATION")
-            condition: (doc-collected? result)
-          gap:
-            type: missing_cbi_authorization
-            severity: blocking
-            message_template: "CBI authorization required for IE fund"
-          resolution:
-            verbs: [kyc.request-document]
-            auto_resolve: true
-
-    # High risk jurisdiction
-    - condition: (high-risk-jurisdiction? jurisdiction)
-      requirements:
-        - id: source_of_funds
-          name: "Source of Funds"
-          description: "Enhanced due diligence - source of funds"
-          evaluation:
-            type: exists
-            query: (kyc.get-document :cbu $cbu_id :type "SOURCE_OF_FUNDS")
-            condition: (doc-collected? result)
-          gap:
-            type: missing_source_of_funds
-            severity: blocking
-            message_template: "Source of funds required for high-risk jurisdiction"
-          resolution:
-            verbs: [kyc.request-document]
-            auto_resolve: true
-
-        - id: enhanced_screening
-          name: "Enhanced Screening"
-          description: "Additional screening for high-risk jurisdiction"
-          evaluation:
-            type: exists
-            query: (screening.get :cbu $cbu_id :type ENHANCED)
-            condition: (screening-complete? result)
-          gap:
-            type: missing_enhanced_screening
-            severity: blocking
-            message_template: "Enhanced screening required"
-          resolution:
-            verbs: [screening.enhanced]
-            auto_resolve: true
-
-    # PEP identified
-    - condition: (has-pep? cbu)
-      requirements:
-        - id: pep_edd
-          name: "PEP Enhanced Due Diligence"
-          description: "Additional due diligence for PEP relationships"
-          evaluation:
-            type: exists
-            query: (kyc.get-edd :cbu $cbu_id :reason "PEP")
-            condition: (edd-complete? result)
-          gap:
-            type: missing_pep_edd
-            severity: blocking
-            message_template: "PEP enhanced due diligence required"
-          resolution:
-            verbs: [kyc.initiate-edd]
-            auto_resolve: false
-            strategy: "Human review required for PEP relationships"
+          1. Identify lowest-confidence claims
+          2. Seek additional corroboration
+          3. Recalculate overall confidence
 ```
 
-### 1.4 Tasks - End State Model
+### 4.2 Tasks - End State Model
 
-- [ ] Create `rust/config/end_states/` directory
-- [ ] Create `schema.yaml` with end state schema
-- [ ] Create `kyc_ready.yaml` with full KYC requirements
-- [ ] Create parser for end state YAML
-- [ ] Create `EndState` struct in Rust
-- [ ] Create `Requirement` struct with evaluation logic
-- [ ] Create `Gap` struct with resolution hints
-- [ ] Unit tests for end state parsing
+- [ ] Create `rust/config/end_states/kyc_verified.yaml`
+- [ ] Update all requirements to be verification-based
+- [ ] Add adversarial pattern checks
+- [ ] Add confidence threshold requirements
+- [ ] Add evidence chain requirements
+- [ ] Update gap messages to reflect verification model
 
 ---
 
-## Part 2: Gap Analysis Engine
+## Part 5: Agent Strategy (Game Theory)
 
-### 2.1 Core Types
+### 5.1 Agent Decision Framework
 
-**File:** `rust/src/agent/gap_analysis.rs`
+**File:** `rust/src/agent/strategy.rs`
 
 ```rust
-//! Gap Analysis Engine
+//! Agent Strategy - Game Theory Decision Framework
 //!
-//! Evaluates current state against end state requirements
-//! to identify gaps that need to be closed.
+//! The agent plays an adversarial verification game.
+//! Goal: Establish verified truth that would catch a sophisticated liar.
 
-use std::collections::HashMap;
-use uuid::Uuid;
-use serde::{Deserialize, Serialize};
+use super::gap_analysis::Gap;
+use crate::verification::types::*;
+use crate::verification::patterns::*;
 
-/// Result of evaluating an end state against current state
-#[derive(Debug, Clone, Serialize)]
-pub struct GapAnalysis {
-    /// The end state being evaluated
-    pub end_state_id: String,
-    
-    /// Entity being evaluated
-    pub entity_id: Uuid,
-    
-    /// Overall progress (0.0 - 1.0)
-    pub progress: f32,
-    
-    /// All requirements with their status
-    pub requirements: Vec<RequirementStatus>,
-    
-    /// Only the gaps (unmet requirements)
-    pub gaps: Vec<Gap>,
-    
-    /// Blocking gaps (must be resolved to proceed)
-    pub blocking_gaps: Vec<Gap>,
-    
-    /// Suggested next actions (prioritized)
-    pub suggested_actions: Vec<SuggestedAction>,
-    
-    /// Timestamp of analysis
-    pub analyzed_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// Status of a single requirement
-#[derive(Debug, Clone, Serialize)]
-pub struct RequirementStatus {
-    pub requirement_id: String,
-    pub name: String,
-    pub status: EvaluationResult,
-    pub details: Option<String>,
-    pub evidence: Vec<String>,
-}
-
-/// Result of evaluating a requirement
-#[derive(Debug, Clone, Copy, Serialize, PartialEq)]
-pub enum EvaluationResult {
-    /// Requirement fully met
-    Met,
-    /// Requirement partially met (e.g., 3 of 5 docs collected)
-    Partial { progress: f32 },
-    /// Requirement not met
-    NotMet,
-    /// Cannot evaluate (missing prerequisite)
-    Blocked,
-    /// Not applicable (conditional requirement, condition not met)
-    NotApplicable,
-}
-
-/// A gap that needs to be closed
-#[derive(Debug, Clone, Serialize)]
-pub struct Gap {
-    /// Which requirement is not met
-    pub requirement_id: String,
-    pub requirement_name: String,
-    
-    /// Gap classification
-    pub gap_type: String,
-    pub severity: GapSeverity,
-    
-    /// Human readable description
-    pub message: String,
-    
-    /// What's specifically missing
-    pub details: GapDetails,
-    
-    /// How to resolve
-    pub resolution: ResolutionHints,
-    
-    /// Prerequisites that must be met first
-    pub blocked_by: Vec<String>,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
-pub enum GapSeverity {
-    /// Must be resolved to reach end state
-    Blocking,
-    /// Should be resolved but not strictly required
-    Warning,
-    /// Informational only
-    Info,
-}
-
-/// Details about what's missing
-#[derive(Debug, Clone, Serialize)]
-pub struct GapDetails {
-    /// Type of detail
-    pub detail_type: GapDetailType,
-    /// Specific items (entity IDs, document types, etc.)
-    pub items: Vec<GapItem>,
-    /// Counts
-    pub total_required: Option<usize>,
-    pub currently_have: Option<usize>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub enum GapDetailType {
-    MissingEntities,
-    MissingDocuments,
-    MissingScreening,
-    MissingEvidence,
-    UnresolvedHits,
-    InvalidData,
-    Custom(String),
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct GapItem {
-    pub id: Option<Uuid>,
-    pub name: String,
-    pub item_type: String,
-    pub details: HashMap<String, serde_json::Value>,
-}
-
-/// Hints for how to resolve a gap
-#[derive(Debug, Clone, Serialize)]
-pub struct ResolutionHints {
-    /// Verbs that can address this gap
-    pub applicable_verbs: Vec<VerbHint>,
-    /// Can agent auto-resolve?
-    pub auto_resolvable: bool,
-    /// Strategy description for agent
-    pub strategy: String,
-    /// Estimated effort
-    pub estimated_actions: usize,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct VerbHint {
-    pub verb: String,
-    pub suggested_args: HashMap<String, serde_json::Value>,
-    pub description: String,
-}
-
-/// Suggested action for agent to take
-#[derive(Debug, Clone, Serialize)]
-pub struct SuggestedAction {
+/// Strategic decision for next action
+#[derive(Debug, Clone)]
+pub struct StrategicDecision {
     /// Priority (lower = do first)
     pub priority: u32,
-    /// The DSL to execute
-    pub dsl: String,
-    /// Human description
-    pub description: String,
-    /// Which gap this addresses
-    pub addresses_gap: String,
-    /// Can be auto-executed?
-    pub auto_execute: bool,
-    /// Estimated impact on progress
-    pub progress_impact: f32,
+    /// The action to take
+    pub action: StrategicAction,
+    /// Reasoning
+    pub rationale: String,
+    /// Expected outcome
+    pub expected_outcome: String,
+    /// Risk if not done
+    pub risk_if_skipped: RiskLevel,
 }
 
-/// The Gap Analysis Engine
-pub struct GapAnalysisEngine {
-    /// Loaded end state definitions
-    end_states: HashMap<String, EndStateDefinition>,
+#[derive(Debug, Clone)]
+pub enum StrategicAction {
+    /// Verify a claim against independent source
+    Verify { claim_id: Uuid, source: SourceType },
+    /// Seek corroboration from multiple sources
+    Corroborate { claim_id: Uuid, sources: Vec<SourceType> },
+    /// Challenge an inconsistency or suspicious element
+    Challenge { entity_id: Uuid, challenge_type: String, questions: Vec<String> },
+    /// Request specific evidence
+    RequestEvidence { entity_id: Uuid, evidence_type: String },
+    /// Run pattern detection
+    DetectPatterns { cbu_id: Uuid },
+    /// Escalate to human
+    Escalate { cbu_id: Uuid, reason: String },
+    /// Recalculate confidence
+    RecalculateConfidence { scope: Uuid },
 }
 
-impl GapAnalysisEngine {
-    pub fn new() -> Self {
-        Self {
-            end_states: HashMap::new(),
-        }
+/// Agent strategy engine
+pub struct StrategyEngine {
+    /// Risk tolerance (lower = more aggressive verification)
+    risk_tolerance: f32,
+}
+
+impl StrategyEngine {
+    pub fn new(risk_tolerance: f32) -> Self {
+        Self { risk_tolerance }
     }
 
-    /// Load end state definitions from config
-    pub fn load_end_states(&mut self, config_dir: &Path) -> Result<(), ConfigError> {
-        // Load all YAML files from config/end_states/
-        todo!()
-    }
-
-    /// Analyze entity against an end state
-    pub async fn analyze(
-        &self,
-        end_state_id: &str,
-        entity_id: Uuid,
-        context: &ExecutionContext,
-    ) -> Result<GapAnalysis, AnalysisError> {
-        let end_state = self.end_states.get(end_state_id)
-            .ok_or(AnalysisError::UnknownEndState(end_state_id.to_string()))?;
-
-        // 1. Get current entity state
-        let entity_state = self.fetch_entity_state(entity_id, context).await?;
-
-        // 2. Evaluate each requirement
-        let mut requirements = Vec::new();
-        let mut gaps = Vec::new();
-
-        for req in &end_state.requirements {
-            // Check if conditional requirement applies
-            if let Some(condition) = &req.condition {
-                if !self.evaluate_condition(condition, &entity_state)? {
-                    requirements.push(RequirementStatus {
-                        requirement_id: req.id.clone(),
-                        name: req.name.clone(),
-                        status: EvaluationResult::NotApplicable,
-                        details: None,
-                        evidence: vec![],
-                    });
-                    continue;
-                }
-            }
-
-            // Check prerequisites
-            let blocked_by: Vec<String> = req.resolution.requires.iter()
-                .filter(|prereq_id| {
-                    requirements.iter()
-                        .find(|r| &r.requirement_id == *prereq_id)
-                        .map(|r| r.status != EvaluationResult::Met)
-                        .unwrap_or(true)
-                })
-                .cloned()
-                .collect();
-
-            if !blocked_by.is_empty() {
-                requirements.push(RequirementStatus {
-                    requirement_id: req.id.clone(),
-                    name: req.name.clone(),
-                    status: EvaluationResult::Blocked,
-                    details: Some(format!("Blocked by: {}", blocked_by.join(", "))),
-                    evidence: vec![],
-                });
-                continue;
-            }
-
-            // Evaluate requirement
-            let (status, details, evidence) = self.evaluate_requirement(
-                req, 
-                &entity_state, 
-                context
-            ).await?;
-
-            requirements.push(RequirementStatus {
-                requirement_id: req.id.clone(),
-                name: req.name.clone(),
-                status,
-                details: details.clone(),
-                evidence,
-            });
-
-            // If not met, create gap
-            if status != EvaluationResult::Met {
-                gaps.push(self.create_gap(req, &status, &details, &entity_state)?);
-            }
-        }
-
-        // 3. Calculate progress
-        let met_count = requirements.iter()
-            .filter(|r| r.status == EvaluationResult::Met)
-            .count();
-        let applicable_count = requirements.iter()
-            .filter(|r| r.status != EvaluationResult::NotApplicable)
-            .count();
-        let progress = if applicable_count > 0 {
-            met_count as f32 / applicable_count as f32
-        } else {
-            0.0
-        };
-
-        // 4. Identify blocking gaps
-        let blocking_gaps: Vec<Gap> = gaps.iter()
-            .filter(|g| g.severity == GapSeverity::Blocking)
-            .cloned()
-            .collect();
-
-        // 5. Generate suggested actions
-        let suggested_actions = self.generate_suggestions(&gaps, &entity_state)?;
-
-        Ok(GapAnalysis {
-            end_state_id: end_state_id.to_string(),
-            entity_id,
-            progress,
-            requirements,
-            gaps,
-            blocking_gaps,
-            suggested_actions,
-            analyzed_at: chrono::Utc::now(),
-        })
-    }
-
-    /// Generate prioritized action suggestions
-    fn generate_suggestions(
+    /// Determine strategic priorities
+    pub fn plan_strategy(
         &self,
         gaps: &[Gap],
-        entity_state: &EntityState,
-    ) -> Result<Vec<SuggestedAction>, AnalysisError> {
-        let mut actions = Vec::new();
-        let mut priority = 0u32;
+        claims: &[Claim],
+        patterns: &[DetectedPattern],
+    ) -> Vec<StrategicDecision> {
+        let mut decisions = Vec::new();
 
-        // Sort gaps: blocking first, then by dependency order
-        let mut sorted_gaps = gaps.to_vec();
-        sorted_gaps.sort_by(|a, b| {
-            // Blocking before non-blocking
-            let severity_order = match (&a.severity, &b.severity) {
-                (GapSeverity::Blocking, GapSeverity::Blocking) => std::cmp::Ordering::Equal,
-                (GapSeverity::Blocking, _) => std::cmp::Ordering::Less,
-                (_, GapSeverity::Blocking) => std::cmp::Ordering::Greater,
-                _ => std::cmp::Ordering::Equal,
-            };
-            
-            if severity_order != std::cmp::Ordering::Equal {
-                return severity_order;
-            }
-
-            // Then by blocked_by count (fewer blockers = do first)
-            a.blocked_by.len().cmp(&b.blocked_by.len())
-        });
-
-        for gap in sorted_gaps {
-            // Skip gaps that are blocked
-            if !gap.blocked_by.is_empty() {
-                continue;
-            }
-
-            for verb_hint in &gap.resolution.applicable_verbs {
-                actions.push(SuggestedAction {
-                    priority,
-                    dsl: self.generate_dsl(&verb_hint, entity_state)?,
-                    description: verb_hint.description.clone(),
-                    addresses_gap: gap.requirement_id.clone(),
-                    auto_execute: gap.resolution.auto_resolvable,
-                    progress_impact: 0.0, // Calculate based on gap weight
-                });
-                priority += 1;
-            }
-        }
-
-        Ok(actions)
-    }
-
-    fn generate_dsl(
-        &self,
-        verb_hint: &VerbHint,
-        entity_state: &EntityState,
-    ) -> Result<String, AnalysisError> {
-        // Generate DSL string from verb hint and entity state
-        let mut parts = vec![format!("({}", verb_hint.verb)];
-        
-        for (arg, value) in &verb_hint.suggested_args {
-            let value_str = match value {
-                serde_json::Value::String(s) => format!("\"{}\"", s),
-                serde_json::Value::Number(n) => n.to_string(),
-                serde_json::Value::Bool(b) => b.to_string(),
-                _ => value.to_string(),
-            };
-            parts.push(format!(":{} {}", arg, value_str));
-        }
-        
-        parts.push(")".to_string());
-        Ok(parts.join(" "))
-    }
-}
-```
-
-### 2.2 Tasks - Gap Analysis
-
-- [ ] Create `rust/src/agent/` module directory
-- [ ] Create `rust/src/agent/mod.rs`
-- [ ] Create `rust/src/agent/gap_analysis.rs`
-- [ ] Implement `GapAnalysis` struct
-- [ ] Implement `GapAnalysisEngine`
-- [ ] Implement requirement evaluation
-- [ ] Implement gap creation
-- [ ] Implement suggestion generation
-- [ ] Implement DSL generation from hints
-- [ ] Unit tests for gap analysis
-
----
-
-## Part 3: Agent Orchestration
-
-### 3.1 Agent DSL Verbs
-
-**File:** `rust/config/verbs/agent.yaml`
-
-```yaml
-domains:
-  agent:
-    description: Agent orchestration and gap analysis verbs
-    verbs:
-      analyze:
-        description: Analyze entity against end state, return gaps
-        behavior: plugin
-        plugin: agent_analyze
-        args:
-          - name: entity
-            type: uuid
-            required: true
-            lookup:
-              table: entities
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: end-state
-            type: string
-            required: true
-            valid_values:
-              - kyc_ready
-              - ubo_complete
-              - docs_collected
-              - screening_complete
-        returns:
-          type: gap_analysis
-          description: Full gap analysis with suggestions
-
-      status:
-        description: Get current status toward end state
-        behavior: plugin
-        plugin: agent_status
-        args:
-          - name: entity
-            type: uuid
-            required: true
-            lookup:
-              table: entities
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: end-state
-            type: string
-            required: false
-            default: kyc_ready
-        returns:
-          type: status_summary
-
-      gaps:
-        description: Get only the gaps (blocking issues)
-        behavior: plugin
-        plugin: agent_gaps
-        args:
-          - name: entity
-            type: uuid
-            required: true
-          - name: end-state
-            type: string
-            required: false
-            default: kyc_ready
-          - name: severity
-            type: string
-            required: false
-            valid_values:
-              - blocking
-              - warning
-              - all
-            default: blocking
-        returns:
-          type: gap_list
-
-      next-actions:
-        description: Get suggested next actions to close gaps
-        behavior: plugin
-        plugin: agent_next_actions
-        args:
-          - name: entity
-            type: uuid
-            required: true
-          - name: end-state
-            type: string
-            required: false
-            default: kyc_ready
-          - name: limit
-            type: integer
-            required: false
-            default: 5
-          - name: auto-only
-            type: boolean
-            required: false
-            default: false
-            description: Only return actions that can be auto-executed
-        returns:
-          type: action_list
-
-      execute-plan:
-        description: Execute a sequence of actions to close gaps
-        behavior: plugin
-        plugin: agent_execute_plan
-        args:
-          - name: entity
-            type: uuid
-            required: true
-          - name: end-state
-            type: string
-            required: false
-            default: kyc_ready
-          - name: auto-only
-            type: boolean
-            required: false
-            default: true
-            description: Only execute auto-resolvable actions
-          - name: dry-run
-            type: boolean
-            required: false
-            default: false
-            description: Show what would be done without executing
-          - name: max-actions
-            type: integer
-            required: false
-            default: 10
-        returns:
-          type: execution_result
-
-      close-gap:
-        description: Attempt to close a specific gap
-        behavior: plugin
-        plugin: agent_close_gap
-        args:
-          - name: entity
-            type: uuid
-            required: true
-          - name: gap-id
-            type: string
-            required: true
-          - name: auto-only
-            type: boolean
-            required: false
-            default: true
-        returns:
-          type: gap_resolution_result
-```
-
-### 3.2 Agent Executor
-
-**File:** `rust/src/agent/executor.rs`
-
-```rust
-//! Agent Executor
-//!
-//! Executes agent orchestration verbs - analyze, plan, execute.
-
-use super::gap_analysis::{GapAnalysis, GapAnalysisEngine, SuggestedAction};
-use crate::dsl_v2::DslEngine;
-
-/// Agent executor - bridges gap analysis to DSL execution
-pub struct AgentExecutor {
-    gap_engine: GapAnalysisEngine,
-    dsl_engine: DslEngine,
-}
-
-impl AgentExecutor {
-    pub fn new(gap_engine: GapAnalysisEngine, dsl_engine: DslEngine) -> Self {
-        Self { gap_engine, dsl_engine }
-    }
-
-    /// Analyze entity against end state
-    pub async fn analyze(
-        &self,
-        entity_id: Uuid,
-        end_state: &str,
-        context: &ExecutionContext,
-    ) -> Result<GapAnalysis, AgentError> {
-        self.gap_engine.analyze(end_state, entity_id, context).await
-            .map_err(|e| AgentError::AnalysisFailed(e.to_string()))
-    }
-
-    /// Get next actions to close gaps
-    pub async fn next_actions(
-        &self,
-        entity_id: Uuid,
-        end_state: &str,
-        limit: usize,
-        auto_only: bool,
-        context: &ExecutionContext,
-    ) -> Result<Vec<SuggestedAction>, AgentError> {
-        let analysis = self.analyze(entity_id, end_state, context).await?;
-        
-        let mut actions = analysis.suggested_actions;
-        
-        if auto_only {
-            actions.retain(|a| a.auto_execute);
-        }
-        
-        actions.truncate(limit);
-        
-        Ok(actions)
-    }
-
-    /// Execute a plan to close gaps
-    pub async fn execute_plan(
-        &self,
-        entity_id: Uuid,
-        end_state: &str,
-        auto_only: bool,
-        dry_run: bool,
-        max_actions: usize,
-        context: &ExecutionContext,
-    ) -> Result<ExecutionPlanResult, AgentError> {
-        let mut results = Vec::new();
-        let mut actions_executed = 0;
-
-        loop {
-            // Re-analyze after each action (state has changed)
-            let analysis = self.analyze(entity_id, end_state, context).await?;
-
-            // Check if done
-            if analysis.gaps.is_empty() {
-                return Ok(ExecutionPlanResult {
-                    status: PlanStatus::Complete,
-                    progress: analysis.progress,
-                    actions_executed: results,
-                    remaining_gaps: vec![],
-                });
-            }
-
-            // Check if we've hit max actions
-            if actions_executed >= max_actions {
-                return Ok(ExecutionPlanResult {
-                    status: PlanStatus::MaxActionsReached,
-                    progress: analysis.progress,
-                    actions_executed: results,
-                    remaining_gaps: analysis.gaps,
-                });
-            }
-
-            // Get next action
-            let next_actions = analysis.suggested_actions.iter()
-                .filter(|a| !auto_only || a.auto_execute)
-                .collect::<Vec<_>>();
-
-            if next_actions.is_empty() {
-                return Ok(ExecutionPlanResult {
-                    status: if auto_only { 
-                        PlanStatus::NeedsHumanIntervention 
-                    } else { 
-                        PlanStatus::Stuck 
-                    },
-                    progress: analysis.progress,
-                    actions_executed: results,
-                    remaining_gaps: analysis.gaps,
-                });
-            }
-
-            let action = &next_actions[0];
-
-            if dry_run {
-                results.push(ActionResult {
-                    dsl: action.dsl.clone(),
-                    description: action.description.clone(),
-                    status: ActionStatus::DryRun,
-                    error: None,
-                    gap_addressed: action.addresses_gap.clone(),
-                });
-                actions_executed += 1;
-                continue;
-            }
-
-            // Execute the action
-            match self.dsl_engine.execute(&action.dsl, context).await {
-                Ok(result) => {
-                    results.push(ActionResult {
-                        dsl: action.dsl.clone(),
-                        description: action.description.clone(),
-                        status: ActionStatus::Success,
-                        error: None,
-                        gap_addressed: action.addresses_gap.clone(),
-                    });
-                }
-                Err(e) => {
-                    results.push(ActionResult {
-                        dsl: action.dsl.clone(),
-                        description: action.description.clone(),
-                        status: ActionStatus::Failed,
-                        error: Some(e.to_string()),
-                        gap_addressed: action.addresses_gap.clone(),
-                    });
-                    
-                    // Don't continue on failure
-                    return Ok(ExecutionPlanResult {
-                        status: PlanStatus::ActionFailed,
-                        progress: analysis.progress,
-                        actions_executed: results,
-                        remaining_gaps: analysis.gaps,
-                    });
-                }
-            }
-
-            actions_executed += 1;
-        }
-    }
-
-    /// Close a specific gap
-    pub async fn close_gap(
-        &self,
-        entity_id: Uuid,
-        gap_id: &str,
-        auto_only: bool,
-        context: &ExecutionContext,
-    ) -> Result<GapResolutionResult, AgentError> {
-        // Analyze to find the gap
-        let analysis = self.analyze(entity_id, "kyc_ready", context).await?;
-        
-        let gap = analysis.gaps.iter()
-            .find(|g| g.requirement_id == gap_id)
-            .ok_or(AgentError::GapNotFound(gap_id.to_string()))?;
-
-        if auto_only && !gap.resolution.auto_resolvable {
-            return Ok(GapResolutionResult {
-                gap_id: gap_id.to_string(),
-                status: ResolutionStatus::RequiresHuman,
-                actions_taken: vec![],
-                message: gap.resolution.strategy.clone(),
+        // PRIORITY 1: Address critical patterns immediately
+        for pattern in patterns.iter().filter(|p| p.risk_level == RiskLevel::Critical) {
+            decisions.push(StrategicDecision {
+                priority: 0,
+                action: StrategicAction::Escalate {
+                    cbu_id: pattern.entities[0], // Simplification
+                    reason: format!("Critical pattern: {}", pattern.description),
+                },
+                rationale: "Critical patterns require immediate human review".into(),
+                expected_outcome: "Human will assess and determine next steps".into(),
+                risk_if_skipped: RiskLevel::Critical,
             });
         }
 
-        // Execute actions to close this gap
-        let mut actions_taken = Vec::new();
-        
-        for verb_hint in &gap.resolution.applicable_verbs {
-            let dsl = self.generate_dsl(verb_hint, entity_id)?;
-            
-            match self.dsl_engine.execute(&dsl, context).await {
-                Ok(_) => {
-                    actions_taken.push(ActionResult {
-                        dsl: dsl.clone(),
-                        description: verb_hint.description.clone(),
-                        status: ActionStatus::Success,
-                        error: None,
-                        gap_addressed: gap_id.to_string(),
-                    });
-                }
-                Err(e) => {
-                    actions_taken.push(ActionResult {
-                        dsl,
-                        description: verb_hint.description.clone(),
-                        status: ActionStatus::Failed,
-                        error: Some(e.to_string()),
-                        gap_addressed: gap_id.to_string(),
-                    });
-                    break;
-                }
-            }
-        }
+        // PRIORITY 2: Verify claims that are still CLAIMED (not verified)
+        let unverified_claims: Vec<&Claim> = claims.iter()
+            .filter(|c| c.verification.status == VerificationState::Claimed)
+            .collect();
 
-        // Re-analyze to see if gap is closed
-        let new_analysis = self.analyze(entity_id, "kyc_ready", context).await?;
-        let gap_closed = !new_analysis.gaps.iter().any(|g| g.requirement_id == gap_id);
+        for claim in unverified_claims {
+            // Prioritize ownership and identity claims
+            let priority = match claim.claim_type {
+                ClaimType::Ownership { .. } => 1,
+                ClaimType::PersonIdentity => 1,
+                ClaimType::Control { .. } => 2,
+                ClaimType::RegulatoryStatus => 2,
+                _ => 3,
+            };
 
-        Ok(GapResolutionResult {
-            gap_id: gap_id.to_string(),
-            status: if gap_closed { 
-                ResolutionStatus::Closed 
-            } else { 
-                ResolutionStatus::PartialProgress 
-            },
-            actions_taken,
-            message: if gap_closed {
-                "Gap closed successfully".to_string()
-            } else {
-                "Actions executed but gap not fully closed".to_string()
-            },
-        })
-    }
-}
+            // Determine best verification source
+            let source = self.best_verification_source(&claim.claim_type);
 
-#[derive(Debug, Clone, Serialize)]
-pub struct ExecutionPlanResult {
-    pub status: PlanStatus,
-    pub progress: f32,
-    pub actions_executed: Vec<ActionResult>,
-    pub remaining_gaps: Vec<Gap>,
-}
-
-#[derive(Debug, Clone, Copy, Serialize)]
-pub enum PlanStatus {
-    Complete,
-    MaxActionsReached,
-    NeedsHumanIntervention,
-    ActionFailed,
-    Stuck,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct ActionResult {
-    pub dsl: String,
-    pub description: String,
-    pub status: ActionStatus,
-    pub error: Option<String>,
-    pub gap_addressed: String,
-}
-
-#[derive(Debug, Clone, Copy, Serialize)]
-pub enum ActionStatus {
-    Success,
-    Failed,
-    DryRun,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct GapResolutionResult {
-    pub gap_id: String,
-    pub status: ResolutionStatus,
-    pub actions_taken: Vec<ActionResult>,
-    pub message: String,
-}
-
-#[derive(Debug, Clone, Copy, Serialize)]
-pub enum ResolutionStatus {
-    Closed,
-    PartialProgress,
-    RequiresHuman,
-    Failed,
-}
-```
-
-### 3.3 Tasks - Agent Orchestration
-
-- [ ] Create `rust/config/verbs/agent.yaml`
-- [ ] Create `rust/src/agent/executor.rs`
-- [ ] Implement `AgentExecutor`
-- [ ] Implement `execute_plan` with re-evaluation loop
-- [ ] Implement `close_gap` for targeted resolution
-- [ ] Wire agent verbs to executor
-- [ ] Integration tests for agent loop
-
----
-
-## Part 4: Feedback & Learning
-
-### 4.1 Execution Telemetry
-
-**File:** `rust/src/agent/telemetry.rs`
-
-```rust
-//! Agent Telemetry
-//!
-//! Captures execution data for learning and improvement.
-
-use std::collections::HashMap;
-use uuid::Uuid;
-use chrono::{DateTime, Utc};
-
-/// Record of a complete agent execution
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExecutionRecord {
-    /// Unique execution ID
-    pub execution_id: Uuid,
-    
-    /// Entity being processed
-    pub entity_id: Uuid,
-    pub entity_type: String,
-    pub jurisdiction: Option<String>,
-    
-    /// End state target
-    pub end_state: String,
-    
-    /// Initial state
-    pub initial_progress: f32,
-    pub initial_gap_count: usize,
-    pub initial_gaps: Vec<String>,
-    
-    /// Final state
-    pub final_progress: f32,
-    pub final_gap_count: usize,
-    pub final_gaps: Vec<String>,
-    
-    /// Actions taken
-    pub actions: Vec<ActionRecord>,
-    
-    /// Timing
-    pub started_at: DateTime<Utc>,
-    pub completed_at: DateTime<Utc>,
-    pub duration_ms: i64,
-    
-    /// Outcome
-    pub outcome: ExecutionOutcome,
-    pub human_interventions: usize,
-    
-    /// Context
-    pub triggered_by: TriggerType,
-    pub user_id: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActionRecord {
-    /// The DSL executed
-    pub dsl: String,
-    pub verb: String,
-    
-    /// What gap it addressed
-    pub gap_type: String,
-    
-    /// Timing
-    pub started_at: DateTime<Utc>,
-    pub duration_ms: i64,
-    
-    /// Outcome
-    pub success: bool,
-    pub error: Option<String>,
-    
-    /// Impact
-    pub gap_closed: bool,
-    pub progress_delta: f32,
-    
-    /// Was this auto or human triggered?
-    pub auto_executed: bool,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub enum ExecutionOutcome {
-    /// Reached end state
-    Complete,
-    /// Made progress but not complete
-    PartialProgress,
-    /// Blocked by human-required action
-    NeedsHuman,
-    /// Failed with error
-    Failed,
-    /// Cancelled
-    Cancelled,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub enum TriggerType {
-    /// User initiated
-    UserRequest,
-    /// Document received
-    DocumentEvent,
-    /// Screening completed
-    ScreeningEvent,
-    /// Scheduled check
-    Scheduled,
-    /// API call
-    ApiCall,
-}
-
-/// Telemetry collector
-pub struct TelemetryCollector {
-    /// Current execution being tracked
-    current: Option<ExecutionRecord>,
-    
-    /// Storage backend
-    store: Box<dyn TelemetryStore>,
-}
-
-impl TelemetryCollector {
-    /// Start tracking an execution
-    pub fn start_execution(
-        &mut self,
-        entity_id: Uuid,
-        entity_type: &str,
-        jurisdiction: Option<&str>,
-        end_state: &str,
-        initial_analysis: &GapAnalysis,
-        trigger: TriggerType,
-        user_id: Option<&str>,
-    ) -> Uuid {
-        let execution_id = Uuid::new_v4();
-        
-        self.current = Some(ExecutionRecord {
-            execution_id,
-            entity_id,
-            entity_type: entity_type.to_string(),
-            jurisdiction: jurisdiction.map(|s| s.to_string()),
-            end_state: end_state.to_string(),
-            initial_progress: initial_analysis.progress,
-            initial_gap_count: initial_analysis.gaps.len(),
-            initial_gaps: initial_analysis.gaps.iter()
-                .map(|g| g.gap_type.clone())
-                .collect(),
-            final_progress: 0.0,
-            final_gap_count: 0,
-            final_gaps: vec![],
-            actions: vec![],
-            started_at: Utc::now(),
-            completed_at: Utc::now(),
-            duration_ms: 0,
-            outcome: ExecutionOutcome::PartialProgress,
-            human_interventions: 0,
-            triggered_by: trigger,
-            user_id: user_id.map(|s| s.to_string()),
-        });
-
-        execution_id
-    }
-
-    /// Record an action
-    pub fn record_action(&mut self, action: ActionRecord) {
-        if let Some(ref mut record) = self.current {
-            record.actions.push(action);
-        }
-    }
-
-    /// Complete execution tracking
-    pub async fn complete_execution(
-        &mut self,
-        final_analysis: &GapAnalysis,
-        outcome: ExecutionOutcome,
-    ) -> Result<(), TelemetryError> {
-        if let Some(mut record) = self.current.take() {
-            record.final_progress = final_analysis.progress;
-            record.final_gap_count = final_analysis.gaps.len();
-            record.final_gaps = final_analysis.gaps.iter()
-                .map(|g| g.gap_type.clone())
-                .collect();
-            record.completed_at = Utc::now();
-            record.duration_ms = (record.completed_at - record.started_at)
-                .num_milliseconds();
-            record.outcome = outcome;
-            record.human_interventions = record.actions.iter()
-                .filter(|a| !a.auto_executed)
-                .count();
-
-            self.store.save(record).await?;
-        }
-        Ok(())
-    }
-}
-
-/// Trait for telemetry storage backends
-#[async_trait]
-pub trait TelemetryStore: Send + Sync {
-    async fn save(&self, record: ExecutionRecord) -> Result<(), TelemetryError>;
-    async fn query(&self, query: TelemetryQuery) -> Result<Vec<ExecutionRecord>, TelemetryError>;
-    async fn get_stats(&self, query: StatsQuery) -> Result<ExecutionStats, TelemetryError>;
-}
-```
-
-### 4.2 Learning Analytics
-
-**File:** `rust/src/agent/analytics.rs`
-
-```rust
-//! Agent Learning Analytics
-//!
-//! Analyzes telemetry to improve agent performance.
-
-/// Aggregated statistics from telemetry
-#[derive(Debug, Clone, Serialize)]
-pub struct ExecutionStats {
-    /// Total executions
-    pub total_executions: usize,
-    
-    /// Outcome breakdown
-    pub outcomes: HashMap<ExecutionOutcome, usize>,
-    
-    /// Average progress improvement
-    pub avg_progress_improvement: f32,
-    
-    /// Average actions to completion
-    pub avg_actions_to_complete: f32,
-    
-    /// Average duration
-    pub avg_duration_ms: i64,
-    
-    /// Gap resolution rates
-    pub gap_resolution_rates: HashMap<String, GapStats>,
-    
-    /// Verb effectiveness
-    pub verb_effectiveness: HashMap<String, VerbStats>,
-    
-    /// Patterns by entity type
-    pub entity_type_patterns: HashMap<String, EntityTypePattern>,
-    
-    /// Patterns by jurisdiction
-    pub jurisdiction_patterns: HashMap<String, JurisdictionPattern>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct GapStats {
-    pub gap_type: String,
-    pub occurrences: usize,
-    pub auto_resolved: usize,
-    pub human_resolved: usize,
-    pub avg_resolution_time_ms: i64,
-    pub common_verbs: Vec<(String, usize)>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct VerbStats {
-    pub verb: String,
-    pub total_uses: usize,
-    pub success_rate: f32,
-    pub avg_duration_ms: i64,
-    pub gaps_addressed: HashMap<String, usize>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct EntityTypePattern {
-    pub entity_type: String,
-    pub avg_gap_count: f32,
-    pub common_gaps: Vec<(String, f32)>,  // (gap_type, frequency)
-    pub typical_verb_sequence: Vec<String>,
-    pub avg_time_to_complete_ms: i64,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct JurisdictionPattern {
-    pub jurisdiction: String,
-    pub additional_requirements: Vec<String>,
-    pub avg_doc_count: f32,
-    pub common_issues: Vec<String>,
-}
-
-/// Analytics engine
-pub struct AnalyticsEngine {
-    store: Box<dyn TelemetryStore>,
-}
-
-impl AnalyticsEngine {
-    /// Get recommendations for a specific entity
-    pub async fn get_recommendations(
-        &self,
-        entity_type: &str,
-        jurisdiction: Option<&str>,
-        current_gaps: &[Gap],
-    ) -> Result<Vec<Recommendation>, AnalyticsError> {
-        // Look up patterns for this entity type / jurisdiction
-        let patterns = self.get_patterns(entity_type, jurisdiction).await?;
-
-        let mut recommendations = Vec::new();
-
-        // Predict likely future gaps
-        for (gap_type, frequency) in &patterns.common_gaps {
-            if frequency > &0.5 && !current_gaps.iter().any(|g| &g.gap_type == gap_type) {
-                recommendations.push(Recommendation {
-                    rec_type: RecommendationType::PreemptiveAction,
-                    message: format!(
-                        "{}% of {} entities encounter '{}' - consider addressing proactively",
-                        (frequency * 100.0) as u32,
-                        entity_type,
-                        gap_type
-                    ),
-                    suggested_action: None,
-                    confidence: *frequency,
-                });
-            }
-        }
-
-        // Recommend optimal verb sequence
-        if !patterns.typical_verb_sequence.is_empty() {
-            recommendations.push(Recommendation {
-                rec_type: RecommendationType::OptimalSequence,
-                message: "Recommended action sequence based on historical success".to_string(),
-                suggested_action: Some(patterns.typical_verb_sequence.clone()),
-                confidence: 0.8,
+            decisions.push(StrategicDecision {
+                priority,
+                action: StrategicAction::Verify {
+                    claim_id: claim.id,
+                    source,
+                },
+                rationale: format!(
+                    "Claim '{}' is unverified (source: {:?}, confidence: {:.0}%)",
+                    claim.content.description,
+                    claim.source.source_type,
+                    claim.confidence * 100.0
+                ),
+                expected_outcome: "Claim verified against independent source".into(),
+                risk_if_skipped: if priority <= 1 { RiskLevel::High } else { RiskLevel::Medium },
             });
         }
 
-        // Flag jurisdiction-specific requirements
-        if let Some(j) = jurisdiction {
-            if let Some(jp) = self.get_jurisdiction_pattern(j).await? {
-                for req in &jp.additional_requirements {
-                    recommendations.push(Recommendation {
-                        rec_type: RecommendationType::JurisdictionRequirement,
-                        message: format!("{} requires: {}", j, req),
-                        suggested_action: None,
-                        confidence: 1.0,
+        // PRIORITY 3: Address low-confidence claims
+        let low_confidence: Vec<&Claim> = claims.iter()
+            .filter(|c| c.confidence < 0.60 && c.verification.status != VerificationState::Refuted)
+            .collect();
+
+        for claim in low_confidence {
+            decisions.push(StrategicDecision {
+                priority: 4,
+                action: StrategicAction::Corroborate {
+                    claim_id: claim.id,
+                    sources: vec![SourceType::Gleif, SourceType::GovernmentRegistry],
+                },
+                rationale: format!(
+                    "Low confidence ({:.0}%) on claim: {}",
+                    claim.confidence * 100.0,
+                    claim.content.description
+                ),
+                expected_outcome: "Confidence increased through corroboration".into(),
+                risk_if_skipped: RiskLevel::Medium,
+            });
+        }
+
+        // PRIORITY 4: Resolve inconsistencies
+        for claim in claims.iter().filter(|c| !c.inconsistencies.is_empty()) {
+            for inconsistency in &claim.inconsistencies {
+                if !inconsistency.resolved {
+                    decisions.push(StrategicDecision {
+                        priority: 3,
+                        action: StrategicAction::Challenge {
+                            entity_id: claim.subject_id,
+                            challenge_type: "inconsistency".into(),
+                            questions: vec![
+                                format!(
+                                    "Source A says '{}', Source B says '{}'. Which is correct?",
+                                    inconsistency.value_a,
+                                    inconsistency.value_b
+                                ),
+                            ],
+                        },
+                        rationale: format!("Inconsistency: {}", inconsistency.description),
+                        expected_outcome: "Inconsistency explained and resolved".into(),
+                        risk_if_skipped: match inconsistency.severity {
+                            InconsistencySeverity::Critical => RiskLevel::Critical,
+                            InconsistencySeverity::Serious => RiskLevel::High,
+                            InconsistencySeverity::Moderate => RiskLevel::Medium,
+                            InconsistencySeverity::Minor => RiskLevel::Low,
+                        },
                     });
                 }
             }
         }
 
-        Ok(recommendations)
-    }
-
-    /// Identify areas for improvement
-    pub async fn get_improvement_insights(&self) -> Result<Vec<Insight>, AnalyticsError> {
-        let stats = self.get_stats(StatsQuery::default()).await?;
-        let mut insights = Vec::new();
-
-        // Find gaps with low auto-resolution rate
-        for (gap_type, gap_stats) in &stats.gap_resolution_rates {
-            let auto_rate = if gap_stats.occurrences > 0 {
-                gap_stats.auto_resolved as f32 / gap_stats.occurrences as f32
-            } else {
-                0.0
-            };
-
-            if auto_rate < 0.5 && gap_stats.occurrences > 10 {
-                insights.push(Insight {
-                    insight_type: InsightType::LowAutoResolution,
-                    message: format!(
-                        "'{}' has only {:.0}% auto-resolution rate ({} occurrences)",
-                        gap_type,
-                        auto_rate * 100.0,
-                        gap_stats.occurrences
-                    ),
-                    recommendation: "Consider adding more resolution strategies".to_string(),
-                    impact: InsightImpact::High,
-                });
-            }
+        // PRIORITY 5: Investigate high-risk patterns
+        for pattern in patterns.iter().filter(|p| p.risk_level == RiskLevel::High) {
+            decisions.push(StrategicDecision {
+                priority: 5,
+                action: StrategicAction::Challenge {
+                    entity_id: pattern.entities[0],
+                    challenge_type: format!("{:?}", pattern.pattern_type),
+                    questions: self.questions_for_pattern(pattern),
+                },
+                rationale: format!("High-risk pattern: {}", pattern.description),
+                expected_outcome: "Pattern explained or escalated".into(),
+                risk_if_skipped: RiskLevel::High,
+            });
         }
 
-        // Find verbs with low success rate
-        for (verb, verb_stats) in &stats.verb_effectiveness {
-            if verb_stats.success_rate < 0.8 && verb_stats.total_uses > 20 {
-                insights.push(Insight {
-                    insight_type: InsightType::VerbFailures,
-                    message: format!(
-                        "'{}' has {:.0}% success rate ({} uses)",
-                        verb,
-                        verb_stats.success_rate * 100.0,
-                        verb_stats.total_uses
-                    ),
-                    recommendation: "Investigate common failure causes".to_string(),
-                    impact: InsightImpact::Medium,
-                });
-            }
-        }
+        // Sort by priority
+        decisions.sort_by_key(|d| d.priority);
 
-        Ok(insights)
+        decisions
+    }
+
+    fn best_verification_source(&self, claim_type: &ClaimType) -> SourceType {
+        match claim_type {
+            ClaimType::EntityExists => SourceType::GovernmentRegistry,
+            ClaimType::Ownership { .. } => SourceType::Gleif,
+            ClaimType::Control { .. } => SourceType::GovernmentRegistry,
+            ClaimType::PersonIdentity => SourceType::GovernmentRegistry,
+            ClaimType::Jurisdiction => SourceType::Gleif,
+            ClaimType::RegulatoryStatus => SourceType::ExchangeListing,
+            ClaimType::DocumentAuthenticity => SourceType::NotarizedDocument,
+        }
+    }
+
+    fn questions_for_pattern(&self, pattern: &DetectedPattern) -> Vec<String> {
+        match pattern.pattern_type {
+            PatternType::LayeringStructure => vec![
+                "What is the business purpose for this ownership structure?".into(),
+                "Why are intermediate holding entities necessary?".into(),
+                "Provide documentation for each layer's business activity".into(),
+            ],
+            PatternType::OpacityJurisdictionUsage => vec![
+                "Why are entities domiciled in these jurisdictions?".into(),
+                "Provide source of funds documentation".into(),
+                "Provide regulatory status in each jurisdiction".into(),
+            ],
+            PatternType::NomineeUsage => vec![
+                "Confirm whether nominee arrangements are in place".into(),
+                "If nominees used, identify the underlying beneficial owner".into(),
+                "Provide documentation of nominee arrangement".into(),
+            ],
+            PatternType::RegistryMismatch => vec![
+                format!(
+                    "Registry shows different information than provided. Please explain: {}",
+                    pattern.description
+                ),
+            ],
+            _ => vec![
+                format!("Please explain the following: {}", pattern.description),
+            ],
+        }
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
-pub struct Recommendation {
-    pub rec_type: RecommendationType,
-    pub message: String,
-    pub suggested_action: Option<Vec<String>>,
-    pub confidence: f32,
-}
+/// The core game theory principles
+pub mod principles {
+    /// NEVER accept client claims at face value
+    pub const DISTRUST_BY_DEFAULT: &str = 
+        "Every claim starts as UNVERIFIED regardless of source. \
+         Client-provided information has low base confidence.";
 
-#[derive(Debug, Clone, Copy, Serialize)]
-pub enum RecommendationType {
-    PreemptiveAction,
-    OptimalSequence,
-    JurisdictionRequirement,
-    RiskWarning,
-}
+    /// Always seek independent verification
+    pub const INDEPENDENT_VERIFICATION: &str = 
+        "Verify every material claim against at least one independent source. \
+         GLEIF, government registries, and exchange listings are preferred.";
 
-#[derive(Debug, Clone, Serialize)]
-pub struct Insight {
-    pub insight_type: InsightType,
-    pub message: String,
-    pub recommendation: String,
-    pub impact: InsightImpact,
-}
+    /// Multiple sources increase confidence
+    pub const CORROBORATION: &str = 
+        "Two independent sources agreeing significantly increases confidence. \
+         Conflicting sources trigger investigation.";
 
-#[derive(Debug, Clone, Copy, Serialize)]
-pub enum InsightType {
-    LowAutoResolution,
-    VerbFailures,
-    SlowResolution,
-    CommonBlocker,
-    PatternAnomaly,
-}
+    /// Inconsistencies are red flags
+    pub const INCONSISTENCY_ALERT: &str = 
+        "Any inconsistency between sources must be resolved. \
+         Unexplained inconsistencies block verification.";
 
-#[derive(Debug, Clone, Copy, Serialize)]
-pub enum InsightImpact {
-    High,
-    Medium,
-    Low,
+    /// Patterns reveal intent
+    pub const PATTERN_ANALYSIS: &str = 
+        "Structural and behavioral patterns can indicate deception. \
+         Circular ownership, layering, nominee usage require investigation.";
+
+    /// The test: would this catch a liar?
+    pub const ADVERSARIAL_STANDARD: &str = 
+        "Every verification decision should answer: \
+         'Would this process catch a sophisticated liar trying to hide true ownership?'";
 }
 ```
 
-### 4.3 Tasks - Feedback & Learning
+### 5.2 Agent System Prompt
 
-- [ ] Create `rust/src/agent/telemetry.rs`
-- [ ] Implement `ExecutionRecord` struct
-- [ ] Implement `TelemetryCollector`
-- [ ] Implement database storage for telemetry
-- [ ] Create `rust/src/agent/analytics.rs`
-- [ ] Implement `ExecutionStats` aggregation
-- [ ] Implement pattern detection
-- [ ] Implement recommendation generation
-- [ ] Create analytics dashboard queries
-
----
-
-## Part 5: LLM Agent Integration
-
-### 5.1 Agent System Prompt
-
-**File:** `rust/config/agent/kyc_agent_prompt.md`
+**File:** `rust/config/agent/adversarial_agent_prompt.md`
 
 ```markdown
-# KYC Agent System Prompt
+# Adversarial KYC Agent System Prompt
 
-You are a KYC (Know Your Customer) specialist agent for a financial services 
-onboarding platform. Your role is to help complete KYC requirements for 
-Client Business Units (CBUs) by analyzing gaps and executing appropriate 
-actions via DSL verbs.
+You are a KYC verification agent engaged in an adversarial verification game.
 
-## Your Capabilities
+## The Game
 
-You have access to the following DSL domains:
+**You (Agent)**: Establish VERIFIED truth about beneficial ownership
+**Client**: Achieve KYC clearance (may be honest OR deceptive)
 
-### Analysis
-- `(agent.analyze :entity @cbu :end-state "kyc_ready")` - Analyze gaps
-- `(agent.status :entity @cbu)` - Get current status
-- `(agent.gaps :entity @cbu)` - Get blocking gaps
-- `(agent.next-actions :entity @cbu)` - Get suggested actions
+**Your Win**: All claims verified to high confidence, would catch a sophisticated liar
+**Your Loss**: Accept unverified claims (even from honest client = systemic failure)
 
-### Entity Management
-- `(entity.create-* ...)` - Create entities (funds, companies, persons)
-- `(entity.update ...)` - Update entity attributes
+## Core Principles
 
-### UBO Chain
-- `(ubo.add-ownership ...)` - Add ownership relationship
-- `(ubo.add-control ...)` - Add control person
-- `(ubo.apply-exemption ...)` - Apply listed company/regulated fund exemption
-- `(ubo.verify-chain ...)` - Verify ownership chain
+### 1. DISTRUST BY DEFAULT
+- Client claims are UNVERIFIED until proven
+- Client documents have low base confidence (40-60%)
+- "Trust but verify" means VERIFY EVERYTHING
 
-### KYC Documents
-- `(kyc.request-document ...)` - Request document from client
-- `(kyc.link-evidence ...)` - Link document as evidence
-- `(kyc.validate-document ...)` - Validate document
+### 2. INDEPENDENT VERIFICATION
+Every material claim needs independent confirmation:
+- GLEIF (ownership, LEI, jurisdiction)
+- Government registries (incorporation, directors)
+- Exchange listings (public company status)
+- Regulatory filings (fund registration)
 
-### Screening
-- `(screening.pep :person @person)` - Run PEP screening
-- `(screening.sanctions :entity @entity)` - Run sanctions screening
-- `(screening.adverse-media :entity @entity)` - Run adverse media check
+### 3. CORROBORATION STRENGTHENS
+- One source = weak
+- Two sources agreeing = strong
+- Three+ sources = very high confidence
+- Conflicting sources = INVESTIGATE
 
-### Graph Visualization
-- `(graph.view :focus @entity ...)` - Show entity in context
+### 4. INCONSISTENCIES ARE RED FLAGS
+Never ignore:
+- Client says X, registry says Y
+- Document dates don't align
+- Jurisdiction mismatches
+- Story changes when challenged
 
-## Your Process
+### 5. PATTERNS REVEAL INTENT
+Watch for:
+- Circular ownership (A→B→C→A)
+- Deep layering with single owners
+- Multiple opacity jurisdictions
+- Nominee usage without explanation
+- Selective document delays
 
-1. **Assess**: Always start by analyzing the current state
-   - Run `(agent.analyze ...)` to understand gaps
-   - Use `(graph.view ...)` to visualize the structure
+## Verification Verbs
 
-2. **Plan**: Identify which gaps to address
-   - Prioritize blocking gaps
-   - Consider dependencies (some gaps must be closed before others)
-   - Check if actions can be auto-executed or need human input
+```lisp
+;; Register what client claims
+(verify.register-claim :entity @e :claim-type "ownership" 
+                       :source-type "client_uncertified" ...)
 
-3. **Execute**: Take actions to close gaps
-   - Execute DSL verbs
-   - Verify the action succeeded
-   - Re-analyze to confirm gap is closed
+;; Verify against independent source
+(verify.verify-against-gleif :entity @e)
+(verify.verify-against-registry :entity @e :registry "companies_house_uk")
 
-4. **Report**: Communicate clearly with the user
-   - Explain what you did and why
-   - Show progress toward end state
-   - Highlight anything that needs human attention
+;; Seek corroboration
+(verify.corroborate :claim @c :sources ["gleif" "registry"])
 
-## Domain Knowledge
+;; Check for inconsistencies
+(verify.check-consistency :cbu @cbu)
 
-### UBO Requirements
-- 25% ownership threshold (EU 4AMLD/5AMLD)
-- Must trace to natural persons OR apply exemption
-- Control prong: directors, officers with significant control
-- Each ownership link needs documentary evidence
+;; Detect adversarial patterns
+(verify.detect-patterns :cbu @cbu)
+(verify.detect-evasion :cbu @cbu)
 
-### Exemptions
-- **Listed Company**: Publicly traded on regulated exchange
-- **Regulated Fund**: UCITS, AIF under regulatory supervision
-- When exemption applies, no need to identify natural person UBOs
+;; Challenge when needed
+(verify.challenge :entity @e :challenge-type "inconsistency"
+                  :questions ["Registry shows X, you claim Y. Explain."])
 
-### Document Requirements by Entity Type
-- **Fund**: Prospectus, KID, regulatory registration
-- **Company**: Certificate of incorporation, register of directors, 
-  register of shareholders
-- **Natural Person**: Passport/ID, proof of address
-- **Trust**: Trust deed, schedule of beneficiaries
+;; Escalate when necessary
+(verify.escalate :cbu @cbu :reason "Critical pattern" :risk-level "critical")
+```
 
-### Jurisdiction-Specific
-- **Luxembourg (LU)**: CSSF registration required
-- **Ireland (IE)**: CBI authorization required
-- **High-risk jurisdictions**: Enhanced due diligence, source of funds
+## Decision Process
 
-### Screening
-- All natural persons: PEP + sanctions + adverse media
-- All legal entities: Sanctions
-- Hits require human review before proceeding
+For every claim:
 
-## Communication Style
+1. **Register** - Record claim with source type
+2. **Assess** - What is the base confidence?
+3. **Verify** - Can we check an independent source?
+4. **Corroborate** - Can we find a second source?
+5. **Challenge** - Are there inconsistencies to resolve?
+6. **Decide** - Is confidence above threshold?
 
-- Be concise but thorough
-- Always show the DSL you're executing
-- Explain your reasoning
-- Highlight decisions that need human input
-- Use the graph visualization to help users understand structure
+## Confidence Thresholds
+
+| Score | State | Action |
+|-------|-------|--------|
+| ≥80% | VERIFIED | Can proceed |
+| 60-79% | PROVISIONAL | Need more evidence |
+| 40-59% | UNVERIFIED | Actively challenge |
+| <40% | SUSPECT | Escalate immediately |
+
+## Red Lines (Always Escalate)
+
+- Circular ownership detected
+- Registry data contradicts client
+- Critical pattern detected
+- Client refuses to explain structure
+- Document appears altered
+- Multiple high-risk indicators
+
+## The Test
+
+Before approving anything, ask:
+
+> "If this client were a sophisticated money launderer trying to 
+> hide true beneficial ownership, would this verification process 
+> catch them?"
+
+If the answer is "maybe not", the verification is insufficient.
 
 ## Example Interaction
 
-User: "Start KYC for Allianz Income Fund"
+User: "Verify ownership for FundCo Ltd"
 
-Agent: Let me analyze the current state.
+Agent: Let me verify the ownership claims.
 
-```
-(agent.analyze :entity @allianz-income-fund :end-state "kyc_ready")
-```
-
-Current status: 35% complete
-
-**Blocking Gaps:**
-1. UBO chain incomplete - need to trace ownership to natural persons
-2. Control persons not identified - need register of directors
-3. Screening not started - 0 persons screened
-
-Let me show you the current structure:
-
-```
-(graph.view :focus @allianz-income-fund :depth 3 :edges [ownership])
+```lisp
+;; First, check what we have
+(verify.list-claims :entity @fundco :type "ownership")
 ```
 
-The fund is owned by Allianz GI Luxembourg (ManCo), which is owned by 
-Allianz Global Investors GmbH (DE). I can see Allianz SE at the top of 
-the chain.
+I see 3 ownership claims, all from client documents (confidence: 40-50%).
 
-Allianz SE is publicly traded on XETRA, so the listed company exemption 
-applies. I'll apply that:
+Let me verify against independent sources:
 
-```
-(ubo.apply-exemption :entity @allianz-se :type "LISTED_COMPANY" 
-                     :evidence "XETRA:ALV")
+```lisp
+;; Check GLEIF
+(verify.verify-against-gleif :entity @fundco)
 ```
 
-UBO chain is now complete. Next, I need the register of directors 
-from the ManCo to identify control persons:
+GLEIF shows FundCo's parent is HoldingCo (LEI: 5493...) with 100% ownership.
+This matches claim #1. ✓ Confidence now 85%.
 
-```
-(kyc.request-document :entity @allianz-gi-lu 
-                      :type "REGISTER_OF_DIRECTORS"
-                      :reason "Control prong - identify officers")
-```
+But claim #2 says HoldingCo is owned by "ParentCorp BVI".
+GLEIF shows HoldingCo's parent is "ParentCorp Ltd (UK)".
 
-Document requested. Once received, I'll:
-1. Extract director names
-2. Create person entities
-3. Run PEP/sanctions screening
+**INCONSISTENCY DETECTED**
 
-Current progress: 55% complete. Waiting for document.
+```lisp
+(verify.challenge :entity @holdingco 
+                  :challenge-type "registry_mismatch"
+                  :questions ["GLEIF shows UK parent, you claimed BVI parent. 
+                              Which is correct and why the discrepancy?"])
 ```
 
-### 5.2 Tasks - LLM Integration
+I cannot proceed until this inconsistency is resolved. The discrepancy 
+between a BVI and UK parent is significant - different regulatory regimes,
+different transparency requirements.
 
-- [ ] Create `rust/config/agent/kyc_agent_prompt.md`
-- [ ] Create agent API endpoint (accepts natural language, returns DSL + results)
-- [ ] Implement conversation context management
-- [ ] Implement DSL extraction from LLM response
-- [ ] Implement execution + response formatting
-- [ ] Add agent UI component (chat interface)
+Current status: **BLOCKED** pending inconsistency resolution.
+```
+
+---
+
+### 5.3 Tasks - Agent Strategy
+
+- [ ] Create `rust/src/agent/strategy.rs`
+- [ ] Implement `StrategyEngine`
+- [ ] Implement strategic decision prioritization
+- [ ] Implement pattern-specific question generation
+- [ ] Create `rust/config/agent/adversarial_agent_prompt.md`
+- [ ] Integrate strategy engine with agent executor
+- [ ] Test agent with simulated adversarial scenarios
+
+---
+
+## Part 6: Feedback & Learning (Updated)
+
+### 6.1 Telemetry for Adversarial Model
+
+Track not just execution, but **verification effectiveness**:
+
+```rust
+/// Extended telemetry for adversarial model
+#[derive(Debug, Clone, Serialize)]
+pub struct VerificationTelemetry {
+    /// Execution record
+    pub execution: ExecutionRecord,
+    
+    /// Verification effectiveness
+    pub verification_stats: VerificationStats,
+    
+    /// Pattern detection effectiveness
+    pub pattern_stats: PatternStats,
+    
+    /// Adversarial indicators
+    pub adversarial_indicators: Vec<AdversarialIndicator>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct VerificationStats {
+    /// Claims started as CLAIMED
+    pub claims_received: usize,
+    /// Claims verified to ≥80%
+    pub claims_verified: usize,
+    /// Claims that failed verification
+    pub claims_refuted: usize,
+    /// Inconsistencies detected
+    pub inconsistencies_found: usize,
+    /// Inconsistencies resolved
+    pub inconsistencies_resolved: usize,
+    /// Average confidence improvement
+    pub avg_confidence_improvement: f32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PatternStats {
+    /// Patterns detected
+    pub patterns_detected: usize,
+    /// By type
+    pub by_type: HashMap<String, usize>,
+    /// Patterns that led to escalation
+    pub patterns_escalated: usize,
+    /// Patterns satisfactorily explained
+    pub patterns_cleared: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AdversarialIndicator {
+    /// What was detected
+    pub indicator: String,
+    /// Outcome
+    pub outcome: AdversarialOutcome,
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+pub enum AdversarialOutcome {
+    /// False alarm - legitimate explanation
+    FalsePositive,
+    /// Real issue - properly escalated
+    TruePositive,
+    /// Missed - detected later
+    FalseNegative,
+    /// Unknown - pending resolution
+    Pending,
+}
+```
+
+### 6.2 Learning Focus
+
+The model learns:
+
+1. **Which patterns predict real problems** vs false positives
+2. **Which verification sources are most reliable** for each claim type
+3. **Which challenge questions** get useful responses
+4. **Evasion signatures** - what behavior preceded later-discovered fraud
+5. **Jurisdiction-specific** verification requirements
 
 ---
 
@@ -2125,45 +2147,61 @@ Current progress: 55% complete. Waiting for document.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  IMPLEMENTATION ORDER                                                       │
+│  THE ADVERSARIAL MODEL                                                      │
 │                                                                             │
-│  1. Part 1: End State Model (YAML schema + kyc_ready definition)           │
-│  2. Part 2: Gap Analysis Engine (evaluate requirements, identify gaps)     │
-│  3. Part 3: Agent Orchestration (agent.* verbs, executor)                  │
-│  4. Part 4: Telemetry & Learning (execution records, analytics)            │
-│  5. Part 5: LLM Integration (system prompt, API, UI)                       │
+│  NOT: "Collect data to complete checklist"                                 │
+│  BUT: "Verify claims to catch a sophisticated liar"                        │
 │                                                                             │
-│  ESTIMATED: 5-7 days                                                        │
+│  EVERY CLAIM:                                                               │
+│  1. Registered with source                                                 │
+│  2. Assigned base confidence                                               │
+│  3. Verified against independent source                                    │
+│  4. Corroborated if possible                                               │
+│  5. Checked for inconsistencies                                            │
+│  6. Patterns analyzed                                                      │
+│  7. Confidence recalculated                                                │
+│  8. Either VERIFIED (≥80%) or CHALLENGED                                   │
 │                                                                             │
-│  DEPENDENCIES:                                                              │
-│  - Existing DSL infrastructure                                             │
-│  - Graph DSL domain (TODO-GRAPH-DSL-DOMAIN.md)                             │
-│  - KYC verbs (existing)                                                    │
-│  - Screening verbs (existing)                                              │
+│  THE STANDARD:                                                              │
+│  "Would this process catch a sophisticated liar?"                          │
+│                                                                             │
+│  If not → verification is insufficient                                     │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## The Vision Realized
+## Implementation Order
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
+│  PHASE 1: Verification Types (2 days)                                       │
+│  • Claim, Evidence, Confidence models                                       │
+│  • Confidence calculator                                                   │
+│  • Database tables                                                         │
 │                                                                             │
-│  User: "Get this fund KYC ready"                                           │
+│  PHASE 2: Adversarial Detection (2 days)                                    │
+│  • Pattern detector                                                        │
+│  • Evasion detector                                                        │
+│  • Integration with graph                                                  │
 │                                                                             │
-│  Agent:                                                                     │
-│    1. Analyzes current state → identifies 8 gaps                           │
-│    2. Applies domain knowledge → GLEIF for ownership, exemptions          │
-│    3. Executes verbs → closes 5 gaps automatically                        │
-│    4. Reports → "3 items need your input: screening hits, doc review"     │
-│    5. Learns → execution data improves future performance                 │
+│  PHASE 3: Verification Verbs (2 days)                                       │
+│  • verify.* verb implementations                                           │
+│  • GLEIF verification                                                      │
+│  • Registry verification                                                   │
 │                                                                             │
-│  The agent moves the chess pieces. The human approves the strategy.       │
+│  PHASE 4: End State & Strategy (2 days)                                     │
+│  • kyc_verified end state                                                  │
+│  • Strategy engine                                                         │
+│  • Agent prompt                                                            │
 │                                                                             │
-│  Every execution makes the next one better.                                │
-│  Intent-driven. Gap-based. Continuously learning.                          │
+│  PHASE 5: Integration & Testing (2 days)                                    │
+│  • Agent orchestration                                                     │
+│  • Adversarial test scenarios                                              │
+│  • Telemetry                                                               │
+│                                                                             │
+│  TOTAL: ~10 days                                                            │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -2172,16 +2210,15 @@ Current progress: 55% complete. Waiting for document.
 
 ## Success Criteria
 
-- [ ] End state model parses and validates
-- [ ] Gap analysis correctly identifies missing requirements
-- [ ] Agent verbs execute and return meaningful results
-- [ ] Execute-plan loop closes gaps iteratively
-- [ ] Telemetry captures all execution data
-- [ ] Analytics provides actionable insights
-- [ ] LLM agent can run complete KYC workflow
-- [ ] Human intervention points are clear
-- [ ] Progress is always visible
+- [ ] Every claim has confidence score
+- [ ] Verification against GLEIF works
+- [ ] Pattern detection finds circular ownership
+- [ ] Inconsistencies are flagged
+- [ ] Agent challenges unverified claims
+- [ ] Agent escalates critical patterns
+- [ ] Confidence thresholds enforced
+- [ ] Would catch a simulated liar in test scenarios
 
 ---
 
-*Intent → End State → Gaps → Verbs → Learn → Repeat*
+*The game: Verify truth. Catch lies. Never accept unverified claims.*

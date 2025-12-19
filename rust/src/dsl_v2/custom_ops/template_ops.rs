@@ -87,7 +87,7 @@ impl CustomOperation for TemplateInvokeOp {
         // Get template from registry
         let registry = runtime_registry();
         let template = registry
-            .get_template(&template_id)
+            .get_template(template_id)
             .ok_or_else(|| anyhow!("Template not found: {}", template_id))?;
 
         // Build expansion context from current execution context
@@ -99,7 +99,7 @@ impl CustomOperation for TemplateInvokeOp {
         };
 
         // Expand template
-        let expansion = TemplateExpander::expand(&template, &explicit_params, &exp_ctx);
+        let expansion = TemplateExpander::expand(template, &explicit_params, &exp_ctx);
 
         // Check for missing required params
         if !expansion.missing_params.is_empty() {
@@ -413,7 +413,7 @@ impl CustomOperation for TemplateBatchOp {
             .find(|a| a.key == "on-error")
             .and_then(|a| a.value.as_string())
             .unwrap_or("continue");
-        let on_error = OnErrorMode::from_str(&on_error_str);
+        let on_error = OnErrorMode::from_str(on_error_str);
 
         // 6. Extract :limit (optional)
         let limit: Option<usize> = verb_call
@@ -455,7 +455,7 @@ impl CustomOperation for TemplateBatchOp {
         // 8. Get template from registry
         let registry = runtime_registry();
         let template = registry
-            .get_template(&template_id)
+            .get_template(template_id)
             .ok_or_else(|| anyhow!("Template not found: {}", template_id))?;
 
         // 9. Create parent context snapshot for batch executor

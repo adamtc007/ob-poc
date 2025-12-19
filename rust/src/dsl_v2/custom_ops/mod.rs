@@ -28,6 +28,7 @@ mod threshold;
 mod trading_profile;
 mod ubo_analysis;
 pub mod ubo_graph_ops;
+mod verify_ops;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -237,6 +238,14 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(BatchAbortOp));
         registry.register(Arc::new(BatchStatusOp));
         registry.register(Arc::new(BatchAddProductsOp));
+
+        // Verification operations (adversarial agent model)
+        registry.register(Arc::new(verify_ops::VerifyDetectPatternsOp));
+        registry.register(Arc::new(verify_ops::VerifyDetectEvasionOp));
+        registry.register(Arc::new(verify_ops::VerifyCalculateConfidenceOp));
+        registry.register(Arc::new(verify_ops::VerifyGetStatusOp));
+        registry.register(Arc::new(verify_ops::VerifyAgainstRegistryOp));
+        registry.register(Arc::new(verify_ops::VerifyAssertOp));
 
         registry
     }
