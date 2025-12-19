@@ -427,6 +427,7 @@ impl PatternDetector {
     }
 
     /// DFS helper to find cycles
+    #[allow(clippy::only_used_in_recursion)]
     fn find_cycle(
         &self,
         graph: &HashMap<Uuid, Vec<Uuid>>,
