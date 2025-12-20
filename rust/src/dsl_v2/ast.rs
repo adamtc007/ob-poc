@@ -49,11 +49,21 @@ pub struct Program {
 }
 
 impl Program {
-    /// Render the program back to DSL source
+    /// Render the program back to DSL source (for execution - shows UUIDs when resolved)
     pub fn to_dsl_string(&self) -> String {
         self.statements
             .iter()
             .map(|s| s.to_dsl_string())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Render for USER display - human readable, no UUIDs
+    /// Use this for: chat UI, agent responses, DSL review panels
+    pub fn to_user_dsl_string(&self) -> String {
+        self.statements
+            .iter()
+            .map(|s| s.to_user_dsl_string())
             .collect::<Vec<_>>()
             .join("\n")
     }
@@ -67,10 +77,18 @@ pub enum Statement {
 }
 
 impl Statement {
-    /// Render the statement back to DSL source
+    /// Render the statement back to DSL source (for execution)
     pub fn to_dsl_string(&self) -> String {
         match self {
             Statement::VerbCall(vc) => vc.to_dsl_string(),
+            Statement::Comment(c) => format!("; {}", c),
+        }
+    }
+
+    /// Render for USER display - human readable, no UUIDs
+    pub fn to_user_dsl_string(&self) -> String {
+        match self {
+            Statement::VerbCall(vc) => vc.to_user_dsl_string(),
             Statement::Comment(c) => format!("; {}", c),
         }
     }
@@ -88,12 +106,28 @@ pub struct VerbCall {
 }
 
 impl VerbCall {
-    /// Render the verb call back to DSL source
+    /// Render the verb call back to DSL source (for execution - shows UUIDs)
     pub fn to_dsl_string(&self) -> String {
         let mut parts = vec![format!("({}.{}", self.domain, self.verb)];
 
         for arg in &self.arguments {
             parts.push(format!(":{} {}", arg.key, arg.value.to_dsl_string()));
+        }
+
+        if let Some(ref binding) = self.binding {
+            parts.push(format!(":as @{}", binding));
+        }
+
+        parts.push(")".to_string());
+        parts.join(" ")
+    }
+
+    /// Render for USER display - human readable, no UUIDs
+    pub fn to_user_dsl_string(&self) -> String {
+        let mut parts = vec![format!("({}.{}", self.domain, self.verb)];
+
+        for arg in &self.arguments {
+            parts.push(format!(":{} {}", arg.key, arg.value.to_user_dsl_string()));
         }
 
         if let Some(ref binding) = self.binding {
@@ -194,7 +228,7 @@ impl AstNode {
     // DSL RENDERING
     // =========================================================================
 
-    /// Render the node back to DSL source
+    /// Render the node back to DSL source (for execution - shows UUIDs when resolved)
     pub fn to_dsl_string(&self) -> String {
         match self {
             AstNode::Literal(lit) => lit.to_dsl_string(),
@@ -223,6 +257,34 @@ impl AstNode {
                 format!("{{{}}}", pairs.join(" "))
             }
             AstNode::Nested(vc) => vc.to_dsl_string(),
+        }
+    }
+
+    /// Render for USER display - human readable, no UUIDs
+    /// Use this for: chat UI, agent responses, DSL review panels
+    ///
+    /// Always shows the human-readable `value` field from EntityRef,
+    /// never the resolved UUID. This lets users review intent, not implementation.
+    pub fn to_user_dsl_string(&self) -> String {
+        match self {
+            AstNode::Literal(lit) => lit.to_dsl_string(),
+            AstNode::SymbolRef { name, .. } => format!("@{}", name),
+            AstNode::EntityRef { value, .. } => {
+                // Always show the human-readable search value, never the UUID
+                format!("\"{}\"", value)
+            }
+            AstNode::List { items, .. } => {
+                let inner: Vec<String> = items.iter().map(|i| i.to_user_dsl_string()).collect();
+                format!("[{}]", inner.join(" "))
+            }
+            AstNode::Map { entries, .. } => {
+                let pairs: Vec<String> = entries
+                    .iter()
+                    .map(|(k, v)| format!(":{} {}", k, v.to_user_dsl_string()))
+                    .collect();
+                format!("{{{}}}", pairs.join(" "))
+            }
+            AstNode::Nested(vc) => vc.to_user_dsl_string(),
         }
     }
 

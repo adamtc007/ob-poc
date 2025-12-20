@@ -119,6 +119,28 @@ pub struct PendingDsl {
     pub was_reordered: bool,
 }
 
+impl PendingDsl {
+    /// DSL for user display (in chat) - human readable, no UUIDs
+    /// Shows entity names like "BlackRock ManCo" not UUIDs
+    pub fn to_user_dsl(&self) -> String {
+        self.ast
+            .iter()
+            .map(|s| s.to_user_dsl_string())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// DSL for execution/internal use (with resolved UUIDs)
+    /// Note: Executor should use AST directly, not this string
+    pub fn to_exec_dsl(&self) -> String {
+        self.ast
+            .iter()
+            .map(|s| s.to_dsl_string())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+}
+
 // ============================================================================
 // Session Types
 // ============================================================================

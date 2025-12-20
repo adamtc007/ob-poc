@@ -1335,6 +1335,19 @@ impl AgentService {
         };
 
         // Update session - accumulate DSL incrementally
+        // Generate user-friendly DSL from AST (shows entity names, not UUIDs)
+        let user_dsl: Option<String> = if let Some(ref ast_statements) = ast {
+            Some(
+                ast_statements
+                    .iter()
+                    .map(|s| s.to_user_dsl_string())
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            )
+        } else {
+            dsl.clone() // Fallback to raw DSL if no AST
+        };
+
         if let Some(ref dsl_source) = dsl {
             if let Some(ref ast_statements) = ast {
                 session.set_pending_dsl(
@@ -1344,8 +1357,10 @@ impl AgentService {
                     was_reordered,
                 );
             }
-            // Push to accumulated DSL (incremental REPL)
-            session.assembled_dsl.push(dsl_source.clone());
+            // Push user-friendly DSL to accumulated DSL (for chat display)
+            if let Some(ref user_dsl_str) = user_dsl {
+                session.assembled_dsl.push(user_dsl_str.clone());
+            }
 
             if all_valid {
                 session.state = SessionState::ReadyToExecute;
@@ -1354,7 +1369,7 @@ impl AgentService {
             }
         }
 
-        session.add_agent_message(explanation.clone(), None, dsl.clone());
+        session.add_agent_message(explanation.clone(), None, user_dsl.clone());
 
         let combined_dsl = if session.assembled_dsl.is_empty() {
             None
