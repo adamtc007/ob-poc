@@ -1475,12 +1475,17 @@ impl AgentService {
 
     /// Build system prompt for intent extraction
     ///
-    /// Uses a layered architecture for maintainability:
+    /// Uses a 10-layer architecture for maintainability (see prompts/INTEGRATION.md):
     /// 1. Role definition and constraints
-    /// 2. Verb vocabulary (from registry)
-    /// 3. Domain knowledge (code mappings)
-    /// 4. Ambiguity detection rules
-    /// 5. Few-shot examples
+    /// 2. Structure rules (output format)
+    /// 3. Verb vocabulary (from registry)
+    /// 4. DAG dependencies (@result_N semantics)
+    /// 5. Domain knowledge (code mappings)
+    /// 6. Entity context (pre-resolved - injected separately)
+    /// 7. Session state (injected separately)
+    /// 8. Ambiguity detection rules
+    /// 9. Few-shot examples
+    /// 10. Error context (if retrying - injected separately)
     fn build_intent_extraction_prompt(&self, vocab: &str) -> String {
         // Layer 1: Role and constraints
         let role_prompt = r#"You are a KYC/AML onboarding DSL assistant. Convert natural language to structured DSL intents.
@@ -1540,13 +1545,16 @@ Rate your confidence in each interpretation:
 - 0.30-0.49: Multiple interpretations, ASK for clarification
 - 0.0-0.29: Very unclear, MUST ask for clarification"#;
 
-        // Layer 3: Domain knowledge (code mappings)
+        // Layer 4: DAG dependencies - teaches @result_N semantics
+        let dag_dependencies = include_str!("prompts/dag_dependencies.md");
+
+        // Layer 5: Domain knowledge (code mappings)
         let domain_knowledge = include_str!("prompts/domain_knowledge.md");
 
-        // Layer 4: Ambiguity detection rules
+        // Layer 8: Ambiguity detection rules
         let ambiguity_rules = include_str!("prompts/ambiguity_detection.md");
 
-        // Layer 5: Few-shot examples
+        // Layer 9: Few-shot examples
         let few_shot_examples = include_str!("prompts/few_shot_examples.md");
 
         format!(
@@ -1557,6 +1565,8 @@ Rate your confidence in each interpretation:
 {vocab}
 
 {structure_rules}
+
+{dag_dependencies}
 
 {domain_knowledge}
 

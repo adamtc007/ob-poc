@@ -36,6 +36,21 @@
 | Semantic Intent Layer | ❌ TODO | Not implemented. |
 | Active Correction Learning | ❌ TODO | Not implemented. |
 
+### NEW: DAG Dependency Semantics - ADDED 2025-12-20
+
+| Technique | Status | Implementation Details |
+|-----------|--------|------------------------|
+| DAG Dependency Prompting | ✅ DONE | Created `rust/src/api/prompts/dag_dependencies.md` - teaches LLM @result_N semantics, lookup vs refs distinction, dependency patterns (fan-out, chain, diamond) |
+| Prompt Integration Guide | ✅ DONE | Created `rust/src/api/prompts/INTEGRATION.md` - documents 10-layer prompt architecture |
+| Code Integration | ✅ DONE | Integrated `dag_dependencies.md` into `build_intent_extraction_prompt()` as Layer 4 |
+
+**Key concepts taught to LLM:**
+- `@result_N` creates DAG edges (execution dependencies)
+- `lookups` resolved before DAG execution (not edges)
+- Output order = logical (for humans), execution order = DAG (automatic)
+- Circular dependencies are errors
+- Parallel execution when no dependencies
+
 ### Files Modified
 
 | File | Changes Made |
@@ -44,6 +59,8 @@
 | `rust/src/api/prompts/few_shot_examples.md` | NEW - 14 comprehensive examples with confidence scoring guide |
 | `rust/src/api/prompts/domain_knowledge.md` | EXISTS - Market codes, products, roles, jurisdictions |
 | `rust/src/api/prompts/ambiguity_detection.md` | EXISTS - Ambiguity patterns and clarification format |
+| `rust/src/api/prompts/dag_dependencies.md` | NEW - Multi-intent dependencies, @result_N, lookup vs refs, patterns |
+| `rust/src/api/prompts/INTEGRATION.md` | NEW - 10-layer prompt architecture documentation |
 
 ### Key Architecture Notes
 
