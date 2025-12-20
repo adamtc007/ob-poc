@@ -43,12 +43,18 @@ pub enum ParamValue {
     Integer(i64),
     Boolean(bool),
     Uuid(Uuid),
+    /// Resolved entity reference - holds both display name and UUID
+    /// Used when an entity lookup was resolved via EntityGateway
+    ResolvedEntity {
+        display_name: String,
+        resolved_id: Uuid,
+    },
     List(Vec<ParamValue>),
     Object(HashMap<String, ParamValue>),
 }
 
 impl ParamValue {
-    /// Convert to DSL string representation
+    /// Convert to DSL string for EXECUTION (uses UUIDs)
     pub fn to_dsl_string(&self) -> String {
         match self {
             ParamValue::String(s) => {
@@ -63,6 +69,10 @@ impl ParamValue {
             ParamValue::Integer(i) => i.to_string(),
             ParamValue::Boolean(b) => if *b { "true" } else { "false" }.to_string(),
             ParamValue::Uuid(u) => format!("\"{}\"", u),
+            ParamValue::ResolvedEntity { resolved_id, .. } => {
+                // For execution, use the resolved UUID
+                format!("\"{}\"", resolved_id)
+            }
             ParamValue::List(items) => {
                 let inner: Vec<String> = items.iter().map(|v| v.to_dsl_string()).collect();
                 format!("[{}]", inner.join(" "))
@@ -71,6 +81,38 @@ impl ParamValue {
                 let pairs: Vec<String> = map
                     .iter()
                     .map(|(k, v)| format!(":{} {}", k, v.to_dsl_string()))
+                    .collect();
+                format!("{{{}}}", pairs.join(" "))
+            }
+        }
+    }
+
+    /// Convert to DSL string for USER display (human readable, no UUIDs)
+    pub fn to_user_dsl_string(&self) -> String {
+        match self {
+            ParamValue::String(s) => {
+                if s.starts_with('@') {
+                    s.clone()
+                } else {
+                    format!("\"{}\"", s.replace('\"', "\\\""))
+                }
+            }
+            ParamValue::Number(n) => n.to_string(),
+            ParamValue::Integer(i) => i.to_string(),
+            ParamValue::Boolean(b) => if *b { "true" } else { "false" }.to_string(),
+            ParamValue::Uuid(u) => format!("\"{}\"", u), // Raw UUID stays as UUID (no display name available)
+            ParamValue::ResolvedEntity { display_name, .. } => {
+                // For user display, show the human-readable name
+                format!("\"{}\"", display_name.replace('\"', "\\\""))
+            }
+            ParamValue::List(items) => {
+                let inner: Vec<String> = items.iter().map(|v| v.to_user_dsl_string()).collect();
+                format!("[{}]", inner.join(" "))
+            }
+            ParamValue::Object(map) => {
+                let pairs: Vec<String> = map
+                    .iter()
+                    .map(|(k, v)| format!(":{} {}", k, v.to_user_dsl_string()))
                     .collect();
                 format!("{{{}}}", pairs.join(" "))
             }

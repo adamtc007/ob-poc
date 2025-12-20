@@ -102,7 +102,7 @@
 //! Both `agentic_server` and `ob-poc-web` should use this service.
 
 use crate::agentic::llm_client::{LlmClient, ToolDefinition};
-use crate::api::dsl_builder::{build_dsl_program, validate_intent};
+use crate::api::dsl_builder::{build_dsl_program, build_user_dsl_program, validate_intent};
 use crate::api::intent::{IntentValidation, ParamValue, VerbIntent};
 use crate::api::session::{
     AgentSession, DisambiguationItem, DisambiguationRequest, EntityMatchOption, SessionState,
@@ -133,11 +133,19 @@ pub struct EntityLookup {
     pub jurisdiction_hint: Option<String>,
 }
 
+/// A resolved entity with both display name and UUID
+#[derive(Debug, Clone)]
+pub struct ResolvedEntityLookup {
+    pub display_name: String,
+    pub entity_id: Uuid,
+}
+
 /// Result of resolving entity lookups
 #[derive(Debug)]
 pub enum LookupResolution {
     /// All lookups resolved to exactly one entity
-    Resolved(HashMap<String, Uuid>),
+    /// Maps param name -> (display_name, entity_id)
+    Resolved(HashMap<String, ResolvedEntityLookup>),
     /// Some lookups are ambiguous - need disambiguation
     Ambiguous(Vec<DisambiguationItem>),
     /// Error during lookup
@@ -490,6 +498,7 @@ impl AgentService {
         // Retry loop with validation feedback
         let mut feedback_context = String::new();
         let mut final_dsl: Option<String> = None;
+        let mut final_user_dsl: Option<String> = None;
         let mut final_explanation = String::new();
         let mut all_intents: Vec<VerbIntent> = Vec::new();
         let mut validation_results: Vec<IntentValidation> = Vec::new();
@@ -666,8 +675,9 @@ impl AgentService {
                         validation_results.push(validation);
                     }
 
-                    // Build DSL from intents
+                    // Build DSL from intents - both execution (UUIDs) and user (display names)
                     let dsl = build_dsl_program(&modified_intents);
+                    let user_dsl = build_user_dsl_program(&modified_intents);
                     tracing::debug!("[CHAT] Built DSL from intents: {}", dsl);
 
                     // Run semantic validation if we have a database pool
@@ -689,6 +699,7 @@ impl AgentService {
                             dsl.len()
                         );
                         final_dsl = Some(dsl);
+                        final_user_dsl = Some(user_dsl);
                         final_explanation = explanation;
                         all_intents = modified_intents;
                         break;
@@ -706,6 +717,7 @@ impl AgentService {
                     } else {
                         // Last attempt - return what we have with errors
                         final_dsl = Some(dsl);
+                        final_user_dsl = Some(user_dsl);
                         final_explanation = format!(
                             "{}\n\nNote: DSL has validation issues:\n{}",
                             explanation,
@@ -723,6 +735,7 @@ impl AgentService {
             all_intents,
             validation_results,
             final_dsl,
+            final_user_dsl,
             final_explanation,
         )
         .await
@@ -786,12 +799,25 @@ impl AgentService {
     ) -> Result<AgentChatResponse, String> {
         use crate::api::session::DisambiguationSelection;
 
-        // Build resolved IDs from user's selections
-        let mut resolved_ids: HashMap<String, Uuid> = HashMap::new();
+        // Build resolved lookups from user's selections
+        let mut resolved: HashMap<String, ResolvedEntityLookup> = HashMap::new();
         for selection in &response.selections {
             match selection {
-                DisambiguationSelection::Entity { param, entity_id } => {
-                    resolved_ids.insert(param.clone(), *entity_id);
+                DisambiguationSelection::Entity {
+                    param,
+                    entity_id,
+                    display_name,
+                } => {
+                    resolved.insert(
+                        param.clone(),
+                        ResolvedEntityLookup {
+                            // Use display_name if provided, otherwise fall back to UUID string
+                            display_name: display_name
+                                .clone()
+                                .unwrap_or_else(|| entity_id.to_string()),
+                            entity_id: *entity_id,
+                        },
+                    );
                 }
                 DisambiguationSelection::Interpretation { .. } => {
                     // Handle interpretation selections if needed
@@ -806,8 +832,8 @@ impl AgentService {
             return Err("No original intents available for disambiguation".to_string());
         }
 
-        // Inject resolved IDs and build response
-        let modified_intents = self.inject_resolved_ids(original_intents, &resolved_ids);
+        // Inject resolved lookups and build response
+        let modified_intents = self.inject_resolved_ids(original_intents, &resolved);
 
         // Validate
         let validation_results: Vec<IntentValidation> =
@@ -815,18 +841,22 @@ impl AgentService {
 
         let all_valid = validation_results.iter().all(|v| v.valid);
 
-        // Build DSL
-        let dsl = if !modified_intents.is_empty() && all_valid {
-            Some(build_dsl_program(&modified_intents))
+        // Build DSL - both execution and user versions
+        let (exec_dsl, user_dsl) = if !modified_intents.is_empty() && all_valid {
+            (
+                Some(build_dsl_program(&modified_intents)),
+                Some(build_user_dsl_program(&modified_intents)),
+            )
         } else {
-            None
+            (None, None)
         };
 
         self.build_response(
             session,
             modified_intents,
             validation_results,
-            dsl,
+            exec_dsl,
+            user_dsl,
             "Entities resolved. DSL ready for execution.".to_string(),
         )
         .await
@@ -1199,7 +1229,7 @@ impl AgentService {
             }
         };
 
-        let mut resolved: HashMap<String, Uuid> = HashMap::new();
+        let mut resolved: HashMap<String, ResolvedEntityLookup> = HashMap::new();
         let mut ambiguous: Vec<DisambiguationItem> = Vec::new();
 
         for (param, lookup) in lookups {
@@ -1216,10 +1246,22 @@ impl AgentService {
 
             match resolver.resolve(ref_type, &lookup.search_text).await {
                 Ok(ResolveResult::Found { id, .. }) => {
-                    resolved.insert(param.clone(), id);
+                    resolved.insert(
+                        param.clone(),
+                        ResolvedEntityLookup {
+                            display_name: lookup.search_text.clone(),
+                            entity_id: id,
+                        },
+                    );
                 }
                 Ok(ResolveResult::FoundByCode { uuid: Some(id), .. }) => {
-                    resolved.insert(param.clone(), id);
+                    resolved.insert(
+                        param.clone(),
+                        ResolvedEntityLookup {
+                            display_name: lookup.search_text.clone(),
+                            entity_id: id,
+                        },
+                    );
                 }
                 Ok(ResolveResult::FoundByCode { uuid: None, .. }) => {
                     tracing::debug!(
@@ -1271,16 +1313,21 @@ impl AgentService {
     }
 
     /// Inject resolved entity IDs into intents
+    /// Uses ResolvedEntity to preserve display name for user-friendly DSL rendering
     fn inject_resolved_ids(
         &self,
         mut intents: Vec<VerbIntent>,
-        resolved_ids: &HashMap<String, Uuid>,
+        resolved: &HashMap<String, ResolvedEntityLookup>,
     ) -> Vec<VerbIntent> {
         for intent in &mut intents {
-            for (param, entity_id) in resolved_ids {
-                intent
-                    .params
-                    .insert(param.clone(), ParamValue::Uuid(*entity_id));
+            for (param, lookup) in resolved {
+                intent.params.insert(
+                    param.clone(),
+                    ParamValue::ResolvedEntity {
+                        display_name: lookup.display_name.clone(),
+                        resolved_id: lookup.entity_id,
+                    },
+                );
             }
             intent.lookups = None;
         }
@@ -1288,23 +1335,26 @@ impl AgentService {
     }
 
     /// Build final response with DSL
+    /// Takes both execution DSL (with UUIDs for DB) and user DSL (with display names for chat)
     async fn build_response(
         &self,
         session: &mut AgentSession,
         intents: Vec<VerbIntent>,
         validation_results: Vec<IntentValidation>,
-        dsl: Option<String>,
+        exec_dsl: Option<String>,
+        user_dsl: Option<String>,
         explanation: String,
     ) -> Result<AgentChatResponse, String> {
         let all_valid = validation_results.iter().all(|v| v.valid);
 
         // Parse to AST and compile to ExecutionPlan (includes DAG toposort)
         // Single pipeline: Parse → Compile (with toposort) → Ready for execution
+        // NOTE: We parse the EXECUTION DSL (with UUIDs) for actual execution
         let (ast, plan, was_reordered): (
             Option<Vec<Statement>>,
             Option<crate::dsl_v2::execution_plan::ExecutionPlan>,
             bool,
-        ) = if let Some(ref src) = dsl {
+        ) = if let Some(ref src) = exec_dsl {
             use crate::dsl_v2::{compile, parse_program};
             match parse_program(src) {
                 Ok(program) => {
@@ -1334,24 +1384,11 @@ impl AgentService {
             (None, None, false)
         };
 
-        // Update session - accumulate DSL incrementally
-        // Generate user-friendly DSL from AST (shows entity names, not UUIDs)
-        let user_dsl: Option<String> = if let Some(ref ast_statements) = ast {
-            Some(
-                ast_statements
-                    .iter()
-                    .map(|s| s.to_user_dsl_string())
-                    .collect::<Vec<_>>()
-                    .join("\n"),
-            )
-        } else {
-            dsl.clone() // Fallback to raw DSL if no AST
-        };
-
-        if let Some(ref dsl_source) = dsl {
+        // Store execution DSL in session for actual execution
+        if let Some(ref exec_dsl_source) = exec_dsl {
             if let Some(ref ast_statements) = ast {
                 session.set_pending_dsl(
-                    dsl_source.clone(),
+                    exec_dsl_source.clone(),
                     ast_statements.clone(),
                     plan.clone(),
                     was_reordered,
@@ -1803,12 +1840,30 @@ mod tests {
 
         let mut resolved = HashMap::new();
         let id = Uuid::new_v4();
-        resolved.insert("entity-id".to_string(), id);
+        resolved.insert(
+            "entity-id".to_string(),
+            ResolvedEntityLookup {
+                display_name: "John Smith".to_string(),
+                entity_id: id,
+            },
+        );
 
         let modified = service.inject_resolved_ids(vec![intent], &resolved);
 
         assert_eq!(modified.len(), 1);
         assert!(modified[0].params.contains_key("entity-id"));
         assert!(modified[0].lookups.is_none());
+
+        // Verify it's a ResolvedEntity with the display name preserved
+        match &modified[0].params["entity-id"] {
+            ParamValue::ResolvedEntity {
+                display_name,
+                resolved_id,
+            } => {
+                assert_eq!(display_name, "John Smith");
+                assert_eq!(*resolved_id, id);
+            }
+            _ => panic!("Expected ResolvedEntity variant"),
+        }
     }
 }

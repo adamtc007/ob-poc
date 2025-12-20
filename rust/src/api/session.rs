@@ -1586,7 +1586,13 @@ pub struct DisambiguationResponse {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum DisambiguationSelection {
     /// Selected entity for an EntityMatch
-    Entity { param: String, entity_id: Uuid },
+    Entity {
+        param: String,
+        entity_id: Uuid,
+        /// Display name of the selected entity (for user-friendly DSL)
+        #[serde(default)]
+        display_name: Option<String>,
+    },
     /// Selected interpretation for an InterpretationChoice
     Interpretation {
         text: String,

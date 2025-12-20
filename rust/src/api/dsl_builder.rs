@@ -22,7 +22,19 @@ pub struct DslBuildResult {
 }
 
 /// Build DSL string from a single VerbIntent, returning binding metadata
+/// This builds EXECUTION DSL (with UUIDs for resolved entities)
 pub fn build_dsl_statement_with_metadata(intent: &VerbIntent) -> DslBuildResult {
+    build_dsl_statement_internal(intent, false)
+}
+
+/// Build USER-FRIENDLY DSL string from a single VerbIntent
+/// Shows display names instead of UUIDs for resolved entities
+pub fn build_user_dsl_statement_with_metadata(intent: &VerbIntent) -> DslBuildResult {
+    build_dsl_statement_internal(intent, true)
+}
+
+/// Internal helper to build DSL with optional user-friendly rendering
+fn build_dsl_statement_internal(intent: &VerbIntent, user_friendly: bool) -> DslBuildResult {
     let mut parts = vec![format!("({}", intent.verb)];
 
     // Add parameters in sorted order for determinism
@@ -31,7 +43,12 @@ pub fn build_dsl_statement_with_metadata(intent: &VerbIntent) -> DslBuildResult 
 
     for name in param_names {
         if let Some(value) = intent.params.get(name) {
-            parts.push(format!(":{} {}", name, value.to_dsl_string()));
+            let rendered = if user_friendly {
+                value.to_user_dsl_string()
+            } else {
+                value.to_dsl_string()
+            };
+            parts.push(format!(":{} {}", name, rendered));
         }
     }
 
@@ -123,9 +140,20 @@ fn get_entity_type_from_verb(verb: &str) -> String {
     }
 }
 
-/// Build complete DSL program from a sequence of intents
+/// Build complete DSL program from a sequence of intents (EXECUTION version with UUIDs)
 /// Tracks bindings generated for each statement and replaces @result_N references
 pub fn build_dsl_program(intents: &[VerbIntent]) -> String {
+    build_dsl_program_internal(intents, false)
+}
+
+/// Build complete USER-FRIENDLY DSL program from a sequence of intents
+/// Shows display names instead of UUIDs - for chat UI display
+pub fn build_user_dsl_program(intents: &[VerbIntent]) -> String {
+    build_dsl_program_internal(intents, true)
+}
+
+/// Internal helper to build DSL program with optional user-friendly rendering
+fn build_dsl_program_internal(intents: &[VerbIntent], user_friendly: bool) -> String {
     let mut statements = Vec::new();
     // Map from @result_N -> actual semantic binding name
     let mut result_bindings: std::collections::HashMap<String, String> =
@@ -133,7 +161,11 @@ pub fn build_dsl_program(intents: &[VerbIntent]) -> String {
 
     for (idx, intent) in intents.iter().enumerate() {
         // Build the statement and get binding metadata
-        let build_result = build_dsl_statement_with_metadata(intent);
+        let build_result = if user_friendly {
+            build_user_dsl_statement_with_metadata(intent)
+        } else {
+            build_dsl_statement_with_metadata(intent)
+        };
         let mut statement = build_result.statement;
 
         // Replace any @result_N references with actual binding names
