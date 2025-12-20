@@ -1474,26 +1474,40 @@ impl AgentService {
     }
 
     /// Build system prompt for intent extraction
+    ///
+    /// Uses a layered architecture for maintainability:
+    /// 1. Role definition and constraints
+    /// 2. Verb vocabulary (from registry)
+    /// 3. Domain knowledge (code mappings)
+    /// 4. Ambiguity detection rules
+    /// 5. Few-shot examples
     fn build_intent_extraction_prompt(&self, vocab: &str) -> String {
-        // Include domain knowledge and ambiguity detection rules
-        let domain_knowledge = include_str!("prompts/domain_knowledge.md");
-        let ambiguity_rules = include_str!("prompts/ambiguity_detection.md");
-
-        format!(
-            r#"You are a KYC/AML onboarding DSL assistant. Convert natural language to structured DSL intents.
+        // Layer 1: Role and constraints
+        let role_prompt = r#"You are a KYC/AML onboarding DSL assistant. Convert natural language to structured DSL intents.
 
 IMPORTANT: You MUST use the generate_dsl_intents tool to return your response. Do NOT return plain text.
 
-## Available DSL Verbs
+## Your Role
+- Translate natural language requests into structured DSL operations
+- Identify entity references that need database resolution
+- Ask for clarification when requests are ambiguous (set needs_clarification=true)
+- Rate your confidence in each interpretation (0.0-1.0)
+- Never execute anything - only generate structured intents
 
-{vocab}
+## Constraints
+- Only use verbs from the AVAILABLE VERBS list below
+- Never invent verbs, parameters, or entity types
+- Express uncertainty in confidence scores
+- If unsure, ask rather than guess"#;
 
+        // Layer 2: Intent structure rules
+        let structure_rules = r#"
 ## Intent Structure
 
 Each intent represents a single DSL verb call with:
 - verb: The verb name (e.g., "cbu.ensure", "entity.create-proper-person")
-- params: Literal parameter values (e.g., {{"name": "Acme Corp", "jurisdiction": "LU"}})
-- refs: References to previous results or session bindings (e.g., {{"cbu-id": "@cbu"}} or {{"cbu-id": "@result_1"}})
+- params: Literal parameter values (e.g., {"name": "Acme Corp", "jurisdiction": "LU"})
+- refs: References to previous results or session bindings (e.g., {"cbu-id": "@cbu"} or {"cbu-id": "@result_1"})
 - lookups: Entity references needing database resolution
 
 ## Rules
@@ -1504,14 +1518,10 @@ Each intent represents a single DSL verb call with:
 4. For sequences of new entities, use @result_N references where N is the sequence number
 5. Check for ambiguity before generating intents - ask for clarification if needed
 6. Recognize REMOVAL intent: words like "remove", "delete", "drop", "unlink", "take off", "unassign" indicate removal operations
-   - "remove [product]" / "delete [product]" / "unlink [product]" → cbu.remove-product
+   - "remove [product]" / "delete [product]" → cbu.remove-product
    - "remove [entity] as [role]" / "unassign [role]" → cbu.remove-role
    - "delete [entity]" → entity.delete
    - "end ownership" → ubo.end-ownership
-
-{domain_knowledge}
-
-{ambiguity_rules}
 
 ## Entity Lookups
 
@@ -1520,51 +1530,39 @@ When the user mentions existing entities by name:
 - Provide search_text (the name) and entity_type (person, company, cbu, entity, product, role)
 - If jurisdiction is mentioned, include jurisdiction_hint
 
-Example: "Add John Smith as director of Apex Capital"
-- For "John Smith": lookups.entity-id = {{search_text: "John Smith", entity_type: "person"}}
-- For "Apex Capital": lookups.cbu-id = {{search_text: "Apex Capital", entity_type: "cbu"}}
+## Confidence Scoring
 
-## Examples
+Rate your confidence in each interpretation:
+- 0.95-1.0: Unambiguous request with all required info
+- 0.85-0.94: Clear intent but requires entity lookup
+- 0.70-0.84: Some inference required, minor assumptions
+- 0.50-0.69: Significant assumptions, consider asking
+- 0.30-0.49: Multiple interpretations, ASK for clarification
+- 0.0-0.29: Very unclear, MUST ask for clarification"#;
 
-User: "Create a fund called Test Fund in Luxembourg"
-Intent: {{
-  "verb": "cbu.ensure",
-  "params": {{"name": "Test Fund", "jurisdiction": "LU", "client-type": "fund"}},
-  "refs": {{}}
-}}
+        // Layer 3: Domain knowledge (code mappings)
+        let domain_knowledge = include_str!("prompts/domain_knowledge.md");
 
-User: "Add custody product to the fund" (with @cbu in session)
-Intent: {{
-  "verb": "cbu.add-product",
-  "params": {{"product": "CUSTODY"}},
-  "refs": {{"cbu-id": "@cbu"}}
-}}
+        // Layer 4: Ambiguity detection rules
+        let ambiguity_rules = include_str!("prompts/ambiguity_detection.md");
 
-User: "Remove fund accounting" (with @cbu in session)
-Intent: {{
-  "verb": "cbu.remove-product",
-  "params": {{"product": "FUND_ACCOUNTING"}},
-  "refs": {{"cbu-id": "@cbu"}}
-}}
+        // Layer 5: Few-shot examples
+        let few_shot_examples = include_str!("prompts/few_shot_examples.md");
 
-User: "Delete the custody product" (with @cbu in session)
-Intent: {{
-  "verb": "cbu.remove-product",
-  "params": {{"product": "CUSTODY"}},
-  "refs": {{"cbu-id": "@cbu"}}
-}}
+        format!(
+            r#"{role_prompt}
 
-User: "Add John Smith as director"  (with @cbu in session)
-Intent 1: {{
-  "verb": "entity.create-proper-person",
-  "params": {{"first-name": "John", "last-name": "Smith"}},
-  "refs": {{}}
-}}
-Intent 2: {{
-  "verb": "cbu.assign-role",
-  "params": {{"role": "DIRECTOR"}},
-  "refs": {{"cbu-id": "@cbu", "entity-id": "@result_1"}}
-}}"#
+## Available DSL Verbs
+
+{vocab}
+
+{structure_rules}
+
+{domain_knowledge}
+
+{ambiguity_rules}
+
+{few_shot_examples}"#
         )
     }
 
@@ -1662,9 +1660,15 @@ Intent 2: {{
                     "explanation": {
                         "type": "string",
                         "description": "Brief explanation of what the DSL will do, or why clarification is needed"
+                    },
+                    "confidence": {
+                        "type": "number",
+                        "minimum": 0.0,
+                        "maximum": 1.0,
+                        "description": "Confidence in interpretation: 0.95-1.0=certain, 0.85-0.94=high, 0.70-0.84=good, 0.50-0.69=medium (consider asking), <0.50=ask for clarification"
                     }
                 },
-                "required": ["intents", "explanation"]
+                "required": ["intents", "explanation", "confidence"]
             }),
         }
     }
