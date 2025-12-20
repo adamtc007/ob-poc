@@ -5295,6 +5295,60 @@ rust/src/dsl_v2/
 
 **Key insight**: AI is good at understanding intent, but prone to syntax errors and hallucinating IDs. By having AI produce structured data and using EntityGateway for resolution, we get reliable entity lookup.
 
+### Two-Pass Resolution with Display Feedback Loop
+
+The agent chat pipeline uses a **two-pass architecture** to maintain both human-readable display names and resolved UUIDs:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  PASS 1: Intent Extraction + Unresolved Lookups                  │
+│  LLM extracts VerbIntents with lookups containing search_text   │
+│  e.g., EntityLookup { search_text: "Apex Fund", entity_type: "cbu" }
+│  This is the "user intent" - no UUIDs yet                       │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  PASS 2: Resolution + Source Update Feedback                     │
+│  EntityGateway resolves lookups → UUIDs                         │
+│  BUT: We preserve the display_name alongside resolved_id        │
+│                                                                  │
+│  ParamValue::ResolvedEntity {                                   │
+│      display_name: "Apex Fund",    // for user display          │
+│      resolved_id: uuid,            // for execution             │
+│  }                                                               │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  DUAL DSL GENERATION (from same intents)                         │
+│                                                                  │
+│  exec_dsl: (cbu.add-product :cbu-id "550e8400-..." :product "CUSTODY")
+│            ↳ Used for parsing, validation, execution            │
+│                                                                  │
+│  user_dsl: (cbu.add-product :cbu-id "Apex Fund" :product "CUSTODY")
+│            ↳ Displayed in chat UI, stored in session            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Why this matters**: The semantic resolution phase (Pass 2) "fixes up" unresolved references, but we need to feed that resolution back to update the source representation for display. Without this feedback loop, users see UUIDs instead of entity names.
+
+**Key types** (`rust/src/api/`):
+
+| Type | File | Purpose |
+|------|------|---------|
+| `ParamValue::ResolvedEntity` | intent.rs | Carries both display_name and resolved_id |
+| `ResolvedEntityLookup` | agent_service.rs | Resolution result with both values |
+| `to_user_dsl_string()` | intent.rs | Renders display_name for user DSL |
+| `build_user_dsl_program()` | dsl_builder.rs | Builds complete user-friendly DSL |
+
+**Flow in agent_service.rs**:
+1. `resolve_lookups()` → returns `HashMap<String, ResolvedEntityLookup>` with display names
+2. `inject_resolved_ids()` → creates `ParamValue::ResolvedEntity` preserving both values
+3. `build_dsl_program()` → exec_dsl with UUIDs
+4. `build_user_dsl_program()` → user_dsl with display names
+5. `build_response()` → stores user_dsl in session for chat display
+
 ## Environment Variables
 
 ```bash
