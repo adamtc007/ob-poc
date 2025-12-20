@@ -752,7 +752,19 @@ match action {
 
 ## egui State Management & Best Practices
 
-> **⛔ TL;DR:** Read `/EGUI-RULES.md` for the 5 non-negotiable rules in a short checklist format. This section explains the WHY. EGUI-RULES.md is the quick reference WHAT.
+> **⛔ STOP: Read the 5 rules below before writing ANY egui/WASM code. Violations cause frozen UI, state drift, and impossible-to-debug bugs.**
+
+### The 5 Non-Negotiable Rules (Quick Reference)
+
+| Rule | Do This | NOT This |
+|------|---------|----------|
+| **1. No local state mirroring server data** | `AppState.session` (fetched) | `panel.messages: Vec<Message>` |
+| **2. Actions return values, no callbacks** | `return Some(Action::Save)` | `self.save_data()` in button handler |
+| **3. Short lock, then render** | Extract data, drop lock, then render | Hold lock during entire render |
+| **4. Process async first, render second** | `process_async_results()` at top of `update()` | Check async mid-render |
+| **5. Server round-trip for mutations** | POST → wait → refetch | Optimistic local update |
+
+**If unsure:** Is this data from the server? → It goes in `AppState`, never mutated by UI.
 
 The UI uses egui in immediate mode with server-first state management. These patterns are **mandatory** for all egui code in this project.
 
