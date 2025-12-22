@@ -13,7 +13,7 @@ domains:
             - cbu_id
             - instrument_class_id
             - market_id
-            - counterparty_entity_id
+            - counterparty_key
           returning: universe_id
         args:
           - name: cbu-id
@@ -184,6 +184,85 @@ domains:
           type: uuid
           name: ssi_id
           capture: true
+      ensure-ssi:
+        description: Create or update an SSI by name (idempotent)
+        behavior: crud
+        crud:
+          operation: upsert
+          table: cbu_ssi
+          schema: custody
+          conflict_keys:
+            - cbu_id
+            - ssi_name
+          returning: ssi_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: name
+            type: string
+            required: true
+            maps_to: ssi_name
+          - name: type
+            type: string
+            required: true
+            maps_to: ssi_type
+            valid_values:
+              - SECURITIES
+              - CASH
+              - COLLATERAL
+              - FX_NOSTRO
+          - name: safekeeping-account
+            type: string
+            required: false
+            maps_to: safekeeping_account
+          - name: safekeeping-bic
+            type: string
+            required: false
+            maps_to: safekeeping_bic
+          - name: safekeeping-name
+            type: string
+            required: false
+            maps_to: safekeeping_account_name
+          - name: cash-account
+            type: string
+            required: false
+            maps_to: cash_account
+          - name: cash-bic
+            type: string
+            required: false
+            maps_to: cash_account_bic
+          - name: cash-currency
+            type: string
+            required: false
+            maps_to: cash_currency
+          - name: collateral-account
+            type: string
+            required: false
+            maps_to: collateral_account
+          - name: collateral-bic
+            type: string
+            required: false
+            maps_to: collateral_account_bic
+          - name: pset-bic
+            type: string
+            required: false
+            maps_to: pset_bic
+          - name: effective-date
+            type: date
+            required: true
+            maps_to: effective_date
+        returns:
+          type: uuid
+          name: ssi_id
+          capture: true
       list-ssis:
         description: List SSIs for a CBU
         behavior: crud
@@ -265,6 +344,103 @@ domains:
           operation: insert
           table: ssi_booking_rules
           schema: custody
+          returning: rule_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: ssi-id
+            type: uuid
+            required: true
+            maps_to: ssi_id
+            lookup:
+              table: cbu_ssi
+              entity_type: ssi
+              schema: custody
+              search_key: ssi_name
+              primary_key: ssi_id
+          - name: name
+            type: string
+            required: true
+            maps_to: rule_name
+          - name: priority
+            type: integer
+            required: true
+            maps_to: priority
+          - name: instrument-class
+            type: lookup
+            required: false
+            maps_to: instrument_class_id
+            lookup:
+              table: instrument_classes
+              entity_type: instrument_class
+              schema: custody
+              code_column: code
+              id_column: class_id
+          - name: security-type
+            type: lookup
+            required: false
+            maps_to: security_type_id
+            lookup:
+              table: security_types
+              schema: custody
+              code_column: code
+              id_column: security_type_id
+          - name: market
+            type: lookup
+            required: false
+            maps_to: market_id
+            lookup:
+              table: markets
+              entity_type: market
+              schema: custody
+              code_column: mic
+              id_column: market_id
+          - name: currency
+            type: string
+            required: false
+            maps_to: currency
+          - name: settlement-type
+            type: string
+            required: false
+            maps_to: settlement_type
+          - name: counterparty
+            type: uuid
+            required: false
+            maps_to: counterparty_entity_id
+          - name: isda-asset-class
+            type: string
+            required: false
+            maps_to: isda_asset_class
+          - name: isda-base-product
+            type: string
+            required: false
+            maps_to: isda_base_product
+          - name: effective-date
+            type: date
+            required: false
+            maps_to: effective_date
+        returns:
+          type: uuid
+          name: rule_id
+          capture: true
+      ensure-booking-rule:
+        description: Create or update a booking rule by name (idempotent)
+        behavior: crud
+        crud:
+          operation: upsert
+          table: ssi_booking_rules
+          schema: custody
+          conflict_keys:
+            - cbu_id
+            - rule_name
           returning: rule_id
         args:
           - name: cbu-id

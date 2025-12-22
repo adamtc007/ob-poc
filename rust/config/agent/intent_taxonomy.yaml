@@ -1,0 +1,607 @@
+# Hierarchical intent taxonomy for trading matrix domain
+# Phase 3.1: Agent Intelligence - Intent Classification
+#
+# This taxonomy defines all recognizable intents for the trading matrix agent.
+# Each intent maps to a canonical DSL verb and includes trigger phrases,
+# required/optional entities, and default inference rules.
+
+version: "1.0"
+description: "Trading matrix domain intent taxonomy"
+
+# Intent taxonomy organized by domain/subdomain/intent
+intent_taxonomy:
+  # ==========================================================================
+  # TRADING MATRIX DOMAIN
+  # ==========================================================================
+  trading_matrix:
+    description: "Configuration of trading capabilities and operational setup"
+
+    # ------------------------------------------------------------------------
+    # Investment Manager Sub-domain
+    # ------------------------------------------------------------------------
+    investment_manager:
+      description: "Investment manager assignment, scope, and connectivity"
+
+      intents:
+        - intent: im_assign
+          description: "Assign a new investment manager to CBU"
+          canonical_verb: investment-manager.assign
+          trigger_phrases:
+            - "add {manager} as investment manager"
+            - "{manager} will handle {scope}"
+            - "assign {manager} to trade {scope}"
+            - "set up {manager} for {scope}"
+            - "{manager} manages {scope}"
+            - "use {manager} for {scope}"
+            - "{manager} to do {scope}"
+            - "bring on {manager}"
+            - "onboard {manager} as IM"
+          required_entities:
+            - manager_name_or_lei
+          optional_entities:
+            - scope_markets
+            - scope_instruments
+            - instruction_method
+            - priority
+          default_inferences:
+            priority: 100
+            instruction_method: SWIFT
+          examples:
+            - input: "BlackRock will handle European equities via CTM"
+              entities:
+                manager_name_or_lei: "BlackRock"
+                scope_markets: ["XLON", "XETR", "XPAR", "XAMS"]
+                scope_instruments: ["EQUITY"]
+                instruction_method: "CTM"
+
+        - intent: im_update_scope
+          description: "Modify an existing IM's trading scope"
+          canonical_verb: investment-manager.set-scope
+          trigger_phrases:
+            - "expand {manager} to include {scope}"
+            - "restrict {manager} to {scope}"
+            - "add {scope} to {manager}'s mandate"
+            - "{manager} can now trade {scope}"
+            - "extend {manager} scope to {scope}"
+            - "limit {manager} to only {scope}"
+          required_entities:
+            - manager_reference  # Must resolve to existing IM
+            - scope_modification
+          examples:
+            - input: "Expand BlackRock to include Asian equities"
+              entities:
+                manager_reference: "@im-blackrock"
+                scope_modification:
+                  action: "add"
+                  markets: ["XHKG", "XTKS", "XSES"]
+
+        - intent: im_change_connectivity
+          description: "Change how IM sends trade instructions"
+          canonical_verb: investment-manager.link-connectivity
+          trigger_phrases:
+            - "switch {manager} to {method}"
+            - "{manager} will use {method} now"
+            - "connect {manager} via {method}"
+            - "change {manager} to {method}"
+            - "{manager} instructions via {method}"
+          required_entities:
+            - manager_reference
+            - instruction_method
+          examples:
+            - input: "Switch BlackRock to FIX"
+              entities:
+                manager_reference: "@im-blackrock"
+                instruction_method: "FIX"
+
+        - intent: im_remove
+          description: "Remove an investment manager from CBU"
+          canonical_verb: investment-manager.remove
+          trigger_phrases:
+            - "remove {manager}"
+            - "terminate {manager}"
+            - "drop {manager}"
+            - "{manager} is no longer our IM"
+            - "offboard {manager}"
+          required_entities:
+            - manager_reference
+
+        - intent: im_query
+          description: "Query about IM configuration"
+          canonical_verb: investment-manager.list
+          trigger_phrases:
+            - "who handles {scope}"
+            - "which IM trades {scope}"
+            - "show me the investment managers"
+            - "what can {manager} trade"
+            - "list all IMs"
+            - "who are our investment managers"
+          is_query: true
+          required_entities: []
+          optional_entities:
+            - scope_filter
+            - manager_reference
+
+        - intent: im_find_for_trade
+          description: "Find which IM would handle a specific trade"
+          canonical_verb: investment-manager.find-for-trade
+          trigger_phrases:
+            - "who would handle a {instrument} trade in {market}"
+            - "which IM for {trade_description}"
+            - "route this trade: {trade_description}"
+            - "who trades {instrument} in {market}"
+          is_query: true
+          required_entities:
+            - trade_characteristics
+
+    # ------------------------------------------------------------------------
+    # Pricing Sub-domain
+    # ------------------------------------------------------------------------
+    pricing:
+      description: "Pricing source configuration"
+
+      intents:
+        - intent: pricing_set
+          description: "Configure pricing source for instrument class"
+          canonical_verb: pricing-config.set
+          trigger_phrases:
+            - "use {source} for {instruments}"
+            - "{source} pricing for {instruments}"
+            - "price {instruments} from {source}"
+            - "{source} across the board"
+            - "{source} for everything"
+            - "get prices from {source}"
+            - "{source} for all pricing"
+          required_entities:
+            - pricing_source
+          optional_entities:
+            - instrument_classes  # If omitted, infer from context or use all
+            - priority
+          default_inferences:
+            priority: 1
+          examples:
+            - input: "Bloomberg for equities and bonds"
+              entities:
+                pricing_source: "BLOOMBERG"
+                instrument_classes: ["EQUITY", "GOVT_BOND", "CORP_BOND"]
+            - input: "Bloomberg across the board"
+              entities:
+                pricing_source: "BLOOMBERG"
+                instrument_classes: "_ALL_IN_UNIVERSE"
+
+        - intent: pricing_set_fallback
+          description: "Configure fallback pricing source"
+          canonical_verb: pricing-config.set
+          trigger_phrases:
+            - "fall back to {source} for {instruments}"
+            - "use {source} as backup for {instruments}"
+            - "secondary pricing from {source}"
+            - "if {primary} fails, use {source}"
+          required_entities:
+            - pricing_source
+          optional_entities:
+            - instrument_classes
+          default_inferences:
+            priority: 2  # Lower priority = fallback
+
+        - intent: pricing_query
+          description: "Query pricing configuration"
+          canonical_verb: pricing-config.list
+          trigger_phrases:
+            - "what's the pricing source for {instruments}"
+            - "where do we get {instrument} prices"
+            - "show pricing config"
+            - "pricing sources"
+          is_query: true
+          required_entities: []
+
+    # ------------------------------------------------------------------------
+    # Cash Management Sub-domain
+    # ------------------------------------------------------------------------
+    cash_management:
+      description: "Cash sweep and STIF configuration"
+
+      intents:
+        - intent: sweep_configure
+          description: "Set up cash sweep"
+          canonical_verb: cash-sweep.configure
+          trigger_phrases:
+            - "sweep {currency} above {amount} to {vehicle}"
+            - "set up {currency} sweep"
+            - "{currency} cash to STIF"
+            - "sweep idle {currency}"
+            - "cash sweep for {currency}"
+            - "{currency} to money market"
+          required_entities:
+            - currency
+          optional_entities:
+            - threshold_amount
+            - vehicle_type
+            - sweep_time
+          default_inferences:
+            vehicle_type: STIF
+            threshold_amount_by_currency:
+              USD: 100000
+              EUR: 100000
+              GBP: 75000
+              JPY: 10000000
+              CHF: 100000
+          examples:
+            - input: "Sweep USD above 500k to STIF"
+              entities:
+                currency: "USD"
+                threshold_amount: 500000
+                vehicle_type: "STIF"
+
+        - intent: sweep_update_threshold
+          description: "Update sweep threshold"
+          canonical_verb: cash-sweep.update-threshold
+          trigger_phrases:
+            - "change {currency} threshold to {amount}"
+            - "increase {currency} sweep to {amount}"
+            - "lower the {currency} threshold"
+          required_entities:
+            - currency
+            - threshold_amount
+
+        - intent: sweep_query
+          description: "Query sweep configuration"
+          canonical_verb: cash-sweep.list
+          trigger_phrases:
+            - "what are the sweep thresholds"
+            - "show cash sweeps"
+            - "where does {currency} cash go"
+          is_query: true
+          required_entities: []
+
+    # ------------------------------------------------------------------------
+    # SLA Sub-domain
+    # ------------------------------------------------------------------------
+    sla:
+      description: "Service level agreement management"
+
+      intents:
+        - intent: sla_commit
+          description: "Create SLA commitment"
+          canonical_verb: sla.commit
+          trigger_phrases:
+            - "we need {target}% {metric}"
+            - "SLA for {metric}"
+            - "commit to {target} {metric}"
+            - "{metric} must be {target}"
+            - "guarantee {target}% {metric}"
+            - "{metric} SLA of {target}%"
+          required_entities:
+            - metric_type_or_template
+          optional_entities:
+            - target_override
+          examples:
+            - input: "We need 99.5% settlement rate"
+              entities:
+                metric_type_or_template: "settlement_rate"
+                target_override: 99.5
+
+        - intent: sla_use_template
+          description: "Apply SLA template"
+          canonical_verb: sla.apply-template
+          trigger_phrases:
+            - "use {template} SLA template"
+            - "apply {template} SLAs"
+            - "standard {template} commitments"
+          required_entities:
+            - template_name
+
+        - intent: sla_query
+          description: "Query SLA status"
+          canonical_verb: sla.list-commitments
+          trigger_phrases:
+            - "what are our SLAs"
+            - "show SLA coverage"
+            - "are we meeting SLAs"
+            - "any SLA breaches"
+            - "SLA status"
+          is_query: true
+          required_entities: []
+
+    # ------------------------------------------------------------------------
+    # Trading Profile Sub-domain
+    # ------------------------------------------------------------------------
+    profile:
+      description: "Trading profile lifecycle"
+
+      intents:
+        - intent: profile_create
+          description: "Start new trading profile"
+          canonical_verb: trading-profile.create
+          trigger_phrases:
+            - "start trading profile"
+            - "new trading matrix"
+            - "set up trading for {cbu}"
+            - "traded instruments day"
+            - "configure trading"
+            - "begin trading setup"
+            - "create trading profile"
+          required_entities: []
+          optional_entities:
+            - cbu_reference
+            - base_currency
+          default_inferences:
+            cbu_reference: "_CURRENT_CBU"
+
+        - intent: profile_set_universe
+          description: "Define tradeable universe"
+          canonical_verb: trading-profile.set-universe
+          trigger_phrases:
+            - "we trade {instruments} in {markets}"
+            - "universe is {instruments} in {markets}"
+            - "add {instruments} to universe"
+            - "trade {instruments} across {markets}"
+          required_entities:
+            - instrument_classes
+          optional_entities:
+            - markets
+            - currencies
+
+        - intent: profile_visualize
+          description: "Show trading matrix visually"
+          canonical_verb: trading-profile.visualize
+          trigger_phrases:
+            - "show me the matrix"
+            - "visualize trading profile"
+            - "what can we trade"
+            - "trading overview"
+            - "show the grid"
+          is_query: true
+          required_entities: []
+
+        - intent: profile_validate
+          description: "Check for configuration gaps"
+          canonical_verb: trading-profile.validate-matrix
+          trigger_phrases:
+            - "check for gaps"
+            - "validate the profile"
+            - "is anything missing"
+            - "are we complete"
+            - "what's missing"
+            - "any gaps"
+          is_query: true
+          required_entities: []
+
+        - intent: profile_materialize
+          description: "Push profile to operational tables"
+          canonical_verb: trading-profile.materialize
+          trigger_phrases:
+            - "activate this"
+            - "push to production"
+            - "materialize"
+            - "make it live"
+            - "we're done, save it"
+            - "finalize"
+            - "go live"
+          required_entities: []
+          confirmation_required: true
+
+    # ------------------------------------------------------------------------
+    # Custody/Settlement Sub-domain
+    # ------------------------------------------------------------------------
+    custody:
+      description: "Custody accounts and settlement instructions"
+
+      intents:
+        - intent: ssi_create
+          description: "Create standing settlement instruction"
+          canonical_verb: cbu-custody.ensure-ssi
+          trigger_phrases:
+            - "create SSI for {market}"
+            - "set up settlement for {market}"
+            - "SSI with {custodian}"
+            - "settlement account at {custodian}"
+          required_entities:
+            - ssi_type
+          optional_entities:
+            - market
+            - custodian_bic
+            - currency
+
+        - intent: booking_rule_create
+          description: "Create booking rule for SSI routing"
+          canonical_verb: cbu-custody.ensure-booking-rule
+          trigger_phrases:
+            - "route {instruments} in {market} to {ssi}"
+            - "book {scope} trades to {ssi}"
+            - "use {ssi} for {scope}"
+          required_entities:
+            - ssi_reference
+          optional_entities:
+            - instrument_class
+            - market
+            - currency
+            - settlement_type
+
+        - intent: universe_add
+          description: "Add to trading universe"
+          canonical_verb: cbu-custody.add-universe
+          trigger_phrases:
+            - "add {instruments} in {market}"
+            - "we'll trade {instruments} in {market}"
+            - "enable {instruments} for {market}"
+          required_entities:
+            - instrument_class
+            - market
+          optional_entities:
+            - currencies
+            - settlement_types
+
+  # ==========================================================================
+  # COMPOUND/META INTENTS
+  # ==========================================================================
+  compound:
+    description: "Intents that expand to multiple atomic intents"
+
+    intents:
+      - intent: full_setup
+        description: "Complete trading matrix setup"
+        expands_to:
+          - profile_create
+          - im_assign  # multiple
+          - pricing_set  # multiple
+          - sweep_configure  # multiple
+          - sla_commit  # multiple
+          - profile_validate
+        trigger_phrases:
+          - "set up complete trading for {cbu}"
+          - "full custody setup"
+          - "onboard trading for {cbu}"
+          - "complete trading configuration"
+
+      - intent: im_with_connectivity
+        description: "Assign IM and provision connectivity in one"
+        expands_to:
+          - im_assign
+          - service_resource.provision
+          - im_link_connectivity
+        trigger_phrases:
+          - "{manager} via {method}"  # Implies assign + connectivity
+
+      - intent: european_equity_setup
+        description: "Set up European equity trading"
+        expands_to:
+          - universe_add  # for each European market
+          - im_assign  # with European scope
+          - ssi_create  # for European CSDs
+        trigger_phrases:
+          - "set up European equities"
+          - "enable trading in Europe"
+          - "European equity capability"
+
+  # ==========================================================================
+  # CLARIFICATION INTENTS
+  # ==========================================================================
+  clarification:
+    description: "Intents for handling ambiguity and clarification"
+
+    intents:
+      - intent: clarify_manager
+        description: "Clarify which investment manager"
+        trigger_conditions:
+          - multiple_manager_matches
+          - ambiguous_manager_reference
+        prompts:
+          - "Which investment manager do you mean: {options}?"
+          - "I found multiple matches for '{query}': {options}. Which one?"
+
+      - intent: clarify_scope
+        description: "Clarify trading scope"
+        trigger_conditions:
+          - ambiguous_scope
+          - missing_scope
+        prompts:
+          - "What instruments should {manager} trade?"
+          - "Which markets should this cover?"
+
+      - intent: confirm_expansion
+        description: "Confirm scope expansion"
+        trigger_conditions:
+          - category_expansion
+        prompts:
+          - "'{category}' includes {expanded_list}. Is that correct?"
+
+  # ==========================================================================
+  # WORKFLOW INTENTS
+  # ==========================================================================
+  workflow:
+    description: "Workflow navigation and control"
+
+    intents:
+      - intent: workflow_next
+        description: "Move to next step"
+        trigger_phrases:
+          - "next"
+          - "continue"
+          - "what's next"
+          - "move on"
+        action: advance_workflow
+
+      - intent: workflow_back
+        description: "Go back to previous step"
+        trigger_phrases:
+          - "go back"
+          - "previous"
+          - "undo that"
+        action: revert_workflow
+
+      - intent: workflow_status
+        description: "Show workflow progress"
+        trigger_phrases:
+          - "where are we"
+          - "show progress"
+          - "what's done"
+          - "status"
+        is_query: true
+
+      - intent: workflow_skip
+        description: "Skip current step"
+        trigger_phrases:
+          - "skip this"
+          - "not now"
+          - "later"
+          - "skip"
+        action: skip_step
+
+# ==========================================================================
+# INTENT RELATIONSHIPS
+# ==========================================================================
+intent_relationships:
+  # Natural followups - boost confidence when intent follows another
+  natural_followups:
+    profile_create:
+      - profile_set_universe
+      - im_assign
+    im_assign:
+      - im_assign  # Can assign multiple IMs
+      - pricing_set
+      - im_change_connectivity
+    pricing_set:
+      - pricing_set  # Can set multiple sources
+      - sweep_configure
+      - sla_commit
+    sweep_configure:
+      - sweep_configure  # Multiple currencies
+      - sla_commit
+    sla_commit:
+      - sla_commit  # Multiple SLAs
+      - profile_validate
+    profile_validate:
+      - profile_materialize
+      - im_assign  # Fix gaps
+
+  # Exclusive intents - can't both be true
+  mutually_exclusive:
+    - [im_assign, im_remove]
+    - [profile_create, profile_materialize]
+
+# ==========================================================================
+# CONFIDENCE THRESHOLDS
+# ==========================================================================
+confidence_thresholds:
+  # Per-intent thresholds (overrides defaults)
+  defaults:
+    execute_threshold: 0.85      # Auto-execute if above
+    confirm_threshold: 0.65      # Confirm before executing
+    suggest_threshold: 0.45      # Suggest but ask
+    clarify_threshold: 0.0       # Below this, ask clarifying questions
+
+  overrides:
+    # Higher thresholds for destructive actions
+    im_remove:
+      execute_threshold: 0.95
+      confirm_threshold: 0.80
+    profile_materialize:
+      execute_threshold: 0.95
+      confirm_threshold: 0.80
+    # Lower thresholds for queries (safe to execute)
+    im_query:
+      execute_threshold: 0.60
+    pricing_query:
+      execute_threshold: 0.60
+    profile_visualize:
+      execute_threshold: 0.60

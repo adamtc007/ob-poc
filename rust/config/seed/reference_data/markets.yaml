@@ -1,0 +1,529 @@
+# ISO 10383 MIC codes - Global Markets Reference Data
+# Source: https://www.iso20022.org/market-identifier-codes
+# Updated: 2025-12-22
+
+markets:
+  # ============================================================================
+  # AMERICAS
+  # ============================================================================
+
+  # United States
+  - mic: XNYS
+    name: New York Stock Exchange
+    country_code: US
+    primary_currency: USD
+    csd_bic: DTCYUS33
+    timezone: America/New_York
+    settlement_cycle: T+1
+    is_active: true
+
+  - mic: XNAS
+    name: NASDAQ
+    country_code: US
+    primary_currency: USD
+    csd_bic: DTCYUS33
+    timezone: America/New_York
+    settlement_cycle: T+1
+    is_active: true
+
+  - mic: XASE
+    name: NYSE American (AMEX)
+    country_code: US
+    primary_currency: USD
+    csd_bic: DTCYUS33
+    timezone: America/New_York
+    settlement_cycle: T+1
+    is_active: true
+
+  - mic: ARCX
+    name: NYSE Arca
+    country_code: US
+    primary_currency: USD
+    csd_bic: DTCYUS33
+    timezone: America/New_York
+    settlement_cycle: T+1
+    is_active: true
+
+  - mic: BATS
+    name: CBOE BZX Exchange
+    country_code: US
+    primary_currency: USD
+    csd_bic: DTCYUS33
+    timezone: America/New_York
+    settlement_cycle: T+1
+    is_active: true
+
+  - mic: IEXG
+    name: Investors Exchange (IEX)
+    country_code: US
+    primary_currency: USD
+    csd_bic: DTCYUS33
+    timezone: America/New_York
+    settlement_cycle: T+1
+    is_active: true
+
+  # Canada
+  - mic: XTSE
+    name: Toronto Stock Exchange
+    country_code: CA
+    primary_currency: CAD
+    csd_bic: CDABORDC
+    timezone: America/Toronto
+    settlement_cycle: T+1
+    is_active: true
+
+  - mic: XTSX
+    name: TSX Venture Exchange
+    country_code: CA
+    primary_currency: CAD
+    csd_bic: CDABORDC
+    timezone: America/Toronto
+    settlement_cycle: T+1
+    is_active: true
+
+  # Brazil
+  - mic: BVMF
+    name: B3 - Brasil Bolsa Balcao
+    country_code: BR
+    primary_currency: BRL
+    csd_bic: CETABORJ
+    timezone: America/Sao_Paulo
+    settlement_cycle: T+2
+    is_active: true
+
+  # Mexico
+  - mic: XMEX
+    name: Bolsa Mexicana de Valores
+    country_code: MX
+    primary_currency: MXN
+    csd_bic: INDEVAL
+    timezone: America/Mexico_City
+    settlement_cycle: T+2
+    is_active: true
+
+  # ============================================================================
+  # EUROPE
+  # ============================================================================
+
+  # United Kingdom
+  - mic: XLON
+    name: London Stock Exchange
+    country_code: GB
+    primary_currency: GBP
+    csd_bic: CABORDC1
+    timezone: Europe/London
+    settlement_cycle: T+1
+    is_active: true
+
+  - mic: TRQX
+    name: Turquoise
+    country_code: GB
+    primary_currency: GBP
+    csd_bic: CABORDC1
+    timezone: Europe/London
+    settlement_cycle: T+1
+    is_active: true
+
+  # Germany
+  - mic: XETR
+    name: XETRA (Deutsche Boerse)
+    country_code: DE
+    primary_currency: EUR
+    csd_bic: DAKVDEFF
+    timezone: Europe/Berlin
+    settlement_cycle: T+2
+    is_active: true
+
+  - mic: XFRA
+    name: Frankfurt Stock Exchange
+    country_code: DE
+    primary_currency: EUR
+    csd_bic: DAKVDEFF
+    timezone: Europe/Berlin
+    settlement_cycle: T+2
+    is_active: true
+
+  # France
+  - mic: XPAR
+    name: Euronext Paris
+    country_code: FR
+    primary_currency: EUR
+    csd_bic: SICABORDC
+    timezone: Europe/Paris
+    settlement_cycle: T+2
+    is_active: true
+
+  # Netherlands
+  - mic: XAMS
+    name: Euronext Amsterdam
+    country_code: NL
+    primary_currency: EUR
+    csd_bic: NEDABORDC
+    timezone: Europe/Amsterdam
+    settlement_cycle: T+2
+    is_active: true
+
+  # Belgium
+  - mic: XBRU
+    name: Euronext Brussels
+    country_code: BE
+    primary_currency: EUR
+    csd_bic: EABORDC1
+    timezone: Europe/Brussels
+    settlement_cycle: T+2
+    is_active: true
+
+  # Ireland
+  - mic: XDUB
+    name: Euronext Dublin
+    country_code: IE
+    primary_currency: EUR
+    csd_bic: EUROCLEAR
+    timezone: Europe/Dublin
+    settlement_cycle: T+2
+    is_active: true
+
+  # Switzerland
+  - mic: XSWX
+    name: SIX Swiss Exchange
+    country_code: CH
+    primary_currency: CHF
+    csd_bic: SABORDC
+    timezone: Europe/Zurich
+    settlement_cycle: T+2
+    is_active: true
+
+  # Italy
+  - mic: XMIL
+    name: Borsa Italiana (Euronext Milan)
+    country_code: IT
+    primary_currency: EUR
+    csd_bic: MABORDC1
+    timezone: Europe/Rome
+    settlement_cycle: T+2
+    is_active: true
+
+  # Spain
+  - mic: XMAD
+    name: Bolsa de Madrid (BME)
+    country_code: ES
+    primary_currency: EUR
+    csd_bic: IABORDC1
+    timezone: Europe/Madrid
+    settlement_cycle: T+2
+    is_active: true
+
+  # Portugal
+  - mic: XLIS
+    name: Euronext Lisbon
+    country_code: PT
+    primary_currency: EUR
+    csd_bic: INTERBOLSA
+    timezone: Europe/Lisbon
+    settlement_cycle: T+2
+    is_active: true
+
+  # Sweden
+  - mic: XSTO
+    name: Nasdaq Stockholm
+    country_code: SE
+    primary_currency: SEK
+    csd_bic: ECSDBORDC
+    timezone: Europe/Stockholm
+    settlement_cycle: T+2
+    is_active: true
+
+  # Denmark
+  - mic: XCSE
+    name: Nasdaq Copenhagen
+    country_code: DK
+    primary_currency: DKK
+    csd_bic: VPABORDC
+    timezone: Europe/Copenhagen
+    settlement_cycle: T+2
+    is_active: true
+
+  # Norway
+  - mic: XOSL
+    name: Oslo Bors
+    country_code: "NO"
+    primary_currency: NOK
+    csd_bic: VPSABORDC
+    timezone: Europe/Oslo
+    settlement_cycle: T+2
+    is_active: true
+
+  # Finland
+  - mic: XHEL
+    name: Nasdaq Helsinki
+    country_code: FI
+    primary_currency: EUR
+    csd_bic: ECSDBORDC
+    timezone: Europe/Helsinki
+    settlement_cycle: T+2
+    is_active: true
+
+  # Austria
+  - mic: XWBO
+    name: Wiener Boerse
+    country_code: AT
+    primary_currency: EUR
+    csd_bic: OEKBATW1
+    timezone: Europe/Vienna
+    settlement_cycle: T+2
+    is_active: true
+
+  # Poland
+  - mic: XWAR
+    name: Warsaw Stock Exchange
+    country_code: PL
+    primary_currency: PLN
+    csd_bic: KDPWPLPW
+    timezone: Europe/Warsaw
+    settlement_cycle: T+2
+    is_active: true
+
+  # ============================================================================
+  # ASIA-PACIFIC
+  # ============================================================================
+
+  # Japan
+  - mic: XTKS
+    name: Tokyo Stock Exchange
+    country_code: JP
+    primary_currency: JPY
+    csd_bic: JASDECJP
+    timezone: Asia/Tokyo
+    settlement_cycle: T+2
+    is_active: true
+
+  - mic: XOSE
+    name: Osaka Exchange
+    country_code: JP
+    primary_currency: JPY
+    csd_bic: JASDECJP
+    timezone: Asia/Tokyo
+    settlement_cycle: T+2
+    is_active: true
+
+  # Hong Kong
+  - mic: XHKG
+    name: Hong Kong Stock Exchange
+    country_code: HK
+    primary_currency: HKD
+    csd_bic: CCASCHKX
+    timezone: Asia/Hong_Kong
+    settlement_cycle: T+2
+    is_active: true
+
+  # China
+  - mic: XSHG
+    name: Shanghai Stock Exchange
+    country_code: CN
+    primary_currency: CNY
+    csd_bic: CDCPBORG
+    timezone: Asia/Shanghai
+    settlement_cycle: T+1
+    is_active: true
+
+  - mic: XSHE
+    name: Shenzhen Stock Exchange
+    country_code: CN
+    primary_currency: CNY
+    csd_bic: CDCPBORG
+    timezone: Asia/Shanghai
+    settlement_cycle: T+1
+    is_active: true
+
+  # South Korea
+  - mic: XKRX
+    name: Korea Exchange
+    country_code: KR
+    primary_currency: KRW
+    csd_bic: KSDCBORG
+    timezone: Asia/Seoul
+    settlement_cycle: T+2
+    is_active: true
+
+  # Taiwan
+  - mic: XTAI
+    name: Taiwan Stock Exchange
+    country_code: TW
+    primary_currency: TWD
+    csd_bic: TDCCBORG
+    timezone: Asia/Taipei
+    settlement_cycle: T+2
+    is_active: true
+
+  # Singapore
+  - mic: XSES
+    name: Singapore Exchange
+    country_code: SG
+    primary_currency: SGD
+    csd_bic: CDPBORG
+    timezone: Asia/Singapore
+    settlement_cycle: T+2
+    is_active: true
+
+  # Australia
+  - mic: XASX
+    name: Australian Securities Exchange
+    country_code: AU
+    primary_currency: AUD
+    csd_bic: CHESBORG
+    timezone: Australia/Sydney
+    settlement_cycle: T+2
+    is_active: true
+
+  # New Zealand
+  - mic: XNZE
+    name: New Zealand Exchange
+    country_code: NZ
+    primary_currency: NZD
+    csd_bic: LINKNZWN
+    timezone: Pacific/Auckland
+    settlement_cycle: T+2
+    is_active: true
+
+  # India
+  - mic: XBOM
+    name: Bombay Stock Exchange
+    country_code: IN
+    primary_currency: INR
+    csd_bic: CDSLBORG
+    timezone: Asia/Kolkata
+    settlement_cycle: T+1
+    is_active: true
+
+  - mic: XNSE
+    name: National Stock Exchange of India
+    country_code: IN
+    primary_currency: INR
+    csd_bic: NSDLBORG
+    timezone: Asia/Kolkata
+    settlement_cycle: T+1
+    is_active: true
+
+  # Thailand
+  - mic: XBKK
+    name: Stock Exchange of Thailand
+    country_code: TH
+    primary_currency: THB
+    csd_bic: TSDBORG
+    timezone: Asia/Bangkok
+    settlement_cycle: T+2
+    is_active: true
+
+  # Malaysia
+  - mic: XKLS
+    name: Bursa Malaysia
+    country_code: MY
+    primary_currency: MYR
+    csd_bic: BURMBORG
+    timezone: Asia/Kuala_Lumpur
+    settlement_cycle: T+2
+    is_active: true
+
+  # Indonesia
+  - mic: XIDX
+    name: Indonesia Stock Exchange
+    country_code: ID
+    primary_currency: IDR
+    csd_bic: KSEIBORD
+    timezone: Asia/Jakarta
+    settlement_cycle: T+2
+    is_active: true
+
+  # Philippines
+  - mic: XPHS
+    name: Philippine Stock Exchange
+    country_code: PH
+    primary_currency: PHP
+    csd_bic: SCPBORG
+    timezone: Asia/Manila
+    settlement_cycle: T+2
+    is_active: true
+
+  # Vietnam
+  - mic: HOSE
+    name: Ho Chi Minh Stock Exchange
+    country_code: VN
+    primary_currency: VND
+    csd_bic: VSDBORG
+    timezone: Asia/Ho_Chi_Minh
+    settlement_cycle: T+2
+    is_active: true
+
+  # ============================================================================
+  # MIDDLE EAST & AFRICA
+  # ============================================================================
+
+  # Israel
+  - mic: XTAE
+    name: Tel Aviv Stock Exchange
+    country_code: IL
+    primary_currency: ILS
+    csd_bic: TASEBORG
+    timezone: Asia/Jerusalem
+    settlement_cycle: T+2
+    is_active: true
+
+  # UAE
+  - mic: XDFM
+    name: Dubai Financial Market
+    country_code: AE
+    primary_currency: AED
+    csd_bic: DFMBORG
+    timezone: Asia/Dubai
+    settlement_cycle: T+2
+    is_active: true
+
+  # Saudi Arabia
+  - mic: XSAU
+    name: Saudi Stock Exchange (Tadawul)
+    country_code: SA
+    primary_currency: SAR
+    csd_bic: TADWBORG
+    timezone: Asia/Riyadh
+    settlement_cycle: T+2
+    is_active: true
+
+  # South Africa
+  - mic: XJSE
+    name: Johannesburg Stock Exchange
+    country_code: ZA
+    primary_currency: ZAR
+    csd_bic: STTRBORG
+    timezone: Africa/Johannesburg
+    settlement_cycle: T+3
+    is_active: true
+
+  # Egypt
+  - mic: XCAI
+    name: Egyptian Exchange
+    country_code: EG
+    primary_currency: EGP
+    csd_bic: MISDBORG
+    timezone: Africa/Cairo
+    settlement_cycle: T+2
+    is_active: true
+
+  # Qatar
+  - mic: DSMD
+    name: Qatar Stock Exchange
+    country_code: QA
+    primary_currency: QAR
+    csd_bic: QSEBORG
+    timezone: Asia/Qatar
+    settlement_cycle: T+2
+    is_active: true
+
+  # Kuwait
+  - mic: XKUW
+    name: Boursa Kuwait
+    country_code: KW
+    primary_currency: KWD
+    csd_bic: KUCSBORG
+    timezone: Asia/Kuwait
+    settlement_cycle: T+2
+    is_active: true

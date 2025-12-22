@@ -1,0 +1,281 @@
+# Investment Manager Assignment Verbs
+# =============================================================================
+# Manages IM assignments to CBUs with trading scope and connectivity linking
+# =============================================================================
+
+domains:
+  investment-manager:
+    description: "Investment manager assignment and scope management"
+    verbs:
+      assign:
+        description: Assign investment manager to CBU with trading scope
+        behavior: crud
+        crud:
+          operation: insert
+          table: cbu_im_assignments
+          schema: custody
+          returning: assignment_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: profile-id
+            type: uuid
+            required: false
+            maps_to: profile_id
+            lookup:
+              table: cbu_trading_profiles
+              schema: ob-poc
+              search_key: profile_id
+              primary_key: profile_id
+          - name: manager-lei
+            type: string
+            required: true
+            maps_to: manager_lei
+          - name: manager-bic
+            type: string
+            required: false
+            maps_to: manager_bic
+          - name: manager-name
+            type: string
+            required: false
+            maps_to: manager_name
+          - name: manager-entity-id
+            type: uuid
+            required: false
+            maps_to: manager_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: priority
+            type: integer
+            required: true
+            maps_to: priority
+          - name: role
+            type: string
+            required: false
+            default: INVESTMENT_MANAGER
+            maps_to: manager_role
+            valid_values:
+              - INVESTMENT_MANAGER
+              - SUB_ADVISOR
+              - OVERLAY_MANAGER
+              - TRANSITION_MANAGER
+              - EXECUTION_BROKER
+          - name: scope-all
+            type: boolean
+            required: false
+            default: false
+            maps_to: scope_all
+          - name: scope-markets
+            type: string_list
+            required: false
+            maps_to: scope_markets
+          - name: scope-instrument-classes
+            type: string_list
+            required: false
+            maps_to: scope_instrument_classes
+          - name: scope-currencies
+            type: string_list
+            required: false
+            maps_to: scope_currencies
+          - name: scope-isda-asset-classes
+            type: string_list
+            required: false
+            maps_to: scope_isda_asset_classes
+          - name: instruction-method
+            type: string
+            required: true
+            maps_to: instruction_method
+            valid_values:
+              - SWIFT
+              - CTM
+              - FIX
+              - API
+              - ALERT
+              - MANUAL
+          - name: can-trade
+            type: boolean
+            required: false
+            default: true
+            maps_to: can_trade
+          - name: can-settle
+            type: boolean
+            required: false
+            default: true
+            maps_to: can_settle
+          - name: can-affirm
+            type: boolean
+            required: false
+            default: false
+            maps_to: can_affirm
+          - name: effective-date
+            type: date
+            required: false
+            maps_to: effective_date
+        returns:
+          type: uuid
+          name: assignment_id
+          capture: true
+
+      set-scope:
+        description: Update scope for existing IM assignment
+        behavior: crud
+        crud:
+          operation: update
+          table: cbu_im_assignments
+          schema: custody
+          key: assignment_id
+        args:
+          - name: assignment-id
+            type: uuid
+            required: true
+            maps_to: assignment_id
+          - name: scope-all
+            type: boolean
+            required: false
+            maps_to: scope_all
+          - name: scope-markets
+            type: string_list
+            required: false
+            maps_to: scope_markets
+          - name: scope-instrument-classes
+            type: string_list
+            required: false
+            maps_to: scope_instrument_classes
+          - name: scope-currencies
+            type: string_list
+            required: false
+            maps_to: scope_currencies
+          - name: scope-isda-asset-classes
+            type: string_list
+            required: false
+            maps_to: scope_isda_asset_classes
+        returns:
+          type: affected
+
+      link-connectivity:
+        description: Link IM assignment to instruction delivery resource
+        behavior: crud
+        crud:
+          operation: update
+          table: cbu_im_assignments
+          schema: custody
+          key: assignment_id
+        args:
+          - name: assignment-id
+            type: uuid
+            required: true
+            maps_to: assignment_id
+          - name: resource-instance-id
+            type: uuid
+            required: true
+            maps_to: instruction_resource_id
+            lookup:
+              table: cbu_resource_instances
+              entity_type: resource_instance
+              schema: ob-poc
+              search_key: instance_name
+              primary_key: instance_id
+        returns:
+          type: affected
+
+      list:
+        description: List IM assignments for CBU
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: cbu_im_assignments
+          schema: custody
+          fk_col: cbu_id
+          order_by: priority
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+        returns:
+          type: record_set
+
+      suspend:
+        description: Suspend an IM assignment
+        behavior: crud
+        crud:
+          operation: update
+          table: cbu_im_assignments
+          schema: custody
+          key: assignment_id
+          set_values:
+            status: SUSPENDED
+        args:
+          - name: assignment-id
+            type: uuid
+            required: true
+            maps_to: assignment_id
+        returns:
+          type: affected
+
+      terminate:
+        description: Terminate an IM assignment
+        behavior: crud
+        crud:
+          operation: update
+          table: cbu_im_assignments
+          schema: custody
+          key: assignment_id
+          set_values:
+            status: TERMINATED
+        args:
+          - name: assignment-id
+            type: uuid
+            required: true
+            maps_to: assignment_id
+          - name: termination-date
+            type: date
+            required: false
+            maps_to: termination_date
+        returns:
+          type: affected
+
+      find-for-trade:
+        description: Find IM assignment that covers given trade characteristics
+        behavior: plugin
+        handler: find_im_for_trade
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: market
+            type: string
+            required: false
+          - name: instrument-class
+            type: string
+            required: true
+          - name: currency
+            type: string
+            required: false
+          - name: isda-asset-class
+            type: string
+            required: false
+        returns:
+          type: record
+          description: Matching IM assignment with instruction method

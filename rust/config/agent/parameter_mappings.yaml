@@ -1,0 +1,476 @@
+# Parameter Mappings Configuration
+# =============================================================================
+# Maps extracted entities to DSL verb parameters
+# Used by DslGenerator to translate classified intents into executable DSL
+# =============================================================================
+
+version: "1.0"
+description: "Entity to parameter mappings for DSL generation"
+
+# =============================================================================
+# Investment Manager Verbs
+# =============================================================================
+parameter_mappings:
+  investment-manager.assign:
+    description: "Assign investment manager to CBU"
+    mappings:
+      # Manager identification (at least one required)
+      - entity_type: manager_reference
+        param: manager-name
+        priority: 1
+
+      - entity_type: lei
+        param: manager-lei
+        priority: 2
+
+      - entity_type: bic
+        param: manager-bic
+        priority: 3
+
+      # Context-inferred parameters
+      - entity_type: cbu_reference
+        param: cbu-id
+        source: context
+        fallback: session.current_cbu
+
+      - entity_type: profile_reference
+        param: profile-id
+        source: context
+        fallback: session.current_profile
+
+      # Scope parameters (lists that may expand)
+      - entity_type: market_reference
+        param: scope-markets
+        is_list: true
+        iterate_if_list: false  # Collect all into array
+
+      - entity_type: instrument_class_reference
+        param: scope-instrument-classes
+        is_list: true
+        iterate_if_list: false
+
+      - entity_type: currency
+        param: scope-currencies
+        is_list: true
+        iterate_if_list: false
+
+      # Optional parameters with defaults
+      - entity_type: instruction_method
+        param: instruction-method
+        default_if_missing: SWIFT
+
+      - entity_type: priority_value
+        param: priority
+        default_if_missing: 100
+
+      - entity_type: im_role
+        param: role
+        default_if_missing: INVESTMENT_MANAGER
+
+    defaults:
+      can-trade: true
+      can-settle: true
+      can-affirm: false
+
+    symbol_template: "@im-{manager-name}"
+    symbol_transform: lowercase_hyphenate
+
+  investment-manager.set-scope:
+    description: "Update scope for existing IM assignment"
+    mappings:
+      - entity_type: im_assignment_reference
+        param: assignment-id
+        required: true
+        source: context_or_extract
+
+      - entity_type: market_reference
+        param: scope-markets
+        is_list: true
+
+      - entity_type: instrument_class_reference
+        param: scope-instrument-classes
+        is_list: true
+
+      - entity_type: currency
+        param: scope-currencies
+        is_list: true
+
+  investment-manager.list:
+    description: "List IM assignments for CBU"
+    mappings:
+      - entity_type: cbu_reference
+        param: cbu-id
+        source: context
+        fallback: session.current_cbu
+
+# =============================================================================
+# Pricing Configuration Verbs
+# =============================================================================
+  pricing-config.set:
+    description: "Set pricing source for instrument class"
+    mappings:
+      - entity_type: cbu_reference
+        param: cbu-id
+        source: context
+        fallback: session.current_cbu
+
+      - entity_type: profile_reference
+        param: profile-id
+        source: context
+        fallback: session.current_profile
+
+      - entity_type: instrument_class_reference
+        param: instrument-class
+        required: true
+        iterate_if_list: true  # Generate multiple statements
+
+      - entity_type: market_reference
+        param: market
+        required: false
+        iterate_if_list: true  # Cross-product if both lists
+
+      - entity_type: currency
+        param: currency
+        required: false
+
+      - entity_type: pricing_source
+        param: source
+        required: true
+
+      - entity_type: pricing_source
+        context_key: fallback
+        param: fallback-source
+        required: false
+
+      - entity_type: priority_value
+        param: priority
+        default_if_missing: 100
+
+      - entity_type: price_type
+        param: price-type
+        default_if_missing: CLOSING
+
+    defaults:
+      max-age-hours: 24
+      tolerance-pct: 5.0
+      stale-action: WARN
+
+    symbol_template: "@pricing-{instrument-class}-{source}"
+    symbol_transform: lowercase_hyphenate
+
+  pricing-config.list:
+    description: "List pricing configurations for CBU"
+    mappings:
+      - entity_type: cbu_reference
+        param: cbu-id
+        source: context
+        fallback: session.current_cbu
+
+      - entity_type: instrument_class_reference
+        param: instrument-class
+        required: false
+
+# =============================================================================
+# Cash Sweep Configuration Verbs
+# =============================================================================
+  cash-sweep.configure:
+    description: "Configure cash sweep for currency"
+    mappings:
+      - entity_type: cbu_reference
+        param: cbu-id
+        source: context
+        fallback: session.current_cbu
+
+      - entity_type: profile_reference
+        param: profile-id
+        source: context
+        fallback: session.current_profile
+
+      - entity_type: currency
+        param: currency
+        required: true
+        iterate_if_list: true
+
+      - entity_type: amount
+        param: threshold-amount
+        required: true
+
+      - entity_type: sweep_vehicle
+        param: vehicle-type
+        default_if_missing: STIF
+
+      - entity_type: time_reference
+        param: sweep-time
+        required: true
+        transform: to_24h_format
+
+      - entity_type: timezone
+        param: sweep-timezone
+        infer_from: currency
+        inference_rules:
+          USD: America/New_York
+          EUR: Europe/Luxembourg
+          GBP: Europe/London
+          CHF: Europe/Zurich
+          JPY: Asia/Tokyo
+          HKD: Asia/Hong_Kong
+          SGD: Asia/Singapore
+          AUD: Australia/Sydney
+          default: UTC
+
+      - entity_type: frequency
+        param: sweep-frequency
+        default_if_missing: DAILY
+
+    defaults:
+      interest-allocation: ACCRUED
+
+    symbol_template: "@sweep-{currency}"
+    symbol_transform: lowercase_hyphenate
+
+  cash-sweep.list:
+    description: "List cash sweep configurations for CBU"
+    mappings:
+      - entity_type: cbu_reference
+        param: cbu-id
+        source: context
+        fallback: session.current_cbu
+
+  cash-sweep.update-threshold:
+    description: "Update sweep threshold amount"
+    mappings:
+      - entity_type: sweep_reference
+        param: sweep-id
+        required: true
+        source: context_or_extract
+
+      - entity_type: amount
+        param: threshold-amount
+        required: true
+
+  cash-sweep.update-timing:
+    description: "Update sweep timing"
+    mappings:
+      - entity_type: sweep_reference
+        param: sweep-id
+        required: true
+        source: context_or_extract
+
+      - entity_type: time_reference
+        param: sweep-time
+        transform: to_24h_format
+
+      - entity_type: timezone
+        param: sweep-timezone
+
+      - entity_type: frequency
+        param: sweep-frequency
+
+# =============================================================================
+# SLA Verbs
+# =============================================================================
+  sla.commit:
+    description: "Create SLA commitment for CBU"
+    mappings:
+      - entity_type: cbu_reference
+        param: cbu-id
+        source: context
+        fallback: session.current_cbu
+
+      - entity_type: profile_reference
+        param: profile-id
+        source: context
+        fallback: session.current_profile
+
+      - entity_type: sla_template_reference
+        param: template-code
+        required: true
+
+      - entity_type: percentage
+        param: override-target
+        context_key: target_override
+        condition: differs_from_template
+
+      - entity_type: percentage
+        param: override-warning
+        context_key: warning_override
+
+      - entity_type: instrument_class_reference
+        param: scope-instrument-classes
+        is_list: true
+
+      - entity_type: market_reference
+        param: scope-markets
+        is_list: true
+
+      - entity_type: currency
+        param: scope-currencies
+        is_list: true
+
+    symbol_template: "@sla-{template-code}"
+    symbol_transform: lowercase_hyphenate
+
+  sla.list-templates:
+    description: "List available SLA templates"
+    mappings:
+      - entity_type: sla_applies_to_type
+        param: applies-to-type
+
+      - entity_type: sla_applies_to_code
+        param: applies-to-code
+
+  sla.list-commitments:
+    description: "List SLA commitments for CBU"
+    mappings:
+      - entity_type: cbu_reference
+        param: cbu-id
+        source: context
+        fallback: session.current_cbu
+
+  sla.record-measurement:
+    description: "Record SLA measurement for period"
+    mappings:
+      - entity_type: sla_commitment_reference
+        param: commitment-id
+        required: true
+        source: context_or_extract
+
+      - entity_type: date_range
+        params:
+          - period-start
+          - period-end
+        required: true
+
+      - entity_type: measurement_value
+        param: measured-value
+        required: true
+
+      - entity_type: sla_status
+        param: status
+        required: true
+
+  sla.report-breach:
+    description: "Report SLA breach"
+    mappings:
+      - entity_type: sla_measurement_reference
+        param: measurement-id
+        required: true
+
+      - entity_type: sla_commitment_reference
+        param: commitment-id
+        required: true
+
+      - entity_type: severity
+        param: severity
+        required: true
+
+      - entity_type: date
+        param: breach-date
+        required: true
+
+      - entity_type: root_cause_category
+        param: root-cause-category
+        required: true
+
+      - entity_type: description
+        param: root-cause-description
+        required: true
+
+# =============================================================================
+# Trading Profile Verbs
+# =============================================================================
+  trading-profile.import:
+    description: "Import trading profile from YAML file"
+    mappings:
+      - entity_type: cbu_reference
+        param: cbu-id
+        source: context
+        fallback: session.current_cbu
+
+      - entity_type: file_path
+        param: file-path
+        required: true
+
+  trading-profile.materialize:
+    description: "Sync document to operational tables"
+    mappings:
+      - entity_type: profile_reference
+        param: profile-id
+        required: true
+        source: context_or_extract
+
+      - entity_type: section_list
+        param: sections
+        is_list: true
+
+# =============================================================================
+# Transform Functions
+# =============================================================================
+transforms:
+  lowercase_hyphenate:
+    description: "Convert to lowercase and replace spaces with hyphens"
+    steps:
+      - lowercase
+      - replace: [" ", "-"]
+      - replace: ["_", "-"]
+      - truncate: 20
+
+  to_24h_format:
+    description: "Convert time expression to HH:MM format"
+    patterns:
+      - pattern: "(\d{1,2}):(\d{2})\s*(am|pm)"
+        action: convert_12h_to_24h
+      - pattern: "(\d{1,2})(am|pm)"
+        action: convert_12h_to_24h_no_minutes
+      - pattern: "end of day"
+        result: "17:00"
+      - pattern: "eod"
+        result: "17:00"
+      - pattern: "close of business"
+        result: "17:00"
+      - pattern: "cob"
+        result: "17:00"
+      - pattern: "market close"
+        result: "16:00"
+      - pattern: "noon"
+        result: "12:00"
+      - pattern: "midnight"
+        result: "00:00"
+
+  name_or_lei:
+    description: "Use LEI if available, otherwise name"
+    priority:
+      - lei
+      - name
+
+# =============================================================================
+# Inference Rules
+# =============================================================================
+inference_rules:
+  # Infer priority based on role
+  priority_from_role:
+    INVESTMENT_MANAGER: 100
+    SUB_ADVISOR: 50
+    OVERLAY_MANAGER: 30
+    TRANSITION_MANAGER: 10
+    EXECUTION_BROKER: 10
+
+  # Infer instruction method based on instrument class
+  instruction_method_from_instrument:
+    IRS: API
+    XCCY: API
+    SWAPTION: API
+    FX_FORWARD: SWIFT
+    FX_OPTION: SWIFT
+    EQUITY: CTM
+    ETF: CTM
+    GOVT_BOND: SWIFT
+    CORP_BOND: SWIFT
+    default: SWIFT
+
+  # Infer vehicle type based on currency
+  vehicle_from_currency:
+    USD: STIF
+    EUR: MMF
+    GBP: MMF
+    default: STIF

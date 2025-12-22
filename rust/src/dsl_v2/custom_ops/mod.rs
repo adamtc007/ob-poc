@@ -22,9 +22,11 @@ pub mod batch_control_ops;
 mod custody;
 pub mod entity_query;
 mod onboarding;
+mod refdata_loader;
 mod rfi;
 pub mod template_ops;
 mod threshold;
+mod trading_matrix;
 mod trading_profile;
 mod ubo_analysis;
 pub mod ubo_graph_ops;
@@ -51,11 +53,16 @@ pub use onboarding::{
     OnboardingEnsureOp, OnboardingExecuteOp, OnboardingGetUrlsOp, OnboardingPlanOp,
     OnboardingShowPlanOp, OnboardingStatusOp,
 };
+pub use refdata_loader::{
+    get_refdata_operations, LoadAllRefdataOp, LoadInstrumentClassesOp, LoadMarketsOp,
+    LoadSlaTemplatesOp, LoadSubcustodiansOp,
+};
 pub use rfi::{RfiCheckCompletionOp, RfiGenerateOp, RfiListByCaseOp};
 pub use template_ops::{
     TemplateBatchOp, TemplateBatchResult, TemplateInvokeOp, TemplateInvokeResult,
 };
 pub use threshold::{ThresholdCheckEntityOp, ThresholdDeriveOp, ThresholdEvaluateOp};
+pub use trading_matrix::{FindImForTradeOp, FindPricingForInstrumentOp, ListOpenSlaBreachesOp};
 pub use trading_profile::{
     TradingProfileActivateOp, TradingProfileGetActiveOp, TradingProfileImportOp,
     TradingProfileMaterializeOp, TradingProfileValidateOp,
@@ -246,6 +253,16 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(verify_ops::VerifyGetStatusOp));
         registry.register(Arc::new(verify_ops::VerifyAgainstRegistryOp));
         registry.register(Arc::new(verify_ops::VerifyAssertOp));
+
+        // Trading Matrix operations (IM assignment, pricing config, SLA)
+        registry.register(Arc::new(FindImForTradeOp));
+        registry.register(Arc::new(FindPricingForInstrumentOp));
+        registry.register(Arc::new(ListOpenSlaBreachesOp));
+
+        // Reference Data bulk loading operations
+        for op in get_refdata_operations() {
+            registry.register(Arc::from(op));
+        }
 
         registry
     }
@@ -3938,6 +3955,10 @@ mod tests {
         assert!(registry.has("cbu", "add-product"));
         assert!(registry.has("cbu", "show"));
         assert!(registry.has("cbu", "delete-cascade"));
+        // Trading Matrix operations
+        assert!(registry.has("investment-manager", "find-for-trade"));
+        assert!(registry.has("pricing-config", "find-for-instrument"));
+        assert!(registry.has("sla", "list-open-breaches"));
     }
 
     #[test]

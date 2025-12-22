@@ -2744,6 +2744,167 @@ The `cbu-custody` domain implements a three-layer model for settlement instructi
 - `FOP` - Free of Payment
 - `RVP` - Receive vs Payment
 
+## Trading Matrix (IM Assignment, Pricing, SLA)
+
+The Trading Matrix is a core onboarding pillar that enables **traceability from trade execution back to contractual terms**. It answers: "For this trade, which Investment Manager was responsible, what pricing applies, and are we meeting our SLA commitments?"
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         TRADE EVENT                              │
+│  Instrument: AAPL, Market: XNYS, Currency: USD                  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+          ┌───────────────────┼───────────────────┐
+          ▼                   ▼                   ▼
+┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
+│  IM Assignment   │ │  Pricing Config  │ │  SLA Commitment  │
+│  "Who executed?" │ │  "What rate?"    │ │  "Did we meet?"  │
+└──────────────────┘ └──────────────────┘ └──────────────────┘
+          │                   │                   │
+          ▼                   ▼                   ▼
+┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
+│ cbu_im_assign    │ │ cbu_pricing_cfg  │ │ cbu_sla_commit   │
+│ - scope matching │ │ - priority-based │ │ - per-metric     │
+│ - NULL=any       │ │ - tiered rates   │ │ - thresholds     │
+└──────────────────┘ └──────────────────┘ └──────────────────┘
+```
+
+### Database Tables (custody schema)
+
+| Table | Purpose |
+|-------|---------|
+| `investment_managers` | IM entity master with regulatory status |
+| `cbu_im_assignments` | CBU → IM assignment with scope (instrument/market/currency) |
+| `pricing_templates` | Reusable pricing configurations |
+| `pricing_tiers` | Volume/value-based tier thresholds |
+| `cbu_pricing_configs` | CBU-specific pricing with template + overrides |
+| `sla_templates` | Standard SLA definitions (T+1, 99.9% uptime) |
+| `sla_metrics` | Individual metrics within templates |
+| `cbu_sla_commitments` | CBU-specific SLA commitments |
+| `sla_breaches` | Recorded SLA breaches with remediation |
+| `cash_sweep_configs` | Cash sweep/investment configurations |
+
+### Traceability Chain
+
+For any trade, the system can trace:
+
+```
+Trade (AAPL, XNYS, USD)
+    │
+    ├── IM Assignment → Goldman Sachs Asset Management
+    │   └── Scope: instrument_class=EQUITY, market=XNYS, currency=USD
+    │
+    ├── Pricing Config → "US Equity Standard" template
+    │   ├── Base rate: 2.5 bps
+    │   └── Tier: Volume > $10M → 1.8 bps
+    │
+    └── SLA Commitment → "Trade Settlement T+1"
+        ├── Target: 99.5%
+        ├── Actual: 99.2%
+        └── Breach: Recorded with remediation plan
+```
+
+### Scope Matching (IM Assignment)
+
+IM assignments use **NULL=any** semantics for flexible scope matching:
+
+```sql
+-- Find IM for: instrument_class=EQUITY, market=XNYS, currency=USD
+SELECT * FROM custody.cbu_im_assignments
+WHERE cbu_id = $1
+  AND status = 'active'
+  AND (instrument_class_id IS NULL OR instrument_class_id = $2)
+  AND (market_id IS NULL OR market_id = $3)
+  AND (currency IS NULL OR currency = $4)
+ORDER BY
+  -- Most specific first (fewer NULLs = higher priority)
+  (instrument_class_id IS NOT NULL)::int +
+  (market_id IS NOT NULL)::int +
+  (currency IS NOT NULL)::int DESC
+LIMIT 1;
+```
+
+### Priority-Based Pricing
+
+Pricing configs use explicit priority for deterministic selection:
+
+```clojure
+;; Higher priority (lower number) wins
+(pricing-config.assign :cbu-id @fund :template-code "US_EQUITY_PREMIUM"
+  :instrument-class "EQUITY" :market "XNYS" :priority 10)
+
+(pricing-config.assign :cbu-id @fund :template-code "EQUITY_STANDARD"
+  :instrument-class "EQUITY" :priority 50)  ;; Fallback
+```
+
+### SLA Breach Workflow
+
+```
+Measurement → Compare to Target → Breach Detected → Record → Remediate → Close
+     │                                    │
+     └── cbu_sla_commitments.target_value │
+                                          ▼
+                               sla_breaches table:
+                               - breach_severity
+                               - root_cause_category
+                               - remediation_plan
+                               - remediation_due_date
+                               - escalated_to
+```
+
+### Example: Full Trading Matrix Setup
+
+```clojure
+;; 1. Create Investment Manager entity
+(entity.create-limited-company :name "Goldman Sachs Asset Management"
+  :jurisdiction "US" :as @gsam)
+
+;; 2. Register as Investment Manager
+(investment-manager.create :entity-id @gsam :regulatory-status "SEC_REGISTERED"
+  :aum-usd 2000000000000 :as @im)
+
+;; 3. Assign IM to CBU for US Equities
+(investment-manager.assign :cbu-id @fund :im-id @im
+  :instrument-class "EQUITY" :market "XNYS" :currency "USD")
+
+;; 4. Create pricing template
+(pricing-config.create-template :code "US_EQUITY_STD" :name "US Equity Standard"
+  :fee-type "TRANSACTION" :base-rate 0.00025 :as @pricing-tpl)
+
+;; 5. Add volume tier
+(pricing-config.add-tier :template-id @pricing-tpl :tier-name "High Volume"
+  :min-value 10000000 :rate-adjustment -0.00007)
+
+;; 6. Assign pricing to CBU
+(pricing-config.assign :cbu-id @fund :template-id @pricing-tpl
+  :instrument-class "EQUITY" :priority 10)
+
+;; 7. Create SLA template
+(sla.create-template :code "TRADE_SETTLE_T1" :name "Trade Settlement T+1"
+  :category "SETTLEMENT" :as @sla-tpl)
+
+;; 8. Add metric to template
+(sla.add-metric :template-id @sla-tpl :code "SETTLE_RATE"
+  :name "Settlement Success Rate" :target-value 99.5
+  :measurement-unit "PERCENTAGE" :measurement-frequency "DAILY")
+
+;; 9. Commit SLA to CBU
+(sla.commit :cbu-id @fund :template-id @sla-tpl :effective-date "2024-01-01")
+
+;; 10. Query: Find IM for a trade
+(investment-manager.find-for-trade :cbu-id @fund
+  :instrument-class "EQUITY" :market "XNYS" :currency "USD")
+
+;; 11. Query: Find pricing for instrument
+(pricing-config.find-for-instrument :cbu-id @fund
+  :instrument-class "EQUITY" :market "XNYS")
+
+;; 12. Query: List open SLA breaches
+(sla.list-open-breaches :cbu-id @fund)
+```
+
 ## Trading Profile DSL
 
 The `trading-profile` domain provides a document-centric approach to CBU trading configuration. A single JSONB document is the source of truth, which is then materialized to operational tables.
@@ -5889,6 +6050,73 @@ Adversarial verification for KYC (game-theoretic "Distrust And Verify" model)
 | `verify.resolve-escalation` | Record escalation decision |
 | `verify.verify-against-registry` | Check entity against GLEIF/Companies House |
 
+### investment-manager
+
+Investment Manager assignment and trade routing
+
+| Verb | Description |
+|------|-------------|
+| `investment-manager.assign` | Assign an investment manager to a CBU |
+| `investment-manager.set-scope` | Configure scope (instrument classes, markets, currencies) |
+| `investment-manager.link-connectivity` | Link IM to connectivity resource (FIX, SWIFT) |
+| `investment-manager.list` | List IM assignments for a CBU |
+| `investment-manager.suspend` | Suspend an IM assignment |
+| `investment-manager.terminate` | Terminate an IM assignment |
+| `investment-manager.find-for-trade` | Find IM for given trade characteristics (plugin) |
+
+### pricing-config
+
+Pricing source configuration for instrument valuation
+
+| Verb | Description |
+|------|-------------|
+| `pricing-config.set` | Configure pricing source for instrument class/market |
+| `pricing-config.link-resource` | Link pricing config to data feed resource |
+| `pricing-config.list` | List pricing configurations for a CBU |
+| `pricing-config.remove` | Remove a pricing configuration |
+| `pricing-config.deactivate` | Deactivate a pricing configuration |
+| `pricing-config.find-for-instrument` | Find pricing source for instrument (plugin) |
+
+### sla
+
+SLA commitment, measurement, and breach management
+
+| Verb | Description |
+|------|-------------|
+| `sla.commit` | Create SLA commitment from template |
+| `sla.bind-to-product` | Bind SLA to a product |
+| `sla.bind-to-service` | Bind SLA to a service |
+| `sla.bind-to-resource` | Bind SLA to a resource instance |
+| `sla.override-target` | Override template target for specific commitment |
+| `sla.list-commitments` | List SLA commitments for a CBU |
+| `sla.record-measurement` | Record an SLA measurement |
+| `sla.list-measurements` | List measurements for a commitment |
+| `sla.report-breach` | Report an SLA breach |
+| `sla.update-remediation` | Update breach remediation status |
+| `sla.escalate-breach` | Escalate a breach |
+| `sla.close-breach` | Close a resolved breach |
+| `sla.list-open-breaches` | List open breaches for a CBU (plugin) |
+| `sla.list-templates` | List available SLA templates |
+| `sla.list-metrics` | List available SLA metrics |
+| `sla.get-template` | Get SLA template details |
+| `sla.get-commitment` | Get commitment details with measurements |
+
+### cash-sweep
+
+Cash sweep and STIF configuration
+
+| Verb | Description |
+|------|-------------|
+| `cash-sweep.configure` | Configure cash sweep for a CBU |
+| `cash-sweep.link-resource` | Link sweep config to cash management resource |
+| `cash-sweep.list` | List sweep configurations for a CBU |
+| `cash-sweep.update-threshold` | Update sweep threshold |
+| `cash-sweep.update-timing` | Update sweep timing |
+| `cash-sweep.change-vehicle` | Change sweep vehicle (STIF, MMF) |
+| `cash-sweep.suspend` | Suspend sweep configuration |
+| `cash-sweep.reactivate` | Reactivate sweep configuration |
+| `cash-sweep.remove` | Remove sweep configuration |
+
 ### Reference Data Domains
 
 The following domains manage reference/master data used throughout the system.
@@ -6278,3 +6506,73 @@ If uncertain about DSL semantics, CBU/UBO/KYC domain rules, graph invariants, or
 4. Wait for guidance
 
 Never silently "guess and commit" on complex domain logic.
+
+
+---
+
+## Current Priority: Phase 3 Agent Intelligence Baseline Completion
+
+**Status:** In Progress  
+**TODO File:** `TODO-PHASE3-BASELINE-COMPLETION.md`
+
+### What's Done
+- Intent classifier with pattern matching
+- Entity extractor with region/hierarchy expansion
+- DSL generator with parameter mappings
+- Pipeline orchestration with session management
+- Configuration files (taxonomy, entity types, mappings)
+- Evaluation dataset (40+ test cases)
+
+### Critical Gaps to Fix
+
+1. **Wire Execution** (Phase 3.1)
+   - `pipeline.rs` execution is stubbed
+   - Need to connect to actual `DslExecutor`
+   - Add async support and transactions
+
+2. **Complete Parameter Mappings** (Phase 3.2)
+   - ~15 verbs in taxonomy have no mappings
+   - Add to `config/agent/parameter_mappings.yaml`
+   - Add missing entity types
+
+3. **LLM Fallback** (Phase 3.3)
+   - Currently 100% pattern matching
+   - Need semantic fallback when patterns fail
+
+4. **Evaluation Harness** (Phase 3.4)
+   - Dataset exists but no runner
+   - Build CLI to measure accuracy
+
+### Key Files
+
+```
+rust/src/agentic/
+├── pipeline.rs           # Main orchestration (needs execution wiring)
+├── intent_classifier.rs  # Pattern-based classification
+├── entity_extractor.rs   # Entity extraction with expansion
+├── dsl_generator.rs      # Intent+entities → DSL
+├── taxonomy.rs           # Loads intent_taxonomy.yaml
+├── market_regions.rs     # Region expansion config
+├── instrument_hierarchy.rs # Instrument category expansion
+
+rust/config/agent/
+├── intent_taxonomy.yaml      # All intents and trigger phrases
+├── entity_types.yaml         # Entity patterns and normalization
+├── parameter_mappings.yaml   # Intent → DSL parameter mapping (INCOMPLETE)
+├── market_regions.yaml       # European → [XLON, XETR, ...]
+├── instrument_hierarchy.yaml # Fixed Income → [GOVT_BOND, CORP_BOND]
+├── evaluation_dataset.yaml   # Golden test cases
+```
+
+### Success Criteria
+- All 25+ intents can generate valid DSL
+- Generated DSL executes against database
+- Evaluation passes at 85%+ accuracy
+- Demo: "Add BlackRock for European equities via CTM" → DSL → Execution → Confirmation
+
+### Execution Order
+1. Week 1: Wire execution + complete parameter mappings
+2. Week 2: Evaluation harness + gap fixing
+3. Week 3: LLM fallback + query implementation
+4. Week 4: Polish and documentation
+

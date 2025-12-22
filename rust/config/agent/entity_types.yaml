@@ -1,0 +1,746 @@
+# Domain-specific entity types for trading matrix agent
+# Phase 3.2: Agent Intelligence - Entity Extraction
+#
+# This file defines all entity types that the agent can extract from
+# natural language input. Each type includes patterns for recognition,
+# normalization rules, and validation constraints.
+
+version: "1.0"
+description: "Trading matrix domain entity types"
+
+# ==========================================================================
+# ENTITY TYPE DEFINITIONS
+# ==========================================================================
+entity_types:
+
+  # ------------------------------------------------------------------------
+  # Investment Manager References
+  # ------------------------------------------------------------------------
+  manager_reference:
+    description: "Reference to an investment manager"
+    category: "financial_entity"
+    patterns:
+      - type: NAME
+        description: "Manager name as free text"
+        examples:
+          - "BlackRock"
+          - "PIMCO"
+          - "Vanguard"
+          - "State Street"
+          - "Fidelity"
+          - "Goldman Sachs Asset Management"
+          - "JP Morgan Asset Management"
+        fuzzy_match: true
+        min_similarity: 0.8
+
+      - type: LEI
+        description: "Legal Entity Identifier"
+        regex: "[A-Z0-9]{20}"
+        examples:
+          - "549300HTOVZ6GXGJNQ89"
+          - "S6XOOCT0IEG5ABCC6L87"
+        validation: lei_checksum
+
+      - type: ANAPHORA
+        description: "Anaphoric reference to previously mentioned manager"
+        examples:
+          - "the first IM"
+          - "that manager"
+          - "them"
+          - "the same IM"
+          - "BlackRock's"  # Possessive
+        requires_context: true
+
+      - type: SYMBOL
+        description: "DSL symbol reference"
+        regex: "@[a-z][a-z0-9-]*"
+        examples:
+          - "@im-blackrock"
+          - "@im-pimco"
+          - "@im-1"
+
+    normalization:
+      lookup_table: investment_managers
+      fuzzy_match: true
+      fuzzy_threshold: 0.75
+      case_insensitive: true
+
+    validation:
+      # Must resolve to known IM or be flagged for creation
+      resolution_required: true
+      allow_create: true
+
+  # ------------------------------------------------------------------------
+  # Market References
+  # ------------------------------------------------------------------------
+  market_reference:
+    description: "Reference to a trading market/exchange"
+    category: "reference_data"
+    patterns:
+      - type: MIC
+        description: "ISO 10383 Market Identifier Code"
+        regex: "X[A-Z]{3}"
+        examples:
+          - "XNYS"
+          - "XLON"
+          - "XETR"
+          - "XPAR"
+          - "XHKG"
+          - "XTKS"
+
+      - type: NAME
+        description: "Exchange name"
+        mappings:
+          "NYSE": "XNYS"
+          "New York Stock Exchange": "XNYS"
+          "NASDAQ": "XNAS"
+          "London": "XLON"
+          "LSE": "XLON"
+          "London Stock Exchange": "XLON"
+          "Frankfurt": "XETR"
+          "XETRA": "XETR"
+          "Deutsche Börse": "XETR"
+          "Paris": "XPAR"
+          "Euronext Paris": "XPAR"
+          "Amsterdam": "XAMS"
+          "Euronext Amsterdam": "XAMS"
+          "Hong Kong": "XHKG"
+          "HKEX": "XHKG"
+          "Tokyo": "XTKS"
+          "TSE": "XTKS"
+          "Singapore": "XSES"
+          "SGX": "XSES"
+          "Sydney": "XASX"
+          "ASX": "XASX"
+          "Toronto": "XTSE"
+          "TSX": "XTSE"
+          "Zurich": "XSWX"
+          "SIX": "XSWX"
+          "Milan": "XMIL"
+          "Borsa Italiana": "XMIL"
+
+      - type: REGION
+        description: "Geographic region (expands to market list)"
+        examples:
+          - "European"
+          - "Asian"
+          - "US"
+          - "APAC"
+          - "EMEA"
+        expands_to: market_list
+        expansion_config: market_regions.yaml
+
+    normalization:
+      lookup_table: markets
+      primary_key: mic
+
+    validation:
+      must_exist: true
+      lookup_table: custody.markets
+
+  # ------------------------------------------------------------------------
+  # Instrument Class References
+  # ------------------------------------------------------------------------
+  instrument_class_reference:
+    description: "Reference to an instrument class"
+    category: "reference_data"
+    patterns:
+      - type: CODE
+        description: "Instrument class code"
+        examples:
+          - "EQUITY"
+          - "GOVT_BOND"
+          - "CORP_BOND"
+          - "ETF"
+          - "IRS"
+          - "CDS"
+          - "FX_FORWARD"
+
+      - type: NAME
+        description: "Instrument class name"
+        mappings:
+          "equities": "EQUITY"
+          "equity": "EQUITY"
+          "stocks": "EQUITY"
+          "shares": "EQUITY"
+          "government bonds": "GOVT_BOND"
+          "govvies": "GOVT_BOND"
+          "sovereigns": "GOVT_BOND"
+          "treasuries": "GOVT_BOND"
+          "gilts": "GILT"
+          "corporate bonds": "CORP_BOND"
+          "corporates": "CORP_BOND"
+          "credit": "CORP_BOND"
+          "ETFs": "ETF"
+          "exchange traded funds": "ETF"
+          "swaps": "IRS"
+          "interest rate swaps": "IRS"
+          "rates": "IRS"
+          "credit derivatives": "CDS"
+          "CDS": "CDS"
+          "FX forwards": "FX_FORWARD"
+          "currency forwards": "FX_FORWARD"
+
+      - type: CATEGORY
+        description: "Instrument category (expands to class list)"
+        examples:
+          - "fixed income"
+          - "derivatives"
+          - "alternatives"
+          - "listed securities"
+        expands_to: instrument_list
+        expansion_config: instrument_hierarchy.yaml
+
+    normalization:
+      lookup_table: instrument_classes
+      primary_key: class_code
+      hierarchy_aware: true
+
+    validation:
+      must_exist: true
+      lookup_table: custody.instrument_classes
+
+  # ------------------------------------------------------------------------
+  # Instruction Method
+  # ------------------------------------------------------------------------
+  instruction_method:
+    description: "How trade instructions are delivered to custodian"
+    category: "reference_data"
+    patterns:
+      - type: CODE
+        valid_values:
+          - SWIFT
+          - CTM
+          - FIX
+          - API
+          - ALERT
+          - MANUAL
+
+      - type: NAME
+        mappings:
+          "message": "SWIFT"
+          "SWIFT message": "SWIFT"
+          "MT": "SWIFT"
+          "matching": "CTM"
+          "Omgeo": "CTM"
+          "electronic": "FIX"
+          "FIX protocol": "FIX"
+          "programmatic": "API"
+          "REST": "API"
+          "Bloomberg": "ALERT"
+          "ALERT": "ALERT"
+          "manual": "MANUAL"
+          "phone": "MANUAL"
+          "fax": "MANUAL"
+          "email": "MANUAL"
+
+    normalization:
+      uppercase: true
+
+    validation:
+      must_be_one_of:
+        - SWIFT
+        - CTM
+        - FIX
+        - API
+        - ALERT
+        - MANUAL
+
+  # ------------------------------------------------------------------------
+  # Pricing Source
+  # ------------------------------------------------------------------------
+  pricing_source:
+    description: "Source of pricing data"
+    category: "reference_data"
+    patterns:
+      - type: CODE
+        valid_values:
+          - BLOOMBERG
+          - REFINITIV
+          - MARKIT
+          - ICE
+          - INTERNAL
+          - EXCHANGE
+
+      - type: NAME
+        mappings:
+          "Bloomberg": "BLOOMBERG"
+          "BBG": "BLOOMBERG"
+          "BLP": "BLOOMBERG"
+          "Reuters": "REFINITIV"
+          "Refinitiv": "REFINITIV"
+          "LSEG": "REFINITIV"
+          "Markit": "MARKIT"
+          "IHS Markit": "MARKIT"
+          "ICE": "ICE"
+          "Intercontinental Exchange": "ICE"
+          "in-house": "INTERNAL"
+          "internal": "INTERNAL"
+          "our prices": "INTERNAL"
+          "exchange": "EXCHANGE"
+          "direct feed": "EXCHANGE"
+
+    normalization:
+      uppercase: true
+
+  # ------------------------------------------------------------------------
+  # Currency
+  # ------------------------------------------------------------------------
+  currency:
+    description: "Currency code"
+    category: "reference_data"
+    patterns:
+      - type: ISO_CODE
+        description: "ISO 4217 currency code"
+        regex: "[A-Z]{3}"
+        examples:
+          - "USD"
+          - "EUR"
+          - "GBP"
+          - "JPY"
+          - "CHF"
+
+      - type: NAME
+        mappings:
+          "dollars": "USD"
+          "US dollars": "USD"
+          "bucks": "USD"
+          "euros": "EUR"
+          "euro": "EUR"
+          "pounds": "GBP"
+          "sterling": "GBP"
+          "British pounds": "GBP"
+          "yen": "JPY"
+          "Japanese yen": "JPY"
+          "Swiss francs": "CHF"
+          "francs": "CHF"
+          "Hong Kong dollars": "HKD"
+          "Canadian dollars": "CAD"
+          "Australian dollars": "AUD"
+          "Singapore dollars": "SGD"
+
+      - type: SYMBOL
+        mappings:
+          "$": "USD"
+          "€": "EUR"
+          "£": "GBP"
+          "¥": "JPY"
+          "₣": "CHF"
+
+    normalization:
+      uppercase: true
+      lookup_table: currencies
+
+    validation:
+      must_exist: true
+      lookup_table: custody.currencies
+
+  # ------------------------------------------------------------------------
+  # Monetary Amount
+  # ------------------------------------------------------------------------
+  amount:
+    description: "Monetary amount"
+    category: "numeric"
+    patterns:
+      - type: NUMBER
+        regex: "\\d{1,3}(?:,\\d{3})*(?:\\.\\d+)?"
+        examples:
+          - "100000"
+          - "1,000,000"
+          - "500000.00"
+
+      - type: WITH_UNIT
+        regex: "(\\d{1,3}(?:,\\d{3})*(?:\\.\\d+)?)\\s*(k|m|mm|bn|K|M|B|billion|million|thousand)?"
+        examples:
+          - "500k"
+          - "1m"
+          - "1.5mm"
+          - "2bn"
+          - "100 thousand"
+          - "5 million"
+        normalization:
+          k: 1000
+          K: 1000
+          thousand: 1000
+          m: 1000000
+          M: 1000000
+          mm: 1000000
+          million: 1000000
+          bn: 1000000000
+          B: 1000000000
+          billion: 1000000000
+
+    normalization:
+      type: decimal
+      remove_commas: true
+
+    validation:
+      min: 0
+      max: 1000000000000  # 1 trillion
+
+  # ------------------------------------------------------------------------
+  # Percentage
+  # ------------------------------------------------------------------------
+  percentage:
+    description: "Percentage value"
+    category: "numeric"
+    patterns:
+      - type: WITH_SYMBOL
+        regex: "(\\d+(?:\\.\\d+)?)\\s*%"
+        examples:
+          - "99.5%"
+          - "95%"
+          - "99.99%"
+
+      - type: NUMBER
+        regex: "\\d+(?:\\.\\d+)?"
+        context_required: true  # Need context to know it's a percentage
+        examples:
+          - "99.5"
+          - "95"
+
+    normalization:
+      type: decimal
+      divide_by_100: false  # Keep as percentage value
+
+    validation:
+      min: 0
+      max: 100
+
+  # ------------------------------------------------------------------------
+  # Time Reference
+  # ------------------------------------------------------------------------
+  time_reference:
+    description: "Time of day reference"
+    category: "temporal"
+    patterns:
+      - type: TIME_24H
+        regex: "([01]?\\d|2[0-3]):([0-5]\\d)"
+        examples:
+          - "16:00"
+          - "17:30"
+          - "09:00"
+
+      - type: TIME_12H
+        regex: "(\\d{1,2}):?(\\d{2})?\\s*(am|pm|AM|PM)"
+        examples:
+          - "4:00 PM"
+          - "5pm"
+          - "9:30 AM"
+
+      - type: NAME
+        mappings:
+          "close": "16:00"
+          "market close": null  # Needs market context
+          "end of day": "17:00"
+          "EOD": "17:00"
+          "COB": "17:00"
+          "close of business": "17:00"
+          "opening": "09:00"
+          "market open": null  # Needs market context
+
+    normalization:
+      format: "HH:MM"
+      timezone_context: true
+
+  # ------------------------------------------------------------------------
+  # Priority
+  # ------------------------------------------------------------------------
+  priority:
+    description: "Priority/precedence value"
+    category: "numeric"
+    patterns:
+      - type: NUMBER
+        regex: "\\d+"
+        examples:
+          - "1"
+          - "10"
+          - "100"
+
+      - type: ORDINAL
+        mappings:
+          "first": 1
+          "primary": 1
+          "main": 1
+          "default": 100
+          "secondary": 2
+          "second": 2
+          "backup": 2
+          "fallback": 2
+          "tertiary": 3
+          "third": 3
+
+      - type: RELATIVE
+        mappings:
+          "highest": 1
+          "high": 10
+          "normal": 50
+          "low": 90
+          "lowest": 100
+
+    normalization:
+      type: integer
+
+    validation:
+      min: 1
+      max: 1000
+
+  # ------------------------------------------------------------------------
+  # Scope Expression (Composite)
+  # ------------------------------------------------------------------------
+  scope_expression:
+    description: "Defines a trading scope (markets + instruments)"
+    category: "composite"
+    components:
+      markets:
+        type: list
+        element_type: market_reference
+        optional: true
+      instruments:
+        type: list
+        element_type: instrument_class_reference
+        optional: true
+      currencies:
+        type: list
+        element_type: currency
+        optional: true
+      exclude:
+        type: list
+        description: "Exclusions from scope"
+        optional: true
+
+    examples:
+      - text: "European equities"
+        parsed:
+          markets: ["XLON", "XETR", "XPAR", "XAMS"]
+          instruments: ["EQUITY"]
+
+      - text: "US and Canadian bonds"
+        parsed:
+          markets: ["XNYS", "XNAS", "XTSE"]
+          instruments: ["GOVT_BOND", "CORP_BOND"]
+
+      - text: "global fixed income except munis"
+        parsed:
+          markets: "_ALL"
+          instruments: ["GOVT_BOND", "CORP_BOND", "HIGH_YIELD"]
+          exclude: ["MUNI_BOND"]
+
+      - text: "everything"
+        parsed:
+          markets: "_ALL_IN_UNIVERSE"
+          instruments: "_ALL_IN_UNIVERSE"
+
+  # ------------------------------------------------------------------------
+  # CBU Reference
+  # ------------------------------------------------------------------------
+  cbu_reference:
+    description: "Reference to a Client Business Unit"
+    category: "entity"
+    patterns:
+      - type: NAME
+        description: "CBU name"
+        examples:
+          - "Pacific Growth Fund"
+          - "Apex Capital"
+          - "Wellington Retirement Fund"
+        fuzzy_match: true
+
+      - type: UUID
+        regex: "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+
+      - type: SYMBOL
+        regex: "@[a-z][a-z0-9-]*"
+        examples:
+          - "@cbu"
+          - "@fund"
+          - "@current-cbu"
+
+      - type: ANAPHORA
+        examples:
+          - "the fund"
+          - "this client"
+          - "the CBU"
+          - "them"
+        requires_context: true
+
+    normalization:
+      lookup_table: cbus
+      primary_key: cbu_id
+
+    context_defaults:
+      - "_CURRENT_CBU"  # Use session's current CBU if not specified
+
+  # ------------------------------------------------------------------------
+  # SSI Reference
+  # ------------------------------------------------------------------------
+  ssi_reference:
+    description: "Reference to a Standing Settlement Instruction"
+    category: "entity"
+    patterns:
+      - type: NAME
+        description: "SSI name"
+        examples:
+          - "US Equity SSI"
+          - "EUR Cash Account"
+          - "GBP Custody"
+
+      - type: SYMBOL
+        regex: "@[a-z][a-z0-9-]*"
+        examples:
+          - "@ssi-us-equity"
+          - "@ssi-eur-cash"
+
+      - type: UUID
+        regex: "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+
+    normalization:
+      lookup_table: cbu_ssi
+      primary_key: ssi_id
+      scope: current_cbu  # SSIs are scoped to CBU
+
+  # ------------------------------------------------------------------------
+  # SLA Metric Type
+  # ------------------------------------------------------------------------
+  sla_metric_type:
+    description: "Type of SLA metric"
+    category: "reference_data"
+    patterns:
+      - type: CODE
+        valid_values:
+          - SETTLEMENT_RATE
+          - FAIL_RATE
+          - INSTRUCTION_TIMELINESS
+          - RECONCILIATION_TIMELINESS
+          - CORPORATE_ACTION_TIMELINESS
+          - REPORTING_SLA
+
+      - type: NAME
+        mappings:
+          "settlement rate": "SETTLEMENT_RATE"
+          "settlement": "SETTLEMENT_RATE"
+          "settle rate": "SETTLEMENT_RATE"
+          "fail rate": "FAIL_RATE"
+          "failure rate": "FAIL_RATE"
+          "fails": "FAIL_RATE"
+          "instruction timeliness": "INSTRUCTION_TIMELINESS"
+          "trade instructions": "INSTRUCTION_TIMELINESS"
+          "instruction SLA": "INSTRUCTION_TIMELINESS"
+          "reconciliation": "RECONCILIATION_TIMELINESS"
+          "recon": "RECONCILIATION_TIMELINESS"
+          "corporate actions": "CORPORATE_ACTION_TIMELINESS"
+          "corp actions": "CORPORATE_ACTION_TIMELINESS"
+          "CA timeliness": "CORPORATE_ACTION_TIMELINESS"
+          "reporting": "REPORTING_SLA"
+
+  # ------------------------------------------------------------------------
+  # Vehicle Type (for cash sweeps)
+  # ------------------------------------------------------------------------
+  vehicle_type:
+    description: "Investment vehicle for cash sweeps"
+    category: "reference_data"
+    patterns:
+      - type: CODE
+        valid_values:
+          - STIF
+          - MMF
+          - REPO
+          - DEPOSIT
+
+      - type: NAME
+        mappings:
+          "STIF": "STIF"
+          "short-term investment fund": "STIF"
+          "money market": "MMF"
+          "money market fund": "MMF"
+          "MMF": "MMF"
+          "repo": "REPO"
+          "repurchase": "REPO"
+          "overnight repo": "REPO"
+          "deposit": "DEPOSIT"
+          "bank deposit": "DEPOSIT"
+          "TD": "DEPOSIT"
+          "term deposit": "DEPOSIT"
+
+  # ------------------------------------------------------------------------
+  # Settlement Type
+  # ------------------------------------------------------------------------
+  settlement_type:
+    description: "Settlement method"
+    category: "reference_data"
+    patterns:
+      - type: CODE
+        valid_values:
+          - DVP
+          - FOP
+          - RVP
+          - DAP
+
+      - type: NAME
+        mappings:
+          "delivery versus payment": "DVP"
+          "DVP": "DVP"
+          "free of payment": "FOP"
+          "FOP": "FOP"
+          "receive versus payment": "RVP"
+          "RVP": "RVP"
+          "delivery against payment": "DAP"
+          "DAP": "DAP"
+
+  # ------------------------------------------------------------------------
+  # BIC (Bank Identifier Code)
+  # ------------------------------------------------------------------------
+  bic:
+    description: "SWIFT/BIC code"
+    category: "reference_data"
+    patterns:
+      - type: BIC8
+        regex: "[A-Z]{6}[A-Z0-9]{2}"
+        examples:
+          - "CITIUS33"
+          - "BABOROCP"
+
+      - type: BIC11
+        regex: "[A-Z]{6}[A-Z0-9]{2}[A-Z0-9]{3}"
+        examples:
+          - "CITIUS33XXX"
+
+    normalization:
+      uppercase: true
+      pad_to_11: true  # Add XXX if 8-char
+
+# ==========================================================================
+# EXTRACTION CONFIGURATION
+# ==========================================================================
+extraction_config:
+  # Order matters - earlier types take precedence for overlapping matches
+  extraction_order:
+    - currency  # Extract short patterns first
+    - percentage
+    - amount
+    - bic
+    - market_reference
+    - instrument_class_reference
+    - instruction_method
+    - pricing_source
+    - manager_reference
+    - cbu_reference
+    - ssi_reference
+    - scope_expression
+
+  # Patterns that should be extracted even without context
+  context_free:
+    - currency
+    - bic
+    - market_reference  # MIC codes
+    - percentage
+
+  # Patterns that need conversation context
+  context_required:
+    - anaphora  # "them", "that manager"
+    - relative_references  # "the first IM"
+
+  # Expansion configuration
+  expansions:
+    market_regions: market_regions.yaml
+    instrument_hierarchy: instrument_hierarchy.yaml

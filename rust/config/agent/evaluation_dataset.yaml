@@ -1,0 +1,465 @@
+# Evaluation Dataset for Agent Intelligence Testing
+# This file contains golden test cases for evaluating the agent pipeline
+#
+# Categories:
+#   - investment_manager: IM assignment tests
+#   - pricing: Pricing configuration tests
+#   - cash_sweep: Cash sweep configuration tests
+#   - sla: SLA commitment tests
+#   - compound: Multi-intent tests
+#   - context: Context-dependent tests
+#   - edge_case: Edge cases and error handling
+
+version: "1.0"
+description: "Golden dataset for Phase 3 agent evaluation"
+
+evaluation_cases:
+  # ==================== Investment Manager Tests ====================
+
+  - id: im_simple_1
+    category: investment_manager
+    difficulty: easy
+    input: "Add BlackRock as our investment manager"
+    expected_intents:
+      - im_assign
+    expected_entities:
+      manager_reference: "BlackRock"
+    expected_dsl_contains:
+      - "investment-manager.assign"
+      - "BlackRock"
+    expected_dsl_not_contains: []
+    notes: "Basic IM assignment without scope"
+
+  - id: im_simple_2
+    category: investment_manager
+    difficulty: easy
+    input: "Use Vanguard for equities"
+    expected_intents:
+      - im_assign
+    expected_entities:
+      manager_reference: "Vanguard"
+      instrument_class_reference: "EQUITY"
+    expected_dsl_contains:
+      - "investment-manager.assign"
+      - "Vanguard"
+      - "EQUITY"
+
+  - id: im_with_region
+    category: investment_manager
+    difficulty: medium
+    input: "Add BlackRock for European equities"
+    expected_intents:
+      - im_assign
+    expected_entities:
+      manager_reference: "BlackRock"
+      market_reference: "European"
+      instrument_class_reference: "EQUITY"
+    expected_dsl_contains:
+      - "investment-manager.assign"
+      - "BlackRock"
+    expected_expansion:
+      market_reference:
+        from: "European"
+        to: ["XLON", "XETR", "XPAR", "XAMS"]
+
+  - id: im_with_method
+    category: investment_manager
+    difficulty: medium
+    input: "BlackRock will handle US equities via CTM"
+    expected_intents:
+      - im_assign
+    expected_entities:
+      manager_reference: "BlackRock"
+      market_reference: "US"
+      instrument_class_reference: "EQUITY"
+      instruction_method: "CTM"
+    expected_dsl_contains:
+      - "investment-manager.assign"
+      - "BlackRock"
+      - "CTM"
+
+  - id: im_multiple_markets
+    category: investment_manager
+    difficulty: medium
+    input: "PIMCO manages bonds in US and Europe"
+    expected_intents:
+      - im_assign
+    expected_entities:
+      manager_reference: "PIMCO"
+      market_reference: ["US", "European"]
+      instrument_class_reference: "FIXED_INCOME"
+    expected_dsl_contains:
+      - "investment-manager.assign"
+      - "PIMCO"
+
+  - id: im_full_spec
+    category: investment_manager
+    difficulty: hard
+    input: "Add Fidelity as investment manager for Asian equities and fixed income, using FIX protocol, priority 50"
+    expected_intents:
+      - im_assign
+    expected_entities:
+      manager_reference: "Fidelity"
+      market_reference: "Asian"
+      instrument_class_reference: ["EQUITY", "FIXED_INCOME"]
+      instruction_method: "FIX"
+    expected_dsl_contains:
+      - "investment-manager.assign"
+      - "Fidelity"
+      - "FIX"
+      - "50"
+
+  # ==================== Pricing Configuration Tests ====================
+
+  - id: pricing_simple_1
+    category: pricing
+    difficulty: easy
+    input: "Use Bloomberg for pricing"
+    expected_intents:
+      - pricing_set
+    expected_entities:
+      pricing_source: "BLOOMBERG"
+    expected_dsl_contains:
+      - "pricing-config.set"
+      - "BLOOMBERG"
+
+  - id: pricing_with_scope
+    category: pricing
+    difficulty: medium
+    input: "Get equity prices from Bloomberg"
+    expected_intents:
+      - pricing_set
+    expected_entities:
+      pricing_source: "BLOOMBERG"
+      instrument_class_reference: "EQUITY"
+    expected_dsl_contains:
+      - "pricing-config.set"
+      - "BLOOMBERG"
+      - "EQUITY"
+
+  - id: pricing_refinitiv
+    category: pricing
+    difficulty: easy
+    input: "Use Refinitiv for bond pricing"
+    expected_intents:
+      - pricing_set
+    expected_entities:
+      pricing_source: "REFINITIV"
+      instrument_class_reference: "FIXED_INCOME"
+    expected_dsl_contains:
+      - "pricing-config.set"
+      - "REFINITIV"
+
+  - id: pricing_all_instruments
+    category: pricing
+    difficulty: medium
+    input: "Bloomberg for all pricing across the board"
+    expected_intents:
+      - pricing_set
+    expected_entities:
+      pricing_source: "BLOOMBERG"
+    expected_expansion:
+      instrument_class_reference:
+        all: true
+    notes: "Should expand to all configured instrument classes"
+
+  # ==================== Cash Sweep Tests ====================
+
+  - id: sweep_simple_1
+    category: cash_sweep
+    difficulty: easy
+    input: "Sweep EUR to STIF"
+    expected_intents:
+      - sweep_configure
+    expected_entities:
+      currency: "EUR"
+      sweep_vehicle: "STIF"
+    expected_dsl_contains:
+      - "cash-sweep.configure"
+      - "EUR"
+      - "STIF"
+
+  - id: sweep_multiple
+    category: cash_sweep
+    difficulty: medium
+    input: "Sweep EUR and USD to money market"
+    expected_intents:
+      - sweep_configure
+    expected_entities:
+      currency: ["EUR", "USD"]
+      sweep_vehicle: "MONEY_MARKET"
+    expected_dsl_contains:
+      - "cash-sweep.configure"
+
+  - id: sweep_with_threshold
+    category: cash_sweep
+    difficulty: hard
+    input: "Sweep USD above 100000 to overnight repo"
+    expected_intents:
+      - sweep_configure
+    expected_entities:
+      currency: "USD"
+      sweep_vehicle: "OVERNIGHT_REPO"
+      threshold: 100000
+    expected_dsl_contains:
+      - "cash-sweep.configure"
+      - "USD"
+      - "100000"
+
+  # ==================== SLA Tests ====================
+
+  - id: sla_simple_1
+    category: sla
+    difficulty: easy
+    input: "Commit to T+1 settlement"
+    expected_intents:
+      - sla_commit
+    expected_entities:
+      settlement_cycle: "T+1"
+    expected_dsl_contains:
+      - "sla.commit"
+      - "T+1"
+
+  - id: sla_with_scope
+    category: sla
+    difficulty: medium
+    input: "T+2 settlement for European equities"
+    expected_intents:
+      - sla_commit
+    expected_entities:
+      settlement_cycle: "T+2"
+      market_reference: "European"
+      instrument_class_reference: "EQUITY"
+    expected_dsl_contains:
+      - "sla.commit"
+      - "T+2"
+
+  # ==================== Compound Intent Tests ====================
+
+  - id: compound_im_pricing
+    category: compound
+    difficulty: medium
+    input: "BlackRock handles equities and use Bloomberg for pricing"
+    expected_intents:
+      - im_assign
+      - pricing_set
+    expected_entities:
+      manager_reference: "BlackRock"
+      instrument_class_reference: "EQUITY"
+      pricing_source: "BLOOMBERG"
+    expected_dsl_contains:
+      - "investment-manager.assign"
+      - "pricing-config.set"
+      - "BlackRock"
+      - "BLOOMBERG"
+
+  - id: compound_two_ims
+    category: compound
+    difficulty: medium
+    input: "BlackRock for equities, PIMCO for bonds"
+    expected_intents:
+      - im_assign
+      - im_assign
+    expected_dsl_statements: 2
+    expected_dsl_contains:
+      - "investment-manager.assign"
+      - "BlackRock"
+      - "PIMCO"
+
+  - id: compound_three_ims
+    category: compound
+    difficulty: hard
+    input: "BlackRock handles European equities via CTM, PIMCO does fixed income through SWIFT, and Vanguard covers US markets using FIX"
+    expected_intents:
+      - im_assign
+      - im_assign
+      - im_assign
+    expected_dsl_statements: 3
+    expected_dsl_contains:
+      - "BlackRock"
+      - "PIMCO"
+      - "Vanguard"
+      - "CTM"
+      - "SWIFT"
+      - "FIX"
+
+  - id: compound_full_setup
+    category: compound
+    difficulty: hard
+    input: |
+      Set up our Luxembourg fund with:
+      BlackRock for European equities via CTM,
+      PIMCO for fixed income via SWIFT,
+      Bloomberg for all pricing,
+      and sweep EUR to STIF
+    expected_intents:
+      - im_assign
+      - im_assign
+      - pricing_set
+      - sweep_configure
+    expected_dsl_statements: 4
+    expected_dsl_contains:
+      - "investment-manager.assign"
+      - "pricing-config.set"
+      - "cash-sweep.configure"
+      - "BlackRock"
+      - "PIMCO"
+      - "BLOOMBERG"
+      - "EUR"
+      - "STIF"
+
+  # ==================== Context-Dependent Tests ====================
+
+  - id: context_coreference_1
+    category: context
+    difficulty: medium
+    input: "Now connect them via CTM"
+    context:
+      last_intent: "im_assign"
+      session_entities:
+        manager_reference: "BlackRock"
+    expected_intents:
+      - im_assign
+    expected_entities:
+      manager_reference: "BlackRock"
+      instruction_method: "CTM"
+    notes: "'them' should resolve to BlackRock from context"
+
+  - id: context_followup_1
+    category: context
+    difficulty: medium
+    input: "also add Vanguard"
+    context:
+      last_intent: "im_assign"
+    expected_intents:
+      - im_assign
+    expected_entities:
+      manager_reference: "Vanguard"
+    notes: "Followup should inherit intent from previous turn"
+
+  - id: context_implicit_cbu
+    category: context
+    difficulty: easy
+    input: "Add BlackRock as IM"
+    context:
+      cbu_id: "test-cbu-123"
+    expected_dsl_contains:
+      - "investment-manager.assign"
+      - "test-cbu-123"
+    notes: "CBU should be injected from context"
+
+  # ==================== Edge Cases ====================
+
+  - id: edge_empty_input
+    category: edge_case
+    difficulty: easy
+    input: ""
+    expected_intents: []
+    expected_response_type: clarification
+    notes: "Empty input should trigger clarification"
+
+  - id: edge_ambiguous
+    category: edge_case
+    difficulty: easy
+    input: "set it up"
+    expected_response_type: clarification
+    notes: "Ambiguous input should trigger clarification"
+
+  - id: edge_unknown_manager
+    category: edge_case
+    difficulty: medium
+    input: "Add XYZ Corp as investment manager"
+    expected_intents:
+      - im_assign
+    expected_entities:
+      manager_reference: null
+    notes: "Unknown manager should not be extracted"
+
+  - id: edge_invalid_market
+    category: edge_case
+    difficulty: medium
+    input: "Trade on INVALID_MIC"
+    expected_entities:
+      market_reference: null
+    notes: "Invalid MIC should not be extracted"
+
+  - id: edge_mixed_valid_invalid
+    category: edge_case
+    difficulty: hard
+    input: "BlackRock handles XLON and INVALID_MIC"
+    expected_entities:
+      manager_reference: "BlackRock"
+      market_reference: "XLON"
+    notes: "Should extract valid entities and ignore invalid"
+
+  - id: edge_case_sensitivity
+    category: edge_case
+    difficulty: easy
+    input: "add BLACKROCK as im"
+    expected_entities:
+      manager_reference: "BlackRock"
+    notes: "Case should be normalized"
+
+  - id: edge_partial_phrase
+    category: edge_case
+    difficulty: medium
+    input: "blackrock equities ctm"
+    expected_intents:
+      - im_assign
+    expected_entities:
+      manager_reference: "BlackRock"
+      instrument_class_reference: "EQUITY"
+      instruction_method: "CTM"
+    notes: "Should handle telegram-style input"
+
+# Metrics configuration for evaluation
+metrics:
+  intent_classification:
+    accuracy_threshold: 0.85
+    precision_threshold: 0.80
+    recall_threshold: 0.80
+
+  entity_extraction:
+    accuracy_threshold: 0.90
+    precision_threshold: 0.85
+    recall_threshold: 0.85
+
+  dsl_generation:
+    validity_threshold: 0.95
+    completeness_threshold: 0.90
+
+# Test categories for selective running
+categories:
+  quick_smoke:
+    - im_simple_1
+    - pricing_simple_1
+    - sweep_simple_1
+    - sla_simple_1
+
+  intent_classification:
+    - im_simple_1
+    - im_simple_2
+    - pricing_simple_1
+    - pricing_with_scope
+
+  entity_extraction:
+    - im_with_region
+    - im_with_method
+    - im_multiple_markets
+
+  compound_intents:
+    - compound_im_pricing
+    - compound_two_ims
+    - compound_three_ims
+    - compound_full_setup
+
+  context_handling:
+    - context_coreference_1
+    - context_followup_1
+    - context_implicit_cbu
+
+  edge_cases:
+    - edge_empty_input
+    - edge_ambiguous
+    - edge_unknown_manager
+    - edge_invalid_market

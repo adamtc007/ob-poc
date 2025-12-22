@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict IkFbxlxy6aJi8swHbfngTZL3v25iidSbEs0TtNCFvOgZUckfGJneXWOhagxXl7S
+\restrict iDaxl4bOyGZyX8cDlATU8eanEaHvhGDOrOZj4jK6b7xpBcHD1sofTvWVR30dROu
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -176,6 +176,20 @@ $$;
 --
 
 COMMENT ON FUNCTION custody.find_ssi_for_trade(p_cbu_id uuid, p_instrument_class_id uuid, p_security_type_id uuid, p_market_id uuid, p_currency character varying, p_settlement_type character varying, p_counterparty_entity_id uuid) IS 'ALERT-style SSI lookup. Returns the first matching SSI based on booking rule priority.';
+
+
+--
+-- Name: sync_counterparty_key(); Type: FUNCTION; Schema: custody; Owner: -
+--
+
+CREATE FUNCTION custody.sync_counterparty_key() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  NEW.counterparty_key := COALESCE(NEW.counterparty_entity_id, '00000000-0000-0000-0000-000000000000'::uuid);
+  RETURN NEW;
+END;
+$$;
 
 
 --
@@ -1805,6 +1819,84 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: cbu_cash_sweep_config; Type: TABLE; Schema: custody; Owner: -
+--
+
+CREATE TABLE custody.cbu_cash_sweep_config (
+    sweep_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cbu_id uuid NOT NULL,
+    profile_id uuid,
+    currency character varying(3) NOT NULL,
+    threshold_amount numeric(18,2) NOT NULL,
+    vehicle_type character varying(20) NOT NULL,
+    vehicle_id character varying(50),
+    vehicle_name character varying(255),
+    sweep_time time without time zone NOT NULL,
+    sweep_timezone character varying(50) NOT NULL,
+    sweep_frequency character varying(20) DEFAULT 'DAILY'::character varying,
+    interest_allocation character varying(20) DEFAULT 'ACCRUED'::character varying,
+    interest_account_id uuid,
+    sweep_resource_id uuid,
+    is_active boolean DEFAULT true,
+    effective_date date DEFAULT CURRENT_DATE NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT valid_interest_allocation CHECK (((interest_allocation)::text = ANY ((ARRAY['ACCRUED'::character varying, 'MONTHLY'::character varying, 'QUARTERLY'::character varying, 'REINVEST'::character varying])::text[]))),
+    CONSTRAINT valid_sweep_frequency CHECK (((sweep_frequency)::text = ANY ((ARRAY['INTRADAY'::character varying, 'DAILY'::character varying, 'WEEKLY'::character varying, 'MONTHLY'::character varying])::text[]))),
+    CONSTRAINT valid_vehicle_type CHECK (((vehicle_type)::text = ANY ((ARRAY['STIF'::character varying, 'MMF'::character varying, 'DEPOSIT'::character varying, 'OVERNIGHT_REPO'::character varying, 'TRI_PARTY_REPO'::character varying, 'MANUAL'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE cbu_cash_sweep_config; Type: COMMENT; Schema: custody; Owner: -
+--
+
+COMMENT ON TABLE custody.cbu_cash_sweep_config IS 'Cash sweep configuration for idle cash management. STIFs, MMFs, overnight deposits.';
+
+
+--
+-- Name: cbu_im_assignments; Type: TABLE; Schema: custody; Owner: -
+--
+
+CREATE TABLE custody.cbu_im_assignments (
+    assignment_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cbu_id uuid NOT NULL,
+    profile_id uuid,
+    manager_entity_id uuid,
+    manager_lei character varying(20),
+    manager_bic character varying(11),
+    manager_name character varying(255),
+    manager_role character varying(30) DEFAULT 'INVESTMENT_MANAGER'::character varying NOT NULL,
+    priority integer DEFAULT 100 NOT NULL,
+    scope_all boolean DEFAULT false,
+    scope_markets text[],
+    scope_instrument_classes text[],
+    scope_currencies text[],
+    scope_isda_asset_classes text[],
+    instruction_method character varying(20) NOT NULL,
+    instruction_resource_id uuid,
+    can_trade boolean DEFAULT true,
+    can_settle boolean DEFAULT true,
+    can_affirm boolean DEFAULT false,
+    effective_date date DEFAULT CURRENT_DATE NOT NULL,
+    termination_date date,
+    status character varying(20) DEFAULT 'ACTIVE'::character varying,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT valid_im_role CHECK (((manager_role)::text = ANY ((ARRAY['INVESTMENT_MANAGER'::character varying, 'SUB_ADVISOR'::character varying, 'OVERLAY_MANAGER'::character varying, 'TRANSITION_MANAGER'::character varying, 'EXECUTION_BROKER'::character varying])::text[]))),
+    CONSTRAINT valid_im_status CHECK (((status)::text = ANY ((ARRAY['ACTIVE'::character varying, 'SUSPENDED'::character varying, 'TERMINATED'::character varying])::text[]))),
+    CONSTRAINT valid_instruction_method CHECK (((instruction_method)::text = ANY ((ARRAY['SWIFT'::character varying, 'CTM'::character varying, 'FIX'::character varying, 'API'::character varying, 'MANUAL'::character varying, 'ALERT'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE cbu_im_assignments; Type: COMMENT; Schema: custody; Owner: -
+--
+
+COMMENT ON TABLE custody.cbu_im_assignments IS 'Investment Manager assignments with trading scope. Materialized from trading profile.
+Links IM to instruction delivery resource for traceability.';
+
+
+--
 -- Name: cbu_instrument_universe; Type: TABLE; Schema: custody; Owner: -
 --
 
@@ -1820,7 +1912,8 @@ CREATE TABLE custody.cbu_instrument_universe (
     is_traded boolean DEFAULT true,
     is_active boolean DEFAULT true,
     effective_date date DEFAULT CURRENT_DATE NOT NULL,
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now(),
+    counterparty_key uuid DEFAULT '00000000-0000-0000-0000-000000000000'::uuid NOT NULL
 );
 
 
@@ -1829,6 +1922,42 @@ CREATE TABLE custody.cbu_instrument_universe (
 --
 
 COMMENT ON TABLE custody.cbu_instrument_universe IS 'Layer 1: Declares what instrument classes, markets, currencies a CBU trades. Drives SSI completeness checks.';
+
+
+--
+-- Name: cbu_pricing_config; Type: TABLE; Schema: custody; Owner: -
+--
+
+CREATE TABLE custody.cbu_pricing_config (
+    config_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cbu_id uuid NOT NULL,
+    profile_id uuid,
+    instrument_class_id uuid,
+    market_id uuid,
+    currency character varying(3),
+    priority integer DEFAULT 1 NOT NULL,
+    source character varying(30) NOT NULL,
+    price_type character varying(20) DEFAULT 'CLOSING'::character varying NOT NULL,
+    fallback_source character varying(30),
+    max_age_hours integer DEFAULT 24,
+    tolerance_pct numeric(5,2) DEFAULT 5.0,
+    stale_action character varying(20) DEFAULT 'WARN'::character varying,
+    pricing_resource_id uuid,
+    effective_date date DEFAULT CURRENT_DATE NOT NULL,
+    is_active boolean DEFAULT true,
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT valid_price_source CHECK (((source)::text = ANY ((ARRAY['BLOOMBERG'::character varying, 'REUTERS'::character varying, 'MARKIT'::character varying, 'REFINITIV'::character varying, 'ICE'::character varying, 'MODEL'::character varying, 'INTERNAL'::character varying, 'VENDOR'::character varying, 'COUNTERPARTY'::character varying])::text[]))),
+    CONSTRAINT valid_price_type CHECK (((price_type)::text = ANY ((ARRAY['CLOSING'::character varying, 'MID'::character varying, 'BID'::character varying, 'ASK'::character varying, 'VWAP'::character varying, 'OFFICIAL'::character varying])::text[]))),
+    CONSTRAINT valid_stale_action CHECK (((stale_action)::text = ANY ((ARRAY['WARN'::character varying, 'BLOCK'::character varying, 'USE_FALLBACK'::character varying, 'ESCALATE'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE cbu_pricing_config; Type: COMMENT; Schema: custody; Owner: -
+--
+
+COMMENT ON TABLE custody.cbu_pricing_config IS 'Pricing source configuration by instrument class. Materialized from trading profile.
+Links to provisioned pricing feed resource for traceability.';
 
 
 --
@@ -3304,6 +3433,47 @@ COMMENT ON COLUMN "ob-poc".cbu_resource_instances.instance_url IS 'Unique URL/en
 
 
 --
+-- Name: cbu_sla_commitments; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".cbu_sla_commitments (
+    commitment_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cbu_id uuid NOT NULL,
+    profile_id uuid,
+    template_id uuid,
+    override_target_value numeric(10,4),
+    override_warning_threshold numeric(10,4),
+    bound_service_id uuid,
+    bound_resource_instance_id uuid,
+    bound_isda_id uuid,
+    bound_csa_id uuid,
+    scope_instrument_classes text[],
+    scope_markets text[],
+    scope_currencies text[],
+    scope_counterparties uuid[],
+    penalty_structure jsonb,
+    incentive_structure jsonb,
+    effective_date date DEFAULT CURRENT_DATE NOT NULL,
+    termination_date date,
+    status character varying(20) DEFAULT 'ACTIVE'::character varying,
+    negotiated_by character varying(255),
+    negotiated_date date,
+    source_document_id uuid,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT valid_sla_status CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'ACTIVE'::character varying, 'SUSPENDED'::character varying, 'TERMINATED'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE cbu_sla_commitments; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".cbu_sla_commitments IS 'CBU-specific SLA commitments. Links trading profile sections, service resources,
+and ISDA/CSA agreements to measurable SLA targets.';
+
+
+--
 -- Name: cbu_trading_profiles; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -3319,6 +3489,11 @@ CREATE TABLE "ob-poc".cbu_trading_profiles (
     activated_at timestamp with time zone,
     activated_by character varying(255),
     notes text,
+    source_document_id uuid,
+    materialization_status character varying(20) DEFAULT 'PENDING'::character varying,
+    materialized_at timestamp with time zone,
+    materialization_hash text,
+    sla_profile_id uuid,
     CONSTRAINT cbu_trading_profiles_status_check CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'PENDING_REVIEW'::character varying, 'ACTIVE'::character varying, 'SUPERSEDED'::character varying, 'ARCHIVED'::character varying])::text[])))
 );
 
@@ -3582,6 +3757,37 @@ CREATE TABLE "ob-poc".delegation_relationships (
     effective_to date,
     created_at timestamp with time zone DEFAULT now()
 );
+
+
+--
+-- Name: detected_patterns; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".detected_patterns (
+    pattern_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cbu_id uuid NOT NULL,
+    case_id uuid,
+    pattern_type character varying(50) NOT NULL,
+    severity character varying(20) NOT NULL,
+    description text NOT NULL,
+    involved_entities uuid[] NOT NULL,
+    evidence jsonb,
+    status character varying(20) DEFAULT 'DETECTED'::character varying NOT NULL,
+    detected_at timestamp with time zone DEFAULT now() NOT NULL,
+    resolved_at timestamp with time zone,
+    resolved_by character varying(100),
+    resolution_notes text,
+    CONSTRAINT detected_patterns_pattern_type_check CHECK (((pattern_type)::text = ANY ((ARRAY['CIRCULAR_OWNERSHIP'::character varying, 'LAYERING'::character varying, 'NOMINEE_USAGE'::character varying, 'OPACITY_JURISDICTION'::character varying, 'REGISTRY_MISMATCH'::character varying, 'OWNERSHIP_GAPS'::character varying, 'RECENT_RESTRUCTURING'::character varying, 'ROLE_CONCENTRATION'::character varying])::text[]))),
+    CONSTRAINT detected_patterns_severity_check CHECK (((severity)::text = ANY ((ARRAY['INFO'::character varying, 'LOW'::character varying, 'MEDIUM'::character varying, 'HIGH'::character varying, 'CRITICAL'::character varying])::text[]))),
+    CONSTRAINT detected_patterns_status_check CHECK (((status)::text = ANY ((ARRAY['DETECTED'::character varying, 'INVESTIGATING'::character varying, 'RESOLVED'::character varying, 'FALSE_POSITIVE'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE detected_patterns; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".detected_patterns IS 'Audit trail for adversarial pattern detection (circular ownership, layering, nominee usage, etc.)';
 
 
 --
@@ -5014,6 +5220,28 @@ CREATE TABLE "ob-poc".resource_instance_dependencies (
 
 
 --
+-- Name: resource_profile_sources; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".resource_profile_sources (
+    link_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    instance_id uuid NOT NULL,
+    profile_id uuid NOT NULL,
+    profile_section character varying(50) NOT NULL,
+    profile_path text,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE resource_profile_sources; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".resource_profile_sources IS 'Links provisioned service resources back to their source in the trading profile.
+Enables: "Why was this SWIFT gateway provisioned?" → "investment_managers[0].instruction_method = SWIFT"';
+
+
+--
 -- Name: risk_bands; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -5261,6 +5489,102 @@ CREATE TABLE "ob-poc".settlement_types (
 
 
 --
+-- Name: sla_breaches; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".sla_breaches (
+    breach_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    measurement_id uuid NOT NULL,
+    commitment_id uuid NOT NULL,
+    breach_severity character varying(20) NOT NULL,
+    breach_date date NOT NULL,
+    detected_at timestamp with time zone DEFAULT now(),
+    root_cause_category character varying(50),
+    root_cause_description text,
+    remediation_status character varying(20) DEFAULT 'OPEN'::character varying,
+    remediation_plan text,
+    remediation_due_date date,
+    remediation_completed_at timestamp with time zone,
+    penalty_applied boolean DEFAULT false,
+    penalty_amount numeric(18,2),
+    penalty_currency character varying(3),
+    escalated_to character varying(255),
+    escalated_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT valid_breach_severity CHECK (((breach_severity)::text = ANY ((ARRAY['MINOR'::character varying, 'MAJOR'::character varying, 'CRITICAL'::character varying])::text[]))),
+    CONSTRAINT valid_remediation_status CHECK (((remediation_status)::text = ANY ((ARRAY['OPEN'::character varying, 'IN_PROGRESS'::character varying, 'RESOLVED'::character varying, 'WAIVED'::character varying, 'ESCALATED'::character varying])::text[]))),
+    CONSTRAINT valid_root_cause CHECK (((root_cause_category IS NULL) OR ((root_cause_category)::text = ANY ((ARRAY['SYSTEM'::character varying, 'VENDOR'::character varying, 'MARKET'::character varying, 'CLIENT'::character varying, 'INTERNAL'::character varying, 'EXTERNAL'::character varying, 'UNKNOWN'::character varying])::text[]))))
+);
+
+
+--
+-- Name: sla_measurements; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".sla_measurements (
+    measurement_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    commitment_id uuid NOT NULL,
+    period_start date NOT NULL,
+    period_end date NOT NULL,
+    measured_value numeric(10,4) NOT NULL,
+    sample_size integer,
+    status character varying(20) NOT NULL,
+    variance_pct numeric(6,2),
+    measurement_notes text,
+    measurement_method character varying(50),
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT valid_measurement_method CHECK (((measurement_method IS NULL) OR ((measurement_method)::text = ANY ((ARRAY['AUTOMATED'::character varying, 'MANUAL'::character varying, 'ESTIMATED'::character varying, 'SYSTEM'::character varying])::text[])))),
+    CONSTRAINT valid_measurement_status CHECK (((status)::text = ANY ((ARRAY['MET'::character varying, 'WARNING'::character varying, 'BREACH'::character varying])::text[])))
+);
+
+
+--
+-- Name: sla_metric_types; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".sla_metric_types (
+    metric_code character varying(50) NOT NULL,
+    name character varying(100) NOT NULL,
+    description text,
+    metric_category character varying(30) NOT NULL,
+    unit character varying(20) NOT NULL,
+    aggregation_method character varying(20) DEFAULT 'AVERAGE'::character varying,
+    higher_is_better boolean DEFAULT true,
+    is_active boolean DEFAULT true,
+    CONSTRAINT valid_aggregation CHECK (((aggregation_method)::text = ANY ((ARRAY['AVERAGE'::character varying, 'SUM'::character varying, 'MIN'::character varying, 'MAX'::character varying, 'MEDIAN'::character varying, 'P95'::character varying, 'P99'::character varying])::text[]))),
+    CONSTRAINT valid_metric_category CHECK (((metric_category)::text = ANY ((ARRAY['TIMELINESS'::character varying, 'ACCURACY'::character varying, 'AVAILABILITY'::character varying, 'VOLUME'::character varying, 'QUALITY'::character varying])::text[]))),
+    CONSTRAINT valid_unit CHECK (((unit)::text = ANY ((ARRAY['PERCENT'::character varying, 'HOURS'::character varying, 'MINUTES'::character varying, 'SECONDS'::character varying, 'COUNT'::character varying, 'CURRENCY'::character varying, 'BASIS_POINTS'::character varying])::text[])))
+);
+
+
+--
+-- Name: sla_templates; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".sla_templates (
+    template_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    template_code character varying(50) NOT NULL,
+    name character varying(255) NOT NULL,
+    description text,
+    applies_to_type character varying(30) NOT NULL,
+    applies_to_code character varying(50),
+    metric_code character varying(50) NOT NULL,
+    target_value numeric(10,4) NOT NULL,
+    warning_threshold numeric(10,4),
+    measurement_period character varying(20) DEFAULT 'MONTHLY'::character varying,
+    response_time_hours numeric(5,2),
+    escalation_path text,
+    regulatory_requirement boolean DEFAULT false,
+    regulatory_reference text,
+    is_active boolean DEFAULT true,
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT valid_applies_to CHECK (((applies_to_type)::text = ANY ((ARRAY['SERVICE'::character varying, 'RESOURCE_TYPE'::character varying, 'ISDA'::character varying, 'CSA'::character varying, 'PRODUCT'::character varying])::text[]))),
+    CONSTRAINT valid_measurement_period CHECK (((measurement_period)::text = ANY ((ARRAY['DAILY'::character varying, 'WEEKLY'::character varying, 'MONTHLY'::character varying, 'QUARTERLY'::character varying, 'ANNUAL'::character varying])::text[])))
+);
+
+
+--
 -- Name: ssi_types; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -5373,6 +5697,32 @@ CREATE TABLE "ob-poc".threshold_requirements (
 --
 
 COMMENT ON TABLE "ob-poc".threshold_requirements IS 'KYC attribute requirements per entity role and risk band';
+
+
+--
+-- Name: trading_profile_documents; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".trading_profile_documents (
+    link_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    profile_id uuid NOT NULL,
+    doc_id uuid NOT NULL,
+    profile_section character varying(50) NOT NULL,
+    extraction_status character varying(20) DEFAULT 'PENDING'::character varying,
+    extracted_at timestamp with time zone,
+    extraction_notes text,
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT valid_extraction_status CHECK (((extraction_status)::text = ANY ((ARRAY['PENDING'::character varying, 'IN_PROGRESS'::character varying, 'COMPLETE'::character varying, 'FAILED'::character varying, 'PARTIAL'::character varying])::text[]))),
+    CONSTRAINT valid_profile_section CHECK (((profile_section)::text = ANY ((ARRAY['universe'::character varying, 'investment_managers'::character varying, 'isda_agreements'::character varying, 'settlement_config'::character varying, 'booking_rules'::character varying, 'standing_instructions'::character varying, 'pricing_matrix'::character varying, 'valuation_config'::character varying, 'constraints'::character varying, 'cash_sweep_config'::character varying, 'sla_commitments'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE trading_profile_documents; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".trading_profile_documents IS 'Links source documents (IMA, ISDA, SSI forms) to trading profile sections they populate.
+Enables audit trail: "Where did this config come from?" → traces to source document.';
 
 
 --
@@ -6330,6 +6680,76 @@ CREATE VIEW "ob-poc".v_workflow_summary AS
 
 
 --
+-- Name: verification_challenges; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".verification_challenges (
+    challenge_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cbu_id uuid NOT NULL,
+    case_id uuid,
+    entity_id uuid,
+    allegation_id uuid,
+    observation_id uuid,
+    challenge_type character varying(30) NOT NULL,
+    challenge_reason text NOT NULL,
+    severity character varying(20) NOT NULL,
+    status character varying(20) DEFAULT 'OPEN'::character varying NOT NULL,
+    response_text text,
+    response_evidence_ids uuid[],
+    raised_at timestamp with time zone DEFAULT now() NOT NULL,
+    raised_by character varying(100),
+    responded_at timestamp with time zone,
+    resolved_at timestamp with time zone,
+    resolved_by character varying(100),
+    resolution_type character varying(30),
+    resolution_notes text,
+    CONSTRAINT verification_challenges_resolution_type_check CHECK (((resolution_type IS NULL) OR ((resolution_type)::text = ANY ((ARRAY['ACCEPTED'::character varying, 'REJECTED'::character varying, 'WAIVED'::character varying, 'ESCALATED'::character varying])::text[])))),
+    CONSTRAINT verification_challenges_severity_check CHECK (((severity)::text = ANY ((ARRAY['INFO'::character varying, 'LOW'::character varying, 'MEDIUM'::character varying, 'HIGH'::character varying, 'CRITICAL'::character varying])::text[]))),
+    CONSTRAINT verification_challenges_status_check CHECK (((status)::text = ANY ((ARRAY['OPEN'::character varying, 'RESPONDED'::character varying, 'RESOLVED'::character varying, 'ESCALATED'::character varying])::text[]))),
+    CONSTRAINT verification_challenges_type_check CHECK (((challenge_type)::text = ANY ((ARRAY['INCONSISTENCY'::character varying, 'LOW_CONFIDENCE'::character varying, 'MISSING_CORROBORATION'::character varying, 'PATTERN_DETECTED'::character varying, 'EVASION_SIGNAL'::character varying, 'REGISTRY_MISMATCH'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE verification_challenges; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".verification_challenges IS 'Challenge/response workflow for adversarial verification - tracks formal challenges requiring client response';
+
+
+--
+-- Name: verification_escalations; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".verification_escalations (
+    escalation_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cbu_id uuid NOT NULL,
+    case_id uuid,
+    challenge_id uuid,
+    escalation_level character varying(30) NOT NULL,
+    escalation_reason text NOT NULL,
+    risk_indicators jsonb,
+    status character varying(20) DEFAULT 'PENDING'::character varying NOT NULL,
+    decision character varying(20),
+    decision_notes text,
+    escalated_at timestamp with time zone DEFAULT now() NOT NULL,
+    escalated_by character varying(100),
+    decided_at timestamp with time zone,
+    decided_by character varying(100),
+    CONSTRAINT verification_escalations_decision_check CHECK (((decision IS NULL) OR ((decision)::text = ANY ((ARRAY['APPROVE'::character varying, 'REJECT'::character varying, 'REQUIRE_MORE_INFO'::character varying, 'ESCALATE_FURTHER'::character varying])::text[])))),
+    CONSTRAINT verification_escalations_level_check CHECK (((escalation_level)::text = ANY ((ARRAY['SENIOR_ANALYST'::character varying, 'COMPLIANCE_OFFICER'::character varying, 'MLRO'::character varying, 'COMMITTEE'::character varying])::text[]))),
+    CONSTRAINT verification_escalations_status_check CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'UNDER_REVIEW'::character varying, 'DECIDED'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE verification_escalations; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".verification_escalations IS 'Risk-based escalation routing for verification challenges requiring higher authority review';
+
+
+--
 -- Name: workflow_audit_log; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -6850,11 +7270,35 @@ ALTER TABLE ONLY public.rules ALTER COLUMN id SET DEFAULT nextval('public.rules_
 
 
 --
--- Name: cbu_instrument_universe cbu_instrument_universe_cbu_id_instrument_class_id_market_i_key; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_cash_sweep_config cbu_cash_sweep_config_cbu_id_currency_key; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_cash_sweep_config
+    ADD CONSTRAINT cbu_cash_sweep_config_cbu_id_currency_key UNIQUE (cbu_id, currency);
+
+
+--
+-- Name: cbu_cash_sweep_config cbu_cash_sweep_config_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_cash_sweep_config
+    ADD CONSTRAINT cbu_cash_sweep_config_pkey PRIMARY KEY (sweep_id);
+
+
+--
+-- Name: cbu_im_assignments cbu_im_assignments_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_im_assignments
+    ADD CONSTRAINT cbu_im_assignments_pkey PRIMARY KEY (assignment_id);
+
+
+--
+-- Name: cbu_instrument_universe cbu_instrument_universe_natural_key; Type: CONSTRAINT; Schema: custody; Owner: -
 --
 
 ALTER TABLE ONLY custody.cbu_instrument_universe
-    ADD CONSTRAINT cbu_instrument_universe_cbu_id_instrument_class_id_market_i_key UNIQUE (cbu_id, instrument_class_id, market_id, counterparty_entity_id);
+    ADD CONSTRAINT cbu_instrument_universe_natural_key UNIQUE (cbu_id, instrument_class_id, market_id, counterparty_key);
 
 
 --
@@ -6863,6 +7307,14 @@ ALTER TABLE ONLY custody.cbu_instrument_universe
 
 ALTER TABLE ONLY custody.cbu_instrument_universe
     ADD CONSTRAINT cbu_instrument_universe_pkey PRIMARY KEY (universe_id);
+
+
+--
+-- Name: cbu_pricing_config cbu_pricing_config_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_pricing_config
+    ADD CONSTRAINT cbu_pricing_config_pkey PRIMARY KEY (config_id);
 
 
 --
@@ -7063,6 +7515,14 @@ ALTER TABLE ONLY custody.security_types
 
 ALTER TABLE ONLY custody.ssi_booking_rules
     ADD CONSTRAINT ssi_booking_rules_cbu_id_priority_rule_name_key UNIQUE (cbu_id, priority, rule_name);
+
+
+--
+-- Name: ssi_booking_rules ssi_booking_rules_cbu_rule_name_key; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.ssi_booking_rules
+    ADD CONSTRAINT ssi_booking_rules_cbu_rule_name_key UNIQUE (cbu_id, rule_name);
 
 
 --
@@ -7386,6 +7846,14 @@ ALTER TABLE ONLY "ob-poc".cbu_resource_instances
 
 
 --
+-- Name: cbu_sla_commitments cbu_sla_commitments_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_sla_commitments
+    ADD CONSTRAINT cbu_sla_commitments_pkey PRIMARY KEY (commitment_id);
+
+
+--
 -- Name: cbu_trading_profiles cbu_trading_profiles_cbu_id_version_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -7479,6 +7947,14 @@ ALTER TABLE ONLY "ob-poc".currencies
 
 ALTER TABLE ONLY "ob-poc".delegation_relationships
     ADD CONSTRAINT delegation_relationships_pkey PRIMARY KEY (delegation_id);
+
+
+--
+-- Name: detected_patterns detected_patterns_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".detected_patterns
+    ADD CONSTRAINT detected_patterns_pkey PRIMARY KEY (pattern_id);
 
 
 --
@@ -8066,6 +8542,14 @@ ALTER TABLE ONLY "ob-poc".resource_instance_dependencies
 
 
 --
+-- Name: resource_profile_sources resource_profile_sources_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".resource_profile_sources
+    ADD CONSTRAINT resource_profile_sources_pkey PRIMARY KEY (link_id);
+
+
+--
 -- Name: risk_bands risk_bands_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -8250,6 +8734,46 @@ ALTER TABLE ONLY "ob-poc".settlement_types
 
 
 --
+-- Name: sla_breaches sla_breaches_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".sla_breaches
+    ADD CONSTRAINT sla_breaches_pkey PRIMARY KEY (breach_id);
+
+
+--
+-- Name: sla_measurements sla_measurements_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".sla_measurements
+    ADD CONSTRAINT sla_measurements_pkey PRIMARY KEY (measurement_id);
+
+
+--
+-- Name: sla_metric_types sla_metric_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".sla_metric_types
+    ADD CONSTRAINT sla_metric_types_pkey PRIMARY KEY (metric_code);
+
+
+--
+-- Name: sla_templates sla_templates_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".sla_templates
+    ADD CONSTRAINT sla_templates_pkey PRIMARY KEY (template_id);
+
+
+--
+-- Name: sla_templates sla_templates_template_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".sla_templates
+    ADD CONSTRAINT sla_templates_template_code_key UNIQUE (template_code);
+
+
+--
 -- Name: ssi_types ssi_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -8295,6 +8819,14 @@ ALTER TABLE ONLY "ob-poc".threshold_requirements
 
 ALTER TABLE ONLY "ob-poc".threshold_requirements
     ADD CONSTRAINT threshold_requirements_pkey PRIMARY KEY (requirement_id);
+
+
+--
+-- Name: trading_profile_documents trading_profile_documents_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".trading_profile_documents
+    ADD CONSTRAINT trading_profile_documents_pkey PRIMARY KEY (link_id);
 
 
 --
@@ -8407,6 +8939,22 @@ ALTER TABLE ONLY "ob-poc".workflow_instances
 
 ALTER TABLE ONLY "ob-poc".workflow_definitions
     ADD CONSTRAINT uq_workflow_version UNIQUE (workflow_id, version);
+
+
+--
+-- Name: verification_challenges verification_challenges_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".verification_challenges
+    ADD CONSTRAINT verification_challenges_pkey PRIMARY KEY (challenge_id);
+
+
+--
+-- Name: verification_escalations verification_escalations_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".verification_escalations
+    ADD CONSTRAINT verification_escalations_pkey PRIMARY KEY (escalation_id);
 
 
 --
@@ -8594,17 +9142,59 @@ ALTER TABLE ONLY public.rules
 
 
 --
--- Name: cbu_instrument_universe_no_counterparty_key; Type: INDEX; Schema: custody; Owner: -
---
-
-CREATE UNIQUE INDEX cbu_instrument_universe_no_counterparty_key ON custody.cbu_instrument_universe USING btree (cbu_id, instrument_class_id, market_id) WHERE (counterparty_entity_id IS NULL);
-
-
---
 -- Name: idx_booking_rules_lookup; Type: INDEX; Schema: custody; Owner: -
 --
 
 CREATE INDEX idx_booking_rules_lookup ON custody.ssi_booking_rules USING btree (cbu_id, is_active, priority, instrument_class_id, security_type_id, market_id, currency);
+
+
+--
+-- Name: idx_cbu_im_active; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_cbu_im_active ON custody.cbu_im_assignments USING btree (cbu_id) WHERE ((status)::text = 'ACTIVE'::text);
+
+
+--
+-- Name: idx_cbu_im_cbu; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_cbu_im_cbu ON custody.cbu_im_assignments USING btree (cbu_id);
+
+
+--
+-- Name: idx_cbu_im_manager; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_cbu_im_manager ON custody.cbu_im_assignments USING btree (manager_entity_id);
+
+
+--
+-- Name: idx_cbu_im_method; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_cbu_im_method ON custody.cbu_im_assignments USING btree (instruction_method);
+
+
+--
+-- Name: idx_cbu_im_profile; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_cbu_im_profile ON custody.cbu_im_assignments USING btree (profile_id);
+
+
+--
+-- Name: idx_cbu_pricing_cbu; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_cbu_pricing_cbu ON custody.cbu_pricing_config USING btree (cbu_id);
+
+
+--
+-- Name: idx_cbu_pricing_class; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_cbu_pricing_class ON custody.cbu_pricing_config USING btree (instrument_class_id);
 
 
 --
@@ -8619,6 +9209,13 @@ CREATE INDEX idx_cbu_ssi_active ON custody.cbu_ssi USING btree (cbu_id, status) 
 --
 
 CREATE INDEX idx_cbu_ssi_lookup ON custody.cbu_ssi USING btree (cbu_id, status);
+
+
+--
+-- Name: idx_cbu_sweep_cbu; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_cbu_sweep_cbu ON custody.cbu_cash_sweep_config USING btree (cbu_id);
 
 
 --
@@ -9126,6 +9723,34 @@ CREATE INDEX idx_cbu_rel_verif_status ON "ob-poc".cbu_relationship_verification 
 
 
 --
+-- Name: idx_cbu_sla_active; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_sla_active ON "ob-poc".cbu_sla_commitments USING btree (cbu_id) WHERE ((status)::text = 'ACTIVE'::text);
+
+
+--
+-- Name: idx_cbu_sla_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_sla_cbu ON "ob-poc".cbu_sla_commitments USING btree (cbu_id);
+
+
+--
+-- Name: idx_cbu_sla_profile; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_sla_profile ON "ob-poc".cbu_sla_commitments USING btree (profile_id);
+
+
+--
+-- Name: idx_cbu_sla_resource; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_sla_resource ON "ob-poc".cbu_sla_commitments USING btree (bound_resource_instance_id);
+
+
+--
 -- Name: idx_cbus_embedding; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -9354,6 +9979,27 @@ CREATE INDEX idx_delegation_delegate ON "ob-poc".delegation_relationships USING 
 --
 
 CREATE INDEX idx_delegation_delegator ON "ob-poc".delegation_relationships USING btree (delegator_entity_id);
+
+
+--
+-- Name: idx_detected_patterns_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_detected_patterns_cbu ON "ob-poc".detected_patterns USING btree (cbu_id);
+
+
+--
+-- Name: idx_detected_patterns_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_detected_patterns_status ON "ob-poc".detected_patterns USING btree (status);
+
+
+--
+-- Name: idx_detected_patterns_type; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_detected_patterns_type ON "ob-poc".detected_patterns USING btree (pattern_type);
 
 
 --
@@ -10323,6 +10969,20 @@ CREATE INDEX idx_roles_name ON "ob-poc".roles USING btree (name);
 
 
 --
+-- Name: idx_rps_instance; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_rps_instance ON "ob-poc".resource_profile_sources USING btree (instance_id);
+
+
+--
+-- Name: idx_rps_profile; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_rps_profile ON "ob-poc".resource_profile_sources USING btree (profile_id);
+
+
+--
 -- Name: idx_screening_lists_type; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -10442,6 +11102,41 @@ CREATE INDEX idx_share_classes_parent ON "ob-poc".entity_share_classes USING btr
 
 
 --
+-- Name: idx_sla_breach_commitment; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_sla_breach_commitment ON "ob-poc".sla_breaches USING btree (commitment_id);
+
+
+--
+-- Name: idx_sla_breach_open; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_sla_breach_open ON "ob-poc".sla_breaches USING btree (commitment_id) WHERE ((remediation_status)::text = ANY ((ARRAY['OPEN'::character varying, 'IN_PROGRESS'::character varying])::text[]));
+
+
+--
+-- Name: idx_sla_meas_breach; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_sla_meas_breach ON "ob-poc".sla_measurements USING btree (commitment_id) WHERE ((status)::text = 'BREACH'::text);
+
+
+--
+-- Name: idx_sla_meas_commitment; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_sla_meas_commitment ON "ob-poc".sla_measurements USING btree (commitment_id);
+
+
+--
+-- Name: idx_sla_meas_period; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_sla_meas_period ON "ob-poc".sla_measurements USING btree (period_start, period_end);
+
+
+--
 -- Name: idx_taxonomy_crud_entity; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -10495,6 +11190,27 @@ CREATE INDEX idx_threshold_requirements_band ON "ob-poc".threshold_requirements 
 --
 
 CREATE INDEX idx_threshold_requirements_role ON "ob-poc".threshold_requirements USING btree (entity_role);
+
+
+--
+-- Name: idx_tpd_doc; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_tpd_doc ON "ob-poc".trading_profile_documents USING btree (doc_id);
+
+
+--
+-- Name: idx_tpd_profile; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_tpd_profile ON "ob-poc".trading_profile_documents USING btree (profile_id);
+
+
+--
+-- Name: idx_tpd_section; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_tpd_section ON "ob-poc".trading_profile_documents USING btree (profile_section);
 
 
 --
@@ -10670,6 +11386,48 @@ CREATE INDEX idx_ubo_snapshots_cbu_id ON "ob-poc".ubo_snapshots USING btree (cbu
 --
 
 CREATE INDEX idx_values_attr_uuid ON "ob-poc".attribute_values_typed USING btree (attribute_uuid);
+
+
+--
+-- Name: idx_verification_challenges_case; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_verification_challenges_case ON "ob-poc".verification_challenges USING btree (case_id);
+
+
+--
+-- Name: idx_verification_challenges_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_verification_challenges_cbu ON "ob-poc".verification_challenges USING btree (cbu_id);
+
+
+--
+-- Name: idx_verification_challenges_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_verification_challenges_status ON "ob-poc".verification_challenges USING btree (status);
+
+
+--
+-- Name: idx_verification_escalations_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_verification_escalations_cbu ON "ob-poc".verification_escalations USING btree (cbu_id);
+
+
+--
+-- Name: idx_verification_escalations_level; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_verification_escalations_level ON "ob-poc".verification_escalations USING btree (escalation_level);
+
+
+--
+-- Name: idx_verification_escalations_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_verification_escalations_status ON "ob-poc".verification_escalations USING btree (status);
 
 
 --
@@ -10853,6 +11611,13 @@ CREATE OR REPLACE VIEW kyc.v_workstream_detail AS
 
 
 --
+-- Name: cbu_instrument_universe sync_counterparty_key_trigger; Type: TRIGGER; Schema: custody; Owner: -
+--
+
+CREATE TRIGGER sync_counterparty_key_trigger BEFORE INSERT OR UPDATE ON custody.cbu_instrument_universe FOR EACH ROW EXECUTE FUNCTION custody.sync_counterparty_key();
+
+
+--
 -- Name: cbus trg_cbu_status_change; Type: TRIGGER; Schema: ob-poc; Owner: -
 --
 
@@ -10944,6 +11709,62 @@ CREATE TRIGGER update_rules_updated_at BEFORE UPDATE ON public.rules FOR EACH RO
 
 
 --
+-- Name: cbu_cash_sweep_config cbu_cash_sweep_config_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_cash_sweep_config
+    ADD CONSTRAINT cbu_cash_sweep_config_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
+-- Name: cbu_cash_sweep_config cbu_cash_sweep_config_profile_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_cash_sweep_config
+    ADD CONSTRAINT cbu_cash_sweep_config_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES "ob-poc".cbu_trading_profiles(profile_id);
+
+
+--
+-- Name: cbu_cash_sweep_config cbu_cash_sweep_config_sweep_resource_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_cash_sweep_config
+    ADD CONSTRAINT cbu_cash_sweep_config_sweep_resource_id_fkey FOREIGN KEY (sweep_resource_id) REFERENCES "ob-poc".cbu_resource_instances(instance_id);
+
+
+--
+-- Name: cbu_im_assignments cbu_im_assignments_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_im_assignments
+    ADD CONSTRAINT cbu_im_assignments_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
+-- Name: cbu_im_assignments cbu_im_assignments_instruction_resource_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_im_assignments
+    ADD CONSTRAINT cbu_im_assignments_instruction_resource_id_fkey FOREIGN KEY (instruction_resource_id) REFERENCES "ob-poc".cbu_resource_instances(instance_id);
+
+
+--
+-- Name: cbu_im_assignments cbu_im_assignments_manager_entity_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_im_assignments
+    ADD CONSTRAINT cbu_im_assignments_manager_entity_id_fkey FOREIGN KEY (manager_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: cbu_im_assignments cbu_im_assignments_profile_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_im_assignments
+    ADD CONSTRAINT cbu_im_assignments_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES "ob-poc".cbu_trading_profiles(profile_id);
+
+
+--
 -- Name: cbu_instrument_universe cbu_instrument_universe_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
 --
 
@@ -10973,6 +11794,46 @@ ALTER TABLE ONLY custody.cbu_instrument_universe
 
 ALTER TABLE ONLY custody.cbu_instrument_universe
     ADD CONSTRAINT cbu_instrument_universe_market_id_fkey FOREIGN KEY (market_id) REFERENCES custody.markets(market_id);
+
+
+--
+-- Name: cbu_pricing_config cbu_pricing_config_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_pricing_config
+    ADD CONSTRAINT cbu_pricing_config_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
+-- Name: cbu_pricing_config cbu_pricing_config_instrument_class_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_pricing_config
+    ADD CONSTRAINT cbu_pricing_config_instrument_class_id_fkey FOREIGN KEY (instrument_class_id) REFERENCES custody.instrument_classes(class_id);
+
+
+--
+-- Name: cbu_pricing_config cbu_pricing_config_market_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_pricing_config
+    ADD CONSTRAINT cbu_pricing_config_market_id_fkey FOREIGN KEY (market_id) REFERENCES custody.markets(market_id);
+
+
+--
+-- Name: cbu_pricing_config cbu_pricing_config_pricing_resource_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_pricing_config
+    ADD CONSTRAINT cbu_pricing_config_pricing_resource_id_fkey FOREIGN KEY (pricing_resource_id) REFERENCES "ob-poc".cbu_resource_instances(instance_id);
+
+
+--
+-- Name: cbu_pricing_config cbu_pricing_config_profile_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_pricing_config
+    ADD CONSTRAINT cbu_pricing_config_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES "ob-poc".cbu_trading_profiles(profile_id);
 
 
 --
@@ -11584,11 +12445,67 @@ ALTER TABLE ONLY "ob-poc".cbu_resource_instances
 
 
 --
+-- Name: cbu_sla_commitments cbu_sla_commitments_bound_resource_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_sla_commitments
+    ADD CONSTRAINT cbu_sla_commitments_bound_resource_instance_id_fkey FOREIGN KEY (bound_resource_instance_id) REFERENCES "ob-poc".cbu_resource_instances(instance_id);
+
+
+--
+-- Name: cbu_sla_commitments cbu_sla_commitments_bound_service_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_sla_commitments
+    ADD CONSTRAINT cbu_sla_commitments_bound_service_id_fkey FOREIGN KEY (bound_service_id) REFERENCES "ob-poc".services(service_id);
+
+
+--
+-- Name: cbu_sla_commitments cbu_sla_commitments_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_sla_commitments
+    ADD CONSTRAINT cbu_sla_commitments_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
+-- Name: cbu_sla_commitments cbu_sla_commitments_profile_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_sla_commitments
+    ADD CONSTRAINT cbu_sla_commitments_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES "ob-poc".cbu_trading_profiles(profile_id);
+
+
+--
+-- Name: cbu_sla_commitments cbu_sla_commitments_source_document_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_sla_commitments
+    ADD CONSTRAINT cbu_sla_commitments_source_document_id_fkey FOREIGN KEY (source_document_id) REFERENCES "ob-poc".document_catalog(doc_id);
+
+
+--
+-- Name: cbu_sla_commitments cbu_sla_commitments_template_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_sla_commitments
+    ADD CONSTRAINT cbu_sla_commitments_template_id_fkey FOREIGN KEY (template_id) REFERENCES "ob-poc".sla_templates(template_id);
+
+
+--
 -- Name: cbu_trading_profiles cbu_trading_profiles_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_trading_profiles
     ADD CONSTRAINT cbu_trading_profiles_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
+-- Name: cbu_trading_profiles cbu_trading_profiles_source_document_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_trading_profiles
+    ADD CONSTRAINT cbu_trading_profiles_source_document_id_fkey FOREIGN KEY (source_document_id) REFERENCES "ob-poc".document_catalog(doc_id);
 
 
 --
@@ -11693,6 +12610,22 @@ ALTER TABLE ONLY "ob-poc".delegation_relationships
 
 ALTER TABLE ONLY "ob-poc".delegation_relationships
     ADD CONSTRAINT delegation_relationships_delegator_entity_id_fkey FOREIGN KEY (delegator_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: detected_patterns detected_patterns_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".detected_patterns
+    ADD CONSTRAINT detected_patterns_case_id_fkey FOREIGN KEY (case_id) REFERENCES kyc.cases(case_id);
+
+
+--
+-- Name: detected_patterns detected_patterns_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".detected_patterns
+    ADD CONSTRAINT detected_patterns_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id);
 
 
 --
@@ -12344,6 +13277,22 @@ ALTER TABLE ONLY "ob-poc".resource_instance_dependencies
 
 
 --
+-- Name: resource_profile_sources resource_profile_sources_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".resource_profile_sources
+    ADD CONSTRAINT resource_profile_sources_instance_id_fkey FOREIGN KEY (instance_id) REFERENCES "ob-poc".cbu_resource_instances(instance_id) ON DELETE CASCADE;
+
+
+--
+-- Name: resource_profile_sources resource_profile_sources_profile_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".resource_profile_sources
+    ADD CONSTRAINT resource_profile_sources_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES "ob-poc".cbu_trading_profiles(profile_id) ON DELETE CASCADE;
+
+
+--
 -- Name: screening_requirements screening_requirements_risk_band_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -12416,11 +13365,59 @@ ALTER TABLE ONLY "ob-poc".service_resource_capabilities
 
 
 --
+-- Name: sla_breaches sla_breaches_commitment_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".sla_breaches
+    ADD CONSTRAINT sla_breaches_commitment_id_fkey FOREIGN KEY (commitment_id) REFERENCES "ob-poc".cbu_sla_commitments(commitment_id);
+
+
+--
+-- Name: sla_breaches sla_breaches_measurement_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".sla_breaches
+    ADD CONSTRAINT sla_breaches_measurement_id_fkey FOREIGN KEY (measurement_id) REFERENCES "ob-poc".sla_measurements(measurement_id);
+
+
+--
+-- Name: sla_measurements sla_measurements_commitment_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".sla_measurements
+    ADD CONSTRAINT sla_measurements_commitment_id_fkey FOREIGN KEY (commitment_id) REFERENCES "ob-poc".cbu_sla_commitments(commitment_id) ON DELETE CASCADE;
+
+
+--
+-- Name: sla_templates sla_templates_metric_code_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".sla_templates
+    ADD CONSTRAINT sla_templates_metric_code_fkey FOREIGN KEY (metric_code) REFERENCES "ob-poc".sla_metric_types(metric_code);
+
+
+--
 -- Name: threshold_requirements threshold_requirements_risk_band_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
 ALTER TABLE ONLY "ob-poc".threshold_requirements
     ADD CONSTRAINT threshold_requirements_risk_band_fkey FOREIGN KEY (risk_band) REFERENCES "ob-poc".risk_bands(band_code);
+
+
+--
+-- Name: trading_profile_documents trading_profile_documents_doc_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".trading_profile_documents
+    ADD CONSTRAINT trading_profile_documents_doc_id_fkey FOREIGN KEY (doc_id) REFERENCES "ob-poc".document_catalog(doc_id);
+
+
+--
+-- Name: trading_profile_documents trading_profile_documents_profile_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".trading_profile_documents
+    ADD CONSTRAINT trading_profile_documents_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES "ob-poc".cbu_trading_profiles(profile_id) ON DELETE CASCADE;
 
 
 --
@@ -12576,6 +13573,70 @@ ALTER TABLE ONLY "ob-poc".ubo_snapshots
 
 
 --
+-- Name: verification_challenges verification_challenges_allegation_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".verification_challenges
+    ADD CONSTRAINT verification_challenges_allegation_id_fkey FOREIGN KEY (allegation_id) REFERENCES "ob-poc".client_allegations(allegation_id);
+
+
+--
+-- Name: verification_challenges verification_challenges_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".verification_challenges
+    ADD CONSTRAINT verification_challenges_case_id_fkey FOREIGN KEY (case_id) REFERENCES kyc.cases(case_id);
+
+
+--
+-- Name: verification_challenges verification_challenges_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".verification_challenges
+    ADD CONSTRAINT verification_challenges_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id);
+
+
+--
+-- Name: verification_challenges verification_challenges_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".verification_challenges
+    ADD CONSTRAINT verification_challenges_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: verification_challenges verification_challenges_observation_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".verification_challenges
+    ADD CONSTRAINT verification_challenges_observation_id_fkey FOREIGN KEY (observation_id) REFERENCES "ob-poc".attribute_observations(observation_id);
+
+
+--
+-- Name: verification_escalations verification_escalations_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".verification_escalations
+    ADD CONSTRAINT verification_escalations_case_id_fkey FOREIGN KEY (case_id) REFERENCES kyc.cases(case_id);
+
+
+--
+-- Name: verification_escalations verification_escalations_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".verification_escalations
+    ADD CONSTRAINT verification_escalations_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id);
+
+
+--
+-- Name: verification_escalations verification_escalations_challenge_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".verification_escalations
+    ADD CONSTRAINT verification_escalations_challenge_id_fkey FOREIGN KEY (challenge_id) REFERENCES "ob-poc".verification_challenges(challenge_id);
+
+
+--
 -- Name: workflow_audit_log workflow_audit_log_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -12659,112 +13720,5 @@ ALTER TABLE ONLY public.rules
 -- PostgreSQL database dump complete
 --
 
-\unrestrict IkFbxlxy6aJi8swHbfngTZL3v25iidSbEs0TtNCFvOgZUckfGJneXWOhagxXl7S
+\unrestrict iDaxl4bOyGZyX8cDlATU8eanEaHvhGDOrOZj4jK6b7xpBcHD1sofTvWVR30dROu
 
--- Adversarial Verification Model Tables
--- Part of Phase 2-3 implementation
-
---
--- Pattern detection audit trail
---
-CREATE TABLE IF NOT EXISTS "ob-poc".detected_patterns (
-    pattern_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    cbu_id uuid NOT NULL,
-    case_id uuid,
-    pattern_type varchar(50) NOT NULL,
-    severity varchar(20) NOT NULL,
-    description text NOT NULL,
-    involved_entities uuid[] NOT NULL,
-    evidence jsonb,
-    status varchar(20) DEFAULT 'DETECTED'::varchar NOT NULL,
-    detected_at timestamptz DEFAULT now() NOT NULL,
-    resolved_at timestamptz,
-    resolved_by varchar(100),
-    resolution_notes text,
-    CONSTRAINT detected_patterns_pkey PRIMARY KEY (pattern_id),
-    CONSTRAINT detected_patterns_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id),
-    CONSTRAINT detected_patterns_case_id_fkey FOREIGN KEY (case_id) REFERENCES kyc.cases(case_id),
-    CONSTRAINT detected_patterns_pattern_type_check CHECK (pattern_type IN ('CIRCULAR_OWNERSHIP', 'LAYERING', 'NOMINEE_USAGE', 'OPACITY_JURISDICTION', 'REGISTRY_MISMATCH', 'OWNERSHIP_GAPS', 'RECENT_RESTRUCTURING', 'ROLE_CONCENTRATION')),
-    CONSTRAINT detected_patterns_severity_check CHECK (severity IN ('INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL')),
-    CONSTRAINT detected_patterns_status_check CHECK (status IN ('DETECTED', 'INVESTIGATING', 'RESOLVED', 'FALSE_POSITIVE'))
-);
-
-CREATE INDEX IF NOT EXISTS idx_detected_patterns_cbu ON "ob-poc".detected_patterns(cbu_id);
-CREATE INDEX IF NOT EXISTS idx_detected_patterns_type ON "ob-poc".detected_patterns(pattern_type);
-CREATE INDEX IF NOT EXISTS idx_detected_patterns_status ON "ob-poc".detected_patterns(status);
-
-COMMENT ON TABLE "ob-poc".detected_patterns IS 'Audit trail for adversarial pattern detection (circular ownership, layering, nominee usage, etc.)';
-
---
--- Challenge/response workflow for adversarial verification
---
-CREATE TABLE IF NOT EXISTS "ob-poc".verification_challenges (
-    challenge_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    cbu_id uuid NOT NULL,
-    case_id uuid,
-    entity_id uuid,
-    allegation_id uuid,
-    observation_id uuid,
-    challenge_type varchar(30) NOT NULL,
-    challenge_reason text NOT NULL,
-    severity varchar(20) NOT NULL,
-    status varchar(20) DEFAULT 'OPEN'::varchar NOT NULL,
-    response_text text,
-    response_evidence_ids uuid[],
-    raised_at timestamptz DEFAULT now() NOT NULL,
-    raised_by varchar(100),
-    responded_at timestamptz,
-    resolved_at timestamptz,
-    resolved_by varchar(100),
-    resolution_type varchar(30),
-    resolution_notes text,
-    CONSTRAINT verification_challenges_pkey PRIMARY KEY (challenge_id),
-    CONSTRAINT verification_challenges_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id),
-    CONSTRAINT verification_challenges_case_id_fkey FOREIGN KEY (case_id) REFERENCES kyc.cases(case_id),
-    CONSTRAINT verification_challenges_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id),
-    CONSTRAINT verification_challenges_allegation_id_fkey FOREIGN KEY (allegation_id) REFERENCES "ob-poc".client_allegations(allegation_id),
-    CONSTRAINT verification_challenges_observation_id_fkey FOREIGN KEY (observation_id) REFERENCES "ob-poc".attribute_observations(observation_id),
-    CONSTRAINT verification_challenges_type_check CHECK (challenge_type IN ('INCONSISTENCY', 'LOW_CONFIDENCE', 'MISSING_CORROBORATION', 'PATTERN_DETECTED', 'EVASION_SIGNAL', 'REGISTRY_MISMATCH')),
-    CONSTRAINT verification_challenges_severity_check CHECK (severity IN ('INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL')),
-    CONSTRAINT verification_challenges_status_check CHECK (status IN ('OPEN', 'RESPONDED', 'RESOLVED', 'ESCALATED')),
-    CONSTRAINT verification_challenges_resolution_type_check CHECK (resolution_type IS NULL OR resolution_type IN ('ACCEPTED', 'REJECTED', 'WAIVED', 'ESCALATED'))
-);
-
-CREATE INDEX IF NOT EXISTS idx_verification_challenges_cbu ON "ob-poc".verification_challenges(cbu_id);
-CREATE INDEX IF NOT EXISTS idx_verification_challenges_status ON "ob-poc".verification_challenges(status);
-CREATE INDEX IF NOT EXISTS idx_verification_challenges_case ON "ob-poc".verification_challenges(case_id);
-
-COMMENT ON TABLE "ob-poc".verification_challenges IS 'Challenge/response workflow for adversarial verification - tracks formal challenges requiring client response';
-
---
--- Risk-based escalation routing
---
-CREATE TABLE IF NOT EXISTS "ob-poc".verification_escalations (
-    escalation_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    cbu_id uuid NOT NULL,
-    case_id uuid,
-    challenge_id uuid,
-    escalation_level varchar(30) NOT NULL,
-    escalation_reason text NOT NULL,
-    risk_indicators jsonb,
-    status varchar(20) DEFAULT 'PENDING'::varchar NOT NULL,
-    decision varchar(20),
-    decision_notes text,
-    escalated_at timestamptz DEFAULT now() NOT NULL,
-    escalated_by varchar(100),
-    decided_at timestamptz,
-    decided_by varchar(100),
-    CONSTRAINT verification_escalations_pkey PRIMARY KEY (escalation_id),
-    CONSTRAINT verification_escalations_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id),
-    CONSTRAINT verification_escalations_case_id_fkey FOREIGN KEY (case_id) REFERENCES kyc.cases(case_id),
-    CONSTRAINT verification_escalations_challenge_id_fkey FOREIGN KEY (challenge_id) REFERENCES "ob-poc".verification_challenges(challenge_id),
-    CONSTRAINT verification_escalations_level_check CHECK (escalation_level IN ('SENIOR_ANALYST', 'COMPLIANCE_OFFICER', 'MLRO', 'COMMITTEE')),
-    CONSTRAINT verification_escalations_status_check CHECK (status IN ('PENDING', 'UNDER_REVIEW', 'DECIDED')),
-    CONSTRAINT verification_escalations_decision_check CHECK (decision IS NULL OR decision IN ('APPROVE', 'REJECT', 'REQUIRE_MORE_INFO', 'ESCALATE_FURTHER'))
-);
-
-CREATE INDEX IF NOT EXISTS idx_verification_escalations_cbu ON "ob-poc".verification_escalations(cbu_id);
-CREATE INDEX IF NOT EXISTS idx_verification_escalations_status ON "ob-poc".verification_escalations(status);
-CREATE INDEX IF NOT EXISTS idx_verification_escalations_level ON "ob-poc".verification_escalations(escalation_level);
-
-COMMENT ON TABLE "ob-poc".verification_escalations IS 'Risk-based escalation routing for verification challenges requiring higher authority review';

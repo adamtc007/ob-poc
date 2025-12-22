@@ -413,7 +413,7 @@ impl CustomOperation for TemplateBatchOp {
             .find(|a| a.key == "on-error")
             .and_then(|a| a.value.as_string())
             .unwrap_or("continue");
-        let on_error = OnErrorMode::from_str(on_error_str);
+        let on_error: OnErrorMode = on_error_str.parse().unwrap_or_default();
 
         // 6. Extract :limit (optional)
         let limit: Option<usize> = verb_call

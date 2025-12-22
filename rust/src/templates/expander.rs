@@ -318,7 +318,7 @@ impl TemplateExpander {
         // Sort by key length descending to substitute longer keys first
         // This prevents $fund from matching in $fund_entity.name
         let mut sorted_keys: Vec<_> = explicit_params.keys().collect();
-        sorted_keys.sort_by(|a, b| b.len().cmp(&a.len()));
+        sorted_keys.sort_by_key(|k| std::cmp::Reverse(k.len()));
 
         for key in sorted_keys {
             if let Some(value) = explicit_params.get(key) {

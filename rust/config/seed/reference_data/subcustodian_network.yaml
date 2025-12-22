@@ -1,0 +1,464 @@
+# Subcustodian Network Reference Data
+# Global custodian's agent bank network by market
+# Updated: 2025-12-22
+# NOTE: BICs are illustrative - production data from network team
+
+subcustodian_network:
+  # ============================================================================
+  # AMERICAS
+  # ============================================================================
+
+  # United States (Direct - no subcustodian needed)
+  - market_mic: XNYS
+    subcustodian_bic: IRVTUS3N
+    subcustodian_name: BNY Mellon (Direct)
+    csd_bic: DTCYUS33
+    is_direct: true
+    currencies: [USD]
+    is_active: true
+
+  - market_mic: XNAS
+    subcustodian_bic: IRVTUS3N
+    subcustodian_name: BNY Mellon (Direct)
+    csd_bic: DTCYUS33
+    is_direct: true
+    currencies: [USD]
+    is_active: true
+
+  - market_mic: XASE
+    subcustodian_bic: IRVTUS3N
+    subcustodian_name: BNY Mellon (Direct)
+    csd_bic: DTCYUS33
+    is_direct: true
+    currencies: [USD]
+    is_active: true
+
+  - market_mic: ARCX
+    subcustodian_bic: IRVTUS3N
+    subcustodian_name: BNY Mellon (Direct)
+    csd_bic: DTCYUS33
+    is_direct: true
+    currencies: [USD]
+    is_active: true
+
+  # Canada
+  - market_mic: XTSE
+    subcustodian_bic: ROABORDC
+    subcustodian_name: RBC Investor Services
+    csd_bic: CDABORDC
+    is_direct: false
+    currencies: [CAD, USD]
+    is_active: true
+
+  - market_mic: XTSX
+    subcustodian_bic: ROABORDC
+    subcustodian_name: RBC Investor Services
+    csd_bic: CDABORDC
+    is_direct: false
+    currencies: [CAD]
+    is_active: true
+
+  # Brazil
+  - market_mic: BVMF
+    subcustodian_bic: ITABORPP
+    subcustodian_name: Itau Unibanco
+    csd_bic: CETABORJ
+    is_direct: false
+    currencies: [BRL, USD]
+    is_active: true
+
+  # Mexico
+  - market_mic: XMEX
+    subcustodian_bic: BABORDC
+    subcustodian_name: BBVA Mexico
+    csd_bic: INDEVAL
+    is_direct: false
+    currencies: [MXN, USD]
+    is_active: true
+
+  # ============================================================================
+  # EUROPE
+  # ============================================================================
+
+  # United Kingdom
+  - market_mic: XLON
+    subcustodian_bic: HSBCGB2L
+    subcustodian_name: HSBC Securities Services
+    csd_bic: CABORDC1
+    is_direct: false
+    currencies: [GBP, EUR, USD]
+    is_active: true
+
+  - market_mic: TRQX
+    subcustodian_bic: HSBCGB2L
+    subcustodian_name: HSBC Securities Services
+    csd_bic: CABORDC1
+    is_direct: false
+    currencies: [GBP, EUR]
+    is_active: true
+
+  # Germany
+  - market_mic: XETR
+    subcustodian_bic: DEUTDEFF
+    subcustodian_name: Deutsche Bank AG
+    csd_bic: DAKVDEFF
+    is_direct: false
+    currencies: [EUR]
+    is_active: true
+
+  - market_mic: XFRA
+    subcustodian_bic: DEUTDEFF
+    subcustodian_name: Deutsche Bank AG
+    csd_bic: DAKVDEFF
+    is_direct: false
+    currencies: [EUR]
+    is_active: true
+
+  # France
+  - market_mic: XPAR
+    subcustodian_bic: BNPAFRPP
+    subcustodian_name: BNP Paribas Securities Services
+    csd_bic: SICABORDC
+    is_direct: false
+    currencies: [EUR]
+    is_active: true
+
+  # Netherlands
+  - market_mic: XAMS
+    subcustodian_bic: ABNANL2A
+    subcustodian_name: ABN AMRO Clearing Bank
+    csd_bic: NEDABORDC
+    is_direct: false
+    currencies: [EUR]
+    is_active: true
+
+  # Belgium
+  - market_mic: XBRU
+    subcustodian_bic: BNPABRBB
+    subcustodian_name: BNP Paribas Securities Services Belgium
+    csd_bic: EABORDC1
+    is_direct: false
+    currencies: [EUR]
+    is_active: true
+
+  # Ireland
+  - market_mic: XDUB
+    subcustodian_bic: BOABORDC
+    subcustodian_name: Bank of Ireland Securities Services
+    csd_bic: EUROCLEAR
+    is_direct: false
+    currencies: [EUR, GBP, USD]
+    is_active: true
+
+  # Switzerland
+  - market_mic: XSWX
+    subcustodian_bic: UBSWCHZH
+    subcustodian_name: UBS Switzerland AG
+    csd_bic: SABORDC
+    is_direct: false
+    currencies: [CHF, EUR, USD]
+    is_active: true
+
+  # Italy
+  - market_mic: XMIL
+    subcustodian_bic: INTEITM1
+    subcustodian_name: Intesa Sanpaolo
+    csd_bic: MABORDC1
+    is_direct: false
+    currencies: [EUR]
+    is_active: true
+
+  # Spain
+  - market_mic: XMAD
+    subcustodian_bic: BBVAESMM
+    subcustodian_name: BBVA
+    csd_bic: IABORDC1
+    is_direct: false
+    currencies: [EUR]
+    is_active: true
+
+  # Portugal
+  - market_mic: XLIS
+    subcustodian_bic: BESCPTPL
+    subcustodian_name: Novo Banco
+    csd_bic: INTERBOLSA
+    is_direct: false
+    currencies: [EUR]
+    is_active: true
+
+  # Sweden
+  - market_mic: XSTO
+    subcustodian_bic: HANDSESS
+    subcustodian_name: Handelsbanken
+    csd_bic: ECSDBORDC
+    is_direct: false
+    currencies: [SEK, EUR]
+    is_active: true
+
+  # Denmark
+  - market_mic: XCSE
+    subcustodian_bic: DABADKKK
+    subcustodian_name: Danske Bank
+    csd_bic: VPABORDC
+    is_direct: false
+    currencies: [DKK, EUR]
+    is_active: true
+
+  # Norway
+  - market_mic: XOSL
+    subcustodian_bic: DNBANODD
+    subcustodian_name: DNB Bank ASA
+    csd_bic: VPSABORDC
+    is_direct: false
+    currencies: [NOK, EUR]
+    is_active: true
+
+  # Finland
+  - market_mic: XHEL
+    subcustodian_bic: NABORDC1
+    subcustodian_name: Nordea Bank Finland
+    csd_bic: ECSDBORDC
+    is_direct: false
+    currencies: [EUR]
+    is_active: true
+
+  # Austria
+  - market_mic: XWBO
+    subcustodian_bic: GIBAATWG
+    subcustodian_name: Erste Group Bank AG
+    csd_bic: OEKBATW1
+    is_direct: false
+    currencies: [EUR]
+    is_active: true
+
+  # Poland
+  - market_mic: XWAR
+    subcustodian_bic: BABORDC
+    subcustodian_name: Bank Pekao S.A.
+    csd_bic: KDPWPLPW
+    is_direct: false
+    currencies: [PLN, EUR]
+    is_active: true
+
+  # ============================================================================
+  # ASIA-PACIFIC
+  # ============================================================================
+
+  # Japan
+  - market_mic: XTKS
+    subcustodian_bic: MABORJPJ
+    subcustodian_name: Mizuho Bank
+    csd_bic: JASDECJP
+    is_direct: false
+    currencies: [JPY, USD]
+    is_active: true
+
+  - market_mic: XOSE
+    subcustodian_bic: MABORJPJ
+    subcustodian_name: Mizuho Bank
+    csd_bic: JASDECJP
+    is_direct: false
+    currencies: [JPY]
+    is_active: true
+
+  # Hong Kong
+  - market_mic: XHKG
+    subcustodian_bic: HSBCHKHH
+    subcustodian_name: HSBC Hong Kong
+    csd_bic: CCASCHKX
+    is_direct: false
+    currencies: [HKD, USD, CNH]
+    is_active: true
+
+  # China (A-shares via Stock Connect)
+  - market_mic: XSHG
+    subcustodian_bic: HSBCCNSH
+    subcustodian_name: HSBC China (via Stock Connect)
+    csd_bic: CDCPBORG
+    is_direct: false
+    currencies: [CNY]
+    is_active: true
+    notes: "Access via Hong Kong Stock Connect"
+
+  - market_mic: XSHE
+    subcustodian_bic: HSBCCNSH
+    subcustodian_name: HSBC China (via Stock Connect)
+    csd_bic: CDCPBORG
+    is_direct: false
+    currencies: [CNY]
+    is_active: true
+    notes: "Access via Hong Kong Stock Connect"
+
+  # South Korea
+  - market_mic: XKRX
+    subcustodian_bic: SCBLKRSE
+    subcustodian_name: Standard Chartered Korea
+    csd_bic: KSDCBORG
+    is_direct: false
+    currencies: [KRW, USD]
+    is_active: true
+
+  # Taiwan
+  - market_mic: XTAI
+    subcustodian_bic: SCBLTWTX
+    subcustodian_name: Standard Chartered Taiwan
+    csd_bic: TDCCBORG
+    is_direct: false
+    currencies: [TWD, USD]
+    is_active: true
+
+  # Singapore
+  - market_mic: XSES
+    subcustodian_bic: DBSSSGSG
+    subcustodian_name: DBS Bank
+    csd_bic: CDPBORG
+    is_direct: false
+    currencies: [SGD, USD]
+    is_active: true
+
+  # Australia
+  - market_mic: XASX
+    subcustodian_bic: NABORC1A
+    subcustodian_name: National Australia Bank
+    csd_bic: CHESBORG
+    is_direct: false
+    currencies: [AUD, USD]
+    is_active: true
+
+  # New Zealand
+  - market_mic: XNZE
+    subcustodian_bic: ANZBNZ22
+    subcustodian_name: ANZ New Zealand
+    csd_bic: LINKNZWN
+    is_direct: false
+    currencies: [NZD, AUD]
+    is_active: true
+
+  # India
+  - market_mic: XBOM
+    subcustodian_bic: HABORDC1
+    subcustodian_name: HSBC India
+    csd_bic: CDSLBORG
+    is_direct: false
+    currencies: [INR, USD]
+    is_active: true
+
+  - market_mic: XNSE
+    subcustodian_bic: HABORDC1
+    subcustodian_name: HSBC India
+    csd_bic: NSDLBORG
+    is_direct: false
+    currencies: [INR]
+    is_active: true
+
+  # Thailand
+  - market_mic: XBKK
+    subcustodian_bic: SCBLTHBX
+    subcustodian_name: Standard Chartered Thailand
+    csd_bic: TSDBORG
+    is_direct: false
+    currencies: [THB, USD]
+    is_active: true
+
+  # Malaysia
+  - market_mic: XKLS
+    subcustodian_bic: HSBCMYKL
+    subcustodian_name: HSBC Malaysia
+    csd_bic: BURMBORG
+    is_direct: false
+    currencies: [MYR, USD]
+    is_active: true
+
+  # Indonesia
+  - market_mic: XIDX
+    subcustodian_bic: HSBCIDJX
+    subcustodian_name: HSBC Indonesia
+    csd_bic: KSEIBORD
+    is_direct: false
+    currencies: [IDR, USD]
+    is_active: true
+
+  # Philippines
+  - market_mic: XPHS
+    subcustodian_bic: HSBCPHM1
+    subcustodian_name: HSBC Philippines
+    csd_bic: SCPBORG
+    is_direct: false
+    currencies: [PHP, USD]
+    is_active: true
+
+  # Vietnam
+  - market_mic: HOSE
+    subcustodian_bic: HSBCVNVX
+    subcustodian_name: HSBC Vietnam
+    csd_bic: VSDBORG
+    is_direct: false
+    currencies: [VND, USD]
+    is_active: true
+
+  # ============================================================================
+  # MIDDLE EAST & AFRICA
+  # ============================================================================
+
+  # Israel
+  - market_mic: XTAE
+    subcustodian_bic: HABORDC1
+    subcustodian_name: Bank Hapoalim
+    csd_bic: TASEBORG
+    is_direct: false
+    currencies: [ILS, USD]
+    is_active: true
+
+  # UAE
+  - market_mic: XDFM
+    subcustodian_bic: HSBCAEADDXB
+    subcustodian_name: HSBC UAE
+    csd_bic: DFMBORG
+    is_direct: false
+    currencies: [AED, USD]
+    is_active: true
+
+  # Saudi Arabia
+  - market_mic: XSAU
+    subcustodian_bic: HSBCSARI
+    subcustodian_name: HSBC Saudi Arabia
+    csd_bic: TADWBORG
+    is_direct: false
+    currencies: [SAR, USD]
+    is_active: true
+
+  # South Africa
+  - market_mic: XJSE
+    subcustodian_bic: SBZAZAJJ
+    subcustodian_name: Standard Bank South Africa
+    csd_bic: STTRBORG
+    is_direct: false
+    currencies: [ZAR, USD]
+    is_active: true
+
+  # Egypt
+  - market_mic: XCAI
+    subcustodian_bic: HSBCEGCX
+    subcustodian_name: HSBC Egypt
+    csd_bic: MISDBORG
+    is_direct: false
+    currencies: [EGP, USD]
+    is_active: true
+
+  # Qatar
+  - market_mic: DSMD
+    subcustodian_bic: HSBCQAQAQ
+    subcustodian_name: HSBC Qatar
+    csd_bic: QSEBORG
+    is_direct: false
+    currencies: [QAR, USD]
+    is_active: true
+
+  # Kuwait
+  - market_mic: XKUW
+    subcustodian_bic: HSBCKWKW
+    subcustodian_name: HSBC Kuwait
+    csd_bic: KUCSBORG
+    is_direct: false
+    currencies: [KWD, USD]
+    is_active: true

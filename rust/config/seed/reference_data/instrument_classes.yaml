@@ -1,0 +1,503 @@
+# Instrument Classes Taxonomy
+# CFI (ISO 10962), SMPG, and ISDA Mappings
+# Updated: 2025-12-22
+
+instrument_classes:
+  # ============================================================================
+  # EQUITIES (CFI Category: E)
+  # ============================================================================
+  - code: EQUITY
+    name: Listed Equity
+    parent: null
+    cfi_category: E
+    smpg_group: EQUITIES
+    settlement_cycle: T+1
+    requires_isda: false
+    is_active: true
+    children:
+      - code: EQUITY_COMMON
+        name: Common Stock
+        cfi_prefixes: ["ES"]
+        smpg_code: SECU
+        description: Ordinary shares with voting rights
+
+      - code: EQUITY_PREFERRED
+        name: Preferred Stock
+        cfi_prefixes: ["EP"]
+        smpg_code: PREF
+        description: Preference shares with fixed dividend priority
+
+      - code: EQUITY_ADR
+        name: American Depositary Receipt
+        cfi_prefixes: ["ED"]
+        smpg_code: ADRC
+        description: US-listed receipts for foreign shares
+
+      - code: EQUITY_GDR
+        name: Global Depositary Receipt
+        cfi_prefixes: ["EG"]
+        smpg_code: GDRC
+        description: Multi-market depositary receipts
+
+      - code: EQUITY_REIT
+        name: Real Estate Investment Trust
+        cfi_prefixes: ["ER"]
+        smpg_code: REIT
+        description: Listed real estate investment vehicles
+
+      - code: EQUITY_RIGHTS
+        name: Rights
+        cfi_prefixes: ["EW"]
+        smpg_code: RGHT
+        description: Subscription rights to purchase new shares
+
+      - code: EQUITY_WARRANTS
+        name: Warrants
+        cfi_prefixes: ["EY"]
+        smpg_code: WRNT
+        description: Long-dated options to purchase shares
+
+  # ============================================================================
+  # COLLECTIVE INVESTMENT SCHEMES (CFI Category: C)
+  # ============================================================================
+  - code: CIS
+    name: Collective Investment Scheme
+    parent: null
+    cfi_category: C
+    smpg_group: FUNDS
+    requires_isda: false
+    is_active: true
+    children:
+      - code: ETF
+        name: Exchange Traded Fund
+        cfi_prefixes: ["CE"]
+        smpg_code: ETFL
+        settlement_cycle: T+1
+        description: Listed fund tracking index or basket
+
+      - code: MUTUAL_FUND
+        name: Mutual Fund / UCITS
+        cfi_prefixes: ["CI"]
+        smpg_code: FUND
+        settlement_cycle: T+2
+        description: Open-ended collective investment scheme
+
+      - code: CLOSED_END_FUND
+        name: Closed End Fund
+        cfi_prefixes: ["CC"]
+        smpg_code: CLFC
+        settlement_cycle: T+1
+        description: Listed investment company with fixed shares
+
+      - code: MMF
+        name: Money Market Fund
+        cfi_prefixes: ["CM"]
+        smpg_code: MMFT
+        settlement_cycle: T+0
+        sweep_eligible: true
+        description: Short-term liquid investment fund
+
+  # ============================================================================
+  # FIXED INCOME - GOVERNMENT (CFI Category: D)
+  # ============================================================================
+  - code: FIXED_INCOME
+    name: Fixed Income
+    parent: null
+    cfi_category: D
+    smpg_group: BONDS
+    requires_isda: false
+    is_active: true
+    children:
+      - code: GOVT_BOND
+        name: Government Bond
+        cfi_prefixes: ["DB"]
+        cfi_group: B
+        smpg_code: GOVB
+        settlement_cycle: T+1
+        description: Sovereign debt securities
+        children:
+          - code: GOVT_BOND_US
+            name: US Treasury
+            smpg_code: USTY
+            description: US Treasury bills, notes, bonds
+
+          - code: GOVT_BOND_UK
+            name: UK Gilt
+            smpg_code: GILT
+            description: UK government gilts
+
+          - code: GOVT_BOND_EU
+            name: Eurozone Sovereign
+            smpg_code: EGSB
+            description: Eurozone government bonds
+
+          - code: GOVT_BOND_JGB
+            name: Japanese Government Bond
+            smpg_code: JGBJ
+            description: Japanese government bonds
+
+      - code: CORP_BOND
+        name: Corporate Bond
+        cfi_prefixes: ["DC"]
+        smpg_code: CORP
+        settlement_cycle: T+2
+        description: Investment grade and high yield corporate debt
+        children:
+          - code: CORP_BOND_IG
+            name: Investment Grade
+            smpg_code: IGCB
+            description: BBB- and above rated
+
+          - code: CORP_BOND_HY
+            name: High Yield
+            smpg_code: HYCB
+            description: Below investment grade
+
+      - code: MUNI_BOND
+        name: Municipal Bond
+        cfi_prefixes: ["DM"]
+        smpg_code: MUNI
+        settlement_cycle: T+1
+        description: US state and local government debt
+
+      - code: AGENCY_BOND
+        name: Agency Bond
+        cfi_prefixes: ["DA"]
+        smpg_code: AGNC
+        settlement_cycle: T+1
+        description: Government-sponsored enterprise debt
+
+      - code: SUPRANATIONAL
+        name: Supranational Bond
+        cfi_prefixes: ["DS"]
+        smpg_code: SNAT
+        settlement_cycle: T+2
+        description: Multilateral institution debt (World Bank, EIB, etc.)
+
+      - code: COVERED_BOND
+        name: Covered Bond
+        cfi_prefixes: ["DV"]
+        smpg_code: COVB
+        settlement_cycle: T+2
+        description: Dual recourse bonds backed by cover pool
+
+  # ============================================================================
+  # STRUCTURED PRODUCTS
+  # ============================================================================
+  - code: STRUCTURED
+    name: Structured Products
+    parent: null
+    cfi_category: D
+    smpg_group: STRUCTURED
+    requires_isda: false
+    is_active: true
+    children:
+      - code: ABS
+        name: Asset Backed Securities
+        cfi_prefixes: ["DA"]
+        smpg_code: ABSC
+        settlement_cycle: T+2
+        description: Securities backed by asset pools
+
+      - code: MBS
+        name: Mortgage Backed Securities
+        cfi_prefixes: ["DM"]
+        smpg_code: MBSC
+        settlement_cycle: T+2
+        description: Securities backed by mortgage pools
+        children:
+          - code: MBS_AGENCY
+            name: Agency MBS
+            smpg_code: AMBS
+            description: GNMA, FNMA, FHLMC guaranteed
+
+          - code: MBS_NON_AGENCY
+            name: Non-Agency MBS
+            smpg_code: NMBS
+            description: Private label MBS
+
+      - code: CLO
+        name: Collateralized Loan Obligation
+        cfi_prefixes: ["DL"]
+        smpg_code: CLOB
+        settlement_cycle: T+2
+        description: Securities backed by leveraged loan pools
+
+      - code: CDO
+        name: Collateralized Debt Obligation
+        cfi_prefixes: ["DD"]
+        smpg_code: CDOB
+        settlement_cycle: T+2
+        description: Securities backed by mixed debt pools
+
+  # ============================================================================
+  # LISTED DERIVATIVES (CFI Categories: O, F)
+  # ============================================================================
+  - code: LISTED_DERIVATIVE
+    name: Listed Derivatives
+    parent: null
+    cfi_category: O
+    smpg_group: DERIVATIVES
+    requires_isda: false
+    is_active: true
+    children:
+      - code: EQUITY_OPTION
+        name: Equity Option
+        cfi_prefixes: ["OE"]
+        smpg_code: EQOP
+        settlement_cycle: T+1
+        description: Listed options on single stocks
+
+      - code: INDEX_OPTION
+        name: Index Option
+        cfi_prefixes: ["OI"]
+        smpg_code: IDOP
+        settlement_cycle: T+1
+        description: Listed options on indices
+
+      - code: EQUITY_FUTURE
+        name: Equity Future
+        cfi_prefixes: ["FE"]
+        smpg_code: EQFU
+        settlement_cycle: T+1
+        description: Listed futures on single stocks
+
+      - code: INDEX_FUTURE
+        name: Index Future
+        cfi_prefixes: ["FI"]
+        smpg_code: IDFU
+        settlement_cycle: T+1
+        description: Listed futures on indices
+
+      - code: BOND_FUTURE
+        name: Bond Future
+        cfi_prefixes: ["FB"]
+        smpg_code: BDFU
+        settlement_cycle: T+1
+        description: Listed futures on government bonds
+
+      - code: COMMODITY_FUTURE
+        name: Commodity Future
+        cfi_prefixes: ["FC"]
+        smpg_code: COFU
+        settlement_cycle: T+1
+        description: Listed futures on commodities
+
+      - code: FX_FUTURE
+        name: FX Future
+        cfi_prefixes: ["FF"]
+        smpg_code: FXFU
+        settlement_cycle: T+1
+        description: Listed futures on currency pairs
+
+  # ============================================================================
+  # OTC DERIVATIVES (Require ISDA)
+  # ============================================================================
+  - code: OTC_DERIVATIVE
+    name: OTC Derivatives
+    parent: null
+    requires_isda: true
+    is_active: true
+    children:
+      # Interest Rate Products
+      - code: IRS
+        name: Interest Rate Swap
+        isda_asset_class: RATES
+        isda_base_product: SWAP
+        description: Fixed/floating interest rate exchange
+        children:
+          - code: IRS_VANILLA
+            name: Vanilla IRS
+            isda_sub_product: FIXED_FLOAT
+            description: Plain vanilla fixed-for-floating swap
+
+          - code: IRS_BASIS
+            name: Basis Swap
+            isda_sub_product: BASIS
+            description: Floating-for-floating swap
+
+          - code: IRS_OIS
+            name: Overnight Index Swap
+            isda_sub_product: OIS
+            description: Fixed vs overnight rate swap
+
+      - code: SWAPTION
+        name: Interest Rate Swaption
+        isda_asset_class: RATES
+        isda_base_product: SWAPTION
+        description: Option to enter interest rate swap
+
+      - code: CAP_FLOOR
+        name: Interest Rate Cap/Floor
+        isda_asset_class: RATES
+        isda_base_product: CAP_FLOOR
+        description: Interest rate caps and floors
+
+      - code: FRA
+        name: Forward Rate Agreement
+        isda_asset_class: RATES
+        isda_base_product: FRA
+        description: Forward interest rate contract
+
+      # Credit Products
+      - code: CDS
+        name: Credit Default Swap
+        isda_asset_class: CREDIT
+        isda_base_product: CDS
+        description: Credit protection on reference entity
+        children:
+          - code: CDS_SINGLE_NAME
+            name: Single Name CDS
+            isda_sub_product: SINGLE_NAME
+            description: CDS on single reference entity
+
+          - code: CDS_INDEX
+            name: Credit Index
+            isda_sub_product: INDEX
+            description: CDS on credit index (CDX, iTraxx)
+
+          - code: CDS_TRANCHE
+            name: Credit Tranche
+            isda_sub_product: TRANCHE
+            description: Tranched credit index products
+
+      - code: TRS
+        name: Total Return Swap
+        isda_asset_class: CREDIT
+        isda_base_product: TOTAL_RETURN
+        description: Total return exchange on reference asset
+
+      # FX Products
+      - code: FX_FORWARD
+        name: FX Forward
+        isda_asset_class: FX
+        isda_base_product: FORWARD
+        description: Forward currency exchange
+
+      - code: FX_SWAP
+        name: FX Swap
+        isda_asset_class: FX
+        isda_base_product: SWAP
+        description: Simultaneous spot and forward FX
+
+      - code: FX_OPTION
+        name: FX Option
+        isda_asset_class: FX
+        isda_base_product: OPTION
+        description: Option on currency pair
+        children:
+          - code: FX_OPTION_VANILLA
+            name: Vanilla FX Option
+            isda_sub_product: VANILLA
+            description: European or American FX option
+
+          - code: FX_OPTION_BARRIER
+            name: Barrier FX Option
+            isda_sub_product: BARRIER
+            description: Knock-in/knock-out FX option
+
+      - code: FX_NDF
+        name: Non-Deliverable Forward
+        isda_asset_class: FX
+        isda_base_product: NDF
+        description: Cash-settled FX forward for restricted currencies
+
+      # Equity Derivatives
+      - code: EQUITY_SWAP
+        name: Equity Swap
+        isda_asset_class: EQUITY
+        isda_base_product: SWAP
+        description: Total return swap on equity
+
+      - code: VARIANCE_SWAP
+        name: Variance Swap
+        isda_asset_class: EQUITY
+        isda_base_product: VARIANCE
+        description: Volatility-based equity derivative
+
+      # Commodity Products
+      - code: COMMODITY_SWAP
+        name: Commodity Swap
+        isda_asset_class: COMMODITY
+        isda_base_product: SWAP
+        description: Fixed/floating commodity price exchange
+
+  # ============================================================================
+  # CASH / MONEY MARKET
+  # ============================================================================
+  - code: CASH_INSTRUMENTS
+    name: Cash Instruments
+    parent: null
+    requires_isda: false
+    is_active: true
+    children:
+      - code: STIF
+        name: Short-Term Investment Fund
+        settlement_cycle: T+0
+        sweep_eligible: true
+        description: Bank-managed short-term pool
+
+      - code: REPO
+        name: Repurchase Agreement
+        settlement_cycle: T+0
+        description: Collateralized short-term borrowing
+        children:
+          - code: REPO_TRIPARTY
+            name: Tri-Party Repo
+            description: Repo with third-party collateral agent
+
+          - code: REPO_BILATERAL
+            name: Bilateral Repo
+            description: Direct repo between counterparties
+
+      - code: COMMERCIAL_PAPER
+        name: Commercial Paper
+        cfi_prefixes: ["DT"]
+        settlement_cycle: T+0
+        description: Short-term corporate debt
+
+      - code: CD
+        name: Certificate of Deposit
+        cfi_prefixes: ["DT"]
+        settlement_cycle: T+0
+        description: Bank time deposit
+
+      - code: T_BILL
+        name: Treasury Bill
+        cfi_prefixes: ["DT"]
+        settlement_cycle: T+0
+        description: Short-term government discount note
+
+  # ============================================================================
+  # ALTERNATIVES
+  # ============================================================================
+  - code: ALTERNATIVES
+    name: Alternative Investments
+    parent: null
+    requires_isda: false
+    is_active: true
+    children:
+      - code: HEDGE_FUND
+        name: Hedge Fund
+        settlement_cycle: T+30
+        description: Alternative investment fund
+
+      - code: PRIVATE_EQUITY
+        name: Private Equity
+        settlement_cycle: VARIES
+        description: Unlisted equity investment
+
+      - code: REAL_ESTATE_FUND
+        name: Real Estate Fund
+        settlement_cycle: T+30
+        description: Unlisted real estate investment vehicle
+
+      - code: INFRASTRUCTURE
+        name: Infrastructure
+        settlement_cycle: VARIES
+        description: Infrastructure investment
+
+      - code: PRIVATE_CREDIT
+        name: Private Credit
+        settlement_cycle: VARIES
+        description: Direct lending and private debt

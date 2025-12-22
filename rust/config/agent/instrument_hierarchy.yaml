@@ -1,0 +1,763 @@
+# Instrument class hierarchy for category expansion
+# Phase 3.3: Agent Intelligence - Entity Extraction
+#
+# Hierarchical classification of instruments for scope expansion.
+# When a user says "fixed income", we expand to the specific instrument classes.
+
+version: "1.0"
+description: "Hierarchical instrument classification for entity extraction"
+
+# ==========================================================================
+# INSTRUMENT HIERARCHY
+# ==========================================================================
+instrument_hierarchy:
+
+  # Root node
+  root:
+    name: "All Instruments"
+    children:
+      - listed_securities
+      - fixed_income
+      - derivatives
+      - cash_equivalents
+      - alternatives
+
+  # ------------------------------------------------------------------------
+  # Listed Securities
+  # ------------------------------------------------------------------------
+  listed_securities:
+    name: "Listed Securities"
+    description: "Exchange-traded equity and equity-like instruments"
+    aliases:
+      - "equities"
+      - "stocks"
+      - "shares"
+      - "listed"
+      - "equity securities"
+    children:
+      - equity
+      - etf
+      - depositary_receipts
+      - reits
+
+  equity:
+    name: "Equity"
+    code: "EQUITY"
+    cfi_prefix: "ES"
+    description: "Common and preferred stock"
+    aliases:
+      - "equities"
+      - "stocks"
+      - "shares"
+      - "common stock"
+    smpg_category: "EQUITY"
+    requires_isda: false
+
+  etf:
+    name: "Exchange-Traded Funds"
+    code: "ETF"
+    cfi_prefix: "EU"
+    description: "Exchange-traded funds"
+    aliases:
+      - "ETFs"
+      - "exchange traded funds"
+      - "trackers"
+    smpg_category: "ETF"
+    requires_isda: false
+
+  depositary_receipts:
+    name: "Depositary Receipts"
+    description: "ADRs, GDRs, and other depositary receipts"
+    children:
+      - adr
+      - gdr
+
+  adr:
+    name: "American Depositary Receipts"
+    code: "ADR"
+    aliases:
+      - "ADRs"
+      - "American depositary receipts"
+    smpg_category: "EQUITY"
+    requires_isda: false
+
+  gdr:
+    name: "Global Depositary Receipts"
+    code: "GDR"
+    aliases:
+      - "GDRs"
+      - "global depositary receipts"
+    smpg_category: "EQUITY"
+    requires_isda: false
+
+  reits:
+    name: "Real Estate Investment Trusts"
+    code: "REIT"
+    aliases:
+      - "REITs"
+      - "real estate"
+    smpg_category: "EQUITY"
+    requires_isda: false
+
+  # ------------------------------------------------------------------------
+  # Fixed Income
+  # ------------------------------------------------------------------------
+  fixed_income:
+    name: "Fixed Income"
+    description: "Debt instruments and bonds"
+    aliases:
+      - "bonds"
+      - "debt"
+      - "credit"
+      - "fixed income securities"
+    children:
+      - government_bonds
+      - corporate_credit
+      - money_market
+      - structured
+
+  government_bonds:
+    name: "Government Bonds"
+    description: "Sovereign and quasi-sovereign debt"
+    aliases:
+      - "govvies"
+      - "sovereigns"
+      - "government debt"
+      - "sovereign bonds"
+    children:
+      - govt_bond
+      - muni_bond
+      - tips
+      - gilt
+
+  govt_bond:
+    name: "Government Bonds"
+    code: "GOVT_BOND"
+    cfi_prefix: "DB"
+    description: "Sovereign government bonds"
+    aliases:
+      - "treasuries"
+      - "T-bonds"
+      - "government bonds"
+    smpg_category: "GOVT_BOND"
+    requires_isda: false
+
+  muni_bond:
+    name: "Municipal Bonds"
+    code: "MUNI_BOND"
+    cfi_prefix: "DM"
+    description: "US municipal bonds"
+    aliases:
+      - "munis"
+      - "municipal bonds"
+      - "muni"
+    smpg_category: "MUNI_BOND"
+    requires_isda: false
+
+  tips:
+    name: "Inflation-Linked Bonds"
+    code: "TIPS"
+    description: "Treasury Inflation-Protected Securities and linkers"
+    aliases:
+      - "TIPS"
+      - "linkers"
+      - "inflation linked"
+      - "ILBs"
+    smpg_category: "GOVT_BOND"
+    requires_isda: false
+
+  gilt:
+    name: "UK Gilts"
+    code: "GILT"
+    description: "UK government bonds"
+    aliases:
+      - "gilts"
+      - "UK government bonds"
+    smpg_category: "GOVT_BOND"
+    requires_isda: false
+
+  corporate_credit:
+    name: "Corporate Credit"
+    description: "Corporate debt instruments"
+    aliases:
+      - "corporates"
+      - "corporate bonds"
+      - "corp bonds"
+      - "credit"
+    children:
+      - corp_bond
+      - high_yield
+      - convertible
+
+  corp_bond:
+    name: "Investment Grade Corporate Bonds"
+    code: "CORP_BOND"
+    cfi_prefix: "DC"
+    description: "Investment grade corporate bonds"
+    aliases:
+      - "IG corporates"
+      - "investment grade"
+      - "corporate bonds"
+    smpg_category: "CORP_BOND"
+    requires_isda: false
+
+  high_yield:
+    name: "High Yield Bonds"
+    code: "HIGH_YIELD"
+    description: "Non-investment grade corporate bonds"
+    aliases:
+      - "high yield"
+      - "HY"
+      - "junk bonds"
+      - "sub-investment grade"
+    smpg_category: "HIGH_YIELD"
+    requires_isda: false
+
+  convertible:
+    name: "Convertible Bonds"
+    code: "CONVERTIBLE"
+    cfi_prefix: "DC"
+    description: "Bonds convertible to equity"
+    aliases:
+      - "converts"
+      - "convertibles"
+      - "CBs"
+    smpg_category: "CONVERTIBLE"
+    requires_isda: false
+
+  money_market:
+    name: "Money Market Instruments"
+    description: "Short-term debt instruments"
+    aliases:
+      - "money market"
+      - "short-term"
+    children:
+      - cp
+      - cd
+      - tbill
+
+  cp:
+    name: "Commercial Paper"
+    code: "CP"
+    description: "Corporate commercial paper"
+    aliases:
+      - "commercial paper"
+      - "CP"
+    smpg_category: "MONEY_MARKET"
+    requires_isda: false
+
+  cd:
+    name: "Certificates of Deposit"
+    code: "CD"
+    description: "Bank certificates of deposit"
+    aliases:
+      - "CDs"
+      - "certificates of deposit"
+    smpg_category: "MONEY_MARKET"
+    requires_isda: false
+
+  tbill:
+    name: "Treasury Bills"
+    code: "TBILL"
+    description: "Short-term government debt"
+    aliases:
+      - "T-bills"
+      - "treasury bills"
+    smpg_category: "GOVT_BOND"
+    requires_isda: false
+
+  structured:
+    name: "Structured Products"
+    description: "Asset-backed and structured securities"
+    aliases:
+      - "structured"
+      - "securitized"
+      - "ABS"
+    children:
+      - abs
+      - mbs
+      - cmo
+
+  abs:
+    name: "Asset-Backed Securities"
+    code: "ABS"
+    description: "Securities backed by loan pools"
+    aliases:
+      - "ABS"
+      - "asset backed"
+    smpg_category: "ABS"
+    requires_isda: false
+
+  mbs:
+    name: "Mortgage-Backed Securities"
+    code: "MBS"
+    description: "Securities backed by mortgages"
+    aliases:
+      - "MBS"
+      - "mortgage backed"
+      - "RMBS"
+      - "CMBS"
+    smpg_category: "MBS"
+    requires_isda: false
+
+  cmo:
+    name: "Collateralized Mortgage Obligations"
+    code: "CMO"
+    description: "Structured mortgage securities"
+    aliases:
+      - "CMOs"
+    smpg_category: "MBS"
+    requires_isda: false
+
+  # ------------------------------------------------------------------------
+  # Derivatives
+  # ------------------------------------------------------------------------
+  derivatives:
+    name: "Derivatives"
+    description: "OTC and exchange-traded derivatives"
+    aliases:
+      - "OTC"
+      - "swaps"
+      - "options"
+      - "derivatives"
+    requires_isda: true
+    children:
+      - rates_derivatives
+      - credit_derivatives
+      - fx_derivatives
+      - equity_derivatives
+      - commodity_derivatives
+      - listed_derivatives
+
+  rates_derivatives:
+    name: "Rates Derivatives"
+    description: "Interest rate derivatives"
+    aliases:
+      - "rates"
+      - "interest rate derivatives"
+      - "IR derivatives"
+    isda_asset_class: "RATES"
+    children:
+      - irs
+      - xccy
+      - swaption
+      - cap_floor
+      - fra
+
+  irs:
+    name: "Interest Rate Swaps"
+    code: "IRS"
+    description: "Plain vanilla interest rate swaps"
+    aliases:
+      - "swaps"
+      - "interest rate swaps"
+      - "IR swaps"
+    isda_product: "IRSwap"
+    requires_isda: true
+
+  xccy:
+    name: "Cross-Currency Swaps"
+    code: "XCCY"
+    description: "Cross-currency basis swaps"
+    aliases:
+      - "cross-currency"
+      - "XCCY swaps"
+      - "basis swaps"
+    isda_product: "CrossCurrencySwap"
+    requires_isda: true
+
+  swaption:
+    name: "Swaptions"
+    code: "SWAPTION"
+    description: "Options on interest rate swaps"
+    aliases:
+      - "swaptions"
+      - "swap options"
+    isda_product: "Swaption"
+    requires_isda: true
+
+  cap_floor:
+    name: "Caps and Floors"
+    code: "CAP_FLOOR"
+    description: "Interest rate caps and floors"
+    aliases:
+      - "caps"
+      - "floors"
+      - "caps and floors"
+    isda_product: "CapFloor"
+    requires_isda: true
+
+  fra:
+    name: "Forward Rate Agreements"
+    code: "FRA"
+    description: "Forward rate agreements"
+    aliases:
+      - "FRAs"
+      - "forward rate agreements"
+    isda_product: "FRA"
+    requires_isda: true
+
+  credit_derivatives:
+    name: "Credit Derivatives"
+    description: "Credit default and total return products"
+    aliases:
+      - "credit"
+      - "credit derivatives"
+    isda_asset_class: "CREDIT"
+    children:
+      - cds
+      - cds_index
+      - trs
+      - clo
+
+  cds:
+    name: "Credit Default Swaps"
+    code: "CDS"
+    description: "Single-name credit default swaps"
+    aliases:
+      - "CDS"
+      - "credit default swaps"
+    isda_product: "CreditDefaultSwap"
+    requires_isda: true
+
+  cds_index:
+    name: "CDS Indices"
+    code: "CDS_INDEX"
+    description: "Credit index products (CDX, iTraxx)"
+    aliases:
+      - "CDX"
+      - "iTraxx"
+      - "credit indices"
+    isda_product: "CreditDefaultSwapIndex"
+    requires_isda: true
+
+  trs:
+    name: "Total Return Swaps"
+    code: "TRS"
+    description: "Total return swaps"
+    aliases:
+      - "TRS"
+      - "total return swaps"
+    isda_product: "TotalReturnSwap"
+    requires_isda: true
+
+  clo:
+    name: "CLO Notes"
+    code: "CLO"
+    description: "Collateralized loan obligation notes"
+    aliases:
+      - "CLO"
+      - "CLOs"
+    smpg_category: "ABS"
+    requires_isda: false
+
+  fx_derivatives:
+    name: "FX Derivatives"
+    description: "Foreign exchange derivatives"
+    aliases:
+      - "FX"
+      - "forex"
+      - "currency derivatives"
+    isda_asset_class: "FX"
+    children:
+      - fx_forward
+      - fx_option
+      - fx_swap
+      - ndf
+
+  fx_forward:
+    name: "FX Forwards"
+    code: "FX_FORWARD"
+    description: "Foreign exchange forwards"
+    aliases:
+      - "FX forwards"
+      - "currency forwards"
+      - "outright forwards"
+    isda_product: "FXForward"
+    requires_isda: true
+
+  fx_option:
+    name: "FX Options"
+    code: "FX_OPTION"
+    description: "Currency options"
+    aliases:
+      - "FX options"
+      - "currency options"
+    isda_product: "FXOption"
+    requires_isda: true
+
+  fx_swap:
+    name: "FX Swaps"
+    code: "FX_SWAP"
+    description: "FX swap (spot + forward)"
+    aliases:
+      - "FX swaps"
+    isda_product: "FXSwap"
+    requires_isda: true
+
+  ndf:
+    name: "Non-Deliverable Forwards"
+    code: "NDF"
+    description: "Non-deliverable currency forwards"
+    aliases:
+      - "NDFs"
+      - "non-deliverable forwards"
+    isda_product: "NDF"
+    requires_isda: true
+
+  equity_derivatives:
+    name: "Equity Derivatives"
+    description: "Equity-linked derivatives"
+    aliases:
+      - "equity derivatives"
+    isda_asset_class: "EQUITY"
+    children:
+      - equity_swap
+      - equity_option
+      - variance_swap
+
+  equity_swap:
+    name: "Equity Swaps"
+    code: "EQUITY_SWAP"
+    description: "Equity total return swaps"
+    aliases:
+      - "equity swaps"
+      - "ERS"
+    isda_product: "EquitySwap"
+    requires_isda: true
+
+  equity_option:
+    name: "OTC Equity Options"
+    code: "EQUITY_OPTION"
+    description: "OTC equity options"
+    aliases:
+      - "equity options"
+    isda_product: "EquityOption"
+    requires_isda: true
+
+  variance_swap:
+    name: "Variance Swaps"
+    code: "VAR_SWAP"
+    description: "Variance and volatility swaps"
+    aliases:
+      - "variance swaps"
+      - "vol swaps"
+    isda_product: "VarianceSwap"
+    requires_isda: true
+
+  commodity_derivatives:
+    name: "Commodity Derivatives"
+    description: "Commodity-linked derivatives"
+    aliases:
+      - "commodities"
+      - "commodity derivatives"
+    isda_asset_class: "COMMODITY"
+    children:
+      - commodity_swap
+      - commodity_option
+
+  commodity_swap:
+    name: "Commodity Swaps"
+    code: "COMMODITY_SWAP"
+    description: "Commodity swaps and forwards"
+    aliases:
+      - "commodity swaps"
+    isda_product: "CommoditySwap"
+    requires_isda: true
+
+  commodity_option:
+    name: "Commodity Options"
+    code: "COMMODITY_OPTION"
+    description: "OTC commodity options"
+    aliases:
+      - "commodity options"
+    isda_product: "CommodityOption"
+    requires_isda: true
+
+  listed_derivatives:
+    name: "Listed Derivatives"
+    description: "Exchange-traded derivatives"
+    aliases:
+      - "ETD"
+      - "futures"
+      - "listed options"
+    requires_isda: false
+    children:
+      - futures
+      - listed_options
+
+  futures:
+    name: "Futures"
+    code: "FUTURES"
+    cfi_prefix: "FF"
+    description: "Exchange-traded futures"
+    aliases:
+      - "futures"
+    smpg_category: "FUTURES"
+    requires_isda: false
+
+  listed_options:
+    name: "Listed Options"
+    code: "LISTED_OPTION"
+    cfi_prefix: "O"
+    description: "Exchange-traded options"
+    aliases:
+      - "listed options"
+      - "exchange options"
+    smpg_category: "OPTIONS"
+    requires_isda: false
+
+  # ------------------------------------------------------------------------
+  # Cash Equivalents
+  # ------------------------------------------------------------------------
+  cash_equivalents:
+    name: "Cash Equivalents"
+    description: "Cash and near-cash instruments"
+    aliases:
+      - "cash"
+      - "liquidity"
+    children:
+      - cash
+      - repo
+      - reverse_repo
+
+  cash:
+    name: "Cash"
+    code: "CASH"
+    description: "Currency holdings"
+    aliases:
+      - "cash"
+      - "currency"
+    requires_isda: false
+
+  repo:
+    name: "Repurchase Agreements"
+    code: "REPO"
+    description: "Repo transactions"
+    aliases:
+      - "repo"
+      - "repurchase"
+    isda_product: "Repo"
+    requires_isda: true
+
+  reverse_repo:
+    name: "Reverse Repo"
+    code: "REVERSE_REPO"
+    description: "Reverse repurchase agreements"
+    aliases:
+      - "reverse repo"
+    isda_product: "Repo"
+    requires_isda: true
+
+  # ------------------------------------------------------------------------
+  # Alternatives
+  # ------------------------------------------------------------------------
+  alternatives:
+    name: "Alternatives"
+    description: "Alternative investments"
+    aliases:
+      - "alts"
+      - "alternatives"
+      - "alternative investments"
+    children:
+      - private_equity
+      - hedge_fund
+      - real_assets
+
+  private_equity:
+    name: "Private Equity"
+    code: "PE"
+    description: "Private equity and venture capital"
+    aliases:
+      - "PE"
+      - "private equity"
+      - "VC"
+    requires_isda: false
+
+  hedge_fund:
+    name: "Hedge Funds"
+    code: "HF"
+    description: "Hedge fund investments"
+    aliases:
+      - "hedge funds"
+      - "HF"
+    requires_isda: false
+
+  real_assets:
+    name: "Real Assets"
+    description: "Real estate, infrastructure, commodities"
+    children:
+      - real_estate
+      - infrastructure
+
+  real_estate:
+    name: "Real Estate"
+    code: "RE"
+    description: "Direct real estate investments"
+    aliases:
+      - "real estate"
+      - "property"
+    requires_isda: false
+
+  infrastructure:
+    name: "Infrastructure"
+    code: "INFRA"
+    description: "Infrastructure investments"
+    aliases:
+      - "infrastructure"
+      - "infra"
+    requires_isda: false
+
+# ==========================================================================
+# SHORTHAND EXPANSIONS
+# ==========================================================================
+shorthand_expansions:
+  # Common shorthand terms that expand to multiple instrument classes
+
+  "everything":
+    expands_to: "_ALL_IN_UNIVERSE"
+
+  "all":
+    expands_to: "_ALL_IN_UNIVERSE"
+
+  "across the board":
+    expands_to: "_ALL_IN_UNIVERSE"
+
+  "all securities":
+    expands_to:
+      - listed_securities
+      - fixed_income
+
+  "all OTC":
+    expands_to:
+      - derivatives
+    filter: requires_isda == true
+
+  "vanilla rates":
+    expands_to:
+      - IRS
+      - FRA
+
+  "flow rates":
+    expands_to:
+      - IRS
+      - XCCY
+      - CAP_FLOOR
+      - FRA
+
+  "investment grade":
+    expands_to:
+      - GOVT_BOND
+      - CORP_BOND
+
+  "high grade":
+    expands_to:
+      - GOVT_BOND
+      - CORP_BOND
+
+  "credit":
+    context_dependent: true
+    contexts:
+      derivatives: CDS
+      bonds: CORP_BOND
+      default: CORP_BOND

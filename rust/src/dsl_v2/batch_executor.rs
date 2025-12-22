@@ -39,14 +39,15 @@ pub enum OnErrorMode {
     Rollback,
 }
 
-impl OnErrorMode {
-    /// Parse from string
-    pub fn from_str(s: &str) -> Self {
-        match s.to_lowercase().as_str() {
+impl std::str::FromStr for OnErrorMode {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s.to_lowercase().as_str() {
             "stop" => OnErrorMode::Stop,
             "rollback" => OnErrorMode::Rollback,
             _ => OnErrorMode::Continue,
-        }
+        })
     }
 }
 
@@ -407,10 +408,19 @@ mod tests {
 
     #[test]
     fn test_on_error_mode_from_str() {
-        assert_eq!(OnErrorMode::from_str("continue"), OnErrorMode::Continue);
-        assert_eq!(OnErrorMode::from_str("stop"), OnErrorMode::Stop);
-        assert_eq!(OnErrorMode::from_str("rollback"), OnErrorMode::Rollback);
-        assert_eq!(OnErrorMode::from_str("unknown"), OnErrorMode::Continue);
+        assert_eq!(
+            "continue".parse::<OnErrorMode>().unwrap(),
+            OnErrorMode::Continue
+        );
+        assert_eq!("stop".parse::<OnErrorMode>().unwrap(), OnErrorMode::Stop);
+        assert_eq!(
+            "rollback".parse::<OnErrorMode>().unwrap(),
+            OnErrorMode::Rollback
+        );
+        assert_eq!(
+            "unknown".parse::<OnErrorMode>().unwrap(),
+            OnErrorMode::Continue
+        );
     }
 
     #[test]

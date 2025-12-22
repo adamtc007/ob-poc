@@ -1,0 +1,534 @@
+# SLA Templates Reference Data
+# Production Service Level Agreements by Service Category
+# Updated: 2025-12-22
+
+sla_templates:
+  # ============================================================================
+  # CUSTODY SERVICE SLAs
+  # ============================================================================
+
+  # Settlement SLAs
+  - template_code: CUSTODY_DVP_SETTLE_RATE
+    name: DVP Settlement Success Rate
+    category: SETTLEMENT
+    applies_to_type: SERVICE
+    applies_to_code: CUSTODY
+    metric_code: SETTLEMENT_RATE
+    target_value: 99.50
+    warning_threshold: 98.50
+    measurement_unit: PERCENTAGE
+    measurement_period: MONTHLY
+    description: "Percentage of DVP instructions settled on intended settlement date"
+    penalty_type: SERVICE_CREDIT
+    penalty_value: 0.01
+    penalty_unit: BPS_OF_AUM
+    is_active: true
+
+  - template_code: CUSTODY_FOP_SETTLE_RATE
+    name: FOP Settlement Success Rate
+    category: SETTLEMENT
+    applies_to_type: SERVICE
+    applies_to_code: CUSTODY
+    metric_code: SETTLEMENT_RATE
+    target_value: 99.00
+    warning_threshold: 97.50
+    measurement_unit: PERCENTAGE
+    measurement_period: MONTHLY
+    description: "Percentage of FOP instructions settled on intended settlement date"
+    is_active: true
+
+  - template_code: CUSTODY_INSTR_STP_RATE
+    name: Instruction STP Rate
+    category: SETTLEMENT
+    applies_to_type: SERVICE
+    applies_to_code: CUSTODY
+    metric_code: STP_RATE
+    target_value: 95.00
+    warning_threshold: 90.00
+    measurement_unit: PERCENTAGE
+    measurement_period: MONTHLY
+    description: "Percentage of instructions processed without manual intervention"
+    is_active: true
+
+  - template_code: CUSTODY_FAIL_RESOLUTION
+    name: Failed Trade Resolution Time
+    category: SETTLEMENT
+    applies_to_type: SERVICE
+    applies_to_code: CUSTODY
+    metric_code: RESOLUTION_TIME
+    target_value: 24
+    warning_threshold: 48
+    measurement_unit: HOURS
+    measurement_period: DAILY
+    description: "Maximum hours to resolve failed settlement"
+    is_active: true
+
+  # Corporate Actions SLAs
+  - template_code: CUSTODY_CA_MANDATORY_NOTIFY
+    name: Mandatory Corporate Action Notification
+    category: CORPORATE_ACTIONS
+    applies_to_type: SERVICE
+    applies_to_code: CUSTODY
+    metric_code: NOTIFICATION_TIME
+    target_value: 24
+    warning_threshold: 48
+    measurement_unit: HOURS
+    measurement_period: DAILY
+    description: "Hours after announcement to notify client of mandatory actions"
+    is_active: true
+
+  - template_code: CUSTODY_CA_VOLUNTARY_NOTIFY
+    name: Voluntary Corporate Action Notification
+    category: CORPORATE_ACTIONS
+    applies_to_type: SERVICE
+    applies_to_code: CUSTODY
+    metric_code: NOTIFICATION_TIME
+    target_value: 48
+    warning_threshold: 72
+    measurement_unit: HOURS
+    measurement_period: DAILY
+    description: "Hours after announcement to notify client of voluntary actions"
+    is_active: true
+
+  - template_code: CUSTODY_CA_PROCESSING_ACCURACY
+    name: Corporate Action Processing Accuracy
+    category: CORPORATE_ACTIONS
+    applies_to_type: SERVICE
+    applies_to_code: CUSTODY
+    metric_code: PROCESSING_ACCURACY
+    target_value: 99.90
+    warning_threshold: 99.50
+    measurement_unit: PERCENTAGE
+    measurement_period: MONTHLY
+    description: "Percentage of corporate actions processed correctly"
+    is_active: true
+
+  - template_code: CUSTODY_CA_ELECTION_DEADLINE
+    name: Corporate Action Election Processing
+    category: CORPORATE_ACTIONS
+    applies_to_type: SERVICE
+    applies_to_code: CUSTODY
+    metric_code: DEADLINE_COMPLIANCE
+    target_value: 100.00
+    warning_threshold: 99.00
+    measurement_unit: PERCENTAGE
+    measurement_period: MONTHLY
+    description: "Percentage of client elections submitted before market deadline"
+    is_active: true
+
+  # Income Processing SLAs
+  - template_code: CUSTODY_INCOME_CREDIT_RATE
+    name: Income Credit Timeliness
+    category: INCOME
+    applies_to_type: SERVICE
+    applies_to_code: CUSTODY
+    metric_code: CREDIT_TIMELINESS
+    target_value: 99.50
+    warning_threshold: 98.00
+    measurement_unit: PERCENTAGE
+    measurement_period: MONTHLY
+    description: "Percentage of income payments credited on pay date"
+    is_active: true
+
+  - template_code: CUSTODY_INCOME_ACCURACY
+    name: Income Processing Accuracy
+    category: INCOME
+    applies_to_type: SERVICE
+    applies_to_code: CUSTODY
+    metric_code: PROCESSING_ACCURACY
+    target_value: 99.95
+    warning_threshold: 99.50
+    measurement_unit: PERCENTAGE
+    measurement_period: MONTHLY
+    description: "Percentage of income payments calculated correctly"
+    is_active: true
+
+  # ============================================================================
+  # FUND ACCOUNTING SLAs
+  # ============================================================================
+
+  - template_code: FA_NAV_DELIVERY_DAILY
+    name: Daily NAV Delivery
+    category: NAV
+    applies_to_type: SERVICE
+    applies_to_code: FUND_ACCOUNTING
+    metric_code: NAV_DELIVERY_TIME
+    target_value: 18.00
+    warning_threshold: 19.00
+    measurement_unit: HOURS_LOCAL
+    measurement_period: DAILY
+    description: "NAV delivered by 18:00 local time for daily-priced funds"
+    regulatory_requirement: true
+    regulatory_reference: "UCITS Art. 76"
+    is_active: true
+
+  - template_code: FA_NAV_DELIVERY_WEEKLY
+    name: Weekly NAV Delivery
+    category: NAV
+    applies_to_type: SERVICE
+    applies_to_code: FUND_ACCOUNTING
+    metric_code: NAV_DELIVERY_TIME
+    target_value: 12.00
+    warning_threshold: 14.00
+    measurement_unit: HOURS_LOCAL
+    measurement_period: WEEKLY
+    description: "NAV delivered by 12:00 local time T+1 for weekly-priced funds"
+    is_active: true
+
+  - template_code: FA_NAV_ACCURACY
+    name: NAV Calculation Accuracy
+    category: NAV
+    applies_to_type: SERVICE
+    applies_to_code: FUND_ACCOUNTING
+    metric_code: NAV_ACCURACY
+    target_value: 99.999
+    warning_threshold: 99.990
+    measurement_unit: PERCENTAGE
+    measurement_period: MONTHLY
+    description: "Percentage of NAVs calculated without material error"
+    regulatory_requirement: true
+    regulatory_reference: "UCITS Valuation Rules"
+    is_active: true
+
+  - template_code: FA_PRICE_COMPLETENESS
+    name: Price Completeness
+    category: PRICING
+    applies_to_type: SERVICE
+    applies_to_code: FUND_ACCOUNTING
+    metric_code: PRICE_AVAILABILITY
+    target_value: 100.00
+    warning_threshold: 99.50
+    measurement_unit: PERCENTAGE
+    measurement_period: DAILY
+    description: "Percentage of required prices received before NAV calculation"
+    is_active: true
+
+  - template_code: FA_PRICE_ACCURACY
+    name: Price Accuracy
+    category: PRICING
+    applies_to_type: SERVICE
+    applies_to_code: FUND_ACCOUNTING
+    metric_code: PRICE_ACCURACY
+    target_value: 99.95
+    warning_threshold: 99.50
+    measurement_unit: PERCENTAGE
+    measurement_period: MONTHLY
+    description: "Percentage of prices within tolerance of independent validation"
+    is_active: true
+
+  - template_code: FA_RECONCILIATION_RATE
+    name: Cash Reconciliation Rate
+    category: RECONCILIATION
+    applies_to_type: SERVICE
+    applies_to_code: FUND_ACCOUNTING
+    metric_code: RECONCILIATION_RATE
+    target_value: 99.50
+    warning_threshold: 98.00
+    measurement_unit: PERCENTAGE
+    measurement_period: DAILY
+    description: "Percentage of cash positions reconciled without breaks"
+    is_active: true
+
+  # ============================================================================
+  # MIDDLE OFFICE SLAs
+  # ============================================================================
+
+  - template_code: MO_TRADE_MATCH_RATE
+    name: Trade Matching Rate
+    category: TRADE_MATCHING
+    applies_to_type: SERVICE
+    applies_to_code: MIDDLE_OFFICE
+    metric_code: MATCH_RATE
+    target_value: 98.00
+    warning_threshold: 95.00
+    measurement_unit: PERCENTAGE
+    measurement_period: MONTHLY
+    description: "Percentage of trades matched on T+0"
+    is_active: true
+
+  - template_code: MO_TRADE_MATCH_STP
+    name: Trade Matching STP Rate
+    category: TRADE_MATCHING
+    applies_to_type: SERVICE
+    applies_to_code: MIDDLE_OFFICE
+    metric_code: STP_RATE
+    target_value: 90.00
+    warning_threshold: 85.00
+    measurement_unit: PERCENTAGE
+    measurement_period: MONTHLY
+    description: "Percentage of trades matched without manual intervention"
+    is_active: true
+
+  - template_code: MO_EXCEPTION_RESOLUTION
+    name: Trade Exception Resolution
+    category: TRADE_MATCHING
+    applies_to_type: SERVICE
+    applies_to_code: MIDDLE_OFFICE
+    metric_code: RESOLUTION_TIME
+    target_value: 4
+    warning_threshold: 8
+    measurement_unit: HOURS
+    measurement_period: DAILY
+    description: "Hours to resolve trade matching exceptions"
+    is_active: true
+
+  - template_code: MO_AFFIRMATION_RATE
+    name: Trade Affirmation Rate
+    category: TRADE_MATCHING
+    applies_to_type: SERVICE
+    applies_to_code: MIDDLE_OFFICE
+    metric_code: AFFIRMATION_RATE
+    target_value: 95.00
+    warning_threshold: 90.00
+    measurement_unit: PERCENTAGE
+    measurement_period: MONTHLY
+    description: "Percentage of trades affirmed by cut-off"
+    is_active: true
+
+  # ============================================================================
+  # TRANSFER AGENCY SLAs
+  # ============================================================================
+
+  - template_code: TA_ORDER_PROCESSING
+    name: Order Processing Timeliness
+    category: ORDER_PROCESSING
+    applies_to_type: SERVICE
+    applies_to_code: TRANSFER_AGENCY
+    metric_code: PROCESSING_TIME
+    target_value: 99.00
+    warning_threshold: 97.00
+    measurement_unit: PERCENTAGE
+    measurement_period: MONTHLY
+    description: "Percentage of orders processed by dealing cut-off"
+    is_active: true
+
+  - template_code: TA_SETTLEMENT_RATE
+    name: Subscription/Redemption Settlement
+    category: SETTLEMENT
+    applies_to_type: SERVICE
+    applies_to_code: TRANSFER_AGENCY
+    metric_code: SETTLEMENT_RATE
+    target_value: 99.50
+    warning_threshold: 98.00
+    measurement_unit: PERCENTAGE
+    measurement_period: MONTHLY
+    description: "Percentage of subscription/redemption orders settled on time"
+    is_active: true
+
+  - template_code: TA_INVESTOR_STATEMENT
+    name: Investor Statement Delivery
+    category: REPORTING
+    applies_to_type: SERVICE
+    applies_to_code: TRANSFER_AGENCY
+    metric_code: STATEMENT_TIMELINESS
+    target_value: 100.00
+    warning_threshold: 99.00
+    measurement_unit: PERCENTAGE
+    measurement_period: QUARTERLY
+    description: "Percentage of investor statements delivered within 5 business days"
+    is_active: true
+
+  # ============================================================================
+  # COLLATERAL MANAGEMENT SLAs
+  # ============================================================================
+
+  - template_code: COLL_MARGIN_CALL_SAME_DAY
+    name: Same-Day Margin Call Settlement
+    category: COLLATERAL
+    applies_to_type: CSA
+    metric_code: MARGIN_CALL_TIMELINESS
+    target_value: 4.00
+    warning_threshold: 6.00
+    measurement_unit: HOURS
+    measurement_period: DAILY
+    description: "Margin calls settled within 4 hours of receipt"
+    regulatory_requirement: true
+    regulatory_reference: "EMIR Margin Rules"
+    is_active: true
+
+  - template_code: COLL_MARGIN_ACCURACY
+    name: Margin Call Accuracy
+    category: COLLATERAL
+    applies_to_type: CSA
+    metric_code: CALCULATION_ACCURACY
+    target_value: 100.00
+    warning_threshold: 99.00
+    measurement_unit: PERCENTAGE
+    measurement_period: MONTHLY
+    description: "Percentage of margin calls calculated correctly"
+    is_active: true
+
+  - template_code: COLL_COLLATERAL_OPTIMIZATION
+    name: Collateral Optimization Rate
+    category: COLLATERAL
+    applies_to_type: CSA
+    metric_code: OPTIMIZATION_RATE
+    target_value: 95.00
+    warning_threshold: 90.00
+    measurement_unit: PERCENTAGE
+    measurement_period: MONTHLY
+    description: "Percentage of margin met with lowest-cost eligible collateral"
+    is_active: true
+
+  - template_code: COLL_SUBSTITUTION_TIME
+    name: Collateral Substitution Timeliness
+    category: COLLATERAL
+    applies_to_type: CSA
+    metric_code: SUBSTITUTION_TIME
+    target_value: 24
+    warning_threshold: 48
+    measurement_unit: HOURS
+    measurement_period: DAILY
+    description: "Hours to process collateral substitution requests"
+    is_active: true
+
+  # ============================================================================
+  # REGULATORY REPORTING SLAs
+  # ============================================================================
+
+  - template_code: REG_EMIR_REPORTING
+    name: EMIR Trade Reporting
+    category: REGULATORY
+    applies_to_type: SERVICE
+    applies_to_code: REGULATORY_REPORTING
+    metric_code: REPORTING_TIMELINESS
+    target_value: 100.00
+    warning_threshold: 99.50
+    measurement_unit: PERCENTAGE
+    measurement_period: DAILY
+    description: "Percentage of trades reported to TR within T+1"
+    regulatory_requirement: true
+    regulatory_reference: "EMIR Art. 9"
+    is_active: true
+
+  - template_code: REG_MIFID_REPORTING
+    name: MiFID Transaction Reporting
+    category: REGULATORY
+    applies_to_type: SERVICE
+    applies_to_code: REGULATORY_REPORTING
+    metric_code: REPORTING_TIMELINESS
+    target_value: 100.00
+    warning_threshold: 99.50
+    measurement_unit: PERCENTAGE
+    measurement_period: DAILY
+    description: "Percentage of transactions reported to ARM within T+1"
+    regulatory_requirement: true
+    regulatory_reference: "MiFIR Art. 26"
+    is_active: true
+
+  - template_code: REG_FATCA_REPORTING
+    name: FATCA/CRS Reporting
+    category: REGULATORY
+    applies_to_type: SERVICE
+    applies_to_code: REGULATORY_REPORTING
+    metric_code: REPORTING_TIMELINESS
+    target_value: 100.00
+    warning_threshold: 100.00
+    measurement_unit: PERCENTAGE
+    measurement_period: ANNUALLY
+    description: "Annual FATCA/CRS reports submitted before deadline"
+    regulatory_requirement: true
+    regulatory_reference: "FATCA IGA"
+    is_active: true
+
+  # ============================================================================
+  # CLIENT REPORTING SLAs
+  # ============================================================================
+
+  - template_code: RPT_DAILY_POSITION
+    name: Daily Position Report
+    category: CLIENT_REPORTING
+    applies_to_type: SERVICE
+    applies_to_code: CLIENT_REPORTING
+    metric_code: REPORT_TIMELINESS
+    target_value: 8.00
+    warning_threshold: 9.00
+    measurement_unit: HOURS_LOCAL
+    measurement_period: DAILY
+    description: "Daily position reports delivered by 08:00 local time"
+    is_active: true
+
+  - template_code: RPT_MONTHLY_STATEMENT
+    name: Monthly Statement Delivery
+    category: CLIENT_REPORTING
+    applies_to_type: SERVICE
+    applies_to_code: CLIENT_REPORTING
+    metric_code: REPORT_TIMELINESS
+    target_value: 5
+    warning_threshold: 7
+    measurement_unit: BUSINESS_DAYS
+    measurement_period: MONTHLY
+    description: "Monthly statements delivered within 5 business days of month-end"
+    is_active: true
+
+  - template_code: RPT_AD_HOC_RESPONSE
+    name: Ad-Hoc Report Response Time
+    category: CLIENT_REPORTING
+    applies_to_type: SERVICE
+    applies_to_code: CLIENT_REPORTING
+    metric_code: RESPONSE_TIME
+    target_value: 24
+    warning_threshold: 48
+    measurement_unit: HOURS
+    measurement_period: DAILY
+    description: "Response time for ad-hoc client data requests"
+    is_active: true
+
+  # ============================================================================
+  # SYSTEM AVAILABILITY SLAs
+  # ============================================================================
+
+  - template_code: SYS_CORE_AVAILABILITY
+    name: Core System Availability
+    category: TECHNOLOGY
+    applies_to_type: PLATFORM
+    applies_to_code: CORE_BANKING
+    metric_code: SYSTEM_AVAILABILITY
+    target_value: 99.90
+    warning_threshold: 99.50
+    measurement_unit: PERCENTAGE
+    measurement_period: MONTHLY
+    description: "Core system uptime during business hours"
+    penalty_type: SERVICE_CREDIT
+    penalty_value: 0.05
+    penalty_unit: BPS_OF_AUM
+    is_active: true
+
+  - template_code: SYS_CLIENT_PORTAL
+    name: Client Portal Availability
+    category: TECHNOLOGY
+    applies_to_type: PLATFORM
+    applies_to_code: CLIENT_PORTAL
+    metric_code: SYSTEM_AVAILABILITY
+    target_value: 99.50
+    warning_threshold: 99.00
+    measurement_unit: PERCENTAGE
+    measurement_period: MONTHLY
+    description: "Client portal uptime 24x7"
+    is_active: true
+
+  - template_code: SYS_API_AVAILABILITY
+    name: API Gateway Availability
+    category: TECHNOLOGY
+    applies_to_type: PLATFORM
+    applies_to_code: API_GATEWAY
+    metric_code: SYSTEM_AVAILABILITY
+    target_value: 99.95
+    warning_threshold: 99.50
+    measurement_unit: PERCENTAGE
+    measurement_period: MONTHLY
+    description: "API gateway uptime for automated integrations"
+    is_active: true
+
+  - template_code: SYS_API_RESPONSE_TIME
+    name: API Response Time
+    category: TECHNOLOGY
+    applies_to_type: PLATFORM
+    applies_to_code: API_GATEWAY
+    metric_code: RESPONSE_TIME
+    target_value: 500
+    warning_threshold: 1000
+    measurement_unit: MILLISECONDS
+    measurement_period: MONTHLY
+    description: "95th percentile API response time"
+    is_active: true

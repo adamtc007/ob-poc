@@ -1,0 +1,347 @@
+# Market region expansion mappings
+# Phase 3.3: Agent Intelligence - Entity Extraction
+#
+# Maps region names to specific market MIC codes for scope expansion.
+# When a user says "European equities", we expand to the specific markets.
+
+version: "1.0"
+description: "Geographic region to market MIC code mappings"
+
+# ==========================================================================
+# MARKET REGIONS
+# ==========================================================================
+market_regions:
+
+  # ------------------------------------------------------------------------
+  # Europe
+  # ------------------------------------------------------------------------
+  European:
+    description: "Major European markets"
+    markets:
+      - XLON  # London Stock Exchange
+      - XETR  # XETRA (Frankfurt)
+      - XPAR  # Euronext Paris
+      - XAMS  # Euronext Amsterdam
+      - XSWX  # SIX Swiss Exchange
+      - XMIL  # Borsa Italiana (Milan)
+      - XMAD  # BME Spanish Exchanges
+      - XBRU  # Euronext Brussels
+      - XLIS  # Euronext Lisbon
+      - XDUB  # Euronext Dublin
+      - XOSL  # Oslo Børs
+      - XSTO  # Nasdaq Stockholm
+      - XHEL  # Nasdaq Helsinki
+      - XCSE  # Nasdaq Copenhagen
+      - XWAR  # Warsaw Stock Exchange
+      - XPRA  # Prague Stock Exchange
+      - XATH  # Athens Stock Exchange
+    aliases:
+      - "Europe"
+      - "EU"
+      - "EMEA equities"
+      - "European markets"
+
+  Western_European:
+    description: "Western European markets only"
+    markets:
+      - XLON
+      - XETR
+      - XPAR
+      - XAMS
+      - XSWX
+      - XMIL
+      - XMAD
+      - XBRU
+    aliases:
+      - "Western Europe"
+      - "West Europe"
+
+  Nordic:
+    description: "Nordic markets"
+    markets:
+      - XSTO  # Stockholm
+      - XHEL  # Helsinki
+      - XCSE  # Copenhagen
+      - XOSL  # Oslo
+      - XICE  # Iceland
+    aliases:
+      - "Nordics"
+      - "Scandinavian"
+      - "Scandinavia"
+
+  UK:
+    description: "United Kingdom markets"
+    markets:
+      - XLON
+    aliases:
+      - "Britain"
+      - "British"
+      - "United Kingdom"
+
+  # ------------------------------------------------------------------------
+  # Americas
+  # ------------------------------------------------------------------------
+  US:
+    description: "US markets"
+    markets:
+      - XNYS  # NYSE
+      - XNAS  # NASDAQ
+      - XASE  # NYSE American
+      - BATS  # CBOE BZX (BATS)
+      - ARCX  # NYSE Arca
+      - IEXG  # IEX
+    aliases:
+      - "American"
+      - "United States"
+      - "USA"
+      - "US markets"
+
+  North_American:
+    description: "US and Canadian markets"
+    union_of:
+      - US
+      - Canadian
+    aliases:
+      - "North America"
+      - "NA"
+
+  Canadian:
+    description: "Canadian markets"
+    markets:
+      - XTSE  # Toronto Stock Exchange
+      - XTSX  # TSX Venture
+      - XCNQ  # Canadian Securities Exchange
+    aliases:
+      - "Canada"
+      - "TSX"
+
+  Latin_American:
+    description: "Latin American markets"
+    markets:
+      - XBSP  # B3 (Brazil)
+      - XMEX  # BMV (Mexico)
+      - XSGO  # Santiago Stock Exchange
+      - XBUE  # BYMA (Argentina)
+      - XLIM  # Lima Stock Exchange
+      - XBOG  # BVC (Colombia)
+    aliases:
+      - "LatAm"
+      - "Latin America"
+      - "South America"
+      - "LATAM"
+
+  # ------------------------------------------------------------------------
+  # Asia Pacific
+  # ------------------------------------------------------------------------
+  Asian:
+    description: "Major Asian markets"
+    markets:
+      - XHKG  # Hong Kong
+      - XTKS  # Tokyo Stock Exchange
+      - XSES  # Singapore Exchange
+      - XKRX  # Korea Exchange
+      - XTAI  # Taiwan Stock Exchange
+      - XBOM  # BSE India
+      - XNSE  # NSE India
+      - XSHG  # Shanghai
+      - XSHE  # Shenzhen
+    aliases:
+      - "Asia"
+      - "Asian markets"
+
+  APAC:
+    description: "Asia-Pacific including Australia/NZ"
+    union_of:
+      - Asian
+      - Australian
+    aliases:
+      - "Asia-Pacific"
+      - "Asia Pacific"
+      - "AsiaPac"
+
+  Australian:
+    description: "Australian and New Zealand markets"
+    markets:
+      - XASX  # Australian Securities Exchange
+      - XNZE  # NZX (New Zealand)
+    aliases:
+      - "Australia"
+      - "ANZ"
+      - "Australasia"
+
+  Greater_China:
+    description: "China, Hong Kong, Taiwan"
+    markets:
+      - XHKG
+      - XSHG
+      - XSHE
+      - XTAI
+    aliases:
+      - "China"
+      - "Chinese markets"
+      - "Greater China"
+
+  Japan:
+    description: "Japanese markets"
+    markets:
+      - XTKS  # Tokyo
+      - XOSE  # Osaka
+      - XNGO  # Nagoya
+      - XSAP  # Sapporo
+      - XFKA  # Fukuoka
+    aliases:
+      - "Japanese"
+      - "Japan"
+
+  Southeast_Asian:
+    description: "Southeast Asian markets"
+    markets:
+      - XSES  # Singapore
+      - XKLS  # Bursa Malaysia
+      - XBKK  # Thailand
+      - XIDX  # Indonesia
+      - XPHS  # Philippines
+      - XSTC  # Vietnam (HOSE)
+    aliases:
+      - "Southeast Asia"
+      - "SEA"
+      - "ASEAN"
+
+  # ------------------------------------------------------------------------
+  # Middle East & Africa
+  # ------------------------------------------------------------------------
+  Middle_Eastern:
+    description: "Middle Eastern markets"
+    markets:
+      - XDFM  # Dubai Financial Market
+      - XADS  # Abu Dhabi Securities Exchange
+      - XTAE  # Tel Aviv Stock Exchange
+      - XSAU  # Saudi Stock Exchange (Tadawul)
+      - XQAT  # Qatar Stock Exchange
+      - XKUW  # Boursa Kuwait
+    aliases:
+      - "Middle East"
+      - "MENA"
+      - "Gulf"
+      - "GCC"
+
+  African:
+    description: "African markets"
+    markets:
+      - XJSE  # Johannesburg Stock Exchange
+      - XCAI  # Egyptian Exchange
+      - XNSA  # Nigerian Stock Exchange
+      - XNAI  # Nairobi Securities Exchange
+      - XCAS  # Casablanca Stock Exchange
+    aliases:
+      - "Africa"
+      - "African markets"
+
+  EMEA:
+    description: "Europe, Middle East, Africa"
+    union_of:
+      - European
+      - Middle_Eastern
+      - African
+    aliases:
+      - "EMEA markets"
+
+  # ------------------------------------------------------------------------
+  # Special Groupings
+  # ------------------------------------------------------------------------
+  Global:
+    description: "All supported markets worldwide"
+    expands_to: ALL_MARKETS
+    aliases:
+      - "worldwide"
+      - "all markets"
+      - "everywhere"
+      - "global"
+      - "all"
+
+  Developed:
+    description: "Developed market economies"
+    union_of:
+      - US
+      - European
+      - Japan
+      - Australian
+      - Canadian
+    exclude:
+      - Emerging
+    aliases:
+      - "DM"
+      - "developed markets"
+
+  Emerging:
+    description: "Emerging market economies"
+    markets:
+      - XBSP  # Brazil
+      - XMEX  # Mexico
+      - XJSE  # South Africa
+      - XBOM  # India
+      - XNSE  # India
+      - XSHG  # China
+      - XSHE  # China
+      - XKRX  # Korea
+      - XTAI  # Taiwan
+      - XKLS  # Malaysia
+      - XBKK  # Thailand
+      - XIDX  # Indonesia
+      - XPHS  # Philippines
+      - XWAR  # Poland
+      - XATH  # Greece
+    aliases:
+      - "EM"
+      - "emerging markets"
+      - "emerging"
+
+  Frontier:
+    description: "Frontier markets"
+    markets:
+      - XSTC  # Vietnam
+      - XNAI  # Kenya
+      - XNSA  # Nigeria
+      - XCAS  # Morocco
+      - XBUE  # Argentina
+      - XLIM  # Peru
+      - XBOG  # Colombia
+    aliases:
+      - "FM"
+      - "frontier markets"
+
+# ==========================================================================
+# TIMEZONE MAPPINGS
+# ==========================================================================
+market_timezones:
+  # Used for sweep timing and SLA calculations
+  XNYS: "America/New_York"
+  XNAS: "America/New_York"
+  XLON: "Europe/London"
+  XETR: "Europe/Berlin"
+  XPAR: "Europe/Paris"
+  XAMS: "Europe/Amsterdam"
+  XSWX: "Europe/Zurich"
+  XHKG: "Asia/Hong_Kong"
+  XTKS: "Asia/Tokyo"
+  XSES: "Asia/Singapore"
+  XASX: "Australia/Sydney"
+  XTSE: "America/Toronto"
+
+# ==========================================================================
+# CSD MAPPINGS
+# ==========================================================================
+# Central Securities Depository for each market (for SSI creation)
+market_csds:
+  XNYS: "DTCYUS33"  # DTC
+  XNAS: "DTCYUS33"  # DTC
+  XLON: "CABOROCP"  # Euroclear UK & International
+  XETR: "DAABOROCP"  # Clearstream Banking Frankfurt
+  XPAR: "SICVFRPP"  # Euroclear France
+  XAMS: "NEABOROCP"  # Euroclear Netherlands
+  XSWX: "SABOROCP"  # SIX SIS
+  XHKG: "CCASHKHH"  # CCASS
+  XTKS: "JASDECJT"  # JASDEC
+  XSES: "CDPHSGSG"  # CDP Singapore
+  XASX: "CABOROCP"  # ASX Clear (uses CHESS)
+  XTSE: "CDSLCATT"  # CDS Canada
