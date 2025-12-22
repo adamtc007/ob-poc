@@ -103,6 +103,60 @@ parameter_mappings:
         source: context
         fallback: session.current_cbu
 
+  investment-manager.link-connectivity:
+    description: "Link connectivity method to IM assignment"
+    mappings:
+      - entity_type: im_assignment_reference
+        param: assignment-id
+        required: true
+        source: context_or_extract
+
+      - entity_type: instruction_method
+        param: instruction-method
+        required: true
+
+      - entity_type: resource_instance_reference
+        param: resource-instance-id
+        required: false
+        source: context
+
+  investment-manager.remove:
+    description: "Remove investment manager assignment"
+    mappings:
+      - entity_type: im_assignment_reference
+        param: assignment-id
+        required: true
+        source: context_or_extract
+
+      - entity_type: cbu_reference
+        param: cbu-id
+        source: context
+        fallback: session.current_cbu
+
+      - entity_type: date
+        param: effective-date
+        default_if_missing: today
+
+  investment-manager.find-for-trade:
+    description: "Find which IM would handle a specific trade"
+    mappings:
+      - entity_type: cbu_reference
+        param: cbu-id
+        source: context
+        fallback: session.current_cbu
+
+      - entity_type: instrument_class_reference
+        param: instrument-class
+        required: true
+
+      - entity_type: market_reference
+        param: market
+        required: true
+
+      - entity_type: currency
+        param: currency
+        required: false
+
 # =============================================================================
 # Pricing Configuration Verbs
 # =============================================================================
@@ -310,6 +364,29 @@ parameter_mappings:
     symbol_template: "@sla-{template-code}"
     symbol_transform: lowercase_hyphenate
 
+  sla.apply-template:
+    description: "Apply SLA template to CBU"
+    mappings:
+      - entity_type: cbu_reference
+        param: cbu-id
+        source: context
+        fallback: session.current_cbu
+
+      - entity_type: sla_template_reference
+        param: template-name
+        required: true
+
+      - entity_type: instrument_class_reference
+        param: scope-instrument-classes
+        is_list: true
+
+      - entity_type: market_reference
+        param: scope-markets
+        is_list: true
+
+    symbol_template: "@sla-template-{template-name}"
+    symbol_transform: lowercase_hyphenate
+
   sla.list-templates:
     description: "List available SLA templates"
     mappings:
@@ -379,6 +456,75 @@ parameter_mappings:
 # =============================================================================
 # Trading Profile Verbs
 # =============================================================================
+  trading-profile.create:
+    description: "Create new trading profile for CBU"
+    mappings:
+      - entity_type: cbu_reference
+        param: cbu-id
+        source: context
+        fallback: session.current_cbu
+
+      - entity_type: currency
+        param: base-currency
+        default_if_missing: USD
+
+      - entity_type: profile_name
+        param: name
+        required: false
+
+    symbol_template: "@profile-{cbu-id}"
+    symbol_transform: lowercase_hyphenate
+
+  trading-profile.set-universe:
+    description: "Define tradeable universe for profile"
+    mappings:
+      - entity_type: profile_reference
+        param: profile-id
+        source: context
+        fallback: session.current_profile
+
+      - entity_type: instrument_class_reference
+        param: instrument-classes
+        required: true
+        is_list: true
+
+      - entity_type: market_reference
+        param: markets
+        is_list: true
+
+      - entity_type: currency
+        param: currencies
+        is_list: true
+
+  trading-profile.visualize:
+    description: "Show trading matrix visualization"
+    mappings:
+      - entity_type: cbu_reference
+        param: cbu-id
+        source: context
+        fallback: session.current_cbu
+
+      - entity_type: profile_reference
+        param: profile-id
+        source: context
+        fallback: session.current_profile
+
+      - entity_type: view_type
+        param: view
+        default_if_missing: matrix
+
+  trading-profile.validate-matrix:
+    description: "Validate trading profile for gaps"
+    mappings:
+      - entity_type: profile_reference
+        param: profile-id
+        source: context
+        fallback: session.current_profile
+
+      - entity_type: validation_level
+        param: level
+        default_if_missing: full
+
   trading-profile.import:
     description: "Import trading profile from YAML file"
     mappings:
@@ -402,6 +548,123 @@ parameter_mappings:
       - entity_type: section_list
         param: sections
         is_list: true
+
+# =============================================================================
+# Custody/Settlement Verbs
+# =============================================================================
+  cbu-custody.ensure-ssi:
+    description: "Create or update standing settlement instruction"
+    mappings:
+      - entity_type: cbu_reference
+        param: cbu-id
+        source: context
+        fallback: session.current_cbu
+
+      - entity_type: ssi_type
+        param: ssi-type
+        required: true
+
+      - entity_type: ssi_name
+        param: name
+        required: true
+
+      - entity_type: market_reference
+        param: market
+        required: false
+
+      - entity_type: bic
+        param: safekeeping-bic
+        required: false
+
+      - entity_type: account_number
+        param: safekeeping-account
+        required: false
+
+      - entity_type: bic
+        context_key: cash_bic
+        param: cash-bic
+        required: false
+
+      - entity_type: account_number
+        context_key: cash_account
+        param: cash-account
+        required: false
+
+      - entity_type: currency
+        param: currency
+        required: false
+
+      - entity_type: bic
+        context_key: pset_bic
+        param: pset-bic
+        required: false
+
+    symbol_template: "@ssi-{name}"
+    symbol_transform: lowercase_hyphenate
+
+  cbu-custody.ensure-booking-rule:
+    description: "Create or update booking rule for SSI routing"
+    mappings:
+      - entity_type: cbu_reference
+        param: cbu-id
+        source: context
+        fallback: session.current_cbu
+
+      - entity_type: ssi_reference
+        param: ssi-id
+        required: true
+
+      - entity_type: rule_name
+        param: name
+        required: true
+
+      - entity_type: instrument_class_reference
+        param: instrument-class
+        required: false
+
+      - entity_type: market_reference
+        param: market
+        required: false
+
+      - entity_type: currency
+        param: currency
+        required: false
+
+      - entity_type: settlement_type
+        param: settlement-type
+        required: false
+
+      - entity_type: priority_value
+        param: priority
+        default_if_missing: 50
+
+    symbol_template: "@rule-{name}"
+    symbol_transform: lowercase_hyphenate
+
+  cbu-custody.add-universe:
+    description: "Add instrument/market combination to trading universe"
+    mappings:
+      - entity_type: cbu_reference
+        param: cbu-id
+        source: context
+        fallback: session.current_cbu
+
+      - entity_type: instrument_class_reference
+        param: instrument-class
+        required: true
+
+      - entity_type: market_reference
+        param: market
+        required: true
+
+      - entity_type: currency
+        param: currencies
+        is_list: true
+
+      - entity_type: settlement_type
+        param: settlement-types
+        is_list: true
+        default_if_missing: [DVP]
 
 # =============================================================================
 # Transform Functions
