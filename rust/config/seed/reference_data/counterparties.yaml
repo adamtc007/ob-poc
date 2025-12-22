@@ -1,0 +1,393 @@
+# Major derivatives counterparties reference data
+# Phase 3.5: OTC Derivatives & Collateral Management
+#
+# This file contains seed data for major derivatives counterparties
+# used for entity extraction and reference data lookup.
+
+version: "1.0"
+description: "Major derivatives counterparties"
+
+counterparties:
+  # ==========================================================================
+  # US Banks
+  # ==========================================================================
+  - name: Goldman Sachs
+    short_name: GS
+    lei: 784F5XWPLTWKTBV3E584
+    counterparty_type: BANK
+    jurisdiction: US
+    bics:
+      - bic: GABORUSMXXX
+        type: SWIFT
+        is_primary: true
+      - bic: GSCO
+        type: DTCC
+    is_financial_counterparty: true
+    is_covered_entity: true
+
+  - name: JP Morgan
+    short_name: JPM
+    lei: 8I5DZWZKVSZI1NUHU748
+    counterparty_type: BANK
+    jurisdiction: US
+    bics:
+      - bic: CHASUS33XXX
+        type: SWIFT
+        is_primary: true
+      - bic: JPMC
+        type: DTCC
+    is_financial_counterparty: true
+    is_covered_entity: true
+
+  - name: Morgan Stanley
+    short_name: MS
+    lei: IGJSJL3JD5P30I6NJZ34
+    counterparty_type: BANK
+    jurisdiction: US
+    bics:
+      - bic: MSTCUS44XXX
+        type: SWIFT
+        is_primary: true
+    is_financial_counterparty: true
+    is_covered_entity: true
+
+  - name: Citibank
+    short_name: Citi
+    lei: E57ODZWZ7FF32TWEFA76
+    counterparty_type: BANK
+    jurisdiction: US
+    bics:
+      - bic: CITIUS33XXX
+        type: SWIFT
+        is_primary: true
+    is_financial_counterparty: true
+    is_covered_entity: true
+
+  - name: Bank of America
+    short_name: BofA
+    lei: 9DJT3UXIJIZJI4WXO774
+    counterparty_type: BANK
+    jurisdiction: US
+    bics:
+      - bic: BOFAUS3NXXX
+        type: SWIFT
+        is_primary: true
+    is_financial_counterparty: true
+    is_covered_entity: true
+
+  - name: Wells Fargo
+    short_name: WFC
+    lei: PBLD0EJDB5FWOLXP3B76
+    counterparty_type: BANK
+    jurisdiction: US
+    bics:
+      - bic: WFBIUS6SXXX
+        type: SWIFT
+        is_primary: true
+    is_financial_counterparty: true
+    is_covered_entity: true
+
+  # ==========================================================================
+  # European Banks
+  # ==========================================================================
+  - name: Deutsche Bank
+    short_name: DB
+    lei: 7LTWFZYICNSX8D621K86
+    counterparty_type: BANK
+    jurisdiction: DE
+    bics:
+      - bic: DEUTDEFFXXX
+        type: SWIFT
+        is_primary: true
+    is_financial_counterparty: true
+    is_covered_entity: true
+
+  - name: Barclays
+    short_name: Barclays
+    lei: G5GSEF7VJP5I7OUK5573
+    counterparty_type: BANK
+    jurisdiction: GB
+    bics:
+      - bic: BABOROCP XXX
+        type: SWIFT
+        is_primary: true
+    is_financial_counterparty: true
+    is_covered_entity: true
+
+  - name: BNP Paribas
+    short_name: BNPP
+    lei: R0MUWSFPU8MPRO8K5P83
+    counterparty_type: BANK
+    jurisdiction: FR
+    bics:
+      - bic: BNPAFRPPXXX
+        type: SWIFT
+        is_primary: true
+    is_financial_counterparty: true
+    is_covered_entity: true
+
+  - name: Societe Generale
+    short_name: SocGen
+    lei: O2RNE8IBXP4R0TD8PU41
+    counterparty_type: BANK
+    jurisdiction: FR
+    bics:
+      - bic: SOGEFRPPXXX
+        type: SWIFT
+        is_primary: true
+    is_financial_counterparty: true
+    is_covered_entity: true
+
+  - name: Credit Agricole
+    short_name: CA
+    lei: 1VUV7VQFKUOQSJ21A208
+    counterparty_type: BANK
+    jurisdiction: FR
+    bics:
+      - bic: AGRIFRPPXXX
+        type: SWIFT
+        is_primary: true
+    is_financial_counterparty: true
+    is_covered_entity: true
+
+  - name: UBS
+    short_name: UBS
+    lei: BFM8T61CT2L1QCEMIK50
+    counterparty_type: BANK
+    jurisdiction: CH
+    bics:
+      - bic: UBSWCHZH80A
+        type: SWIFT
+        is_primary: true
+    is_financial_counterparty: true
+    is_covered_entity: true
+
+  - name: Credit Suisse
+    short_name: CS
+    lei: 549300506SI9CRFV9Z86
+    counterparty_type: BANK
+    jurisdiction: CH
+    bics:
+      - bic: CRESCHZZ80A
+        type: SWIFT
+        is_primary: true
+    is_financial_counterparty: true
+    is_covered_entity: true
+    notes: "Now part of UBS"
+
+  - name: HSBC
+    short_name: HSBC
+    lei: MLU0ZO3ML4LN2LL2TL39
+    counterparty_type: BANK
+    jurisdiction: GB
+    bics:
+      - bic: MIDLGB22XXX
+        type: SWIFT
+        is_primary: true
+    is_financial_counterparty: true
+    is_covered_entity: true
+
+  - name: Standard Chartered
+    short_name: StanChart
+    lei: U4LOSYZ7YG4W3S5F2G91
+    counterparty_type: BANK
+    jurisdiction: GB
+    bics:
+      - bic: SCBLGB2LXXX
+        type: SWIFT
+        is_primary: true
+    is_financial_counterparty: true
+    is_covered_entity: true
+
+  # ==========================================================================
+  # Asian Banks
+  # ==========================================================================
+  - name: Nomura
+    short_name: Nomura
+    lei: 353800GXC94LB13DCQ82
+    counterparty_type: BANK
+    jurisdiction: JP
+    bics:
+      - bic: NOMUUS33XXX
+        type: SWIFT
+        is_primary: true
+    is_financial_counterparty: true
+    is_covered_entity: true
+
+  - name: Mitsubishi UFJ
+    short_name: MUFG
+    lei: 353800V2V8PUY9TK3E06
+    counterparty_type: BANK
+    jurisdiction: JP
+    bics:
+      - bic: BOABOROJXXX
+        type: SWIFT
+        is_primary: true
+    is_financial_counterparty: true
+    is_covered_entity: true
+
+  - name: Mizuho
+    short_name: Mizuho
+    lei: RB0PEZSDGCO3JS6CEU02
+    counterparty_type: BANK
+    jurisdiction: JP
+    bics:
+      - bic: MABOROJJXXX
+        type: SWIFT
+        is_primary: true
+    is_financial_counterparty: true
+    is_covered_entity: true
+
+  - name: DBS Bank
+    short_name: DBS
+    lei: 549300GAI49VHE72AP77
+    counterparty_type: BANK
+    jurisdiction: SG
+    bics:
+      - bic: DBSSSGSGXXX
+        type: SWIFT
+        is_primary: true
+    is_financial_counterparty: true
+    is_covered_entity: false
+
+  # ==========================================================================
+  # IM Custodians (for segregation)
+  # ==========================================================================
+  - name: BNY Mellon
+    short_name: BNYM
+    lei: WFLLPEPC7FZXENRZV188
+    counterparty_type: BANK
+    jurisdiction: US
+    bics:
+      - bic: IRVTUS3NXXX
+        type: SWIFT
+        is_primary: true
+    is_financial_counterparty: true
+    is_covered_entity: true
+    is_im_custodian: true
+
+  - name: State Street
+    short_name: STT
+    lei: 549300ZFEEJ2IP5VME73
+    counterparty_type: BANK
+    jurisdiction: US
+    bics:
+      - bic: SBOSUS33XXX
+        type: SWIFT
+        is_primary: true
+    is_financial_counterparty: true
+    is_covered_entity: true
+    is_im_custodian: true
+
+  - name: Northern Trust
+    short_name: NTRS
+    lei: 6PTKHDJ8HDUF78PFBSM3
+    counterparty_type: BANK
+    jurisdiction: US
+    bics:
+      - bic: CNORUS44XXX
+        type: SWIFT
+        is_primary: true
+    is_financial_counterparty: true
+    is_covered_entity: true
+    is_im_custodian: true
+
+# ==========================================================================
+# Standard CSA Templates
+# ==========================================================================
+csa_templates:
+  # Zero threshold bilateral VM
+  - name: zero_threshold_vm
+    description: "Standard bilateral VM CSA with zero thresholds"
+    csa_type: VM
+    csa_version: "2016 VM"
+    our_threshold: 0
+    their_threshold: 0
+    mta: 500000
+    mta_ccy: USD
+    valuation_agent: CALCULATION_AGENT
+    eligible_collateral:
+      - asset_class: CASH
+        currencies: [USD, EUR, GBP, JPY, CHF]
+        haircut_pct: 0
+      - asset_class: GOVT_BOND
+        issuers: [US, DE, GB, FR, JP]
+        max_maturity_years: 10
+        min_rating: AA
+        haircut_pct: 2.0
+      - asset_class: GOVT_BOND
+        issuers: [US, DE, GB, FR, JP]
+        max_maturity_years: 30
+        min_rating: AA
+        haircut_pct: 4.0
+    interest_benchmarks:
+      USD: SOFR
+      EUR: ESTR
+      GBP: SONIA
+      JPY: TONAR
+      CHF: SARON
+
+  # Standard IM CSA for UMR
+  - name: standard_im
+    description: "Standard IM CSA for UMR compliance"
+    csa_type: IM
+    csa_version: "2018 IM"
+    segregation_required: true
+    third_party_custodian_required: true
+    eligible_collateral:
+      - asset_class: CASH
+        currencies: [USD, EUR, GBP, JPY]
+        haircut_pct: 0
+      - asset_class: GOVT_BOND
+        issuers: [US, DE, GB, FR, JP, CA, AU]
+        max_maturity_years: 1
+        min_rating: AA
+        haircut_pct: 0.5
+      - asset_class: GOVT_BOND
+        issuers: [US, DE, GB, FR, JP, CA, AU]
+        max_maturity_years: 5
+        min_rating: AA
+        haircut_pct: 2.0
+      - asset_class: GOVT_BOND
+        issuers: [US, DE, GB, FR, JP, CA, AU]
+        max_maturity_years: 10
+        min_rating: AA
+        haircut_pct: 4.0
+    fx_haircut_pct: 8.0
+
+# ==========================================================================
+# Confirmation Platforms
+# ==========================================================================
+confirmation_platforms:
+  - code: DTCC_GTR
+    name: DTCC Global Trade Repository
+    platform_type: REPOSITORY
+    products: [IRS, CDS, FX_FORWARD, EQUITY_SWAP]
+    jurisdictions: [US, EU, APAC]
+    stp_capable: true
+    regulatory_reporting: true
+
+  - code: MARKITWIRE
+    name: MarkitWire
+    platform_type: AFFIRMATION
+    products: [IRS, XCCY, CDS, SWAPTION]
+    jurisdictions: [GLOBAL]
+    stp_capable: true
+    owned_by: "S&P Global"
+
+  - code: BLOOMBERG_VCON
+    name: Bloomberg VCON
+    platform_type: AFFIRMATION
+    products: [IRS, XCCY, FX_FORWARD, FX_OPTION]
+    jurisdictions: [GLOBAL]
+    stp_capable: true
+
+  - code: SWIFT_FIN
+    name: SWIFT FIN Messages
+    platform_type: MESSAGING
+    products: [FX_FORWARD, FX_OPTION, IRS]
+    message_types:
+      FX_FORWARD: MT300
+      FX_OPTION: MT305
+      IRS: MT360
+    jurisdictions: [GLOBAL]

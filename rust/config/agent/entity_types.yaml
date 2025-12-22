@@ -12,7 +12,6 @@ description: "Trading matrix domain entity types"
 # ENTITY TYPE DEFINITIONS
 # ==========================================================================
 entity_types:
-
   # ------------------------------------------------------------------------
   # Investment Manager References
   # ------------------------------------------------------------------------
@@ -48,7 +47,7 @@ entity_types:
           - "that manager"
           - "them"
           - "the same IM"
-          - "BlackRock's"  # Possessive
+          - "BlackRock's" # Possessive
         requires_context: true
 
       - type: SYMBOL
@@ -376,7 +375,7 @@ entity_types:
 
     validation:
       min: 0
-      max: 1000000000000  # 1 trillion
+      max: 1000000000000 # 1 trillion
 
   # ------------------------------------------------------------------------
   # Percentage
@@ -394,14 +393,14 @@ entity_types:
 
       - type: NUMBER
         regex: "\\d+(?:\\.\\d+)?"
-        context_required: true  # Need context to know it's a percentage
+        context_required: true # Need context to know it's a percentage
         examples:
           - "99.5"
           - "95"
 
     normalization:
       type: decimal
-      divide_by_100: false  # Keep as percentage value
+      divide_by_100: false # Keep as percentage value
 
     validation:
       min: 0
@@ -431,13 +430,13 @@ entity_types:
       - type: NAME
         mappings:
           "close": "16:00"
-          "market close": null  # Needs market context
+          "market close": null # Needs market context
           "end of day": "17:00"
           "EOD": "17:00"
           "COB": "17:00"
           "close of business": "17:00"
           "opening": "09:00"
-          "market open": null  # Needs market context
+          "market open": null # Needs market context
 
     normalization:
       format: "HH:MM"
@@ -569,7 +568,7 @@ entity_types:
       primary_key: cbu_id
 
     context_defaults:
-      - "_CURRENT_CBU"  # Use session's current CBU if not specified
+      - "_CURRENT_CBU" # Use session's current CBU if not specified
 
   # ------------------------------------------------------------------------
   # SSI Reference
@@ -597,7 +596,7 @@ entity_types:
     normalization:
       lookup_table: cbu_ssi
       primary_key: ssi_id
-      scope: current_cbu  # SSIs are scoped to CBU
+      scope: current_cbu # SSIs are scoped to CBU
 
   # ------------------------------------------------------------------------
   # SLA Metric Type
@@ -707,7 +706,473 @@ entity_types:
 
     normalization:
       uppercase: true
-      pad_to_11: true  # Add XXX if 8-char
+      pad_to_11: true # Add XXX if 8-char
+
+  # ==========================================================================
+  # OTC DERIVATIVES ENTITY TYPES (Phase 3.5)
+  # ==========================================================================
+
+  # ------------------------------------------------------------------------
+  counterparty_reference:
+    description: "Reference to derivatives counterparty"
+    category: "financial_entity"
+    patterns:
+      - type: NAME
+        description: "Counterparty name"
+        examples:
+          - "Goldman Sachs"
+          - "JP Morgan"
+          - "Citi"
+          - "Morgan Stanley"
+          - "Bank of America"
+          - "Deutsche Bank"
+          - "Barclays"
+          - "Credit Suisse"
+          - "UBS"
+          - "BNP Paribas"
+          - "Societe Generale"
+          - "HSBC"
+          - "Nomura"
+        fuzzy_match: true
+        min_similarity: 0.8
+
+      - type: LEI
+        description: "Legal Entity Identifier"
+        regex: "[A-Z0-9]{20}"
+        validation: lei_checksum
+
+      - type: SHORT_NAME
+        description: "Common abbreviations"
+        mappings:
+          "GS": "Goldman Sachs"
+          "JPM": "JP Morgan"
+          "MS": "Morgan Stanley"
+          "DB": "Deutsche Bank"
+          "BNPP": "BNP Paribas"
+          "SocGen": "Societe Generale"
+          "CS": "Credit Suisse"
+          "BoA": "Bank of America"
+          "BofA": "Bank of America"
+
+      - type: SYMBOL
+        description: "DSL symbol reference"
+        regex: "@cp-[a-z][a-z0-9-]*"
+        examples:
+          - "@cp-goldman"
+          - "@cp-jpm"
+
+    normalization:
+      lookup_table: counterparties
+      fuzzy_match: true
+      fuzzy_threshold: 0.8
+
+  # ------------------------------------------------------------------------
+  # ISDA Reference
+  # ------------------------------------------------------------------------
+  isda_reference:
+    description: "Reference to ISDA Master Agreement"
+    category: "entity"
+    patterns:
+      - type: SYMBOL
+        regex: "@isda-[a-z][a-z0-9-]*"
+        examples:
+          - "@isda-goldman"
+          - "@isda-jpm"
+
+      - type: COUNTERPARTY_CONTEXT
+        description: "Resolve from counterparty in context"
+        examples:
+          - "the ISDA"
+          - "our ISDA"
+          - "Goldman's ISDA"
+          - "the ISDA with Goldman"
+        requires_context: true
+
+    normalization:
+      lookup_table: isda_master_agreements
+      primary_key: id
+
+  # ------------------------------------------------------------------------
+  # CSA Reference
+  # ------------------------------------------------------------------------
+  csa_reference:
+    description: "Reference to Credit Support Annex"
+    category: "entity"
+    patterns:
+      - type: SYMBOL
+        regex: "@csa-[a-z][a-z0-9-]*"
+        examples:
+          - "@csa-goldman-vm"
+          - "@csa-jpm-im"
+
+      - type: CONTEXT
+        description: "Contextual reference"
+        examples:
+          - "the CSA"
+          - "our CSA"
+          - "the VM CSA"
+          - "the IM CSA"
+        requires_context: true
+
+    normalization:
+      lookup_table: credit_support_annex
+      primary_key: id
+
+  # ------------------------------------------------------------------------
+  # Derivative Product Types
+  # ------------------------------------------------------------------------
+  derivative_product_type:
+    description: "OTC derivative product type"
+    category: "reference_data"
+    patterns:
+      - type: CODE
+        valid_values:
+          - IRS
+          - XCCY
+          - CDS
+          - FX_FORWARD
+          - FX_OPTION
+          - SWAPTION
+          - EQUITY_SWAP
+          - COMMODITY_SWAP
+          - REPO
+          - TRS
+
+      - type: NAME
+        mappings:
+          "interest rate swap": "IRS"
+          "interest rate swaps": "IRS"
+          "rate swap": "IRS"
+          "rate swaps": "IRS"
+          "swaps": "IRS"
+          "cross currency": "XCCY"
+          "cross-currency swap": "XCCY"
+          "xccy swap": "XCCY"
+          "credit default swap": "CDS"
+          "credit default swaps": "CDS"
+          "credit swaps": "CDS"
+          "FX forward": "FX_FORWARD"
+          "FX forwards": "FX_FORWARD"
+          "currency forward": "FX_FORWARD"
+          "FX option": "FX_OPTION"
+          "FX options": "FX_OPTION"
+          "currency option": "FX_OPTION"
+          "swaption": "SWAPTION"
+          "swaptions": "SWAPTION"
+          "equity swap": "EQUITY_SWAP"
+          "total return swap": "TRS"
+          "repo": "REPO"
+          "repurchase agreement": "REPO"
+
+      - type: CATEGORY
+        description: "Product category (expands to types)"
+        # Note: Category expansions handled by instrument_hierarchy.yaml
+        # These are simple mappings for the most common shorthand
+        mappings:
+          "rates": "IRS"
+          "rate derivatives": "IRS"
+          "credit": "CDS"
+          "credit derivatives": "CDS"
+          "FX": "FX_FORWARD"
+          "FX derivatives": "FX_FORWARD"
+          "all OTC": "IRS"
+
+    normalization:
+      uppercase: true
+
+  # ------------------------------------------------------------------------
+  # ISDA Version
+  # ------------------------------------------------------------------------
+  isda_version:
+    description: "ISDA Master Agreement version"
+    category: "reference_data"
+    patterns:
+      - type: YEAR
+        valid_values: ["2002", "1992"]
+        mappings:
+          "2002 ISDA": "2002"
+          "1992 ISDA": "1992"
+          "old ISDA": "1992"
+          "current": "2002"
+          "standard": "2002"
+
+    default: "2002"
+
+  # ------------------------------------------------------------------------
+  # Governing Law
+  # ------------------------------------------------------------------------
+  governing_law:
+    description: "Governing law for ISDA"
+    category: "reference_data"
+    patterns:
+      - type: CODE
+        valid_values:
+          - NY
+          - ENGLISH
+          - OTHER
+
+      - type: NAME
+        mappings:
+          "New York": "NY"
+          "New York law": "NY"
+          "NY law": "NY"
+          "English": "ENGLISH"
+          "English law": "ENGLISH"
+          "UK law": "ENGLISH"
+
+    default: "NY"
+
+  # ------------------------------------------------------------------------
+  # CSA Type
+  # ------------------------------------------------------------------------
+  csa_type:
+    description: "Type of Credit Support Annex"
+    category: "reference_data"
+    patterns:
+      - type: CODE
+        valid_values:
+          - VM
+          - IM
+          - LEGACY
+
+      - type: NAME
+        mappings:
+          "variation margin": "VM"
+          "VM CSA": "VM"
+          "initial margin": "IM"
+          "IM CSA": "IM"
+          "SIMM": "IM"
+          "legacy": "LEGACY"
+          "old style": "LEGACY"
+          "1995 CSA": "LEGACY"
+
+    default: "VM"
+
+  # ------------------------------------------------------------------------
+  # Collateral Asset Class
+  # ------------------------------------------------------------------------
+  collateral_asset_class:
+    description: "Asset class for collateral"
+    category: "reference_data"
+    patterns:
+      - type: CODE
+        valid_values:
+          - CASH
+          - GOVT_BOND
+          - AGENCY
+          - CORP_BOND
+          - EQUITY
+          - GOLD
+
+      - type: NAME
+        mappings:
+          "cash": "CASH"
+          "government bonds": "GOVT_BOND"
+          "govvies": "GOVT_BOND"
+          "treasuries": "GOVT_BOND"
+          "gilts": "GOVT_BOND"
+          "bunds": "GOVT_BOND"
+          "JGBs": "GOVT_BOND"
+          "agency": "AGENCY"
+          "agency bonds": "AGENCY"
+          "agencies": "AGENCY"
+          "corporate bonds": "CORP_BOND"
+          "corporates": "CORP_BOND"
+          "equity": "EQUITY"
+          "stocks": "EQUITY"
+          "gold": "GOLD"
+
+  # ------------------------------------------------------------------------
+  # Confirmation Method
+  # ------------------------------------------------------------------------
+  confirmation_method:
+    description: "Trade confirmation method/platform"
+    category: "reference_data"
+    patterns:
+      - type: CODE
+        valid_values:
+          - DTCC_GTR
+          - MARKITWIRE
+          - SWIFT_MT300
+          - SWIFT_MT360
+          - PAPER
+          - EMAIL
+
+      - type: NAME
+        mappings:
+          "DTCC": "DTCC_GTR"
+          "GTR": "DTCC_GTR"
+          "trade repository": "DTCC_GTR"
+          "MarkitWire": "MARKITWIRE"
+          "Markit": "MARKITWIRE"
+          "SWIFT": "SWIFT_MT360"
+          "MT300": "SWIFT_MT300"
+          "MT360": "SWIFT_MT360"
+          "paper": "PAPER"
+          "long form": "PAPER"
+          "email": "EMAIL"
+          "electronic": "MARKITWIRE"
+
+  # ------------------------------------------------------------------------
+  # Haircut Percentage
+  # ------------------------------------------------------------------------
+  haircut_percentage:
+    description: "Collateral haircut percentage"
+    category: "numeric"
+    patterns:
+      - type: PERCENTAGE
+        regex: "(\\d+(?:\\.\\d+)?)\\s*%?"
+        examples:
+          - "2%"
+          - "5"
+          - "0.5%"
+          - "15%"
+
+    normalization:
+      type: decimal
+      max: 100
+      min: 0
+
+  # ------------------------------------------------------------------------
+  # Threshold Amount
+  # ------------------------------------------------------------------------
+  threshold_amount:
+    description: "Collateral threshold amount"
+    category: "numeric"
+    patterns:
+      - type: AMOUNT
+        examples:
+          - "10 million"
+          - "10mm"
+          - "0"
+          - "zero"
+          - "nil"
+        mappings:
+          "zero": 0
+          "nil": 0
+          "none": 0
+
+    normalization:
+      type: decimal
+
+  # ------------------------------------------------------------------------
+  # Collateral Account Type
+  # ------------------------------------------------------------------------
+  collateral_account_type:
+    description: "Type of collateral account"
+    category: "reference_data"
+    patterns:
+      - type: CODE
+        valid_values:
+          - POSTED_VM
+          - RECEIVED_VM
+          - POSTED_IM
+          - RECEIVED_IM
+          - TRI_PARTY
+
+      - type: NAME
+        mappings:
+          "VM posted": "POSTED_VM"
+          "posted VM": "POSTED_VM"
+          "we post VM": "POSTED_VM"
+          "VM received": "RECEIVED_VM"
+          "received VM": "RECEIVED_VM"
+          "they post VM": "RECEIVED_VM"
+          "IM posted": "POSTED_IM"
+          "posted IM": "POSTED_IM"
+          "we post IM": "POSTED_IM"
+          "IM received": "RECEIVED_IM"
+          "received IM": "RECEIVED_IM"
+          "they post IM": "RECEIVED_IM"
+          "tri-party": "TRI_PARTY"
+          "triparty": "TRI_PARTY"
+          "tri party": "TRI_PARTY"
+
+  # ------------------------------------------------------------------------
+  # Interest Rate Benchmark
+  # ------------------------------------------------------------------------
+  interest_benchmark:
+    description: "Interest rate benchmark for CSA"
+    category: "reference_data"
+    patterns:
+      - type: CODE
+        valid_values:
+          - SOFR
+          - ESTR
+          - SONIA
+          - TONAR
+          - FED_FUNDS
+          - SARON
+
+      - type: NAME
+        mappings:
+          "SOFR": "SOFR"
+          "secured overnight": "SOFR"
+          "ESTR": "ESTR"
+          "euro short-term": "ESTR"
+          "SONIA": "SONIA"
+          "sterling overnight": "SONIA"
+          "TONAR": "TONAR"
+          "Tokyo overnight": "TONAR"
+          "fed funds": "FED_FUNDS"
+          "federal funds": "FED_FUNDS"
+          "SARON": "SARON"
+          "Swiss average": "SARON"
+
+  # ------------------------------------------------------------------------
+  # Custodian Reference (for IM segregation)
+  # ------------------------------------------------------------------------
+  custodian_reference:
+    description: "Reference to custodian for IM segregation"
+    category: "financial_entity"
+    patterns:
+      - type: NAME
+        examples:
+          - "BNY Mellon"
+          - "State Street"
+          - "JP Morgan"
+          - "Northern Trust"
+          - "Euroclear"
+          - "Clearstream"
+        fuzzy_match: true
+
+      - type: BIC
+        regex: "[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?"
+        examples:
+          - "IRVTUS3NXXX"
+          - "BABOROCP"
+
+    normalization:
+      lookup_table: custodians
+      fuzzy_match: true
+
+  # ------------------------------------------------------------------------
+  # Counterparty Type
+  # ------------------------------------------------------------------------
+  counterparty_type:
+    description: "Classification of counterparty"
+    category: "reference_data"
+    patterns:
+      - type: CODE
+        valid_values:
+          - BANK
+          - BROKER_DEALER
+          - ASSET_MANAGER
+          - CORPORATE
+          - SOVEREIGN
+
+      - type: NAME
+        mappings:
+          "bank": "BANK"
+          "dealer": "BROKER_DEALER"
+          "broker": "BROKER_DEALER"
+          "broker-dealer": "BROKER_DEALER"
+          "asset manager": "ASSET_MANAGER"
+          "fund manager": "ASSET_MANAGER"
+          "corporate": "CORPORATE"
+          "company": "CORPORATE"
+          "sovereign": "SOVEREIGN"
+          "government": "SOVEREIGN"
 
 # ==========================================================================
 # EXTRACTION CONFIGURATION
@@ -715,7 +1180,7 @@ entity_types:
 extraction_config:
   # Order matters - earlier types take precedence for overlapping matches
   extraction_order:
-    - currency  # Extract short patterns first
+    - currency # Extract short patterns first
     - percentage
     - amount
     - bic
@@ -732,13 +1197,13 @@ extraction_config:
   context_free:
     - currency
     - bic
-    - market_reference  # MIC codes
+    - market_reference # MIC codes
     - percentage
 
   # Patterns that need conversation context
   context_required:
-    - anaphora  # "them", "that manager"
-    - relative_references  # "the first IM"
+    - anaphora # "them", "that manager"
+    - relative_references # "the first IM"
 
   # Expansion configuration
   expansions:

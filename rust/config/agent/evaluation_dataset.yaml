@@ -412,6 +412,349 @@ evaluation_cases:
       instruction_method: "CTM"
     notes: "Should handle telegram-style input"
 
+  # ==================== OTC Derivatives Tests (Phase 3.5) ====================
+
+  # --- Counterparty Tests ---
+
+  - id: otc_counterparty_simple
+    category: otc_derivatives
+    difficulty: easy
+    input: "Add Goldman Sachs as a counterparty"
+    expected_intents:
+      - counterparty_create
+    expected_entities:
+      counterparty_reference: "Goldman Sachs"
+    expected_dsl_contains:
+      - "counterparty.ensure"
+      - "Goldman Sachs"
+    notes: "Basic counterparty onboarding"
+
+  - id: otc_counterparty_with_lei
+    category: otc_derivatives
+    difficulty: medium
+    input: "Onboard JP Morgan (LEI: 8I5DZWZKVSZI1NUHU748) for derivatives trading"
+    expected_intents:
+      - counterparty_create
+    expected_entities:
+      counterparty_reference: "JP Morgan"
+      lei: "8I5DZWZKVSZI1NUHU748"
+    expected_dsl_contains:
+      - "counterparty.ensure"
+      - "JP Morgan"
+      - "8I5DZWZKVSZI1NUHU748"
+
+  - id: otc_counterparty_short_name
+    category: otc_derivatives
+    difficulty: easy
+    input: "Add GS as counterparty"
+    expected_intents:
+      - counterparty_create
+    expected_entities:
+      counterparty_reference: "Goldman Sachs"
+    expected_dsl_contains:
+      - "counterparty.ensure"
+    notes: "Short name should resolve to full name"
+
+  # --- ISDA Tests ---
+
+  - id: otc_isda_simple
+    category: otc_derivatives
+    difficulty: easy
+    input: "Establish ISDA with Goldman Sachs"
+    expected_intents:
+      - isda_establish
+    expected_entities:
+      counterparty_reference: "Goldman Sachs"
+      isda_version: "2002"
+    expected_dsl_contains:
+      - "isda.establish"
+      - "Goldman Sachs"
+      - "2002"
+    notes: "Default to 2002 ISDA"
+
+  - id: otc_isda_with_law
+    category: otc_derivatives
+    difficulty: medium
+    input: "2002 ISDA with Deutsche Bank under English law"
+    expected_intents:
+      - isda_establish
+    expected_entities:
+      counterparty_reference: "Deutsche Bank"
+      isda_version: "2002"
+      governing_law: "ENGLISH"
+    expected_dsl_contains:
+      - "isda.establish"
+      - "Deutsche Bank"
+      - "ENGLISH"
+
+  - id: otc_isda_product_scope
+    category: otc_derivatives
+    difficulty: medium
+    input: "Add interest rate swaps and FX forwards to the Goldman ISDA"
+    expected_intents:
+      - isda_add_products
+    expected_entities:
+      isda_reference: "@isda-goldman"
+      derivative_product_type: ["IRS", "FX_FORWARD"]
+    expected_dsl_contains:
+      - "isda.add-product-scope"
+      - "IRS"
+      - "FX_FORWARD"
+
+  # --- CSA Tests ---
+
+  - id: otc_csa_simple_vm
+    category: otc_derivatives
+    difficulty: easy
+    input: "Add VM CSA to the Goldman ISDA"
+    expected_intents:
+      - csa_establish
+    expected_entities:
+      isda_reference: "@isda-goldman"
+      csa_type: "VM"
+    expected_dsl_contains:
+      - "csa.establish"
+      - "VM"
+
+  - id: otc_csa_with_thresholds
+    category: otc_derivatives
+    difficulty: medium
+    input: "Establish CSA with Goldman: zero threshold, 500k MTA, USD"
+    expected_intents:
+      - csa_establish
+    expected_entities:
+      counterparty_reference: "Goldman Sachs"
+      csa_type: "VM"
+      our_threshold: 0
+      mta: 500000
+      threshold_ccy: "USD"
+    expected_dsl_contains:
+      - "csa.establish"
+      - "500000"
+      - "USD"
+
+  - id: otc_csa_im
+    category: otc_derivatives
+    difficulty: hard
+    input: "Set up IM CSA with Morgan Stanley using third-party custody at State Street"
+    expected_intents:
+      - csa_establish
+    expected_entities:
+      counterparty_reference: "Morgan Stanley"
+      csa_type: "IM"
+      custodian_reference: "State Street"
+    expected_dsl_contains:
+      - "csa.establish"
+      - "IM"
+      - "State Street"
+
+  - id: otc_csa_eligible_collateral
+    category: otc_derivatives
+    difficulty: medium
+    input: "Accept cash and treasuries with 2% haircut for the Goldman CSA"
+    expected_intents:
+      - csa_add_eligible_collateral
+    expected_entities:
+      csa_reference: "@csa-goldman"
+      collateral_asset_class: ["CASH", "GOVT_BOND"]
+      haircut_percentage: 2.0
+    expected_dsl_contains:
+      - "csa.add-eligible-collateral"
+      - "CASH"
+      - "GOVT_BOND"
+
+  # --- Collateral Account Tests ---
+
+  - id: otc_collateral_vm_account
+    category: otc_derivatives
+    difficulty: medium
+    input: "Set up VM collateral account for Goldman"
+    expected_intents:
+      - collateral_setup_accounts
+    expected_entities:
+      counterparty_reference: "Goldman Sachs"
+      collateral_account_type: "VM_POSTED"
+    expected_dsl_contains:
+      - "collateral.ensure-account"
+      - "VM_POSTED"
+
+  - id: otc_collateral_im_segregated
+    category: otc_derivatives
+    difficulty: hard
+    input: "Create segregated IM account with BNY Mellon as custodian for Morgan Stanley collateral"
+    expected_intents:
+      - collateral_setup_accounts
+    expected_entities:
+      counterparty_reference: "Morgan Stanley"
+      collateral_account_type: "POSTED_IM"
+      custodian_reference: "BNY Mellon"
+    expected_dsl_contains:
+      - "collateral.ensure-account"
+      - "POSTED_IM"
+      - "BNY Mellon"
+
+  # --- Confirmation Tests ---
+
+  - id: otc_confirmation_simple
+    category: otc_derivatives
+    difficulty: easy
+    input: "Use DTCC for IRS confirmations with Goldman"
+    expected_intents:
+      - confirmation_configure
+    expected_entities:
+      counterparty_reference: "Goldman Sachs"
+      confirmation_method: "DTCC_GTR"
+      derivative_product_type: "IRS"
+    expected_dsl_contains:
+      - "confirmation.configure"
+      - "DTCC_GTR"
+      - "IRS"
+
+  - id: otc_confirmation_multiple
+    category: otc_derivatives
+    difficulty: medium
+    input: "Configure MarkitWire for rates products and DTCC for credit with JP Morgan"
+    expected_intents:
+      - confirmation_configure
+      - confirmation_configure
+    expected_entities:
+      counterparty_reference: "JP Morgan"
+      confirmation_method: ["MARKITWIRE", "DTCC_GTR"]
+    expected_dsl_statements: 2
+    expected_dsl_contains:
+      - "confirmation.configure"
+      - "MARKITWIRE"
+      - "DTCC_GTR"
+
+  # --- Compound OTC Tests ---
+
+  - id: otc_compound_full_setup
+    category: otc_derivatives
+    difficulty: hard
+    input: |
+      Set up Goldman Sachs for OTC trading:
+      2002 ISDA under NY law,
+      VM CSA with zero threshold,
+      accept cash and treasuries,
+      use DTCC for confirmations
+    expected_intents:
+      - counterparty_create
+      - isda_establish
+      - csa_establish
+      - csa_add_eligible_collateral
+      - confirmation_configure
+    expected_dsl_statements: 5
+    expected_dsl_contains:
+      - "counterparty.ensure"
+      - "isda.establish"
+      - "csa.establish"
+      - "csa.add-eligible-collateral"
+      - "confirmation.configure"
+      - "Goldman Sachs"
+      - "2002"
+      - "NY"
+      - "VM"
+      - "DTCC"
+
+  - id: otc_compound_im_setup
+    category: otc_derivatives
+    difficulty: hard
+    input: |
+      Configure IM for Morgan Stanley:
+      IM CSA with State Street custody,
+      accept cash, treasuries, and agencies,
+      10% haircut on agencies
+    expected_intents:
+      - csa_establish
+      - csa_add_eligible_collateral
+      - collateral_setup_accounts
+    expected_dsl_contains:
+      - "csa.establish"
+      - "IM"
+      - "State Street"
+      - "CASH"
+      - "GOVT_BOND"
+      - "AGENCY"
+
+  - id: otc_compound_multi_counterparty
+    category: otc_derivatives
+    difficulty: hard
+    input: "Set up ISDAs with Goldman and JP Morgan, both under NY law with VM CSAs"
+    expected_intents:
+      - isda_establish
+      - isda_establish
+      - csa_establish
+      - csa_establish
+    expected_dsl_statements: 4
+    expected_dsl_contains:
+      - "Goldman"
+      - "JP Morgan"
+      - "NY"
+      - "VM"
+
+  # --- Context-Dependent OTC Tests ---
+
+  - id: otc_context_add_product
+    category: otc_derivatives
+    difficulty: medium
+    input: "Also add CDS coverage"
+    context:
+      last_intent: "isda_establish"
+      session_entities:
+        isda_reference: "@isda-goldman"
+    expected_intents:
+      - isda_add_products
+    expected_entities:
+      derivative_product_type: "CDS"
+    notes: "Should inherit ISDA reference from context"
+
+  - id: otc_context_followup_csa
+    category: otc_derivatives
+    difficulty: medium
+    input: "Now add a CSA to it"
+    context:
+      last_intent: "isda_establish"
+      session_entities:
+        isda_reference: "@isda-goldman"
+        counterparty_reference: "Goldman Sachs"
+    expected_intents:
+      - csa_establish
+    expected_dsl_contains:
+      - "csa.establish"
+    notes: "Should link CSA to ISDA from context"
+
+  # --- OTC Edge Cases ---
+
+  - id: otc_edge_unknown_counterparty
+    category: otc_derivatives
+    difficulty: medium
+    input: "Establish ISDA with Unknown Bank Ltd"
+    expected_intents:
+      - isda_establish
+    expected_entities:
+      counterparty_reference: null
+    expected_response_type: clarification
+    notes: "Unknown counterparty should trigger clarification"
+
+  - id: otc_edge_invalid_csa_type
+    category: otc_derivatives
+    difficulty: easy
+    input: "Add XYZ CSA to Goldman ISDA"
+    expected_entities:
+      csa_type: null
+    notes: "Invalid CSA type should not be extracted"
+
+  - id: otc_edge_benchmark_inference
+    category: otc_derivatives
+    difficulty: medium
+    input: "EUR-denominated CSA with Goldman"
+    expected_intents:
+      - csa_establish
+    expected_entities:
+      threshold_ccy: "EUR"
+      interest_benchmark: "ESTR"
+    notes: "Should infer ESTR from EUR currency"
+
 # Metrics configuration for evaluation
 metrics:
   intent_classification:
@@ -463,3 +806,27 @@ categories:
     - edge_ambiguous
     - edge_unknown_manager
     - edge_invalid_market
+
+  otc_derivatives:
+    - otc_counterparty_simple
+    - otc_counterparty_with_lei
+    - otc_counterparty_short_name
+    - otc_isda_simple
+    - otc_isda_with_law
+    - otc_isda_product_scope
+    - otc_csa_simple_vm
+    - otc_csa_with_thresholds
+    - otc_csa_im
+    - otc_csa_eligible_collateral
+    - otc_collateral_vm_account
+    - otc_collateral_im_segregated
+    - otc_confirmation_simple
+    - otc_confirmation_multiple
+    - otc_compound_full_setup
+    - otc_compound_im_setup
+    - otc_compound_multi_counterparty
+    - otc_context_add_product
+    - otc_context_followup_csa
+    - otc_edge_unknown_counterparty
+    - otc_edge_invalid_csa_type
+    - otc_edge_benchmark_inference

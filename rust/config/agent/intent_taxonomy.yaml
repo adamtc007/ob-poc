@@ -65,7 +65,7 @@ intent_taxonomy:
             - "extend {manager} scope to {scope}"
             - "limit {manager} to only {scope}"
           required_entities:
-            - manager_reference  # Must resolve to existing IM
+            - manager_reference # Must resolve to existing IM
             - scope_modification
           examples:
             - input: "Expand BlackRock to include Asian equities"
@@ -154,7 +154,7 @@ intent_taxonomy:
           required_entities:
             - pricing_source
           optional_entities:
-            - instrument_classes  # If omitted, infer from context or use all
+            - instrument_classes # If omitted, infer from context or use all
             - priority
           default_inferences:
             priority: 1
@@ -181,7 +181,7 @@ intent_taxonomy:
           optional_entities:
             - instrument_classes
           default_inferences:
-            priority: 2  # Lower priority = fallback
+            priority: 2 # Lower priority = fallback
 
         - intent: pricing_query
           description: "Query pricing configuration"
@@ -432,6 +432,323 @@ intent_taxonomy:
             - settlement_types
 
   # ==========================================================================
+  # OTC DERIVATIVES DOMAIN (Phase 3.5)
+  # ==========================================================================
+  otc_derivatives:
+    description: "OTC derivatives trading setup and collateral management"
+
+    # ------------------------------------------------------------------------
+    # Counterparty Management Sub-domain
+    # ------------------------------------------------------------------------
+    counterparty:
+      description: "Derivatives counterparty management"
+
+      intents:
+        - intent: counterparty_create
+          description: "Create or onboard a derivatives counterparty"
+          canonical_verb: counterparty.ensure
+          trigger_phrases:
+            - "add {counterparty} as counterparty"
+            - "onboard {counterparty} for derivatives"
+            - "set up {counterparty} as trading counterparty"
+            - "we trade derivatives with {counterparty}"
+            - "{counterparty} is our swap counterparty"
+            - "create counterparty {counterparty}"
+          required_entities:
+            - counterparty_reference
+          optional_entities:
+            - counterparty_type
+            - jurisdiction
+            - lei
+          default_inferences:
+            counterparty_type: BANK
+            is_financial_counterparty: true
+          examples:
+            - input: "Add Goldman Sachs as counterparty for derivatives"
+              entities:
+                counterparty_reference: "Goldman Sachs"
+                counterparty_type: "BANK"
+
+        - intent: counterparty_add_bic
+          description: "Add BIC code to counterparty"
+          canonical_verb: counterparty.add-bic
+          trigger_phrases:
+            - "add BIC {bic} to {counterparty}"
+            - "{counterparty} BIC is {bic}"
+            - "set {counterparty} SWIFT to {bic}"
+          required_entities:
+            - counterparty_reference
+            - bic
+
+        - intent: counterparty_query
+          description: "Query counterparties"
+          canonical_verb: counterparty.list
+          trigger_phrases:
+            - "who are our swap counterparties"
+            - "list counterparties"
+            - "show derivatives counterparties"
+            - "who do we trade with"
+          is_query: true
+
+    # ------------------------------------------------------------------------
+    # ISDA Management Sub-domain
+    # ------------------------------------------------------------------------
+    isda:
+      description: "ISDA Master Agreement management"
+
+      intents:
+        - intent: isda_establish
+          description: "Establish ISDA Master Agreement"
+          canonical_verb: isda.establish
+          trigger_phrases:
+            - "establish ISDA with {counterparty}"
+            - "set up ISDA master with {counterparty}"
+            - "we have an ISDA with {counterparty}"
+            - "create ISDA for {counterparty}"
+            - "2002 ISDA with {counterparty}"
+            - "link ISDA to {counterparty}"
+          required_entities:
+            - counterparty_reference
+          optional_entities:
+            - isda_version
+            - governing_law
+            - date
+          default_inferences:
+            isda_version: "2002"
+            governing_law: NY
+            netting_applicable: true
+          examples:
+            - input: "Establish 2002 ISDA with Goldman under NY law"
+              entities:
+                counterparty_reference: "Goldman Sachs"
+                isda_version: "2002"
+                governing_law: "NY"
+
+        - intent: isda_add_products
+          description: "Add products to ISDA scope"
+          canonical_verb: isda.add-product-scope
+          trigger_phrases:
+            - "add {products} to the ISDA"
+            - "ISDA covers {products}"
+            - "include {products} under ISDA"
+            - "trade {products} under {counterparty} ISDA"
+          required_entities:
+            - derivative_product_type
+          optional_entities:
+            - isda_reference
+            - counterparty_reference
+          examples:
+            - input: "Add IRS and CDS to the Goldman ISDA"
+              entities:
+                isda_reference: "@isda-goldman"
+                derivative_product_type: ["IRS", "CDS"]
+
+        - intent: isda_query
+          description: "Query ISDA agreements"
+          canonical_verb: isda.query-by-counterparty
+          trigger_phrases:
+            - "do we have an ISDA with {counterparty}"
+            - "show ISDA for {counterparty}"
+            - "what's our ISDA status with {counterparty}"
+            - "list our ISDAs"
+          is_query: true
+
+    # ------------------------------------------------------------------------
+    # CSA Management Sub-domain
+    # ------------------------------------------------------------------------
+    csa:
+      description: "Credit Support Annex and collateral terms"
+
+      intents:
+        - intent: csa_establish
+          description: "Establish CSA under ISDA"
+          canonical_verb: csa.establish
+          trigger_phrases:
+            - "set up CSA with {counterparty}"
+            - "establish VM CSA under {isda}"
+            - "add CSA to ISDA"
+            - "create collateral agreement with {counterparty}"
+            - "we have a CSA with {counterparty}"
+            - "collateral terms with {counterparty}"
+          required_entities:
+            - isda_reference
+          optional_entities:
+            - csa_type
+            - threshold_amount
+            - currency
+          default_inferences:
+            csa_type: VM
+            our_threshold: 0
+            their_threshold: 0
+            mta: 500000
+          examples:
+            - input: "Set up VM CSA with Goldman, zero threshold both ways"
+              entities:
+                counterparty_reference: "Goldman Sachs"
+                csa_type: "VM"
+                threshold_amount: 0
+
+        - intent: csa_add_eligible_collateral
+          description: "Add eligible collateral to CSA"
+          canonical_verb: csa.add-eligible-collateral
+          trigger_phrases:
+            - "accept {collateral_type} as collateral"
+            - "add {collateral_type} to eligible collateral"
+            - "{collateral_type} with {haircut}% haircut"
+            - "we can post {collateral_type}"
+            - "eligible collateral includes {collateral_type}"
+          required_entities:
+            - collateral_asset_class
+          optional_entities:
+            - csa_reference
+            - haircut_percentage
+            - currency
+            - jurisdiction
+          examples:
+            - input: "Accept USD cash and US treasuries with 2% haircut"
+              entities:
+                collateral_asset_class: ["CASH", "GOVT_BOND"]
+                currency: "USD"
+                jurisdiction: "US"
+                haircut_percentage: 2.0
+
+        - intent: csa_set_im_terms
+          description: "Configure Initial Margin terms"
+          canonical_verb: csa.set-im-terms
+          trigger_phrases:
+            - "set up IM CSA"
+            - "initial margin terms"
+            - "configure IM with {counterparty}"
+            - "post IM to {custodian}"
+            - "IM segregation at {custodian}"
+          required_entities:
+            - csa_reference
+          optional_entities:
+            - custodian_reference
+            - threshold_amount
+
+        - intent: csa_query
+          description: "Query CSA terms"
+          canonical_verb: csa.list
+          trigger_phrases:
+            - "what are our collateral terms with {counterparty}"
+            - "show CSA for {counterparty}"
+            - "what collateral can we post"
+            - "what's the threshold with {counterparty}"
+          is_query: true
+
+    # ------------------------------------------------------------------------
+    # Collateral Operations Sub-domain
+    # ------------------------------------------------------------------------
+    collateral:
+      description: "Collateral account and position management"
+
+      intents:
+        - intent: collateral_setup_accounts
+          description: "Set up collateral accounts"
+          canonical_verb: collateral.ensure-account
+          trigger_phrases:
+            - "set up collateral accounts for {csa}"
+            - "create VM account with {counterparty}"
+            - "establish IM segregated account"
+            - "collateral account at {custodian}"
+            - "tri-party account with {agent}"
+          required_entities:
+            - collateral_account_type
+          optional_entities:
+            - csa_reference
+            - custodian_reference
+          examples:
+            - input: "Set up tri-party IM account at BNY"
+              entities:
+                collateral_account_type: "TRI_PARTY"
+                custodian_reference: "BNY Mellon"
+
+        - intent: collateral_query_accounts
+          description: "Query collateral accounts"
+          canonical_verb: collateral.list-accounts
+          trigger_phrases:
+            - "show collateral accounts"
+            - "list our collateral positions"
+            - "where is our collateral"
+            - "collateral account status"
+          is_query: true
+
+    # ------------------------------------------------------------------------
+    # Confirmation Workflow Sub-domain
+    # ------------------------------------------------------------------------
+    confirmation:
+      description: "Trade confirmation configuration"
+
+      intents:
+        - intent: confirmation_configure
+          description: "Configure confirmation method"
+          canonical_verb: confirmation.configure
+          trigger_phrases:
+            - "use {platform} for confirmations with {counterparty}"
+            - "confirm {products} via {platform}"
+            - "set up {platform} for {counterparty}"
+            - "confirmation method is {platform}"
+            - "{products} confirms through {platform}"
+          required_entities:
+            - confirmation_method
+          optional_entities:
+            - counterparty_reference
+            - derivative_product_type
+          default_inferences:
+            auto_match: true
+            target_days: 1
+          examples:
+            - input: "Use MarkitWire for IRS confirmations with Goldman"
+              entities:
+                confirmation_method: "MARKITWIRE"
+                derivative_product_type: ["IRS"]
+                counterparty_reference: "Goldman Sachs"
+
+        - intent: confirmation_query
+          description: "Query confirmation setup"
+          canonical_verb: confirmation.list
+          trigger_phrases:
+            - "how do we confirm with {counterparty}"
+            - "show confirmation methods"
+            - "confirmation status"
+          is_query: true
+
+    # ------------------------------------------------------------------------
+    # Compound OTC Intents
+    # ------------------------------------------------------------------------
+    compound_otc:
+      description: "Multi-step OTC setup"
+
+      intents:
+        - intent: full_counterparty_setup
+          description: "Complete counterparty onboarding"
+          expands_to:
+            - counterparty_create
+            - isda_establish
+            - isda_add_products
+            - csa_establish
+            - csa_add_eligible_collateral
+            - confirmation_configure
+          trigger_phrases:
+            - "set up complete derivatives relationship with {counterparty}"
+            - "full counterparty onboarding for {counterparty}"
+            - "establish trading with {counterparty}"
+          examples:
+            - input: "Set up complete derivatives relationship with Goldman"
+
+        - intent: im_setup
+          description: "Complete IM setup"
+          expands_to:
+            - csa_establish
+            - csa_add_eligible_collateral
+            - collateral_setup_accounts
+          trigger_phrases:
+            - "set up initial margin with {counterparty}"
+            - "IM setup for {counterparty}"
+            - "configure UMR compliance with {counterparty}"
+
+  # ==========================================================================
   # COMPOUND/META INTENTS
   # ==========================================================================
   compound:
@@ -442,10 +759,10 @@ intent_taxonomy:
         description: "Complete trading matrix setup"
         expands_to:
           - profile_create
-          - im_assign  # multiple
-          - pricing_set  # multiple
-          - sweep_configure  # multiple
-          - sla_commit  # multiple
+          - im_assign # multiple
+          - pricing_set # multiple
+          - sweep_configure # multiple
+          - sla_commit # multiple
           - profile_validate
         trigger_phrases:
           - "set up complete trading for {cbu}"
@@ -460,14 +777,14 @@ intent_taxonomy:
           - service_resource.provision
           - im_link_connectivity
         trigger_phrases:
-          - "{manager} via {method}"  # Implies assign + connectivity
+          - "{manager} via {method}" # Implies assign + connectivity
 
       - intent: european_equity_setup
         description: "Set up European equity trading"
         expands_to:
-          - universe_add  # for each European market
-          - im_assign  # with European scope
-          - ssi_create  # for European CSDs
+          - universe_add # for each European market
+          - im_assign # with European scope
+          - ssi_create # for European CSDs
         trigger_phrases:
           - "set up European equities"
           - "enable trading in Europe"
@@ -557,22 +874,22 @@ intent_relationships:
       - profile_set_universe
       - im_assign
     im_assign:
-      - im_assign  # Can assign multiple IMs
+      - im_assign # Can assign multiple IMs
       - pricing_set
       - im_change_connectivity
     pricing_set:
-      - pricing_set  # Can set multiple sources
+      - pricing_set # Can set multiple sources
       - sweep_configure
       - sla_commit
     sweep_configure:
-      - sweep_configure  # Multiple currencies
+      - sweep_configure # Multiple currencies
       - sla_commit
     sla_commit:
-      - sla_commit  # Multiple SLAs
+      - sla_commit # Multiple SLAs
       - profile_validate
     profile_validate:
       - profile_materialize
-      - im_assign  # Fix gaps
+      - im_assign # Fix gaps
 
   # Exclusive intents - can't both be true
   mutually_exclusive:
@@ -585,10 +902,10 @@ intent_relationships:
 confidence_thresholds:
   # Per-intent thresholds (overrides defaults)
   defaults:
-    execute_threshold: 0.85      # Auto-execute if above
-    confirm_threshold: 0.65      # Confirm before executing
-    suggest_threshold: 0.45      # Suggest but ask
-    clarify_threshold: 0.0       # Below this, ask clarifying questions
+    execute_threshold: 0.85 # Auto-execute if above
+    confirm_threshold: 0.65 # Confirm before executing
+    suggest_threshold: 0.45 # Suggest but ask
+    clarify_threshold: 0.0 # Below this, ask clarifying questions
 
   overrides:
     # Higher thresholds for destructive actions
@@ -604,4 +921,13 @@ confidence_thresholds:
     pricing_query:
       execute_threshold: 0.60
     profile_visualize:
+      execute_threshold: 0.60
+    # OTC derivatives queries
+    counterparty_query:
+      execute_threshold: 0.60
+    isda_query:
+      execute_threshold: 0.60
+    csa_query:
+      execute_threshold: 0.60
+    confirmation_query:
       execute_threshold: 0.60

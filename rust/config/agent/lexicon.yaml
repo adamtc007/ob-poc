@@ -1,0 +1,529 @@
+# Lexicon configuration for intent tokenization.
+#
+# This file defines the dictionary of known terms for the tokenizer.
+# Words are looked up here FIRST before attempting EntityGateway resolution.
+#
+# Structure:
+# - verbs: Action words grouped by semantic class
+# - entities: Entity type indicators (not actual entities - those come from DB)
+# - roles: Role identifiers
+# - products: Product codes
+# - instruments: Instrument types (OTC vs exchange-traded)
+# - markets: Market identifiers (MIC codes)
+# - currencies: Currency codes
+# - csa_types: CSA type codes
+# - laws: Governing law specifications
+# - prepositions: Function words for structure
+# - conjunctions: Coordinators
+# - articles: Determiners
+# - pronouns: For coreference resolution
+# - modifiers: Adjectives and qualifiers
+
+verbs:
+  # Create/add/establish - brings something into existence
+  create:
+    - add
+    - create
+    - establish
+    - onboard
+    - register
+    - set up
+    - setup
+    - provision
+    - open
+    - initiate
+    - start
+    - introduce
+    - define
+
+  # Update/modify - changes existing entity
+  update:
+    - update
+    - modify
+    - change
+    - amend
+    - revise
+    - edit
+    - adjust
+    - correct
+    - fix
+
+  # Delete/remove - removes entity or relationship
+  delete:
+    - delete
+    - remove
+    - terminate
+    - close
+    - end
+    - cancel
+    - revoke
+    - deactivate
+    - suspend
+
+  # Query/list - retrieves information
+  query:
+    - list
+    - show
+    - get
+    - find
+    - search
+    - look up
+    - lookup
+    - display
+    - view
+    - what
+    - which
+    - who
+
+  # Link/assign - creates relationship
+  link:
+    - assign
+    - link
+    - connect
+    - associate
+    - attach
+    - bind
+    - map
+    - relate
+
+  # Unlink - removes relationship
+  unlink:
+    - unlink
+    - disconnect
+    - disassociate
+    - detach
+    - unbind
+    - unmap
+
+  # Provision - enables service/resource
+  provision:
+    - provision
+    - enable
+    - activate
+    - configure
+    - deploy
+
+  # Trade - transaction-related
+  trade:
+    - trade
+    - execute
+    - transact
+    - settle
+    - book
+
+entities:
+  # CBU indicators
+  cbu:
+    - cbu
+    - client
+    - fund
+    - account
+    - portfolio
+
+  # Person indicators
+  person:
+    - person
+    - individual
+    - director
+    - ubo
+    - signatory
+    - officer
+    - manager
+    - trustee
+
+  # Legal entity indicators
+  legal_entity:
+    - company
+    - corporation
+    - ltd
+    - llc
+    - plc
+    - inc
+    - gmbh
+    - sarl
+    - entity
+    - firm
+    - bank
+    - institution
+
+  # Counterparty indicators (OTC domain)
+  counterparty:
+    - counterparty
+    - counterparties
+    - dealer
+    - dealers
+    - broker
+    - prime broker
+    - pb
+
+  # ISDA indicators
+  isda:
+    - isda
+    - master agreement
+    - isda master
+    - isda agreement
+
+  # CSA indicators
+  csa:
+    - csa
+    - credit support annex
+    - collateral agreement
+    - margin agreement
+
+roles:
+  - director
+  - ubo
+  - beneficial owner
+  - shareholder
+  - signatory
+  - authorized signatory
+  - trustee
+  - settlor
+  - protector
+  - beneficiary
+  - investment manager
+  - im
+  - management company
+  - manco
+  - custodian
+  - administrator
+  - counterparty
+  - principal
+  - agent
+
+products:
+  - custody
+  - fund accounting
+  - fund admin
+  - transfer agency
+  - ta
+  - prime brokerage
+  - pb
+  - collateral management
+  - middle office
+  - reporting
+  - otc clearing
+
+instruments:
+  # OTC derivatives (ISDA/CSA lifecycle)
+  otc:
+    - irs
+    - interest rate swap
+    - cds
+    - credit default swap
+    - fx forward
+    - fx swap
+    - currency swap
+    - swaption
+    - cap
+    - floor
+    - collar
+    - fra
+    - forward rate agreement
+    - ndf
+    - non-deliverable forward
+    - trs
+    - total return swap
+    - variance swap
+    - otc option
+    - exotic
+    - structured product
+    - cdo
+    - clo
+    - abs
+    - mbs
+    - repo
+    - reverse repo
+    - securities lending
+    - stock loan
+
+  # Exchange-traded securities (SSI/booking rules lifecycle)
+  exchange_traded:
+    - equity
+    - equities
+    - stock
+    - stocks
+    - share
+    - shares
+    - bond
+    - bonds
+    - fixed income
+    - government bond
+    - corporate bond
+    - etf
+    - exchange traded fund
+    - mutual fund
+    - listed option
+    - future
+    - futures
+    - warrant
+    - rights
+    - adr
+    - gdr
+    - reit
+    - preferred stock
+    - common stock
+
+markets:
+  # US markets
+  - xnys
+  - nyse
+  - xnas
+  - nasdaq
+  - xase
+  - amex
+  - xchi
+  - cboe
+  - xcme
+  - cme
+  - xnym
+  - nymex
+
+  # European markets
+  - xlon
+  - lse
+  - xpar
+  - euronext paris
+  - xams
+  - euronext amsterdam
+  - xfra
+  - frankfurt
+  - xetr
+  - xetra
+  - xmil
+  - borsa italiana
+  - xmad
+  - madrid
+  - xswx
+  - six swiss
+
+  # Asian markets
+  - xtks
+  - tokyo
+  - xhkg
+  - hong kong
+  - xshg
+  - shanghai
+  - xshe
+  - shenzhen
+  - xkrx
+  - korea
+  - xses
+  - singapore
+  - xasx
+  - asx
+
+  # Generic
+  - us markets
+  - us
+  - uk markets
+  - uk
+  - european markets
+  - europe
+  - asian markets
+  - asia
+  - global
+
+currencies:
+  - usd
+  - eur
+  - gbp
+  - jpy
+  - chf
+  - cad
+  - aud
+  - nzd
+  - hkd
+  - sgd
+  - cny
+  - krw
+  - inr
+  - brl
+  - mxn
+  - zar
+  - sek
+  - nok
+  - dkk
+  - pln
+
+csa_types:
+  - vm
+  - variation margin
+  - im
+  - initial margin
+  - two way
+  - two-way
+  - one way
+  - one-way
+  - title transfer
+  - pledge
+  - scsa
+  - standard csa
+
+laws:
+  - code: NY_LAW
+    aliases:
+      - new york law
+      - ny law
+      - new york
+      - ny
+
+  - code: ENGLISH_LAW
+    aliases:
+      - english law
+      - uk law
+      - england
+      - london
+
+  - code: GERMAN_LAW
+    aliases:
+      - german law
+      - germany
+      - frankfurt
+
+  - code: FRENCH_LAW
+    aliases:
+      - french law
+      - france
+      - paris
+
+  - code: SINGAPORE_LAW
+    aliases:
+      - singapore law
+      - singapore
+
+  - code: HONG_KONG_LAW
+    aliases:
+      - hong kong law
+      - hong kong
+      - hk
+
+  - code: JAPANESE_LAW
+    aliases:
+      - japanese law
+      - japan
+      - tokyo
+
+prepositions:
+  to:
+    - to
+    - into
+    - towards
+
+  for_:
+    - for
+
+  as_:
+    - as
+
+  with:
+    - with
+    - including
+    - plus
+
+  under:
+    - under
+    - pursuant to
+    - governed by
+    - subject to
+
+  from:
+    - from
+
+  in_:
+    - in
+    - within
+    - inside
+
+  on:
+    - on
+    - upon
+
+  by:
+    - by
+    - via
+    - through
+
+  of:
+    - of
+
+  at:
+    - at
+
+conjunctions:
+  - and
+  - or
+  - but
+  - also
+  - then
+  - plus
+
+articles:
+  - a
+  - an
+  - the
+
+pronouns:
+  - it
+  - its
+  - them
+  - their
+  - they
+  - this
+  - that
+  - these
+  - those
+  - which
+  - who
+  - whom
+
+modifiers:
+  # Temporal
+  temporal:
+    - new
+    - existing
+    - current
+    - previous
+    - former
+    - old
+    - latest
+    - recent
+
+  # Bilateral/multilateral
+  lateral:
+    - bilateral
+    - multilateral
+    - unilateral
+
+  # OTC-specific qualifiers
+  otc_qualifier:
+    - collateralized
+    - uncollateralized
+    - margined
+    - cleared
+    - uncleared
+    - standardized
+    - bespoke
+    - vanilla
+    - exotic
+    - structured
+
+  # Risk-related
+  risk:
+    - high
+    - medium
+    - low
+    - enhanced
+    - standard
+    - simplified
+
+  # Status
+  status:
+    - active
+    - pending
+    - suspended
+    - terminated
+    - expired
+    - draft
+    - approved
+    - rejected

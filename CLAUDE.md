@@ -2,6 +2,52 @@
 
 This file provides guidance to Claude Code when working with this repository.
 
+## Lexicon-Based Agent Pipeline
+
+The agentic module uses a **lexicon-backed tokenizer + nom grammar parser** for natural language intent extraction.
+
+### Architecture
+
+```
+Natural Language → TOKENIZER (lexicon-backed) → Token Stream
+                         ↓
+Token Stream → NOM GRAMMAR PARSER → IntentAst
+                         ↓
+IntentAst → DSL GENERATOR → DSL Source
+                         ↓
+DSL Source → EXISTING DSL PIPELINE → Database
+```
+
+### Key Files
+
+```
+rust/config/agent/lexicon.yaml             ← Token vocabulary (verbs, entities, roles, etc.)
+rust/src/agentic/lexicon/
+├── mod.rs                                 ← Module exports
+├── tokens.rs                              ← Token, TokenType, TokenSource types
+├── loader.rs                              ← LexiconConfig YAML loader
+├── tokenizer.rs                           ← Lexicon-backed tokenizer with entity resolution
+├── intent_ast.rs                          ← IntentAst enum (RoleAssign, IsdaEstablish, etc.)
+├── intent_parser.rs                       ← Nom grammar parsers for each intent type
+└── pipeline.rs                            ← Full pipeline: tokenize → parse → generate DSL
+rust/src/agentic/lexicon_agent.rs          ← LexiconAgentPipeline (main entry point)
+```
+
+### Supported Intent Types
+
+| Intent | Example | DSL Generated |
+|--------|---------|---------------|
+| `RoleAssign` | "Add John as director" | `(cbu.assign-role ...)` |
+| `CounterpartyCreate` | "Add Goldman as counterparty" | `(entity.ensure-limited-company ...)` |
+| `IsdaEstablish` | "Set up ISDA with Goldman under NY law" | `(isda.create ...)` |
+| `CsaAdd` | "Add VM CSA" | `(isda.add-csa ...)` |
+| `ProductAdd` | "Add custody product" | `(cbu.add-product ...)` |
+| `UniverseDefine` | "Trade US equities" | `(cbu-custody.add-universe ...)` |
+
+### Token Types
+
+The lexicon defines vocabulary for: verbs (add, create, set up), entities (resolved via EntityGateway), roles (director, signatory), products (custody, fund accounting), instruments (equity, bond), markets (NYSE, LSE), currencies (USD, EUR), governing laws (NY, English), CSA types (VM, IM), prepositions, articles, and modifiers.
+
 ## Project Overview
 
 **OB-POC** is a KYC/AML onboarding system using a declarative DSL. The DSL is the single source of truth for onboarding workflows.
@@ -6506,73 +6552,4 @@ If uncertain about DSL semantics, CBU/UBO/KYC domain rules, graph invariants, or
 4. Wait for guidance
 
 Never silently "guess and commit" on complex domain logic.
-
-
----
-
-## Current Priority: Phase 3 Agent Intelligence Baseline Completion
-
-**Status:** In Progress  
-**TODO File:** `TODO-PHASE3-BASELINE-COMPLETION.md`
-
-### What's Done
-- Intent classifier with pattern matching
-- Entity extractor with region/hierarchy expansion
-- DSL generator with parameter mappings
-- Pipeline orchestration with session management
-- Configuration files (taxonomy, entity types, mappings)
-- Evaluation dataset (40+ test cases)
-
-### Critical Gaps to Fix
-
-1. **Wire Execution** (Phase 3.1)
-   - `pipeline.rs` execution is stubbed
-   - Need to connect to actual `DslExecutor`
-   - Add async support and transactions
-
-2. **Complete Parameter Mappings** (Phase 3.2)
-   - ~15 verbs in taxonomy have no mappings
-   - Add to `config/agent/parameter_mappings.yaml`
-   - Add missing entity types
-
-3. **LLM Fallback** (Phase 3.3)
-   - Currently 100% pattern matching
-   - Need semantic fallback when patterns fail
-
-4. **Evaluation Harness** (Phase 3.4)
-   - Dataset exists but no runner
-   - Build CLI to measure accuracy
-
-### Key Files
-
-```
-rust/src/agentic/
-├── pipeline.rs           # Main orchestration (needs execution wiring)
-├── intent_classifier.rs  # Pattern-based classification
-├── entity_extractor.rs   # Entity extraction with expansion
-├── dsl_generator.rs      # Intent+entities → DSL
-├── taxonomy.rs           # Loads intent_taxonomy.yaml
-├── market_regions.rs     # Region expansion config
-├── instrument_hierarchy.rs # Instrument category expansion
-
-rust/config/agent/
-├── intent_taxonomy.yaml      # All intents and trigger phrases
-├── entity_types.yaml         # Entity patterns and normalization
-├── parameter_mappings.yaml   # Intent → DSL parameter mapping (INCOMPLETE)
-├── market_regions.yaml       # European → [XLON, XETR, ...]
-├── instrument_hierarchy.yaml # Fixed Income → [GOVT_BOND, CORP_BOND]
-├── evaluation_dataset.yaml   # Golden test cases
-```
-
-### Success Criteria
-- All 25+ intents can generate valid DSL
-- Generated DSL executes against database
-- Evaluation passes at 85%+ accuracy
-- Demo: "Add BlackRock for European equities via CTM" → DSL → Execution → Confirmation
-
-### Execution Order
-1. Week 1: Wire execution + complete parameter mappings
-2. Week 2: Evaluation harness + gap fixing
-3. Week 3: LLM fallback + query implementation
-4. Week 4: Polish and documentation
 

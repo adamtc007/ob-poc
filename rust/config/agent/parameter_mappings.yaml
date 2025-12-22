@@ -739,3 +739,409 @@ inference_rules:
     EUR: MMF
     GBP: MMF
     default: STIF
+
+  # Infer interest benchmark from currency
+  interest_benchmark_from_currency:
+    USD: SOFR
+    EUR: ESTR
+    GBP: SONIA
+    JPY: TONAR
+    CHF: SARON
+    default: SOFR
+
+  # =============================================================================
+  # OTC DERIVATIVES VERBS (Phase 3.5)
+  # =============================================================================
+
+  # =============================================================================
+  # Counterparty Verbs
+  # =============================================================================
+  counterparty.ensure:
+    description: "Create or update counterparty"
+    mappings:
+      - entity_type: counterparty_reference
+        param: name
+        required: true
+
+      - entity_type: lei
+        param: lei
+
+      - entity_type: counterparty_type
+        param: counterparty-type
+        default_if_missing: BANK
+
+      - entity_type: jurisdiction
+        param: jurisdiction
+        default_if_missing: US
+
+      - entity_type: boolean
+        context_key: is_financial
+        param: is-financial-counterparty
+        default_if_missing: true
+
+      - entity_type: boolean
+        context_key: is_covered
+        param: is-covered-entity
+        default_if_missing: false
+
+    symbol_template: "@cp-{name}"
+    symbol_transform: lowercase_hyphenate
+
+  counterparty.add-bic:
+    description: "Add BIC to counterparty"
+    mappings:
+      - entity_type: counterparty_reference
+        param: counterparty-id
+        required: true
+        source: context_or_extract
+
+      - entity_type: bic
+        param: bic
+        required: true
+
+      - entity_type: bic_type
+        param: bic-type
+        default_if_missing: SWIFT
+
+      - entity_type: boolean
+        param: is-primary
+        default_if_missing: false
+
+  counterparty.list:
+    description: "List counterparties"
+    mappings:
+      - entity_type: counterparty_type
+        param: counterparty-type
+
+      - entity_type: jurisdiction
+        param: jurisdiction
+
+  # =============================================================================
+  # ISDA Verbs
+  # =============================================================================
+  isda.establish:
+    description: "Establish ISDA Master Agreement"
+    mappings:
+      - entity_type: cbu_reference
+        param: cbu-id
+        source: context
+        fallback: session.current_cbu
+
+      - entity_type: counterparty_reference
+        param: counterparty-id
+        required: true
+        source: context_or_extract
+
+      - entity_type: isda_version
+        param: version
+        default_if_missing: "2002"
+
+      - entity_type: governing_law
+        param: governing-law
+        default_if_missing: NY
+
+      - entity_type: date
+        param: agreement-date
+        default_if_missing: today
+
+      - entity_type: boolean
+        param: netting-applicable
+        default_if_missing: true
+
+      - entity_type: boolean
+        param: cross-default-applicable
+        default_if_missing: true
+
+      - entity_type: amount
+        param: cross-default-threshold
+
+      - entity_type: currency
+        param: cross-default-threshold-ccy
+        default_if_missing: USD
+
+    defaults:
+      netting-applicable: true
+      cross-default-applicable: true
+
+    symbol_template: "@isda-{counterparty-id}"
+    symbol_transform: lowercase_hyphenate
+
+  isda.add-product-scope:
+    description: "Add products to ISDA scope"
+    mappings:
+      - entity_type: isda_reference
+        param: isda-id
+        required: true
+        source: context_or_extract
+
+      - entity_type: derivative_product_type
+        param: product-type
+        required: true
+        is_list: true
+        iterate_if_list: true
+
+      - entity_type: boolean
+        param: included
+        default_if_missing: true
+
+  isda.query-by-counterparty:
+    description: "Find ISDA for counterparty"
+    mappings:
+      - entity_type: cbu_reference
+        param: cbu-id
+        source: context
+        fallback: session.current_cbu
+
+      - entity_type: counterparty_reference
+        param: counterparty-id
+
+  # =============================================================================
+  # CSA Verbs
+  # =============================================================================
+  csa.establish:
+    description: "Establish CSA under ISDA"
+    mappings:
+      - entity_type: isda_reference
+        param: isda-id
+        required: true
+        source: context_or_extract
+
+      - entity_type: csa_type
+        param: csa-type
+        required: true
+        default_if_missing: VM
+
+      - entity_type: csa_version
+        param: csa-version
+
+      - entity_type: threshold_amount
+        context_key: our
+        param: our-threshold
+        default_if_missing: 0
+
+      - entity_type: threshold_amount
+        context_key: their
+        param: their-threshold
+        default_if_missing: 0
+
+      - entity_type: currency
+        param: threshold-ccy
+        default_if_missing: USD
+
+      - entity_type: amount
+        param: mta
+        default_if_missing: 500000
+
+      - entity_type: currency
+        param: mta-ccy
+        default_if_missing: USD
+
+      - entity_type: valuation_agent
+        param: valuation-agent
+        default_if_missing: CALCULATION_AGENT
+
+      - entity_type: interest_benchmark
+        param: interest-benchmark
+        infer_from: threshold_ccy
+        inference_rules:
+          USD: SOFR
+          EUR: ESTR
+          GBP: SONIA
+          JPY: TONAR
+          default: SOFR
+
+      - entity_type: boolean
+        param: rehypothecation
+        default_if_missing: false
+
+    symbol_template: "@csa-{isda-id}"
+    symbol_transform: lowercase_hyphenate
+
+  csa.add-eligible-collateral:
+    description: "Add eligible collateral type to CSA"
+    mappings:
+      - entity_type: csa_reference
+        param: csa-id
+        required: true
+        source: context_or_extract
+
+      - entity_type: collateral_asset_class
+        param: asset-class
+        required: true
+        is_list: true
+        iterate_if_list: true
+
+      - entity_type: currency
+        param: currency
+
+      - entity_type: jurisdiction
+        param: issuer-jurisdiction
+
+      - entity_type: credit_rating
+        param: min-rating
+
+      - entity_type: integer
+        param: max-maturity-years
+
+      - entity_type: haircut_percentage
+        param: haircut-pct
+        required: true
+        default_if_missing: 0
+
+      - entity_type: haircut_percentage
+        context_key: fx
+        param: fx-haircut-pct
+        default_if_missing: 8.0
+
+      - entity_type: priority_value
+        param: priority
+        default_if_missing: 100
+
+  csa.set-im-terms:
+    description: "Set Initial Margin specific terms"
+    mappings:
+      - entity_type: csa_reference
+        param: csa-id
+        required: true
+
+      - entity_type: amount
+        context_key: our
+        param: our-independent-amount
+
+      - entity_type: amount
+        context_key: their
+        param: their-independent-amount
+
+      - entity_type: currency
+        param: ia-ccy
+        default_if_missing: USD
+
+  csa.list:
+    description: "List CSAs"
+    mappings:
+      - entity_type: cbu_reference
+        param: cbu-id
+        source: context
+        fallback: session.current_cbu
+
+      - entity_type: counterparty_reference
+        param: counterparty-id
+
+  # =============================================================================
+  # Collateral Verbs
+  # =============================================================================
+  collateral.ensure-account:
+    description: "Ensure collateral account exists"
+    mappings:
+      - entity_type: cbu_reference
+        param: cbu-id
+        source: context
+        fallback: session.current_cbu
+
+      - entity_type: csa_reference
+        param: csa-id
+        source: context_or_extract
+
+      - entity_type: account_name
+        param: account-name
+        required: true
+
+      - entity_type: collateral_account_type
+        param: account-type
+        required: true
+
+      - entity_type: bic
+        param: custodian-bic
+
+      - entity_type: custodian_reference
+        param: custodian-name
+
+      - entity_type: boolean
+        param: is-third-party
+        infer_from: account_type
+        inference_rules:
+          POSTED_IM: true
+          RECEIVED_IM: true
+          TRI_PARTY: true
+          default: false
+
+      - entity_type: boolean
+        param: is-segregated
+        infer_from: account_type
+        inference_rules:
+          POSTED_IM: true
+          RECEIVED_IM: true
+          default: false
+
+      - entity_type: segregation_type
+        param: segregation-type
+
+    symbol_template: "@collat-{account-type}"
+    symbol_transform: lowercase_hyphenate
+
+  collateral.list-accounts:
+    description: "List collateral accounts"
+    mappings:
+      - entity_type: cbu_reference
+        param: cbu-id
+        source: context
+        fallback: session.current_cbu
+
+      - entity_type: csa_reference
+        param: csa-id
+
+      - entity_type: collateral_account_type
+        param: account-type
+
+  # =============================================================================
+  # Confirmation Verbs
+  # =============================================================================
+  confirmation.configure:
+    description: "Configure confirmation method"
+    mappings:
+      - entity_type: cbu_reference
+        param: cbu-id
+        source: context
+        fallback: session.current_cbu
+
+      - entity_type: counterparty_reference
+        param: counterparty-id
+
+      - entity_type: derivative_product_type
+        param: product-type
+        is_list: true
+        iterate_if_list: true
+
+      - entity_type: confirmation_method
+        param: method
+        required: true
+
+      - entity_type: platform_id
+        param: platform-id
+
+      - entity_type: platform_id
+        context_key: our
+        param: our-platform-id
+
+      - entity_type: boolean
+        param: auto-match
+        default_if_missing: true
+
+      - entity_type: decimal
+        param: match-tolerance-bps
+        default_if_missing: 1.0
+
+      - entity_type: integer
+        param: target-days
+        default_if_missing: 1
+
+  confirmation.list:
+    description: "List confirmation configurations"
+    mappings:
+      - entity_type: cbu_reference
+        param: cbu-id
+        source: context
+        fallback: session.current_cbu
+
+      - entity_type: counterparty_reference
+        param: counterparty-id

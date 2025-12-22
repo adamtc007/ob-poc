@@ -172,7 +172,7 @@ mod template_batch_tests {
     #[tokio::test]
     async fn test_entity_query_basic() -> Result<()> {
         let db = TestDb::new().await?;
-        let entity_ids = db.seed_test_entities().await?;
+        let _entity_ids = db.seed_test_entities().await?;
 
         let executor = DslExecutor::new(db.pool.clone());
         let mut ctx = ExecutionContext::new();
