@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict fi8zoUFKlrKiU3RCZv2WiLzrQtR1vCHZRNyTG3E09NuZwBuICSuQAIeMh5DvjJk
+\restrict gVc4bdDyLpvjBGhOcseMSz6ZXAHcB9SDudYAaDLIIwhM9JdTHTekBmKiNAZgT1n
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -20,35 +20,43 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- Name: custody; Type: SCHEMA; Schema: -; Owner: -
+-- Name: custody; Type: SCHEMA; Schema: -; Owner: adamtc007
 --
 
 CREATE SCHEMA custody;
 
 
+ALTER SCHEMA custody OWNER TO adamtc007;
+
 --
--- Name: kyc; Type: SCHEMA; Schema: -; Owner: -
+-- Name: kyc; Type: SCHEMA; Schema: -; Owner: adamtc007
 --
 
 CREATE SCHEMA kyc;
 
 
+ALTER SCHEMA kyc OWNER TO adamtc007;
+
 --
--- Name: ob-poc; Type: SCHEMA; Schema: -; Owner: -
+-- Name: ob-poc; Type: SCHEMA; Schema: -; Owner: adamtc007
 --
 
 CREATE SCHEMA "ob-poc";
 
 
+ALTER SCHEMA "ob-poc" OWNER TO adamtc007;
+
 --
--- Name: public; Type: SCHEMA; Schema: -; Owner: -
+-- Name: public; Type: SCHEMA; Schema: -; Owner: adamtc007
 --
 
 -- *not* creating schema, since initdb creates it
 
 
+ALTER SCHEMA public OWNER TO adamtc007;
+
 --
--- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: -
+-- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: adamtc007
 --
 
 COMMENT ON SCHEMA public IS 'Runtime API Endpoints System - Phase 1 Foundation';
@@ -62,7 +70,7 @@ CREATE EXTENSION IF NOT EXISTS fuzzystrmatch WITH SCHEMA public;
 
 
 --
--- Name: EXTENSION fuzzystrmatch; Type: COMMENT; Schema: -; Owner: -
+-- Name: EXTENSION fuzzystrmatch; Type: COMMENT; Schema: -; Owner: 
 --
 
 COMMENT ON EXTENSION fuzzystrmatch IS 'determine similarities and distance between strings';
@@ -76,7 +84,7 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
 
 
 --
--- Name: EXTENSION pg_trgm; Type: COMMENT; Schema: -; Owner: -
+-- Name: EXTENSION pg_trgm; Type: COMMENT; Schema: -; Owner: 
 --
 
 COMMENT ON EXTENSION pg_trgm IS 'text similarity measurement and index searching based on trigrams';
@@ -90,7 +98,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
 
 
 --
--- Name: EXTENSION "uuid-ossp"; Type: COMMENT; Schema: -; Owner: -
+-- Name: EXTENSION "uuid-ossp"; Type: COMMENT; Schema: -; Owner: 
 --
 
 COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UUIDs)';
@@ -104,14 +112,14 @@ CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
 
 
 --
--- Name: EXTENSION vector; Type: COMMENT; Schema: -; Owner: -
+-- Name: EXTENSION vector; Type: COMMENT; Schema: -; Owner: 
 --
 
 COMMENT ON EXTENSION vector IS 'vector data type and ivfflat and hnsw access methods';
 
 
 --
--- Name: action_type_enum; Type: TYPE; Schema: public; Owner: -
+-- Name: action_type_enum; Type: TYPE; Schema: public; Owner: adamtc007
 --
 
 CREATE TYPE public.action_type_enum AS ENUM (
@@ -123,8 +131,10 @@ CREATE TYPE public.action_type_enum AS ENUM (
 );
 
 
+ALTER TYPE public.action_type_enum OWNER TO adamtc007;
+
 --
--- Name: execution_status_enum; Type: TYPE; Schema: public; Owner: -
+-- Name: execution_status_enum; Type: TYPE; Schema: public; Owner: adamtc007
 --
 
 CREATE TYPE public.execution_status_enum AS ENUM (
@@ -136,8 +146,10 @@ CREATE TYPE public.execution_status_enum AS ENUM (
 );
 
 
+ALTER TYPE public.execution_status_enum OWNER TO adamtc007;
+
 --
--- Name: find_ssi_for_trade(uuid, uuid, uuid, uuid, character varying, character varying, uuid); Type: FUNCTION; Schema: custody; Owner: -
+-- Name: find_ssi_for_trade(uuid, uuid, uuid, uuid, character varying, character varying, uuid); Type: FUNCTION; Schema: custody; Owner: adamtc007
 --
 
 CREATE FUNCTION custody.find_ssi_for_trade(p_cbu_id uuid, p_instrument_class_id uuid, p_security_type_id uuid, p_market_id uuid, p_currency character varying, p_settlement_type character varying, p_counterparty_entity_id uuid DEFAULT NULL::uuid) RETURNS TABLE(ssi_id uuid, ssi_name character varying, rule_id uuid, rule_name character varying, rule_priority integer, specificity_score integer)
@@ -171,15 +183,17 @@ END;
 $$;
 
 
+ALTER FUNCTION custody.find_ssi_for_trade(p_cbu_id uuid, p_instrument_class_id uuid, p_security_type_id uuid, p_market_id uuid, p_currency character varying, p_settlement_type character varying, p_counterparty_entity_id uuid) OWNER TO adamtc007;
+
 --
--- Name: FUNCTION find_ssi_for_trade(p_cbu_id uuid, p_instrument_class_id uuid, p_security_type_id uuid, p_market_id uuid, p_currency character varying, p_settlement_type character varying, p_counterparty_entity_id uuid); Type: COMMENT; Schema: custody; Owner: -
+-- Name: FUNCTION find_ssi_for_trade(p_cbu_id uuid, p_instrument_class_id uuid, p_security_type_id uuid, p_market_id uuid, p_currency character varying, p_settlement_type character varying, p_counterparty_entity_id uuid); Type: COMMENT; Schema: custody; Owner: adamtc007
 --
 
 COMMENT ON FUNCTION custody.find_ssi_for_trade(p_cbu_id uuid, p_instrument_class_id uuid, p_security_type_id uuid, p_market_id uuid, p_currency character varying, p_settlement_type character varying, p_counterparty_entity_id uuid) IS 'ALERT-style SSI lookup. Returns the first matching SSI based on booking rule priority.';
 
 
 --
--- Name: sync_counterparty_key(); Type: FUNCTION; Schema: custody; Owner: -
+-- Name: sync_counterparty_key(); Type: FUNCTION; Schema: custody; Owner: adamtc007
 --
 
 CREATE FUNCTION custody.sync_counterparty_key() RETURNS trigger
@@ -192,8 +206,10 @@ END;
 $$;
 
 
+ALTER FUNCTION custody.sync_counterparty_key() OWNER TO adamtc007;
+
 --
--- Name: check_case_doc_completion(uuid); Type: FUNCTION; Schema: kyc; Owner: -
+-- Name: check_case_doc_completion(uuid); Type: FUNCTION; Schema: kyc; Owner: adamtc007
 --
 
 CREATE FUNCTION kyc.check_case_doc_completion(p_case_id uuid) RETURNS TABLE(total_requests integer, pending_requests integer, received_requests integer, verified_requests integer, mandatory_pending integer, all_mandatory_complete boolean)
@@ -218,8 +234,10 @@ WHERE w.case_id = p_case_id;
 $$;
 
 
+ALTER FUNCTION kyc.check_case_doc_completion(p_case_id uuid) OWNER TO adamtc007;
+
 --
--- Name: generate_doc_requests_from_threshold(uuid, character varying); Type: FUNCTION; Schema: kyc; Owner: -
+-- Name: generate_doc_requests_from_threshold(uuid, character varying); Type: FUNCTION; Schema: kyc; Owner: adamtc007
 --
 
 CREATE FUNCTION kyc.generate_doc_requests_from_threshold(p_case_id uuid, p_batch_reference character varying DEFAULT NULL::character varying) RETURNS TABLE(batch_id uuid, requests_created integer, entities_processed integer)
@@ -321,15 +339,17 @@ END;
 $$;
 
 
+ALTER FUNCTION kyc.generate_doc_requests_from_threshold(p_case_id uuid, p_batch_reference character varying) OWNER TO adamtc007;
+
 --
--- Name: FUNCTION generate_doc_requests_from_threshold(p_case_id uuid, p_batch_reference character varying); Type: COMMENT; Schema: kyc; Owner: -
+-- Name: FUNCTION generate_doc_requests_from_threshold(p_case_id uuid, p_batch_reference character varying); Type: COMMENT; Schema: kyc; Owner: adamtc007
 --
 
 COMMENT ON FUNCTION kyc.generate_doc_requests_from_threshold(p_case_id uuid, p_batch_reference character varying) IS 'Generates doc_requests based on threshold requirements for all workstreams in a case';
 
 
 --
--- Name: is_valid_case_transition(character varying, character varying); Type: FUNCTION; Schema: kyc; Owner: -
+-- Name: is_valid_case_transition(character varying, character varying); Type: FUNCTION; Schema: kyc; Owner: adamtc007
 --
 
 CREATE FUNCTION kyc.is_valid_case_transition(p_from_status character varying, p_to_status character varying) RETURNS boolean
@@ -350,8 +370,10 @@ END;
 $$;
 
 
+ALTER FUNCTION kyc.is_valid_case_transition(p_from_status character varying, p_to_status character varying) OWNER TO adamtc007;
+
 --
--- Name: is_valid_doc_request_transition(character varying, character varying); Type: FUNCTION; Schema: kyc; Owner: -
+-- Name: is_valid_doc_request_transition(character varying, character varying); Type: FUNCTION; Schema: kyc; Owner: adamtc007
 --
 
 CREATE FUNCTION kyc.is_valid_doc_request_transition(p_from_status character varying, p_to_status character varying) RETURNS boolean
@@ -372,8 +394,10 @@ END;
 $$;
 
 
+ALTER FUNCTION kyc.is_valid_doc_request_transition(p_from_status character varying, p_to_status character varying) OWNER TO adamtc007;
+
 --
--- Name: is_valid_workstream_transition(character varying, character varying); Type: FUNCTION; Schema: kyc; Owner: -
+-- Name: is_valid_workstream_transition(character varying, character varying); Type: FUNCTION; Schema: kyc; Owner: adamtc007
 --
 
 CREATE FUNCTION kyc.is_valid_workstream_transition(p_from_status character varying, p_to_status character varying) RETURNS boolean
@@ -396,8 +420,10 @@ END;
 $$;
 
 
+ALTER FUNCTION kyc.is_valid_workstream_transition(p_from_status character varying, p_to_status character varying) OWNER TO adamtc007;
+
 --
--- Name: abort_hung_sessions(); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: abort_hung_sessions(); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".abort_hung_sessions() RETURNS integer
@@ -421,8 +447,10 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".abort_hung_sessions() OWNER TO adamtc007;
+
 --
--- Name: apply_case_decision(uuid, character varying, character varying, text); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: apply_case_decision(uuid, character varying, character varying, text); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".apply_case_decision(p_case_id uuid, p_decision character varying, p_decided_by character varying, p_notes text DEFAULT NULL::text) RETURNS boolean
@@ -506,15 +534,17 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".apply_case_decision(p_case_id uuid, p_decision character varying, p_decided_by character varying, p_notes text) OWNER TO adamtc007;
+
 --
--- Name: FUNCTION apply_case_decision(p_case_id uuid, p_decision character varying, p_decided_by character varying, p_notes text); Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: FUNCTION apply_case_decision(p_case_id uuid, p_decision character varying, p_decided_by character varying, p_notes text); Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON FUNCTION "ob-poc".apply_case_decision(p_case_id uuid, p_decision character varying, p_decided_by character varying, p_notes text) IS 'Applies decision to case with validation';
 
 
 --
--- Name: can_prove_ubo(uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: can_prove_ubo(uuid); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".can_prove_ubo(p_ubo_id uuid) RETURNS TABLE(can_prove boolean, has_identity_proof boolean, has_ownership_proof boolean, missing_evidence text[], verified_evidence_count integer, pending_evidence_count integer)
@@ -570,15 +600,17 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".can_prove_ubo(p_ubo_id uuid) OWNER TO adamtc007;
+
 --
--- Name: FUNCTION can_prove_ubo(p_ubo_id uuid); Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: FUNCTION can_prove_ubo(p_ubo_id uuid); Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON FUNCTION "ob-poc".can_prove_ubo(p_ubo_id uuid) IS 'Checks if UBO has sufficient evidence to be proven';
 
 
 --
--- Name: capture_ubo_snapshot(uuid, uuid, character varying, character varying, character varying); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: capture_ubo_snapshot(uuid, uuid, character varying, character varying, character varying); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".capture_ubo_snapshot(p_cbu_id uuid, p_case_id uuid DEFAULT NULL::uuid, p_snapshot_type character varying DEFAULT 'MANUAL'::character varying, p_reason character varying DEFAULT NULL::character varying, p_captured_by character varying DEFAULT NULL::character varying) RETURNS uuid
@@ -661,15 +693,17 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".capture_ubo_snapshot(p_cbu_id uuid, p_case_id uuid, p_snapshot_type character varying, p_reason character varying, p_captured_by character varying) OWNER TO adamtc007;
+
 --
--- Name: FUNCTION capture_ubo_snapshot(p_cbu_id uuid, p_case_id uuid, p_snapshot_type character varying, p_reason character varying, p_captured_by character varying); Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: FUNCTION capture_ubo_snapshot(p_cbu_id uuid, p_case_id uuid, p_snapshot_type character varying, p_reason character varying, p_captured_by character varying); Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON FUNCTION "ob-poc".capture_ubo_snapshot(p_cbu_id uuid, p_case_id uuid, p_snapshot_type character varying, p_reason character varying, p_captured_by character varying) IS 'Captures current UBO state as a snapshot';
 
 
 --
--- Name: check_cbu_evidence_completeness(uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: check_cbu_evidence_completeness(uuid); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".check_cbu_evidence_completeness(p_cbu_id uuid) RETURNS TABLE(is_complete boolean, missing_categories text[], verified_count integer, pending_count integer, rejected_count integer)
@@ -718,15 +752,17 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".check_cbu_evidence_completeness(p_cbu_id uuid) OWNER TO adamtc007;
+
 --
--- Name: FUNCTION check_cbu_evidence_completeness(p_cbu_id uuid); Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: FUNCTION check_cbu_evidence_completeness(p_cbu_id uuid); Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON FUNCTION "ob-poc".check_cbu_evidence_completeness(p_cbu_id uuid) IS 'Checks if CBU has all required evidence categories verified';
 
 
 --
--- Name: check_cbu_invariants(); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: check_cbu_invariants(); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".check_cbu_invariants() RETURNS TABLE(cbu_id uuid, cbu_name character varying, violation_type character varying, violation_detail text)
@@ -785,15 +821,17 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".check_cbu_invariants() OWNER TO adamtc007;
+
 --
--- Name: FUNCTION check_cbu_invariants(); Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: FUNCTION check_cbu_invariants(); Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON FUNCTION "ob-poc".check_cbu_invariants() IS 'Checks CBU data integrity. Run periodically or before major operations. Returns violations.';
 
 
 --
--- Name: check_ubo_completeness(uuid, numeric); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: check_ubo_completeness(uuid, numeric); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".check_ubo_completeness(p_cbu_id uuid, p_threshold numeric DEFAULT 25.0) RETURNS TABLE(is_complete boolean, total_identified_ownership numeric, gap_percentage numeric, missing_chains integer, ubos_above_threshold integer, issues jsonb)
@@ -857,15 +895,17 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".check_ubo_completeness(p_cbu_id uuid, p_threshold numeric) OWNER TO adamtc007;
+
 --
--- Name: FUNCTION check_ubo_completeness(p_cbu_id uuid, p_threshold numeric); Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: FUNCTION check_ubo_completeness(p_cbu_id uuid, p_threshold numeric); Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON FUNCTION "ob-poc".check_ubo_completeness(p_cbu_id uuid, p_threshold numeric) IS 'Validates UBO determination completeness for a CBU';
 
 
 --
--- Name: cleanup_demo_data(); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: cleanup_demo_data(); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".cleanup_demo_data() RETURNS void
@@ -884,8 +924,10 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".cleanup_demo_data() OWNER TO adamtc007;
+
 --
--- Name: cleanup_expired_sessions(); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: cleanup_expired_sessions(); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".cleanup_expired_sessions() RETURNS integer
@@ -903,8 +945,10 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".cleanup_expired_sessions() OWNER TO adamtc007;
+
 --
--- Name: compute_case_redflag_score(uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: compute_case_redflag_score(uuid); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".compute_case_redflag_score(p_case_id uuid) RETURNS TABLE(soft_count integer, escalate_count integer, hard_stop_count integer, soft_score integer, escalate_score integer, has_hard_stop boolean, total_score integer, open_flags integer, mitigated_flags integer, waived_flags integer)
@@ -945,15 +989,17 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".compute_case_redflag_score(p_case_id uuid) OWNER TO adamtc007;
+
 --
--- Name: FUNCTION compute_case_redflag_score(p_case_id uuid); Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: FUNCTION compute_case_redflag_score(p_case_id uuid); Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON FUNCTION "ob-poc".compute_case_redflag_score(p_case_id uuid) IS 'Computes aggregated red-flag scores for a case';
 
 
 --
--- Name: compute_cbu_risk_score(uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: compute_cbu_risk_score(uuid); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".compute_cbu_risk_score(target_cbu_id uuid) RETURNS TABLE(risk_score integer, risk_band character varying, factors jsonb)
@@ -1033,8 +1079,10 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".compute_cbu_risk_score(target_cbu_id uuid) OWNER TO adamtc007;
+
 --
--- Name: compute_ownership_chains(uuid, uuid, integer); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: compute_ownership_chains(uuid, uuid, integer); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".compute_ownership_chains(p_cbu_id uuid, p_target_entity_id uuid DEFAULT NULL::uuid, p_max_depth integer DEFAULT 10) RETURNS TABLE(chain_id integer, ubo_person_id uuid, ubo_name text, path_entities uuid[], path_names text[], ownership_percentages numeric[], effective_ownership numeric, chain_depth integer, is_complete boolean, relationship_types text[], has_control_path boolean)
@@ -1130,8 +1178,10 @@ WHERE oc.owner_is_person = true
 $$;
 
 
+ALTER FUNCTION "ob-poc".compute_ownership_chains(p_cbu_id uuid, p_target_entity_id uuid, p_max_depth integer) OWNER TO adamtc007;
+
 --
--- Name: FUNCTION compute_ownership_chains(p_cbu_id uuid, p_target_entity_id uuid, p_max_depth integer); Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: FUNCTION compute_ownership_chains(p_cbu_id uuid, p_target_entity_id uuid, p_max_depth integer); Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON FUNCTION "ob-poc".compute_ownership_chains(p_cbu_id uuid, p_target_entity_id uuid, p_max_depth integer) IS 'Computes ownership and control chains from CBU entities to ultimate beneficial owners (UBOs).
@@ -1147,7 +1197,7 @@ The has_control_path flag indicates if the chain includes any control relationsh
 
 
 --
--- Name: evaluate_case_decision(uuid, character varying); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: evaluate_case_decision(uuid, character varying); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".evaluate_case_decision(p_case_id uuid, p_evaluator character varying DEFAULT NULL::character varying) RETURNS uuid
@@ -1206,15 +1256,17 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".evaluate_case_decision(p_case_id uuid, p_evaluator character varying) OWNER TO adamtc007;
+
 --
--- Name: FUNCTION evaluate_case_decision(p_case_id uuid, p_evaluator character varying); Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: FUNCTION evaluate_case_decision(p_case_id uuid, p_evaluator character varying); Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON FUNCTION "ob-poc".evaluate_case_decision(p_case_id uuid, p_evaluator character varying) IS 'Evaluates case and creates recommendation snapshot';
 
 
 --
--- Name: get_attribute_value(uuid, text); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: get_attribute_value(uuid, text); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".get_attribute_value(p_entity_id uuid, p_attribute_id text) RETURNS TABLE(value_text text, value_number numeric, value_integer bigint, value_boolean boolean, value_date date, value_datetime timestamp with time zone, value_json jsonb)
@@ -1237,8 +1289,10 @@ CREATE FUNCTION "ob-poc".get_attribute_value(p_entity_id uuid, p_attribute_id te
 $$;
 
 
+ALTER FUNCTION "ob-poc".get_attribute_value(p_entity_id uuid, p_attribute_id text) OWNER TO adamtc007;
+
 --
--- Name: get_next_version_number(character varying); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: get_next_version_number(character varying); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".get_next_version_number(domain_name_param character varying) RETURNS integer
@@ -1258,8 +1312,10 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".get_next_version_number(domain_name_param character varying) OWNER TO adamtc007;
+
 --
--- Name: invalidate_ast_cache(); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: invalidate_ast_cache(); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".invalidate_ast_cache() RETURNS trigger
@@ -1277,8 +1333,10 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".invalidate_ast_cache() OWNER TO adamtc007;
+
 --
--- Name: is_natural_person(uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: is_natural_person(uuid); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".is_natural_person(entity_id uuid) RETURNS boolean
@@ -1296,15 +1354,17 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".is_natural_person(entity_id uuid) OWNER TO adamtc007;
+
 --
--- Name: FUNCTION is_natural_person(entity_id uuid); Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: FUNCTION is_natural_person(entity_id uuid); Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON FUNCTION "ob-poc".is_natural_person(entity_id uuid) IS 'Returns true if entity is a natural person (PERSON category)';
 
 
 --
--- Name: is_valid_cbu_transition(character varying, character varying); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: is_valid_cbu_transition(character varying, character varying); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".is_valid_cbu_transition(p_from_status character varying, p_to_status character varying) RETURNS boolean
@@ -1334,15 +1394,17 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".is_valid_cbu_transition(p_from_status character varying, p_to_status character varying) OWNER TO adamtc007;
+
 --
--- Name: FUNCTION is_valid_cbu_transition(p_from_status character varying, p_to_status character varying); Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: FUNCTION is_valid_cbu_transition(p_from_status character varying, p_to_status character varying); Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON FUNCTION "ob-poc".is_valid_cbu_transition(p_from_status character varying, p_to_status character varying) IS 'Validates CBU status transitions';
 
 
 --
--- Name: is_valid_ubo_transition(character varying, character varying); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: is_valid_ubo_transition(character varying, character varying); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".is_valid_ubo_transition(p_from_status character varying, p_to_status character varying) RETURNS boolean
@@ -1381,15 +1443,17 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".is_valid_ubo_transition(p_from_status character varying, p_to_status character varying) OWNER TO adamtc007;
+
 --
--- Name: FUNCTION is_valid_ubo_transition(p_from_status character varying, p_to_status character varying); Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: FUNCTION is_valid_ubo_transition(p_from_status character varying, p_to_status character varying); Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON FUNCTION "ob-poc".is_valid_ubo_transition(p_from_status character varying, p_to_status character varying) IS 'Validates UBO verification status transitions';
 
 
 --
--- Name: log_cbu_status_change(); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: log_cbu_status_change(); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".log_cbu_status_change() RETURNS trigger
@@ -1413,8 +1477,10 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".log_cbu_status_change() OWNER TO adamtc007;
+
 --
--- Name: refresh_document_type_similarities(); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: refresh_document_type_similarities(); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".refresh_document_type_similarities() RETURNS void
@@ -1457,8 +1523,10 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".refresh_document_type_similarities() OWNER TO adamtc007;
+
 --
--- Name: resolve_semantic_to_uuid(text); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: resolve_semantic_to_uuid(text); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".resolve_semantic_to_uuid(semantic_id text) RETURNS uuid
@@ -1468,8 +1536,10 @@ CREATE FUNCTION "ob-poc".resolve_semantic_to_uuid(semantic_id text) RETURNS uuid
 $$;
 
 
+ALTER FUNCTION "ob-poc".resolve_semantic_to_uuid(semantic_id text) OWNER TO adamtc007;
+
 --
--- Name: resolve_uuid_to_semantic(uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: resolve_uuid_to_semantic(uuid); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".resolve_uuid_to_semantic(attr_uuid uuid) RETURNS text
@@ -1479,8 +1549,10 @@ CREATE FUNCTION "ob-poc".resolve_uuid_to_semantic(attr_uuid uuid) RETURNS text
 $$;
 
 
+ALTER FUNCTION "ob-poc".resolve_uuid_to_semantic(attr_uuid uuid) OWNER TO adamtc007;
+
 --
--- Name: set_attribute_value(uuid, text, text, numeric, bigint, boolean, date, timestamp with time zone, jsonb, text); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: set_attribute_value(uuid, text, text, numeric, bigint, boolean, date, timestamp with time zone, jsonb, text); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".set_attribute_value(p_entity_id uuid, p_attribute_id text, p_value_text text DEFAULT NULL::text, p_value_number numeric DEFAULT NULL::numeric, p_value_integer bigint DEFAULT NULL::bigint, p_value_boolean boolean DEFAULT NULL::boolean, p_value_date date DEFAULT NULL::date, p_value_datetime timestamp with time zone DEFAULT NULL::timestamp with time zone, p_value_json jsonb DEFAULT NULL::jsonb, p_created_by text DEFAULT 'system'::text) RETURNS bigint
@@ -1528,8 +1600,10 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".set_attribute_value(p_entity_id uuid, p_attribute_id text, p_value_text text, p_value_number numeric, p_value_integer bigint, p_value_boolean boolean, p_value_date date, p_value_datetime timestamp with time zone, p_value_json jsonb, p_created_by text) OWNER TO adamtc007;
+
 --
--- Name: sync_commercial_client_role(); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: sync_commercial_client_role(); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".sync_commercial_client_role() RETURNS trigger
@@ -1565,15 +1639,17 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".sync_commercial_client_role() OWNER TO adamtc007;
+
 --
--- Name: FUNCTION sync_commercial_client_role(); Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: FUNCTION sync_commercial_client_role(); Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON FUNCTION "ob-poc".sync_commercial_client_role() IS 'Maintains invariant: commercial_client_entity_id always has matching COMMERCIAL_CLIENT role in cbu_entity_roles';
 
 
 --
--- Name: update_attribute_registry_timestamp(); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: update_attribute_registry_timestamp(); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".update_attribute_registry_timestamp() RETURNS trigger
@@ -1586,8 +1662,10 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".update_attribute_registry_timestamp() OWNER TO adamtc007;
+
 --
--- Name: update_entity_deps_timestamp(); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: update_entity_deps_timestamp(); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".update_entity_deps_timestamp() RETURNS trigger
@@ -1600,8 +1678,10 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".update_entity_deps_timestamp() OWNER TO adamtc007;
+
 --
--- Name: update_proofs_timestamp(); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: update_proofs_timestamp(); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".update_proofs_timestamp() RETURNS trigger
@@ -1614,8 +1694,10 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".update_proofs_timestamp() OWNER TO adamtc007;
+
 --
--- Name: update_timestamp(); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: update_timestamp(); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".update_timestamp() RETURNS trigger
@@ -1628,8 +1710,10 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".update_timestamp() OWNER TO adamtc007;
+
 --
--- Name: update_ubo_edges_timestamp(); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: update_ubo_edges_timestamp(); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".update_ubo_edges_timestamp() RETURNS trigger
@@ -1642,8 +1726,10 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".update_ubo_edges_timestamp() OWNER TO adamtc007;
+
 --
--- Name: update_workflow_timestamp(); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: update_workflow_timestamp(); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".update_workflow_timestamp() RETURNS trigger
@@ -1656,8 +1742,10 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".update_workflow_timestamp() OWNER TO adamtc007;
+
 --
--- Name: validate_ubo_status_transition(); Type: FUNCTION; Schema: ob-poc; Owner: -
+-- Name: validate_ubo_status_transition(); Type: FUNCTION; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE FUNCTION "ob-poc".validate_ubo_status_transition() RETURNS trigger
@@ -1696,8 +1784,10 @@ END;
 $$;
 
 
+ALTER FUNCTION "ob-poc".validate_ubo_status_transition() OWNER TO adamtc007;
+
 --
--- Name: ensure_entity_exists(character varying, character varying, character varying); Type: FUNCTION; Schema: public; Owner: -
+-- Name: ensure_entity_exists(character varying, character varying, character varying); Type: FUNCTION; Schema: public; Owner: adamtc007
 --
 
 CREATE FUNCTION public.ensure_entity_exists(p_entity_type_name character varying, p_entity_name character varying, p_external_id character varying DEFAULT NULL::character varying) RETURNS uuid
@@ -1733,8 +1823,10 @@ END;
 $$;
 
 
+ALTER FUNCTION public.ensure_entity_exists(p_entity_type_name character varying, p_entity_name character varying, p_external_id character varying) OWNER TO adamtc007;
+
 --
--- Name: generate_correlation_id(text, uuid, uuid, text); Type: FUNCTION; Schema: public; Owner: -
+-- Name: generate_correlation_id(text, uuid, uuid, text); Type: FUNCTION; Schema: public; Owner: adamtc007
 --
 
 CREATE FUNCTION public.generate_correlation_id(template text, cbu_id_val uuid, action_id_val uuid, resource_type_name text) RETURNS text
@@ -1752,8 +1844,10 @@ END;
 $$;
 
 
+ALTER FUNCTION public.generate_correlation_id(template text, cbu_id_val uuid, action_id_val uuid, resource_type_name text) OWNER TO adamtc007;
+
 --
--- Name: generate_idempotency_key(text, text, text, uuid, uuid, uuid); Type: FUNCTION; Schema: public; Owner: -
+-- Name: generate_idempotency_key(text, text, text, uuid, uuid, uuid); Type: FUNCTION; Schema: public; Owner: adamtc007
 --
 
 CREATE FUNCTION public.generate_idempotency_key(template text, resource_type_name text, environment_name text, cbu_id_val uuid, action_id_val uuid, dsl_version_id_val uuid) RETURNS text
@@ -1777,8 +1871,10 @@ END;
 $$;
 
 
+ALTER FUNCTION public.generate_idempotency_key(template text, resource_type_name text, environment_name text, cbu_id_val uuid, action_id_val uuid, dsl_version_id_val uuid) OWNER TO adamtc007;
+
 --
--- Name: get_resource_endpoint_url(text, text, text); Type: FUNCTION; Schema: public; Owner: -
+-- Name: get_resource_endpoint_url(text, text, text); Type: FUNCTION; Schema: public; Owner: adamtc007
 --
 
 CREATE FUNCTION public.get_resource_endpoint_url(resource_type_name text, lifecycle_action text, environment_name text DEFAULT 'production'::text) RETURNS text
@@ -1800,8 +1896,10 @@ END;
 $_$;
 
 
+ALTER FUNCTION public.get_resource_endpoint_url(resource_type_name text, lifecycle_action text, environment_name text) OWNER TO adamtc007;
+
 --
--- Name: update_updated_at_column(); Type: FUNCTION; Schema: public; Owner: -
+-- Name: update_updated_at_column(); Type: FUNCTION; Schema: public; Owner: adamtc007
 --
 
 CREATE FUNCTION public.update_updated_at_column() RETURNS trigger
@@ -1814,12 +1912,14 @@ END;
 $$;
 
 
+ALTER FUNCTION public.update_updated_at_column() OWNER TO adamtc007;
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
 
 --
--- Name: cbu_cash_sweep_config; Type: TABLE; Schema: custody; Owner: -
+-- Name: cbu_cash_sweep_config; Type: TABLE; Schema: custody; Owner: adamtc007
 --
 
 CREATE TABLE custody.cbu_cash_sweep_config (
@@ -1846,15 +1946,17 @@ CREATE TABLE custody.cbu_cash_sweep_config (
 );
 
 
+ALTER TABLE custody.cbu_cash_sweep_config OWNER TO adamtc007;
+
 --
--- Name: TABLE cbu_cash_sweep_config; Type: COMMENT; Schema: custody; Owner: -
+-- Name: TABLE cbu_cash_sweep_config; Type: COMMENT; Schema: custody; Owner: adamtc007
 --
 
 COMMENT ON TABLE custody.cbu_cash_sweep_config IS 'Cash sweep configuration for idle cash management. STIFs, MMFs, overnight deposits.';
 
 
 --
--- Name: cbu_im_assignments; Type: TABLE; Schema: custody; Owner: -
+-- Name: cbu_im_assignments; Type: TABLE; Schema: custody; Owner: adamtc007
 --
 
 CREATE TABLE custody.cbu_im_assignments (
@@ -1888,8 +1990,10 @@ CREATE TABLE custody.cbu_im_assignments (
 );
 
 
+ALTER TABLE custody.cbu_im_assignments OWNER TO adamtc007;
+
 --
--- Name: TABLE cbu_im_assignments; Type: COMMENT; Schema: custody; Owner: -
+-- Name: TABLE cbu_im_assignments; Type: COMMENT; Schema: custody; Owner: adamtc007
 --
 
 COMMENT ON TABLE custody.cbu_im_assignments IS 'Investment Manager assignments with trading scope. Materialized from trading profile.
@@ -1897,7 +2001,7 @@ Links IM to instruction delivery resource for traceability.';
 
 
 --
--- Name: cbu_instrument_universe; Type: TABLE; Schema: custody; Owner: -
+-- Name: cbu_instrument_universe; Type: TABLE; Schema: custody; Owner: adamtc007
 --
 
 CREATE TABLE custody.cbu_instrument_universe (
@@ -1917,15 +2021,17 @@ CREATE TABLE custody.cbu_instrument_universe (
 );
 
 
+ALTER TABLE custody.cbu_instrument_universe OWNER TO adamtc007;
+
 --
--- Name: TABLE cbu_instrument_universe; Type: COMMENT; Schema: custody; Owner: -
+-- Name: TABLE cbu_instrument_universe; Type: COMMENT; Schema: custody; Owner: adamtc007
 --
 
 COMMENT ON TABLE custody.cbu_instrument_universe IS 'Layer 1: Declares what instrument classes, markets, currencies a CBU trades. Drives SSI completeness checks.';
 
 
 --
--- Name: cbu_pricing_config; Type: TABLE; Schema: custody; Owner: -
+-- Name: cbu_pricing_config; Type: TABLE; Schema: custody; Owner: adamtc007
 --
 
 CREATE TABLE custody.cbu_pricing_config (
@@ -1952,8 +2058,10 @@ CREATE TABLE custody.cbu_pricing_config (
 );
 
 
+ALTER TABLE custody.cbu_pricing_config OWNER TO adamtc007;
+
 --
--- Name: TABLE cbu_pricing_config; Type: COMMENT; Schema: custody; Owner: -
+-- Name: TABLE cbu_pricing_config; Type: COMMENT; Schema: custody; Owner: adamtc007
 --
 
 COMMENT ON TABLE custody.cbu_pricing_config IS 'Pricing source configuration by instrument class. Materialized from trading profile.
@@ -1961,7 +2069,7 @@ Links to provisioned pricing feed resource for traceability.';
 
 
 --
--- Name: cbu_ssi; Type: TABLE; Schema: custody; Owner: -
+-- Name: cbu_ssi; Type: TABLE; Schema: custody; Owner: adamtc007
 --
 
 CREATE TABLE custody.cbu_ssi (
@@ -1992,15 +2100,17 @@ CREATE TABLE custody.cbu_ssi (
 );
 
 
+ALTER TABLE custody.cbu_ssi OWNER TO adamtc007;
+
 --
--- Name: TABLE cbu_ssi; Type: COMMENT; Schema: custody; Owner: -
+-- Name: TABLE cbu_ssi; Type: COMMENT; Schema: custody; Owner: adamtc007
 --
 
 COMMENT ON TABLE custody.cbu_ssi IS 'Layer 2: Pure SSI account data. No routing logic - just the accounts themselves.';
 
 
 --
--- Name: cbu_ssi_agent_override; Type: TABLE; Schema: custody; Owner: -
+-- Name: cbu_ssi_agent_override; Type: TABLE; Schema: custody; Owner: adamtc007
 --
 
 CREATE TABLE custody.cbu_ssi_agent_override (
@@ -2017,8 +2127,10 @@ CREATE TABLE custody.cbu_ssi_agent_override (
 );
 
 
+ALTER TABLE custody.cbu_ssi_agent_override OWNER TO adamtc007;
+
 --
--- Name: cfi_codes; Type: TABLE; Schema: custody; Owner: -
+-- Name: cfi_codes; Type: TABLE; Schema: custody; Owner: adamtc007
 --
 
 CREATE TABLE custody.cfi_codes (
@@ -2037,15 +2149,17 @@ CREATE TABLE custody.cfi_codes (
 );
 
 
+ALTER TABLE custody.cfi_codes OWNER TO adamtc007;
+
 --
--- Name: TABLE cfi_codes; Type: COMMENT; Schema: custody; Owner: -
+-- Name: TABLE cfi_codes; Type: COMMENT; Schema: custody; Owner: adamtc007
 --
 
 COMMENT ON TABLE custody.cfi_codes IS 'ISO 10962 CFI code registry. Maps incoming security CFI to our classification.';
 
 
 --
--- Name: csa_agreements; Type: TABLE; Schema: custody; Owner: -
+-- Name: csa_agreements; Type: TABLE; Schema: custody; Owner: adamtc007
 --
 
 CREATE TABLE custody.csa_agreements (
@@ -2064,8 +2178,10 @@ CREATE TABLE custody.csa_agreements (
 );
 
 
+ALTER TABLE custody.csa_agreements OWNER TO adamtc007;
+
 --
--- Name: entity_settlement_identity; Type: TABLE; Schema: custody; Owner: -
+-- Name: entity_settlement_identity; Type: TABLE; Schema: custody; Owner: adamtc007
 --
 
 CREATE TABLE custody.entity_settlement_identity (
@@ -2081,8 +2197,10 @@ CREATE TABLE custody.entity_settlement_identity (
 );
 
 
+ALTER TABLE custody.entity_settlement_identity OWNER TO adamtc007;
+
 --
--- Name: entity_ssi; Type: TABLE; Schema: custody; Owner: -
+-- Name: entity_ssi; Type: TABLE; Schema: custody; Owner: adamtc007
 --
 
 CREATE TABLE custody.entity_ssi (
@@ -2104,8 +2222,10 @@ CREATE TABLE custody.entity_ssi (
 );
 
 
+ALTER TABLE custody.entity_ssi OWNER TO adamtc007;
+
 --
--- Name: instruction_paths; Type: TABLE; Schema: custody; Owner: -
+-- Name: instruction_paths; Type: TABLE; Schema: custody; Owner: adamtc007
 --
 
 CREATE TABLE custody.instruction_paths (
@@ -2124,8 +2244,10 @@ CREATE TABLE custody.instruction_paths (
 );
 
 
+ALTER TABLE custody.instruction_paths OWNER TO adamtc007;
+
 --
--- Name: instruction_types; Type: TABLE; Schema: custody; Owner: -
+-- Name: instruction_types; Type: TABLE; Schema: custody; Owner: adamtc007
 --
 
 CREATE TABLE custody.instruction_types (
@@ -2141,8 +2263,10 @@ CREATE TABLE custody.instruction_types (
 );
 
 
+ALTER TABLE custody.instruction_types OWNER TO adamtc007;
+
 --
--- Name: instrument_classes; Type: TABLE; Schema: custody; Owner: -
+-- Name: instrument_classes; Type: TABLE; Schema: custody; Owner: adamtc007
 --
 
 CREATE TABLE custody.instrument_classes (
@@ -2164,15 +2288,17 @@ CREATE TABLE custody.instrument_classes (
 );
 
 
+ALTER TABLE custody.instrument_classes OWNER TO adamtc007;
+
 --
--- Name: TABLE instrument_classes; Type: COMMENT; Schema: custody; Owner: -
+-- Name: TABLE instrument_classes; Type: COMMENT; Schema: custody; Owner: adamtc007
 --
 
 COMMENT ON TABLE custody.instrument_classes IS 'Canonical instrument classification. Maps to CFI, SMPG/ALERT, and ISDA taxonomies.';
 
 
 --
--- Name: isda_agreements; Type: TABLE; Schema: custody; Owner: -
+-- Name: isda_agreements; Type: TABLE; Schema: custody; Owner: adamtc007
 --
 
 CREATE TABLE custody.isda_agreements (
@@ -2189,8 +2315,10 @@ CREATE TABLE custody.isda_agreements (
 );
 
 
+ALTER TABLE custody.isda_agreements OWNER TO adamtc007;
+
 --
--- Name: isda_product_coverage; Type: TABLE; Schema: custody; Owner: -
+-- Name: isda_product_coverage; Type: TABLE; Schema: custody; Owner: adamtc007
 --
 
 CREATE TABLE custody.isda_product_coverage (
@@ -2203,8 +2331,10 @@ CREATE TABLE custody.isda_product_coverage (
 );
 
 
+ALTER TABLE custody.isda_product_coverage OWNER TO adamtc007;
+
 --
--- Name: isda_product_taxonomy; Type: TABLE; Schema: custody; Owner: -
+-- Name: isda_product_taxonomy; Type: TABLE; Schema: custody; Owner: adamtc007
 --
 
 CREATE TABLE custody.isda_product_taxonomy (
@@ -2221,15 +2351,17 @@ CREATE TABLE custody.isda_product_taxonomy (
 );
 
 
+ALTER TABLE custody.isda_product_taxonomy OWNER TO adamtc007;
+
 --
--- Name: TABLE isda_product_taxonomy; Type: COMMENT; Schema: custody; Owner: -
+-- Name: TABLE isda_product_taxonomy; Type: COMMENT; Schema: custody; Owner: adamtc007
 --
 
 COMMENT ON TABLE custody.isda_product_taxonomy IS 'ISDA OTC derivatives taxonomy. Used for regulatory reporting and ISDA/CSA linking.';
 
 
 --
--- Name: markets; Type: TABLE; Schema: custody; Owner: -
+-- Name: markets; Type: TABLE; Schema: custody; Owner: adamtc007
 --
 
 CREATE TABLE custody.markets (
@@ -2249,8 +2381,10 @@ CREATE TABLE custody.markets (
 );
 
 
+ALTER TABLE custody.markets OWNER TO adamtc007;
+
 --
--- Name: security_types; Type: TABLE; Schema: custody; Owner: -
+-- Name: security_types; Type: TABLE; Schema: custody; Owner: adamtc007
 --
 
 CREATE TABLE custody.security_types (
@@ -2264,15 +2398,17 @@ CREATE TABLE custody.security_types (
 );
 
 
+ALTER TABLE custody.security_types OWNER TO adamtc007;
+
 --
--- Name: TABLE security_types; Type: COMMENT; Schema: custody; Owner: -
+-- Name: TABLE security_types; Type: COMMENT; Schema: custody; Owner: adamtc007
 --
 
 COMMENT ON TABLE custody.security_types IS 'SMPG/ALERT security type codes. Used for granular booking rule matching.';
 
 
 --
--- Name: ssi_booking_rules; Type: TABLE; Schema: custody; Owner: -
+-- Name: ssi_booking_rules; Type: TABLE; Schema: custody; Owner: adamtc007
 --
 
 CREATE TABLE custody.ssi_booking_rules (
@@ -2322,15 +2458,17 @@ END)) STORED,
 );
 
 
+ALTER TABLE custody.ssi_booking_rules OWNER TO adamtc007;
+
 --
--- Name: TABLE ssi_booking_rules; Type: COMMENT; Schema: custody; Owner: -
+-- Name: TABLE ssi_booking_rules; Type: COMMENT; Schema: custody; Owner: adamtc007
 --
 
 COMMENT ON TABLE custody.ssi_booking_rules IS 'Layer 3: ALERT-style booking rules. Priority-based matching with wildcards (NULL = any).';
 
 
 --
--- Name: subcustodian_network; Type: TABLE; Schema: custody; Owner: -
+-- Name: subcustodian_network; Type: TABLE; Schema: custody; Owner: adamtc007
 --
 
 CREATE TABLE custody.subcustodian_network (
@@ -2353,8 +2491,10 @@ CREATE TABLE custody.subcustodian_network (
 );
 
 
+ALTER TABLE custody.subcustodian_network OWNER TO adamtc007;
+
 --
--- Name: approval_requests; Type: TABLE; Schema: kyc; Owner: -
+-- Name: approval_requests; Type: TABLE; Schema: kyc; Owner: adamtc007
 --
 
 CREATE TABLE kyc.approval_requests (
@@ -2371,8 +2511,10 @@ CREATE TABLE kyc.approval_requests (
 );
 
 
+ALTER TABLE kyc.approval_requests OWNER TO adamtc007;
+
 --
--- Name: case_events; Type: TABLE; Schema: kyc; Owner: -
+-- Name: case_events; Type: TABLE; Schema: kyc; Owner: adamtc007
 --
 
 CREATE TABLE kyc.case_events (
@@ -2388,15 +2530,17 @@ CREATE TABLE kyc.case_events (
 );
 
 
+ALTER TABLE kyc.case_events OWNER TO adamtc007;
+
 --
--- Name: TABLE case_events; Type: COMMENT; Schema: kyc; Owner: -
+-- Name: TABLE case_events; Type: COMMENT; Schema: kyc; Owner: adamtc007
 --
 
 COMMENT ON TABLE kyc.case_events IS 'Audit log of all case activities';
 
 
 --
--- Name: cases; Type: TABLE; Schema: kyc; Owner: -
+-- Name: cases; Type: TABLE; Schema: kyc; Owner: adamtc007
 --
 
 CREATE TABLE kyc.cases (
@@ -2421,15 +2565,17 @@ CREATE TABLE kyc.cases (
 );
 
 
+ALTER TABLE kyc.cases OWNER TO adamtc007;
+
 --
--- Name: TABLE cases; Type: COMMENT; Schema: kyc; Owner: -
+-- Name: TABLE cases; Type: COMMENT; Schema: kyc; Owner: adamtc007
 --
 
 COMMENT ON TABLE kyc.cases IS 'KYC cases for client onboarding and periodic review';
 
 
 --
--- Name: doc_request_acceptable_types; Type: TABLE; Schema: kyc; Owner: -
+-- Name: doc_request_acceptable_types; Type: TABLE; Schema: kyc; Owner: adamtc007
 --
 
 CREATE TABLE kyc.doc_request_acceptable_types (
@@ -2440,15 +2586,17 @@ CREATE TABLE kyc.doc_request_acceptable_types (
 );
 
 
+ALTER TABLE kyc.doc_request_acceptable_types OWNER TO adamtc007;
+
 --
--- Name: TABLE doc_request_acceptable_types; Type: COMMENT; Schema: kyc; Owner: -
+-- Name: TABLE doc_request_acceptable_types; Type: COMMENT; Schema: kyc; Owner: adamtc007
 --
 
 COMMENT ON TABLE kyc.doc_request_acceptable_types IS 'Document types that can satisfy a doc_request';
 
 
 --
--- Name: doc_requests; Type: TABLE; Schema: kyc; Owner: -
+-- Name: doc_requests; Type: TABLE; Schema: kyc; Owner: adamtc007
 --
 
 CREATE TABLE kyc.doc_requests (
@@ -2475,36 +2623,38 @@ CREATE TABLE kyc.doc_requests (
 );
 
 
+ALTER TABLE kyc.doc_requests OWNER TO adamtc007;
+
 --
--- Name: TABLE doc_requests; Type: COMMENT; Schema: kyc; Owner: -
+-- Name: TABLE doc_requests; Type: COMMENT; Schema: kyc; Owner: adamtc007
 --
 
 COMMENT ON TABLE kyc.doc_requests IS 'Document requirements and collection tracking';
 
 
 --
--- Name: COLUMN doc_requests.batch_id; Type: COMMENT; Schema: kyc; Owner: -
+-- Name: COLUMN doc_requests.batch_id; Type: COMMENT; Schema: kyc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN kyc.doc_requests.batch_id IS 'Groups doc_requests generated together';
 
 
 --
--- Name: COLUMN doc_requests.batch_reference; Type: COMMENT; Schema: kyc; Owner: -
+-- Name: COLUMN doc_requests.batch_reference; Type: COMMENT; Schema: kyc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN kyc.doc_requests.batch_reference IS 'Human-readable batch reference (e.g., RFI-20241204-abc123)';
 
 
 --
--- Name: COLUMN doc_requests.generation_source; Type: COMMENT; Schema: kyc; Owner: -
+-- Name: COLUMN doc_requests.generation_source; Type: COMMENT; Schema: kyc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN kyc.doc_requests.generation_source IS 'How request was created: MANUAL, THRESHOLD, PERIODIC_REVIEW';
 
 
 --
--- Name: entity_workstreams; Type: TABLE; Schema: kyc; Owner: -
+-- Name: entity_workstreams; Type: TABLE; Schema: kyc; Owner: adamtc007
 --
 
 CREATE TABLE kyc.entity_workstreams (
@@ -2530,15 +2680,17 @@ CREATE TABLE kyc.entity_workstreams (
 );
 
 
+ALTER TABLE kyc.entity_workstreams OWNER TO adamtc007;
+
 --
--- Name: TABLE entity_workstreams; Type: COMMENT; Schema: kyc; Owner: -
+-- Name: TABLE entity_workstreams; Type: COMMENT; Schema: kyc; Owner: adamtc007
 --
 
 COMMENT ON TABLE kyc.entity_workstreams IS 'Per-entity work items within a KYC case';
 
 
 --
--- Name: holdings; Type: TABLE; Schema: kyc; Owner: -
+-- Name: holdings; Type: TABLE; Schema: kyc; Owner: adamtc007
 --
 
 CREATE TABLE kyc.holdings (
@@ -2554,15 +2706,17 @@ CREATE TABLE kyc.holdings (
 );
 
 
+ALTER TABLE kyc.holdings OWNER TO adamtc007;
+
 --
--- Name: TABLE holdings; Type: COMMENT; Schema: kyc; Owner: -
+-- Name: TABLE holdings; Type: COMMENT; Schema: kyc; Owner: adamtc007
 --
 
 COMMENT ON TABLE kyc.holdings IS 'Investor positions (units held) in fund share classes';
 
 
 --
--- Name: movements; Type: TABLE; Schema: kyc; Owner: -
+-- Name: movements; Type: TABLE; Schema: kyc; Owner: adamtc007
 --
 
 CREATE TABLE kyc.movements (
@@ -2585,15 +2739,17 @@ CREATE TABLE kyc.movements (
 );
 
 
+ALTER TABLE kyc.movements OWNER TO adamtc007;
+
 --
--- Name: TABLE movements; Type: COMMENT; Schema: kyc; Owner: -
+-- Name: TABLE movements; Type: COMMENT; Schema: kyc; Owner: adamtc007
 --
 
 COMMENT ON TABLE kyc.movements IS 'Subscription, redemption, and transfer transactions';
 
 
 --
--- Name: red_flags; Type: TABLE; Schema: kyc; Owner: -
+-- Name: red_flags; Type: TABLE; Schema: kyc; Owner: adamtc007
 --
 
 CREATE TABLE kyc.red_flags (
@@ -2621,15 +2777,17 @@ CREATE TABLE kyc.red_flags (
 );
 
 
+ALTER TABLE kyc.red_flags OWNER TO adamtc007;
+
 --
--- Name: TABLE red_flags; Type: COMMENT; Schema: kyc; Owner: -
+-- Name: TABLE red_flags; Type: COMMENT; Schema: kyc; Owner: adamtc007
 --
 
 COMMENT ON TABLE kyc.red_flags IS 'Risk indicators and issues found during KYC review';
 
 
 --
--- Name: rule_executions; Type: TABLE; Schema: kyc; Owner: -
+-- Name: rule_executions; Type: TABLE; Schema: kyc; Owner: adamtc007
 --
 
 CREATE TABLE kyc.rule_executions (
@@ -2645,8 +2803,10 @@ CREATE TABLE kyc.rule_executions (
 );
 
 
+ALTER TABLE kyc.rule_executions OWNER TO adamtc007;
+
 --
--- Name: screenings; Type: TABLE; Schema: kyc; Owner: -
+-- Name: screenings; Type: TABLE; Schema: kyc; Owner: adamtc007
 --
 
 CREATE TABLE kyc.screenings (
@@ -2670,15 +2830,17 @@ CREATE TABLE kyc.screenings (
 );
 
 
+ALTER TABLE kyc.screenings OWNER TO adamtc007;
+
 --
--- Name: TABLE screenings; Type: COMMENT; Schema: kyc; Owner: -
+-- Name: TABLE screenings; Type: COMMENT; Schema: kyc; Owner: adamtc007
 --
 
 COMMENT ON TABLE kyc.screenings IS 'Screening results from various providers';
 
 
 --
--- Name: share_classes; Type: TABLE; Schema: kyc; Owner: -
+-- Name: share_classes; Type: TABLE; Schema: kyc; Owner: adamtc007
 --
 
 CREATE TABLE kyc.share_classes (
@@ -2712,85 +2874,87 @@ CREATE TABLE kyc.share_classes (
 );
 
 
+ALTER TABLE kyc.share_classes OWNER TO adamtc007;
+
 --
--- Name: TABLE share_classes; Type: COMMENT; Schema: kyc; Owner: -
+-- Name: TABLE share_classes; Type: COMMENT; Schema: kyc; Owner: adamtc007
 --
 
 COMMENT ON TABLE kyc.share_classes IS 'Fund share class master data with NAV, fees, and liquidity terms';
 
 
 --
--- Name: COLUMN share_classes.fund_type; Type: COMMENT; Schema: kyc; Owner: -
+-- Name: COLUMN share_classes.fund_type; Type: COMMENT; Schema: kyc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN kyc.share_classes.fund_type IS 'HEDGE_FUND, UCITS, AIFMD, etc.';
 
 
 --
--- Name: COLUMN share_classes.fund_structure; Type: COMMENT; Schema: kyc; Owner: -
+-- Name: COLUMN share_classes.fund_structure; Type: COMMENT; Schema: kyc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN kyc.share_classes.fund_structure IS 'OPEN_ENDED, CLOSED_ENDED';
 
 
 --
--- Name: COLUMN share_classes.investor_eligibility; Type: COMMENT; Schema: kyc; Owner: -
+-- Name: COLUMN share_classes.investor_eligibility; Type: COMMENT; Schema: kyc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN kyc.share_classes.investor_eligibility IS 'RETAIL, PROFESSIONAL, QUALIFIED';
 
 
 --
--- Name: COLUMN share_classes.lock_up_period_months; Type: COMMENT; Schema: kyc; Owner: -
+-- Name: COLUMN share_classes.lock_up_period_months; Type: COMMENT; Schema: kyc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN kyc.share_classes.lock_up_period_months IS 'Lock-up period for hedge funds';
 
 
 --
--- Name: COLUMN share_classes.gate_percentage; Type: COMMENT; Schema: kyc; Owner: -
+-- Name: COLUMN share_classes.gate_percentage; Type: COMMENT; Schema: kyc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN kyc.share_classes.gate_percentage IS 'Redemption gate percentage';
 
 
 --
--- Name: COLUMN share_classes.high_water_mark; Type: COMMENT; Schema: kyc; Owner: -
+-- Name: COLUMN share_classes.high_water_mark; Type: COMMENT; Schema: kyc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN kyc.share_classes.high_water_mark IS 'Performance fee uses high water mark';
 
 
 --
--- Name: COLUMN share_classes.hurdle_rate; Type: COMMENT; Schema: kyc; Owner: -
+-- Name: COLUMN share_classes.hurdle_rate; Type: COMMENT; Schema: kyc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN kyc.share_classes.hurdle_rate IS 'Hurdle rate for performance fee';
 
 
 --
--- Name: COLUMN share_classes.entity_id; Type: COMMENT; Schema: kyc; Owner: -
+-- Name: COLUMN share_classes.entity_id; Type: COMMENT; Schema: kyc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN kyc.share_classes.entity_id IS 'The share class entity itself (optional - links to entity ontology)';
 
 
 --
--- Name: COLUMN share_classes.class_category; Type: COMMENT; Schema: kyc; Owner: -
+-- Name: COLUMN share_classes.class_category; Type: COMMENT; Schema: kyc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN kyc.share_classes.class_category IS 'CORPORATE = company ownership shares, FUND = investment fund shares';
 
 
 --
--- Name: COLUMN share_classes.issuer_entity_id; Type: COMMENT; Schema: kyc; Owner: -
+-- Name: COLUMN share_classes.issuer_entity_id; Type: COMMENT; Schema: kyc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN kyc.share_classes.issuer_entity_id IS 'The sub-fund/fund entity that issues these shares';
 
 
 --
--- Name: v_case_summary; Type: VIEW; Schema: kyc; Owner: -
+-- Name: v_case_summary; Type: VIEW; Schema: kyc; Owner: adamtc007
 --
 
 CREATE VIEW kyc.v_case_summary AS
@@ -2809,8 +2973,10 @@ SELECT
     NULL::bigint AS pending_docs;
 
 
+ALTER VIEW kyc.v_case_summary OWNER TO adamtc007;
+
 --
--- Name: v_workstream_detail; Type: VIEW; Schema: kyc; Owner: -
+-- Name: v_workstream_detail; Type: VIEW; Schema: kyc; Owner: adamtc007
 --
 
 CREATE VIEW kyc.v_workstream_detail AS
@@ -2833,8 +2999,10 @@ SELECT
     NULL::bigint AS open_flags;
 
 
+ALTER VIEW kyc.v_workstream_detail OWNER TO adamtc007;
+
 --
--- Name: attribute_dictionary; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: attribute_dictionary; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".attribute_dictionary (
@@ -2851,8 +3019,10 @@ CREATE TABLE "ob-poc".attribute_dictionary (
 );
 
 
+ALTER TABLE "ob-poc".attribute_dictionary OWNER TO adamtc007;
+
 --
--- Name: attribute_observations; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: attribute_observations; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".attribute_observations (
@@ -2915,15 +3085,17 @@ END) = 1)),
 );
 
 
+ALTER TABLE "ob-poc".attribute_observations OWNER TO adamtc007;
+
 --
--- Name: TABLE attribute_observations; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE attribute_observations; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".attribute_observations IS 'Observation-based attribute storage. Multiple observations per attribute per entity, each with source provenance.';
 
 
 --
--- Name: attribute_registry; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: attribute_registry; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".attribute_registry (
@@ -2952,57 +3124,59 @@ CREATE TABLE "ob-poc".attribute_registry (
 );
 
 
+ALTER TABLE "ob-poc".attribute_registry OWNER TO adamtc007;
+
 --
--- Name: TABLE attribute_registry; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE attribute_registry; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".attribute_registry IS 'Type-safe attribute registry with string-based identifiers following the AttributeID-as-Type pattern';
 
 
 --
--- Name: COLUMN attribute_registry.id; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN attribute_registry.id; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".attribute_registry.id IS 'Attribute identifier in format attr.{category}.{name} (e.g., attr.identity.first_name)';
 
 
 --
--- Name: COLUMN attribute_registry.validation_rules; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN attribute_registry.validation_rules; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".attribute_registry.validation_rules IS 'JSON object containing validation rules: {required, min_value, max_value, min_length, max_length, pattern, allowed_values}';
 
 
 --
--- Name: COLUMN attribute_registry.applicability; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN attribute_registry.applicability; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".attribute_registry.applicability IS 'CSG applicability rules: entity_types[], required_for[], source_documents[], depends_on[]';
 
 
 --
--- Name: COLUMN attribute_registry.reconciliation_rules; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN attribute_registry.reconciliation_rules; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".attribute_registry.reconciliation_rules IS 'Rules for comparing observations: {"allow_spelling_variation": true, "date_tolerance_days": 0}';
 
 
 --
--- Name: COLUMN attribute_registry.acceptable_variation_threshold; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN attribute_registry.acceptable_variation_threshold; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".attribute_registry.acceptable_variation_threshold IS 'Similarity threshold (0-1) for acceptable string variations';
 
 
 --
--- Name: COLUMN attribute_registry.requires_authoritative_source; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN attribute_registry.requires_authoritative_source; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".attribute_registry.requires_authoritative_source IS 'If true, at least one observation must be from an authoritative source';
 
 
 --
--- Name: attribute_values_typed; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: attribute_values_typed; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".attribute_values_typed (
@@ -3027,22 +3201,24 @@ CREATE TABLE "ob-poc".attribute_values_typed (
 );
 
 
+ALTER TABLE "ob-poc".attribute_values_typed OWNER TO adamtc007;
+
 --
--- Name: TABLE attribute_values_typed; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE attribute_values_typed; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".attribute_values_typed IS 'Type-safe attribute values with proper column typing based on value_type';
 
 
 --
--- Name: CONSTRAINT check_single_value ON attribute_values_typed; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: CONSTRAINT check_single_value ON attribute_values_typed; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON CONSTRAINT check_single_value ON "ob-poc".attribute_values_typed IS 'Ensures exactly one value column is populated per row';
 
 
 --
--- Name: attribute_values_typed_id_seq; Type: SEQUENCE; Schema: ob-poc; Owner: -
+-- Name: attribute_values_typed_id_seq; Type: SEQUENCE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE SEQUENCE "ob-poc".attribute_values_typed_id_seq
@@ -3054,15 +3230,17 @@ CREATE SEQUENCE "ob-poc".attribute_values_typed_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE "ob-poc".attribute_values_typed_id_seq OWNER TO adamtc007;
+
 --
--- Name: attribute_values_typed_id_seq; Type: SEQUENCE OWNED BY; Schema: ob-poc; Owner: -
+-- Name: attribute_values_typed_id_seq; Type: SEQUENCE OWNED BY; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER SEQUENCE "ob-poc".attribute_values_typed_id_seq OWNED BY "ob-poc".attribute_values_typed.id;
 
 
 --
--- Name: case_decision_thresholds; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: case_decision_thresholds; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".case_decision_thresholds (
@@ -3080,15 +3258,17 @@ CREATE TABLE "ob-poc".case_decision_thresholds (
 );
 
 
+ALTER TABLE "ob-poc".case_decision_thresholds OWNER TO adamtc007;
+
 --
--- Name: TABLE case_decision_thresholds; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE case_decision_thresholds; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".case_decision_thresholds IS 'Thresholds mapping scores to recommended actions';
 
 
 --
--- Name: case_evaluation_snapshots; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: case_evaluation_snapshots; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".case_evaluation_snapshots (
@@ -3117,15 +3297,17 @@ CREATE TABLE "ob-poc".case_evaluation_snapshots (
 );
 
 
+ALTER TABLE "ob-poc".case_evaluation_snapshots OWNER TO adamtc007;
+
 --
--- Name: TABLE case_evaluation_snapshots; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE case_evaluation_snapshots; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".case_evaluation_snapshots IS 'Audit trail of case evaluations and decisions';
 
 
 --
--- Name: case_types; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: case_types; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".case_types (
@@ -3137,8 +3319,10 @@ CREATE TABLE "ob-poc".case_types (
 );
 
 
+ALTER TABLE "ob-poc".case_types OWNER TO adamtc007;
+
 --
--- Name: cbu_change_log; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: cbu_change_log; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".cbu_change_log (
@@ -3157,15 +3341,17 @@ CREATE TABLE "ob-poc".cbu_change_log (
 );
 
 
+ALTER TABLE "ob-poc".cbu_change_log OWNER TO adamtc007;
+
 --
--- Name: TABLE cbu_change_log; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE cbu_change_log; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".cbu_change_log IS 'Audit trail of all CBU changes';
 
 
 --
--- Name: cbu_relationship_verification; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: cbu_relationship_verification; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".cbu_relationship_verification (
@@ -3189,8 +3375,10 @@ CREATE TABLE "ob-poc".cbu_relationship_verification (
 );
 
 
+ALTER TABLE "ob-poc".cbu_relationship_verification OWNER TO adamtc007;
+
 --
--- Name: cbu_convergence_status; Type: VIEW; Schema: ob-poc; Owner: -
+-- Name: cbu_convergence_status; Type: VIEW; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE VIEW "ob-poc".cbu_convergence_status AS
@@ -3207,8 +3395,10 @@ CREATE VIEW "ob-poc".cbu_convergence_status AS
   GROUP BY cbu_id;
 
 
+ALTER VIEW "ob-poc".cbu_convergence_status OWNER TO adamtc007;
+
 --
--- Name: cbu_creation_log; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: cbu_creation_log; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".cbu_creation_log (
@@ -3222,8 +3412,10 @@ CREATE TABLE "ob-poc".cbu_creation_log (
 );
 
 
+ALTER TABLE "ob-poc".cbu_creation_log OWNER TO adamtc007;
+
 --
--- Name: cbu_entity_roles; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: cbu_entity_roles; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".cbu_entity_roles (
@@ -3235,8 +3427,10 @@ CREATE TABLE "ob-poc".cbu_entity_roles (
 );
 
 
+ALTER TABLE "ob-poc".cbu_entity_roles OWNER TO adamtc007;
+
 --
--- Name: cbu_evidence; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: cbu_evidence; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".cbu_evidence (
@@ -3259,15 +3453,17 @@ CREATE TABLE "ob-poc".cbu_evidence (
 );
 
 
+ALTER TABLE "ob-poc".cbu_evidence OWNER TO adamtc007;
+
 --
--- Name: TABLE cbu_evidence; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE cbu_evidence; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".cbu_evidence IS 'Evidence/documentation attached to CBUs for validation';
 
 
 --
--- Name: cbu_layout_overrides; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: cbu_layout_overrides; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".cbu_layout_overrides (
@@ -3280,8 +3476,10 @@ CREATE TABLE "ob-poc".cbu_layout_overrides (
 );
 
 
+ALTER TABLE "ob-poc".cbu_layout_overrides OWNER TO adamtc007;
+
 --
--- Name: entities; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: entities; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".entities (
@@ -3294,8 +3492,10 @@ CREATE TABLE "ob-poc".entities (
 );
 
 
+ALTER TABLE "ob-poc".entities OWNER TO adamtc007;
+
 --
--- Name: entity_relationships; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: entity_relationships; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".entity_relationships (
@@ -3323,8 +3523,10 @@ CREATE TABLE "ob-poc".entity_relationships (
 );
 
 
+ALTER TABLE "ob-poc".entity_relationships OWNER TO adamtc007;
+
 --
--- Name: entity_types; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: entity_types; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".entity_types (
@@ -3345,22 +3547,24 @@ CREATE TABLE "ob-poc".entity_types (
 );
 
 
+ALTER TABLE "ob-poc".entity_types OWNER TO adamtc007;
+
 --
--- Name: COLUMN entity_types.semantic_context; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN entity_types.semantic_context; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".entity_types.semantic_context IS 'Rich semantic metadata: category, parent_type, synonyms[], typical_documents[], typical_attributes[]';
 
 
 --
--- Name: COLUMN entity_types.type_hierarchy_path; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN entity_types.type_hierarchy_path; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".entity_types.type_hierarchy_path IS 'Materialized path for efficient ancestor queries, e.g., ["ENTITY", "LEGAL_ENTITY", "LIMITED_COMPANY"]';
 
 
 --
--- Name: cbu_ownership_graph; Type: VIEW; Schema: ob-poc; Owner: -
+-- Name: cbu_ownership_graph; Type: VIEW; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE VIEW "ob-poc".cbu_ownership_graph AS
@@ -3393,8 +3597,10 @@ CREATE VIEW "ob-poc".cbu_ownership_graph AS
   WHERE ((r.effective_to IS NULL) OR (r.effective_to > CURRENT_DATE));
 
 
+ALTER VIEW "ob-poc".cbu_ownership_graph OWNER TO adamtc007;
+
 --
--- Name: cbu_resource_instances; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: cbu_resource_instances; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".cbu_resource_instances (
@@ -3418,22 +3624,24 @@ CREATE TABLE "ob-poc".cbu_resource_instances (
 );
 
 
+ALTER TABLE "ob-poc".cbu_resource_instances OWNER TO adamtc007;
+
 --
--- Name: TABLE cbu_resource_instances; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE cbu_resource_instances; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".cbu_resource_instances IS 'Production resource instances - the actual delivered artifacts for a CBU (accounts, connections, platform access)';
 
 
 --
--- Name: COLUMN cbu_resource_instances.instance_url; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN cbu_resource_instances.instance_url; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".cbu_resource_instances.instance_url IS 'Unique URL/endpoint for this resource instance (e.g., https://custody.bank.com/accounts/ABC123)';
 
 
 --
--- Name: cbu_sla_commitments; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: cbu_sla_commitments; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".cbu_sla_commitments (
@@ -3465,8 +3673,10 @@ CREATE TABLE "ob-poc".cbu_sla_commitments (
 );
 
 
+ALTER TABLE "ob-poc".cbu_sla_commitments OWNER TO adamtc007;
+
 --
--- Name: TABLE cbu_sla_commitments; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE cbu_sla_commitments; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".cbu_sla_commitments IS 'CBU-specific SLA commitments. Links trading profile sections, service resources,
@@ -3474,7 +3684,7 @@ and ISDA/CSA agreements to measurable SLA targets.';
 
 
 --
--- Name: cbu_trading_profiles; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: cbu_trading_profiles; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".cbu_trading_profiles (
@@ -3498,8 +3708,10 @@ CREATE TABLE "ob-poc".cbu_trading_profiles (
 );
 
 
+ALTER TABLE "ob-poc".cbu_trading_profiles OWNER TO adamtc007;
+
 --
--- Name: TABLE cbu_trading_profiles; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE cbu_trading_profiles; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".cbu_trading_profiles IS 'Versioned trading profile documents - single source of truth for CBU trading configuration.
@@ -3508,7 +3720,7 @@ trading-profile.materialize verb.';
 
 
 --
--- Name: COLUMN cbu_trading_profiles.document; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN cbu_trading_profiles.document; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".cbu_trading_profiles.document IS 'JSONB document containing: universe, investment_managers, isda_agreements, settlement_config,
@@ -3516,14 +3728,14 @@ booking_rules, standing_instructions, pricing_matrix, valuation_config, constrai
 
 
 --
--- Name: COLUMN cbu_trading_profiles.document_hash; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN cbu_trading_profiles.document_hash; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".cbu_trading_profiles.document_hash IS 'SHA-256 hash of document for change detection and idempotency';
 
 
 --
--- Name: cbus; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: cbus; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".cbus (
@@ -3551,43 +3763,45 @@ CREATE TABLE "ob-poc".cbus (
 );
 
 
+ALTER TABLE "ob-poc".cbus OWNER TO adamtc007;
+
 --
--- Name: COLUMN cbus.risk_context; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN cbus.risk_context; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".cbus.risk_context IS 'Risk-related context: risk_rating, pep_exposure, sanctions_exposure, industry_codes[]';
 
 
 --
--- Name: COLUMN cbus.onboarding_context; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN cbus.onboarding_context; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".cbus.onboarding_context IS 'Onboarding state: stage, completed_steps[], pending_requirements[], override_rules[]';
 
 
 --
--- Name: COLUMN cbus.semantic_context; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN cbus.semantic_context; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".cbus.semantic_context IS 'Rich semantic metadata: business_description, industry_keywords[], related_entities[]';
 
 
 --
--- Name: COLUMN cbus.commercial_client_entity_id; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN cbus.commercial_client_entity_id; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".cbus.commercial_client_entity_id IS 'Head office entity that contracted with the bank (e.g., Blackrock Inc). Convenience field - actual ownership is in holdings chain.';
 
 
 --
--- Name: COLUMN cbus.cbu_category; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN cbus.cbu_category; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".cbus.cbu_category IS 'Template discriminator for visualization layout: FUND_MANDATE, CORPORATE_GROUP, INSTITUTIONAL_ACCOUNT, RETAIL_CLIENT, FAMILY_TRUST, CORRESPONDENT_BANK, INTERNAL_TEST';
 
 
 --
--- Name: client_allegations; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: client_allegations; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".client_allegations (
@@ -3617,15 +3831,17 @@ CREATE TABLE "ob-poc".client_allegations (
 );
 
 
+ALTER TABLE "ob-poc".client_allegations OWNER TO adamtc007;
+
 --
--- Name: TABLE client_allegations; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE client_allegations; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".client_allegations IS 'Client allegations - the unverified claims that form the starting point of KYC verification.';
 
 
 --
--- Name: client_types; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: client_types; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".client_types (
@@ -3638,8 +3854,10 @@ CREATE TABLE "ob-poc".client_types (
 );
 
 
+ALTER TABLE "ob-poc".client_types OWNER TO adamtc007;
+
 --
--- Name: crud_operations; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: crud_operations; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".crud_operations (
@@ -3669,29 +3887,31 @@ CREATE TABLE "ob-poc".crud_operations (
 );
 
 
+ALTER TABLE "ob-poc".crud_operations OWNER TO adamtc007;
+
 --
--- Name: TABLE crud_operations; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE crud_operations; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".crud_operations IS 'Tracks all CRUD operations generated by the agentic system with AI metadata and execution status';
 
 
 --
--- Name: COLUMN crud_operations.affected_records; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN crud_operations.affected_records; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".crud_operations.affected_records IS 'JSON array of record IDs affected by this operation';
 
 
 --
--- Name: COLUMN crud_operations.ai_confidence; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN crud_operations.ai_confidence; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".crud_operations.ai_confidence IS 'AI confidence score between 0.0 and 1.0 for the generated DSL';
 
 
 --
--- Name: csg_validation_rules; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: csg_validation_rules; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".csg_validation_rules (
@@ -3722,8 +3942,10 @@ CREATE TABLE "ob-poc".csg_validation_rules (
 );
 
 
+ALTER TABLE "ob-poc".csg_validation_rules OWNER TO adamtc007;
+
 --
--- Name: currencies; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: currencies; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".currencies (
@@ -3738,8 +3960,10 @@ CREATE TABLE "ob-poc".currencies (
 );
 
 
+ALTER TABLE "ob-poc".currencies OWNER TO adamtc007;
+
 --
--- Name: delegation_relationships; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: delegation_relationships; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".delegation_relationships (
@@ -3759,8 +3983,10 @@ CREATE TABLE "ob-poc".delegation_relationships (
 );
 
 
+ALTER TABLE "ob-poc".delegation_relationships OWNER TO adamtc007;
+
 --
--- Name: detected_patterns; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: detected_patterns; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".detected_patterns (
@@ -3783,15 +4009,17 @@ CREATE TABLE "ob-poc".detected_patterns (
 );
 
 
+ALTER TABLE "ob-poc".detected_patterns OWNER TO adamtc007;
+
 --
--- Name: TABLE detected_patterns; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE detected_patterns; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".detected_patterns IS 'Audit trail for adversarial pattern detection (circular ownership, layering, nominee usage, etc.)';
 
 
 --
--- Name: dictionary; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: dictionary; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".dictionary (
@@ -3809,8 +4037,10 @@ CREATE TABLE "ob-poc".dictionary (
 );
 
 
+ALTER TABLE "ob-poc".dictionary OWNER TO adamtc007;
+
 --
--- Name: document_attribute_links; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: document_attribute_links; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".document_attribute_links (
@@ -3838,15 +4068,17 @@ CREATE TABLE "ob-poc".document_attribute_links (
 );
 
 
+ALTER TABLE "ob-poc".document_attribute_links OWNER TO adamtc007;
+
 --
--- Name: TABLE document_attribute_links; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE document_attribute_links; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".document_attribute_links IS 'Bidirectional links between document types and attributes. SOURCE = document provides attribute value. SINK = attribute requires document as proof.';
 
 
 --
--- Name: document_attribute_mappings; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: document_attribute_mappings; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".document_attribute_mappings (
@@ -3866,29 +4098,31 @@ CREATE TABLE "ob-poc".document_attribute_mappings (
 );
 
 
+ALTER TABLE "ob-poc".document_attribute_mappings OWNER TO adamtc007;
+
 --
--- Name: TABLE document_attribute_mappings; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE document_attribute_mappings; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".document_attribute_mappings IS 'Seeded with common document type to attribute mappings for KYC and onboarding';
 
 
 --
--- Name: COLUMN document_attribute_mappings.extraction_method; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN document_attribute_mappings.extraction_method; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".document_attribute_mappings.extraction_method IS 'Method used to extract the attribute: OCR, MRZ, BARCODE, FORM_FIELD, etc.';
 
 
 --
--- Name: COLUMN document_attribute_mappings.confidence_threshold; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN document_attribute_mappings.confidence_threshold; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".document_attribute_mappings.confidence_threshold IS 'Minimum confidence score (0.0-1.0) required for extraction';
 
 
 --
--- Name: document_catalog; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: document_catalog; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".document_catalog (
@@ -3915,15 +4149,17 @@ CREATE TABLE "ob-poc".document_catalog (
 );
 
 
+ALTER TABLE "ob-poc".document_catalog OWNER TO adamtc007;
+
 --
--- Name: TABLE document_catalog; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE document_catalog; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".document_catalog IS 'Central "fact" table for all document instances. Stores file info and AI extraction results.';
 
 
 --
--- Name: document_types; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: document_types; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".document_types (
@@ -3945,29 +4181,31 @@ CREATE TABLE "ob-poc".document_types (
 );
 
 
+ALTER TABLE "ob-poc".document_types OWNER TO adamtc007;
+
 --
--- Name: COLUMN document_types.applicability; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN document_types.applicability; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".document_types.applicability IS 'CSG applicability rules: entity_types[], jurisdictions[], client_types[], required_for[], excludes[]';
 
 
 --
--- Name: COLUMN document_types.semantic_context; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN document_types.semantic_context; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".document_types.semantic_context IS 'Rich semantic metadata: purpose, synonyms[], related_documents[], extraction_hints{}, keywords[]';
 
 
 --
--- Name: COLUMN document_types.embedding; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN document_types.embedding; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".document_types.embedding IS 'OpenAI ada-002 or equivalent embedding of type description + semantic context';
 
 
 --
--- Name: document_validity_rules; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: document_validity_rules; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".document_validity_rules (
@@ -3989,8 +4227,10 @@ CREATE TABLE "ob-poc".document_validity_rules (
 );
 
 
+ALTER TABLE "ob-poc".document_validity_rules OWNER TO adamtc007;
+
 --
--- Name: dsl_domains; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: dsl_domains; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".dsl_domains (
@@ -4005,8 +4245,10 @@ CREATE TABLE "ob-poc".dsl_domains (
 );
 
 
+ALTER TABLE "ob-poc".dsl_domains OWNER TO adamtc007;
+
 --
--- Name: dsl_examples; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: dsl_examples; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".dsl_examples (
@@ -4033,22 +4275,24 @@ CREATE TABLE "ob-poc".dsl_examples (
 );
 
 
+ALTER TABLE "ob-poc".dsl_examples OWNER TO adamtc007;
+
 --
--- Name: TABLE dsl_examples; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE dsl_examples; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".dsl_examples IS 'Curated library of natural language to DSL examples for training and context';
 
 
 --
--- Name: COLUMN dsl_examples.success_rate; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN dsl_examples.success_rate; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".dsl_examples.success_rate IS 'Rate of successful operations when using this example (0.0 to 1.0)';
 
 
 --
--- Name: dsl_execution_log; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: dsl_execution_log; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".dsl_execution_log (
@@ -4071,8 +4315,10 @@ END) STORED
 );
 
 
+ALTER TABLE "ob-poc".dsl_execution_log OWNER TO adamtc007;
+
 --
--- Name: dsl_versions; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: dsl_versions; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".dsl_versions (
@@ -4091,8 +4337,10 @@ CREATE TABLE "ob-poc".dsl_versions (
 );
 
 
+ALTER TABLE "ob-poc".dsl_versions OWNER TO adamtc007;
+
 --
--- Name: dsl_execution_summary; Type: VIEW; Schema: ob-poc; Owner: -
+-- Name: dsl_execution_summary; Type: VIEW; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE VIEW "ob-poc".dsl_execution_summary AS
@@ -4119,8 +4367,10 @@ CREATE VIEW "ob-poc".dsl_execution_summary AS
   ORDER BY d.domain_name, dv.version_number DESC;
 
 
+ALTER VIEW "ob-poc".dsl_execution_summary OWNER TO adamtc007;
+
 --
--- Name: dsl_generation_log; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: dsl_generation_log; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".dsl_generation_log (
@@ -4143,64 +4393,66 @@ CREATE TABLE "ob-poc".dsl_generation_log (
 );
 
 
+ALTER TABLE "ob-poc".dsl_generation_log OWNER TO adamtc007;
+
 --
--- Name: TABLE dsl_generation_log; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE dsl_generation_log; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".dsl_generation_log IS 'Captures agent DSL generation iterations for training data extraction and audit trail';
 
 
 --
--- Name: COLUMN dsl_generation_log.user_intent; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN dsl_generation_log.user_intent; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".dsl_generation_log.user_intent IS 'Natural language description of what user wanted - the input side of training pairs';
 
 
 --
--- Name: COLUMN dsl_generation_log.final_valid_dsl; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN dsl_generation_log.final_valid_dsl; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".dsl_generation_log.final_valid_dsl IS 'Successfully validated DSL - the output side of training pairs';
 
 
 --
--- Name: COLUMN dsl_generation_log.iterations; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN dsl_generation_log.iterations; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".dsl_generation_log.iterations IS 'JSONB array of each generation attempt with prompts, responses, and validation results';
 
 
 --
--- Name: COLUMN dsl_generation_log.domain_name; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN dsl_generation_log.domain_name; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".dsl_generation_log.domain_name IS 'Primary domain for this generation: cbu, entity, document, etc.';
 
 
 --
--- Name: COLUMN dsl_generation_log.model_used; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN dsl_generation_log.model_used; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".dsl_generation_log.model_used IS 'LLM model identifier used for generation';
 
 
 --
--- Name: COLUMN dsl_generation_log.total_attempts; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN dsl_generation_log.total_attempts; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".dsl_generation_log.total_attempts IS 'Number of generation attempts before success or failure';
 
 
 --
--- Name: COLUMN dsl_generation_log.success; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN dsl_generation_log.success; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".dsl_generation_log.success IS 'Whether generation ultimately succeeded';
 
 
 --
--- Name: dsl_idempotency; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: dsl_idempotency; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".dsl_idempotency (
@@ -4217,8 +4469,10 @@ CREATE TABLE "ob-poc".dsl_idempotency (
 );
 
 
+ALTER TABLE "ob-poc".dsl_idempotency OWNER TO adamtc007;
+
 --
--- Name: dsl_instance_versions; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: dsl_instance_versions; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".dsl_instance_versions (
@@ -4235,15 +4489,17 @@ CREATE TABLE "ob-poc".dsl_instance_versions (
 );
 
 
+ALTER TABLE "ob-poc".dsl_instance_versions OWNER TO adamtc007;
+
 --
--- Name: COLUMN dsl_instance_versions.compilation_status; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN dsl_instance_versions.compilation_status; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".dsl_instance_versions.compilation_status IS 'PARSED = syntax OK, needs resolution; PARTIAL = some resolved; RESOLVED = all resolved; EXECUTED = has been run; FAILED = execution failed';
 
 
 --
--- Name: dsl_instances; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: dsl_instances; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".dsl_instances (
@@ -4263,8 +4519,10 @@ CREATE TABLE "ob-poc".dsl_instances (
 );
 
 
+ALTER TABLE "ob-poc".dsl_instances OWNER TO adamtc007;
+
 --
--- Name: dsl_instances_id_seq; Type: SEQUENCE; Schema: ob-poc; Owner: -
+-- Name: dsl_instances_id_seq; Type: SEQUENCE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE SEQUENCE "ob-poc".dsl_instances_id_seq
@@ -4276,15 +4534,17 @@ CREATE SEQUENCE "ob-poc".dsl_instances_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE "ob-poc".dsl_instances_id_seq OWNER TO adamtc007;
+
 --
--- Name: dsl_instances_id_seq; Type: SEQUENCE OWNED BY; Schema: ob-poc; Owner: -
+-- Name: dsl_instances_id_seq; Type: SEQUENCE OWNED BY; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER SEQUENCE "ob-poc".dsl_instances_id_seq OWNED BY "ob-poc".dsl_instances.id;
 
 
 --
--- Name: dsl_ob; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: dsl_ob; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".dsl_ob (
@@ -4295,22 +4555,24 @@ CREATE TABLE "ob-poc".dsl_ob (
 );
 
 
+ALTER TABLE "ob-poc".dsl_ob OWNER TO adamtc007;
+
 --
--- Name: TABLE dsl_ob; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE dsl_ob; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".dsl_ob IS 'DSL documents with enforced CBU referential integrity';
 
 
 --
--- Name: COLUMN dsl_ob.cbu_id; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN dsl_ob.cbu_id; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".dsl_ob.cbu_id IS 'UUID reference to cbus table primary key';
 
 
 --
--- Name: dsl_session_events; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: dsl_session_events; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".dsl_session_events (
@@ -4325,8 +4587,10 @@ CREATE TABLE "ob-poc".dsl_session_events (
 );
 
 
+ALTER TABLE "ob-poc".dsl_session_events OWNER TO adamtc007;
+
 --
--- Name: dsl_session_locks; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: dsl_session_locks; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".dsl_session_locks (
@@ -4337,8 +4601,10 @@ CREATE TABLE "ob-poc".dsl_session_locks (
 );
 
 
+ALTER TABLE "ob-poc".dsl_session_locks OWNER TO adamtc007;
+
 --
--- Name: dsl_sessions; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: dsl_sessions; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".dsl_sessions (
@@ -4362,8 +4628,10 @@ CREATE TABLE "ob-poc".dsl_sessions (
 );
 
 
+ALTER TABLE "ob-poc".dsl_sessions OWNER TO adamtc007;
+
 --
--- Name: dsl_snapshots; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: dsl_snapshots; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".dsl_snapshots (
@@ -4381,8 +4649,10 @@ CREATE TABLE "ob-poc".dsl_snapshots (
 );
 
 
+ALTER TABLE "ob-poc".dsl_snapshots OWNER TO adamtc007;
+
 --
--- Name: entity_crud_rules; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: entity_crud_rules; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".entity_crud_rules (
@@ -4402,15 +4672,17 @@ CREATE TABLE "ob-poc".entity_crud_rules (
 );
 
 
+ALTER TABLE "ob-poc".entity_crud_rules OWNER TO adamtc007;
+
 --
--- Name: TABLE entity_crud_rules; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE entity_crud_rules; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".entity_crud_rules IS 'Entity-specific validation rules and constraints for CRUD operations';
 
 
 --
--- Name: entity_funds; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: entity_funds; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".entity_funds (
@@ -4449,8 +4721,10 @@ CREATE TABLE "ob-poc".entity_funds (
 );
 
 
+ALTER TABLE "ob-poc".entity_funds OWNER TO adamtc007;
+
 --
--- Name: entity_limited_companies; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: entity_limited_companies; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".entity_limited_companies (
@@ -4467,8 +4741,10 @@ CREATE TABLE "ob-poc".entity_limited_companies (
 );
 
 
+ALTER TABLE "ob-poc".entity_limited_companies OWNER TO adamtc007;
+
 --
--- Name: entity_manco; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: entity_manco; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".entity_manco (
@@ -4488,8 +4764,10 @@ CREATE TABLE "ob-poc".entity_manco (
 );
 
 
+ALTER TABLE "ob-poc".entity_manco OWNER TO adamtc007;
+
 --
--- Name: entity_partnerships; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: entity_partnerships; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".entity_partnerships (
@@ -4506,8 +4784,10 @@ CREATE TABLE "ob-poc".entity_partnerships (
 );
 
 
+ALTER TABLE "ob-poc".entity_partnerships OWNER TO adamtc007;
+
 --
--- Name: entity_proper_persons; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: entity_proper_persons; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".entity_proper_persons (
@@ -4527,8 +4807,10 @@ CREATE TABLE "ob-poc".entity_proper_persons (
 );
 
 
+ALTER TABLE "ob-poc".entity_proper_persons OWNER TO adamtc007;
+
 --
--- Name: entity_relationships_current; Type: VIEW; Schema: ob-poc; Owner: -
+-- Name: entity_relationships_current; Type: VIEW; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE VIEW "ob-poc".entity_relationships_current AS
@@ -4553,8 +4835,10 @@ CREATE VIEW "ob-poc".entity_relationships_current AS
   WHERE ((effective_to IS NULL) OR (effective_to > CURRENT_DATE));
 
 
+ALTER VIEW "ob-poc".entity_relationships_current OWNER TO adamtc007;
+
 --
--- Name: entity_trusts; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: entity_trusts; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".entity_trusts (
@@ -4572,8 +4856,10 @@ CREATE TABLE "ob-poc".entity_trusts (
 );
 
 
+ALTER TABLE "ob-poc".entity_trusts OWNER TO adamtc007;
+
 --
--- Name: entity_search_view; Type: VIEW; Schema: ob-poc; Owner: -
+-- Name: entity_search_view; Type: VIEW; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE VIEW "ob-poc".entity_search_view AS
@@ -4614,8 +4900,10 @@ UNION ALL
   WHERE (entity_trusts.trust_id IS NOT NULL);
 
 
+ALTER VIEW "ob-poc".entity_search_view OWNER TO adamtc007;
+
 --
--- Name: entity_share_classes; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: entity_share_classes; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".entity_share_classes (
@@ -4638,8 +4926,10 @@ CREATE TABLE "ob-poc".entity_share_classes (
 );
 
 
+ALTER TABLE "ob-poc".entity_share_classes OWNER TO adamtc007;
+
 --
--- Name: entity_type_dependencies; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: entity_type_dependencies; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".entity_type_dependencies (
@@ -4659,8 +4949,10 @@ CREATE TABLE "ob-poc".entity_type_dependencies (
 );
 
 
+ALTER TABLE "ob-poc".entity_type_dependencies OWNER TO adamtc007;
+
 --
--- Name: TABLE entity_type_dependencies; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE entity_type_dependencies; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".entity_type_dependencies IS 'Unified entity/resource dependency graph. Drives compiler ordering, linter validation, and onboarding workflows.
@@ -4668,56 +4960,56 @@ from_type/subtype depends on to_type/subtype. via_arg indicates which DSL argume
 
 
 --
--- Name: COLUMN entity_type_dependencies.from_type; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN entity_type_dependencies.from_type; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".entity_type_dependencies.from_type IS 'Entity type that has the dependency (e.g., resource_instance, entity, case, workstream)';
 
 
 --
--- Name: COLUMN entity_type_dependencies.from_subtype; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN entity_type_dependencies.from_subtype; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".entity_type_dependencies.from_subtype IS 'Subtype qualifier (e.g., CUSTODY_ACCT for resources, fund_sub for entities)';
 
 
 --
--- Name: COLUMN entity_type_dependencies.to_type; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN entity_type_dependencies.to_type; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".entity_type_dependencies.to_type IS 'Entity type that is depended upon';
 
 
 --
--- Name: COLUMN entity_type_dependencies.to_subtype; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN entity_type_dependencies.to_subtype; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".entity_type_dependencies.to_subtype IS 'Subtype qualifier for the dependency target';
 
 
 --
--- Name: COLUMN entity_type_dependencies.via_arg; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN entity_type_dependencies.via_arg; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".entity_type_dependencies.via_arg IS 'DSL argument name that carries this dependency (for linter validation)';
 
 
 --
--- Name: COLUMN entity_type_dependencies.dependency_kind; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN entity_type_dependencies.dependency_kind; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".entity_type_dependencies.dependency_kind IS 'required = must exist before creation, optional = may be linked, lifecycle = state transition dependency';
 
 
 --
--- Name: COLUMN entity_type_dependencies.priority; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN entity_type_dependencies.priority; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".entity_type_dependencies.priority IS 'Ordering hint when multiple dependencies exist (lower = higher priority)';
 
 
 --
--- Name: entity_validation_rules; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: entity_validation_rules; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".entity_validation_rules (
@@ -4736,22 +5028,24 @@ CREATE TABLE "ob-poc".entity_validation_rules (
 );
 
 
+ALTER TABLE "ob-poc".entity_validation_rules OWNER TO adamtc007;
+
 --
--- Name: TABLE entity_validation_rules; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE entity_validation_rules; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".entity_validation_rules IS 'Defines validation rules for agentic CRUD operations';
 
 
 --
--- Name: COLUMN entity_validation_rules.validation_rule; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN entity_validation_rules.validation_rule; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".entity_validation_rules.validation_rule IS 'JSON object defining the validation logic';
 
 
 --
--- Name: fund_investments; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: fund_investments; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".fund_investments (
@@ -4768,8 +5062,10 @@ CREATE TABLE "ob-poc".fund_investments (
 );
 
 
+ALTER TABLE "ob-poc".fund_investments OWNER TO adamtc007;
+
 --
--- Name: fund_structure; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: fund_structure; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".fund_structure (
@@ -4784,8 +5080,10 @@ CREATE TABLE "ob-poc".fund_structure (
 );
 
 
+ALTER TABLE "ob-poc".fund_structure OWNER TO adamtc007;
+
 --
--- Name: master_jurisdictions; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: master_jurisdictions; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".master_jurisdictions (
@@ -4803,22 +5101,24 @@ CREATE TABLE "ob-poc".master_jurisdictions (
 );
 
 
+ALTER TABLE "ob-poc".master_jurisdictions OWNER TO adamtc007;
+
 --
--- Name: TABLE master_jurisdictions; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE master_jurisdictions; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".master_jurisdictions IS 'Comprehensive jurisdiction lookup table for entity formation and compliance';
 
 
 --
--- Name: COLUMN master_jurisdictions.offshore_jurisdiction; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN master_jurisdictions.offshore_jurisdiction; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".master_jurisdictions.offshore_jurisdiction IS 'TRUE for offshore/tax haven jurisdictions';
 
 
 --
--- Name: jurisdictions; Type: VIEW; Schema: ob-poc; Owner: -
+-- Name: jurisdictions; Type: VIEW; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE VIEW "ob-poc".jurisdictions AS
@@ -4829,8 +5129,10 @@ CREATE VIEW "ob-poc".jurisdictions AS
    FROM "ob-poc".master_jurisdictions;
 
 
+ALTER VIEW "ob-poc".jurisdictions OWNER TO adamtc007;
+
 --
--- Name: kyc_decisions; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: kyc_decisions; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".kyc_decisions (
@@ -4851,15 +5153,17 @@ CREATE TABLE "ob-poc".kyc_decisions (
 );
 
 
+ALTER TABLE "ob-poc".kyc_decisions OWNER TO adamtc007;
+
 --
--- Name: TABLE kyc_decisions; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE kyc_decisions; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".kyc_decisions IS 'Final KYC decisions with complete evaluation snapshot';
 
 
 --
--- Name: master_entity_xref; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: master_entity_xref; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".master_entity_xref (
@@ -4880,22 +5184,24 @@ CREATE TABLE "ob-poc".master_entity_xref (
 );
 
 
+ALTER TABLE "ob-poc".master_entity_xref OWNER TO adamtc007;
+
 --
--- Name: TABLE master_entity_xref; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE master_entity_xref; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".master_entity_xref IS 'Master cross-reference table linking all entity types with unified metadata';
 
 
 --
--- Name: COLUMN master_entity_xref.regulatory_numbers; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN master_entity_xref.regulatory_numbers; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".master_entity_xref.regulatory_numbers IS 'JSON object storing various regulatory identification numbers';
 
 
 --
--- Name: observation_discrepancies; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: observation_discrepancies; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".observation_discrepancies (
@@ -4929,15 +5235,17 @@ CREATE TABLE "ob-poc".observation_discrepancies (
 );
 
 
+ALTER TABLE "ob-poc".observation_discrepancies OWNER TO adamtc007;
+
 --
--- Name: TABLE observation_discrepancies; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE observation_discrepancies; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".observation_discrepancies IS 'Tracks discrepancies detected between attribute observations during KYC reconciliation.';
 
 
 --
--- Name: onboarding_executions; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: onboarding_executions; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".onboarding_executions (
@@ -4952,8 +5260,10 @@ CREATE TABLE "ob-poc".onboarding_executions (
 );
 
 
+ALTER TABLE "ob-poc".onboarding_executions OWNER TO adamtc007;
+
 --
--- Name: onboarding_plans; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: onboarding_plans; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".onboarding_plans (
@@ -4971,8 +5281,10 @@ CREATE TABLE "ob-poc".onboarding_plans (
 );
 
 
+ALTER TABLE "ob-poc".onboarding_plans OWNER TO adamtc007;
+
 --
--- Name: onboarding_products; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: onboarding_products; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".onboarding_products (
@@ -4984,8 +5296,10 @@ CREATE TABLE "ob-poc".onboarding_products (
 );
 
 
+ALTER TABLE "ob-poc".onboarding_products OWNER TO adamtc007;
+
 --
--- Name: onboarding_requests; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: onboarding_requests; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".onboarding_requests (
@@ -5005,8 +5319,10 @@ CREATE TABLE "ob-poc".onboarding_requests (
 );
 
 
+ALTER TABLE "ob-poc".onboarding_requests OWNER TO adamtc007;
+
 --
--- Name: onboarding_tasks; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: onboarding_tasks; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".onboarding_tasks (
@@ -5024,8 +5340,10 @@ CREATE TABLE "ob-poc".onboarding_tasks (
 );
 
 
+ALTER TABLE "ob-poc".onboarding_tasks OWNER TO adamtc007;
+
 --
--- Name: product_services; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: product_services; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".product_services (
@@ -5038,8 +5356,10 @@ CREATE TABLE "ob-poc".product_services (
 );
 
 
+ALTER TABLE "ob-poc".product_services OWNER TO adamtc007;
+
 --
--- Name: products; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: products; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".products (
@@ -5057,8 +5377,10 @@ CREATE TABLE "ob-poc".products (
 );
 
 
+ALTER TABLE "ob-poc".products OWNER TO adamtc007;
+
 --
--- Name: proofs; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: proofs; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".proofs (
@@ -5080,15 +5402,17 @@ CREATE TABLE "ob-poc".proofs (
 );
 
 
+ALTER TABLE "ob-poc".proofs OWNER TO adamtc007;
+
 --
--- Name: TABLE proofs; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE proofs; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".proofs IS 'Evidence documents that prove ownership/control assertions';
 
 
 --
--- Name: red_flag_severities; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: red_flag_severities; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".red_flag_severities (
@@ -5101,8 +5425,10 @@ CREATE TABLE "ob-poc".red_flag_severities (
 );
 
 
+ALTER TABLE "ob-poc".red_flag_severities OWNER TO adamtc007;
+
 --
--- Name: redflag_score_config; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: redflag_score_config; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".redflag_score_config (
@@ -5117,15 +5443,17 @@ CREATE TABLE "ob-poc".redflag_score_config (
 );
 
 
+ALTER TABLE "ob-poc".redflag_score_config OWNER TO adamtc007;
+
 --
--- Name: TABLE redflag_score_config; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE redflag_score_config; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".redflag_score_config IS 'Red-flag severity weights for score calculation';
 
 
 --
--- Name: requirement_acceptable_docs; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: requirement_acceptable_docs; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".requirement_acceptable_docs (
@@ -5135,8 +5463,10 @@ CREATE TABLE "ob-poc".requirement_acceptable_docs (
 );
 
 
+ALTER TABLE "ob-poc".requirement_acceptable_docs OWNER TO adamtc007;
+
 --
--- Name: resource_attribute_requirements; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: resource_attribute_requirements; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".resource_attribute_requirements (
@@ -5152,8 +5482,10 @@ CREATE TABLE "ob-poc".resource_attribute_requirements (
 );
 
 
+ALTER TABLE "ob-poc".resource_attribute_requirements OWNER TO adamtc007;
+
 --
--- Name: resource_dependencies; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: resource_dependencies; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".resource_dependencies (
@@ -5171,8 +5503,10 @@ CREATE TABLE "ob-poc".resource_dependencies (
 );
 
 
+ALTER TABLE "ob-poc".resource_dependencies OWNER TO adamtc007;
+
 --
--- Name: TABLE resource_dependencies; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE resource_dependencies; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".resource_dependencies IS 'Resource type dependencies for onboarding. E.g., custody_account depends on cash_account.
@@ -5180,7 +5514,7 @@ The inject_arg specifies which provisioning argument receives the dependency URL
 
 
 --
--- Name: resource_instance_attributes; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: resource_instance_attributes; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".resource_instance_attributes (
@@ -5200,15 +5534,17 @@ CREATE TABLE "ob-poc".resource_instance_attributes (
 );
 
 
+ALTER TABLE "ob-poc".resource_instance_attributes OWNER TO adamtc007;
+
 --
--- Name: TABLE resource_instance_attributes; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE resource_instance_attributes; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".resource_instance_attributes IS 'Attribute values for resource instances - dense storage (row exists = value set)';
 
 
 --
--- Name: resource_instance_dependencies; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: resource_instance_dependencies; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".resource_instance_dependencies (
@@ -5219,8 +5555,10 @@ CREATE TABLE "ob-poc".resource_instance_dependencies (
 );
 
 
+ALTER TABLE "ob-poc".resource_instance_dependencies OWNER TO adamtc007;
+
 --
--- Name: resource_profile_sources; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: resource_profile_sources; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".resource_profile_sources (
@@ -5233,8 +5571,10 @@ CREATE TABLE "ob-poc".resource_profile_sources (
 );
 
 
+ALTER TABLE "ob-poc".resource_profile_sources OWNER TO adamtc007;
+
 --
--- Name: TABLE resource_profile_sources; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE resource_profile_sources; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".resource_profile_sources IS 'Links provisioned service resources back to their source in the trading profile.
@@ -5242,7 +5582,7 @@ Enables: "Why was this SWIFT gateway provisioned?" → "investment_managers[0].i
 
 
 --
--- Name: risk_bands; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: risk_bands; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".risk_bands (
@@ -5256,15 +5596,17 @@ CREATE TABLE "ob-poc".risk_bands (
 );
 
 
+ALTER TABLE "ob-poc".risk_bands OWNER TO adamtc007;
+
 --
--- Name: TABLE risk_bands; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE risk_bands; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".risk_bands IS 'Risk band definitions mapping composite score to risk level';
 
 
 --
--- Name: risk_ratings; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: risk_ratings; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".risk_ratings (
@@ -5277,8 +5619,10 @@ CREATE TABLE "ob-poc".risk_ratings (
 );
 
 
+ALTER TABLE "ob-poc".risk_ratings OWNER TO adamtc007;
+
 --
--- Name: roles; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: roles; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".roles (
@@ -5292,8 +5636,10 @@ CREATE TABLE "ob-poc".roles (
 );
 
 
+ALTER TABLE "ob-poc".roles OWNER TO adamtc007;
+
 --
--- Name: schema_changes; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: schema_changes; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".schema_changes (
@@ -5306,8 +5652,10 @@ CREATE TABLE "ob-poc".schema_changes (
 );
 
 
+ALTER TABLE "ob-poc".schema_changes OWNER TO adamtc007;
+
 --
--- Name: screening_lists; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: screening_lists; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".screening_lists (
@@ -5322,8 +5670,10 @@ CREATE TABLE "ob-poc".screening_lists (
 );
 
 
+ALTER TABLE "ob-poc".screening_lists OWNER TO adamtc007;
+
 --
--- Name: screening_requirements; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: screening_requirements; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".screening_requirements (
@@ -5334,8 +5684,10 @@ CREATE TABLE "ob-poc".screening_requirements (
 );
 
 
+ALTER TABLE "ob-poc".screening_requirements OWNER TO adamtc007;
+
 --
--- Name: screening_types; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: screening_types; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".screening_types (
@@ -5347,8 +5699,10 @@ CREATE TABLE "ob-poc".screening_types (
 );
 
 
+ALTER TABLE "ob-poc".screening_types OWNER TO adamtc007;
+
 --
--- Name: service_delivery_map; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: service_delivery_map; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".service_delivery_map (
@@ -5370,15 +5724,17 @@ CREATE TABLE "ob-poc".service_delivery_map (
 );
 
 
+ALTER TABLE "ob-poc".service_delivery_map OWNER TO adamtc007;
+
 --
--- Name: TABLE service_delivery_map; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE service_delivery_map; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".service_delivery_map IS 'Tracks service delivery for CBU onboarding - links CBU -> Product -> Service -> Instance';
 
 
 --
--- Name: service_option_choices; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: service_option_choices; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".service_option_choices (
@@ -5395,8 +5751,10 @@ CREATE TABLE "ob-poc".service_option_choices (
 );
 
 
+ALTER TABLE "ob-poc".service_option_choices OWNER TO adamtc007;
+
 --
--- Name: service_option_definitions; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: service_option_definitions; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".service_option_definitions (
@@ -5413,8 +5771,10 @@ CREATE TABLE "ob-poc".service_option_definitions (
 );
 
 
+ALTER TABLE "ob-poc".service_option_definitions OWNER TO adamtc007;
+
 --
--- Name: service_resource_capabilities; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: service_resource_capabilities; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".service_resource_capabilities (
@@ -5431,8 +5791,10 @@ CREATE TABLE "ob-poc".service_resource_capabilities (
 );
 
 
+ALTER TABLE "ob-poc".service_resource_capabilities OWNER TO adamtc007;
+
 --
--- Name: service_resource_types; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: service_resource_types; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".service_resource_types (
@@ -5458,8 +5820,10 @@ CREATE TABLE "ob-poc".service_resource_types (
 );
 
 
+ALTER TABLE "ob-poc".service_resource_types OWNER TO adamtc007;
+
 --
--- Name: services; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: services; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".services (
@@ -5475,8 +5839,10 @@ CREATE TABLE "ob-poc".services (
 );
 
 
+ALTER TABLE "ob-poc".services OWNER TO adamtc007;
+
 --
--- Name: settlement_types; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: settlement_types; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".settlement_types (
@@ -5488,8 +5854,10 @@ CREATE TABLE "ob-poc".settlement_types (
 );
 
 
+ALTER TABLE "ob-poc".settlement_types OWNER TO adamtc007;
+
 --
--- Name: sla_breaches; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: sla_breaches; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".sla_breaches (
@@ -5518,8 +5886,10 @@ CREATE TABLE "ob-poc".sla_breaches (
 );
 
 
+ALTER TABLE "ob-poc".sla_breaches OWNER TO adamtc007;
+
 --
--- Name: sla_measurements; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: sla_measurements; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".sla_measurements (
@@ -5539,8 +5909,10 @@ CREATE TABLE "ob-poc".sla_measurements (
 );
 
 
+ALTER TABLE "ob-poc".sla_measurements OWNER TO adamtc007;
+
 --
--- Name: sla_metric_types; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: sla_metric_types; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".sla_metric_types (
@@ -5558,8 +5930,10 @@ CREATE TABLE "ob-poc".sla_metric_types (
 );
 
 
+ALTER TABLE "ob-poc".sla_metric_types OWNER TO adamtc007;
+
 --
--- Name: sla_templates; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: sla_templates; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".sla_templates (
@@ -5584,8 +5958,10 @@ CREATE TABLE "ob-poc".sla_templates (
 );
 
 
+ALTER TABLE "ob-poc".sla_templates OWNER TO adamtc007;
+
 --
--- Name: ssi_types; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: ssi_types; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".ssi_types (
@@ -5597,8 +5973,10 @@ CREATE TABLE "ob-poc".ssi_types (
 );
 
 
+ALTER TABLE "ob-poc".ssi_types OWNER TO adamtc007;
+
 --
--- Name: taxonomy_crud_log; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: taxonomy_crud_log; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".taxonomy_crud_log (
@@ -5617,29 +5995,31 @@ CREATE TABLE "ob-poc".taxonomy_crud_log (
 );
 
 
+ALTER TABLE "ob-poc".taxonomy_crud_log OWNER TO adamtc007;
+
 --
--- Name: TABLE taxonomy_crud_log; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE taxonomy_crud_log; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".taxonomy_crud_log IS 'Audit log for taxonomy CRUD operations';
 
 
 --
--- Name: COLUMN taxonomy_crud_log.operation_type; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN taxonomy_crud_log.operation_type; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".taxonomy_crud_log.operation_type IS 'CREATE, READ, UPDATE, DELETE';
 
 
 --
--- Name: COLUMN taxonomy_crud_log.entity_type; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN taxonomy_crud_log.entity_type; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".taxonomy_crud_log.entity_type IS 'product, service, resource, onboarding';
 
 
 --
--- Name: threshold_factors; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: threshold_factors; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".threshold_factors (
@@ -5653,29 +6033,31 @@ CREATE TABLE "ob-poc".threshold_factors (
 );
 
 
+ALTER TABLE "ob-poc".threshold_factors OWNER TO adamtc007;
+
 --
--- Name: TABLE threshold_factors; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE threshold_factors; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".threshold_factors IS 'Risk factors contributing to overall CBU risk score';
 
 
 --
--- Name: COLUMN threshold_factors.factor_type; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN threshold_factors.factor_type; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".threshold_factors.factor_type IS 'Category: CBU_TYPE, SOURCE_OF_FUNDS, NATURE_PURPOSE, JURISDICTION, PRODUCT_RISK';
 
 
 --
--- Name: COLUMN threshold_factors.risk_weight; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN threshold_factors.risk_weight; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".threshold_factors.risk_weight IS 'Contribution to composite risk score (higher = riskier)';
 
 
 --
--- Name: threshold_requirements; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: threshold_requirements; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".threshold_requirements (
@@ -5692,15 +6074,17 @@ CREATE TABLE "ob-poc".threshold_requirements (
 );
 
 
+ALTER TABLE "ob-poc".threshold_requirements OWNER TO adamtc007;
+
 --
--- Name: TABLE threshold_requirements; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE threshold_requirements; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".threshold_requirements IS 'KYC attribute requirements per entity role and risk band';
 
 
 --
--- Name: trading_profile_documents; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: trading_profile_documents; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".trading_profile_documents (
@@ -5717,8 +6101,10 @@ CREATE TABLE "ob-poc".trading_profile_documents (
 );
 
 
+ALTER TABLE "ob-poc".trading_profile_documents OWNER TO adamtc007;
+
 --
--- Name: TABLE trading_profile_documents; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE trading_profile_documents; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".trading_profile_documents IS 'Links source documents (IMA, ISDA, SSI forms) to trading profile sections they populate.
@@ -5726,7 +6112,7 @@ Enables audit trail: "Where did this config come from?" → traces to source doc
 
 
 --
--- Name: trading_profile_materializations; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: trading_profile_materializations; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".trading_profile_materializations (
@@ -5743,8 +6129,10 @@ CREATE TABLE "ob-poc".trading_profile_materializations (
 );
 
 
+ALTER TABLE "ob-poc".trading_profile_materializations OWNER TO adamtc007;
+
 --
--- Name: trust_parties; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: trust_parties; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".trust_parties (
@@ -5761,8 +6149,10 @@ CREATE TABLE "ob-poc".trust_parties (
 );
 
 
+ALTER TABLE "ob-poc".trust_parties OWNER TO adamtc007;
+
 --
--- Name: ubo_assertion_log; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: ubo_assertion_log; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".ubo_assertion_log (
@@ -5780,15 +6170,17 @@ CREATE TABLE "ob-poc".ubo_assertion_log (
 );
 
 
+ALTER TABLE "ob-poc".ubo_assertion_log OWNER TO adamtc007;
+
 --
--- Name: TABLE ubo_assertion_log; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE ubo_assertion_log; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".ubo_assertion_log IS 'Audit log of all KYC assertions (declarative gates)';
 
 
 --
--- Name: ubo_convergence_status; Type: VIEW; Schema: ob-poc; Owner: -
+-- Name: ubo_convergence_status; Type: VIEW; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE VIEW "ob-poc".ubo_convergence_status AS
@@ -5803,15 +6195,17 @@ CREATE VIEW "ob-poc".ubo_convergence_status AS
   GROUP BY cbu_id;
 
 
+ALTER VIEW "ob-poc".ubo_convergence_status OWNER TO adamtc007;
+
 --
--- Name: VIEW ubo_convergence_status; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: VIEW ubo_convergence_status; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON VIEW "ob-poc".ubo_convergence_status IS 'Computed convergence status per CBU from cbu_relationship_verification';
 
 
 --
--- Name: ubo_evidence; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: ubo_evidence; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".ubo_evidence (
@@ -5835,15 +6229,17 @@ CREATE TABLE "ob-poc".ubo_evidence (
 );
 
 
+ALTER TABLE "ob-poc".ubo_evidence OWNER TO adamtc007;
+
 --
--- Name: TABLE ubo_evidence; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE ubo_evidence; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".ubo_evidence IS 'Evidence documents and attestations supporting UBO determinations';
 
 
 --
--- Name: ubo_expired_proofs; Type: VIEW; Schema: ob-poc; Owner: -
+-- Name: ubo_expired_proofs; Type: VIEW; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE VIEW "ob-poc".ubo_expired_proofs AS
@@ -5861,15 +6257,17 @@ CREATE VIEW "ob-poc".ubo_expired_proofs AS
   WHERE (((d.status)::text <> ALL ((ARRAY['active'::character varying, 'valid'::character varying])::text[])) OR ((v.status)::text = 'disputed'::text));
 
 
+ALTER VIEW "ob-poc".ubo_expired_proofs OWNER TO adamtc007;
+
 --
--- Name: VIEW ubo_expired_proofs; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: VIEW ubo_expired_proofs; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON VIEW "ob-poc".ubo_expired_proofs IS 'Relationship verifications with invalid or expired proof documents';
 
 
 --
--- Name: ubo_missing_proofs; Type: VIEW; Schema: ob-poc; Owner: -
+-- Name: ubo_missing_proofs; Type: VIEW; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE VIEW "ob-poc".ubo_missing_proofs AS
@@ -5895,15 +6293,17 @@ CREATE VIEW "ob-poc".ubo_missing_proofs AS
   WHERE (((v.status)::text = ANY ((ARRAY['alleged'::character varying, 'pending'::character varying, 'unverified'::character varying])::text[])) AND (v.proof_document_id IS NULL));
 
 
+ALTER VIEW "ob-poc".ubo_missing_proofs OWNER TO adamtc007;
+
 --
--- Name: VIEW ubo_missing_proofs; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: VIEW ubo_missing_proofs; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON VIEW "ob-poc".ubo_missing_proofs IS 'Relationship verifications missing proof documents';
 
 
 --
--- Name: ubo_registry; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: ubo_registry; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".ubo_registry (
@@ -5943,15 +6343,17 @@ CREATE TABLE "ob-poc".ubo_registry (
 );
 
 
+ALTER TABLE "ob-poc".ubo_registry OWNER TO adamtc007;
+
 --
--- Name: TABLE ubo_registry; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE ubo_registry; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".ubo_registry IS 'DEPRECATED: UBO status now derived from ubo_edges + entity_workstreams';
 
 
 --
--- Name: ubo_snapshot_comparisons; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: ubo_snapshot_comparisons; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".ubo_snapshot_comparisons (
@@ -5973,15 +6375,17 @@ CREATE TABLE "ob-poc".ubo_snapshot_comparisons (
 );
 
 
+ALTER TABLE "ob-poc".ubo_snapshot_comparisons OWNER TO adamtc007;
+
 --
--- Name: TABLE ubo_snapshot_comparisons; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE ubo_snapshot_comparisons; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".ubo_snapshot_comparisons IS 'Comparisons between UBO snapshots to detect changes';
 
 
 --
--- Name: ubo_snapshots; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: ubo_snapshots; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".ubo_snapshots (
@@ -6004,15 +6408,17 @@ CREATE TABLE "ob-poc".ubo_snapshots (
 );
 
 
+ALTER TABLE "ob-poc".ubo_snapshots OWNER TO adamtc007;
+
 --
--- Name: TABLE ubo_snapshots; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE ubo_snapshots; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".ubo_snapshots IS 'Point-in-time snapshots of UBO ownership state for a CBU';
 
 
 --
--- Name: v_active_trading_profiles; Type: VIEW; Schema: ob-poc; Owner: -
+-- Name: v_active_trading_profiles; Type: VIEW; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE VIEW "ob-poc".v_active_trading_profiles AS
@@ -6030,8 +6436,10 @@ CREATE VIEW "ob-poc".v_active_trading_profiles AS
   WHERE ((tp.status)::text = 'ACTIVE'::text);
 
 
+ALTER VIEW "ob-poc".v_active_trading_profiles OWNER TO adamtc007;
+
 --
--- Name: v_allegation_summary; Type: VIEW; Schema: ob-poc; Owner: -
+-- Name: v_allegation_summary; Type: VIEW; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE VIEW "ob-poc".v_allegation_summary AS
@@ -6049,8 +6457,10 @@ CREATE VIEW "ob-poc".v_allegation_summary AS
   GROUP BY ca.cbu_id, ca.entity_id, e.name;
 
 
+ALTER VIEW "ob-poc".v_allegation_summary OWNER TO adamtc007;
+
 --
--- Name: v_attribute_current; Type: VIEW; Schema: ob-poc; Owner: -
+-- Name: v_attribute_current; Type: VIEW; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE VIEW "ob-poc".v_attribute_current AS
@@ -6073,15 +6483,17 @@ CREATE VIEW "ob-poc".v_attribute_current AS
   ORDER BY entity_id, attribute_id, is_authoritative DESC, confidence DESC, observed_at DESC;
 
 
+ALTER VIEW "ob-poc".v_attribute_current OWNER TO adamtc007;
+
 --
--- Name: VIEW v_attribute_current; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: VIEW v_attribute_current; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON VIEW "ob-poc".v_attribute_current IS 'Current best value for each attribute - prioritizes authoritative sources, then confidence, then recency';
 
 
 --
--- Name: v_case_redflag_summary; Type: VIEW; Schema: ob-poc; Owner: -
+-- Name: v_case_redflag_summary; Type: VIEW; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE VIEW "ob-poc".v_case_redflag_summary AS
@@ -6111,15 +6523,17 @@ CREATE VIEW "ob-poc".v_case_redflag_summary AS
      CROSS JOIN LATERAL "ob-poc".compute_case_redflag_score(c.case_id) scores(soft_count, escalate_count, hard_stop_count, soft_score, escalate_score, has_hard_stop, total_score, open_flags, mitigated_flags, waived_flags));
 
 
+ALTER VIEW "ob-poc".v_case_redflag_summary OWNER TO adamtc007;
+
 --
--- Name: VIEW v_case_redflag_summary; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: VIEW v_case_redflag_summary; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON VIEW "ob-poc".v_case_redflag_summary IS 'Summary view of case red-flag status';
 
 
 --
--- Name: v_cbu_entity_graph; Type: VIEW; Schema: ob-poc; Owner: -
+-- Name: v_cbu_entity_graph; Type: VIEW; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE VIEW "ob-poc".v_cbu_entity_graph AS
@@ -6183,15 +6597,17 @@ CREATE VIEW "ob-poc".v_cbu_entity_graph AS
          LIMIT 1) ew ON (true));
 
 
+ALTER VIEW "ob-poc".v_cbu_entity_graph OWNER TO adamtc007;
+
 --
--- Name: VIEW v_cbu_entity_graph; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: VIEW v_cbu_entity_graph; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON VIEW "ob-poc".v_cbu_entity_graph IS 'Complete CBU entity relationship graph with roles, KYC status, and entity details. Use for visualization and entity queries.';
 
 
 --
--- Name: v_cbu_entity_with_roles; Type: VIEW; Schema: ob-poc; Owner: -
+-- Name: v_cbu_entity_with_roles; Type: VIEW; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE VIEW "ob-poc".v_cbu_entity_with_roles AS
@@ -6233,8 +6649,10 @@ CREATE VIEW "ob-poc".v_cbu_entity_with_roles AS
   GROUP BY cbu_id, entity_id, entity_name, entity_type, entity_category, jurisdiction;
 
 
+ALTER VIEW "ob-poc".v_cbu_entity_with_roles OWNER TO adamtc007;
+
 --
--- Name: v_cbu_investor_details; Type: VIEW; Schema: ob-poc; Owner: -
+-- Name: v_cbu_investor_details; Type: VIEW; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE VIEW "ob-poc".v_cbu_investor_details AS
@@ -6256,8 +6674,10 @@ CREATE VIEW "ob-poc".v_cbu_investor_details AS
   WHERE ((h.status)::text = 'active'::text);
 
 
+ALTER VIEW "ob-poc".v_cbu_investor_details OWNER TO adamtc007;
+
 --
--- Name: v_cbu_investor_groups; Type: VIEW; Schema: ob-poc; Owner: -
+-- Name: v_cbu_investor_groups; Type: VIEW; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE VIEW "ob-poc".v_cbu_investor_groups AS
@@ -6275,8 +6695,10 @@ CREATE VIEW "ob-poc".v_cbu_investor_groups AS
   GROUP BY sc.cbu_id, h.share_class_id, sc.name, sc.currency, sc.isin;
 
 
+ALTER VIEW "ob-poc".v_cbu_investor_groups OWNER TO adamtc007;
+
 --
--- Name: v_cbu_kyc_summary; Type: VIEW; Schema: ob-poc; Owner: -
+-- Name: v_cbu_kyc_summary; Type: VIEW; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE VIEW "ob-poc".v_cbu_kyc_summary AS
@@ -6365,15 +6787,17 @@ CREATE VIEW "ob-poc".v_cbu_kyc_summary AS
      LEFT JOIN allegation_summary als ON ((c.cbu_id = als.cbu_id)));
 
 
+ALTER VIEW "ob-poc".v_cbu_kyc_summary OWNER TO adamtc007;
+
 --
--- Name: VIEW v_cbu_kyc_summary; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: VIEW v_cbu_kyc_summary; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON VIEW "ob-poc".v_cbu_kyc_summary IS 'KYC-focused CBU summary: overall status, risk rating, entity breakdown. Use for dashboards and compliance queries.';
 
 
 --
--- Name: v_cbu_lifecycle; Type: VIEW; Schema: ob-poc; Owner: -
+-- Name: v_cbu_lifecycle; Type: VIEW; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE VIEW "ob-poc".v_cbu_lifecycle AS
@@ -6471,15 +6895,17 @@ CREATE VIEW "ob-poc".v_cbu_lifecycle AS
      LEFT JOIN resource_agg ra ON ((c.cbu_id = ra.cbu_id)));
 
 
+ALTER VIEW "ob-poc".v_cbu_lifecycle OWNER TO adamtc007;
+
 --
--- Name: VIEW v_cbu_lifecycle; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: VIEW v_cbu_lifecycle; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON VIEW "ob-poc".v_cbu_lifecycle IS 'Derived CBU lifecycle state - composite of KYC cases/workstreams, services, and resources. Use this instead of storing status on CBU directly.';
 
 
 --
--- Name: v_cbu_validation_summary; Type: VIEW; Schema: ob-poc; Owner: -
+-- Name: v_cbu_validation_summary; Type: VIEW; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE VIEW "ob-poc".v_cbu_validation_summary AS
@@ -6502,8 +6928,10 @@ CREATE VIEW "ob-poc".v_cbu_validation_summary AS
   GROUP BY c.cbu_id, c.name, c.status, c.client_type, c.jurisdiction;
 
 
+ALTER VIEW "ob-poc".v_cbu_validation_summary OWNER TO adamtc007;
+
 --
--- Name: v_document_extraction_map; Type: VIEW; Schema: ob-poc; Owner: -
+-- Name: v_document_extraction_map; Type: VIEW; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE VIEW "ob-poc".v_document_extraction_map AS
@@ -6522,8 +6950,10 @@ CREATE VIEW "ob-poc".v_document_extraction_map AS
   ORDER BY dt.type_code, dal.direction, ar.id;
 
 
+ALTER VIEW "ob-poc".v_document_extraction_map OWNER TO adamtc007;
+
 --
--- Name: v_open_discrepancies; Type: VIEW; Schema: ob-poc; Owner: -
+-- Name: v_open_discrepancies; Type: VIEW; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE VIEW "ob-poc".v_open_discrepancies AS
@@ -6567,8 +6997,10 @@ CREATE VIEW "ob-poc".v_open_discrepancies AS
         END, od.detected_at;
 
 
+ALTER VIEW "ob-poc".v_open_discrepancies OWNER TO adamtc007;
+
 --
--- Name: v_ubo_candidates; Type: VIEW; Schema: ob-poc; Owner: -
+-- Name: v_ubo_candidates; Type: VIEW; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE VIEW "ob-poc".v_ubo_candidates AS
@@ -6610,8 +7042,10 @@ CREATE VIEW "ob-poc".v_ubo_candidates AS
   GROUP BY oc.cbu_id, oc.owner_entity_id, e.name, et.entity_category, et.name;
 
 
+ALTER VIEW "ob-poc".v_ubo_candidates OWNER TO adamtc007;
+
 --
--- Name: v_ubo_evidence_summary; Type: VIEW; Schema: ob-poc; Owner: -
+-- Name: v_ubo_evidence_summary; Type: VIEW; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE VIEW "ob-poc".v_ubo_evidence_summary AS
@@ -6637,15 +7071,17 @@ CREATE VIEW "ob-poc".v_ubo_evidence_summary AS
   GROUP BY ur.ubo_id, ur.cbu_id, ur.subject_entity_id, ur.ubo_proper_person_id, e.name, ur.verification_status, ur.proof_date, ur.proof_method;
 
 
+ALTER VIEW "ob-poc".v_ubo_evidence_summary OWNER TO adamtc007;
+
 --
--- Name: VIEW v_ubo_evidence_summary; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: VIEW v_ubo_evidence_summary; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON VIEW "ob-poc".v_ubo_evidence_summary IS 'Summary view of UBO records with evidence status';
 
 
 --
--- Name: workflow_definitions; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: workflow_definitions; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".workflow_definitions (
@@ -6658,15 +7094,17 @@ CREATE TABLE "ob-poc".workflow_definitions (
 );
 
 
+ALTER TABLE "ob-poc".workflow_definitions OWNER TO adamtc007;
+
 --
--- Name: TABLE workflow_definitions; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE workflow_definitions; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".workflow_definitions IS 'Cached workflow definitions loaded from YAML files on startup';
 
 
 --
--- Name: v_workflow_summary; Type: VIEW; Schema: ob-poc; Owner: -
+-- Name: v_workflow_summary; Type: VIEW; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE VIEW "ob-poc".v_workflow_summary AS
@@ -6679,8 +7117,10 @@ CREATE VIEW "ob-poc".v_workflow_summary AS
    FROM "ob-poc".workflow_definitions;
 
 
+ALTER VIEW "ob-poc".v_workflow_summary OWNER TO adamtc007;
+
 --
--- Name: verification_challenges; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: verification_challenges; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".verification_challenges (
@@ -6710,15 +7150,17 @@ CREATE TABLE "ob-poc".verification_challenges (
 );
 
 
+ALTER TABLE "ob-poc".verification_challenges OWNER TO adamtc007;
+
 --
--- Name: TABLE verification_challenges; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE verification_challenges; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".verification_challenges IS 'Challenge/response workflow for adversarial verification - tracks formal challenges requiring client response';
 
 
 --
--- Name: verification_escalations; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: verification_escalations; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".verification_escalations (
@@ -6742,15 +7184,17 @@ CREATE TABLE "ob-poc".verification_escalations (
 );
 
 
+ALTER TABLE "ob-poc".verification_escalations OWNER TO adamtc007;
+
 --
--- Name: TABLE verification_escalations; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE verification_escalations; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".verification_escalations IS 'Risk-based escalation routing for verification challenges requiring higher authority review';
 
 
 --
--- Name: workflow_audit_log; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: workflow_audit_log; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".workflow_audit_log (
@@ -6767,15 +7211,17 @@ CREATE TABLE "ob-poc".workflow_audit_log (
 );
 
 
+ALTER TABLE "ob-poc".workflow_audit_log OWNER TO adamtc007;
+
 --
--- Name: TABLE workflow_audit_log; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE workflow_audit_log; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".workflow_audit_log IS 'Audit trail of all workflow state transitions';
 
 
 --
--- Name: workflow_instances; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: workflow_instances; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".workflow_instances (
@@ -6795,57 +7241,59 @@ CREATE TABLE "ob-poc".workflow_instances (
 );
 
 
+ALTER TABLE "ob-poc".workflow_instances OWNER TO adamtc007;
+
 --
--- Name: TABLE workflow_instances; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: TABLE workflow_instances; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON TABLE "ob-poc".workflow_instances IS 'Running workflow instances for KYC/onboarding orchestration';
 
 
 --
--- Name: COLUMN workflow_instances.workflow_id; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN workflow_instances.workflow_id; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".workflow_instances.workflow_id IS 'Workflow definition ID (e.g., kyc_onboarding)';
 
 
 --
--- Name: COLUMN workflow_instances.subject_type; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN workflow_instances.subject_type; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".workflow_instances.subject_type IS 'Type of entity this workflow is for (cbu, entity, case)';
 
 
 --
--- Name: COLUMN workflow_instances.subject_id; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN workflow_instances.subject_id; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".workflow_instances.subject_id IS 'UUID of the subject entity';
 
 
 --
--- Name: COLUMN workflow_instances.current_state; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN workflow_instances.current_state; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".workflow_instances.current_state IS 'Current state in the workflow state machine';
 
 
 --
--- Name: COLUMN workflow_instances.history; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN workflow_instances.history; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".workflow_instances.history IS 'JSON array of StateTransition records';
 
 
 --
--- Name: COLUMN workflow_instances.blockers; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: COLUMN workflow_instances.blockers; Type: COMMENT; Schema: ob-poc; Owner: adamtc007
 --
 
 COMMENT ON COLUMN "ob-poc".workflow_instances.blockers IS 'JSON array of current Blocker records';
 
 
 --
--- Name: workstream_statuses; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: workstream_statuses; Type: TABLE; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TABLE "ob-poc".workstream_statuses (
@@ -6858,8 +7306,10 @@ CREATE TABLE "ob-poc".workstream_statuses (
 );
 
 
+ALTER TABLE "ob-poc".workstream_statuses OWNER TO adamtc007;
+
 --
--- Name: attribute_sources; Type: TABLE; Schema: public; Owner: -
+-- Name: attribute_sources; Type: TABLE; Schema: public; Owner: adamtc007
 --
 
 CREATE TABLE public.attribute_sources (
@@ -6874,8 +7324,10 @@ CREATE TABLE public.attribute_sources (
 );
 
 
+ALTER TABLE public.attribute_sources OWNER TO adamtc007;
+
 --
--- Name: attribute_sources_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: attribute_sources_id_seq; Type: SEQUENCE; Schema: public; Owner: adamtc007
 --
 
 CREATE SEQUENCE public.attribute_sources_id_seq
@@ -6887,15 +7339,17 @@ CREATE SEQUENCE public.attribute_sources_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.attribute_sources_id_seq OWNER TO adamtc007;
+
 --
--- Name: attribute_sources_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: attribute_sources_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: adamtc007
 --
 
 ALTER SEQUENCE public.attribute_sources_id_seq OWNED BY public.attribute_sources.id;
 
 
 --
--- Name: business_attributes; Type: TABLE; Schema: public; Owner: -
+-- Name: business_attributes; Type: TABLE; Schema: public; Owner: adamtc007
 --
 
 CREATE TABLE public.business_attributes (
@@ -6923,8 +7377,10 @@ CREATE TABLE public.business_attributes (
 );
 
 
+ALTER TABLE public.business_attributes OWNER TO adamtc007;
+
 --
--- Name: business_attributes_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: business_attributes_id_seq; Type: SEQUENCE; Schema: public; Owner: adamtc007
 --
 
 CREATE SEQUENCE public.business_attributes_id_seq
@@ -6936,15 +7392,17 @@ CREATE SEQUENCE public.business_attributes_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.business_attributes_id_seq OWNER TO adamtc007;
+
 --
--- Name: business_attributes_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: business_attributes_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: adamtc007
 --
 
 ALTER SEQUENCE public.business_attributes_id_seq OWNED BY public.business_attributes.id;
 
 
 --
--- Name: credentials_vault; Type: TABLE; Schema: public; Owner: -
+-- Name: credentials_vault; Type: TABLE; Schema: public; Owner: adamtc007
 --
 
 CREATE TABLE public.credentials_vault (
@@ -6959,8 +7417,10 @@ CREATE TABLE public.credentials_vault (
 );
 
 
+ALTER TABLE public.credentials_vault OWNER TO adamtc007;
+
 --
--- Name: data_domains; Type: TABLE; Schema: public; Owner: -
+-- Name: data_domains; Type: TABLE; Schema: public; Owner: adamtc007
 --
 
 CREATE TABLE public.data_domains (
@@ -6972,8 +7432,10 @@ CREATE TABLE public.data_domains (
 );
 
 
+ALTER TABLE public.data_domains OWNER TO adamtc007;
+
 --
--- Name: data_domains_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: data_domains_id_seq; Type: SEQUENCE; Schema: public; Owner: adamtc007
 --
 
 CREATE SEQUENCE public.data_domains_id_seq
@@ -6985,15 +7447,17 @@ CREATE SEQUENCE public.data_domains_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.data_domains_id_seq OWNER TO adamtc007;
+
 --
--- Name: data_domains_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: data_domains_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: adamtc007
 --
 
 ALTER SEQUENCE public.data_domains_id_seq OWNED BY public.data_domains.id;
 
 
 --
--- Name: derived_attributes; Type: TABLE; Schema: public; Owner: -
+-- Name: derived_attributes; Type: TABLE; Schema: public; Owner: adamtc007
 --
 
 CREATE TABLE public.derived_attributes (
@@ -7012,8 +7476,10 @@ CREATE TABLE public.derived_attributes (
 );
 
 
+ALTER TABLE public.derived_attributes OWNER TO adamtc007;
+
 --
--- Name: derived_attributes_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: derived_attributes_id_seq; Type: SEQUENCE; Schema: public; Owner: adamtc007
 --
 
 CREATE SEQUENCE public.derived_attributes_id_seq
@@ -7025,15 +7491,17 @@ CREATE SEQUENCE public.derived_attributes_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.derived_attributes_id_seq OWNER TO adamtc007;
+
 --
--- Name: derived_attributes_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: derived_attributes_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: adamtc007
 --
 
 ALTER SEQUENCE public.derived_attributes_id_seq OWNED BY public.derived_attributes.id;
 
 
 --
--- Name: rule_categories; Type: TABLE; Schema: public; Owner: -
+-- Name: rule_categories; Type: TABLE; Schema: public; Owner: adamtc007
 --
 
 CREATE TABLE public.rule_categories (
@@ -7046,8 +7514,10 @@ CREATE TABLE public.rule_categories (
 );
 
 
+ALTER TABLE public.rule_categories OWNER TO adamtc007;
+
 --
--- Name: rule_categories_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: rule_categories_id_seq; Type: SEQUENCE; Schema: public; Owner: adamtc007
 --
 
 CREATE SEQUENCE public.rule_categories_id_seq
@@ -7059,15 +7529,17 @@ CREATE SEQUENCE public.rule_categories_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.rule_categories_id_seq OWNER TO adamtc007;
+
 --
--- Name: rule_categories_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: rule_categories_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: adamtc007
 --
 
 ALTER SEQUENCE public.rule_categories_id_seq OWNED BY public.rule_categories.id;
 
 
 --
--- Name: rule_dependencies; Type: TABLE; Schema: public; Owner: -
+-- Name: rule_dependencies; Type: TABLE; Schema: public; Owner: adamtc007
 --
 
 CREATE TABLE public.rule_dependencies (
@@ -7079,8 +7551,10 @@ CREATE TABLE public.rule_dependencies (
 );
 
 
+ALTER TABLE public.rule_dependencies OWNER TO adamtc007;
+
 --
--- Name: rule_dependencies_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: rule_dependencies_id_seq; Type: SEQUENCE; Schema: public; Owner: adamtc007
 --
 
 CREATE SEQUENCE public.rule_dependencies_id_seq
@@ -7092,15 +7566,17 @@ CREATE SEQUENCE public.rule_dependencies_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.rule_dependencies_id_seq OWNER TO adamtc007;
+
 --
--- Name: rule_dependencies_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: rule_dependencies_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: adamtc007
 --
 
 ALTER SEQUENCE public.rule_dependencies_id_seq OWNED BY public.rule_dependencies.id;
 
 
 --
--- Name: rule_executions; Type: TABLE; Schema: public; Owner: -
+-- Name: rule_executions; Type: TABLE; Schema: public; Owner: adamtc007
 --
 
 CREATE TABLE public.rule_executions (
@@ -7116,8 +7592,10 @@ CREATE TABLE public.rule_executions (
 );
 
 
+ALTER TABLE public.rule_executions OWNER TO adamtc007;
+
 --
--- Name: rule_versions; Type: TABLE; Schema: public; Owner: -
+-- Name: rule_versions; Type: TABLE; Schema: public; Owner: adamtc007
 --
 
 CREATE TABLE public.rule_versions (
@@ -7131,8 +7609,10 @@ CREATE TABLE public.rule_versions (
 );
 
 
+ALTER TABLE public.rule_versions OWNER TO adamtc007;
+
 --
--- Name: rule_versions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: rule_versions_id_seq; Type: SEQUENCE; Schema: public; Owner: adamtc007
 --
 
 CREATE SEQUENCE public.rule_versions_id_seq
@@ -7144,15 +7624,17 @@ CREATE SEQUENCE public.rule_versions_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.rule_versions_id_seq OWNER TO adamtc007;
+
 --
--- Name: rule_versions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: rule_versions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: adamtc007
 --
 
 ALTER SEQUENCE public.rule_versions_id_seq OWNED BY public.rule_versions.id;
 
 
 --
--- Name: rules; Type: TABLE; Schema: public; Owner: -
+-- Name: rules; Type: TABLE; Schema: public; Owner: adamtc007
 --
 
 CREATE TABLE public.rules (
@@ -7179,8 +7661,10 @@ CREATE TABLE public.rules (
 );
 
 
+ALTER TABLE public.rules OWNER TO adamtc007;
+
 --
--- Name: rules_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: rules_id_seq; Type: SEQUENCE; Schema: public; Owner: adamtc007
 --
 
 CREATE SEQUENCE public.rules_id_seq
@@ -7192,85 +7676,87 @@ CREATE SEQUENCE public.rules_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.rules_id_seq OWNER TO adamtc007;
+
 --
--- Name: rules_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: rules_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: adamtc007
 --
 
 ALTER SEQUENCE public.rules_id_seq OWNED BY public.rules.id;
 
 
 --
--- Name: attribute_values_typed id; Type: DEFAULT; Schema: ob-poc; Owner: -
+-- Name: attribute_values_typed id; Type: DEFAULT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".attribute_values_typed ALTER COLUMN id SET DEFAULT nextval('"ob-poc".attribute_values_typed_id_seq'::regclass);
 
 
 --
--- Name: dsl_instances id; Type: DEFAULT; Schema: ob-poc; Owner: -
+-- Name: dsl_instances id; Type: DEFAULT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_instances ALTER COLUMN id SET DEFAULT nextval('"ob-poc".dsl_instances_id_seq'::regclass);
 
 
 --
--- Name: attribute_sources id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: attribute_sources id; Type: DEFAULT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.attribute_sources ALTER COLUMN id SET DEFAULT nextval('public.attribute_sources_id_seq'::regclass);
 
 
 --
--- Name: business_attributes id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: business_attributes id; Type: DEFAULT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.business_attributes ALTER COLUMN id SET DEFAULT nextval('public.business_attributes_id_seq'::regclass);
 
 
 --
--- Name: data_domains id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: data_domains id; Type: DEFAULT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.data_domains ALTER COLUMN id SET DEFAULT nextval('public.data_domains_id_seq'::regclass);
 
 
 --
--- Name: derived_attributes id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: derived_attributes id; Type: DEFAULT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.derived_attributes ALTER COLUMN id SET DEFAULT nextval('public.derived_attributes_id_seq'::regclass);
 
 
 --
--- Name: rule_categories id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: rule_categories id; Type: DEFAULT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.rule_categories ALTER COLUMN id SET DEFAULT nextval('public.rule_categories_id_seq'::regclass);
 
 
 --
--- Name: rule_dependencies id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: rule_dependencies id; Type: DEFAULT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.rule_dependencies ALTER COLUMN id SET DEFAULT nextval('public.rule_dependencies_id_seq'::regclass);
 
 
 --
--- Name: rule_versions id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: rule_versions id; Type: DEFAULT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.rule_versions ALTER COLUMN id SET DEFAULT nextval('public.rule_versions_id_seq'::regclass);
 
 
 --
--- Name: rules id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: rules id; Type: DEFAULT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.rules ALTER COLUMN id SET DEFAULT nextval('public.rules_id_seq'::regclass);
 
 
 --
--- Name: cbu_cash_sweep_config cbu_cash_sweep_config_cbu_id_currency_key; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_cash_sweep_config cbu_cash_sweep_config_cbu_id_currency_key; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_cash_sweep_config
@@ -7278,7 +7764,7 @@ ALTER TABLE ONLY custody.cbu_cash_sweep_config
 
 
 --
--- Name: cbu_cash_sweep_config cbu_cash_sweep_config_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_cash_sweep_config cbu_cash_sweep_config_pkey; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_cash_sweep_config
@@ -7286,7 +7772,7 @@ ALTER TABLE ONLY custody.cbu_cash_sweep_config
 
 
 --
--- Name: cbu_im_assignments cbu_im_assignments_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_im_assignments cbu_im_assignments_pkey; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_im_assignments
@@ -7294,7 +7780,7 @@ ALTER TABLE ONLY custody.cbu_im_assignments
 
 
 --
--- Name: cbu_instrument_universe cbu_instrument_universe_natural_key; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_instrument_universe cbu_instrument_universe_natural_key; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_instrument_universe
@@ -7302,7 +7788,7 @@ ALTER TABLE ONLY custody.cbu_instrument_universe
 
 
 --
--- Name: cbu_instrument_universe cbu_instrument_universe_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_instrument_universe cbu_instrument_universe_pkey; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_instrument_universe
@@ -7310,7 +7796,7 @@ ALTER TABLE ONLY custody.cbu_instrument_universe
 
 
 --
--- Name: cbu_pricing_config cbu_pricing_config_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_pricing_config cbu_pricing_config_pkey; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_pricing_config
@@ -7318,7 +7804,7 @@ ALTER TABLE ONLY custody.cbu_pricing_config
 
 
 --
--- Name: cbu_ssi_agent_override cbu_ssi_agent_override_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_ssi_agent_override cbu_ssi_agent_override_pkey; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_ssi_agent_override
@@ -7326,7 +7812,7 @@ ALTER TABLE ONLY custody.cbu_ssi_agent_override
 
 
 --
--- Name: cbu_ssi_agent_override cbu_ssi_agent_override_ssi_id_agent_role_sequence_order_key; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_ssi_agent_override cbu_ssi_agent_override_ssi_id_agent_role_sequence_order_key; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_ssi_agent_override
@@ -7334,7 +7820,7 @@ ALTER TABLE ONLY custody.cbu_ssi_agent_override
 
 
 --
--- Name: cbu_ssi cbu_ssi_cbu_id_ssi_name_key; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_ssi cbu_ssi_cbu_id_ssi_name_key; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_ssi
@@ -7342,7 +7828,7 @@ ALTER TABLE ONLY custody.cbu_ssi
 
 
 --
--- Name: cbu_ssi cbu_ssi_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_ssi cbu_ssi_pkey; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_ssi
@@ -7350,7 +7836,7 @@ ALTER TABLE ONLY custody.cbu_ssi
 
 
 --
--- Name: cfi_codes cfi_codes_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: cfi_codes cfi_codes_pkey; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cfi_codes
@@ -7358,7 +7844,7 @@ ALTER TABLE ONLY custody.cfi_codes
 
 
 --
--- Name: csa_agreements csa_agreements_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: csa_agreements csa_agreements_pkey; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.csa_agreements
@@ -7366,7 +7852,7 @@ ALTER TABLE ONLY custody.csa_agreements
 
 
 --
--- Name: entity_settlement_identity entity_settlement_identity_entity_id_primary_bic_key; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: entity_settlement_identity entity_settlement_identity_entity_id_primary_bic_key; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.entity_settlement_identity
@@ -7374,7 +7860,7 @@ ALTER TABLE ONLY custody.entity_settlement_identity
 
 
 --
--- Name: entity_settlement_identity entity_settlement_identity_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: entity_settlement_identity entity_settlement_identity_pkey; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.entity_settlement_identity
@@ -7382,7 +7868,7 @@ ALTER TABLE ONLY custody.entity_settlement_identity
 
 
 --
--- Name: entity_ssi entity_ssi_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: entity_ssi entity_ssi_pkey; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.entity_ssi
@@ -7390,7 +7876,7 @@ ALTER TABLE ONLY custody.entity_ssi
 
 
 --
--- Name: instruction_paths instruction_paths_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: instruction_paths instruction_paths_pkey; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.instruction_paths
@@ -7398,7 +7884,7 @@ ALTER TABLE ONLY custody.instruction_paths
 
 
 --
--- Name: instruction_types instruction_types_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: instruction_types instruction_types_pkey; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.instruction_types
@@ -7406,7 +7892,7 @@ ALTER TABLE ONLY custody.instruction_types
 
 
 --
--- Name: instruction_types instruction_types_type_code_key; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: instruction_types instruction_types_type_code_key; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.instruction_types
@@ -7414,7 +7900,7 @@ ALTER TABLE ONLY custody.instruction_types
 
 
 --
--- Name: instrument_classes instrument_classes_code_key; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: instrument_classes instrument_classes_code_key; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.instrument_classes
@@ -7422,7 +7908,7 @@ ALTER TABLE ONLY custody.instrument_classes
 
 
 --
--- Name: instrument_classes instrument_classes_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: instrument_classes instrument_classes_pkey; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.instrument_classes
@@ -7430,7 +7916,7 @@ ALTER TABLE ONLY custody.instrument_classes
 
 
 --
--- Name: isda_agreements isda_agreements_cbu_id_counterparty_entity_id_agreement_dat_key; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: isda_agreements isda_agreements_cbu_id_counterparty_entity_id_agreement_dat_key; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.isda_agreements
@@ -7438,7 +7924,7 @@ ALTER TABLE ONLY custody.isda_agreements
 
 
 --
--- Name: isda_agreements isda_agreements_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: isda_agreements isda_agreements_pkey; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.isda_agreements
@@ -7446,7 +7932,7 @@ ALTER TABLE ONLY custody.isda_agreements
 
 
 --
--- Name: isda_product_coverage isda_product_coverage_isda_id_instrument_class_id_key; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: isda_product_coverage isda_product_coverage_isda_id_instrument_class_id_key; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.isda_product_coverage
@@ -7454,7 +7940,7 @@ ALTER TABLE ONLY custody.isda_product_coverage
 
 
 --
--- Name: isda_product_coverage isda_product_coverage_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: isda_product_coverage isda_product_coverage_pkey; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.isda_product_coverage
@@ -7462,7 +7948,7 @@ ALTER TABLE ONLY custody.isda_product_coverage
 
 
 --
--- Name: isda_product_taxonomy isda_product_taxonomy_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: isda_product_taxonomy isda_product_taxonomy_pkey; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.isda_product_taxonomy
@@ -7470,7 +7956,7 @@ ALTER TABLE ONLY custody.isda_product_taxonomy
 
 
 --
--- Name: isda_product_taxonomy isda_product_taxonomy_taxonomy_code_key; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: isda_product_taxonomy isda_product_taxonomy_taxonomy_code_key; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.isda_product_taxonomy
@@ -7478,7 +7964,7 @@ ALTER TABLE ONLY custody.isda_product_taxonomy
 
 
 --
--- Name: markets markets_mic_key; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: markets markets_mic_key; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.markets
@@ -7486,7 +7972,7 @@ ALTER TABLE ONLY custody.markets
 
 
 --
--- Name: markets markets_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: markets markets_pkey; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.markets
@@ -7494,7 +7980,7 @@ ALTER TABLE ONLY custody.markets
 
 
 --
--- Name: security_types security_types_code_key; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: security_types security_types_code_key; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.security_types
@@ -7502,7 +7988,7 @@ ALTER TABLE ONLY custody.security_types
 
 
 --
--- Name: security_types security_types_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: security_types security_types_pkey; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.security_types
@@ -7510,7 +7996,7 @@ ALTER TABLE ONLY custody.security_types
 
 
 --
--- Name: ssi_booking_rules ssi_booking_rules_cbu_id_priority_rule_name_key; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: ssi_booking_rules ssi_booking_rules_cbu_id_priority_rule_name_key; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.ssi_booking_rules
@@ -7518,7 +8004,7 @@ ALTER TABLE ONLY custody.ssi_booking_rules
 
 
 --
--- Name: ssi_booking_rules ssi_booking_rules_cbu_rule_name_key; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: ssi_booking_rules ssi_booking_rules_cbu_rule_name_key; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.ssi_booking_rules
@@ -7526,7 +8012,7 @@ ALTER TABLE ONLY custody.ssi_booking_rules
 
 
 --
--- Name: ssi_booking_rules ssi_booking_rules_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: ssi_booking_rules ssi_booking_rules_pkey; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.ssi_booking_rules
@@ -7534,7 +8020,7 @@ ALTER TABLE ONLY custody.ssi_booking_rules
 
 
 --
--- Name: subcustodian_network subcustodian_network_market_id_currency_subcustodian_bic_ef_key; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: subcustodian_network subcustodian_network_market_id_currency_subcustodian_bic_ef_key; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.subcustodian_network
@@ -7542,7 +8028,7 @@ ALTER TABLE ONLY custody.subcustodian_network
 
 
 --
--- Name: subcustodian_network subcustodian_network_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+-- Name: subcustodian_network subcustodian_network_pkey; Type: CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.subcustodian_network
@@ -7550,7 +8036,7 @@ ALTER TABLE ONLY custody.subcustodian_network
 
 
 --
--- Name: approval_requests approval_requests_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+-- Name: approval_requests approval_requests_pkey; Type: CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.approval_requests
@@ -7558,7 +8044,7 @@ ALTER TABLE ONLY kyc.approval_requests
 
 
 --
--- Name: case_events case_events_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+-- Name: case_events case_events_pkey; Type: CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.case_events
@@ -7566,7 +8052,7 @@ ALTER TABLE ONLY kyc.case_events
 
 
 --
--- Name: cases cases_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+-- Name: cases cases_pkey; Type: CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.cases
@@ -7574,7 +8060,7 @@ ALTER TABLE ONLY kyc.cases
 
 
 --
--- Name: doc_request_acceptable_types doc_request_acceptable_types_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+-- Name: doc_request_acceptable_types doc_request_acceptable_types_pkey; Type: CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.doc_request_acceptable_types
@@ -7582,7 +8068,7 @@ ALTER TABLE ONLY kyc.doc_request_acceptable_types
 
 
 --
--- Name: doc_request_acceptable_types doc_request_acceptable_types_request_id_document_type_id_key; Type: CONSTRAINT; Schema: kyc; Owner: -
+-- Name: doc_request_acceptable_types doc_request_acceptable_types_request_id_document_type_id_key; Type: CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.doc_request_acceptable_types
@@ -7590,7 +8076,7 @@ ALTER TABLE ONLY kyc.doc_request_acceptable_types
 
 
 --
--- Name: doc_requests doc_requests_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+-- Name: doc_requests doc_requests_pkey; Type: CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.doc_requests
@@ -7598,7 +8084,7 @@ ALTER TABLE ONLY kyc.doc_requests
 
 
 --
--- Name: entity_workstreams entity_workstreams_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+-- Name: entity_workstreams entity_workstreams_pkey; Type: CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.entity_workstreams
@@ -7606,7 +8092,7 @@ ALTER TABLE ONLY kyc.entity_workstreams
 
 
 --
--- Name: holdings holdings_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+-- Name: holdings holdings_pkey; Type: CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.holdings
@@ -7614,7 +8100,7 @@ ALTER TABLE ONLY kyc.holdings
 
 
 --
--- Name: holdings holdings_share_class_id_investor_entity_id_key; Type: CONSTRAINT; Schema: kyc; Owner: -
+-- Name: holdings holdings_share_class_id_investor_entity_id_key; Type: CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.holdings
@@ -7622,7 +8108,7 @@ ALTER TABLE ONLY kyc.holdings
 
 
 --
--- Name: movements movements_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+-- Name: movements movements_pkey; Type: CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.movements
@@ -7630,7 +8116,7 @@ ALTER TABLE ONLY kyc.movements
 
 
 --
--- Name: red_flags red_flags_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+-- Name: red_flags red_flags_pkey; Type: CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.red_flags
@@ -7638,7 +8124,7 @@ ALTER TABLE ONLY kyc.red_flags
 
 
 --
--- Name: rule_executions rule_executions_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+-- Name: rule_executions rule_executions_pkey; Type: CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.rule_executions
@@ -7646,7 +8132,7 @@ ALTER TABLE ONLY kyc.rule_executions
 
 
 --
--- Name: screenings screenings_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+-- Name: screenings screenings_pkey; Type: CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.screenings
@@ -7654,7 +8140,7 @@ ALTER TABLE ONLY kyc.screenings
 
 
 --
--- Name: share_classes share_classes_cbu_id_isin_key; Type: CONSTRAINT; Schema: kyc; Owner: -
+-- Name: share_classes share_classes_cbu_id_isin_key; Type: CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.share_classes
@@ -7662,7 +8148,7 @@ ALTER TABLE ONLY kyc.share_classes
 
 
 --
--- Name: share_classes share_classes_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+-- Name: share_classes share_classes_pkey; Type: CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.share_classes
@@ -7670,7 +8156,7 @@ ALTER TABLE ONLY kyc.share_classes
 
 
 --
--- Name: entity_workstreams uq_case_entity; Type: CONSTRAINT; Schema: kyc; Owner: -
+-- Name: entity_workstreams uq_case_entity; Type: CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.entity_workstreams
@@ -7678,7 +8164,7 @@ ALTER TABLE ONLY kyc.entity_workstreams
 
 
 --
--- Name: attribute_dictionary attribute_dictionary_attr_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: attribute_dictionary attribute_dictionary_attr_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".attribute_dictionary
@@ -7686,7 +8172,7 @@ ALTER TABLE ONLY "ob-poc".attribute_dictionary
 
 
 --
--- Name: attribute_dictionary attribute_dictionary_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: attribute_dictionary attribute_dictionary_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".attribute_dictionary
@@ -7694,7 +8180,7 @@ ALTER TABLE ONLY "ob-poc".attribute_dictionary
 
 
 --
--- Name: attribute_observations attribute_observations_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: attribute_observations attribute_observations_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".attribute_observations
@@ -7702,7 +8188,7 @@ ALTER TABLE ONLY "ob-poc".attribute_observations
 
 
 --
--- Name: attribute_registry attribute_registry_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: attribute_registry attribute_registry_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".attribute_registry
@@ -7710,7 +8196,7 @@ ALTER TABLE ONLY "ob-poc".attribute_registry
 
 
 --
--- Name: attribute_values_typed attribute_values_typed_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: attribute_values_typed attribute_values_typed_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".attribute_values_typed
@@ -7718,7 +8204,7 @@ ALTER TABLE ONLY "ob-poc".attribute_values_typed
 
 
 --
--- Name: case_decision_thresholds case_decision_thresholds_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: case_decision_thresholds case_decision_thresholds_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".case_decision_thresholds
@@ -7726,7 +8212,7 @@ ALTER TABLE ONLY "ob-poc".case_decision_thresholds
 
 
 --
--- Name: case_decision_thresholds case_decision_thresholds_threshold_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: case_decision_thresholds case_decision_thresholds_threshold_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".case_decision_thresholds
@@ -7734,7 +8220,7 @@ ALTER TABLE ONLY "ob-poc".case_decision_thresholds
 
 
 --
--- Name: case_evaluation_snapshots case_evaluation_snapshots_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: case_evaluation_snapshots case_evaluation_snapshots_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".case_evaluation_snapshots
@@ -7742,7 +8228,7 @@ ALTER TABLE ONLY "ob-poc".case_evaluation_snapshots
 
 
 --
--- Name: case_types case_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: case_types case_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".case_types
@@ -7750,7 +8236,7 @@ ALTER TABLE ONLY "ob-poc".case_types
 
 
 --
--- Name: cbu_change_log cbu_change_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_change_log cbu_change_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_change_log
@@ -7758,7 +8244,7 @@ ALTER TABLE ONLY "ob-poc".cbu_change_log
 
 
 --
--- Name: cbu_creation_log cbu_creation_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_creation_log cbu_creation_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_creation_log
@@ -7766,7 +8252,7 @@ ALTER TABLE ONLY "ob-poc".cbu_creation_log
 
 
 --
--- Name: cbu_entity_roles cbu_entity_roles_cbu_id_entity_id_role_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_entity_roles cbu_entity_roles_cbu_id_entity_id_role_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_entity_roles
@@ -7774,7 +8260,7 @@ ALTER TABLE ONLY "ob-poc".cbu_entity_roles
 
 
 --
--- Name: cbu_entity_roles cbu_entity_roles_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_entity_roles cbu_entity_roles_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_entity_roles
@@ -7782,7 +8268,7 @@ ALTER TABLE ONLY "ob-poc".cbu_entity_roles
 
 
 --
--- Name: cbu_evidence cbu_evidence_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_evidence cbu_evidence_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_evidence
@@ -7790,7 +8276,7 @@ ALTER TABLE ONLY "ob-poc".cbu_evidence
 
 
 --
--- Name: cbu_layout_overrides cbu_layout_overrides_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_layout_overrides cbu_layout_overrides_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_layout_overrides
@@ -7798,7 +8284,7 @@ ALTER TABLE ONLY "ob-poc".cbu_layout_overrides
 
 
 --
--- Name: cbu_relationship_verification cbu_relationship_verification_cbu_id_relationship_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_relationship_verification cbu_relationship_verification_cbu_id_relationship_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_relationship_verification
@@ -7806,7 +8292,7 @@ ALTER TABLE ONLY "ob-poc".cbu_relationship_verification
 
 
 --
--- Name: cbu_relationship_verification cbu_relationship_verification_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_relationship_verification cbu_relationship_verification_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_relationship_verification
@@ -7814,7 +8300,7 @@ ALTER TABLE ONLY "ob-poc".cbu_relationship_verification
 
 
 --
--- Name: cbu_resource_instances cbu_resource_instances_cbu_id_resource_type_id_instance_ide_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_resource_instances cbu_resource_instances_cbu_id_resource_type_id_instance_ide_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_resource_instances
@@ -7822,7 +8308,7 @@ ALTER TABLE ONLY "ob-poc".cbu_resource_instances
 
 
 --
--- Name: cbu_resource_instances cbu_resource_instances_cbu_product_service_resource_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_resource_instances cbu_resource_instances_cbu_product_service_resource_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_resource_instances
@@ -7830,7 +8316,7 @@ ALTER TABLE ONLY "ob-poc".cbu_resource_instances
 
 
 --
--- Name: cbu_resource_instances cbu_resource_instances_instance_url_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_resource_instances cbu_resource_instances_instance_url_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_resource_instances
@@ -7838,7 +8324,7 @@ ALTER TABLE ONLY "ob-poc".cbu_resource_instances
 
 
 --
--- Name: cbu_resource_instances cbu_resource_instances_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_resource_instances cbu_resource_instances_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_resource_instances
@@ -7846,7 +8332,7 @@ ALTER TABLE ONLY "ob-poc".cbu_resource_instances
 
 
 --
--- Name: cbu_sla_commitments cbu_sla_commitments_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_sla_commitments cbu_sla_commitments_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_sla_commitments
@@ -7854,7 +8340,7 @@ ALTER TABLE ONLY "ob-poc".cbu_sla_commitments
 
 
 --
--- Name: cbu_trading_profiles cbu_trading_profiles_cbu_id_version_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_trading_profiles cbu_trading_profiles_cbu_id_version_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_trading_profiles
@@ -7862,7 +8348,7 @@ ALTER TABLE ONLY "ob-poc".cbu_trading_profiles
 
 
 --
--- Name: cbu_trading_profiles cbu_trading_profiles_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_trading_profiles cbu_trading_profiles_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_trading_profiles
@@ -7870,7 +8356,7 @@ ALTER TABLE ONLY "ob-poc".cbu_trading_profiles
 
 
 --
--- Name: cbus cbus_name_jurisdiction_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbus cbus_name_jurisdiction_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbus
@@ -7878,7 +8364,7 @@ ALTER TABLE ONLY "ob-poc".cbus
 
 
 --
--- Name: cbus cbus_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbus cbus_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbus
@@ -7886,7 +8372,7 @@ ALTER TABLE ONLY "ob-poc".cbus
 
 
 --
--- Name: client_allegations client_allegations_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: client_allegations client_allegations_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".client_allegations
@@ -7894,7 +8380,7 @@ ALTER TABLE ONLY "ob-poc".client_allegations
 
 
 --
--- Name: client_types client_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: client_types client_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".client_types
@@ -7902,7 +8388,7 @@ ALTER TABLE ONLY "ob-poc".client_types
 
 
 --
--- Name: crud_operations crud_operations_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: crud_operations crud_operations_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".crud_operations
@@ -7910,7 +8396,7 @@ ALTER TABLE ONLY "ob-poc".crud_operations
 
 
 --
--- Name: csg_validation_rules csg_validation_rules_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: csg_validation_rules csg_validation_rules_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".csg_validation_rules
@@ -7918,7 +8404,7 @@ ALTER TABLE ONLY "ob-poc".csg_validation_rules
 
 
 --
--- Name: csg_validation_rules csg_validation_rules_rule_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: csg_validation_rules csg_validation_rules_rule_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".csg_validation_rules
@@ -7926,7 +8412,7 @@ ALTER TABLE ONLY "ob-poc".csg_validation_rules
 
 
 --
--- Name: currencies currencies_iso_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: currencies currencies_iso_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".currencies
@@ -7934,7 +8420,7 @@ ALTER TABLE ONLY "ob-poc".currencies
 
 
 --
--- Name: currencies currencies_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: currencies currencies_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".currencies
@@ -7942,7 +8428,7 @@ ALTER TABLE ONLY "ob-poc".currencies
 
 
 --
--- Name: delegation_relationships delegation_relationships_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: delegation_relationships delegation_relationships_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".delegation_relationships
@@ -7950,7 +8436,7 @@ ALTER TABLE ONLY "ob-poc".delegation_relationships
 
 
 --
--- Name: detected_patterns detected_patterns_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: detected_patterns detected_patterns_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".detected_patterns
@@ -7958,7 +8444,7 @@ ALTER TABLE ONLY "ob-poc".detected_patterns
 
 
 --
--- Name: dictionary dictionary_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dictionary dictionary_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dictionary
@@ -7966,7 +8452,7 @@ ALTER TABLE ONLY "ob-poc".dictionary
 
 
 --
--- Name: dictionary dictionary_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dictionary dictionary_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dictionary
@@ -7974,7 +8460,7 @@ ALTER TABLE ONLY "ob-poc".dictionary
 
 
 --
--- Name: document_attribute_links document_attribute_links_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: document_attribute_links document_attribute_links_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".document_attribute_links
@@ -7982,7 +8468,7 @@ ALTER TABLE ONLY "ob-poc".document_attribute_links
 
 
 --
--- Name: document_attribute_mappings document_attribute_mappings_document_type_id_attribute_uuid_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: document_attribute_mappings document_attribute_mappings_document_type_id_attribute_uuid_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".document_attribute_mappings
@@ -7990,7 +8476,7 @@ ALTER TABLE ONLY "ob-poc".document_attribute_mappings
 
 
 --
--- Name: document_attribute_mappings document_attribute_mappings_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: document_attribute_mappings document_attribute_mappings_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".document_attribute_mappings
@@ -7998,7 +8484,7 @@ ALTER TABLE ONLY "ob-poc".document_attribute_mappings
 
 
 --
--- Name: document_catalog document_catalog_file_hash_sha256_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: document_catalog document_catalog_file_hash_sha256_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".document_catalog
@@ -8006,7 +8492,7 @@ ALTER TABLE ONLY "ob-poc".document_catalog
 
 
 --
--- Name: document_catalog document_catalog_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: document_catalog document_catalog_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".document_catalog
@@ -8014,7 +8500,7 @@ ALTER TABLE ONLY "ob-poc".document_catalog
 
 
 --
--- Name: document_types document_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: document_types document_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".document_types
@@ -8022,7 +8508,7 @@ ALTER TABLE ONLY "ob-poc".document_types
 
 
 --
--- Name: document_types document_types_type_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: document_types document_types_type_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".document_types
@@ -8030,7 +8516,7 @@ ALTER TABLE ONLY "ob-poc".document_types
 
 
 --
--- Name: document_validity_rules document_validity_rules_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: document_validity_rules document_validity_rules_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".document_validity_rules
@@ -8038,7 +8524,7 @@ ALTER TABLE ONLY "ob-poc".document_validity_rules
 
 
 --
--- Name: dsl_domains dsl_domains_domain_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_domains dsl_domains_domain_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_domains
@@ -8046,7 +8532,7 @@ ALTER TABLE ONLY "ob-poc".dsl_domains
 
 
 --
--- Name: dsl_domains dsl_domains_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_domains dsl_domains_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_domains
@@ -8054,7 +8540,7 @@ ALTER TABLE ONLY "ob-poc".dsl_domains
 
 
 --
--- Name: dsl_examples dsl_examples_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_examples dsl_examples_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_examples
@@ -8062,7 +8548,7 @@ ALTER TABLE ONLY "ob-poc".dsl_examples
 
 
 --
--- Name: dsl_execution_log dsl_execution_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_execution_log dsl_execution_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_execution_log
@@ -8070,7 +8556,7 @@ ALTER TABLE ONLY "ob-poc".dsl_execution_log
 
 
 --
--- Name: dsl_generation_log dsl_generation_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_generation_log dsl_generation_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_generation_log
@@ -8078,7 +8564,7 @@ ALTER TABLE ONLY "ob-poc".dsl_generation_log
 
 
 --
--- Name: dsl_idempotency dsl_idempotency_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_idempotency dsl_idempotency_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_idempotency
@@ -8086,7 +8572,7 @@ ALTER TABLE ONLY "ob-poc".dsl_idempotency
 
 
 --
--- Name: dsl_instance_versions dsl_instance_versions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_instance_versions dsl_instance_versions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_instance_versions
@@ -8094,7 +8580,7 @@ ALTER TABLE ONLY "ob-poc".dsl_instance_versions
 
 
 --
--- Name: dsl_instances dsl_instances_instance_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_instances dsl_instances_instance_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_instances
@@ -8102,7 +8588,7 @@ ALTER TABLE ONLY "ob-poc".dsl_instances
 
 
 --
--- Name: dsl_instances dsl_instances_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_instances dsl_instances_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_instances
@@ -8110,7 +8596,7 @@ ALTER TABLE ONLY "ob-poc".dsl_instances
 
 
 --
--- Name: dsl_ob dsl_ob_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_ob dsl_ob_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_ob
@@ -8118,7 +8604,7 @@ ALTER TABLE ONLY "ob-poc".dsl_ob
 
 
 --
--- Name: dsl_session_events dsl_session_events_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_session_events dsl_session_events_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_session_events
@@ -8126,7 +8612,7 @@ ALTER TABLE ONLY "ob-poc".dsl_session_events
 
 
 --
--- Name: dsl_session_locks dsl_session_locks_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_session_locks dsl_session_locks_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_session_locks
@@ -8134,7 +8620,7 @@ ALTER TABLE ONLY "ob-poc".dsl_session_locks
 
 
 --
--- Name: dsl_sessions dsl_sessions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_sessions dsl_sessions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_sessions
@@ -8142,7 +8628,7 @@ ALTER TABLE ONLY "ob-poc".dsl_sessions
 
 
 --
--- Name: dsl_snapshots dsl_snapshots_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_snapshots dsl_snapshots_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_snapshots
@@ -8150,7 +8636,7 @@ ALTER TABLE ONLY "ob-poc".dsl_snapshots
 
 
 --
--- Name: dsl_snapshots dsl_snapshots_session_id_version_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_snapshots dsl_snapshots_session_id_version_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_snapshots
@@ -8158,7 +8644,7 @@ ALTER TABLE ONLY "ob-poc".dsl_snapshots
 
 
 --
--- Name: dsl_versions dsl_versions_domain_id_version_number_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_versions dsl_versions_domain_id_version_number_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_versions
@@ -8166,7 +8652,7 @@ ALTER TABLE ONLY "ob-poc".dsl_versions
 
 
 --
--- Name: dsl_versions dsl_versions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_versions dsl_versions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_versions
@@ -8174,7 +8660,7 @@ ALTER TABLE ONLY "ob-poc".dsl_versions
 
 
 --
--- Name: entities entities_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entities entities_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entities
@@ -8182,7 +8668,7 @@ ALTER TABLE ONLY "ob-poc".entities
 
 
 --
--- Name: entity_crud_rules entity_crud_rules_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_crud_rules entity_crud_rules_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_crud_rules
@@ -8190,7 +8676,7 @@ ALTER TABLE ONLY "ob-poc".entity_crud_rules
 
 
 --
--- Name: entity_funds entity_funds_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_funds entity_funds_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_funds
@@ -8198,7 +8684,7 @@ ALTER TABLE ONLY "ob-poc".entity_funds
 
 
 --
--- Name: entity_limited_companies entity_limited_companies_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_limited_companies entity_limited_companies_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_limited_companies
@@ -8206,7 +8692,7 @@ ALTER TABLE ONLY "ob-poc".entity_limited_companies
 
 
 --
--- Name: entity_manco entity_manco_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_manco entity_manco_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_manco
@@ -8214,7 +8700,7 @@ ALTER TABLE ONLY "ob-poc".entity_manco
 
 
 --
--- Name: entity_partnerships entity_partnerships_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_partnerships entity_partnerships_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_partnerships
@@ -8222,7 +8708,7 @@ ALTER TABLE ONLY "ob-poc".entity_partnerships
 
 
 --
--- Name: entity_proper_persons entity_proper_persons_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_proper_persons entity_proper_persons_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_proper_persons
@@ -8230,7 +8716,7 @@ ALTER TABLE ONLY "ob-poc".entity_proper_persons
 
 
 --
--- Name: entity_relationships entity_relationships_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_relationships entity_relationships_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_relationships
@@ -8238,7 +8724,7 @@ ALTER TABLE ONLY "ob-poc".entity_relationships
 
 
 --
--- Name: entity_share_classes entity_share_classes_isin_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_share_classes entity_share_classes_isin_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_share_classes
@@ -8246,7 +8732,7 @@ ALTER TABLE ONLY "ob-poc".entity_share_classes
 
 
 --
--- Name: entity_share_classes entity_share_classes_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_share_classes entity_share_classes_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_share_classes
@@ -8254,7 +8740,7 @@ ALTER TABLE ONLY "ob-poc".entity_share_classes
 
 
 --
--- Name: entity_trusts entity_trusts_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_trusts entity_trusts_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_trusts
@@ -8262,7 +8748,7 @@ ALTER TABLE ONLY "ob-poc".entity_trusts
 
 
 --
--- Name: entity_type_dependencies entity_type_dependencies_from_type_from_subtype_to_type_to__key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_type_dependencies entity_type_dependencies_from_type_from_subtype_to_type_to__key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_type_dependencies
@@ -8270,7 +8756,7 @@ ALTER TABLE ONLY "ob-poc".entity_type_dependencies
 
 
 --
--- Name: entity_type_dependencies entity_type_dependencies_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_type_dependencies entity_type_dependencies_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_type_dependencies
@@ -8278,7 +8764,7 @@ ALTER TABLE ONLY "ob-poc".entity_type_dependencies
 
 
 --
--- Name: entity_types entity_types_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_types entity_types_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_types
@@ -8286,7 +8772,7 @@ ALTER TABLE ONLY "ob-poc".entity_types
 
 
 --
--- Name: entity_types entity_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_types entity_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_types
@@ -8294,7 +8780,7 @@ ALTER TABLE ONLY "ob-poc".entity_types
 
 
 --
--- Name: entity_validation_rules entity_validation_rules_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_validation_rules entity_validation_rules_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_validation_rules
@@ -8302,7 +8788,7 @@ ALTER TABLE ONLY "ob-poc".entity_validation_rules
 
 
 --
--- Name: fund_investments fund_investments_investor_entity_id_investee_entity_id_inve_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: fund_investments fund_investments_investor_entity_id_investee_entity_id_inve_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".fund_investments
@@ -8310,7 +8796,7 @@ ALTER TABLE ONLY "ob-poc".fund_investments
 
 
 --
--- Name: fund_investments fund_investments_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: fund_investments fund_investments_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".fund_investments
@@ -8318,7 +8804,7 @@ ALTER TABLE ONLY "ob-poc".fund_investments
 
 
 --
--- Name: fund_structure fund_structure_parent_entity_id_child_entity_id_relationshi_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: fund_structure fund_structure_parent_entity_id_child_entity_id_relationshi_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".fund_structure
@@ -8326,7 +8812,7 @@ ALTER TABLE ONLY "ob-poc".fund_structure
 
 
 --
--- Name: fund_structure fund_structure_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: fund_structure fund_structure_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".fund_structure
@@ -8334,7 +8820,7 @@ ALTER TABLE ONLY "ob-poc".fund_structure
 
 
 --
--- Name: kyc_decisions kyc_decisions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: kyc_decisions kyc_decisions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".kyc_decisions
@@ -8342,7 +8828,7 @@ ALTER TABLE ONLY "ob-poc".kyc_decisions
 
 
 --
--- Name: master_entity_xref master_entity_xref_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: master_entity_xref master_entity_xref_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".master_entity_xref
@@ -8350,7 +8836,7 @@ ALTER TABLE ONLY "ob-poc".master_entity_xref
 
 
 --
--- Name: master_jurisdictions master_jurisdictions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: master_jurisdictions master_jurisdictions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".master_jurisdictions
@@ -8358,7 +8844,7 @@ ALTER TABLE ONLY "ob-poc".master_jurisdictions
 
 
 --
--- Name: observation_discrepancies observation_discrepancies_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: observation_discrepancies observation_discrepancies_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".observation_discrepancies
@@ -8366,7 +8852,7 @@ ALTER TABLE ONLY "ob-poc".observation_discrepancies
 
 
 --
--- Name: onboarding_executions onboarding_executions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: onboarding_executions onboarding_executions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".onboarding_executions
@@ -8374,7 +8860,7 @@ ALTER TABLE ONLY "ob-poc".onboarding_executions
 
 
 --
--- Name: onboarding_plans onboarding_plans_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: onboarding_plans onboarding_plans_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".onboarding_plans
@@ -8382,7 +8868,7 @@ ALTER TABLE ONLY "ob-poc".onboarding_plans
 
 
 --
--- Name: onboarding_products onboarding_products_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: onboarding_products onboarding_products_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".onboarding_products
@@ -8390,7 +8876,7 @@ ALTER TABLE ONLY "ob-poc".onboarding_products
 
 
 --
--- Name: onboarding_products onboarding_products_request_id_product_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: onboarding_products onboarding_products_request_id_product_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".onboarding_products
@@ -8398,7 +8884,7 @@ ALTER TABLE ONLY "ob-poc".onboarding_products
 
 
 --
--- Name: onboarding_requests onboarding_requests_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: onboarding_requests onboarding_requests_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".onboarding_requests
@@ -8406,7 +8892,7 @@ ALTER TABLE ONLY "ob-poc".onboarding_requests
 
 
 --
--- Name: onboarding_tasks onboarding_tasks_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: onboarding_tasks onboarding_tasks_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".onboarding_tasks
@@ -8414,7 +8900,7 @@ ALTER TABLE ONLY "ob-poc".onboarding_tasks
 
 
 --
--- Name: service_resource_types prod_resources_resource_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: service_resource_types prod_resources_resource_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".service_resource_types
@@ -8422,7 +8908,7 @@ ALTER TABLE ONLY "ob-poc".service_resource_types
 
 
 --
--- Name: product_services product_services_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: product_services product_services_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".product_services
@@ -8430,7 +8916,7 @@ ALTER TABLE ONLY "ob-poc".product_services
 
 
 --
--- Name: products products_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: products products_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".products
@@ -8438,7 +8924,7 @@ ALTER TABLE ONLY "ob-poc".products
 
 
 --
--- Name: products products_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: products products_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".products
@@ -8446,7 +8932,7 @@ ALTER TABLE ONLY "ob-poc".products
 
 
 --
--- Name: products products_product_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: products products_product_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".products
@@ -8454,7 +8940,7 @@ ALTER TABLE ONLY "ob-poc".products
 
 
 --
--- Name: proofs proofs_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: proofs proofs_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".proofs
@@ -8462,7 +8948,7 @@ ALTER TABLE ONLY "ob-poc".proofs
 
 
 --
--- Name: red_flag_severities red_flag_severities_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: red_flag_severities red_flag_severities_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".red_flag_severities
@@ -8470,7 +8956,7 @@ ALTER TABLE ONLY "ob-poc".red_flag_severities
 
 
 --
--- Name: redflag_score_config redflag_score_config_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: redflag_score_config redflag_score_config_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".redflag_score_config
@@ -8478,7 +8964,7 @@ ALTER TABLE ONLY "ob-poc".redflag_score_config
 
 
 --
--- Name: requirement_acceptable_docs requirement_acceptable_docs_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: requirement_acceptable_docs requirement_acceptable_docs_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".requirement_acceptable_docs
@@ -8486,7 +8972,7 @@ ALTER TABLE ONLY "ob-poc".requirement_acceptable_docs
 
 
 --
--- Name: resource_attribute_requirements resource_attribute_requirements_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: resource_attribute_requirements resource_attribute_requirements_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".resource_attribute_requirements
@@ -8494,7 +8980,7 @@ ALTER TABLE ONLY "ob-poc".resource_attribute_requirements
 
 
 --
--- Name: resource_attribute_requirements resource_attribute_requirements_resource_id_attribute_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: resource_attribute_requirements resource_attribute_requirements_resource_id_attribute_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".resource_attribute_requirements
@@ -8502,7 +8988,7 @@ ALTER TABLE ONLY "ob-poc".resource_attribute_requirements
 
 
 --
--- Name: resource_dependencies resource_dependencies_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: resource_dependencies resource_dependencies_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".resource_dependencies
@@ -8510,7 +8996,7 @@ ALTER TABLE ONLY "ob-poc".resource_dependencies
 
 
 --
--- Name: resource_dependencies resource_dependencies_resource_type_id_depends_on_type_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: resource_dependencies resource_dependencies_resource_type_id_depends_on_type_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".resource_dependencies
@@ -8518,7 +9004,7 @@ ALTER TABLE ONLY "ob-poc".resource_dependencies
 
 
 --
--- Name: resource_instance_attributes resource_instance_attributes_instance_id_attribute_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: resource_instance_attributes resource_instance_attributes_instance_id_attribute_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".resource_instance_attributes
@@ -8526,7 +9012,7 @@ ALTER TABLE ONLY "ob-poc".resource_instance_attributes
 
 
 --
--- Name: resource_instance_attributes resource_instance_attributes_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: resource_instance_attributes resource_instance_attributes_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".resource_instance_attributes
@@ -8534,7 +9020,7 @@ ALTER TABLE ONLY "ob-poc".resource_instance_attributes
 
 
 --
--- Name: resource_instance_dependencies resource_instance_dependencies_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: resource_instance_dependencies resource_instance_dependencies_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".resource_instance_dependencies
@@ -8542,7 +9028,7 @@ ALTER TABLE ONLY "ob-poc".resource_instance_dependencies
 
 
 --
--- Name: resource_profile_sources resource_profile_sources_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: resource_profile_sources resource_profile_sources_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".resource_profile_sources
@@ -8550,7 +9036,7 @@ ALTER TABLE ONLY "ob-poc".resource_profile_sources
 
 
 --
--- Name: risk_bands risk_bands_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: risk_bands risk_bands_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".risk_bands
@@ -8558,7 +9044,7 @@ ALTER TABLE ONLY "ob-poc".risk_bands
 
 
 --
--- Name: risk_ratings risk_ratings_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: risk_ratings risk_ratings_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".risk_ratings
@@ -8566,7 +9052,7 @@ ALTER TABLE ONLY "ob-poc".risk_ratings
 
 
 --
--- Name: roles roles_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: roles roles_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".roles
@@ -8574,7 +9060,7 @@ ALTER TABLE ONLY "ob-poc".roles
 
 
 --
--- Name: roles roles_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: roles roles_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".roles
@@ -8582,7 +9068,7 @@ ALTER TABLE ONLY "ob-poc".roles
 
 
 --
--- Name: schema_changes schema_changes_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: schema_changes schema_changes_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".schema_changes
@@ -8590,7 +9076,7 @@ ALTER TABLE ONLY "ob-poc".schema_changes
 
 
 --
--- Name: screening_lists screening_lists_list_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: screening_lists screening_lists_list_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".screening_lists
@@ -8598,7 +9084,7 @@ ALTER TABLE ONLY "ob-poc".screening_lists
 
 
 --
--- Name: screening_lists screening_lists_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: screening_lists screening_lists_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".screening_lists
@@ -8606,7 +9092,7 @@ ALTER TABLE ONLY "ob-poc".screening_lists
 
 
 --
--- Name: screening_requirements screening_requirements_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: screening_requirements screening_requirements_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".screening_requirements
@@ -8614,7 +9100,7 @@ ALTER TABLE ONLY "ob-poc".screening_requirements
 
 
 --
--- Name: screening_types screening_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: screening_types screening_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".screening_types
@@ -8622,7 +9108,7 @@ ALTER TABLE ONLY "ob-poc".screening_types
 
 
 --
--- Name: service_delivery_map service_delivery_map_cbu_id_product_id_service_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: service_delivery_map service_delivery_map_cbu_id_product_id_service_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".service_delivery_map
@@ -8630,7 +9116,7 @@ ALTER TABLE ONLY "ob-poc".service_delivery_map
 
 
 --
--- Name: service_delivery_map service_delivery_map_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: service_delivery_map service_delivery_map_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".service_delivery_map
@@ -8638,7 +9124,7 @@ ALTER TABLE ONLY "ob-poc".service_delivery_map
 
 
 --
--- Name: service_option_choices service_option_choices_option_def_id_choice_value_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: service_option_choices service_option_choices_option_def_id_choice_value_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".service_option_choices
@@ -8646,7 +9132,7 @@ ALTER TABLE ONLY "ob-poc".service_option_choices
 
 
 --
--- Name: service_option_choices service_option_choices_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: service_option_choices service_option_choices_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".service_option_choices
@@ -8654,7 +9140,7 @@ ALTER TABLE ONLY "ob-poc".service_option_choices
 
 
 --
--- Name: service_option_definitions service_option_definitions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: service_option_definitions service_option_definitions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".service_option_definitions
@@ -8662,7 +9148,7 @@ ALTER TABLE ONLY "ob-poc".service_option_definitions
 
 
 --
--- Name: service_option_definitions service_option_definitions_service_id_option_key_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: service_option_definitions service_option_definitions_service_id_option_key_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".service_option_definitions
@@ -8670,7 +9156,7 @@ ALTER TABLE ONLY "ob-poc".service_option_definitions
 
 
 --
--- Name: service_resource_capabilities service_resource_capabilities_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: service_resource_capabilities service_resource_capabilities_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".service_resource_capabilities
@@ -8678,7 +9164,7 @@ ALTER TABLE ONLY "ob-poc".service_resource_capabilities
 
 
 --
--- Name: service_resource_capabilities service_resource_capabilities_service_id_resource_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: service_resource_capabilities service_resource_capabilities_service_id_resource_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".service_resource_capabilities
@@ -8686,7 +9172,7 @@ ALTER TABLE ONLY "ob-poc".service_resource_capabilities
 
 
 --
--- Name: service_resource_types service_resource_types_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: service_resource_types service_resource_types_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".service_resource_types
@@ -8694,7 +9180,7 @@ ALTER TABLE ONLY "ob-poc".service_resource_types
 
 
 --
--- Name: service_resource_types service_resource_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: service_resource_types service_resource_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".service_resource_types
@@ -8702,7 +9188,7 @@ ALTER TABLE ONLY "ob-poc".service_resource_types
 
 
 --
--- Name: services services_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: services services_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".services
@@ -8710,7 +9196,7 @@ ALTER TABLE ONLY "ob-poc".services
 
 
 --
--- Name: services services_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: services services_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".services
@@ -8718,7 +9204,7 @@ ALTER TABLE ONLY "ob-poc".services
 
 
 --
--- Name: services services_service_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: services services_service_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".services
@@ -8726,7 +9212,7 @@ ALTER TABLE ONLY "ob-poc".services
 
 
 --
--- Name: settlement_types settlement_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: settlement_types settlement_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".settlement_types
@@ -8734,7 +9220,7 @@ ALTER TABLE ONLY "ob-poc".settlement_types
 
 
 --
--- Name: sla_breaches sla_breaches_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: sla_breaches sla_breaches_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".sla_breaches
@@ -8742,7 +9228,7 @@ ALTER TABLE ONLY "ob-poc".sla_breaches
 
 
 --
--- Name: sla_measurements sla_measurements_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: sla_measurements sla_measurements_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".sla_measurements
@@ -8750,7 +9236,7 @@ ALTER TABLE ONLY "ob-poc".sla_measurements
 
 
 --
--- Name: sla_metric_types sla_metric_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: sla_metric_types sla_metric_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".sla_metric_types
@@ -8758,7 +9244,7 @@ ALTER TABLE ONLY "ob-poc".sla_metric_types
 
 
 --
--- Name: sla_templates sla_templates_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: sla_templates sla_templates_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".sla_templates
@@ -8766,7 +9252,7 @@ ALTER TABLE ONLY "ob-poc".sla_templates
 
 
 --
--- Name: sla_templates sla_templates_template_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: sla_templates sla_templates_template_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".sla_templates
@@ -8774,7 +9260,7 @@ ALTER TABLE ONLY "ob-poc".sla_templates
 
 
 --
--- Name: ssi_types ssi_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ssi_types ssi_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ssi_types
@@ -8782,7 +9268,7 @@ ALTER TABLE ONLY "ob-poc".ssi_types
 
 
 --
--- Name: taxonomy_crud_log taxonomy_crud_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: taxonomy_crud_log taxonomy_crud_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".taxonomy_crud_log
@@ -8790,7 +9276,7 @@ ALTER TABLE ONLY "ob-poc".taxonomy_crud_log
 
 
 --
--- Name: threshold_factors threshold_factors_factor_type_factor_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: threshold_factors threshold_factors_factor_type_factor_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".threshold_factors
@@ -8798,7 +9284,7 @@ ALTER TABLE ONLY "ob-poc".threshold_factors
 
 
 --
--- Name: threshold_factors threshold_factors_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: threshold_factors threshold_factors_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".threshold_factors
@@ -8806,7 +9292,7 @@ ALTER TABLE ONLY "ob-poc".threshold_factors
 
 
 --
--- Name: threshold_requirements threshold_requirements_entity_role_risk_band_attribute_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: threshold_requirements threshold_requirements_entity_role_risk_band_attribute_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".threshold_requirements
@@ -8814,7 +9300,7 @@ ALTER TABLE ONLY "ob-poc".threshold_requirements
 
 
 --
--- Name: threshold_requirements threshold_requirements_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: threshold_requirements threshold_requirements_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".threshold_requirements
@@ -8822,7 +9308,7 @@ ALTER TABLE ONLY "ob-poc".threshold_requirements
 
 
 --
--- Name: trading_profile_documents trading_profile_documents_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: trading_profile_documents trading_profile_documents_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".trading_profile_documents
@@ -8830,7 +9316,7 @@ ALTER TABLE ONLY "ob-poc".trading_profile_documents
 
 
 --
--- Name: trading_profile_materializations trading_profile_materializations_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: trading_profile_materializations trading_profile_materializations_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".trading_profile_materializations
@@ -8838,7 +9324,7 @@ ALTER TABLE ONLY "ob-poc".trading_profile_materializations
 
 
 --
--- Name: trust_parties trust_parties_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: trust_parties trust_parties_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".trust_parties
@@ -8846,7 +9332,7 @@ ALTER TABLE ONLY "ob-poc".trust_parties
 
 
 --
--- Name: trust_parties trust_parties_trust_id_entity_id_party_role_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: trust_parties trust_parties_trust_id_entity_id_party_role_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".trust_parties
@@ -8854,7 +9340,7 @@ ALTER TABLE ONLY "ob-poc".trust_parties
 
 
 --
--- Name: ubo_assertion_log ubo_assertion_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_assertion_log ubo_assertion_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ubo_assertion_log
@@ -8862,7 +9348,7 @@ ALTER TABLE ONLY "ob-poc".ubo_assertion_log
 
 
 --
--- Name: ubo_evidence ubo_evidence_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_evidence ubo_evidence_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ubo_evidence
@@ -8870,7 +9356,7 @@ ALTER TABLE ONLY "ob-poc".ubo_evidence
 
 
 --
--- Name: ubo_registry ubo_registry_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_registry ubo_registry_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ubo_registry
@@ -8878,7 +9364,7 @@ ALTER TABLE ONLY "ob-poc".ubo_registry
 
 
 --
--- Name: ubo_registry ubo_registry_subject_entity_id_ubo_proper_person_id_relatio_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_registry ubo_registry_subject_entity_id_ubo_proper_person_id_relatio_key; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ubo_registry
@@ -8886,7 +9372,7 @@ ALTER TABLE ONLY "ob-poc".ubo_registry
 
 
 --
--- Name: ubo_snapshot_comparisons ubo_snapshot_comparisons_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_snapshot_comparisons ubo_snapshot_comparisons_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ubo_snapshot_comparisons
@@ -8894,7 +9380,7 @@ ALTER TABLE ONLY "ob-poc".ubo_snapshot_comparisons
 
 
 --
--- Name: ubo_snapshots ubo_snapshots_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_snapshots ubo_snapshots_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ubo_snapshots
@@ -8902,7 +9388,7 @@ ALTER TABLE ONLY "ob-poc".ubo_snapshots
 
 
 --
--- Name: attribute_registry uk_attribute_uuid; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: attribute_registry uk_attribute_uuid; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".attribute_registry
@@ -8910,7 +9396,7 @@ ALTER TABLE ONLY "ob-poc".attribute_registry
 
 
 --
--- Name: document_attribute_links unique_doc_attr_direction; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: document_attribute_links unique_doc_attr_direction; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".document_attribute_links
@@ -8918,7 +9404,7 @@ ALTER TABLE ONLY "ob-poc".document_attribute_links
 
 
 --
--- Name: redflag_score_config uq_redflag_severity; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: redflag_score_config uq_redflag_severity; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".redflag_score_config
@@ -8926,7 +9412,7 @@ ALTER TABLE ONLY "ob-poc".redflag_score_config
 
 
 --
--- Name: workflow_instances uq_workflow_subject; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: workflow_instances uq_workflow_subject; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".workflow_instances
@@ -8934,7 +9420,7 @@ ALTER TABLE ONLY "ob-poc".workflow_instances
 
 
 --
--- Name: workflow_definitions uq_workflow_version; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: workflow_definitions uq_workflow_version; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".workflow_definitions
@@ -8942,7 +9428,7 @@ ALTER TABLE ONLY "ob-poc".workflow_definitions
 
 
 --
--- Name: verification_challenges verification_challenges_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: verification_challenges verification_challenges_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".verification_challenges
@@ -8950,7 +9436,7 @@ ALTER TABLE ONLY "ob-poc".verification_challenges
 
 
 --
--- Name: verification_escalations verification_escalations_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: verification_escalations verification_escalations_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".verification_escalations
@@ -8958,7 +9444,7 @@ ALTER TABLE ONLY "ob-poc".verification_escalations
 
 
 --
--- Name: workflow_audit_log workflow_audit_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: workflow_audit_log workflow_audit_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".workflow_audit_log
@@ -8966,7 +9452,7 @@ ALTER TABLE ONLY "ob-poc".workflow_audit_log
 
 
 --
--- Name: workflow_definitions workflow_definitions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: workflow_definitions workflow_definitions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".workflow_definitions
@@ -8974,7 +9460,7 @@ ALTER TABLE ONLY "ob-poc".workflow_definitions
 
 
 --
--- Name: workflow_instances workflow_instances_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: workflow_instances workflow_instances_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".workflow_instances
@@ -8982,7 +9468,7 @@ ALTER TABLE ONLY "ob-poc".workflow_instances
 
 
 --
--- Name: workstream_statuses workstream_statuses_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: workstream_statuses workstream_statuses_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".workstream_statuses
@@ -8990,7 +9476,7 @@ ALTER TABLE ONLY "ob-poc".workstream_statuses
 
 
 --
--- Name: attribute_sources attribute_sources_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: attribute_sources attribute_sources_pkey; Type: CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.attribute_sources
@@ -8998,7 +9484,7 @@ ALTER TABLE ONLY public.attribute_sources
 
 
 --
--- Name: attribute_sources attribute_sources_source_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: attribute_sources attribute_sources_source_key_key; Type: CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.attribute_sources
@@ -9006,7 +9492,7 @@ ALTER TABLE ONLY public.attribute_sources
 
 
 --
--- Name: business_attributes business_attributes_entity_name_attribute_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: business_attributes business_attributes_entity_name_attribute_name_key; Type: CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.business_attributes
@@ -9014,7 +9500,7 @@ ALTER TABLE ONLY public.business_attributes
 
 
 --
--- Name: business_attributes business_attributes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: business_attributes business_attributes_pkey; Type: CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.business_attributes
@@ -9022,7 +9508,7 @@ ALTER TABLE ONLY public.business_attributes
 
 
 --
--- Name: credentials_vault credentials_vault_credential_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: credentials_vault credentials_vault_credential_name_key; Type: CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.credentials_vault
@@ -9030,7 +9516,7 @@ ALTER TABLE ONLY public.credentials_vault
 
 
 --
--- Name: credentials_vault credentials_vault_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: credentials_vault credentials_vault_pkey; Type: CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.credentials_vault
@@ -9038,7 +9524,7 @@ ALTER TABLE ONLY public.credentials_vault
 
 
 --
--- Name: data_domains data_domains_domain_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: data_domains data_domains_domain_name_key; Type: CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.data_domains
@@ -9046,7 +9532,7 @@ ALTER TABLE ONLY public.data_domains
 
 
 --
--- Name: data_domains data_domains_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: data_domains data_domains_pkey; Type: CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.data_domains
@@ -9054,7 +9540,7 @@ ALTER TABLE ONLY public.data_domains
 
 
 --
--- Name: derived_attributes derived_attributes_entity_name_attribute_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: derived_attributes derived_attributes_entity_name_attribute_name_key; Type: CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.derived_attributes
@@ -9062,7 +9548,7 @@ ALTER TABLE ONLY public.derived_attributes
 
 
 --
--- Name: derived_attributes derived_attributes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: derived_attributes derived_attributes_pkey; Type: CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.derived_attributes
@@ -9070,7 +9556,7 @@ ALTER TABLE ONLY public.derived_attributes
 
 
 --
--- Name: rule_categories rule_categories_category_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: rule_categories rule_categories_category_key_key; Type: CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.rule_categories
@@ -9078,7 +9564,7 @@ ALTER TABLE ONLY public.rule_categories
 
 
 --
--- Name: rule_categories rule_categories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: rule_categories rule_categories_pkey; Type: CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.rule_categories
@@ -9086,7 +9572,7 @@ ALTER TABLE ONLY public.rule_categories
 
 
 --
--- Name: rule_dependencies rule_dependencies_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: rule_dependencies rule_dependencies_pkey; Type: CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.rule_dependencies
@@ -9094,7 +9580,7 @@ ALTER TABLE ONLY public.rule_dependencies
 
 
 --
--- Name: rule_dependencies rule_dependencies_rule_id_attribute_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: rule_dependencies rule_dependencies_rule_id_attribute_id_key; Type: CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.rule_dependencies
@@ -9102,7 +9588,7 @@ ALTER TABLE ONLY public.rule_dependencies
 
 
 --
--- Name: rule_executions rule_executions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: rule_executions rule_executions_pkey; Type: CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.rule_executions
@@ -9110,7 +9596,7 @@ ALTER TABLE ONLY public.rule_executions
 
 
 --
--- Name: rule_versions rule_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: rule_versions rule_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.rule_versions
@@ -9118,7 +9604,7 @@ ALTER TABLE ONLY public.rule_versions
 
 
 --
--- Name: rule_versions rule_versions_rule_id_version_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: rule_versions rule_versions_rule_id_version_key; Type: CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.rule_versions
@@ -9126,7 +9612,7 @@ ALTER TABLE ONLY public.rule_versions
 
 
 --
--- Name: rules rules_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: rules rules_pkey; Type: CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.rules
@@ -9134,7 +9620,7 @@ ALTER TABLE ONLY public.rules
 
 
 --
--- Name: rules rules_rule_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: rules rules_rule_id_key; Type: CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.rules
@@ -9142,2422 +9628,2422 @@ ALTER TABLE ONLY public.rules
 
 
 --
--- Name: idx_booking_rules_lookup; Type: INDEX; Schema: custody; Owner: -
+-- Name: idx_booking_rules_lookup; Type: INDEX; Schema: custody; Owner: adamtc007
 --
 
 CREATE INDEX idx_booking_rules_lookup ON custody.ssi_booking_rules USING btree (cbu_id, is_active, priority, instrument_class_id, security_type_id, market_id, currency);
 
 
 --
--- Name: idx_cbu_im_active; Type: INDEX; Schema: custody; Owner: -
+-- Name: idx_cbu_im_active; Type: INDEX; Schema: custody; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_im_active ON custody.cbu_im_assignments USING btree (cbu_id) WHERE ((status)::text = 'ACTIVE'::text);
 
 
 --
--- Name: idx_cbu_im_cbu; Type: INDEX; Schema: custody; Owner: -
+-- Name: idx_cbu_im_cbu; Type: INDEX; Schema: custody; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_im_cbu ON custody.cbu_im_assignments USING btree (cbu_id);
 
 
 --
--- Name: idx_cbu_im_manager; Type: INDEX; Schema: custody; Owner: -
+-- Name: idx_cbu_im_manager; Type: INDEX; Schema: custody; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_im_manager ON custody.cbu_im_assignments USING btree (manager_entity_id);
 
 
 --
--- Name: idx_cbu_im_method; Type: INDEX; Schema: custody; Owner: -
+-- Name: idx_cbu_im_method; Type: INDEX; Schema: custody; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_im_method ON custody.cbu_im_assignments USING btree (instruction_method);
 
 
 --
--- Name: idx_cbu_im_profile; Type: INDEX; Schema: custody; Owner: -
+-- Name: idx_cbu_im_profile; Type: INDEX; Schema: custody; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_im_profile ON custody.cbu_im_assignments USING btree (profile_id);
 
 
 --
--- Name: idx_cbu_pricing_cbu; Type: INDEX; Schema: custody; Owner: -
+-- Name: idx_cbu_pricing_cbu; Type: INDEX; Schema: custody; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_pricing_cbu ON custody.cbu_pricing_config USING btree (cbu_id);
 
 
 --
--- Name: idx_cbu_pricing_class; Type: INDEX; Schema: custody; Owner: -
+-- Name: idx_cbu_pricing_class; Type: INDEX; Schema: custody; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_pricing_class ON custody.cbu_pricing_config USING btree (instrument_class_id);
 
 
 --
--- Name: idx_cbu_ssi_active; Type: INDEX; Schema: custody; Owner: -
+-- Name: idx_cbu_ssi_active; Type: INDEX; Schema: custody; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_ssi_active ON custody.cbu_ssi USING btree (cbu_id, status) WHERE ((status)::text = 'ACTIVE'::text);
 
 
 --
--- Name: idx_cbu_ssi_lookup; Type: INDEX; Schema: custody; Owner: -
+-- Name: idx_cbu_ssi_lookup; Type: INDEX; Schema: custody; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_ssi_lookup ON custody.cbu_ssi USING btree (cbu_id, status);
 
 
 --
--- Name: idx_cbu_sweep_cbu; Type: INDEX; Schema: custody; Owner: -
+-- Name: idx_cbu_sweep_cbu; Type: INDEX; Schema: custody; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_sweep_cbu ON custody.cbu_cash_sweep_config USING btree (cbu_id);
 
 
 --
--- Name: idx_case_events_case; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_case_events_case; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_case_events_case ON kyc.case_events USING btree (case_id);
 
 
 --
--- Name: idx_case_events_time; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_case_events_time; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_case_events_time ON kyc.case_events USING btree (occurred_at DESC);
 
 
 --
--- Name: idx_case_events_type; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_case_events_type; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_case_events_type ON kyc.case_events USING btree (event_type);
 
 
 --
--- Name: idx_case_events_workstream; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_case_events_workstream; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_case_events_workstream ON kyc.case_events USING btree (workstream_id) WHERE (workstream_id IS NOT NULL);
 
 
 --
--- Name: idx_cases_analyst; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_cases_analyst; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cases_analyst ON kyc.cases USING btree (assigned_analyst_id) WHERE (assigned_analyst_id IS NOT NULL);
 
 
 --
--- Name: idx_cases_cbu; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_cases_cbu; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cases_cbu ON kyc.cases USING btree (cbu_id);
 
 
 --
--- Name: idx_cases_status; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_cases_status; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cases_status ON kyc.cases USING btree (status);
 
 
 --
--- Name: idx_doc_request_types_request; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_doc_request_types_request; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_doc_request_types_request ON kyc.doc_request_acceptable_types USING btree (request_id);
 
 
 --
--- Name: idx_doc_requests_batch; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_doc_requests_batch; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_doc_requests_batch ON kyc.doc_requests USING btree (batch_id) WHERE (batch_id IS NOT NULL);
 
 
 --
--- Name: idx_doc_requests_due_date; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_doc_requests_due_date; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_doc_requests_due_date ON kyc.doc_requests USING btree (due_date);
 
 
 --
--- Name: idx_doc_requests_status; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_doc_requests_status; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_doc_requests_status ON kyc.doc_requests USING btree (status);
 
 
 --
--- Name: idx_doc_requests_type; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_doc_requests_type; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_doc_requests_type ON kyc.doc_requests USING btree (doc_type);
 
 
 --
--- Name: idx_doc_requests_workstream; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_doc_requests_workstream; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_doc_requests_workstream ON kyc.doc_requests USING btree (workstream_id);
 
 
 --
--- Name: idx_holdings_investor; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_holdings_investor; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_holdings_investor ON kyc.holdings USING btree (investor_entity_id);
 
 
 --
--- Name: idx_holdings_share_class; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_holdings_share_class; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_holdings_share_class ON kyc.holdings USING btree (share_class_id);
 
 
 --
--- Name: idx_movements_holding; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_movements_holding; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_movements_holding ON kyc.movements USING btree (holding_id);
 
 
 --
--- Name: idx_movements_status; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_movements_status; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_movements_status ON kyc.movements USING btree (status);
 
 
 --
--- Name: idx_movements_trade_date; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_movements_trade_date; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_movements_trade_date ON kyc.movements USING btree (trade_date);
 
 
 --
--- Name: idx_red_flags_case; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_red_flags_case; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_red_flags_case ON kyc.red_flags USING btree (case_id);
 
 
 --
--- Name: idx_red_flags_severity; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_red_flags_severity; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_red_flags_severity ON kyc.red_flags USING btree (severity);
 
 
 --
--- Name: idx_red_flags_status; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_red_flags_status; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_red_flags_status ON kyc.red_flags USING btree (status);
 
 
 --
--- Name: idx_red_flags_type; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_red_flags_type; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_red_flags_type ON kyc.red_flags USING btree (flag_type);
 
 
 --
--- Name: idx_red_flags_workstream; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_red_flags_workstream; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_red_flags_workstream ON kyc.red_flags USING btree (workstream_id) WHERE (workstream_id IS NOT NULL);
 
 
 --
--- Name: idx_screenings_status; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_screenings_status; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_screenings_status ON kyc.screenings USING btree (status);
 
 
 --
--- Name: idx_screenings_type; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_screenings_type; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_screenings_type ON kyc.screenings USING btree (screening_type);
 
 
 --
--- Name: idx_screenings_workstream; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_screenings_workstream; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_screenings_workstream ON kyc.screenings USING btree (workstream_id);
 
 
 --
--- Name: idx_share_classes_cbu; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_share_classes_cbu; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_share_classes_cbu ON kyc.share_classes USING btree (cbu_id);
 
 
 --
--- Name: idx_share_classes_entity; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_share_classes_entity; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_share_classes_entity ON kyc.share_classes USING btree (entity_id) WHERE (entity_id IS NOT NULL);
 
 
 --
--- Name: idx_share_classes_isin; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_share_classes_isin; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_share_classes_isin ON kyc.share_classes USING btree (isin) WHERE (isin IS NOT NULL);
 
 
 --
--- Name: idx_workstreams_case; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_workstreams_case; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_workstreams_case ON kyc.entity_workstreams USING btree (case_id);
 
 
 --
--- Name: idx_workstreams_discovery; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_workstreams_discovery; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_workstreams_discovery ON kyc.entity_workstreams USING btree (discovery_source_workstream_id) WHERE (discovery_source_workstream_id IS NOT NULL);
 
 
 --
--- Name: idx_workstreams_entity; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_workstreams_entity; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_workstreams_entity ON kyc.entity_workstreams USING btree (entity_id);
 
 
 --
--- Name: idx_workstreams_status; Type: INDEX; Schema: kyc; Owner: -
+-- Name: idx_workstreams_status; Type: INDEX; Schema: kyc; Owner: adamtc007
 --
 
 CREATE INDEX idx_workstreams_status ON kyc.entity_workstreams USING btree (status);
 
 
 --
--- Name: entity_limited_companies_reg_jurisdiction_uniq; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: entity_limited_companies_reg_jurisdiction_uniq; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE UNIQUE INDEX entity_limited_companies_reg_jurisdiction_uniq ON "ob-poc".entity_limited_companies USING btree (registration_number, jurisdiction) WHERE ((registration_number IS NOT NULL) AND (jurisdiction IS NOT NULL));
 
 
 --
--- Name: entity_proper_persons_id_doc_uniq; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: entity_proper_persons_id_doc_uniq; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE UNIQUE INDEX entity_proper_persons_id_doc_uniq ON "ob-poc".entity_proper_persons USING btree (id_document_type, id_document_number) WHERE ((id_document_type IS NOT NULL) AND (id_document_number IS NOT NULL));
 
 
 --
--- Name: idx_alleg_case; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_alleg_case; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_alleg_case ON "ob-poc".client_allegations USING btree (case_id) WHERE (case_id IS NOT NULL);
 
 
 --
--- Name: idx_alleg_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_alleg_cbu; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_alleg_cbu ON "ob-poc".client_allegations USING btree (cbu_id);
 
 
 --
--- Name: idx_alleg_entity; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_alleg_entity; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_alleg_entity ON "ob-poc".client_allegations USING btree (entity_id);
 
 
 --
--- Name: idx_alleg_pending; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_alleg_pending; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_alleg_pending ON "ob-poc".client_allegations USING btree (cbu_id) WHERE ((verification_status)::text = 'PENDING'::text);
 
 
 --
--- Name: idx_alleg_workstream; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_alleg_workstream; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_alleg_workstream ON "ob-poc".client_allegations USING btree (workstream_id) WHERE (workstream_id IS NOT NULL);
 
 
 --
--- Name: idx_assertion_log_case; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_assertion_log_case; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_assertion_log_case ON "ob-poc".ubo_assertion_log USING btree (case_id);
 
 
 --
--- Name: idx_assertion_log_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_assertion_log_cbu; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_assertion_log_cbu ON "ob-poc".ubo_assertion_log USING btree (cbu_id);
 
 
 --
--- Name: idx_assertion_log_type; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_assertion_log_type; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_assertion_log_type ON "ob-poc".ubo_assertion_log USING btree (assertion_type, passed);
 
 
 --
--- Name: idx_attr_uuid; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_attr_uuid; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_attr_uuid ON "ob-poc".attribute_registry USING btree (uuid);
 
 
 --
--- Name: idx_attribute_dictionary_active; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_attribute_dictionary_active; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_attribute_dictionary_active ON "ob-poc".attribute_dictionary USING btree (is_active);
 
 
 --
--- Name: idx_attribute_dictionary_domain; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_attribute_dictionary_domain; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_attribute_dictionary_domain ON "ob-poc".attribute_dictionary USING btree (domain);
 
 
 --
--- Name: idx_attribute_registry_applicability; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_attribute_registry_applicability; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_attribute_registry_applicability ON "ob-poc".attribute_registry USING gin (applicability);
 
 
 --
--- Name: idx_attribute_registry_category; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_attribute_registry_category; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_attribute_registry_category ON "ob-poc".attribute_registry USING btree (category);
 
 
 --
--- Name: idx_attribute_registry_embedding; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_attribute_registry_embedding; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_attribute_registry_embedding ON "ob-poc".attribute_registry USING ivfflat (embedding public.vector_cosine_ops) WITH (lists='100');
 
 
 --
--- Name: idx_attribute_registry_value_type; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_attribute_registry_value_type; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_attribute_registry_value_type ON "ob-poc".attribute_registry USING btree (value_type);
 
 
 --
--- Name: idx_attribute_values_typed_attribute; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_attribute_values_typed_attribute; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_attribute_values_typed_attribute ON "ob-poc".attribute_values_typed USING btree (attribute_id);
 
 
 --
--- Name: idx_attribute_values_typed_effective; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_attribute_values_typed_effective; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_attribute_values_typed_effective ON "ob-poc".attribute_values_typed USING btree (effective_from, effective_to) WHERE (effective_to IS NULL);
 
 
 --
--- Name: idx_attribute_values_typed_entity; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_attribute_values_typed_entity; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_attribute_values_typed_entity ON "ob-poc".attribute_values_typed USING btree (entity_id);
 
 
 --
--- Name: idx_attribute_values_typed_entity_attribute; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_attribute_values_typed_entity_attribute; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_attribute_values_typed_entity_attribute ON "ob-poc".attribute_values_typed USING btree (entity_id, attribute_id);
 
 
 --
--- Name: idx_audit_instance; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_audit_instance; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_audit_instance ON "ob-poc".workflow_audit_log USING btree (instance_id, transitioned_at DESC);
 
 
 --
--- Name: idx_case_eval_snapshots_case_id; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_case_eval_snapshots_case_id; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_case_eval_snapshots_case_id ON "ob-poc".case_evaluation_snapshots USING btree (case_id);
 
 
 --
--- Name: idx_case_eval_snapshots_evaluated_at; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_case_eval_snapshots_evaluated_at; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_case_eval_snapshots_evaluated_at ON "ob-poc".case_evaluation_snapshots USING btree (evaluated_at DESC);
 
 
 --
--- Name: idx_cbu_change_log_case_id; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cbu_change_log_case_id; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_change_log_case_id ON "ob-poc".cbu_change_log USING btree (case_id);
 
 
 --
--- Name: idx_cbu_change_log_cbu_id; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cbu_change_log_cbu_id; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_change_log_cbu_id ON "ob-poc".cbu_change_log USING btree (cbu_id);
 
 
 --
--- Name: idx_cbu_change_log_changed_at; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cbu_change_log_changed_at; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_change_log_changed_at ON "ob-poc".cbu_change_log USING btree (changed_at DESC);
 
 
 --
--- Name: idx_cbu_change_log_type; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cbu_change_log_type; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_change_log_type ON "ob-poc".cbu_change_log USING btree (change_type);
 
 
 --
--- Name: idx_cbu_creation_log_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cbu_creation_log_cbu; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_creation_log_cbu ON "ob-poc".cbu_creation_log USING btree (cbu_id);
 
 
 --
--- Name: idx_cbu_entity_roles_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cbu_entity_roles_cbu; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_entity_roles_cbu ON "ob-poc".cbu_entity_roles USING btree (cbu_id);
 
 
 --
--- Name: idx_cbu_entity_roles_entity; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cbu_entity_roles_entity; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_entity_roles_entity ON "ob-poc".cbu_entity_roles USING btree (entity_id);
 
 
 --
--- Name: idx_cbu_entity_roles_role; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cbu_entity_roles_role; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_entity_roles_role ON "ob-poc".cbu_entity_roles USING btree (role_id);
 
 
 --
--- Name: idx_cbu_evidence_cbu_id; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cbu_evidence_cbu_id; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_evidence_cbu_id ON "ob-poc".cbu_evidence USING btree (cbu_id);
 
 
 --
--- Name: idx_cbu_evidence_document_id; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cbu_evidence_document_id; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_evidence_document_id ON "ob-poc".cbu_evidence USING btree (document_id);
 
 
 --
--- Name: idx_cbu_evidence_status; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cbu_evidence_status; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_evidence_status ON "ob-poc".cbu_evidence USING btree (verification_status);
 
 
 --
--- Name: idx_cbu_name_trgm; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cbu_name_trgm; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_name_trgm ON "ob-poc".cbus USING gin (name public.gin_trgm_ops);
 
 
 --
--- Name: idx_cbu_rel_verif_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cbu_rel_verif_cbu; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_rel_verif_cbu ON "ob-poc".cbu_relationship_verification USING btree (cbu_id);
 
 
 --
--- Name: idx_cbu_rel_verif_rel; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cbu_rel_verif_rel; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_rel_verif_rel ON "ob-poc".cbu_relationship_verification USING btree (relationship_id);
 
 
 --
--- Name: idx_cbu_rel_verif_status; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cbu_rel_verif_status; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_rel_verif_status ON "ob-poc".cbu_relationship_verification USING btree (cbu_id, status);
 
 
 --
--- Name: idx_cbu_sla_active; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cbu_sla_active; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_sla_active ON "ob-poc".cbu_sla_commitments USING btree (cbu_id) WHERE ((status)::text = 'ACTIVE'::text);
 
 
 --
--- Name: idx_cbu_sla_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cbu_sla_cbu; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_sla_cbu ON "ob-poc".cbu_sla_commitments USING btree (cbu_id);
 
 
 --
--- Name: idx_cbu_sla_profile; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cbu_sla_profile; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_sla_profile ON "ob-poc".cbu_sla_commitments USING btree (profile_id);
 
 
 --
--- Name: idx_cbu_sla_resource; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cbu_sla_resource; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbu_sla_resource ON "ob-poc".cbu_sla_commitments USING btree (bound_resource_instance_id);
 
 
 --
--- Name: idx_cbus_embedding; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cbus_embedding; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbus_embedding ON "ob-poc".cbus USING ivfflat (embedding public.vector_cosine_ops) WITH (lists='100');
 
 
 --
--- Name: idx_cbus_name; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cbus_name; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbus_name ON "ob-poc".cbus USING btree (name);
 
 
 --
--- Name: idx_cbus_onboarding_context; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cbus_onboarding_context; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbus_onboarding_context ON "ob-poc".cbus USING gin (onboarding_context);
 
 
 --
--- Name: idx_cbus_product_id; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cbus_product_id; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbus_product_id ON "ob-poc".cbus USING btree (product_id);
 
 
 --
--- Name: idx_cbus_risk_context; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cbus_risk_context; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbus_risk_context ON "ob-poc".cbus USING gin (risk_context);
 
 
 --
--- Name: idx_cbus_semantic_context; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cbus_semantic_context; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cbus_semantic_context ON "ob-poc".cbus USING gin (semantic_context);
 
 
 --
--- Name: idx_companies_name_trgm; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_companies_name_trgm; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_companies_name_trgm ON "ob-poc".entity_limited_companies USING gin (company_name public.gin_trgm_ops);
 
 
 --
--- Name: idx_companies_reg_number; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_companies_reg_number; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_companies_reg_number ON "ob-poc".entity_limited_companies USING btree (registration_number);
 
 
 --
--- Name: idx_cri_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cri_cbu; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cri_cbu ON "ob-poc".cbu_resource_instances USING btree (cbu_id);
 
 
 --
--- Name: idx_cri_resource_type; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cri_resource_type; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cri_resource_type ON "ob-poc".cbu_resource_instances USING btree (resource_type_id);
 
 
 --
--- Name: idx_cri_status; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cri_status; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cri_status ON "ob-poc".cbu_resource_instances USING btree (status);
 
 
 --
--- Name: idx_cri_url; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_cri_url; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_cri_url ON "ob-poc".cbu_resource_instances USING btree (instance_url);
 
 
 --
--- Name: idx_crud_operations_asset; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_crud_operations_asset; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_crud_operations_asset ON "ob-poc".crud_operations USING btree (asset_type);
 
 
 --
--- Name: idx_crud_operations_created; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_crud_operations_created; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_crud_operations_created ON "ob-poc".crud_operations USING btree (created_at DESC);
 
 
 --
--- Name: idx_crud_operations_parent; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_crud_operations_parent; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_crud_operations_parent ON "ob-poc".crud_operations USING btree (parent_operation_id) WHERE (parent_operation_id IS NOT NULL);
 
 
 --
--- Name: idx_crud_operations_status; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_crud_operations_status; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_crud_operations_status ON "ob-poc".crud_operations USING btree (execution_status);
 
 
 --
--- Name: idx_crud_operations_transaction; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_crud_operations_transaction; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_crud_operations_transaction ON "ob-poc".crud_operations USING btree (transaction_id) WHERE (transaction_id IS NOT NULL);
 
 
 --
--- Name: idx_crud_operations_type; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_crud_operations_type; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_crud_operations_type ON "ob-poc".crud_operations USING btree (operation_type);
 
 
 --
--- Name: idx_csg_rules_active; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_csg_rules_active; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_csg_rules_active ON "ob-poc".csg_validation_rules USING btree (is_active) WHERE (is_active = true);
 
 
 --
--- Name: idx_csg_rules_params; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_csg_rules_params; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_csg_rules_params ON "ob-poc".csg_validation_rules USING gin (rule_params);
 
 
 --
--- Name: idx_csg_rules_target; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_csg_rules_target; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_csg_rules_target ON "ob-poc".csg_validation_rules USING btree (target_type, target_code);
 
 
 --
--- Name: idx_csg_rules_type; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_csg_rules_type; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_csg_rules_type ON "ob-poc".csg_validation_rules USING btree (rule_type);
 
 
 --
--- Name: idx_currencies_active; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_currencies_active; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_currencies_active ON "ob-poc".currencies USING btree (is_active);
 
 
 --
--- Name: idx_dal_attribute; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dal_attribute; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dal_attribute ON "ob-poc".document_attribute_links USING btree (attribute_id);
 
 
 --
--- Name: idx_dal_document; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dal_document; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dal_document ON "ob-poc".document_attribute_links USING btree (document_type_id);
 
 
 --
--- Name: idx_dal_sink; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dal_sink; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dal_sink ON "ob-poc".document_attribute_links USING btree (attribute_id) WHERE ((direction)::text = ANY ((ARRAY['SINK'::character varying, 'BOTH'::character varying])::text[]));
 
 
 --
--- Name: idx_dal_source; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dal_source; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dal_source ON "ob-poc".document_attribute_links USING btree (document_type_id) WHERE ((direction)::text = ANY ((ARRAY['SOURCE'::character varying, 'BOTH'::character varying])::text[]));
 
 
 --
--- Name: idx_dam_attribute_uuid; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dam_attribute_uuid; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dam_attribute_uuid ON "ob-poc".document_attribute_mappings USING btree (attribute_uuid);
 
 
 --
--- Name: idx_dam_document_type_attribute; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dam_document_type_attribute; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dam_document_type_attribute ON "ob-poc".document_attribute_mappings USING btree (document_type_id, attribute_uuid);
 
 
 --
--- Name: idx_dam_document_type_id; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dam_document_type_id; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dam_document_type_id ON "ob-poc".document_attribute_mappings USING btree (document_type_id);
 
 
 --
--- Name: idx_delegation_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_delegation_cbu; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_delegation_cbu ON "ob-poc".delegation_relationships USING btree (applies_to_cbu_id);
 
 
 --
--- Name: idx_delegation_delegate; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_delegation_delegate; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_delegation_delegate ON "ob-poc".delegation_relationships USING btree (delegate_entity_id);
 
 
 --
--- Name: idx_delegation_delegator; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_delegation_delegator; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_delegation_delegator ON "ob-poc".delegation_relationships USING btree (delegator_entity_id);
 
 
 --
--- Name: idx_detected_patterns_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_detected_patterns_cbu; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_detected_patterns_cbu ON "ob-poc".detected_patterns USING btree (cbu_id);
 
 
 --
--- Name: idx_detected_patterns_status; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_detected_patterns_status; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_detected_patterns_status ON "ob-poc".detected_patterns USING btree (status);
 
 
 --
--- Name: idx_detected_patterns_type; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_detected_patterns_type; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_detected_patterns_type ON "ob-poc".detected_patterns USING btree (pattern_type);
 
 
 --
--- Name: idx_dictionary_domain; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dictionary_domain; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dictionary_domain ON "ob-poc".dictionary USING btree (domain);
 
 
 --
--- Name: idx_dictionary_group_id; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dictionary_group_id; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dictionary_group_id ON "ob-poc".dictionary USING btree (group_id);
 
 
 --
--- Name: idx_dictionary_name; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dictionary_name; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dictionary_name ON "ob-poc".dictionary USING btree (name);
 
 
 --
--- Name: idx_disc_case; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_disc_case; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_disc_case ON "ob-poc".observation_discrepancies USING btree (case_id) WHERE (case_id IS NOT NULL);
 
 
 --
--- Name: idx_disc_entity; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_disc_entity; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_disc_entity ON "ob-poc".observation_discrepancies USING btree (entity_id);
 
 
 --
--- Name: idx_disc_open; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_disc_open; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_disc_open ON "ob-poc".observation_discrepancies USING btree (entity_id) WHERE ((resolution_status)::text = 'OPEN'::text);
 
 
 --
--- Name: idx_disc_severity; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_disc_severity; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_disc_severity ON "ob-poc".observation_discrepancies USING btree (severity) WHERE ((resolution_status)::text = 'OPEN'::text);
 
 
 --
--- Name: idx_doc_attr_mappings_attr; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_doc_attr_mappings_attr; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_doc_attr_mappings_attr ON "ob-poc".document_attribute_mappings USING btree (attribute_uuid);
 
 
 --
--- Name: idx_doc_attr_mappings_doc_type; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_doc_attr_mappings_doc_type; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_doc_attr_mappings_doc_type ON "ob-poc".document_attribute_mappings USING btree (document_type_id);
 
 
 --
--- Name: idx_doc_catalog_hash; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_doc_catalog_hash; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_doc_catalog_hash ON "ob-poc".document_catalog USING btree (file_hash_sha256);
 
 
 --
--- Name: idx_doc_catalog_status; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_doc_catalog_status; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_doc_catalog_status ON "ob-poc".document_catalog USING btree (extraction_status);
 
 
 --
--- Name: idx_doc_validity_by_type; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_doc_validity_by_type; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_doc_validity_by_type ON "ob-poc".document_validity_rules USING btree (document_type_id);
 
 
 --
--- Name: idx_document_catalog_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_document_catalog_cbu; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_document_catalog_cbu ON "ob-poc".document_catalog USING btree (cbu_id);
 
 
 --
--- Name: idx_document_catalog_entity; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_document_catalog_entity; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_document_catalog_entity ON "ob-poc".document_catalog USING btree (entity_id);
 
 
 --
--- Name: idx_document_catalog_type; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_document_catalog_type; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_document_catalog_type ON "ob-poc".document_catalog USING btree (document_type_id);
 
 
 --
--- Name: idx_document_catalog_type_status; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_document_catalog_type_status; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_document_catalog_type_status ON "ob-poc".document_catalog USING btree (document_type_id, extraction_status);
 
 
 --
--- Name: idx_document_types_applicability; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_document_types_applicability; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_document_types_applicability ON "ob-poc".document_types USING gin (applicability);
 
 
 --
--- Name: idx_document_types_embedding; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_document_types_embedding; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_document_types_embedding ON "ob-poc".document_types USING ivfflat (embedding public.vector_cosine_ops) WITH (lists='100');
 
 
 --
--- Name: idx_document_types_semantic_context; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_document_types_semantic_context; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_document_types_semantic_context ON "ob-poc".document_types USING gin (semantic_context);
 
 
 --
--- Name: idx_dsl_domains_active; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_domains_active; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_domains_active ON "ob-poc".dsl_domains USING btree (active);
 
 
 --
--- Name: idx_dsl_domains_name; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_domains_name; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_domains_name ON "ob-poc".dsl_domains USING btree (domain_name);
 
 
 --
--- Name: idx_dsl_examples_asset; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_examples_asset; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_examples_asset ON "ob-poc".dsl_examples USING btree (asset_type);
 
 
 --
--- Name: idx_dsl_examples_complexity; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_examples_complexity; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_examples_complexity ON "ob-poc".dsl_examples USING btree (complexity_level);
 
 
 --
--- Name: idx_dsl_examples_operation; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_examples_operation; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_examples_operation ON "ob-poc".dsl_examples USING btree (operation_type);
 
 
 --
--- Name: idx_dsl_examples_success; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_examples_success; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_examples_success ON "ob-poc".dsl_examples USING btree (success_rate DESC);
 
 
 --
--- Name: idx_dsl_examples_table; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_examples_table; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_examples_table ON "ob-poc".dsl_examples USING btree (entity_table_name) WHERE (entity_table_name IS NOT NULL);
 
 
 --
--- Name: idx_dsl_examples_tags; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_examples_tags; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_examples_tags ON "ob-poc".dsl_examples USING gin (tags);
 
 
 --
--- Name: idx_dsl_examples_usage; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_examples_usage; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_examples_usage ON "ob-poc".dsl_examples USING btree (usage_count DESC);
 
 
 --
--- Name: idx_dsl_execution_cbu_id; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_execution_cbu_id; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_execution_cbu_id ON "ob-poc".dsl_execution_log USING btree (cbu_id);
 
 
 --
--- Name: idx_dsl_execution_started_at; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_execution_started_at; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_execution_started_at ON "ob-poc".dsl_execution_log USING btree (started_at DESC);
 
 
 --
--- Name: idx_dsl_execution_status; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_execution_status; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_execution_status ON "ob-poc".dsl_execution_log USING btree (status);
 
 
 --
--- Name: idx_dsl_execution_version_phase; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_execution_version_phase; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_execution_version_phase ON "ob-poc".dsl_execution_log USING btree (version_id, execution_phase);
 
 
 --
--- Name: idx_dsl_instance_versions_instance_id; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_instance_versions_instance_id; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_instance_versions_instance_id ON "ob-poc".dsl_instance_versions USING btree (instance_id);
 
 
 --
--- Name: idx_dsl_instance_versions_version_number; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_instance_versions_version_number; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_instance_versions_version_number ON "ob-poc".dsl_instance_versions USING btree (instance_id, version_number);
 
 
 --
--- Name: idx_dsl_instances_business_reference; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_instances_business_reference; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_instances_business_reference ON "ob-poc".dsl_instances USING btree (business_reference);
 
 
 --
--- Name: idx_dsl_instances_case_id; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_instances_case_id; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_instances_case_id ON "ob-poc".dsl_instances USING btree (case_id);
 
 
 --
--- Name: idx_dsl_ob_cbu_id_created_at; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_ob_cbu_id_created_at; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_ob_cbu_id_created_at ON "ob-poc".dsl_ob USING btree (cbu_id, created_at DESC);
 
 
 --
--- Name: idx_dsl_session_events_session; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_session_events_session; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_session_events_session ON "ob-poc".dsl_session_events USING btree (session_id);
 
 
 --
--- Name: idx_dsl_sessions_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_sessions_cbu; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_sessions_cbu ON "ob-poc".dsl_sessions USING btree (cbu_id) WHERE (cbu_id IS NOT NULL);
 
 
 --
--- Name: idx_dsl_sessions_expires; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_sessions_expires; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_sessions_expires ON "ob-poc".dsl_sessions USING btree (expires_at) WHERE ((status)::text = 'active'::text);
 
 
 --
--- Name: idx_dsl_sessions_status; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_sessions_status; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_sessions_status ON "ob-poc".dsl_sessions USING btree (status);
 
 
 --
--- Name: idx_dsl_snapshots_session; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_snapshots_session; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_snapshots_session ON "ob-poc".dsl_snapshots USING btree (session_id);
 
 
 --
--- Name: idx_dsl_versions_created_at; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_versions_created_at; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_versions_created_at ON "ob-poc".dsl_versions USING btree (created_at DESC);
 
 
 --
--- Name: idx_dsl_versions_domain_version; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_versions_domain_version; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_versions_domain_version ON "ob-poc".dsl_versions USING btree (domain_id, version_number DESC);
 
 
 --
--- Name: idx_dsl_versions_functional_state; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_versions_functional_state; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_versions_functional_state ON "ob-poc".dsl_versions USING btree (functional_state);
 
 
 --
--- Name: idx_dsl_versions_status; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_versions_status; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_versions_status ON "ob-poc".dsl_versions USING btree (compilation_status);
 
 
 --
--- Name: idx_dsl_versions_unresolved; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_dsl_versions_unresolved; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_dsl_versions_unresolved ON "ob-poc".dsl_instance_versions USING btree (instance_id, unresolved_count) WHERE (unresolved_count > 0);
 
 
 --
--- Name: idx_entities_external_id; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entities_external_id; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entities_external_id ON "ob-poc".entities USING btree (external_id);
 
 
 --
--- Name: idx_entities_name; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entities_name; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entities_name ON "ob-poc".entities USING btree (name);
 
 
 --
--- Name: idx_entities_type; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entities_type; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entities_type ON "ob-poc".entities USING btree (entity_type_id);
 
 
 --
--- Name: idx_entities_type_name; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entities_type_name; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE UNIQUE INDEX idx_entities_type_name ON "ob-poc".entities USING btree (entity_type_id, name);
 
 
 --
--- Name: idx_entity_crud_rules_active; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_crud_rules_active; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entity_crud_rules_active ON "ob-poc".entity_crud_rules USING btree (is_active);
 
 
 --
--- Name: idx_entity_crud_rules_field; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_crud_rules_field; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entity_crud_rules_field ON "ob-poc".entity_crud_rules USING btree (field_name) WHERE (field_name IS NOT NULL);
 
 
 --
--- Name: idx_entity_crud_rules_operation; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_crud_rules_operation; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entity_crud_rules_operation ON "ob-poc".entity_crud_rules USING btree (operation_type);
 
 
 --
--- Name: idx_entity_crud_rules_table; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_crud_rules_table; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entity_crud_rules_table ON "ob-poc".entity_crud_rules USING btree (entity_table_name);
 
 
 --
--- Name: idx_entity_deps_from; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_deps_from; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entity_deps_from ON "ob-poc".entity_type_dependencies USING btree (from_type, from_subtype);
 
 
 --
--- Name: idx_entity_deps_priority; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_deps_priority; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entity_deps_priority ON "ob-poc".entity_type_dependencies USING btree (from_type, from_subtype, priority) WHERE (is_active = true);
 
 
 --
--- Name: idx_entity_deps_to; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_deps_to; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entity_deps_to ON "ob-poc".entity_type_dependencies USING btree (to_type, to_subtype);
 
 
 --
--- Name: idx_entity_funds_jurisdiction; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_funds_jurisdiction; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entity_funds_jurisdiction ON "ob-poc".entity_funds USING btree (jurisdiction);
 
 
 --
--- Name: idx_entity_funds_lei; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_funds_lei; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE UNIQUE INDEX idx_entity_funds_lei ON "ob-poc".entity_funds USING btree (lei) WHERE (lei IS NOT NULL);
 
 
 --
--- Name: idx_entity_funds_master; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_funds_master; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entity_funds_master ON "ob-poc".entity_funds USING btree (master_fund_id);
 
 
 --
--- Name: idx_entity_funds_parent; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_funds_parent; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entity_funds_parent ON "ob-poc".entity_funds USING btree (parent_fund_id);
 
 
 --
--- Name: idx_entity_rel_from; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_rel_from; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entity_rel_from ON "ob-poc".entity_relationships USING btree (from_entity_id);
 
 
 --
--- Name: idx_entity_rel_temporal; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_rel_temporal; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entity_rel_temporal ON "ob-poc".entity_relationships USING btree (effective_from, effective_to);
 
 
 --
--- Name: idx_entity_rel_to; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_rel_to; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entity_rel_to ON "ob-poc".entity_relationships USING btree (to_entity_id);
 
 
 --
--- Name: idx_entity_rel_type; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_rel_type; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entity_rel_type ON "ob-poc".entity_relationships USING btree (relationship_type);
 
 
 --
--- Name: idx_entity_rel_unique_active; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_rel_unique_active; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE UNIQUE INDEX idx_entity_rel_unique_active ON "ob-poc".entity_relationships USING btree (from_entity_id, to_entity_id, relationship_type) WHERE (effective_to IS NULL);
 
 
 --
--- Name: idx_entity_rel_unique_historical; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_rel_unique_historical; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE UNIQUE INDEX idx_entity_rel_unique_historical ON "ob-poc".entity_relationships USING btree (from_entity_id, to_entity_id, relationship_type, effective_to) WHERE (effective_to IS NOT NULL);
 
 
 --
--- Name: idx_entity_types_embedding; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_types_embedding; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entity_types_embedding ON "ob-poc".entity_types USING ivfflat (embedding public.vector_cosine_ops) WITH (lists='50');
 
 
 --
--- Name: idx_entity_types_hierarchy; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_types_hierarchy; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entity_types_hierarchy ON "ob-poc".entity_types USING gin (type_hierarchy_path);
 
 
 --
--- Name: idx_entity_types_name; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_types_name; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entity_types_name ON "ob-poc".entity_types USING btree (name);
 
 
 --
--- Name: idx_entity_types_parent; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_types_parent; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entity_types_parent ON "ob-poc".entity_types USING btree (parent_type_id);
 
 
 --
--- Name: idx_entity_types_semantic_context; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_types_semantic_context; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entity_types_semantic_context ON "ob-poc".entity_types USING gin (semantic_context);
 
 
 --
--- Name: idx_entity_types_table; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_types_table; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entity_types_table ON "ob-poc".entity_types USING btree (table_name);
 
 
 --
--- Name: idx_entity_types_type_code; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_types_type_code; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE UNIQUE INDEX idx_entity_types_type_code ON "ob-poc".entity_types USING btree (type_code);
 
 
 --
--- Name: idx_entity_validation_active; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_validation_active; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entity_validation_active ON "ob-poc".entity_validation_rules USING btree (is_active);
 
 
 --
--- Name: idx_entity_validation_field; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_validation_field; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entity_validation_field ON "ob-poc".entity_validation_rules USING btree (field_name);
 
 
 --
--- Name: idx_entity_validation_type; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_entity_validation_type; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_entity_validation_type ON "ob-poc".entity_validation_rules USING btree (entity_type);
 
 
 --
--- Name: idx_fund_investments_investee; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_fund_investments_investee; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_fund_investments_investee ON "ob-poc".fund_investments USING btree (investee_entity_id);
 
 
 --
--- Name: idx_fund_investments_investor; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_fund_investments_investor; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_fund_investments_investor ON "ob-poc".fund_investments USING btree (investor_entity_id);
 
 
 --
--- Name: idx_fund_structure_child; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_fund_structure_child; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_fund_structure_child ON "ob-poc".fund_structure USING btree (child_entity_id);
 
 
 --
--- Name: idx_fund_structure_parent; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_fund_structure_parent; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_fund_structure_parent ON "ob-poc".fund_structure USING btree (parent_entity_id);
 
 
 --
--- Name: idx_gen_log_created; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_gen_log_created; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_gen_log_created ON "ob-poc".dsl_generation_log USING btree (created_at DESC);
 
 
 --
--- Name: idx_gen_log_domain; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_gen_log_domain; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_gen_log_domain ON "ob-poc".dsl_generation_log USING btree (domain_name);
 
 
 --
--- Name: idx_gen_log_instance; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_gen_log_instance; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_gen_log_instance ON "ob-poc".dsl_generation_log USING btree (instance_id) WHERE (instance_id IS NOT NULL);
 
 
 --
--- Name: idx_gen_log_intent_trgm; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_gen_log_intent_trgm; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_gen_log_intent_trgm ON "ob-poc".dsl_generation_log USING gin (user_intent public.gin_trgm_ops);
 
 
 --
--- Name: idx_gen_log_iterations; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_gen_log_iterations; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_gen_log_iterations ON "ob-poc".dsl_generation_log USING gin (iterations);
 
 
 --
--- Name: idx_gen_log_session; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_gen_log_session; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_gen_log_session ON "ob-poc".dsl_generation_log USING btree (session_id) WHERE (session_id IS NOT NULL);
 
 
 --
--- Name: idx_gen_log_success; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_gen_log_success; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_gen_log_success ON "ob-poc".dsl_generation_log USING btree (success) WHERE (success = true);
 
 
 --
--- Name: idx_kyc_decisions_case; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_kyc_decisions_case; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_kyc_decisions_case ON "ob-poc".kyc_decisions USING btree (case_id);
 
 
 --
--- Name: idx_kyc_decisions_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_kyc_decisions_cbu; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_kyc_decisions_cbu ON "ob-poc".kyc_decisions USING btree (cbu_id);
 
 
 --
--- Name: idx_kyc_decisions_review; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_kyc_decisions_review; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_kyc_decisions_review ON "ob-poc".kyc_decisions USING btree (next_review_date) WHERE ((status)::text = 'CLEARED'::text);
 
 
 --
--- Name: idx_kyc_decisions_status; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_kyc_decisions_status; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_kyc_decisions_status ON "ob-poc".kyc_decisions USING btree (status);
 
 
 --
--- Name: idx_limited_companies_entity_id; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_limited_companies_entity_id; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_limited_companies_entity_id ON "ob-poc".entity_limited_companies USING btree (entity_id);
 
 
 --
--- Name: idx_limited_companies_jurisdiction; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_limited_companies_jurisdiction; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_limited_companies_jurisdiction ON "ob-poc".entity_limited_companies USING btree (jurisdiction);
 
 
 --
--- Name: idx_limited_companies_reg_num; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_limited_companies_reg_num; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_limited_companies_reg_num ON "ob-poc".entity_limited_companies USING btree (registration_number);
 
 
 --
--- Name: idx_master_entity_xref_entity_id; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_master_entity_xref_entity_id; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_master_entity_xref_entity_id ON "ob-poc".master_entity_xref USING btree (entity_id);
 
 
 --
--- Name: idx_master_entity_xref_jurisdiction; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_master_entity_xref_jurisdiction; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_master_entity_xref_jurisdiction ON "ob-poc".master_entity_xref USING btree (jurisdiction_code);
 
 
 --
--- Name: idx_master_entity_xref_name; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_master_entity_xref_name; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_master_entity_xref_name ON "ob-poc".master_entity_xref USING gin (to_tsvector('english'::regconfig, (entity_name)::text));
 
 
 --
--- Name: idx_master_entity_xref_status; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_master_entity_xref_status; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_master_entity_xref_status ON "ob-poc".master_entity_xref USING btree (entity_status);
 
 
 --
--- Name: idx_master_entity_xref_type; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_master_entity_xref_type; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_master_entity_xref_type ON "ob-poc".master_entity_xref USING btree (entity_type);
 
 
 --
--- Name: idx_materializations_profile; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_materializations_profile; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_materializations_profile ON "ob-poc".trading_profile_materializations USING btree (profile_id);
 
 
 --
--- Name: idx_obs_attribute; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_obs_attribute; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_obs_attribute ON "ob-poc".attribute_observations USING btree (attribute_id);
 
 
 --
--- Name: idx_obs_entity_active; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_obs_entity_active; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_obs_entity_active ON "ob-poc".attribute_observations USING btree (entity_id) WHERE ((status)::text = 'ACTIVE'::text);
 
 
 --
--- Name: idx_obs_entity_attr; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_obs_entity_attr; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_obs_entity_attr ON "ob-poc".attribute_observations USING btree (entity_id, attribute_id);
 
 
 --
--- Name: idx_obs_source_doc; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_obs_source_doc; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_obs_source_doc ON "ob-poc".attribute_observations USING btree (source_document_id) WHERE (source_document_id IS NOT NULL);
 
 
 --
--- Name: idx_obs_source_type; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_obs_source_type; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_obs_source_type ON "ob-poc".attribute_observations USING btree (source_type);
 
 
 --
--- Name: idx_onboarding_executions_plan; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_onboarding_executions_plan; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_onboarding_executions_plan ON "ob-poc".onboarding_executions USING btree (plan_id);
 
 
 --
--- Name: idx_onboarding_plans_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_onboarding_plans_cbu; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_onboarding_plans_cbu ON "ob-poc".onboarding_plans USING btree (cbu_id);
 
 
 --
--- Name: idx_onboarding_plans_status; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_onboarding_plans_status; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_onboarding_plans_status ON "ob-poc".onboarding_plans USING btree (status);
 
 
 --
--- Name: idx_onboarding_products_request; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_onboarding_products_request; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_onboarding_products_request ON "ob-poc".onboarding_products USING btree (request_id);
 
 
 --
--- Name: idx_onboarding_request_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_onboarding_request_cbu; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_onboarding_request_cbu ON "ob-poc".onboarding_requests USING btree (cbu_id);
 
 
 --
--- Name: idx_onboarding_request_state; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_onboarding_request_state; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_onboarding_request_state ON "ob-poc".onboarding_requests USING btree (request_state);
 
 
 --
--- Name: idx_onboarding_tasks_exec; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_onboarding_tasks_exec; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_onboarding_tasks_exec ON "ob-poc".onboarding_tasks USING btree (execution_id);
 
 
 --
--- Name: idx_onboarding_tasks_status; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_onboarding_tasks_status; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_onboarding_tasks_status ON "ob-poc".onboarding_tasks USING btree (status);
 
 
 --
--- Name: idx_option_choices_def; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_option_choices_def; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_option_choices_def ON "ob-poc".service_option_choices USING btree (option_def_id);
 
 
 --
--- Name: idx_partnerships_entity_id; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_partnerships_entity_id; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_partnerships_entity_id ON "ob-poc".entity_partnerships USING btree (entity_id);
 
 
 --
--- Name: idx_partnerships_jurisdiction; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_partnerships_jurisdiction; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_partnerships_jurisdiction ON "ob-poc".entity_partnerships USING btree (jurisdiction);
 
 
 --
--- Name: idx_partnerships_type; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_partnerships_type; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_partnerships_type ON "ob-poc".entity_partnerships USING btree (partnership_type);
 
 
 --
--- Name: idx_persons_first_name_trgm; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_persons_first_name_trgm; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_persons_first_name_trgm ON "ob-poc".entity_proper_persons USING gin (first_name public.gin_trgm_ops);
 
 
 --
--- Name: idx_persons_last_name_trgm; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_persons_last_name_trgm; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_persons_last_name_trgm ON "ob-poc".entity_proper_persons USING gin (last_name public.gin_trgm_ops);
 
 
 --
--- Name: idx_persons_search_name_trgm; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_persons_search_name_trgm; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_persons_search_name_trgm ON "ob-poc".entity_proper_persons USING gin (search_name public.gin_trgm_ops);
 
 
 --
--- Name: idx_products_is_active; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_products_is_active; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_products_is_active ON "ob-poc".products USING btree (is_active);
 
 
 --
--- Name: idx_products_name; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_products_name; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_products_name ON "ob-poc".products USING btree (name);
 
 
 --
--- Name: idx_products_product_code; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_products_product_code; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_products_product_code ON "ob-poc".products USING btree (product_code);
 
 
 --
--- Name: idx_proofs_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_proofs_cbu; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_proofs_cbu ON "ob-poc".proofs USING btree (cbu_id);
 
 
 --
--- Name: idx_proofs_document; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_proofs_document; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_proofs_document ON "ob-poc".proofs USING btree (document_id) WHERE (document_id IS NOT NULL);
 
 
 --
--- Name: idx_proofs_status; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_proofs_status; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_proofs_status ON "ob-poc".proofs USING btree (cbu_id, status);
 
 
 --
--- Name: idx_proper_persons_entity_id; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_proper_persons_entity_id; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_proper_persons_entity_id ON "ob-poc".entity_proper_persons USING btree (entity_id);
 
 
 --
--- Name: idx_proper_persons_full_name; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_proper_persons_full_name; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_proper_persons_full_name ON "ob-poc".entity_proper_persons USING btree (last_name, first_name);
 
 
 --
--- Name: idx_proper_persons_id_document; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_proper_persons_id_document; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_proper_persons_id_document ON "ob-poc".entity_proper_persons USING btree (id_document_type, id_document_number);
 
 
 --
--- Name: idx_proper_persons_nationality; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_proper_persons_nationality; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_proper_persons_nationality ON "ob-poc".entity_proper_persons USING btree (nationality);
 
 
 --
--- Name: idx_resource_deps_on; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_resource_deps_on; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_resource_deps_on ON "ob-poc".resource_dependencies USING btree (depends_on_type_id);
 
 
 --
--- Name: idx_resource_deps_type; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_resource_deps_type; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_resource_deps_type ON "ob-poc".resource_dependencies USING btree (resource_type_id);
 
 
 --
--- Name: idx_resource_requirements_resource; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_resource_requirements_resource; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_resource_requirements_resource ON "ob-poc".resource_attribute_requirements USING btree (resource_id);
 
 
 --
--- Name: idx_ria_attribute; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_ria_attribute; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_ria_attribute ON "ob-poc".resource_instance_attributes USING btree (attribute_id);
 
 
 --
--- Name: idx_ria_instance; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_ria_instance; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_ria_instance ON "ob-poc".resource_instance_attributes USING btree (instance_id);
 
 
 --
--- Name: idx_roles_name; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_roles_name; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_roles_name ON "ob-poc".roles USING btree (name);
 
 
 --
--- Name: idx_rps_instance; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_rps_instance; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_rps_instance ON "ob-poc".resource_profile_sources USING btree (instance_id);
 
 
 --
--- Name: idx_rps_profile; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_rps_profile; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_rps_profile ON "ob-poc".resource_profile_sources USING btree (profile_id);
 
 
 --
--- Name: idx_screening_lists_type; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_screening_lists_type; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_screening_lists_type ON "ob-poc".screening_lists USING btree (list_type);
 
 
 --
--- Name: idx_sdm_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_sdm_cbu; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_sdm_cbu ON "ob-poc".service_delivery_map USING btree (cbu_id);
 
 
 --
--- Name: idx_sdm_product; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_sdm_product; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_sdm_product ON "ob-poc".service_delivery_map USING btree (product_id);
 
 
 --
--- Name: idx_sdm_service; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_sdm_service; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_sdm_service ON "ob-poc".service_delivery_map USING btree (service_id);
 
 
 --
--- Name: idx_sdm_status; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_sdm_status; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_sdm_status ON "ob-poc".service_delivery_map USING btree (delivery_status);
 
 
 --
--- Name: idx_service_capabilities_resource; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_service_capabilities_resource; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_service_capabilities_resource ON "ob-poc".service_resource_capabilities USING btree (resource_id);
 
 
 --
--- Name: idx_service_capabilities_service; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_service_capabilities_service; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_service_capabilities_service ON "ob-poc".service_resource_capabilities USING btree (service_id);
 
 
 --
--- Name: idx_service_options_service; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_service_options_service; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_service_options_service ON "ob-poc".service_option_definitions USING btree (service_id);
 
 
 --
--- Name: idx_service_resource_types_dict_group; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_service_resource_types_dict_group; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_service_resource_types_dict_group ON "ob-poc".service_resource_types USING btree (dictionary_group);
 
 
 --
--- Name: idx_service_resource_types_is_active; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_service_resource_types_is_active; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_service_resource_types_is_active ON "ob-poc".service_resource_types USING btree (is_active);
 
 
 --
--- Name: idx_service_resource_types_name; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_service_resource_types_name; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_service_resource_types_name ON "ob-poc".service_resource_types USING btree (name);
 
 
 --
--- Name: idx_service_resource_types_owner; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_service_resource_types_owner; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_service_resource_types_owner ON "ob-poc".service_resource_types USING btree (owner);
 
 
 --
--- Name: idx_service_resource_types_resource_code; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_service_resource_types_resource_code; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_service_resource_types_resource_code ON "ob-poc".service_resource_types USING btree (resource_code);
 
 
 --
--- Name: idx_services_is_active; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_services_is_active; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_services_is_active ON "ob-poc".services USING btree (is_active);
 
 
 --
--- Name: idx_services_name; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_services_name; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_services_name ON "ob-poc".services USING btree (name);
 
 
 --
--- Name: idx_services_service_code; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_services_service_code; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_services_service_code ON "ob-poc".services USING btree (service_code);
 
 
 --
--- Name: idx_share_classes_parent; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_share_classes_parent; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_share_classes_parent ON "ob-poc".entity_share_classes USING btree (parent_fund_id);
 
 
 --
--- Name: idx_sla_breach_commitment; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_sla_breach_commitment; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_sla_breach_commitment ON "ob-poc".sla_breaches USING btree (commitment_id);
 
 
 --
--- Name: idx_sla_breach_open; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_sla_breach_open; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_sla_breach_open ON "ob-poc".sla_breaches USING btree (commitment_id) WHERE ((remediation_status)::text = ANY ((ARRAY['OPEN'::character varying, 'IN_PROGRESS'::character varying])::text[]));
 
 
 --
--- Name: idx_sla_meas_breach; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_sla_meas_breach; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_sla_meas_breach ON "ob-poc".sla_measurements USING btree (commitment_id) WHERE ((status)::text = 'BREACH'::text);
 
 
 --
--- Name: idx_sla_meas_commitment; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_sla_meas_commitment; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_sla_meas_commitment ON "ob-poc".sla_measurements USING btree (commitment_id);
 
 
 --
--- Name: idx_sla_meas_period; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_sla_meas_period; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_sla_meas_period ON "ob-poc".sla_measurements USING btree (period_start, period_end);
 
 
 --
--- Name: idx_taxonomy_crud_entity; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_taxonomy_crud_entity; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_taxonomy_crud_entity ON "ob-poc".taxonomy_crud_log USING btree (entity_type, entity_id);
 
 
 --
--- Name: idx_taxonomy_crud_operation; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_taxonomy_crud_operation; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_taxonomy_crud_operation ON "ob-poc".taxonomy_crud_log USING btree (operation_type);
 
 
 --
--- Name: idx_taxonomy_crud_time; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_taxonomy_crud_time; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_taxonomy_crud_time ON "ob-poc".taxonomy_crud_log USING btree (created_at);
 
 
 --
--- Name: idx_taxonomy_crud_user; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_taxonomy_crud_user; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_taxonomy_crud_user ON "ob-poc".taxonomy_crud_log USING btree (user_id);
 
 
 --
--- Name: idx_threshold_factors_active; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_threshold_factors_active; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_threshold_factors_active ON "ob-poc".threshold_factors USING btree (is_active) WHERE (is_active = true);
 
 
 --
--- Name: idx_threshold_factors_type; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_threshold_factors_type; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_threshold_factors_type ON "ob-poc".threshold_factors USING btree (factor_type);
 
 
 --
--- Name: idx_threshold_requirements_band; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_threshold_requirements_band; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_threshold_requirements_band ON "ob-poc".threshold_requirements USING btree (risk_band);
 
 
 --
--- Name: idx_threshold_requirements_role; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_threshold_requirements_role; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_threshold_requirements_role ON "ob-poc".threshold_requirements USING btree (entity_role);
 
 
 --
--- Name: idx_tpd_doc; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_tpd_doc; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_tpd_doc ON "ob-poc".trading_profile_documents USING btree (doc_id);
 
 
 --
--- Name: idx_tpd_profile; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_tpd_profile; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_tpd_profile ON "ob-poc".trading_profile_documents USING btree (profile_id);
 
 
 --
--- Name: idx_tpd_section; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_tpd_section; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_tpd_section ON "ob-poc".trading_profile_documents USING btree (profile_section);
 
 
 --
--- Name: idx_trading_profiles_cbu_active; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_trading_profiles_cbu_active; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_trading_profiles_cbu_active ON "ob-poc".cbu_trading_profiles USING btree (cbu_id, status) WHERE ((status)::text = 'ACTIVE'::text);
 
 
 --
--- Name: idx_trading_profiles_cbu_version; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_trading_profiles_cbu_version; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_trading_profiles_cbu_version ON "ob-poc".cbu_trading_profiles USING btree (cbu_id, version DESC);
 
 
 --
--- Name: idx_trust_parties_entity; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_trust_parties_entity; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_trust_parties_entity ON "ob-poc".trust_parties USING btree (entity_id);
 
 
 --
--- Name: idx_trust_parties_role; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_trust_parties_role; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_trust_parties_role ON "ob-poc".trust_parties USING btree (party_role);
 
 
 --
--- Name: idx_trust_parties_trust; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_trust_parties_trust; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_trust_parties_trust ON "ob-poc".trust_parties USING btree (trust_id);
 
 
 --
--- Name: idx_trusts_entity_id; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_trusts_entity_id; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_trusts_entity_id ON "ob-poc".entity_trusts USING btree (entity_id);
 
 
 --
--- Name: idx_trusts_jurisdiction; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_trusts_jurisdiction; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_trusts_jurisdiction ON "ob-poc".entity_trusts USING btree (jurisdiction);
 
 
 --
--- Name: idx_trusts_name_trgm; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_trusts_name_trgm; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_trusts_name_trgm ON "ob-poc".entity_trusts USING gin (trust_name public.gin_trgm_ops);
 
 
 --
--- Name: idx_trusts_type; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_trusts_type; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_trusts_type ON "ob-poc".entity_trusts USING btree (trust_type);
 
 
 --
--- Name: idx_ubo_comparisons_baseline; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_ubo_comparisons_baseline; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_ubo_comparisons_baseline ON "ob-poc".ubo_snapshot_comparisons USING btree (baseline_snapshot_id);
 
 
 --
--- Name: idx_ubo_comparisons_cbu_id; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_ubo_comparisons_cbu_id; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_ubo_comparisons_cbu_id ON "ob-poc".ubo_snapshot_comparisons USING btree (cbu_id);
 
 
 --
--- Name: idx_ubo_comparisons_current; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_ubo_comparisons_current; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_ubo_comparisons_current ON "ob-poc".ubo_snapshot_comparisons USING btree (current_snapshot_id);
 
 
 --
--- Name: idx_ubo_evidence_document_id; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_ubo_evidence_document_id; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_ubo_evidence_document_id ON "ob-poc".ubo_evidence USING btree (document_id);
 
 
 --
--- Name: idx_ubo_evidence_status; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_ubo_evidence_status; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_ubo_evidence_status ON "ob-poc".ubo_evidence USING btree (verification_status);
 
 
 --
--- Name: idx_ubo_evidence_ubo_id; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_ubo_evidence_ubo_id; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_ubo_evidence_ubo_id ON "ob-poc".ubo_evidence USING btree (ubo_id);
 
 
 --
--- Name: idx_ubo_registry_case_id; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_ubo_registry_case_id; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_ubo_registry_case_id ON "ob-poc".ubo_registry USING btree (case_id);
 
 
 --
--- Name: idx_ubo_registry_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_ubo_registry_cbu; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_ubo_registry_cbu ON "ob-poc".ubo_registry USING btree (cbu_id);
 
 
 --
--- Name: idx_ubo_registry_subject; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_ubo_registry_subject; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_ubo_registry_subject ON "ob-poc".ubo_registry USING btree (subject_entity_id);
 
 
 --
--- Name: idx_ubo_registry_ubo_proper_person; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_ubo_registry_ubo_proper_person; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_ubo_registry_ubo_proper_person ON "ob-poc".ubo_registry USING btree (ubo_proper_person_id);
 
 
 --
--- Name: idx_ubo_registry_workflow; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_ubo_registry_workflow; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_ubo_registry_workflow ON "ob-poc".ubo_registry USING btree (workflow_type);
 
 
 --
--- Name: idx_ubo_registry_workstream_id; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_ubo_registry_workstream_id; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_ubo_registry_workstream_id ON "ob-poc".ubo_registry USING btree (workstream_id);
 
 
 --
--- Name: idx_ubo_snapshots_captured_at; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_ubo_snapshots_captured_at; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_ubo_snapshots_captured_at ON "ob-poc".ubo_snapshots USING btree (captured_at DESC);
 
 
 --
--- Name: idx_ubo_snapshots_case_id; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_ubo_snapshots_case_id; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_ubo_snapshots_case_id ON "ob-poc".ubo_snapshots USING btree (case_id);
 
 
 --
--- Name: idx_ubo_snapshots_cbu_id; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_ubo_snapshots_cbu_id; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_ubo_snapshots_cbu_id ON "ob-poc".ubo_snapshots USING btree (cbu_id);
 
 
 --
--- Name: idx_values_attr_uuid; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_values_attr_uuid; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_values_attr_uuid ON "ob-poc".attribute_values_typed USING btree (attribute_uuid);
 
 
 --
--- Name: idx_verification_challenges_case; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_verification_challenges_case; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_verification_challenges_case ON "ob-poc".verification_challenges USING btree (case_id);
 
 
 --
--- Name: idx_verification_challenges_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_verification_challenges_cbu; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_verification_challenges_cbu ON "ob-poc".verification_challenges USING btree (cbu_id);
 
 
 --
--- Name: idx_verification_challenges_status; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_verification_challenges_status; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_verification_challenges_status ON "ob-poc".verification_challenges USING btree (status);
 
 
 --
--- Name: idx_verification_escalations_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_verification_escalations_cbu; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_verification_escalations_cbu ON "ob-poc".verification_escalations USING btree (cbu_id);
 
 
 --
--- Name: idx_verification_escalations_level; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_verification_escalations_level; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_verification_escalations_level ON "ob-poc".verification_escalations USING btree (escalation_level);
 
 
 --
--- Name: idx_verification_escalations_status; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_verification_escalations_status; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_verification_escalations_status ON "ob-poc".verification_escalations USING btree (status);
 
 
 --
--- Name: idx_workflow_defs_loaded; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_workflow_defs_loaded; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_workflow_defs_loaded ON "ob-poc".workflow_definitions USING btree (loaded_at DESC);
 
 
 --
--- Name: idx_workflow_state; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_workflow_state; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_workflow_state ON "ob-poc".workflow_instances USING btree (workflow_id, current_state);
 
 
 --
--- Name: idx_workflow_subject; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_workflow_subject; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_workflow_subject ON "ob-poc".workflow_instances USING btree (subject_type, subject_id);
 
 
 --
--- Name: idx_workflow_updated; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_workflow_updated; Type: INDEX; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE INDEX idx_workflow_updated ON "ob-poc".workflow_instances USING btree (updated_at DESC);
 
 
 --
--- Name: idx_business_attrs_entity; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_business_attrs_entity; Type: INDEX; Schema: public; Owner: adamtc007
 --
 
 CREATE INDEX idx_business_attrs_entity ON public.business_attributes USING btree (entity_name);
 
 
 --
--- Name: idx_credentials_active; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_credentials_active; Type: INDEX; Schema: public; Owner: adamtc007
 --
 
 CREATE INDEX idx_credentials_active ON public.credentials_vault USING btree (active);
 
 
 --
--- Name: idx_credentials_environment; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_credentials_environment; Type: INDEX; Schema: public; Owner: adamtc007
 --
 
 CREATE INDEX idx_credentials_environment ON public.credentials_vault USING btree (environment);
 
 
 --
--- Name: idx_credentials_expires; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_credentials_expires; Type: INDEX; Schema: public; Owner: adamtc007
 --
 
 CREATE INDEX idx_credentials_expires ON public.credentials_vault USING btree (expires_at);
 
 
 --
--- Name: idx_derived_attrs_entity; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_derived_attrs_entity; Type: INDEX; Schema: public; Owner: adamtc007
 --
 
 CREATE INDEX idx_derived_attrs_entity ON public.derived_attributes USING btree (entity_name);
 
 
 --
--- Name: idx_executions_rule; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_executions_rule; Type: INDEX; Schema: public; Owner: adamtc007
 --
 
 CREATE INDEX idx_executions_rule ON public.rule_executions USING btree (rule_id);
 
 
 --
--- Name: idx_executions_time; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_executions_time; Type: INDEX; Schema: public; Owner: adamtc007
 --
 
 CREATE INDEX idx_executions_time ON public.rule_executions USING btree (execution_time);
 
 
 --
--- Name: idx_rule_deps_attr; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_rule_deps_attr; Type: INDEX; Schema: public; Owner: adamtc007
 --
 
 CREATE INDEX idx_rule_deps_attr ON public.rule_dependencies USING btree (attribute_id);
 
 
 --
--- Name: idx_rule_deps_rule; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_rule_deps_rule; Type: INDEX; Schema: public; Owner: adamtc007
 --
 
 CREATE INDEX idx_rule_deps_rule ON public.rule_dependencies USING btree (rule_id);
 
 
 --
--- Name: idx_rules_category; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_rules_category; Type: INDEX; Schema: public; Owner: adamtc007
 --
 
 CREATE INDEX idx_rules_category ON public.rules USING btree (category_id);
 
 
 --
--- Name: idx_rules_embedding; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_rules_embedding; Type: INDEX; Schema: public; Owner: adamtc007
 --
 
 CREATE INDEX idx_rules_embedding ON public.rules USING hnsw (embedding public.vector_cosine_ops);
 
 
 --
--- Name: idx_rules_search; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_rules_search; Type: INDEX; Schema: public; Owner: adamtc007
 --
 
 CREATE INDEX idx_rules_search ON public.rules USING gin (search_vector);
 
 
 --
--- Name: idx_rules_status; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_rules_status; Type: INDEX; Schema: public; Owner: adamtc007
 --
 
 CREATE INDEX idx_rules_status ON public.rules USING btree (status);
 
 
 --
--- Name: idx_rules_target; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_rules_target; Type: INDEX; Schema: public; Owner: adamtc007
 --
 
 CREATE INDEX idx_rules_target ON public.rules USING btree (target_attribute_id);
 
 
 --
--- Name: v_case_summary _RETURN; Type: RULE; Schema: kyc; Owner: -
+-- Name: v_case_summary _RETURN; Type: RULE; Schema: kyc; Owner: adamtc007
 --
 
 CREATE OR REPLACE VIEW kyc.v_case_summary AS
@@ -11581,7 +12067,7 @@ CREATE OR REPLACE VIEW kyc.v_case_summary AS
 
 
 --
--- Name: v_workstream_detail _RETURN; Type: RULE; Schema: kyc; Owner: -
+-- Name: v_workstream_detail _RETURN; Type: RULE; Schema: kyc; Owner: adamtc007
 --
 
 CREATE OR REPLACE VIEW kyc.v_workstream_detail AS
@@ -11611,105 +12097,105 @@ CREATE OR REPLACE VIEW kyc.v_workstream_detail AS
 
 
 --
--- Name: cbu_instrument_universe sync_counterparty_key_trigger; Type: TRIGGER; Schema: custody; Owner: -
+-- Name: cbu_instrument_universe sync_counterparty_key_trigger; Type: TRIGGER; Schema: custody; Owner: adamtc007
 --
 
 CREATE TRIGGER sync_counterparty_key_trigger BEFORE INSERT OR UPDATE ON custody.cbu_instrument_universe FOR EACH ROW EXECUTE FUNCTION custody.sync_counterparty_key();
 
 
 --
--- Name: cbus trg_cbu_status_change; Type: TRIGGER; Schema: ob-poc; Owner: -
+-- Name: cbus trg_cbu_status_change; Type: TRIGGER; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TRIGGER trg_cbu_status_change AFTER UPDATE ON "ob-poc".cbus FOR EACH ROW EXECUTE FUNCTION "ob-poc".log_cbu_status_change();
 
 
 --
--- Name: cbu_resource_instances trg_cri_updated; Type: TRIGGER; Schema: ob-poc; Owner: -
+-- Name: cbu_resource_instances trg_cri_updated; Type: TRIGGER; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TRIGGER trg_cri_updated BEFORE UPDATE ON "ob-poc".cbu_resource_instances FOR EACH ROW EXECUTE FUNCTION "ob-poc".update_timestamp();
 
 
 --
--- Name: entity_type_dependencies trg_entity_deps_updated_at; Type: TRIGGER; Schema: ob-poc; Owner: -
+-- Name: entity_type_dependencies trg_entity_deps_updated_at; Type: TRIGGER; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TRIGGER trg_entity_deps_updated_at BEFORE UPDATE ON "ob-poc".entity_type_dependencies FOR EACH ROW EXECUTE FUNCTION "ob-poc".update_entity_deps_timestamp();
 
 
 --
--- Name: proofs trg_proofs_updated; Type: TRIGGER; Schema: ob-poc; Owner: -
+-- Name: proofs trg_proofs_updated; Type: TRIGGER; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TRIGGER trg_proofs_updated BEFORE UPDATE ON "ob-poc".proofs FOR EACH ROW EXECUTE FUNCTION "ob-poc".update_proofs_timestamp();
 
 
 --
--- Name: service_delivery_map trg_sdm_updated; Type: TRIGGER; Schema: ob-poc; Owner: -
+-- Name: service_delivery_map trg_sdm_updated; Type: TRIGGER; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TRIGGER trg_sdm_updated BEFORE UPDATE ON "ob-poc".service_delivery_map FOR EACH ROW EXECUTE FUNCTION "ob-poc".update_timestamp();
 
 
 --
--- Name: cbus trg_sync_commercial_client; Type: TRIGGER; Schema: ob-poc; Owner: -
+-- Name: cbus trg_sync_commercial_client; Type: TRIGGER; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TRIGGER trg_sync_commercial_client AFTER INSERT OR UPDATE OF commercial_client_entity_id ON "ob-poc".cbus FOR EACH ROW EXECUTE FUNCTION "ob-poc".sync_commercial_client_role();
 
 
 --
--- Name: ubo_registry trg_ubo_status_transition; Type: TRIGGER; Schema: ob-poc; Owner: -
+-- Name: ubo_registry trg_ubo_status_transition; Type: TRIGGER; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TRIGGER trg_ubo_status_transition BEFORE UPDATE ON "ob-poc".ubo_registry FOR EACH ROW EXECUTE FUNCTION "ob-poc".validate_ubo_status_transition();
 
 
 --
--- Name: workflow_instances trg_workflow_updated; Type: TRIGGER; Schema: ob-poc; Owner: -
+-- Name: workflow_instances trg_workflow_updated; Type: TRIGGER; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TRIGGER trg_workflow_updated BEFORE UPDATE ON "ob-poc".workflow_instances FOR EACH ROW EXECUTE FUNCTION "ob-poc".update_workflow_timestamp();
 
 
 --
--- Name: dsl_versions trigger_invalidate_ast_cache; Type: TRIGGER; Schema: ob-poc; Owner: -
+-- Name: dsl_versions trigger_invalidate_ast_cache; Type: TRIGGER; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TRIGGER trigger_invalidate_ast_cache AFTER UPDATE ON "ob-poc".dsl_versions FOR EACH ROW EXECUTE FUNCTION "ob-poc".invalidate_ast_cache();
 
 
 --
--- Name: attribute_registry trigger_update_attribute_registry_timestamp; Type: TRIGGER; Schema: ob-poc; Owner: -
+-- Name: attribute_registry trigger_update_attribute_registry_timestamp; Type: TRIGGER; Schema: ob-poc; Owner: adamtc007
 --
 
 CREATE TRIGGER trigger_update_attribute_registry_timestamp BEFORE UPDATE ON "ob-poc".attribute_registry FOR EACH ROW EXECUTE FUNCTION "ob-poc".update_attribute_registry_timestamp();
 
 
 --
--- Name: business_attributes update_business_attributes_updated_at; Type: TRIGGER; Schema: public; Owner: -
+-- Name: business_attributes update_business_attributes_updated_at; Type: TRIGGER; Schema: public; Owner: adamtc007
 --
 
 CREATE TRIGGER update_business_attributes_updated_at BEFORE UPDATE ON public.business_attributes FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 
 --
--- Name: derived_attributes update_derived_attributes_updated_at; Type: TRIGGER; Schema: public; Owner: -
+-- Name: derived_attributes update_derived_attributes_updated_at; Type: TRIGGER; Schema: public; Owner: adamtc007
 --
 
 CREATE TRIGGER update_derived_attributes_updated_at BEFORE UPDATE ON public.derived_attributes FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 
 --
--- Name: rules update_rules_updated_at; Type: TRIGGER; Schema: public; Owner: -
+-- Name: rules update_rules_updated_at; Type: TRIGGER; Schema: public; Owner: adamtc007
 --
 
 CREATE TRIGGER update_rules_updated_at BEFORE UPDATE ON public.rules FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 
 --
--- Name: cbu_cash_sweep_config cbu_cash_sweep_config_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_cash_sweep_config cbu_cash_sweep_config_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_cash_sweep_config
@@ -11717,7 +12203,7 @@ ALTER TABLE ONLY custody.cbu_cash_sweep_config
 
 
 --
--- Name: cbu_cash_sweep_config cbu_cash_sweep_config_profile_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_cash_sweep_config cbu_cash_sweep_config_profile_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_cash_sweep_config
@@ -11725,7 +12211,7 @@ ALTER TABLE ONLY custody.cbu_cash_sweep_config
 
 
 --
--- Name: cbu_cash_sweep_config cbu_cash_sweep_config_sweep_resource_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_cash_sweep_config cbu_cash_sweep_config_sweep_resource_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_cash_sweep_config
@@ -11733,7 +12219,7 @@ ALTER TABLE ONLY custody.cbu_cash_sweep_config
 
 
 --
--- Name: cbu_im_assignments cbu_im_assignments_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_im_assignments cbu_im_assignments_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_im_assignments
@@ -11741,7 +12227,7 @@ ALTER TABLE ONLY custody.cbu_im_assignments
 
 
 --
--- Name: cbu_im_assignments cbu_im_assignments_instruction_resource_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_im_assignments cbu_im_assignments_instruction_resource_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_im_assignments
@@ -11749,7 +12235,7 @@ ALTER TABLE ONLY custody.cbu_im_assignments
 
 
 --
--- Name: cbu_im_assignments cbu_im_assignments_manager_entity_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_im_assignments cbu_im_assignments_manager_entity_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_im_assignments
@@ -11757,7 +12243,7 @@ ALTER TABLE ONLY custody.cbu_im_assignments
 
 
 --
--- Name: cbu_im_assignments cbu_im_assignments_profile_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_im_assignments cbu_im_assignments_profile_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_im_assignments
@@ -11765,7 +12251,7 @@ ALTER TABLE ONLY custody.cbu_im_assignments
 
 
 --
--- Name: cbu_instrument_universe cbu_instrument_universe_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_instrument_universe cbu_instrument_universe_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_instrument_universe
@@ -11773,7 +12259,7 @@ ALTER TABLE ONLY custody.cbu_instrument_universe
 
 
 --
--- Name: cbu_instrument_universe cbu_instrument_universe_counterparty_entity_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_instrument_universe cbu_instrument_universe_counterparty_entity_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_instrument_universe
@@ -11781,7 +12267,7 @@ ALTER TABLE ONLY custody.cbu_instrument_universe
 
 
 --
--- Name: cbu_instrument_universe cbu_instrument_universe_instrument_class_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_instrument_universe cbu_instrument_universe_instrument_class_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_instrument_universe
@@ -11789,7 +12275,7 @@ ALTER TABLE ONLY custody.cbu_instrument_universe
 
 
 --
--- Name: cbu_instrument_universe cbu_instrument_universe_market_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_instrument_universe cbu_instrument_universe_market_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_instrument_universe
@@ -11797,7 +12283,7 @@ ALTER TABLE ONLY custody.cbu_instrument_universe
 
 
 --
--- Name: cbu_pricing_config cbu_pricing_config_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_pricing_config cbu_pricing_config_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_pricing_config
@@ -11805,7 +12291,7 @@ ALTER TABLE ONLY custody.cbu_pricing_config
 
 
 --
--- Name: cbu_pricing_config cbu_pricing_config_instrument_class_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_pricing_config cbu_pricing_config_instrument_class_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_pricing_config
@@ -11813,7 +12299,7 @@ ALTER TABLE ONLY custody.cbu_pricing_config
 
 
 --
--- Name: cbu_pricing_config cbu_pricing_config_market_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_pricing_config cbu_pricing_config_market_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_pricing_config
@@ -11821,7 +12307,7 @@ ALTER TABLE ONLY custody.cbu_pricing_config
 
 
 --
--- Name: cbu_pricing_config cbu_pricing_config_pricing_resource_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_pricing_config cbu_pricing_config_pricing_resource_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_pricing_config
@@ -11829,7 +12315,7 @@ ALTER TABLE ONLY custody.cbu_pricing_config
 
 
 --
--- Name: cbu_pricing_config cbu_pricing_config_profile_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_pricing_config cbu_pricing_config_profile_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_pricing_config
@@ -11837,7 +12323,7 @@ ALTER TABLE ONLY custody.cbu_pricing_config
 
 
 --
--- Name: cbu_ssi_agent_override cbu_ssi_agent_override_ssi_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_ssi_agent_override cbu_ssi_agent_override_ssi_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_ssi_agent_override
@@ -11845,7 +12331,7 @@ ALTER TABLE ONLY custody.cbu_ssi_agent_override
 
 
 --
--- Name: cbu_ssi cbu_ssi_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_ssi cbu_ssi_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_ssi
@@ -11853,7 +12339,7 @@ ALTER TABLE ONLY custody.cbu_ssi
 
 
 --
--- Name: cbu_ssi cbu_ssi_market_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: cbu_ssi cbu_ssi_market_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cbu_ssi
@@ -11861,7 +12347,7 @@ ALTER TABLE ONLY custody.cbu_ssi
 
 
 --
--- Name: cfi_codes cfi_codes_class_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: cfi_codes cfi_codes_class_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cfi_codes
@@ -11869,7 +12355,7 @@ ALTER TABLE ONLY custody.cfi_codes
 
 
 --
--- Name: cfi_codes cfi_codes_security_type_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: cfi_codes cfi_codes_security_type_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.cfi_codes
@@ -11877,7 +12363,7 @@ ALTER TABLE ONLY custody.cfi_codes
 
 
 --
--- Name: csa_agreements csa_agreements_collateral_ssi_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: csa_agreements csa_agreements_collateral_ssi_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.csa_agreements
@@ -11885,7 +12371,7 @@ ALTER TABLE ONLY custody.csa_agreements
 
 
 --
--- Name: csa_agreements csa_agreements_isda_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: csa_agreements csa_agreements_isda_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.csa_agreements
@@ -11893,7 +12379,7 @@ ALTER TABLE ONLY custody.csa_agreements
 
 
 --
--- Name: entity_settlement_identity entity_settlement_identity_entity_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: entity_settlement_identity entity_settlement_identity_entity_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.entity_settlement_identity
@@ -11901,7 +12387,7 @@ ALTER TABLE ONLY custody.entity_settlement_identity
 
 
 --
--- Name: entity_ssi entity_ssi_entity_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: entity_ssi entity_ssi_entity_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.entity_ssi
@@ -11909,7 +12395,7 @@ ALTER TABLE ONLY custody.entity_ssi
 
 
 --
--- Name: entity_ssi entity_ssi_instrument_class_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: entity_ssi entity_ssi_instrument_class_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.entity_ssi
@@ -11917,7 +12403,7 @@ ALTER TABLE ONLY custody.entity_ssi
 
 
 --
--- Name: entity_ssi entity_ssi_market_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: entity_ssi entity_ssi_market_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.entity_ssi
@@ -11925,7 +12411,7 @@ ALTER TABLE ONLY custody.entity_ssi
 
 
 --
--- Name: entity_ssi entity_ssi_security_type_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: entity_ssi entity_ssi_security_type_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.entity_ssi
@@ -11933,7 +12419,7 @@ ALTER TABLE ONLY custody.entity_ssi
 
 
 --
--- Name: instruction_paths instruction_paths_instruction_type_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: instruction_paths instruction_paths_instruction_type_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.instruction_paths
@@ -11941,7 +12427,7 @@ ALTER TABLE ONLY custody.instruction_paths
 
 
 --
--- Name: instruction_paths instruction_paths_instrument_class_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: instruction_paths instruction_paths_instrument_class_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.instruction_paths
@@ -11949,7 +12435,7 @@ ALTER TABLE ONLY custody.instruction_paths
 
 
 --
--- Name: instruction_paths instruction_paths_market_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: instruction_paths instruction_paths_market_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.instruction_paths
@@ -11957,7 +12443,7 @@ ALTER TABLE ONLY custody.instruction_paths
 
 
 --
--- Name: instruction_paths instruction_paths_resource_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: instruction_paths instruction_paths_resource_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.instruction_paths
@@ -11965,7 +12451,7 @@ ALTER TABLE ONLY custody.instruction_paths
 
 
 --
--- Name: instrument_classes instrument_classes_parent_class_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: instrument_classes instrument_classes_parent_class_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.instrument_classes
@@ -11973,7 +12459,7 @@ ALTER TABLE ONLY custody.instrument_classes
 
 
 --
--- Name: isda_agreements isda_agreements_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: isda_agreements isda_agreements_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.isda_agreements
@@ -11981,7 +12467,7 @@ ALTER TABLE ONLY custody.isda_agreements
 
 
 --
--- Name: isda_agreements isda_agreements_counterparty_entity_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: isda_agreements isda_agreements_counterparty_entity_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.isda_agreements
@@ -11989,7 +12475,7 @@ ALTER TABLE ONLY custody.isda_agreements
 
 
 --
--- Name: isda_product_coverage isda_product_coverage_instrument_class_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: isda_product_coverage isda_product_coverage_instrument_class_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.isda_product_coverage
@@ -11997,7 +12483,7 @@ ALTER TABLE ONLY custody.isda_product_coverage
 
 
 --
--- Name: isda_product_coverage isda_product_coverage_isda_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: isda_product_coverage isda_product_coverage_isda_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.isda_product_coverage
@@ -12005,7 +12491,7 @@ ALTER TABLE ONLY custody.isda_product_coverage
 
 
 --
--- Name: isda_product_coverage isda_product_coverage_isda_taxonomy_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: isda_product_coverage isda_product_coverage_isda_taxonomy_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.isda_product_coverage
@@ -12013,7 +12499,7 @@ ALTER TABLE ONLY custody.isda_product_coverage
 
 
 --
--- Name: isda_product_taxonomy isda_product_taxonomy_class_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: isda_product_taxonomy isda_product_taxonomy_class_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.isda_product_taxonomy
@@ -12021,7 +12507,7 @@ ALTER TABLE ONLY custody.isda_product_taxonomy
 
 
 --
--- Name: security_types security_types_class_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: security_types security_types_class_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.security_types
@@ -12029,7 +12515,7 @@ ALTER TABLE ONLY custody.security_types
 
 
 --
--- Name: ssi_booking_rules ssi_booking_rules_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: ssi_booking_rules ssi_booking_rules_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.ssi_booking_rules
@@ -12037,7 +12523,7 @@ ALTER TABLE ONLY custody.ssi_booking_rules
 
 
 --
--- Name: ssi_booking_rules ssi_booking_rules_counterparty_entity_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: ssi_booking_rules ssi_booking_rules_counterparty_entity_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.ssi_booking_rules
@@ -12045,7 +12531,7 @@ ALTER TABLE ONLY custody.ssi_booking_rules
 
 
 --
--- Name: ssi_booking_rules ssi_booking_rules_instrument_class_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: ssi_booking_rules ssi_booking_rules_instrument_class_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.ssi_booking_rules
@@ -12053,7 +12539,7 @@ ALTER TABLE ONLY custody.ssi_booking_rules
 
 
 --
--- Name: ssi_booking_rules ssi_booking_rules_market_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: ssi_booking_rules ssi_booking_rules_market_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.ssi_booking_rules
@@ -12061,7 +12547,7 @@ ALTER TABLE ONLY custody.ssi_booking_rules
 
 
 --
--- Name: ssi_booking_rules ssi_booking_rules_security_type_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: ssi_booking_rules ssi_booking_rules_security_type_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.ssi_booking_rules
@@ -12069,7 +12555,7 @@ ALTER TABLE ONLY custody.ssi_booking_rules
 
 
 --
--- Name: ssi_booking_rules ssi_booking_rules_ssi_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: ssi_booking_rules ssi_booking_rules_ssi_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.ssi_booking_rules
@@ -12077,7 +12563,7 @@ ALTER TABLE ONLY custody.ssi_booking_rules
 
 
 --
--- Name: subcustodian_network subcustodian_network_market_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+-- Name: subcustodian_network subcustodian_network_market_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: adamtc007
 --
 
 ALTER TABLE ONLY custody.subcustodian_network
@@ -12085,7 +12571,7 @@ ALTER TABLE ONLY custody.subcustodian_network
 
 
 --
--- Name: approval_requests approval_requests_case_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+-- Name: approval_requests approval_requests_case_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.approval_requests
@@ -12093,7 +12579,7 @@ ALTER TABLE ONLY kyc.approval_requests
 
 
 --
--- Name: approval_requests approval_requests_workstream_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+-- Name: approval_requests approval_requests_workstream_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.approval_requests
@@ -12101,7 +12587,7 @@ ALTER TABLE ONLY kyc.approval_requests
 
 
 --
--- Name: case_events case_events_case_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+-- Name: case_events case_events_case_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.case_events
@@ -12109,7 +12595,7 @@ ALTER TABLE ONLY kyc.case_events
 
 
 --
--- Name: case_events case_events_workstream_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+-- Name: case_events case_events_workstream_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.case_events
@@ -12117,7 +12603,7 @@ ALTER TABLE ONLY kyc.case_events
 
 
 --
--- Name: cases cases_cbu_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+-- Name: cases cases_cbu_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.cases
@@ -12125,7 +12611,7 @@ ALTER TABLE ONLY kyc.cases
 
 
 --
--- Name: doc_request_acceptable_types doc_request_acceptable_types_document_type_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+-- Name: doc_request_acceptable_types doc_request_acceptable_types_document_type_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.doc_request_acceptable_types
@@ -12133,7 +12619,7 @@ ALTER TABLE ONLY kyc.doc_request_acceptable_types
 
 
 --
--- Name: doc_request_acceptable_types doc_request_acceptable_types_request_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+-- Name: doc_request_acceptable_types doc_request_acceptable_types_request_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.doc_request_acceptable_types
@@ -12141,7 +12627,7 @@ ALTER TABLE ONLY kyc.doc_request_acceptable_types
 
 
 --
--- Name: doc_requests doc_requests_workstream_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+-- Name: doc_requests doc_requests_workstream_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.doc_requests
@@ -12149,7 +12635,7 @@ ALTER TABLE ONLY kyc.doc_requests
 
 
 --
--- Name: entity_workstreams entity_workstreams_case_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+-- Name: entity_workstreams entity_workstreams_case_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.entity_workstreams
@@ -12157,7 +12643,7 @@ ALTER TABLE ONLY kyc.entity_workstreams
 
 
 --
--- Name: entity_workstreams entity_workstreams_discovery_source_workstream_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+-- Name: entity_workstreams entity_workstreams_discovery_source_workstream_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.entity_workstreams
@@ -12165,7 +12651,7 @@ ALTER TABLE ONLY kyc.entity_workstreams
 
 
 --
--- Name: entity_workstreams entity_workstreams_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+-- Name: entity_workstreams entity_workstreams_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.entity_workstreams
@@ -12173,7 +12659,7 @@ ALTER TABLE ONLY kyc.entity_workstreams
 
 
 --
--- Name: holdings holdings_investor_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+-- Name: holdings holdings_investor_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.holdings
@@ -12181,7 +12667,7 @@ ALTER TABLE ONLY kyc.holdings
 
 
 --
--- Name: holdings holdings_share_class_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+-- Name: holdings holdings_share_class_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.holdings
@@ -12189,7 +12675,7 @@ ALTER TABLE ONLY kyc.holdings
 
 
 --
--- Name: movements movements_holding_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+-- Name: movements movements_holding_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.movements
@@ -12197,7 +12683,7 @@ ALTER TABLE ONLY kyc.movements
 
 
 --
--- Name: red_flags red_flags_case_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+-- Name: red_flags red_flags_case_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.red_flags
@@ -12205,7 +12691,7 @@ ALTER TABLE ONLY kyc.red_flags
 
 
 --
--- Name: red_flags red_flags_workstream_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+-- Name: red_flags red_flags_workstream_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.red_flags
@@ -12213,7 +12699,7 @@ ALTER TABLE ONLY kyc.red_flags
 
 
 --
--- Name: rule_executions rule_executions_case_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+-- Name: rule_executions rule_executions_case_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.rule_executions
@@ -12221,7 +12707,7 @@ ALTER TABLE ONLY kyc.rule_executions
 
 
 --
--- Name: rule_executions rule_executions_workstream_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+-- Name: rule_executions rule_executions_workstream_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.rule_executions
@@ -12229,7 +12715,7 @@ ALTER TABLE ONLY kyc.rule_executions
 
 
 --
--- Name: screenings screenings_red_flag_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+-- Name: screenings screenings_red_flag_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.screenings
@@ -12237,7 +12723,7 @@ ALTER TABLE ONLY kyc.screenings
 
 
 --
--- Name: screenings screenings_workstream_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+-- Name: screenings screenings_workstream_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.screenings
@@ -12245,7 +12731,7 @@ ALTER TABLE ONLY kyc.screenings
 
 
 --
--- Name: share_classes share_classes_cbu_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+-- Name: share_classes share_classes_cbu_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.share_classes
@@ -12253,7 +12739,7 @@ ALTER TABLE ONLY kyc.share_classes
 
 
 --
--- Name: share_classes share_classes_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+-- Name: share_classes share_classes_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.share_classes
@@ -12261,7 +12747,7 @@ ALTER TABLE ONLY kyc.share_classes
 
 
 --
--- Name: share_classes share_classes_issuer_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+-- Name: share_classes share_classes_issuer_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY kyc.share_classes
@@ -12269,7 +12755,7 @@ ALTER TABLE ONLY kyc.share_classes
 
 
 --
--- Name: attribute_observations attribute_observations_attribute_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: attribute_observations attribute_observations_attribute_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".attribute_observations
@@ -12277,7 +12763,7 @@ ALTER TABLE ONLY "ob-poc".attribute_observations
 
 
 --
--- Name: attribute_observations attribute_observations_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: attribute_observations attribute_observations_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".attribute_observations
@@ -12285,7 +12771,7 @@ ALTER TABLE ONLY "ob-poc".attribute_observations
 
 
 --
--- Name: attribute_observations attribute_observations_source_document_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: attribute_observations attribute_observations_source_document_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".attribute_observations
@@ -12293,7 +12779,7 @@ ALTER TABLE ONLY "ob-poc".attribute_observations
 
 
 --
--- Name: attribute_observations attribute_observations_source_screening_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: attribute_observations attribute_observations_source_screening_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".attribute_observations
@@ -12301,7 +12787,7 @@ ALTER TABLE ONLY "ob-poc".attribute_observations
 
 
 --
--- Name: attribute_observations attribute_observations_source_workstream_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: attribute_observations attribute_observations_source_workstream_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".attribute_observations
@@ -12309,7 +12795,7 @@ ALTER TABLE ONLY "ob-poc".attribute_observations
 
 
 --
--- Name: attribute_observations attribute_observations_superseded_by_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: attribute_observations attribute_observations_superseded_by_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".attribute_observations
@@ -12317,7 +12803,7 @@ ALTER TABLE ONLY "ob-poc".attribute_observations
 
 
 --
--- Name: attribute_values_typed attribute_values_typed_attribute_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: attribute_values_typed attribute_values_typed_attribute_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".attribute_values_typed
@@ -12325,7 +12811,7 @@ ALTER TABLE ONLY "ob-poc".attribute_values_typed
 
 
 --
--- Name: case_evaluation_snapshots case_evaluation_snapshots_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: case_evaluation_snapshots case_evaluation_snapshots_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".case_evaluation_snapshots
@@ -12333,7 +12819,7 @@ ALTER TABLE ONLY "ob-poc".case_evaluation_snapshots
 
 
 --
--- Name: case_evaluation_snapshots case_evaluation_snapshots_matched_threshold_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: case_evaluation_snapshots case_evaluation_snapshots_matched_threshold_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".case_evaluation_snapshots
@@ -12341,7 +12827,7 @@ ALTER TABLE ONLY "ob-poc".case_evaluation_snapshots
 
 
 --
--- Name: cbu_change_log cbu_change_log_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_change_log cbu_change_log_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_change_log
@@ -12349,7 +12835,7 @@ ALTER TABLE ONLY "ob-poc".cbu_change_log
 
 
 --
--- Name: cbu_entity_roles cbu_entity_roles_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_entity_roles cbu_entity_roles_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_entity_roles
@@ -12357,7 +12843,7 @@ ALTER TABLE ONLY "ob-poc".cbu_entity_roles
 
 
 --
--- Name: cbu_entity_roles cbu_entity_roles_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_entity_roles cbu_entity_roles_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_entity_roles
@@ -12365,7 +12851,7 @@ ALTER TABLE ONLY "ob-poc".cbu_entity_roles
 
 
 --
--- Name: cbu_entity_roles cbu_entity_roles_role_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_entity_roles cbu_entity_roles_role_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_entity_roles
@@ -12373,7 +12859,7 @@ ALTER TABLE ONLY "ob-poc".cbu_entity_roles
 
 
 --
--- Name: cbu_evidence cbu_evidence_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_evidence cbu_evidence_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_evidence
@@ -12381,7 +12867,7 @@ ALTER TABLE ONLY "ob-poc".cbu_evidence
 
 
 --
--- Name: cbu_evidence cbu_evidence_document_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_evidence cbu_evidence_document_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_evidence
@@ -12389,7 +12875,7 @@ ALTER TABLE ONLY "ob-poc".cbu_evidence
 
 
 --
--- Name: cbu_relationship_verification cbu_relationship_verification_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_relationship_verification cbu_relationship_verification_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_relationship_verification
@@ -12397,7 +12883,7 @@ ALTER TABLE ONLY "ob-poc".cbu_relationship_verification
 
 
 --
--- Name: cbu_relationship_verification cbu_relationship_verification_proof_document_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_relationship_verification cbu_relationship_verification_proof_document_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_relationship_verification
@@ -12405,7 +12891,7 @@ ALTER TABLE ONLY "ob-poc".cbu_relationship_verification
 
 
 --
--- Name: cbu_relationship_verification cbu_relationship_verification_relationship_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_relationship_verification cbu_relationship_verification_relationship_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_relationship_verification
@@ -12413,7 +12899,7 @@ ALTER TABLE ONLY "ob-poc".cbu_relationship_verification
 
 
 --
--- Name: cbu_resource_instances cbu_resource_instances_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_resource_instances cbu_resource_instances_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_resource_instances
@@ -12421,7 +12907,7 @@ ALTER TABLE ONLY "ob-poc".cbu_resource_instances
 
 
 --
--- Name: cbu_resource_instances cbu_resource_instances_product_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_resource_instances cbu_resource_instances_product_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_resource_instances
@@ -12429,7 +12915,7 @@ ALTER TABLE ONLY "ob-poc".cbu_resource_instances
 
 
 --
--- Name: cbu_resource_instances cbu_resource_instances_resource_type_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_resource_instances cbu_resource_instances_resource_type_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_resource_instances
@@ -12437,7 +12923,7 @@ ALTER TABLE ONLY "ob-poc".cbu_resource_instances
 
 
 --
--- Name: cbu_resource_instances cbu_resource_instances_service_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_resource_instances cbu_resource_instances_service_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_resource_instances
@@ -12445,7 +12931,7 @@ ALTER TABLE ONLY "ob-poc".cbu_resource_instances
 
 
 --
--- Name: cbu_sla_commitments cbu_sla_commitments_bound_resource_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_sla_commitments cbu_sla_commitments_bound_resource_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_sla_commitments
@@ -12453,7 +12939,7 @@ ALTER TABLE ONLY "ob-poc".cbu_sla_commitments
 
 
 --
--- Name: cbu_sla_commitments cbu_sla_commitments_bound_service_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_sla_commitments cbu_sla_commitments_bound_service_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_sla_commitments
@@ -12461,7 +12947,7 @@ ALTER TABLE ONLY "ob-poc".cbu_sla_commitments
 
 
 --
--- Name: cbu_sla_commitments cbu_sla_commitments_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_sla_commitments cbu_sla_commitments_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_sla_commitments
@@ -12469,7 +12955,7 @@ ALTER TABLE ONLY "ob-poc".cbu_sla_commitments
 
 
 --
--- Name: cbu_sla_commitments cbu_sla_commitments_profile_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_sla_commitments cbu_sla_commitments_profile_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_sla_commitments
@@ -12477,7 +12963,7 @@ ALTER TABLE ONLY "ob-poc".cbu_sla_commitments
 
 
 --
--- Name: cbu_sla_commitments cbu_sla_commitments_source_document_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_sla_commitments cbu_sla_commitments_source_document_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_sla_commitments
@@ -12485,7 +12971,7 @@ ALTER TABLE ONLY "ob-poc".cbu_sla_commitments
 
 
 --
--- Name: cbu_sla_commitments cbu_sla_commitments_template_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_sla_commitments cbu_sla_commitments_template_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_sla_commitments
@@ -12493,7 +12979,7 @@ ALTER TABLE ONLY "ob-poc".cbu_sla_commitments
 
 
 --
--- Name: cbu_trading_profiles cbu_trading_profiles_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_trading_profiles cbu_trading_profiles_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_trading_profiles
@@ -12501,7 +12987,7 @@ ALTER TABLE ONLY "ob-poc".cbu_trading_profiles
 
 
 --
--- Name: cbu_trading_profiles cbu_trading_profiles_source_document_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_trading_profiles cbu_trading_profiles_source_document_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_trading_profiles
@@ -12509,7 +12995,7 @@ ALTER TABLE ONLY "ob-poc".cbu_trading_profiles
 
 
 --
--- Name: cbus cbus_commercial_client_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbus cbus_commercial_client_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbus
@@ -12517,7 +13003,7 @@ ALTER TABLE ONLY "ob-poc".cbus
 
 
 --
--- Name: cbus cbus_product_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbus cbus_product_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbus
@@ -12525,7 +13011,7 @@ ALTER TABLE ONLY "ob-poc".cbus
 
 
 --
--- Name: client_allegations client_allegations_attribute_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: client_allegations client_allegations_attribute_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".client_allegations
@@ -12533,7 +13019,7 @@ ALTER TABLE ONLY "ob-poc".client_allegations
 
 
 --
--- Name: client_allegations client_allegations_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: client_allegations client_allegations_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".client_allegations
@@ -12541,7 +13027,7 @@ ALTER TABLE ONLY "ob-poc".client_allegations
 
 
 --
--- Name: client_allegations client_allegations_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: client_allegations client_allegations_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".client_allegations
@@ -12549,7 +13035,7 @@ ALTER TABLE ONLY "ob-poc".client_allegations
 
 
 --
--- Name: client_allegations client_allegations_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: client_allegations client_allegations_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".client_allegations
@@ -12557,7 +13043,7 @@ ALTER TABLE ONLY "ob-poc".client_allegations
 
 
 --
--- Name: client_allegations client_allegations_verified_by_observation_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: client_allegations client_allegations_verified_by_observation_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".client_allegations
@@ -12565,7 +13051,7 @@ ALTER TABLE ONLY "ob-poc".client_allegations
 
 
 --
--- Name: client_allegations client_allegations_workstream_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: client_allegations client_allegations_workstream_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".client_allegations
@@ -12573,7 +13059,7 @@ ALTER TABLE ONLY "ob-poc".client_allegations
 
 
 --
--- Name: crud_operations crud_operations_parent_operation_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: crud_operations crud_operations_parent_operation_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".crud_operations
@@ -12581,7 +13067,7 @@ ALTER TABLE ONLY "ob-poc".crud_operations
 
 
 --
--- Name: delegation_relationships delegation_relationships_applies_to_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: delegation_relationships delegation_relationships_applies_to_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".delegation_relationships
@@ -12589,7 +13075,7 @@ ALTER TABLE ONLY "ob-poc".delegation_relationships
 
 
 --
--- Name: delegation_relationships delegation_relationships_contract_doc_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: delegation_relationships delegation_relationships_contract_doc_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".delegation_relationships
@@ -12597,7 +13083,7 @@ ALTER TABLE ONLY "ob-poc".delegation_relationships
 
 
 --
--- Name: delegation_relationships delegation_relationships_delegate_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: delegation_relationships delegation_relationships_delegate_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".delegation_relationships
@@ -12605,7 +13091,7 @@ ALTER TABLE ONLY "ob-poc".delegation_relationships
 
 
 --
--- Name: delegation_relationships delegation_relationships_delegator_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: delegation_relationships delegation_relationships_delegator_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".delegation_relationships
@@ -12613,7 +13099,7 @@ ALTER TABLE ONLY "ob-poc".delegation_relationships
 
 
 --
--- Name: detected_patterns detected_patterns_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: detected_patterns detected_patterns_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".detected_patterns
@@ -12621,7 +13107,7 @@ ALTER TABLE ONLY "ob-poc".detected_patterns
 
 
 --
--- Name: detected_patterns detected_patterns_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: detected_patterns detected_patterns_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".detected_patterns
@@ -12629,7 +13115,7 @@ ALTER TABLE ONLY "ob-poc".detected_patterns
 
 
 --
--- Name: document_attribute_links document_attribute_links_attribute_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: document_attribute_links document_attribute_links_attribute_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".document_attribute_links
@@ -12637,7 +13123,7 @@ ALTER TABLE ONLY "ob-poc".document_attribute_links
 
 
 --
--- Name: document_attribute_links document_attribute_links_document_type_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: document_attribute_links document_attribute_links_document_type_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".document_attribute_links
@@ -12645,7 +13131,7 @@ ALTER TABLE ONLY "ob-poc".document_attribute_links
 
 
 --
--- Name: document_attribute_mappings document_attribute_mappings_attribute_uuid_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: document_attribute_mappings document_attribute_mappings_attribute_uuid_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".document_attribute_mappings
@@ -12653,7 +13139,7 @@ ALTER TABLE ONLY "ob-poc".document_attribute_mappings
 
 
 --
--- Name: document_attribute_mappings document_attribute_mappings_document_type_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: document_attribute_mappings document_attribute_mappings_document_type_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".document_attribute_mappings
@@ -12661,7 +13147,7 @@ ALTER TABLE ONLY "ob-poc".document_attribute_mappings
 
 
 --
--- Name: document_catalog document_catalog_document_type_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: document_catalog document_catalog_document_type_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".document_catalog
@@ -12669,7 +13155,7 @@ ALTER TABLE ONLY "ob-poc".document_catalog
 
 
 --
--- Name: document_catalog document_catalog_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: document_catalog document_catalog_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".document_catalog
@@ -12677,7 +13163,7 @@ ALTER TABLE ONLY "ob-poc".document_catalog
 
 
 --
--- Name: document_validity_rules document_validity_rules_document_type_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: document_validity_rules document_validity_rules_document_type_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".document_validity_rules
@@ -12685,7 +13171,7 @@ ALTER TABLE ONLY "ob-poc".document_validity_rules
 
 
 --
--- Name: dsl_execution_log dsl_execution_log_version_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_execution_log dsl_execution_log_version_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_execution_log
@@ -12693,7 +13179,7 @@ ALTER TABLE ONLY "ob-poc".dsl_execution_log
 
 
 --
--- Name: dsl_generation_log dsl_generation_log_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_generation_log dsl_generation_log_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_generation_log
@@ -12701,7 +13187,7 @@ ALTER TABLE ONLY "ob-poc".dsl_generation_log
 
 
 --
--- Name: dsl_session_events dsl_session_events_session_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_session_events dsl_session_events_session_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_session_events
@@ -12709,7 +13195,7 @@ ALTER TABLE ONLY "ob-poc".dsl_session_events
 
 
 --
--- Name: dsl_session_locks dsl_session_locks_session_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_session_locks dsl_session_locks_session_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_session_locks
@@ -12717,7 +13203,7 @@ ALTER TABLE ONLY "ob-poc".dsl_session_locks
 
 
 --
--- Name: dsl_sessions dsl_sessions_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_sessions dsl_sessions_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_sessions
@@ -12725,7 +13211,7 @@ ALTER TABLE ONLY "ob-poc".dsl_sessions
 
 
 --
--- Name: dsl_sessions dsl_sessions_kyc_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_sessions dsl_sessions_kyc_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_sessions
@@ -12733,7 +13219,7 @@ ALTER TABLE ONLY "ob-poc".dsl_sessions
 
 
 --
--- Name: dsl_sessions dsl_sessions_onboarding_request_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_sessions dsl_sessions_onboarding_request_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_sessions
@@ -12741,7 +13227,7 @@ ALTER TABLE ONLY "ob-poc".dsl_sessions
 
 
 --
--- Name: dsl_snapshots dsl_snapshots_session_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_snapshots dsl_snapshots_session_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_snapshots
@@ -12749,7 +13235,7 @@ ALTER TABLE ONLY "ob-poc".dsl_snapshots
 
 
 --
--- Name: dsl_versions dsl_versions_domain_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_versions dsl_versions_domain_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_versions
@@ -12757,7 +13243,7 @@ ALTER TABLE ONLY "ob-poc".dsl_versions
 
 
 --
--- Name: dsl_versions dsl_versions_parent_version_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_versions dsl_versions_parent_version_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_versions
@@ -12765,7 +13251,7 @@ ALTER TABLE ONLY "ob-poc".dsl_versions
 
 
 --
--- Name: entities entities_entity_type_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entities entities_entity_type_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entities
@@ -12773,7 +13259,7 @@ ALTER TABLE ONLY "ob-poc".entities
 
 
 --
--- Name: entity_funds entity_funds_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_funds entity_funds_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_funds
@@ -12781,7 +13267,7 @@ ALTER TABLE ONLY "ob-poc".entity_funds
 
 
 --
--- Name: entity_funds entity_funds_master_fund_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_funds entity_funds_master_fund_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_funds
@@ -12789,7 +13275,7 @@ ALTER TABLE ONLY "ob-poc".entity_funds
 
 
 --
--- Name: entity_funds entity_funds_parent_fund_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_funds entity_funds_parent_fund_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_funds
@@ -12797,7 +13283,7 @@ ALTER TABLE ONLY "ob-poc".entity_funds
 
 
 --
--- Name: entity_limited_companies entity_limited_companies_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_limited_companies entity_limited_companies_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_limited_companies
@@ -12805,7 +13291,7 @@ ALTER TABLE ONLY "ob-poc".entity_limited_companies
 
 
 --
--- Name: entity_manco entity_manco_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_manco entity_manco_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_manco
@@ -12813,7 +13299,7 @@ ALTER TABLE ONLY "ob-poc".entity_manco
 
 
 --
--- Name: entity_partnerships entity_partnerships_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_partnerships entity_partnerships_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_partnerships
@@ -12821,7 +13307,7 @@ ALTER TABLE ONLY "ob-poc".entity_partnerships
 
 
 --
--- Name: entity_proper_persons entity_proper_persons_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_proper_persons entity_proper_persons_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_proper_persons
@@ -12829,7 +13315,7 @@ ALTER TABLE ONLY "ob-poc".entity_proper_persons
 
 
 --
--- Name: entity_relationships entity_relationships_from_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_relationships entity_relationships_from_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_relationships
@@ -12837,7 +13323,7 @@ ALTER TABLE ONLY "ob-poc".entity_relationships
 
 
 --
--- Name: entity_relationships entity_relationships_to_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_relationships entity_relationships_to_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_relationships
@@ -12845,7 +13331,7 @@ ALTER TABLE ONLY "ob-poc".entity_relationships
 
 
 --
--- Name: entity_share_classes entity_share_classes_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_share_classes entity_share_classes_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_share_classes
@@ -12853,7 +13339,7 @@ ALTER TABLE ONLY "ob-poc".entity_share_classes
 
 
 --
--- Name: entity_share_classes entity_share_classes_parent_fund_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_share_classes entity_share_classes_parent_fund_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_share_classes
@@ -12861,7 +13347,7 @@ ALTER TABLE ONLY "ob-poc".entity_share_classes
 
 
 --
--- Name: entity_trusts entity_trusts_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_trusts entity_trusts_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_trusts
@@ -12869,7 +13355,7 @@ ALTER TABLE ONLY "ob-poc".entity_trusts
 
 
 --
--- Name: entity_types entity_types_parent_type_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entity_types entity_types_parent_type_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entity_types
@@ -12877,7 +13363,7 @@ ALTER TABLE ONLY "ob-poc".entity_types
 
 
 --
--- Name: attribute_values_typed fk_attribute_uuid; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: attribute_values_typed fk_attribute_uuid; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".attribute_values_typed
@@ -12885,7 +13371,7 @@ ALTER TABLE ONLY "ob-poc".attribute_values_typed
 
 
 --
--- Name: cbu_creation_log fk_cbu_creation_log_cbu; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_creation_log fk_cbu_creation_log_cbu; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_creation_log
@@ -12893,7 +13379,7 @@ ALTER TABLE ONLY "ob-poc".cbu_creation_log
 
 
 --
--- Name: cbu_entity_roles fk_cbu_entity_roles_cbu_id; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_entity_roles fk_cbu_entity_roles_cbu_id; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_entity_roles
@@ -12901,7 +13387,7 @@ ALTER TABLE ONLY "ob-poc".cbu_entity_roles
 
 
 --
--- Name: cbu_entity_roles fk_cbu_entity_roles_entity_id; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_entity_roles fk_cbu_entity_roles_entity_id; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_entity_roles
@@ -12909,7 +13395,7 @@ ALTER TABLE ONLY "ob-poc".cbu_entity_roles
 
 
 --
--- Name: cbu_entity_roles fk_cbu_entity_roles_role_id; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: cbu_entity_roles fk_cbu_entity_roles_role_id; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_entity_roles
@@ -12917,7 +13403,7 @@ ALTER TABLE ONLY "ob-poc".cbu_entity_roles
 
 
 --
--- Name: document_catalog fk_document_catalog_cbu; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: document_catalog fk_document_catalog_cbu; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".document_catalog
@@ -12925,7 +13411,7 @@ ALTER TABLE ONLY "ob-poc".document_catalog
 
 
 --
--- Name: dsl_ob fk_dsl_ob_cbu_id; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_ob fk_dsl_ob_cbu_id; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_ob
@@ -12933,7 +13419,7 @@ ALTER TABLE ONLY "ob-poc".dsl_ob
 
 
 --
--- Name: entities fk_entities_entity_type_id; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: entities fk_entities_entity_type_id; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".entities
@@ -12941,7 +13427,7 @@ ALTER TABLE ONLY "ob-poc".entities
 
 
 --
--- Name: dsl_instance_versions fk_instance; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: dsl_instance_versions fk_instance; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_instance_versions
@@ -12949,7 +13435,7 @@ ALTER TABLE ONLY "ob-poc".dsl_instance_versions
 
 
 --
--- Name: trust_parties fk_trust_parties_entity_id; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: trust_parties fk_trust_parties_entity_id; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".trust_parties
@@ -12957,7 +13443,7 @@ ALTER TABLE ONLY "ob-poc".trust_parties
 
 
 --
--- Name: trust_parties fk_trust_parties_trust_id; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: trust_parties fk_trust_parties_trust_id; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".trust_parties
@@ -12965,7 +13451,7 @@ ALTER TABLE ONLY "ob-poc".trust_parties
 
 
 --
--- Name: ubo_registry fk_ubo_registry_cbu_id; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_registry fk_ubo_registry_cbu_id; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ubo_registry
@@ -12973,7 +13459,7 @@ ALTER TABLE ONLY "ob-poc".ubo_registry
 
 
 --
--- Name: ubo_registry fk_ubo_registry_subject_entity_id; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_registry fk_ubo_registry_subject_entity_id; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ubo_registry
@@ -12981,7 +13467,7 @@ ALTER TABLE ONLY "ob-poc".ubo_registry
 
 
 --
--- Name: ubo_registry fk_ubo_registry_ubo_proper_person_id; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_registry fk_ubo_registry_ubo_proper_person_id; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ubo_registry
@@ -12989,7 +13475,7 @@ ALTER TABLE ONLY "ob-poc".ubo_registry
 
 
 --
--- Name: fund_investments fund_investments_investee_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: fund_investments fund_investments_investee_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".fund_investments
@@ -12997,7 +13483,7 @@ ALTER TABLE ONLY "ob-poc".fund_investments
 
 
 --
--- Name: fund_investments fund_investments_investor_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: fund_investments fund_investments_investor_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".fund_investments
@@ -13005,7 +13491,7 @@ ALTER TABLE ONLY "ob-poc".fund_investments
 
 
 --
--- Name: fund_structure fund_structure_child_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: fund_structure fund_structure_child_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".fund_structure
@@ -13013,7 +13499,7 @@ ALTER TABLE ONLY "ob-poc".fund_structure
 
 
 --
--- Name: fund_structure fund_structure_parent_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: fund_structure fund_structure_parent_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".fund_structure
@@ -13021,7 +13507,7 @@ ALTER TABLE ONLY "ob-poc".fund_structure
 
 
 --
--- Name: kyc_decisions kyc_decisions_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: kyc_decisions kyc_decisions_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".kyc_decisions
@@ -13029,7 +13515,7 @@ ALTER TABLE ONLY "ob-poc".kyc_decisions
 
 
 --
--- Name: kyc_decisions kyc_decisions_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: kyc_decisions kyc_decisions_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".kyc_decisions
@@ -13037,7 +13523,7 @@ ALTER TABLE ONLY "ob-poc".kyc_decisions
 
 
 --
--- Name: master_entity_xref master_entity_xref_jurisdiction_code_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: master_entity_xref master_entity_xref_jurisdiction_code_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".master_entity_xref
@@ -13045,7 +13531,7 @@ ALTER TABLE ONLY "ob-poc".master_entity_xref
 
 
 --
--- Name: observation_discrepancies observation_discrepancies_accepted_observation_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: observation_discrepancies observation_discrepancies_accepted_observation_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".observation_discrepancies
@@ -13053,7 +13539,7 @@ ALTER TABLE ONLY "ob-poc".observation_discrepancies
 
 
 --
--- Name: observation_discrepancies observation_discrepancies_attribute_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: observation_discrepancies observation_discrepancies_attribute_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".observation_discrepancies
@@ -13061,7 +13547,7 @@ ALTER TABLE ONLY "ob-poc".observation_discrepancies
 
 
 --
--- Name: observation_discrepancies observation_discrepancies_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: observation_discrepancies observation_discrepancies_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".observation_discrepancies
@@ -13069,7 +13555,7 @@ ALTER TABLE ONLY "ob-poc".observation_discrepancies
 
 
 --
--- Name: observation_discrepancies observation_discrepancies_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: observation_discrepancies observation_discrepancies_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".observation_discrepancies
@@ -13077,7 +13563,7 @@ ALTER TABLE ONLY "ob-poc".observation_discrepancies
 
 
 --
--- Name: observation_discrepancies observation_discrepancies_observation_1_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: observation_discrepancies observation_discrepancies_observation_1_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".observation_discrepancies
@@ -13085,7 +13571,7 @@ ALTER TABLE ONLY "ob-poc".observation_discrepancies
 
 
 --
--- Name: observation_discrepancies observation_discrepancies_observation_2_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: observation_discrepancies observation_discrepancies_observation_2_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".observation_discrepancies
@@ -13093,7 +13579,7 @@ ALTER TABLE ONLY "ob-poc".observation_discrepancies
 
 
 --
--- Name: observation_discrepancies observation_discrepancies_red_flag_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: observation_discrepancies observation_discrepancies_red_flag_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".observation_discrepancies
@@ -13101,7 +13587,7 @@ ALTER TABLE ONLY "ob-poc".observation_discrepancies
 
 
 --
--- Name: observation_discrepancies observation_discrepancies_workstream_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: observation_discrepancies observation_discrepancies_workstream_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".observation_discrepancies
@@ -13109,7 +13595,7 @@ ALTER TABLE ONLY "ob-poc".observation_discrepancies
 
 
 --
--- Name: onboarding_executions onboarding_executions_plan_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: onboarding_executions onboarding_executions_plan_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".onboarding_executions
@@ -13117,7 +13603,7 @@ ALTER TABLE ONLY "ob-poc".onboarding_executions
 
 
 --
--- Name: onboarding_plans onboarding_plans_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: onboarding_plans onboarding_plans_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".onboarding_plans
@@ -13125,7 +13611,7 @@ ALTER TABLE ONLY "ob-poc".onboarding_plans
 
 
 --
--- Name: onboarding_products onboarding_products_product_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: onboarding_products onboarding_products_product_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".onboarding_products
@@ -13133,7 +13619,7 @@ ALTER TABLE ONLY "ob-poc".onboarding_products
 
 
 --
--- Name: onboarding_products onboarding_products_request_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: onboarding_products onboarding_products_request_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".onboarding_products
@@ -13141,7 +13627,7 @@ ALTER TABLE ONLY "ob-poc".onboarding_products
 
 
 --
--- Name: onboarding_requests onboarding_requests_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: onboarding_requests onboarding_requests_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".onboarding_requests
@@ -13149,7 +13635,7 @@ ALTER TABLE ONLY "ob-poc".onboarding_requests
 
 
 --
--- Name: onboarding_tasks onboarding_tasks_execution_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: onboarding_tasks onboarding_tasks_execution_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".onboarding_tasks
@@ -13157,7 +13643,7 @@ ALTER TABLE ONLY "ob-poc".onboarding_tasks
 
 
 --
--- Name: onboarding_tasks onboarding_tasks_resource_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: onboarding_tasks onboarding_tasks_resource_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".onboarding_tasks
@@ -13165,7 +13651,7 @@ ALTER TABLE ONLY "ob-poc".onboarding_tasks
 
 
 --
--- Name: product_services product_services_product_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: product_services product_services_product_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".product_services
@@ -13173,7 +13659,7 @@ ALTER TABLE ONLY "ob-poc".product_services
 
 
 --
--- Name: product_services product_services_service_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: product_services product_services_service_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".product_services
@@ -13181,7 +13667,7 @@ ALTER TABLE ONLY "ob-poc".product_services
 
 
 --
--- Name: proofs proofs_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: proofs proofs_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".proofs
@@ -13189,7 +13675,7 @@ ALTER TABLE ONLY "ob-poc".proofs
 
 
 --
--- Name: proofs proofs_document_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: proofs proofs_document_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".proofs
@@ -13197,7 +13683,7 @@ ALTER TABLE ONLY "ob-poc".proofs
 
 
 --
--- Name: requirement_acceptable_docs requirement_acceptable_docs_document_type_code_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: requirement_acceptable_docs requirement_acceptable_docs_document_type_code_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".requirement_acceptable_docs
@@ -13205,7 +13691,7 @@ ALTER TABLE ONLY "ob-poc".requirement_acceptable_docs
 
 
 --
--- Name: requirement_acceptable_docs requirement_acceptable_docs_requirement_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: requirement_acceptable_docs requirement_acceptable_docs_requirement_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".requirement_acceptable_docs
@@ -13213,7 +13699,7 @@ ALTER TABLE ONLY "ob-poc".requirement_acceptable_docs
 
 
 --
--- Name: resource_attribute_requirements resource_attribute_requirements_attribute_uuid_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: resource_attribute_requirements resource_attribute_requirements_attribute_uuid_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".resource_attribute_requirements
@@ -13221,7 +13707,7 @@ ALTER TABLE ONLY "ob-poc".resource_attribute_requirements
 
 
 --
--- Name: resource_attribute_requirements resource_attribute_requirements_resource_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: resource_attribute_requirements resource_attribute_requirements_resource_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".resource_attribute_requirements
@@ -13229,7 +13715,7 @@ ALTER TABLE ONLY "ob-poc".resource_attribute_requirements
 
 
 --
--- Name: resource_dependencies resource_dependencies_depends_on_type_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: resource_dependencies resource_dependencies_depends_on_type_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".resource_dependencies
@@ -13237,7 +13723,7 @@ ALTER TABLE ONLY "ob-poc".resource_dependencies
 
 
 --
--- Name: resource_dependencies resource_dependencies_resource_type_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: resource_dependencies resource_dependencies_resource_type_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".resource_dependencies
@@ -13245,7 +13731,7 @@ ALTER TABLE ONLY "ob-poc".resource_dependencies
 
 
 --
--- Name: resource_instance_attributes resource_instance_attributes_attribute_uuid_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: resource_instance_attributes resource_instance_attributes_attribute_uuid_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".resource_instance_attributes
@@ -13253,7 +13739,7 @@ ALTER TABLE ONLY "ob-poc".resource_instance_attributes
 
 
 --
--- Name: resource_instance_attributes resource_instance_attributes_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: resource_instance_attributes resource_instance_attributes_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".resource_instance_attributes
@@ -13261,7 +13747,7 @@ ALTER TABLE ONLY "ob-poc".resource_instance_attributes
 
 
 --
--- Name: resource_instance_dependencies resource_instance_dependencies_depends_on_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: resource_instance_dependencies resource_instance_dependencies_depends_on_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".resource_instance_dependencies
@@ -13269,7 +13755,7 @@ ALTER TABLE ONLY "ob-poc".resource_instance_dependencies
 
 
 --
--- Name: resource_instance_dependencies resource_instance_dependencies_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: resource_instance_dependencies resource_instance_dependencies_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".resource_instance_dependencies
@@ -13277,7 +13763,7 @@ ALTER TABLE ONLY "ob-poc".resource_instance_dependencies
 
 
 --
--- Name: resource_profile_sources resource_profile_sources_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: resource_profile_sources resource_profile_sources_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".resource_profile_sources
@@ -13285,7 +13771,7 @@ ALTER TABLE ONLY "ob-poc".resource_profile_sources
 
 
 --
--- Name: resource_profile_sources resource_profile_sources_profile_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: resource_profile_sources resource_profile_sources_profile_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".resource_profile_sources
@@ -13293,7 +13779,7 @@ ALTER TABLE ONLY "ob-poc".resource_profile_sources
 
 
 --
--- Name: screening_requirements screening_requirements_risk_band_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: screening_requirements screening_requirements_risk_band_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".screening_requirements
@@ -13301,7 +13787,7 @@ ALTER TABLE ONLY "ob-poc".screening_requirements
 
 
 --
--- Name: service_delivery_map service_delivery_map_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: service_delivery_map service_delivery_map_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".service_delivery_map
@@ -13309,7 +13795,7 @@ ALTER TABLE ONLY "ob-poc".service_delivery_map
 
 
 --
--- Name: service_delivery_map service_delivery_map_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: service_delivery_map service_delivery_map_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".service_delivery_map
@@ -13317,7 +13803,7 @@ ALTER TABLE ONLY "ob-poc".service_delivery_map
 
 
 --
--- Name: service_delivery_map service_delivery_map_product_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: service_delivery_map service_delivery_map_product_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".service_delivery_map
@@ -13325,7 +13811,7 @@ ALTER TABLE ONLY "ob-poc".service_delivery_map
 
 
 --
--- Name: service_delivery_map service_delivery_map_service_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: service_delivery_map service_delivery_map_service_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".service_delivery_map
@@ -13333,7 +13819,7 @@ ALTER TABLE ONLY "ob-poc".service_delivery_map
 
 
 --
--- Name: service_option_choices service_option_choices_option_def_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: service_option_choices service_option_choices_option_def_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".service_option_choices
@@ -13341,7 +13827,7 @@ ALTER TABLE ONLY "ob-poc".service_option_choices
 
 
 --
--- Name: service_option_definitions service_option_definitions_service_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: service_option_definitions service_option_definitions_service_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".service_option_definitions
@@ -13349,7 +13835,7 @@ ALTER TABLE ONLY "ob-poc".service_option_definitions
 
 
 --
--- Name: service_resource_capabilities service_resource_capabilities_resource_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: service_resource_capabilities service_resource_capabilities_resource_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".service_resource_capabilities
@@ -13357,7 +13843,7 @@ ALTER TABLE ONLY "ob-poc".service_resource_capabilities
 
 
 --
--- Name: service_resource_capabilities service_resource_capabilities_service_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: service_resource_capabilities service_resource_capabilities_service_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".service_resource_capabilities
@@ -13365,7 +13851,7 @@ ALTER TABLE ONLY "ob-poc".service_resource_capabilities
 
 
 --
--- Name: sla_breaches sla_breaches_commitment_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: sla_breaches sla_breaches_commitment_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".sla_breaches
@@ -13373,7 +13859,7 @@ ALTER TABLE ONLY "ob-poc".sla_breaches
 
 
 --
--- Name: sla_breaches sla_breaches_measurement_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: sla_breaches sla_breaches_measurement_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".sla_breaches
@@ -13381,7 +13867,7 @@ ALTER TABLE ONLY "ob-poc".sla_breaches
 
 
 --
--- Name: sla_measurements sla_measurements_commitment_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: sla_measurements sla_measurements_commitment_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".sla_measurements
@@ -13389,7 +13875,7 @@ ALTER TABLE ONLY "ob-poc".sla_measurements
 
 
 --
--- Name: sla_templates sla_templates_metric_code_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: sla_templates sla_templates_metric_code_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".sla_templates
@@ -13397,7 +13883,7 @@ ALTER TABLE ONLY "ob-poc".sla_templates
 
 
 --
--- Name: threshold_requirements threshold_requirements_risk_band_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: threshold_requirements threshold_requirements_risk_band_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".threshold_requirements
@@ -13405,7 +13891,7 @@ ALTER TABLE ONLY "ob-poc".threshold_requirements
 
 
 --
--- Name: trading_profile_documents trading_profile_documents_doc_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: trading_profile_documents trading_profile_documents_doc_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".trading_profile_documents
@@ -13413,7 +13899,7 @@ ALTER TABLE ONLY "ob-poc".trading_profile_documents
 
 
 --
--- Name: trading_profile_documents trading_profile_documents_profile_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: trading_profile_documents trading_profile_documents_profile_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".trading_profile_documents
@@ -13421,7 +13907,7 @@ ALTER TABLE ONLY "ob-poc".trading_profile_documents
 
 
 --
--- Name: trading_profile_materializations trading_profile_materializations_profile_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: trading_profile_materializations trading_profile_materializations_profile_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".trading_profile_materializations
@@ -13429,7 +13915,7 @@ ALTER TABLE ONLY "ob-poc".trading_profile_materializations
 
 
 --
--- Name: trust_parties trust_parties_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: trust_parties trust_parties_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".trust_parties
@@ -13437,7 +13923,7 @@ ALTER TABLE ONLY "ob-poc".trust_parties
 
 
 --
--- Name: trust_parties trust_parties_trust_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: trust_parties trust_parties_trust_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".trust_parties
@@ -13445,7 +13931,7 @@ ALTER TABLE ONLY "ob-poc".trust_parties
 
 
 --
--- Name: ubo_assertion_log ubo_assertion_log_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_assertion_log ubo_assertion_log_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ubo_assertion_log
@@ -13453,7 +13939,7 @@ ALTER TABLE ONLY "ob-poc".ubo_assertion_log
 
 
 --
--- Name: ubo_assertion_log ubo_assertion_log_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_assertion_log ubo_assertion_log_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ubo_assertion_log
@@ -13461,7 +13947,7 @@ ALTER TABLE ONLY "ob-poc".ubo_assertion_log
 
 
 --
--- Name: ubo_evidence ubo_evidence_document_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_evidence ubo_evidence_document_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ubo_evidence
@@ -13469,7 +13955,7 @@ ALTER TABLE ONLY "ob-poc".ubo_evidence
 
 
 --
--- Name: ubo_evidence ubo_evidence_ubo_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_evidence ubo_evidence_ubo_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ubo_evidence
@@ -13477,7 +13963,7 @@ ALTER TABLE ONLY "ob-poc".ubo_evidence
 
 
 --
--- Name: ubo_registry ubo_registry_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_registry ubo_registry_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ubo_registry
@@ -13485,7 +13971,7 @@ ALTER TABLE ONLY "ob-poc".ubo_registry
 
 
 --
--- Name: ubo_registry ubo_registry_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_registry ubo_registry_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ubo_registry
@@ -13493,7 +13979,7 @@ ALTER TABLE ONLY "ob-poc".ubo_registry
 
 
 --
--- Name: ubo_registry ubo_registry_replacement_ubo_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_registry ubo_registry_replacement_ubo_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ubo_registry
@@ -13501,7 +13987,7 @@ ALTER TABLE ONLY "ob-poc".ubo_registry
 
 
 --
--- Name: ubo_registry ubo_registry_subject_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_registry ubo_registry_subject_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ubo_registry
@@ -13509,7 +13995,7 @@ ALTER TABLE ONLY "ob-poc".ubo_registry
 
 
 --
--- Name: ubo_registry ubo_registry_superseded_by_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_registry ubo_registry_superseded_by_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ubo_registry
@@ -13517,7 +14003,7 @@ ALTER TABLE ONLY "ob-poc".ubo_registry
 
 
 --
--- Name: ubo_registry ubo_registry_ubo_proper_person_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_registry ubo_registry_ubo_proper_person_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ubo_registry
@@ -13525,7 +14011,7 @@ ALTER TABLE ONLY "ob-poc".ubo_registry
 
 
 --
--- Name: ubo_registry ubo_registry_workstream_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_registry ubo_registry_workstream_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ubo_registry
@@ -13533,7 +14019,7 @@ ALTER TABLE ONLY "ob-poc".ubo_registry
 
 
 --
--- Name: ubo_snapshot_comparisons ubo_snapshot_comparisons_baseline_snapshot_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_snapshot_comparisons ubo_snapshot_comparisons_baseline_snapshot_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ubo_snapshot_comparisons
@@ -13541,7 +14027,7 @@ ALTER TABLE ONLY "ob-poc".ubo_snapshot_comparisons
 
 
 --
--- Name: ubo_snapshot_comparisons ubo_snapshot_comparisons_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_snapshot_comparisons ubo_snapshot_comparisons_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ubo_snapshot_comparisons
@@ -13549,7 +14035,7 @@ ALTER TABLE ONLY "ob-poc".ubo_snapshot_comparisons
 
 
 --
--- Name: ubo_snapshot_comparisons ubo_snapshot_comparisons_current_snapshot_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_snapshot_comparisons ubo_snapshot_comparisons_current_snapshot_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ubo_snapshot_comparisons
@@ -13557,7 +14043,7 @@ ALTER TABLE ONLY "ob-poc".ubo_snapshot_comparisons
 
 
 --
--- Name: ubo_snapshots ubo_snapshots_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_snapshots ubo_snapshots_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ubo_snapshots
@@ -13565,7 +14051,7 @@ ALTER TABLE ONLY "ob-poc".ubo_snapshots
 
 
 --
--- Name: ubo_snapshots ubo_snapshots_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_snapshots ubo_snapshots_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".ubo_snapshots
@@ -13573,7 +14059,7 @@ ALTER TABLE ONLY "ob-poc".ubo_snapshots
 
 
 --
--- Name: verification_challenges verification_challenges_allegation_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: verification_challenges verification_challenges_allegation_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".verification_challenges
@@ -13581,7 +14067,7 @@ ALTER TABLE ONLY "ob-poc".verification_challenges
 
 
 --
--- Name: verification_challenges verification_challenges_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: verification_challenges verification_challenges_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".verification_challenges
@@ -13589,7 +14075,7 @@ ALTER TABLE ONLY "ob-poc".verification_challenges
 
 
 --
--- Name: verification_challenges verification_challenges_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: verification_challenges verification_challenges_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".verification_challenges
@@ -13597,7 +14083,7 @@ ALTER TABLE ONLY "ob-poc".verification_challenges
 
 
 --
--- Name: verification_challenges verification_challenges_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: verification_challenges verification_challenges_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".verification_challenges
@@ -13605,7 +14091,7 @@ ALTER TABLE ONLY "ob-poc".verification_challenges
 
 
 --
--- Name: verification_challenges verification_challenges_observation_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: verification_challenges verification_challenges_observation_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".verification_challenges
@@ -13613,7 +14099,7 @@ ALTER TABLE ONLY "ob-poc".verification_challenges
 
 
 --
--- Name: verification_escalations verification_escalations_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: verification_escalations verification_escalations_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".verification_escalations
@@ -13621,7 +14107,7 @@ ALTER TABLE ONLY "ob-poc".verification_escalations
 
 
 --
--- Name: verification_escalations verification_escalations_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: verification_escalations verification_escalations_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".verification_escalations
@@ -13629,7 +14115,7 @@ ALTER TABLE ONLY "ob-poc".verification_escalations
 
 
 --
--- Name: verification_escalations verification_escalations_challenge_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: verification_escalations verification_escalations_challenge_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".verification_escalations
@@ -13637,7 +14123,7 @@ ALTER TABLE ONLY "ob-poc".verification_escalations
 
 
 --
--- Name: workflow_audit_log workflow_audit_log_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: workflow_audit_log workflow_audit_log_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: adamtc007
 --
 
 ALTER TABLE ONLY "ob-poc".workflow_audit_log
@@ -13645,7 +14131,7 @@ ALTER TABLE ONLY "ob-poc".workflow_audit_log
 
 
 --
--- Name: business_attributes business_attributes_domain_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: business_attributes business_attributes_domain_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.business_attributes
@@ -13653,7 +14139,7 @@ ALTER TABLE ONLY public.business_attributes
 
 
 --
--- Name: business_attributes business_attributes_source_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: business_attributes business_attributes_source_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.business_attributes
@@ -13661,7 +14147,7 @@ ALTER TABLE ONLY public.business_attributes
 
 
 --
--- Name: derived_attributes derived_attributes_domain_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: derived_attributes derived_attributes_domain_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.derived_attributes
@@ -13669,7 +14155,7 @@ ALTER TABLE ONLY public.derived_attributes
 
 
 --
--- Name: rule_dependencies rule_dependencies_attribute_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: rule_dependencies rule_dependencies_attribute_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.rule_dependencies
@@ -13677,7 +14163,7 @@ ALTER TABLE ONLY public.rule_dependencies
 
 
 --
--- Name: rule_dependencies rule_dependencies_rule_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: rule_dependencies rule_dependencies_rule_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.rule_dependencies
@@ -13685,7 +14171,7 @@ ALTER TABLE ONLY public.rule_dependencies
 
 
 --
--- Name: rule_executions rule_executions_rule_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: rule_executions rule_executions_rule_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.rule_executions
@@ -13693,7 +14179,7 @@ ALTER TABLE ONLY public.rule_executions
 
 
 --
--- Name: rule_versions rule_versions_rule_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: rule_versions rule_versions_rule_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.rule_versions
@@ -13701,7 +14187,7 @@ ALTER TABLE ONLY public.rule_versions
 
 
 --
--- Name: rules rules_category_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: rules rules_category_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.rules
@@ -13709,7 +14195,7 @@ ALTER TABLE ONLY public.rules
 
 
 --
--- Name: rules rules_target_attribute_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: rules rules_target_attribute_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: adamtc007
 --
 
 ALTER TABLE ONLY public.rules
@@ -13717,8 +14203,296 @@ ALTER TABLE ONLY public.rules
 
 
 --
+-- Name: SCHEMA "ob-poc"; Type: ACL; Schema: -; Owner: adamtc007
+--
+
+GRANT USAGE ON SCHEMA "ob-poc" TO PUBLIC;
+
+
+--
+-- Name: SCHEMA public; Type: ACL; Schema: -; Owner: adamtc007
+--
+
+REVOKE USAGE ON SCHEMA public FROM PUBLIC;
+GRANT ALL ON SCHEMA public TO PUBLIC;
+
+
+--
+-- Name: TABLE doc_request_acceptable_types; Type: ACL; Schema: kyc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,UPDATE ON TABLE kyc.doc_request_acceptable_types TO PUBLIC;
+
+
+--
+-- Name: TABLE case_decision_thresholds; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,UPDATE ON TABLE "ob-poc".case_decision_thresholds TO PUBLIC;
+
+
+--
+-- Name: TABLE case_evaluation_snapshots; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,UPDATE ON TABLE "ob-poc".case_evaluation_snapshots TO PUBLIC;
+
+
+--
+-- Name: TABLE cbu_entity_roles; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".cbu_entity_roles TO PUBLIC;
+
+
+--
+-- Name: TABLE entities; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".entities TO PUBLIC;
+
+
+--
+-- Name: TABLE entity_types; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".entity_types TO PUBLIC;
+
+
+--
+-- Name: TABLE cbus; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".cbus TO PUBLIC;
+
+
+--
+-- Name: TABLE crud_operations; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".crud_operations TO PUBLIC;
+
+
+--
+-- Name: TABLE dictionary; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".dictionary TO PUBLIC;
+
+
+--
+-- Name: TABLE document_catalog; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".document_catalog TO PUBLIC;
+
+
+--
+-- Name: TABLE document_types; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".document_types TO PUBLIC;
+
+
+--
+-- Name: TABLE dsl_domains; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".dsl_domains TO PUBLIC;
+
+
+--
+-- Name: TABLE dsl_examples; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".dsl_examples TO PUBLIC;
+
+
+--
+-- Name: TABLE dsl_execution_log; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".dsl_execution_log TO PUBLIC;
+
+
+--
+-- Name: TABLE dsl_versions; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".dsl_versions TO PUBLIC;
+
+
+--
+-- Name: TABLE dsl_execution_summary; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".dsl_execution_summary TO PUBLIC;
+
+
+--
+-- Name: TABLE dsl_instances; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".dsl_instances TO PUBLIC;
+
+
+--
+-- Name: SEQUENCE dsl_instances_id_seq; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,USAGE ON SEQUENCE "ob-poc".dsl_instances_id_seq TO PUBLIC;
+
+
+--
+-- Name: TABLE dsl_ob; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".dsl_ob TO PUBLIC;
+
+
+--
+-- Name: TABLE entity_crud_rules; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".entity_crud_rules TO PUBLIC;
+
+
+--
+-- Name: TABLE entity_limited_companies; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".entity_limited_companies TO PUBLIC;
+
+
+--
+-- Name: TABLE entity_partnerships; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".entity_partnerships TO PUBLIC;
+
+
+--
+-- Name: TABLE entity_proper_persons; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".entity_proper_persons TO PUBLIC;
+
+
+--
+-- Name: TABLE entity_trusts; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".entity_trusts TO PUBLIC;
+
+
+--
+-- Name: TABLE entity_validation_rules; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".entity_validation_rules TO PUBLIC;
+
+
+--
+-- Name: TABLE master_jurisdictions; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".master_jurisdictions TO PUBLIC;
+
+
+--
+-- Name: TABLE master_entity_xref; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".master_entity_xref TO PUBLIC;
+
+
+--
+-- Name: TABLE product_services; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".product_services TO PUBLIC;
+
+
+--
+-- Name: TABLE products; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".products TO PUBLIC;
+
+
+--
+-- Name: TABLE redflag_score_config; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,UPDATE ON TABLE "ob-poc".redflag_score_config TO PUBLIC;
+
+
+--
+-- Name: TABLE roles; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".roles TO PUBLIC;
+
+
+--
+-- Name: TABLE schema_changes; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".schema_changes TO PUBLIC;
+
+
+--
+-- Name: TABLE service_resource_types; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".service_resource_types TO PUBLIC;
+
+
+--
+-- Name: TABLE services; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".services TO PUBLIC;
+
+
+--
+-- Name: TABLE trust_parties; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".trust_parties TO PUBLIC;
+
+
+--
+-- Name: TABLE ubo_evidence; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".ubo_evidence TO PUBLIC;
+
+
+--
+-- Name: TABLE ubo_registry; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "ob-poc".ubo_registry TO PUBLIC;
+
+
+--
+-- Name: TABLE ubo_snapshot_comparisons; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,UPDATE ON TABLE "ob-poc".ubo_snapshot_comparisons TO PUBLIC;
+
+
+--
+-- Name: TABLE ubo_snapshots; Type: ACL; Schema: ob-poc; Owner: adamtc007
+--
+
+GRANT SELECT,INSERT,UPDATE ON TABLE "ob-poc".ubo_snapshots TO PUBLIC;
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict fi8zoUFKlrKiU3RCZv2WiLzrQtR1vCHZRNyTG3E09NuZwBuICSuQAIeMh5DvjJk
+\unrestrict gVc4bdDyLpvjBGhOcseMSz6ZXAHcB9SDudYAaDLIIwhM9JdTHTekBmKiNAZgT1n
 

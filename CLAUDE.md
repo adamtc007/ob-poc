@@ -584,6 +584,15 @@ ob-poc/
 │   │   │   ├── csg_linter.rs       # Context-sensitive validation
 │   │   │   ├── execution_plan.rs   # AST → ExecutionPlan compiler
 │   │   │   └── custom_ops/         # Plugin handlers for non-CRUD ops
+│   │   │       ├── mod.rs          # Registry + re-exports only (~370 lines)
+│   │   │       ├── entity_ops.rs   # EntityCreateOp
+│   │   │       ├── document_ops.rs # DocumentCatalogOp, DocumentExtractOp
+│   │   │       ├── screening_ops.rs # PEP, Sanctions, AdverseMedia ops
+│   │   │       ├── resource_ops.rs # Resource instance lifecycle ops
+│   │   │       ├── cbu_ops.rs      # CBU operations (add-product, show, decide, delete-cascade)
+│   │   │       ├── observation_ops.rs # Observation and allegation verification ops
+│   │   │       ├── ubo_analysis.rs # UBO chain tracing and snapshots
+│   │   │       └── ...             # Other domain-specific op modules
 │   │   ├── database/               # Repository pattern services
 │   │   │   └── visualization_repository.rs  # Centralized visualization queries
 │   │   ├── graph/                  # Graph visualization (single pipeline)

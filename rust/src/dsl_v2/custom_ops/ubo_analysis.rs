@@ -13,6 +13,150 @@ use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
+/// Calculate UBO (Ultimate Beneficial Ownership) chain
+///
+/// Rationale: Requires recursive graph traversal through ownership chains
+/// to identify beneficial owners above the specified threshold.
+pub struct UboCalculateOp;
+
+#[async_trait]
+impl CustomOperation for UboCalculateOp {
+    fn domain(&self) -> &'static str {
+        "ubo"
+    }
+    fn verb(&self) -> &'static str {
+        "calculate"
+    }
+    fn rationale(&self) -> &'static str {
+        "Requires recursive graph traversal through ownership hierarchy"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use serde_json::json;
+        use uuid::Uuid;
+
+        // Get CBU ID
+        let cbu_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "cbu-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
+
+        // Get threshold (default 25%)
+        let threshold: f64 = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "threshold")
+            .and_then(|a| a.value.as_decimal())
+            .map(|d| d.to_string().parse().unwrap_or(25.0))
+            .unwrap_or(25.0);
+
+        // First get the primary entity for this CBU
+        let cbu_entity = sqlx::query!(
+            r#"
+            SELECT e.entity_id
+            FROM "ob-poc".cbu_entity_roles cer
+            JOIN "ob-poc".entities e ON e.entity_id = cer.entity_id
+            JOIN "ob-poc".roles r ON r.role_id = cer.role_id
+            WHERE cer.cbu_id = $1
+            AND r.name IN ('Primary Entity', 'Main Entity', 'Client')
+            LIMIT 1
+            "#,
+            cbu_id
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        let target_entity_id = match cbu_entity {
+            Some(row) => row.entity_id,
+            None => {
+                // No primary entity found, return empty result
+                return Ok(ExecutionResult::RecordSet(vec![]));
+            }
+        };
+
+        // Query ownership structure using recursive CTE through entity_relationships
+        let ubos = sqlx::query!(
+            r#"
+            WITH RECURSIVE ownership_chain AS (
+                -- Base case: direct owners of the target entity
+                SELECT
+                    r.from_entity_id as entity_id,
+                    r.percentage as ownership_percent,
+                    ARRAY[r.from_entity_id] as path,
+                    1 as depth
+                FROM "ob-poc".entity_relationships r
+                WHERE r.to_entity_id = $1
+                AND r.relationship_type = 'ownership'
+                AND r.ownership_type IN ('DIRECT', 'BENEFICIAL', 'direct', 'beneficial')
+                AND (r.effective_to IS NULL OR r.effective_to > CURRENT_DATE)
+
+                UNION ALL
+
+                -- Recursive case: owners of owners
+                SELECT
+                    r2.from_entity_id as entity_id,
+                    (oc.ownership_percent * r2.percentage / 100)::numeric(5,2) as ownership_percent,
+                    oc.path || r2.from_entity_id,
+                    oc.depth + 1
+                FROM ownership_chain oc
+                JOIN "ob-poc".entity_relationships r2 ON r2.to_entity_id = oc.entity_id
+                WHERE oc.depth < 10
+                AND r2.relationship_type = 'ownership'
+                AND NOT r2.from_entity_id = ANY(oc.path)
+                AND (r2.effective_to IS NULL OR r2.effective_to > CURRENT_DATE)
+            )
+            SELECT
+                entity_id,
+                SUM(ownership_percent) as total_ownership
+            FROM ownership_chain
+            GROUP BY entity_id
+            HAVING SUM(ownership_percent) >= $2
+            ORDER BY total_ownership DESC
+            "#,
+            target_entity_id,
+            sqlx::types::BigDecimal::try_from(threshold).ok()
+        )
+        .fetch_all(pool)
+        .await?;
+
+        // Build result
+        let ubo_list: Vec<serde_json::Value> = ubos
+            .iter()
+            .map(|row| {
+                json!({
+                    "entity_id": row.entity_id,
+                    "ownership_percent": row.total_ownership
+                })
+            })
+            .collect();
+
+        Ok(ExecutionResult::RecordSet(ubo_list))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::RecordSet(vec![]))
+    }
+}
+
 /// Discover potential UBOs from document extraction or registry lookup
 ///
 /// Rationale: Orchestrates document extraction and registry lookups to identify
