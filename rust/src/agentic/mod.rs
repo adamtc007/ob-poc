@@ -67,6 +67,7 @@ pub mod validator;
 pub mod dsl_generator;
 pub mod entity_extractor;
 pub mod entity_types;
+pub mod evaluation;
 pub mod instrument_hierarchy;
 pub mod intent_classifier;
 pub mod market_regions;
@@ -103,3 +104,8 @@ pub use intent_classifier::{
 pub use market_regions::MarketRegionsConfig;
 pub use pipeline::{AgentPipeline, AgentResponse, PipelineError, ResponseType, SessionContext};
 pub use taxonomy::IntentTaxonomy;
+
+// Re-export evaluation types
+pub use evaluation::{
+    EvaluationDataset, EvaluationError, EvaluationReport, EvaluationResult, EvaluationRunner,
+};

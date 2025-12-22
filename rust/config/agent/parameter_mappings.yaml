@@ -42,7 +42,7 @@ parameter_mappings:
       - entity_type: market_reference
         param: scope-markets
         is_list: true
-        iterate_if_list: false  # Collect all into array
+        iterate_if_list: false # Collect all into array
 
       - entity_type: instrument_class_reference
         param: scope-instrument-classes
@@ -157,9 +157,9 @@ parameter_mappings:
         param: currency
         required: false
 
-# =============================================================================
-# Pricing Configuration Verbs
-# =============================================================================
+  # =============================================================================
+  # Pricing Configuration Verbs
+  # =============================================================================
   pricing-config.set:
     description: "Set pricing source for instrument class"
     mappings:
@@ -176,12 +176,12 @@ parameter_mappings:
       - entity_type: instrument_class_reference
         param: instrument-class
         required: true
-        iterate_if_list: true  # Generate multiple statements
+        iterate_if_list: true # Generate multiple statements
 
       - entity_type: market_reference
         param: market
         required: false
-        iterate_if_list: true  # Cross-product if both lists
+        iterate_if_list: true # Cross-product if both lists
 
       - entity_type: currency
         param: currency
@@ -224,9 +224,9 @@ parameter_mappings:
         param: instrument-class
         required: false
 
-# =============================================================================
-# Cash Sweep Configuration Verbs
-# =============================================================================
+  # =============================================================================
+  # Cash Sweep Configuration Verbs
+  # =============================================================================
   cash-sweep.configure:
     description: "Configure cash sweep for currency"
     mappings:
@@ -320,9 +320,9 @@ parameter_mappings:
       - entity_type: frequency
         param: sweep-frequency
 
-# =============================================================================
-# SLA Verbs
-# =============================================================================
+  # =============================================================================
+  # SLA Verbs
+  # =============================================================================
   sla.commit:
     description: "Create SLA commitment for CBU"
     mappings:
@@ -413,9 +413,11 @@ parameter_mappings:
         source: context_or_extract
 
       - entity_type: date_range
-        params:
-          - period-start
-          - period-end
+        param: period-start
+        required: true
+
+      - entity_type: date_range
+        param: period-end
         required: true
 
       - entity_type: measurement_value
@@ -453,9 +455,9 @@ parameter_mappings:
         param: root-cause-description
         required: true
 
-# =============================================================================
-# Trading Profile Verbs
-# =============================================================================
+  # =============================================================================
+  # Trading Profile Verbs
+  # =============================================================================
   trading-profile.create:
     description: "Create new trading profile for CBU"
     mappings:
@@ -549,9 +551,9 @@ parameter_mappings:
         param: sections
         is_list: true
 
-# =============================================================================
-# Custody/Settlement Verbs
-# =============================================================================
+  # =============================================================================
+  # Custody/Settlement Verbs
+  # =============================================================================
   cbu-custody.ensure-ssi:
     description: "Create or update standing settlement instruction"
     mappings:
@@ -674,16 +676,16 @@ transforms:
     description: "Convert to lowercase and replace spaces with hyphens"
     steps:
       - lowercase
-      - replace: [" ", "-"]
-      - replace: ["_", "-"]
-      - truncate: 20
+      - 'replace: [" ", "-"]'
+      - 'replace: ["_", "-"]'
+      - "truncate: 20"
 
   to_24h_format:
     description: "Convert time expression to HH:MM format"
     patterns:
-      - pattern: "(\d{1,2}):(\d{2})\s*(am|pm)"
+      - pattern: '(\d{1,2}):(\d{2})\s*(am|pm)'
         action: convert_12h_to_24h
-      - pattern: "(\d{1,2})(am|pm)"
+      - pattern: '(\d{1,2})(am|pm)'
         action: convert_12h_to_24h_no_minutes
       - pattern: "end of day"
         result: "17:00"
