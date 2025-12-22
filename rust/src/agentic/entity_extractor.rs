@@ -549,7 +549,7 @@ entity_types:
     description: "Currency"
     patterns:
       - type: ISO_CODE
-        regex: "[A-Z]{3}"
+        regex: "\\b(USD|EUR|GBP|JPY|CHF)\\b"
       - type: NAME
         mappings:
           "dollars": USD

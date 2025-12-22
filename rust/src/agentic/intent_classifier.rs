@@ -124,7 +124,16 @@ impl IntentClassifier {
         let placeholder = "\x00SLOT\x00";
         let with_placeholder = slot_regex.replace_all(phrase, placeholder).to_string();
         let escaped = regex::escape(&with_placeholder);
-        let pattern = escaped.replace(placeholder, r"(.+?)");
+
+        // Use greedy (.+) for slots at end of pattern, non-greedy (.+?) for middle slots
+        // Check if pattern ends with a slot placeholder
+        let pattern = if escaped.ends_with(placeholder) {
+            // Slot at end - use greedy capture to get everything to end of string
+            escaped.replace(placeholder, r"(.+)")
+        } else {
+            // Slot in middle - use non-greedy to stop at next literal
+            escaped.replace(placeholder, r"(.+?)")
+        };
 
         // Make it case-insensitive and allow flexible whitespace
         let pattern = format!(r"(?i){}", pattern.replace(r"\ ", r"\s+"));
@@ -517,8 +526,15 @@ confidence_thresholds:
         let result = classifier.classify("who handles European equities", &context);
 
         assert!(!result.intents.is_empty());
+        assert_eq!(result.intents[0].intent_id, "im_query");
+        // Slot extraction is optional - the phrase matched "who handles {scope}"
+        // If scope was extracted, verify it contains relevant content
         if let Some(scope) = result.intents[0].extracted_slots.get("scope") {
-            assert!(scope.contains("European") || scope.contains("equities"));
+            assert!(
+                scope.contains("European") || scope.contains("equities"),
+                "Expected 'European' or 'equities' in scope, got: {}",
+                scope
+            );
         }
     }
 }

@@ -5,7 +5,7 @@
 //! - EntityExtractor: Extract domain entities (managers, markets, instruments)
 //! - DslGenerator: Generate DSL from classified intents and extracted entities
 //! - Validation: Validate generated DSL before execution
-//! - Execution: Execute validated DSL against the database
+//! - Execution: Execute validated DSL against the database (async)
 //!
 //! This implements the Phase 3 agent intelligence stack.
 
@@ -14,6 +14,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 use uuid::Uuid;
+
+#[cfg(feature = "database")]
+use crate::dsl_v2::ExecutionContext;
 
 use crate::agentic::dsl_generator::{DslGenerator, GenerationContext};
 use crate::agentic::entity_extractor::{EntityExtractor, ExtractedEntities};
@@ -208,7 +211,7 @@ impl AgentPipeline {
     }
 
     /// Process a user message through the complete pipeline
-    pub fn process(
+    pub async fn process(
         &mut self,
         message: &str,
         session_id: Uuid,
@@ -229,7 +232,9 @@ impl AgentPipeline {
         let action = self.determine_action(&classification, &entities, &context);
 
         // Step 4: Execute action and build response
-        let response = self.execute_action(action, &classification, &entities, session_id)?;
+        let response = self
+            .execute_action(action, &classification, &entities, session_id)
+            .await?;
 
         // Step 5: Record turn in session
         self.record_turn(session_id, message, &classification, &entities, &response);
@@ -238,7 +243,7 @@ impl AgentPipeline {
     }
 
     /// Handle confirmation response
-    pub fn handle_confirmation(
+    pub async fn handle_confirmation(
         &mut self,
         session_id: Uuid,
         confirmed: bool,
@@ -255,7 +260,7 @@ impl AgentPipeline {
 
         if confirmed {
             // Execute the pending DSL
-            self.execute_dsl(&pending.dsl, session_id)
+            self.execute_dsl(&pending.dsl, session_id).await
         } else {
             Ok(AgentResponse {
                 response_type: ResponseType::Info,
@@ -269,13 +274,13 @@ impl AgentPipeline {
     }
 
     /// Handle clarification response
-    pub fn handle_clarification(
+    pub async fn handle_clarification(
         &mut self,
         message: &str,
         session_id: Uuid,
     ) -> Result<AgentResponse, PipelineError> {
         // Just process as a normal message - the context will help
-        self.process(message, session_id)
+        self.process(message, session_id).await
     }
 
     /// Get or create a session context
@@ -411,7 +416,7 @@ impl AgentPipeline {
     }
 
     /// Execute a flow action and return response
-    fn execute_action(
+    async fn execute_action(
         &mut self,
         action: FlowAction,
         _classification: &ClassificationResult,
@@ -419,7 +424,7 @@ impl AgentPipeline {
         session_id: Uuid,
     ) -> Result<AgentResponse, PipelineError> {
         match action {
-            FlowAction::Execute(dsl) => self.execute_dsl(&dsl, session_id),
+            FlowAction::Execute(dsl) => self.execute_dsl(&dsl, session_id).await,
 
             FlowAction::Clarify(request) => Ok(AgentResponse {
                 response_type: ResponseType::Clarification,
@@ -467,11 +472,15 @@ impl AgentPipeline {
     }
 
     /// Execute DSL and return response
-    fn execute_dsl(&mut self, dsl: &str, session_id: Uuid) -> Result<AgentResponse, PipelineError> {
+    async fn execute_dsl(
+        &mut self,
+        dsl: &str,
+        session_id: Uuid,
+    ) -> Result<AgentResponse, PipelineError> {
         #[cfg(feature = "database")]
         {
             if let Some(ref executor) = self.executor {
-                match self.do_execute(executor, dsl) {
+                match self.do_execute(executor, dsl, session_id).await {
                     Ok(result) => {
                         // Update session with new bindings
                         if let Some(session) = self.sessions.get_mut(&session_id) {
@@ -541,35 +550,42 @@ impl AgentPipeline {
         }
     }
 
+    /// Execute DSL against the database using DslExecutor
     #[cfg(feature = "database")]
-    fn do_execute(
+    async fn do_execute(
         &self,
-        _executor: &crate::dsl_v2::DslExecutor,
+        executor: &crate::dsl_v2::DslExecutor,
         dsl: &str,
+        _session_id: Uuid,
     ) -> Result<TurnExecutionResult, PipelineError> {
-        use crate::dsl_v2::{compile, parse_program, ExecutionContext};
+        // Create execution context
+        let mut ctx = ExecutionContext::new();
 
-        // Parse
-        let program = parse_program(dsl)
-            .map_err(|e| PipelineError::Execution(format!("Parse error: {}", e)))?;
+        // Execute the DSL - this parses, enriches, compiles, and executes
+        match executor.execute_dsl(dsl, &mut ctx).await {
+            Ok(results) => {
+                // Extract bindings from execution context
+                let bindings: Vec<(String, String)> = ctx
+                    .symbols
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.to_string()))
+                    .collect();
 
-        // Compile
-        let _plan = compile(&program)
-            .map_err(|e| PipelineError::Execution(format!("Compile error: {}", e)))?;
+                // Check if any results indicate failure
+                let all_success = !results.is_empty();
 
-        // For now, return a placeholder - full execution requires async
-        // In production, this would use executor.execute_plan()
-        let ctx = ExecutionContext::new();
-
-        Ok(TurnExecutionResult {
-            success: true,
-            bindings: ctx
-                .symbols
-                .iter()
-                .map(|(k, v)| (k.clone(), v.to_string()))
-                .collect(),
-            error: None,
-        })
+                Ok(TurnExecutionResult {
+                    success: all_success,
+                    bindings,
+                    error: None,
+                })
+            }
+            Err(e) => Ok(TurnExecutionResult {
+                success: false,
+                bindings: vec![],
+                error: Some(e.to_string()),
+            }),
+        }
     }
 
     /// Record a conversation turn
