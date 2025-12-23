@@ -506,27 +506,38 @@ impl App {
                 web_sys::console::log_1(&"ContextPanel: Clear stage focus".into());
                 self.state.set_stage_focus(None);
             }
-            ContextPanelAction::SwitchScope {
-                scope_type,
-                scope_id,
-            } => {
+            ContextPanelAction::SwitchScope { cbu_id, cbu_name } => {
                 web_sys::console::log_1(
-                    &format!("ContextPanel: Switch scope {}:{}", scope_type, scope_id).into(),
+                    &format!("ContextPanel: Switch to CBU {} ({})", cbu_name, cbu_id).into(),
                 );
-                // TODO: Handle scope switching (e.g., switch to different CBU)
+                // Parse UUID and switch CBU context
+                if let Ok(uuid) = Uuid::parse_str(&cbu_id) {
+                    self.state.select_cbu(uuid, &cbu_name);
+                }
             }
             ContextPanelAction::SelectContext {
                 context_type,
                 context_id,
+                display_label,
             } => {
                 web_sys::console::log_1(
                     &format!(
-                        "ContextPanel: Select context {}:{}",
-                        context_type, context_id
+                        "ContextPanel: Select {} '{}' ({})",
+                        context_type, display_label, context_id
                     )
                     .into(),
                 );
-                // TODO: Handle context selection (e.g., select a product)
+                // 1. Set as selected entity in UI (for entity detail panel)
+                self.state.selected_entity_id = Some(context_id.clone());
+
+                // 2. Bind to session so agent knows about the selected context
+                if let Ok(uuid) = Uuid::parse_str(&context_id) {
+                    self.state
+                        .bind_context_entity(uuid, &context_type, &display_label);
+                }
+
+                // 3. Highlight in graph if entity is visible
+                self.state.graph_widget.focus_entity(&context_id);
             }
         }
     }
@@ -1359,6 +1370,55 @@ impl AppState {
                     web_sys::console::error_1(&format!("set_stage_focus error: {}", e).into());
                     if let Ok(mut state) = async_state.lock() {
                         state.last_error = Some(format!("Failed to set stage focus: {}", e));
+                    }
+                }
+            }
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+    }
+
+    /// Bind a context entity (KYC case, product, ISDA, etc.) to the session
+    /// This makes the agent aware of the user's current focus
+    pub fn bind_context_entity(
+        &mut self,
+        entity_id: Uuid,
+        context_type: &str,
+        display_label: &str,
+    ) {
+        let Some(session_id) = self.session_id else {
+            web_sys::console::warn_1(&"bind_context_entity: no session_id".into());
+            return;
+        };
+
+        let async_state = Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+        let context_type = context_type.to_string();
+        let display_label = display_label.to_string();
+
+        spawn_local(async move {
+            let result =
+                api::bind_entity(session_id, entity_id, &context_type, &display_label).await;
+            match result {
+                Ok(_response) => {
+                    web_sys::console::log_1(
+                        &format!(
+                            "bind_context_entity: bound {} '{}' to session",
+                            context_type, display_label
+                        )
+                        .into(),
+                    );
+                    // Refetch session to get updated bindings
+                    let session_result = api::get_session(session_id).await;
+                    if let Ok(mut state) = async_state.lock() {
+                        state.pending_session = Some(session_result);
+                    }
+                }
+                Err(e) => {
+                    web_sys::console::error_1(&format!("bind_context_entity error: {}", e).into());
+                    if let Ok(mut state) = async_state.lock() {
+                        state.last_error = Some(format!("Failed to bind {}: {}", context_type, e));
                     }
                 }
             }

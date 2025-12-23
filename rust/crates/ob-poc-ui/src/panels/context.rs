@@ -15,17 +15,15 @@ use ob_poc_types::{LinkedContext, SessionContext};
 
 /// Action returned from context panel interactions
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Variants for future use
 pub enum ContextPanelAction {
-    /// User wants to switch to a different scope
-    SwitchScope {
-        scope_type: String,
-        scope_id: String,
-    },
-    /// User clicked on a linked context
+    /// User wants to switch to a different CBU scope (future: CBU switcher in context panel)
+    #[allow(dead_code)]
+    SwitchScope { cbu_id: String, cbu_name: String },
+    /// User clicked on a linked context entity (KYC case, product, ISDA, etc.)
     SelectContext {
         context_type: String,
         context_id: String,
+        display_label: String,
     },
     /// User clicked on a stage to focus on it
     FocusStage { stage_code: String },
@@ -145,6 +143,7 @@ fn render_context(ui: &mut Ui, context: &SessionContext) -> Option<ContextPanelA
                         action = Some(ContextPanelAction::SelectContext {
                             context_type: trading.context_type.clone(),
                             context_id: trading.id.clone(),
+                            display_label: trading.label.clone(),
                         });
                     }
                 });
@@ -212,6 +211,7 @@ fn render_linked_section(
                         action = Some(ContextPanelAction::SelectContext {
                             context_type: item.context_type.clone(),
                             context_id: item.id.clone(),
+                            display_label: item.label.clone(),
                         });
                     }
                     if let Some(ref status) = item.status {
