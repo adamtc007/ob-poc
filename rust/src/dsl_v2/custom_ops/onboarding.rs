@@ -1241,6 +1241,14 @@ impl CustomOperation for OnboardingAutoCompleteOp {
             .find(|a| a.key == "target-stage")
             .and_then(|a| a.value.as_string().map(|s| s.to_string()));
 
+        tracing::info!(
+            cbu_id = %cbu_id,
+            max_steps = max_steps,
+            dry_run = dry_run,
+            target_stage = ?target_stage,
+            "onboarding.auto-complete: starting"
+        );
+
         // Load semantic stage registry
         let registry = SemanticStageRegistry::load_default()
             .map_err(|e| anyhow!("Failed to load semantic stage registry: {}", e))?;
