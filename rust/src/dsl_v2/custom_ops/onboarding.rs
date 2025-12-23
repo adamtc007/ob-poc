@@ -1225,7 +1225,8 @@ impl CustomOperation for OnboardingAutoCompleteOp {
             .iter()
             .find(|a| a.key == "max-steps")
             .and_then(|a| a.value.as_integer())
-            .unwrap_or(20) as i32;
+            .map(|v| v.min(1000) as i32) // Cap at 1000 to prevent runaway
+            .unwrap_or(20);
 
         let dry_run: bool = verb_call
             .arguments
