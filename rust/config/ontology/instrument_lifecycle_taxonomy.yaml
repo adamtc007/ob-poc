@@ -1,0 +1,818 @@
+# Instrument Lifecycle Taxonomy
+# =============================================================================
+# Mirrors the Product → Service → Service Resource pattern:
+#   Instrument Class → Lifecycle → Lifecycle Resource
+#
+# Tables:
+#   instrument_classes (like products)
+#   lifecycles (like services)  
+#   lifecycle_resource_types (like service_resource_types)
+#   instrument_lifecycles (like product_services) - junction
+#   lifecycle_resource_capabilities (like service_resource_capabilities) - junction
+#   cbu_lifecycle_instances (like cbu_resource_instances) - CBU provisioning
+# =============================================================================
+
+version: "1.0"
+description: "Instrument lifecycle taxonomy - parallel to product/service/resource"
+
+# =============================================================================
+# LIFECYCLES (analogous to Services)
+# =============================================================================
+# These are the operational services/processes that instruments require
+# Stored in: lifecycles table
+
+lifecycles:
+
+  # ---------------------------------------------------------------------------
+  # Settlement Lifecycles
+  # ---------------------------------------------------------------------------
+  - code: SETTLEMENT_DVP
+    name: "DVP Settlement"
+    description: "Delivery versus payment settlement"
+    category: SETTLEMENT
+    owner: CUSTODY
+    sla_definition:
+      target_stp_rate: 98.5
+      target_fail_rate: 1.5
+      measurement_period: MONTHLY
+
+  - code: SETTLEMENT_FOP
+    name: "Free of Payment Settlement"
+    description: "Securities-only transfer"
+    category: SETTLEMENT
+    owner: CUSTODY
+
+  - code: SETTLEMENT_OTC
+    name: "OTC Settlement"
+    description: "Bilateral OTC settlement"
+    category: SETTLEMENT
+    owner: DERIVATIVES
+
+  - code: SETTLEMENT_CLS
+    name: "CLS Settlement"
+    description: "CLS FX settlement"
+    category: SETTLEMENT
+    owner: FX
+
+  # ---------------------------------------------------------------------------
+  # Asset Servicing Lifecycles
+  # ---------------------------------------------------------------------------
+  - code: CORPORATE_ACTIONS
+    name: "Corporate Actions"
+    description: "CA event processing and elections"
+    category: ASSET_SERVICING
+    owner: CUSTODY
+    sla_definition:
+      election_deadline_buffer_hours: 24
+
+  - code: INCOME_PROCESSING
+    name: "Income Processing"
+    description: "Dividend and coupon collection"
+    category: ASSET_SERVICING
+    owner: CUSTODY
+
+  - code: PROXY_VOTING
+    name: "Proxy Voting"
+    description: "Shareholder voting services"
+    category: ASSET_SERVICING
+    owner: CUSTODY
+
+  - code: CLASS_ACTIONS
+    name: "Class Actions"
+    description: "Securities litigation tracking"
+    category: ASSET_SERVICING
+    owner: CUSTODY
+
+  # ---------------------------------------------------------------------------
+  # Pricing & Valuation Lifecycles
+  # ---------------------------------------------------------------------------
+  - code: PRICING_EOD
+    name: "End of Day Pricing"
+    description: "Daily position valuation"
+    category: PRICING
+    owner: FUND_ACCOUNTING
+    sla_definition:
+      delivery_time: "18:00 EST"
+
+  - code: PRICING_INTRADAY
+    name: "Intraday Pricing"
+    description: "Real-time pricing feed"
+    category: PRICING
+    owner: TRADING
+
+  - code: VALUATION_OTC
+    name: "OTC Valuation"
+    description: "Mark-to-market OTC derivatives"
+    category: PRICING
+    owner: DERIVATIVES
+    sla_definition:
+      model_validation: REQUIRED
+      independent_price_verification: REQUIRED
+
+  # ---------------------------------------------------------------------------
+  # OTC Derivative Lifecycles
+  # ---------------------------------------------------------------------------
+  - code: CONFIRMATION
+    name: "Trade Confirmation"
+    description: "Electronic trade matching"
+    category: OTC_LIFECYCLE
+    owner: DERIVATIVES
+    sla_definition:
+      target_match_rate: 99.0
+      target_days_to_confirm: 1
+
+  - code: COLLATERAL_VM
+    name: "Variation Margin"
+    description: "Daily VM exchange"
+    category: COLLATERAL
+    owner: COLLATERAL_MGMT
+    sla_definition:
+      margin_call_deadline: "10:00 EST"
+      settlement_deadline: "14:00 EST"
+
+  - code: COLLATERAL_IM
+    name: "Initial Margin"
+    description: "Regulatory IM posting"
+    category: COLLATERAL
+    owner: COLLATERAL_MGMT
+    regulatory_driver: UMR
+
+  - code: RESET_FIXING
+    name: "Rate Fixing"
+    description: "Floating rate observation"
+    category: OTC_LIFECYCLE
+    owner: DERIVATIVES
+
+  - code: PAYMENT_NETTING
+    name: "Payment Netting"
+    description: "Netted payment calculation"
+    category: OTC_LIFECYCLE
+    owner: DERIVATIVES
+
+  - code: CREDIT_EVENT
+    name: "Credit Event Processing"
+    description: "CDS credit event handling"
+    category: OTC_LIFECYCLE
+    owner: DERIVATIVES
+
+  - code: EXERCISE_ASSIGNMENT
+    name: "Exercise & Assignment"
+    description: "Option exercise processing"
+    category: OTC_LIFECYCLE
+    owner: DERIVATIVES
+
+  # ---------------------------------------------------------------------------
+  # Tax Lifecycles
+  # ---------------------------------------------------------------------------
+  - code: TAX_RECLAIM
+    name: "Tax Reclaim"
+    description: "WHT reclamation"
+    category: TAX
+    owner: TAX_SERVICES
+
+  - code: TAX_REPORTING
+    name: "Tax Reporting"
+    description: "FATCA/CRS reporting"
+    category: TAX
+    owner: TAX_SERVICES
+    regulatory_driver: FATCA_CRS
+
+  # ---------------------------------------------------------------------------
+  # Regulatory Lifecycles
+  # ---------------------------------------------------------------------------
+  - code: TRADE_REPORTING
+    name: "Trade Reporting"
+    description: "Regulatory trade reporting"
+    category: REGULATORY
+    owner: COMPLIANCE
+    regulatory_driver: EMIR_MIFID_DFA
+
+  - code: POSITION_REPORTING
+    name: "Position Reporting"
+    description: "Position disclosure"
+    category: REGULATORY
+    owner: COMPLIANCE
+
+
+# =============================================================================
+# LIFECYCLE RESOURCE TYPES (analogous to Service Resource Types)
+# =============================================================================
+# These are the resources/accounts/connections that lifecycles need
+# Stored in: lifecycle_resource_types table
+
+lifecycle_resource_types:
+
+  # ---------------------------------------------------------------------------
+  # Account Resources
+  # ---------------------------------------------------------------------------
+  - code: SAFEKEEPING_ACCOUNT
+    name: "Safekeeping Account"
+    description: "Securities custody account"
+    resource_type: ACCOUNT
+    owner: CUSTODY
+    location_type: CSD_OR_CUSTODIAN
+    provisioning_verb: cbu-custody.ensure-ssi
+    provisioning_args:
+      type: SECURITIES
+
+  - code: CASH_ACCOUNT
+    name: "Cash Account"
+    description: "Settlement cash account"
+    resource_type: ACCOUNT
+    owner: CUSTODY
+    location_type: BANK
+    per_currency: true
+    provisioning_verb: cbu-custody.ensure-ssi
+    provisioning_args:
+      type: CASH
+
+  - code: COLLATERAL_ACCOUNT_VM
+    name: "VM Collateral Account"
+    description: "Variation margin account"
+    resource_type: ACCOUNT
+    owner: COLLATERAL_MGMT
+    location_type: CUSTODIAN_OR_COUNTERPARTY
+    per_counterparty: true
+
+  - code: COLLATERAL_ACCOUNT_IM
+    name: "IM Segregated Account"
+    description: "Initial margin segregated account"
+    resource_type: ACCOUNT
+    owner: COLLATERAL_MGMT
+    location_type: TRI_PARTY_AGENT
+    per_counterparty: true
+
+  - code: NOSTRO_ACCOUNT
+    name: "Nostro Account"
+    description: "Correspondent bank account"
+    resource_type: ACCOUNT
+    owner: TREASURY
+    location_type: CORRESPONDENT_BANK
+    per_currency: true
+
+  # ---------------------------------------------------------------------------
+  # SSI Resources
+  # ---------------------------------------------------------------------------
+  - code: SSI_SECURITIES
+    name: "Securities SSI"
+    description: "Securities settlement instruction"
+    resource_type: SSI
+    owner: CUSTODY
+    depends_on: [SAFEKEEPING_ACCOUNT]
+    provisioning_verb: cbu-custody.ensure-ssi
+
+  - code: SSI_CASH
+    name: "Cash SSI"
+    description: "Cash settlement instruction"
+    resource_type: SSI
+    owner: CUSTODY
+    depends_on: [CASH_ACCOUNT]
+    provisioning_verb: cbu-custody.ensure-ssi
+
+  # ---------------------------------------------------------------------------
+  # Agreement Resources
+  # ---------------------------------------------------------------------------
+  - code: ISDA_AGREEMENT
+    name: "ISDA Master Agreement"
+    description: "OTC derivatives master agreement"
+    resource_type: AGREEMENT
+    owner: LEGAL
+    per_counterparty: true
+    provisioning_verb: isda.create
+
+  - code: CSA_VM
+    name: "VM Credit Support Annex"
+    description: "CSA for variation margin"
+    resource_type: AGREEMENT
+    owner: COLLATERAL_MGMT
+    depends_on: [ISDA_AGREEMENT]
+    per_counterparty: true
+    provisioning_verb: isda.add-csa
+    provisioning_args:
+      csa-type: VM
+
+  - code: CSA_IM
+    name: "IM Credit Support Annex"
+    description: "CSA for initial margin"
+    resource_type: AGREEMENT
+    owner: COLLATERAL_MGMT
+    depends_on: [ISDA_AGREEMENT]
+    per_counterparty: true
+    provisioning_verb: isda.add-csa
+    provisioning_args:
+      csa-type: IM
+
+  - code: NETTING_AGREEMENT
+    name: "Netting Agreement"
+    description: "Payment netting terms"
+    resource_type: AGREEMENT
+    owner: LEGAL
+    depends_on: [ISDA_AGREEMENT]
+
+  # ---------------------------------------------------------------------------
+  # Connectivity Resources
+  # ---------------------------------------------------------------------------
+  - code: CONFIRMATION_PLATFORM
+    name: "Confirmation Platform"
+    description: "Electronic confirmation service"
+    resource_type: CONNECTIVITY
+    owner: DERIVATIVES
+    vendor_options:
+      - MARKITWIRE
+      - DTCC_GTR
+      - ICE_LINK
+      - BLOOMBERG_VCON
+    provisioning_verb: service-resource.provision
+    provisioning_args:
+      resource-type: CONFIRMATION_PLATFORM
+
+  - code: TRADE_REPOSITORY
+    name: "Trade Repository"
+    description: "Regulatory trade repository"
+    resource_type: CONNECTIVITY
+    owner: COMPLIANCE
+    vendor_options:
+      - DTCC_GTR
+      - REGIS_TR
+      - UNA_VISTA
+    provisioning_verb: service-resource.provision
+
+  - code: SWIFT_LINK
+    name: "SWIFT Connectivity"
+    description: "SWIFT messaging"
+    resource_type: CONNECTIVITY
+    owner: OPERATIONS
+
+  - code: CSD_LINK
+    name: "CSD Connectivity"
+    description: "Direct CSD connection"
+    resource_type: CONNECTIVITY
+    owner: CUSTODY
+    location_type: CSD
+
+  # ---------------------------------------------------------------------------
+  # Data Feed Resources
+  # ---------------------------------------------------------------------------
+  - code: PRICING_FEED
+    name: "Pricing Feed"
+    description: "Security pricing data"
+    resource_type: DATA_FEED
+    owner: PRICING
+    vendor_options:
+      - BLOOMBERG
+      - REFINITIV
+      - ICE
+      - INTERNAL
+    provisioning_verb: pricing-config.set
+
+  - code: PRICING_FEED_REALTIME
+    name: "Realtime Pricing Feed"
+    description: "Intraday pricing data"
+    resource_type: DATA_FEED
+    owner: TRADING
+    vendor_options:
+      - BLOOMBERG
+      - REFINITIV
+
+  - code: RATE_FEED
+    name: "Rate Feed"
+    description: "Interest rate fixings"
+    resource_type: DATA_FEED
+    owner: DERIVATIVES
+    vendor_options:
+      - BLOOMBERG
+      - REFINITIV
+      - ICE_BENCHMARK
+
+  - code: MARKET_DATA_FEED
+    name: "Market Data Feed"
+    description: "Market data for valuation"
+    resource_type: DATA_FEED
+    owner: DERIVATIVES
+
+  # ---------------------------------------------------------------------------
+  # Process Resources
+  # ---------------------------------------------------------------------------
+  - code: MARGIN_CALL_PROCESS
+    name: "Margin Call Process"
+    description: "Daily margin workflow"
+    resource_type: PROCESS
+    owner: COLLATERAL_MGMT
+    depends_on: [CSA_VM]
+
+  - code: IM_CALCULATION_MODEL
+    name: "IM Calculation"
+    description: "SIMM or Schedule calculation"
+    resource_type: PROCESS
+    owner: RISK
+    vendor_options:
+      - ISDA_SIMM
+      - SCHEDULE
+
+  - code: VALUATION_MODEL
+    name: "Valuation Model"
+    description: "OTC pricing model"
+    resource_type: PROCESS
+    owner: QUANT
+
+  # ---------------------------------------------------------------------------
+  # Classification Resources
+  # ---------------------------------------------------------------------------
+  - code: TAX_PROFILE
+    name: "Tax Profile"
+    description: "Tax status and treaty eligibility"
+    resource_type: CLASSIFICATION
+    owner: TAX_SERVICES
+
+  - code: TAX_CLASSIFICATION
+    name: "Tax Classification"
+    description: "FATCA/CRS classification"
+    resource_type: CLASSIFICATION
+    owner: TAX_SERVICES
+
+
+# =============================================================================
+# INSTRUMENT → LIFECYCLE MAPPINGS (analogous to product_services)
+# =============================================================================
+# Junction table: instrument_lifecycles
+# Which lifecycles apply to which instrument classes
+
+instrument_lifecycles:
+
+  # ---------------------------------------------------------------------------
+  # Equities
+  # ---------------------------------------------------------------------------
+  EQUITY:
+    mandatory:
+      - SETTLEMENT_DVP
+      - CORPORATE_ACTIONS
+      - INCOME_PROCESSING
+      - PRICING_EOD
+    optional:
+      - PROXY_VOTING
+      - CLASS_ACTIONS
+      - PRICING_INTRADAY
+      - TAX_RECLAIM
+      - POSITION_REPORTING
+
+  ETF:
+    mandatory:
+      - SETTLEMENT_DVP
+      - INCOME_PROCESSING
+      - PRICING_EOD
+    optional:
+      - CORPORATE_ACTIONS
+      - TAX_RECLAIM
+
+  # ---------------------------------------------------------------------------
+  # Fixed Income
+  # ---------------------------------------------------------------------------
+  GOVT_BOND:
+    mandatory:
+      - SETTLEMENT_DVP
+      - INCOME_PROCESSING
+      - PRICING_EOD
+    optional:
+      - TAX_RECLAIM
+
+  CORP_BOND:
+    mandatory:
+      - SETTLEMENT_DVP
+      - INCOME_PROCESSING
+      - PRICING_EOD
+      - CORPORATE_ACTIONS
+    optional:
+      - TAX_RECLAIM
+
+  # ---------------------------------------------------------------------------
+  # Listed Derivatives
+  # ---------------------------------------------------------------------------
+  EQUITY_FUTURE:
+    mandatory:
+      - SETTLEMENT_DVP
+      - PRICING_INTRADAY
+    optional:
+      - TRADE_REPORTING
+
+  EQUITY_OPTION:
+    mandatory:
+      - SETTLEMENT_DVP
+      - PRICING_INTRADAY
+      - EXERCISE_ASSIGNMENT
+    optional:
+      - TRADE_REPORTING
+
+  # ---------------------------------------------------------------------------
+  # OTC Interest Rates
+  # ---------------------------------------------------------------------------
+  IRS:
+    mandatory:
+      - CONFIRMATION
+      - COLLATERAL_VM
+      - RESET_FIXING
+      - PAYMENT_NETTING
+      - VALUATION_OTC
+      - TRADE_REPORTING
+    optional:
+      - COLLATERAL_IM
+    requires_isda: true
+
+  SWAPTION:
+    mandatory:
+      - CONFIRMATION
+      - COLLATERAL_VM
+      - EXERCISE_ASSIGNMENT
+      - VALUATION_OTC
+      - TRADE_REPORTING
+    optional:
+      - COLLATERAL_IM
+    requires_isda: true
+
+  FRA:
+    mandatory:
+      - CONFIRMATION
+      - RESET_FIXING
+      - VALUATION_OTC
+      - TRADE_REPORTING
+    optional:
+      - COLLATERAL_VM
+    requires_isda: true
+
+  XCCY:
+    mandatory:
+      - CONFIRMATION
+      - COLLATERAL_VM
+      - RESET_FIXING
+      - PAYMENT_NETTING
+      - VALUATION_OTC
+      - TRADE_REPORTING
+    optional:
+      - COLLATERAL_IM
+    requires_isda: true
+
+  # ---------------------------------------------------------------------------
+  # OTC Credit
+  # ---------------------------------------------------------------------------
+  CDS:
+    mandatory:
+      - CONFIRMATION
+      - COLLATERAL_VM
+      - CREDIT_EVENT
+      - VALUATION_OTC
+      - TRADE_REPORTING
+    optional:
+      - COLLATERAL_IM
+    requires_isda: true
+
+  CDS_INDEX:
+    mandatory:
+      - CONFIRMATION
+      - COLLATERAL_VM
+      - CREDIT_EVENT
+      - VALUATION_OTC
+      - TRADE_REPORTING
+    requires_isda: true
+
+  TRS:
+    mandatory:
+      - CONFIRMATION
+      - COLLATERAL_VM
+      - RESET_FIXING
+      - PAYMENT_NETTING
+      - VALUATION_OTC
+      - TRADE_REPORTING
+    requires_isda: true
+
+  # ---------------------------------------------------------------------------
+  # OTC FX
+  # ---------------------------------------------------------------------------
+  FX_FORWARD:
+    mandatory:
+      - CONFIRMATION
+      - SETTLEMENT_OTC
+      - VALUATION_OTC
+    optional:
+      - COLLATERAL_VM
+      - TRADE_REPORTING
+      - SETTLEMENT_CLS
+    requires_isda: true
+
+  FX_SWAP:
+    mandatory:
+      - CONFIRMATION
+      - SETTLEMENT_OTC
+      - VALUATION_OTC
+    optional:
+      - COLLATERAL_VM
+      - SETTLEMENT_CLS
+    requires_isda: true
+
+  FX_OPTION:
+    mandatory:
+      - CONFIRMATION
+      - COLLATERAL_VM
+      - EXERCISE_ASSIGNMENT
+      - VALUATION_OTC
+      - TRADE_REPORTING
+    optional:
+      - COLLATERAL_IM
+    requires_isda: true
+
+  FX_NDF:
+    mandatory:
+      - CONFIRMATION
+      - RESET_FIXING
+      - SETTLEMENT_OTC
+      - VALUATION_OTC
+      - TRADE_REPORTING
+    optional:
+      - COLLATERAL_VM
+    requires_isda: true
+
+  # ---------------------------------------------------------------------------
+  # OTC Equity
+  # ---------------------------------------------------------------------------
+  EQUITY_SWAP:
+    mandatory:
+      - CONFIRMATION
+      - COLLATERAL_VM
+      - RESET_FIXING
+      - PAYMENT_NETTING
+      - VALUATION_OTC
+      - TRADE_REPORTING
+    requires_isda: true
+
+  VARIANCE_SWAP:
+    mandatory:
+      - CONFIRMATION
+      - COLLATERAL_VM
+      - VALUATION_OTC
+      - TRADE_REPORTING
+    requires_isda: true
+
+  # ---------------------------------------------------------------------------
+  # Cash / Money Market
+  # ---------------------------------------------------------------------------
+  REPO:
+    mandatory:
+      - CONFIRMATION
+      - SETTLEMENT_DVP
+      - INCOME_PROCESSING
+    optional:
+      - TRADE_REPORTING
+
+  MMF:
+    mandatory:
+      - SETTLEMENT_DVP
+      - PRICING_EOD
+    sweep_eligible: true
+
+  STIF:
+    mandatory:
+      - SETTLEMENT_DVP
+      - PRICING_EOD
+    sweep_eligible: true
+
+
+# =============================================================================
+# LIFECYCLE → RESOURCE MAPPINGS (analogous to service_resource_capabilities)
+# =============================================================================
+# Junction table: lifecycle_resource_capabilities
+# Which resources each lifecycle requires
+
+lifecycle_resource_capabilities:
+
+  SETTLEMENT_DVP:
+    required:
+      - SAFEKEEPING_ACCOUNT
+      - CASH_ACCOUNT
+      - SSI_SECURITIES
+      - SSI_CASH
+    optional:
+      - CSD_LINK
+
+  SETTLEMENT_FOP:
+    required:
+      - SAFEKEEPING_ACCOUNT
+      - SSI_SECURITIES
+
+  SETTLEMENT_OTC:
+    required:
+      - CASH_ACCOUNT
+      - SSI_CASH
+    optional:
+      - NOSTRO_ACCOUNT
+
+  SETTLEMENT_CLS:
+    required:
+      - CASH_ACCOUNT
+    optional:
+      - CSD_LINK
+
+  CORPORATE_ACTIONS:
+    required:
+      - SAFEKEEPING_ACCOUNT
+      - CASH_ACCOUNT
+    optional:
+      - SWIFT_LINK
+
+  INCOME_PROCESSING:
+    required:
+      - SAFEKEEPING_ACCOUNT
+      - CASH_ACCOUNT
+      - TAX_PROFILE
+
+  PROXY_VOTING:
+    required:
+      - SAFEKEEPING_ACCOUNT
+
+  PRICING_EOD:
+    required:
+      - PRICING_FEED
+    optional:
+      - PRICING_FEED  # fallback
+
+  PRICING_INTRADAY:
+    required:
+      - PRICING_FEED_REALTIME
+
+  VALUATION_OTC:
+    required:
+      - VALUATION_MODEL
+      - MARKET_DATA_FEED
+
+  CONFIRMATION:
+    required:
+      - CONFIRMATION_PLATFORM
+    optional:
+      - SWIFT_LINK
+
+  COLLATERAL_VM:
+    required:
+      - CSA_VM
+      - COLLATERAL_ACCOUNT_VM
+      - MARGIN_CALL_PROCESS
+
+  COLLATERAL_IM:
+    required:
+      - CSA_IM
+      - COLLATERAL_ACCOUNT_IM
+      - IM_CALCULATION_MODEL
+
+  RESET_FIXING:
+    required:
+      - RATE_FEED
+
+  PAYMENT_NETTING:
+    required:
+      - CASH_ACCOUNT
+      - NETTING_AGREEMENT
+
+  CREDIT_EVENT:
+    required: []
+    optional:
+      - MARKET_DATA_FEED
+
+  EXERCISE_ASSIGNMENT:
+    required: []
+
+  TAX_RECLAIM:
+    required:
+      - TAX_PROFILE
+
+  TAX_REPORTING:
+    required:
+      - TAX_CLASSIFICATION
+
+  TRADE_REPORTING:
+    required:
+      - TRADE_REPOSITORY
+
+
+# =============================================================================
+# LOCATION MAPPINGS
+# =============================================================================
+# Where resources are provisioned based on context
+
+location_mappings:
+
+  # Market → CSD
+  csd_by_market:
+    XLON: { csd: CREST, bic: CABORICREST }
+    XETR: { csd: CBF, bic: DAABORICBF }
+    XPAR: { csd: EUROCLEAR_FR, bic: MABORICPARF }
+    XAMS: { csd: EUROCLEAR_NL, bic: MABORICAMST }
+    XBRU: { csd: EUROCLEAR_BE, bic: MABORICBRSL }
+    XNYS: { csd: DTCC, bic: DTCYUS33 }
+    XNAS: { csd: DTCC, bic: DTCYUS33 }
+    XTKS: { csd: JASDEC, bic: JAABORICTKY }
+    XHKG: { csd: CCASS, bic: CCSSBORICHKG }
+    XSES: { csd: CDP, bic: CDPABORICSGP }
+    XASX: { csd: CHESS, bic: CHSABORICSYD }
+
+  # Tri-party IM custodians
+  im_custodians:
+    - { code: BNYM, bic: IABORICUS33 }
+    - { code: JPM, bic: CHASUS33 }
+    - { code: STATE_STREET, bic: SBOSUS33 }
+    - { code: EUROCLEAR, bic: MABORICBRSL }

@@ -24,6 +24,8 @@ mod custody;
 mod document_ops;
 mod entity_ops;
 pub mod entity_query;
+mod lifecycle_ops;
+mod matrix_overlay_ops;
 mod observation_ops;
 mod onboarding;
 mod refdata_loader;
@@ -55,6 +57,11 @@ pub use custody::{
     ValidateBookingCoverageOp,
 };
 pub use entity_query::{EntityQueryOp, EntityQueryResult};
+pub use lifecycle_ops::{
+    LifecycleAnalyzeGapsOp, LifecycleCheckReadinessOp, LifecycleDiscoverOp, LifecycleExecutePlanOp,
+    LifecycleGeneratePlanOp, LifecycleProvisionOp,
+};
+pub use matrix_overlay_ops::{MatrixCompareProductsOp, MatrixEffectiveOp, MatrixUnifiedGapsOp};
 pub use onboarding::{
     OnboardingEnsureOp, OnboardingExecuteOp, OnboardingGetUrlsOp, OnboardingPlanOp,
     OnboardingShowPlanOp, OnboardingStatusOp,
@@ -279,6 +286,19 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(FindPricingForInstrumentOp));
         registry.register(Arc::new(ListOpenSlaBreachesOp));
 
+        // Lifecycle operations (Instrument → Lifecycle → Resource taxonomy)
+        registry.register(Arc::new(LifecycleProvisionOp));
+        registry.register(Arc::new(LifecycleAnalyzeGapsOp));
+        registry.register(Arc::new(LifecycleCheckReadinessOp));
+        registry.register(Arc::new(LifecycleDiscoverOp));
+        registry.register(Arc::new(LifecycleGeneratePlanOp));
+        registry.register(Arc::new(LifecycleExecutePlanOp));
+
+        // Matrix-Overlay operations (Trading Matrix ↔ Product linkage)
+        registry.register(Arc::new(MatrixEffectiveOp));
+        registry.register(Arc::new(MatrixUnifiedGapsOp));
+        registry.register(Arc::new(MatrixCompareProductsOp));
+
         // Reference Data bulk loading operations
         for op in get_refdata_operations() {
             registry.register(Arc::from(op));
@@ -353,6 +373,17 @@ mod tests {
         assert!(registry.has("investment-manager", "find-for-trade"));
         assert!(registry.has("pricing-config", "find-for-instrument"));
         assert!(registry.has("sla", "list-open-breaches"));
+        // Lifecycle operations
+        assert!(registry.has("lifecycle", "provision"));
+        assert!(registry.has("lifecycle", "analyze-gaps"));
+        assert!(registry.has("lifecycle", "check-readiness"));
+        assert!(registry.has("lifecycle", "discover"));
+        assert!(registry.has("lifecycle", "generate-plan"));
+        assert!(registry.has("lifecycle", "execute-plan"));
+        // Matrix-Overlay operations
+        assert!(registry.has("matrix-overlay", "effective-matrix"));
+        assert!(registry.has("matrix-overlay", "unified-gaps"));
+        assert!(registry.has("matrix-overlay", "compare-products"));
     }
 
     #[test]

@@ -1,0 +1,415 @@
+# Lifecycle Discovery Agent Intents
+# =============================================================================
+# Extends intent_taxonomy.yaml with lifecycle discovery and provisioning intents
+# =============================================================================
+
+version: "1.0"
+description: "Agent intents for lifecycle discovery and provisioning"
+
+# =============================================================================
+# LIFECYCLE DISCOVERY DOMAIN
+# =============================================================================
+lifecycle_discovery:
+  description: "Automatic discovery and provisioning of instrument lifecycle dependencies"
+
+  # ---------------------------------------------------------------------------
+  # Universe Declaration (triggers lifecycle discovery)
+  # ---------------------------------------------------------------------------
+  universe_declaration:
+    description: "Intents that declare what instruments the CBU trades"
+
+    intents:
+      - intent: declare_trading_scope
+        description: "User declares what they want to trade - triggers full lifecycle discovery"
+        canonical_verb: lifecycle.analyze-gaps
+        trigger_phrases:
+          - "we trade {instruments}"
+          - "we want to trade {instruments}"
+          - "{instruments} in {markets}"
+          - "add {instruments} to our universe"
+          - "we'll be trading {instruments}"
+          - "enable {instruments}"
+          - "set up trading for {instruments}"
+          - "we need to trade {instruments} with {counterparties}"
+          - "{instruments} with {counterparties}"
+        required_entities:
+          - instrument_classes
+        optional_entities:
+          - markets
+          - counterparties
+          - currencies
+        post_actions:
+          - expand_instrument_scope
+          - expand_market_scope
+          - discover_lifecycles
+          - identify_gaps
+          - prompt_for_gaps
+        examples:
+          - input: "We trade European equities and vanilla IRS with Goldman"
+            entities:
+              instrument_classes: ["EQUITY", "IRS"]
+              markets: ["XLON", "XETR", "XPAR", "XAMS"]
+              counterparties: ["Goldman Sachs"]
+            lifecycle_discovery:
+              EQUITY:
+                lifecycles: [settlement_dvp, corporate_actions, income_processing, pricing_eod, tax_reclaim]
+                gaps: [safekeeping_account, ssi_securities, ssi_cash]
+              IRS:
+                lifecycles: [confirmation, collateral_vm, reset_fixing, payment_netting, valuation_otc, trade_reporting]
+                gaps: [isda_agreement, csa_agreement, confirmation_platform_link]
+
+          - input: "Add CDS index trading with JPM and Citi"
+            entities:
+              instrument_classes: ["CDS_INDEX"]
+              counterparties: ["JPMorgan", "Citibank"]
+            lifecycle_discovery:
+              CDS_INDEX:
+                lifecycles: [confirmation, collateral_vm, credit_event, valuation_otc, trade_reporting]
+                gaps_per_counterparty:
+                  JPMorgan: [isda_agreement, csa_agreement]
+                  Citibank: [isda_agreement, csa_agreement]
+
+      - intent: declare_otc_counterparty
+        description: "User declares OTC derivative counterparty - triggers ISDA/CSA discovery"
+        canonical_verb: lifecycle.analyze-gaps
+        trigger_phrases:
+          - "we trade derivatives with {counterparty}"
+          - "{counterparty} is our swap counterparty"
+          - "add {counterparty} for {instruments}"
+          - "we have {instruments} with {counterparty}"
+          - "{counterparty} for {instruments}"
+        required_entities:
+          - counterparty_reference
+        optional_entities:
+          - instrument_classes
+        post_actions:
+          - check_isda_exists
+          - check_csa_exists
+          - discover_confirmation_method
+          - prompt_for_gaps
+
+  # ---------------------------------------------------------------------------
+  # Gap Resolution (user responds to prompts)
+  # ---------------------------------------------------------------------------
+  gap_resolution:
+    description: "Intents for resolving discovered gaps"
+
+    intents:
+      - intent: provide_custodian
+        description: "User provides custodian/CSD for safekeeping"
+        trigger_phrases:
+          - "use {custodian} for {market}"
+          - "{custodian} holds our {market} account"
+          - "account at {custodian}"
+          - "{custodian} for securities"
+        resolves_gap: safekeeping_account
+        required_entities:
+          - custodian_reference
+        optional_entities:
+          - market
+          - account_number
+
+      - intent: provide_isda_details
+        description: "User confirms ISDA exists or provides details"
+        trigger_phrases:
+          - "we have an ISDA with {counterparty}"
+          - "ISDA signed in {year}"
+          - "2002 ISDA under {law}"
+          - "{law} law ISDA"
+          - "yes, we have ISDA"
+        resolves_gap: isda_agreement
+        required_entities: []
+        optional_entities:
+          - counterparty_reference
+          - isda_version
+          - governing_law
+          - agreement_date
+
+      - intent: provide_csa_details
+        description: "User provides CSA terms"
+        trigger_phrases:
+          - "zero threshold"
+          - "threshold is {amount}"
+          - "we post {collateral_types}"
+          - "MTA is {amount}"
+          - "daily margin calls"
+          - "VM CSA with zero threshold"
+        resolves_gap: csa_agreement
+        required_entities: []
+        optional_entities:
+          - threshold_amount
+          - mta_amount
+          - eligible_collateral
+          - valuation_time
+
+      - intent: provide_confirmation_method
+        description: "User specifies confirmation platform"
+        trigger_phrases:
+          - "use {platform} for confirmations"
+          - "confirm via {platform}"
+          - "{platform} for {instruments}"
+          - "MarkitWire"
+          - "DTCC"
+          - "ICE"
+        resolves_gap: confirmation_platform_link
+        required_entities:
+          - confirmation_method
+        optional_entities:
+          - instrument_classes
+          - counterparty_reference
+
+      - intent: provide_pricing_source
+        description: "User specifies pricing vendor"
+        trigger_phrases:
+          - "Bloomberg for pricing"
+          - "use {source} for {instruments}"
+          - "price from {source}"
+          - "Refinitiv"
+          - "ICE pricing"
+        resolves_gap: pricing_feed
+        required_entities:
+          - pricing_source
+        optional_entities:
+          - instrument_classes
+
+      - intent: provide_ssi_details
+        description: "User provides SSI account details"
+        trigger_phrases:
+          - "account number is {account}"
+          - "BIC is {bic}"
+          - "settle at {bic}"
+          - "{custodian} account {account}"
+        resolves_gap: ssi_securities
+        required_entities:
+          - bic_or_account
+        optional_entities:
+          - custodian_reference
+          - account_name
+
+  # ---------------------------------------------------------------------------
+  # Provisioning (after gaps resolved)
+  # ---------------------------------------------------------------------------
+  provisioning:
+    description: "Intents for executing provisioning"
+
+    intents:
+      - intent: provision_all
+        description: "User approves full provisioning"
+        canonical_verb: lifecycle.execute-plan
+        trigger_phrases:
+          - "set it all up"
+          - "provision everything"
+          - "go ahead"
+          - "looks good, do it"
+          - "execute the plan"
+          - "create everything"
+        confirmation_required: true
+        
+      - intent: provision_selective
+        description: "User approves partial provisioning"
+        canonical_verb: lifecycle.execute-plan
+        trigger_phrases:
+          - "just set up {components}"
+          - "only create {components}"
+          - "do {components} first"
+          - "skip {components}"
+        required_entities:
+          - component_selection
+        confirmation_required: true
+
+      - intent: review_plan
+        description: "User wants to review before provisioning"
+        canonical_verb: lifecycle.provision-plan
+        trigger_phrases:
+          - "show me the plan"
+          - "what will be created"
+          - "review before executing"
+          - "let me see what you'll do"
+        is_query: true
+
+  # ---------------------------------------------------------------------------
+  # Readiness Checks
+  # ---------------------------------------------------------------------------
+  readiness:
+    description: "Intents for checking trading readiness"
+
+    intents:
+      - intent: check_readiness
+        description: "User asks if they're ready to trade"
+        canonical_verb: lifecycle.check-readiness
+        trigger_phrases:
+          - "are we ready to trade {instruments}"
+          - "can we trade {instruments} in {market}"
+          - "is {instruments} set up"
+          - "what's missing for {instruments}"
+          - "ready for {instruments}?"
+        is_query: true
+        required_entities:
+          - instrument_class
+        optional_entities:
+          - market
+          - counterparty
+
+      - intent: show_gaps
+        description: "User asks about gaps"
+        canonical_verb: lifecycle.analyze-gaps
+        trigger_phrases:
+          - "what's missing"
+          - "show me the gaps"
+          - "what needs to be set up"
+          - "what's blocking us"
+          - "any gaps"
+        is_query: true
+
+      - intent: visualize_coverage
+        description: "User wants to see coverage map"
+        canonical_verb: lifecycle.visualize-cbu-coverage
+        trigger_phrases:
+          - "show coverage"
+          - "visualize our setup"
+          - "what do we have"
+          - "show the matrix"
+          - "lifecycle map"
+        is_query: true
+
+
+# =============================================================================
+# AGENT WORKFLOW ORCHESTRATION
+# =============================================================================
+workflow_orchestration:
+  description: "How the agent orchestrates lifecycle discovery conversations"
+
+  # The main flow when user declares trading scope
+  trading_scope_flow:
+    trigger: declare_trading_scope
+    steps:
+      - step: expand_scope
+        description: "Expand shorthand to specific instruments/markets"
+        action: |
+          - "European equities" → [XLON, XETR, XPAR, XAMS, ...]
+          - "vanilla rates" → [IRS, FRA]
+          - "credit" in derivatives context → [CDS, CDS_INDEX]
+
+      - step: discover_lifecycles
+        description: "Look up mandatory lifecycles for each instrument"
+        action: |
+          For each (instrument, market, counterparty) tuple:
+            1. Load instrument_lifecycle_graph.yaml
+            2. Get mandatory_lifecycles for instrument
+            3. For each lifecycle, get required_resources
+            4. Build dependency tree
+
+      - step: check_provisioned
+        description: "Check which resources already exist"
+        action: |
+          For each required resource:
+            1. Query appropriate table (cbu_ssi, isda_agreements, etc.)
+            2. Mark as PROVISIONED or MISSING
+            3. For MISSING, load gap_prompt template
+
+      - step: present_gaps
+        description: "Present gaps to user and prompt for info"
+        action: |
+          Group gaps by priority:
+            1. Blocking (ISDA for OTC, safekeeping for settlement)
+            2. Required (SSIs, CSAs)
+            3. Optional (fallback pricing, proxy voting)
+          
+          Present blocking gaps first with prompts.
+
+      - step: collect_responses
+        description: "Collect user responses to gap prompts"
+        action: |
+          For each gap prompt response:
+            1. Parse entity from response
+            2. Validate entity (BIC format, account format, etc.)
+            3. Update gap resolution state
+
+      - step: generate_plan
+        description: "Generate DSL provisioning plan"
+        action: |
+          For each resolved gap:
+            1. Get provisioning_verb from resource definition
+            2. Build DSL statement with collected params
+            3. Order statements by dependency
+
+      - step: confirm_and_execute
+        description: "Get confirmation and execute plan"
+        action: |
+          1. Present plan summary to user
+          2. On confirmation, execute DSL statements
+          3. Report results
+
+  # Natural conversation patterns
+  conversation_patterns:
+    
+    # Pattern: User declares scope, agent discovers and prompts
+    discovery_conversation:
+      - user: "We trade European equities and vanilla IRS with Goldman"
+      - agent: |
+          I'll set up trading for:
+          - Equities in London, Frankfurt, Paris, Amsterdam
+          - Interest Rate Swaps with Goldman Sachs
+          
+          For European equities, I need to know:
+          - Which custodian holds your European securities?
+          
+          For IRS with Goldman:
+          - Do you have an ISDA Master Agreement with them?
+      - user: "BNY for Europe, and yes we have 2002 ISDA under NY law"
+      - agent: |
+          Got it. For the Goldman ISDA:
+          - What are your CSA terms? (threshold, MTA, eligible collateral)
+          - How do you confirm IRS trades? (MarkitWire, DTCC, etc.)
+      - user: "Zero threshold, daily margining, USD cash only. MarkitWire for confirms."
+      - agent: |
+          I have everything I need. Here's what I'll create:
+          
+          **European Equities:**
+          - SSI for London (Euroclear UK)
+          - SSI for Euronext markets (Euroclear)
+          - Booking rules for DVP settlement
+          
+          **IRS with Goldman:**
+          - ISDA record (2002, NY law)
+          - VM CSA (zero threshold, USD cash)
+          - MarkitWire confirmation link
+          
+          Ready to provision? [Yes/Review/Modify]
+
+    # Pattern: User adds single instrument type
+    single_instrument_addition:
+      - user: "Add CDS to our Goldman relationship"
+      - agent: |
+          To trade CDS with Goldman, I'll extend your existing ISDA coverage.
+          
+          CDS requires these additional lifecycles:
+          - Credit event determination (ISDA DC)
+          - Auction participation
+          
+          Your existing VM CSA will cover CDS margining.
+          
+          Ready to add CDS coverage? [Yes/Review]
+
+    # Pattern: User asks about gaps
+    gap_inquiry:
+      - user: "What's missing for Asian equities?"
+      - agent: |
+          For Asian equity trading, you're missing:
+          
+          **Hong Kong (XHKG):**
+          - Safekeeping account at CCASS
+          - Securities SSI
+          - Cash SSI (HKD)
+          
+          **Tokyo (XTKS):**
+          - Safekeeping account at JASDEC
+          - Securities SSI
+          - Cash SSI (JPY)
+          
+          **Singapore (XSES):**
+          - Safekeeping account at CDP
+          - Securities SSI
+          - Cash SSI (SGD)
+          
+          Would you like me to set these up?

@@ -69,6 +69,9 @@ pub mod templates;
 // Verification module - adversarial agent model for KYC
 pub mod verification;
 
+// Taxonomy module - generic taxonomy pattern for Product/Instrument domains
+pub mod taxonomy;
+
 // Database integration re-exports (when database feature is enabled)
 #[cfg(feature = "database")]
 pub use database::DictionaryDatabaseService;

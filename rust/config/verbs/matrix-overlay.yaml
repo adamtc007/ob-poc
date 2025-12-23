@@ -1,0 +1,463 @@
+# Matrix-Overlay Domain Verbs
+# =============================================================================
+# Links Trading Matrix entries to Product subscriptions
+# Key insight: Products ADD attributes to matrix entries, they don't define them
+# =============================================================================
+
+domains:
+  product-subscription:
+    description: "CBU product subscription management"
+
+    verbs:
+      # =========================================================================
+      # PRODUCT SUBSCRIPTION CRUD
+      # =========================================================================
+
+      subscribe:
+        description: "Subscribe a CBU to a product"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: cbu_product_subscriptions
+          schema: ob-poc
+          unique_cols:
+            - cbu_id
+            - product_id
+          returning: subscription_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: product
+            type: lookup
+            required: true
+            maps_to: product_id
+            lookup:
+              table: products
+              entity_type: product
+              schema: ob-poc
+              code_column: product_code
+              id_column: product_id
+          - name: effective-from
+            type: date
+            required: false
+            maps_to: effective_from
+          - name: config
+            type: json
+            required: false
+            maps_to: config
+        returns:
+          type: uuid
+          name: subscription_id
+          capture: true
+
+      unsubscribe:
+        description: "Terminate a product subscription"
+        behavior: crud
+        crud:
+          operation: update
+          table: cbu_product_subscriptions
+          schema: ob-poc
+          key: subscription_id
+          set_values:
+            status: TERMINATED
+            effective_to: now()
+        args:
+          - name: subscription-id
+            type: uuid
+            required: true
+            maps_to: subscription_id
+        returns:
+          type: affected
+
+      suspend:
+        description: "Suspend a product subscription"
+        behavior: crud
+        crud:
+          operation: update
+          table: cbu_product_subscriptions
+          schema: ob-poc
+          key: subscription_id
+          set_values:
+            status: SUSPENDED
+        args:
+          - name: subscription-id
+            type: uuid
+            required: true
+            maps_to: subscription_id
+        returns:
+          type: affected
+
+      reactivate:
+        description: "Reactivate a suspended subscription"
+        behavior: crud
+        crud:
+          operation: update
+          table: cbu_product_subscriptions
+          schema: ob-poc
+          key: subscription_id
+          set_values:
+            status: ACTIVE
+        args:
+          - name: subscription-id
+            type: uuid
+            required: true
+            maps_to: subscription_id
+        returns:
+          type: affected
+
+      list:
+        description: "List product subscriptions for a CBU"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: cbu_product_subscriptions
+          schema: ob-poc
+          fk_col: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+            valid_values:
+              - PENDING
+              - ACTIVE
+              - SUSPENDED
+              - TERMINATED
+        returns:
+          type: record_set
+
+  matrix-overlay:
+    description: "Trading matrix product overlay management"
+
+    verbs:
+      # =========================================================================
+      # OVERLAY OPERATIONS
+      # =========================================================================
+
+      add:
+        description: "Add a product overlay to matrix entries"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: cbu_matrix_product_overlay
+          schema: ob-poc
+          unique_cols:
+            - cbu_id
+            - subscription_id
+            - instrument_class_id
+            - market_id
+            - currency
+            - counterparty_entity_id
+          returning: overlay_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: subscription-id
+            type: uuid
+            required: true
+            maps_to: subscription_id
+          # Context scoping (NULL = applies to all)
+          - name: instrument-class
+            type: lookup
+            required: false
+            maps_to: instrument_class_id
+            lookup:
+              table: instrument_classes
+              entity_type: instrument_class
+              schema: custody
+              code_column: code
+              id_column: class_id
+          - name: market
+            type: lookup
+            required: false
+            maps_to: market_id
+            lookup:
+              table: markets
+              entity_type: market
+              schema: custody
+              code_column: mic
+              id_column: market_id
+          - name: currency
+            type: string
+            required: false
+            maps_to: currency
+          - name: counterparty
+            type: uuid
+            required: false
+            maps_to: counterparty_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          # Attributes this overlay adds
+          - name: additional-services
+            type: json
+            required: false
+            maps_to: additional_services
+            description: "Array of service codes to add"
+          - name: additional-slas
+            type: json
+            required: false
+            maps_to: additional_slas
+            description: "Array of SLA template codes"
+          - name: additional-resources
+            type: json
+            required: false
+            maps_to: additional_resources
+            description: "Array of extra resource requirements"
+          - name: config
+            type: json
+            required: false
+            maps_to: product_specific_config
+        returns:
+          type: uuid
+          name: overlay_id
+          capture: true
+
+      remove:
+        description: "Remove a product overlay"
+        behavior: crud
+        crud:
+          operation: delete
+          table: cbu_matrix_product_overlay
+          schema: ob-poc
+          key: overlay_id
+        args:
+          - name: overlay-id
+            type: uuid
+            required: true
+            maps_to: overlay_id
+        returns:
+          type: affected
+
+      suspend:
+        description: "Suspend a product overlay"
+        behavior: crud
+        crud:
+          operation: update
+          table: cbu_matrix_product_overlay
+          schema: ob-poc
+          key: overlay_id
+          set_values:
+            status: SUSPENDED
+        args:
+          - name: overlay-id
+            type: uuid
+            required: true
+            maps_to: overlay_id
+        returns:
+          type: affected
+
+      activate:
+        description: "Activate a suspended overlay"
+        behavior: crud
+        crud:
+          operation: update
+          table: cbu_matrix_product_overlay
+          schema: ob-poc
+          key: overlay_id
+          set_values:
+            status: ACTIVE
+        args:
+          - name: overlay-id
+            type: uuid
+            required: true
+            maps_to: overlay_id
+        returns:
+          type: affected
+
+      list:
+        description: "List overlays for a CBU"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: cbu_matrix_product_overlay
+          schema: ob-poc
+          fk_col: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: subscription-id
+            type: uuid
+            required: false
+            maps_to: subscription_id
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+        returns:
+          type: record_set
+
+      list-by-subscription:
+        description: "List overlays for a product subscription"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: cbu_matrix_product_overlay
+          schema: ob-poc
+          fk_col: subscription_id
+        args:
+          - name: subscription-id
+            type: uuid
+            required: true
+            maps_to: subscription_id
+        returns:
+          type: record_set
+
+      # =========================================================================
+      # ANALYSIS OPERATIONS
+      # =========================================================================
+
+      effective-matrix:
+        description: "Get effective matrix with all product overlays"
+        behavior: plugin
+        plugin:
+          handler: MatrixEffectiveOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: instrument-class
+            type: lookup
+            required: false
+            lookup:
+              table: instrument_classes
+              entity_type: instrument_class
+              schema: custody
+              code_column: code
+              id_column: class_id
+          - name: market
+            type: lookup
+            required: false
+            lookup:
+              table: markets
+              entity_type: market
+              schema: custody
+              code_column: mic
+              id_column: market_id
+        returns:
+          type: record_set
+          description: |
+            Returns matrix entries with aggregated product overlays:
+            [
+              {
+                instrument_class: "EQUITY",
+                market: "XLON",
+                products: ["CUSTODY", "PRIME_BROKERAGE"],
+                combined_services: [...],
+                combined_slas: [...]
+              }
+            ]
+
+      unified-gaps:
+        description: "Get all gaps from both lifecycle and service domains"
+        behavior: plugin
+        plugin:
+          handler: MatrixUnifiedGapsOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: domain
+            type: string
+            required: false
+            valid_values:
+              - ALL
+              - LIFECYCLE
+              - SERVICE
+            default: ALL
+        returns:
+          type: record_set
+          description: |
+            Returns unified gaps from both domains:
+            [
+              { source: "LIFECYCLE", operation: "SETTLEMENT", missing_resource: "SSI_SECURITIES" },
+              { source: "SERVICE", operation: "REPORTING", missing_resource: "SWIFT_CONN" }
+            ]
+
+      compare-products:
+        description: "Compare what different products add to a matrix entry"
+        behavior: plugin
+        plugin:
+          handler: MatrixCompareProductsOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: instrument-class
+            type: lookup
+            required: true
+            lookup:
+              table: instrument_classes
+              entity_type: instrument_class
+              schema: custody
+              code_column: code
+              id_column: class_id
+          - name: products
+            type: string_list
+            required: true
+            description: "Product codes to compare"
+        returns:
+          type: record
+          description: |
+            {
+              base_lifecycles: [...],
+              by_product: {
+                "CUSTODY": { services: [...], slas: [...] },
+                "PRIME_BROKERAGE": { services: [...], slas: [...] }
+              },
+              overlap: [...],
+              unique_to_each: { ... }
+            }

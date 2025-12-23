@@ -1,0 +1,571 @@
+# Lifecycle Domain Verbs
+# =============================================================================
+# Verbs for managing instrument lifecycle taxonomy
+# Parallel to product/service/service-resource pattern
+# =============================================================================
+
+domains:
+  lifecycle:
+    description: "Instrument lifecycle taxonomy operations"
+    
+    verbs:
+      # =========================================================================
+      # LIFECYCLE REFERENCE DATA (read-only like services)
+      # =========================================================================
+      
+      read:
+        description: "Read a lifecycle by ID or code"
+        behavior: crud
+        crud:
+          operation: select
+          table: lifecycles
+          schema: ob-poc
+        args:
+          - name: lifecycle-id
+            type: uuid
+            required: false
+            maps_to: lifecycle_id
+          - name: code
+            type: string
+            required: false
+            maps_to: code
+        returns:
+          type: record
+
+      list:
+        description: "List lifecycles with optional filters"
+        behavior: crud
+        crud:
+          operation: select
+          table: lifecycles
+          schema: ob-poc
+        args:
+          - name: category
+            type: string
+            required: false
+            maps_to: category
+            valid_values:
+              - SETTLEMENT
+              - ASSET_SERVICING
+              - PRICING
+              - OTC_LIFECYCLE
+              - COLLATERAL
+              - TAX
+              - REGULATORY
+          - name: owner
+            type: string
+            required: false
+            maps_to: owner
+          - name: is-active
+            type: boolean
+            required: false
+            maps_to: is_active
+        returns:
+          type: record_set
+
+      list-by-instrument:
+        description: "List lifecycles for an instrument class"
+        behavior: crud
+        crud:
+          operation: select_with_join
+          primary_table: lifecycles
+          join_table: instrument_lifecycles
+          join_col: lifecycle_id
+          filter_col: instrument_class_id
+          schema: ob-poc
+        args:
+          - name: instrument-class
+            type: lookup
+            required: true
+            lookup:
+              table: instrument_classes
+              entity_type: instrument_class
+              schema: custody
+              code_column: code
+              id_column: class_id
+          - name: is-mandatory
+            type: boolean
+            required: false
+        returns:
+          type: record_set
+
+      # =========================================================================
+      # LIFECYCLE RESOURCE TYPES (read-only like service_resource_types)
+      # =========================================================================
+
+      read-resource-type:
+        description: "Read a lifecycle resource type"
+        behavior: crud
+        crud:
+          operation: select
+          table: lifecycle_resource_types
+          schema: ob-poc
+        args:
+          - name: resource-type-id
+            type: uuid
+            required: false
+            maps_to: resource_type_id
+          - name: code
+            type: string
+            required: false
+            maps_to: code
+        returns:
+          type: record
+
+      list-resource-types:
+        description: "List lifecycle resource types"
+        behavior: crud
+        crud:
+          operation: select
+          table: lifecycle_resource_types
+          schema: ob-poc
+        args:
+          - name: resource-type
+            type: string
+            required: false
+            maps_to: resource_type
+            valid_values:
+              - ACCOUNT
+              - SSI
+              - AGREEMENT
+              - CONNECTIVITY
+              - DATA_FEED
+              - PROCESS
+              - CLASSIFICATION
+          - name: owner
+            type: string
+            required: false
+            maps_to: owner
+        returns:
+          type: record_set
+
+      list-resources-for-lifecycle:
+        description: "List resource types required by a lifecycle"
+        behavior: crud
+        crud:
+          operation: select_with_join
+          primary_table: lifecycle_resource_types
+          join_table: lifecycle_resource_capabilities
+          join_col: resource_type_id
+          filter_col: lifecycle_id
+          schema: ob-poc
+        args:
+          - name: lifecycle
+            type: lookup
+            required: true
+            lookup:
+              table: lifecycles
+              entity_type: lifecycle
+              schema: ob-poc
+              code_column: code
+              id_column: lifecycle_id
+          - name: is-required
+            type: boolean
+            required: false
+        returns:
+          type: record_set
+
+      # =========================================================================
+      # CBU LIFECYCLE INSTANCE OPERATIONS (like cbu_resource_instances)
+      # =========================================================================
+
+      provision:
+        description: "Provision a lifecycle resource instance for a CBU"
+        behavior: plugin
+        plugin:
+          handler: LifecycleProvisionOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: resource-type
+            type: lookup
+            required: true
+            lookup:
+              table: lifecycle_resource_types
+              entity_type: lifecycle_resource_type
+              schema: ob-poc
+              code_column: code
+              id_column: resource_type_id
+          - name: instance-identifier
+            type: string
+            required: false
+            description: "Human-readable identifier (auto-generated if not provided)"
+          # Context scoping
+          - name: market
+            type: lookup
+            required: false
+            description: "Market context (for per-market resources)"
+            lookup:
+              table: markets
+              entity_type: market
+              schema: custody
+              code_column: mic
+              id_column: market_id
+          - name: currency
+            type: string
+            required: false
+            description: "Currency context (for per-currency resources)"
+          - name: counterparty
+            type: uuid
+            required: false
+            description: "Counterparty context (for per-counterparty resources)"
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          # Provider details
+          - name: provider
+            type: string
+            required: false
+            description: "Provider code (BNYM, BLOOMBERG, etc.)"
+          - name: provider-account
+            type: string
+            required: false
+          - name: provider-bic
+            type: string
+            required: false
+          # Dependencies
+          - name: depends-on
+            type: string_list
+            required: false
+            description: "URLs of resources this depends on"
+          # Config
+          - name: config
+            type: json
+            required: false
+        produces:
+          type: lifecycle_instance
+          resolved: false
+        returns:
+          type: uuid
+          name: instance_id
+          capture: true
+
+      activate:
+        description: "Activate a lifecycle resource instance"
+        behavior: crud
+        crud:
+          operation: update
+          table: cbu_lifecycle_instances
+          schema: ob-poc
+          key: instance_id
+          set_values:
+            status: ACTIVE
+            activated_at: now()
+        args:
+          - name: instance-id
+            type: uuid
+            required: true
+            maps_to: instance_id
+        returns:
+          type: affected
+
+      suspend:
+        description: "Suspend a lifecycle resource instance"
+        behavior: crud
+        crud:
+          operation: update
+          table: cbu_lifecycle_instances
+          schema: ob-poc
+          key: instance_id
+          set_values:
+            status: SUSPENDED
+            suspended_at: now()
+        args:
+          - name: instance-id
+            type: uuid
+            required: true
+            maps_to: instance_id
+          - name: reason
+            type: string
+            required: false
+        returns:
+          type: affected
+
+      decommission:
+        description: "Decommission a lifecycle resource instance"
+        behavior: crud
+        crud:
+          operation: update
+          table: cbu_lifecycle_instances
+          schema: ob-poc
+          key: instance_id
+          set_values:
+            status: DECOMMISSIONED
+            decommissioned_at: now()
+        args:
+          - name: instance-id
+            type: uuid
+            required: true
+            maps_to: instance_id
+          - name: reason
+            type: string
+            required: false
+        returns:
+          type: affected
+
+      list-instances:
+        description: "List lifecycle resource instances for a CBU"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: cbu_lifecycle_instances
+          schema: ob-poc
+          fk_col: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: resource-type
+            type: string
+            required: false
+            maps_to: resource_type_id
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+        returns:
+          type: record_set
+
+      # =========================================================================
+      # GAP ANALYSIS OPERATIONS
+      # =========================================================================
+
+      analyze-gaps:
+        description: "Analyze lifecycle provisioning gaps for a CBU"
+        behavior: plugin
+        plugin:
+          handler: LifecycleAnalyzeGapsOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: scope
+            type: string
+            required: false
+            default: ALL
+            valid_values:
+              - ALL
+              - SECURITIES
+              - DERIVATIVES
+              - NEW
+        returns:
+          type: record_set
+          description: |
+            Returns gaps grouped by universe entry:
+            [
+              {
+                instrument_class: "EQUITY",
+                market: "XLON",
+                missing_lifecycles: [],
+                missing_resources: [
+                  { code: "SAFEKEEPING_ACCOUNT", prompt: "..." }
+                ]
+              }
+            ]
+
+      check-readiness:
+        description: "Check if CBU is ready to trade an instrument"
+        behavior: plugin
+        plugin:
+          handler: LifecycleCheckReadinessOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: instrument-class
+            type: lookup
+            required: true
+            lookup:
+              table: instrument_classes
+              entity_type: instrument_class
+              schema: custody
+              code_column: code
+              id_column: class_id
+          - name: market
+            type: lookup
+            required: false
+            lookup:
+              table: markets
+              entity_type: market
+              schema: custody
+              code_column: mic
+              id_column: market_id
+          - name: counterparty
+            type: uuid
+            required: false
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record
+          description: "{ ready: bool, blocking_gaps: [...], warnings: [...] }"
+
+      # =========================================================================
+      # PROVISIONING PLAN OPERATIONS
+      # =========================================================================
+
+      generate-plan:
+        description: "Generate DSL provisioning plan for lifecycle gaps"
+        behavior: plugin
+        plugin:
+          handler: LifecycleGeneratePlanOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: user-responses
+            type: json
+            required: false
+            description: "User responses to gap prompts"
+        returns:
+          type: record
+          description: |
+            {
+              dsl_statements: [...],
+              pending_prompts: [...],
+              ready_to_execute: bool
+            }
+
+      execute-plan:
+        description: "Execute a provisioning plan"
+        behavior: plugin
+        plugin:
+          handler: LifecycleExecutePlanOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: plan
+            type: json
+            required: true
+          - name: dry-run
+            type: boolean
+            required: false
+            default: false
+        returns:
+          type: record
+
+      # =========================================================================
+      # DISCOVERY OPERATIONS
+      # =========================================================================
+
+      discover:
+        description: "Discover all lifecycles and resources for an instrument"
+        behavior: plugin
+        plugin:
+          handler: LifecycleDiscoverOp
+        args:
+          - name: instrument-class
+            type: lookup
+            required: true
+            lookup:
+              table: instrument_classes
+              entity_type: instrument_class
+              schema: custody
+              code_column: code
+              id_column: class_id
+          - name: include-optional
+            type: boolean
+            required: false
+            default: false
+        returns:
+          type: record
+          description: |
+            {
+              instrument_class: "IRS",
+              requires_isda: true,
+              mandatory_lifecycles: [
+                { code: "CONFIRMATION", resources: [...] },
+                { code: "COLLATERAL_VM", resources: [...] }
+              ],
+              optional_lifecycles: [...]
+            }
+
+      # =========================================================================
+      # VISUALIZATION OPERATIONS  
+      # =========================================================================
+
+      visualize-coverage:
+        description: "Generate coverage visualization for CBU"
+        behavior: plugin
+        plugin:
+          handler: LifecycleVisualizeCoverageOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: format
+            type: string
+            required: false
+            default: MERMAID
+            valid_values:
+              - MERMAID
+              - DOT
+              - JSON
+        returns:
+          type: string
+
+      visualize-dependencies:
+        description: "Generate dependency graph for instrument lifecycles"
+        behavior: plugin
+        plugin:
+          handler: LifecycleVisualizeDepsOp
+        args:
+          - name: instrument-class
+            type: string
+            required: true
+          - name: format
+            type: string
+            required: false
+            default: MERMAID
+        returns:
+          type: string
