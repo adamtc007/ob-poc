@@ -64,8 +64,8 @@ pub use lifecycle_ops::{
 };
 pub use matrix_overlay_ops::{MatrixCompareProductsOp, MatrixEffectiveOp, MatrixUnifiedGapsOp};
 pub use onboarding::{
-    OnboardingEnsureOp, OnboardingExecuteOp, OnboardingGetUrlsOp, OnboardingPlanOp,
-    OnboardingShowPlanOp, OnboardingStatusOp,
+    OnboardingAutoCompleteOp, OnboardingEnsureOp, OnboardingExecuteOp, OnboardingGetUrlsOp,
+    OnboardingPlanOp, OnboardingShowPlanOp, OnboardingStatusOp,
 };
 pub use refdata_loader::{
     get_refdata_operations, LoadAllRefdataOp, LoadInstrumentClassesOp, LoadMarketsOp,
@@ -262,6 +262,7 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(OnboardingStatusOp));
         registry.register(Arc::new(OnboardingGetUrlsOp));
         registry.register(Arc::new(OnboardingEnsureOp));
+        registry.register(Arc::new(OnboardingAutoCompleteOp));
 
         // Trading Profile operations
         registry.register(Arc::new(TradingProfileImportOp));
