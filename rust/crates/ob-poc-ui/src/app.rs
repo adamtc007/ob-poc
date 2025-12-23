@@ -7,9 +7,10 @@
 
 use crate::api;
 use crate::panels::{
-    ast_panel, cbu_search_modal, chat_panel, container_browse_panel, dsl_editor_panel,
-    entity_detail_panel, repl_panel, results_panel, toolbar, CbuSearchAction, CbuSearchData,
-    ContainerBrowseAction, ContainerBrowseData, DslEditorAction, ToolbarAction, ToolbarData,
+    ast_panel, cbu_search_modal, chat_panel, container_browse_panel, context_panel,
+    dsl_editor_panel, entity_detail_panel, repl_panel, results_panel, toolbar, CbuSearchAction,
+    CbuSearchData, ContainerBrowseAction, ContainerBrowseData, ContextPanelAction, DslEditorAction,
+    ToolbarAction, ToolbarData,
 };
 use crate::state::{AppState, AsyncState, CbuSearchUi, LayoutMode, PanelState, TextBuffers};
 use ob_poc_graph::{CbuGraphWidget, ViewMode};
@@ -37,6 +38,7 @@ impl App {
             resolution: None,
             messages: Vec::new(),
             cbu_list: Vec::new(),
+            session_context: None,
             buffers: TextBuffers::default(),
             view_mode: ViewMode::KycUbo,
             panels: PanelState::default(),
@@ -90,6 +92,20 @@ impl eframe::App for App {
                 &format!("update: central graph fetch for cbu_id={}", cbu_id).into(),
             );
             self.state.fetch_graph(cbu_id);
+        }
+
+        // Central context refetch - triggered by: select_cbu
+        if self.state.take_pending_context_refetch() {
+            if let Some(session_id) = self.state.session_id {
+                web_sys::console::log_1(
+                    &format!(
+                        "update: central context fetch for session_id={}",
+                        session_id
+                    )
+                    .into(),
+                );
+                self.state.fetch_session_context(session_id);
+            }
         }
 
         // Check for pending execute command from agent
@@ -338,6 +354,18 @@ impl eframe::App for App {
         };
         self.handle_container_browse_action(container_browse_action);
 
+        // Context panel (left side) - shows session context and semantic stages
+        let context_action = egui::SidePanel::left("context_panel")
+            .default_width(220.0)
+            .min_width(180.0)
+            .max_width(350.0)
+            .resizable(true)
+            .show(ctx, |ui| context_panel(ui, &self.state))
+            .inner;
+
+        // Handle context panel actions
+        self.handle_context_panel_action(context_action);
+
         // Main content area
         egui::CentralPanel::default().show(ctx, |ui| match self.state.panels.layout {
             LayoutMode::FourPanel => self.render_four_panel(ui),
@@ -459,6 +487,46 @@ impl App {
             ContainerBrowseAction::FilterChange { field, value } => {
                 self.state.container_browse.set_filter(field, value);
                 // TODO: Trigger refetch
+            }
+        }
+    }
+
+    /// Handle context panel actions (stage focus, scope switching)
+    fn handle_context_panel_action(&mut self, action: Option<ContextPanelAction>) {
+        let Some(action) = action else { return };
+
+        match action {
+            ContextPanelAction::FocusStage { stage_code } => {
+                web_sys::console::log_1(
+                    &format!("ContextPanel: Focus stage {}", stage_code).into(),
+                );
+                self.state.set_stage_focus(Some(stage_code));
+            }
+            ContextPanelAction::ClearStageFocus => {
+                web_sys::console::log_1(&"ContextPanel: Clear stage focus".into());
+                self.state.set_stage_focus(None);
+            }
+            ContextPanelAction::SwitchScope {
+                scope_type,
+                scope_id,
+            } => {
+                web_sys::console::log_1(
+                    &format!("ContextPanel: Switch scope {}:{}", scope_type, scope_id).into(),
+                );
+                // TODO: Handle scope switching (e.g., switch to different CBU)
+            }
+            ContextPanelAction::SelectContext {
+                context_type,
+                context_id,
+            } => {
+                web_sys::console::log_1(
+                    &format!(
+                        "ContextPanel: Select context {}:{}",
+                        context_type, context_id
+                    )
+                    .into(),
+                );
+                // TODO: Handle context selection (e.g., select a product)
             }
         }
     }
@@ -772,6 +840,7 @@ impl AppState {
         if let Ok(mut state) = self.async_state.lock() {
             state.pending_cbu_id = Some(cbu_id);
             state.needs_graph_refetch = true;
+            state.needs_context_refetch = true;
         }
 
         let async_state = Arc::clone(&self.async_state);
@@ -1247,6 +1316,51 @@ impl AppState {
             let result = api::search_cbus(&query, 15).await;
             if let Ok(mut state) = async_state.lock() {
                 state.pending_cbu_search = Some(result);
+            }
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+    }
+
+    // =========================================================================
+    // Stage Focus Methods
+    // =========================================================================
+
+    /// Set or clear stage focus - calls POST /api/session/:id/focus
+    pub fn set_stage_focus(&mut self, stage_code: Option<String>) {
+        let Some(session_id) = self.session_id else {
+            web_sys::console::warn_1(&"set_stage_focus: no session_id".into());
+            return;
+        };
+
+        let async_state = Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+
+        spawn_local(async move {
+            let result = api::set_stage_focus(session_id, stage_code.as_deref()).await;
+            match result {
+                Ok(response) => {
+                    web_sys::console::log_1(
+                        &format!(
+                            "set_stage_focus: success, stage={:?}, verbs={}",
+                            response.stage_code,
+                            response.relevant_verbs.len()
+                        )
+                        .into(),
+                    );
+                    // Refetch session to get updated context with stage_focus
+                    let session_result = api::get_session(session_id).await;
+                    if let Ok(mut state) = async_state.lock() {
+                        state.pending_session = Some(session_result);
+                    }
+                }
+                Err(e) => {
+                    web_sys::console::error_1(&format!("set_stage_focus error: {}", e).into());
+                    if let Ok(mut state) = async_state.lock() {
+                        state.last_error = Some(format!("Failed to set stage focus: {}", e));
+                    }
+                }
             }
             if let Some(ctx) = ctx {
                 ctx.request_repaint();

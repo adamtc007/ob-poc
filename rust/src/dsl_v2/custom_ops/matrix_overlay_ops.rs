@@ -322,15 +322,9 @@ impl CustomOperation for MatrixCompareProductsOp {
             .iter()
             .find(|a| a.key == "products")
             .and_then(|a| {
-                if let Some(list) = a.value.as_list() {
-                    Some(
-                        list.iter()
+                a.value.as_list().map(|list| list.iter()
                             .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                            .collect(),
-                    )
-                } else {
-                    None
-                }
+                            .collect())
             })
             .ok_or_else(|| anyhow::anyhow!("Missing products argument (must be a list)"))?;
 
@@ -375,7 +369,7 @@ impl CustomOperation for MatrixCompareProductsOp {
             .filter(|s| {
                 products
                     .iter()
-                    .all(|p| by_product.get(p).map_or(false, |v| v.contains(s)))
+                    .all(|p| by_product.get(p).is_some_and(|v| v.contains(s)))
             })
             .cloned()
             .collect();
@@ -390,7 +384,7 @@ impl CustomOperation for MatrixCompareProductsOp {
                     products
                         .iter()
                         .filter(|p| *p != product_code)
-                        .all(|p| by_product.get(p).map_or(true, |v| !v.contains(s)))
+                        .all(|p| by_product.get(p).is_none_or(|v| !v.contains(s)))
                 })
                 .cloned()
                 .collect();

@@ -32,6 +32,7 @@ mod refdata_loader;
 mod resource_ops;
 mod rfi;
 mod screening_ops;
+mod semantic_ops;
 pub mod template_ops;
 mod threshold;
 mod trading_matrix;
@@ -71,6 +72,10 @@ pub use refdata_loader::{
     LoadSlaTemplatesOp, LoadSubcustodiansOp,
 };
 pub use rfi::{RfiCheckCompletionOp, RfiGenerateOp, RfiListByCaseOp};
+pub use semantic_ops::{
+    SemanticListStagesOp, SemanticMissingEntitiesOp, SemanticNextActionsOp,
+    SemanticPromptContextOp, SemanticStagesForProductOp, SemanticStateOp,
+};
 pub use template_ops::{
     TemplateBatchOp, TemplateBatchResult, TemplateInvokeOp, TemplateInvokeResult,
 };
@@ -208,6 +213,14 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(ThresholdDeriveOp));
         registry.register(Arc::new(ThresholdEvaluateOp));
         registry.register(Arc::new(ThresholdCheckEntityOp));
+
+        // Semantic stage operations (onboarding journey progress tracking)
+        registry.register(Arc::new(SemanticStateOp));
+        registry.register(Arc::new(SemanticListStagesOp));
+        registry.register(Arc::new(SemanticStagesForProductOp));
+        registry.register(Arc::new(SemanticNextActionsOp));
+        registry.register(Arc::new(SemanticMissingEntitiesOp));
+        registry.register(Arc::new(SemanticPromptContextOp));
 
         // RFI operations (Phase 3) - works with existing kyc.doc_requests
         registry.register(Arc::new(RfiGenerateOp));

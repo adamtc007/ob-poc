@@ -276,6 +276,7 @@ impl<D: TaxonomyDomain> TaxonomyOps<D> {
             meta.fq_gap_view()
         );
 
+        #[allow(clippy::type_complexity)]
         let rows: Vec<(
             Uuid,
             String, // cbu_id, cbu_name

@@ -486,11 +486,11 @@ mod tests {
         assert!(!state.open);
 
         state.open_container(
-            "uuid-123",
-            "ShareClass",
-            "Class A USD",
-            "INVESTOR_HOLDING",
-            "share_class_id",
+            "uuid-123".to_string(),
+            "ShareClass".to_string(),
+            "Class A USD".to_string(),
+            Some("INVESTOR_HOLDING".to_string()),
+            Some("share_class_id".to_string()),
         );
 
         assert!(state.open);
@@ -504,9 +504,11 @@ mod tests {
 
     #[test]
     fn test_filter_management() {
-        let mut state = ContainerBrowseState::default();
-        state.open = true;
-        state.container_id = Some("test".to_string());
+        let mut state = ContainerBrowseState {
+            open: true,
+            container_id: Some("test".to_string()),
+            ..Default::default()
+        };
 
         // Add filter
         state.set_filter("jurisdiction".to_string(), Some("US".to_string()));

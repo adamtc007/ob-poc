@@ -7,9 +7,10 @@ use ob_poc_graph::{CbuGraphData, ViewMode};
 use ob_poc_types::{
     CbuSummary, ChatRequest, ChatResponse, CommitResolutionResponse, ConfirmAllRequest,
     ConfirmResolutionRequest, CreateSessionRequest, CreateSessionResponse, ExecuteRequest,
-    ExecuteResponse, ResolutionSearchRequest, ResolutionSearchResponse, ResolutionSessionResponse,
-    SelectResolutionRequest, SelectResolutionResponse, SessionStateResponse, SetBindingRequest,
-    SetBindingResponse, StartResolutionRequest, ValidateDslRequest, ValidateDslResponse,
+    ExecuteResponse, GetContextResponse, ResolutionSearchRequest, ResolutionSearchResponse,
+    ResolutionSessionResponse, SelectResolutionRequest, SelectResolutionResponse, SessionContext,
+    SessionStateResponse, SetBindingRequest, SetBindingResponse, StartResolutionRequest,
+    ValidateDslRequest, ValidateDslResponse,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use std::collections::HashMap;
@@ -167,6 +168,13 @@ pub async fn bind_entity(
     .await
 }
 
+/// Get session context (CBU info, linked entities, symbols)
+/// Used to populate ContextPanel and inform agent prompts
+pub async fn get_session_context(session_id: Uuid) -> Result<SessionContext, String> {
+    let response: GetContextResponse = get(&format!("/api/session/{}/context", session_id)).await?;
+    Ok(response.context)
+}
+
 // =============================================================================
 // Chat API
 // =============================================================================
@@ -272,6 +280,41 @@ pub struct CbuSearchMatch {
     pub detail: Option<String>,
     /// Relevance score 0.0-1.0
     pub score: f32,
+}
+
+// =============================================================================
+// Stage Focus API
+// =============================================================================
+
+/// Request to set stage focus
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct SetFocusRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stage_code: Option<String>,
+}
+
+/// Response from setting stage focus
+#[derive(Clone, Debug, serde::Deserialize)]
+#[allow(dead_code)] // Fields are part of API response, may be used in future
+pub struct SetFocusResponse {
+    pub success: bool,
+    pub stage_code: Option<String>,
+    pub stage_name: Option<String>,
+    pub relevant_verbs: Vec<String>,
+}
+
+/// Set or clear stage focus for the session
+pub async fn set_stage_focus(
+    session_id: Uuid,
+    stage_code: Option<&str>,
+) -> Result<SetFocusResponse, String> {
+    post(
+        &format!("/api/session/{}/focus", session_id),
+        &SetFocusRequest {
+            stage_code: stage_code.map(|s| s.to_string()),
+        },
+    )
+    .await
 }
 
 // =============================================================================

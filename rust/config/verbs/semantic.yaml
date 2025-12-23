@@ -1,0 +1,157 @@
+# Semantic Stage DSL Domain
+#
+# This domain provides verbs for querying onboarding journey progress.
+# These verbs are READ-ONLY - they derive state from existing entities.
+#
+# Key Concept: Semantic stages represent "where we are" in the onboarding journey
+# based on which entities exist. This is NOT a workflow engine - it's a session-time
+# view for agent decision support.
+#
+# The entities ARE the truth. This just helps interpret that truth.
+
+version: "1.0"
+
+domains:
+  semantic:
+    description: "Semantic stage operations - derive onboarding progress from entity state"
+    verbs:
+      # =========================================================================
+      # STATE DERIVATION
+      # =========================================================================
+
+      get-state:
+        description: "Derive semantic state for a CBU - shows stage progress, gaps, and blockers"
+        behavior: plugin
+        plugin:
+          handler: SemanticStateOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU to analyze"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+              resolution_mode: entity
+        returns:
+          type: semantic_state
+          capture: true
+          description: "Full semantic state including stages, progress, and next actions"
+
+      # =========================================================================
+      # STAGE QUERIES
+      # =========================================================================
+
+      list-stages:
+        description: "List all defined semantic stages with their dependencies"
+        behavior: plugin
+        plugin:
+          handler: SemanticListStagesOp
+        args: []
+        returns:
+          type: stage_list
+          capture: true
+          description: "All stage definitions in dependency order"
+
+      stages-for-product:
+        description: "Get required stages for a specific product"
+        behavior: plugin
+        plugin:
+          handler: SemanticStagesForProductOp
+        args:
+          - name: product
+            type: string
+            required: true
+            description: "Product code (e.g., CUSTODY, FUND_ACCOUNTING)"
+            lookup:
+              table: products
+              schema: ob-poc
+              entity_type: product
+              search_key: product_code
+              primary_key: product_code
+              resolution_mode: reference
+        returns:
+          type: stage_list
+          capture: true
+          description: "Stages required for this product"
+
+      # =========================================================================
+      # PROGRESS QUERIES
+      # =========================================================================
+
+      next-actions:
+        description: "Get the next actionable stages for a CBU (unblocked, incomplete stages)"
+        behavior: plugin
+        plugin:
+          handler: SemanticNextActionsOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU to analyze"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+              resolution_mode: entity
+        returns:
+          type: action_list
+          capture: true
+          description: "List of actionable stages with suggested verbs"
+
+      missing-entities:
+        description: "Get entities that are missing for stage completion"
+        behavior: plugin
+        plugin:
+          handler: SemanticMissingEntitiesOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU to analyze"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+              resolution_mode: entity
+          - name: stage
+            type: string
+            required: false
+            description: "Specific stage to check (omit for all stages)"
+        returns:
+          type: missing_entity_list
+          capture: true
+          description: "List of missing entities with suggestions for creation"
+
+      # =========================================================================
+      # PROMPT CONTEXT
+      # =========================================================================
+
+      prompt-context:
+        description: "Get semantic state formatted for agent prompt injection"
+        behavior: plugin
+        plugin:
+          handler: SemanticPromptContextOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU to analyze"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+              resolution_mode: entity
+        returns:
+          type: string
+          capture: true
+          description: "Formatted string for agent system prompt"

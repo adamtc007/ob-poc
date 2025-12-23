@@ -1,11 +1,12 @@
 //! REST API routes for DSL v2 execution
 //!
 //! Session endpoints:
-//! - POST   /api/session           - Create new session
-//! - GET    /api/session/:id       - Get session state
-//! - DELETE /api/session/:id       - Delete session
+//! - POST   /api/session             - Create new session
+//! - GET    /api/session/:id         - Get session state
+//! - DELETE /api/session/:id         - Delete session
 //! - POST   /api/session/:id/execute - Execute DSL
-//! - POST   /api/session/:id/clear - Clear session
+//! - POST   /api/session/:id/clear   - Clear session
+//! - GET    /api/session/:id/context - Get session context (CBU, linked entities, symbols)
 //!
 //! Vocabulary endpoints:
 //! - GET    /api/agent/domains      - List available DSL domains
@@ -22,6 +23,7 @@ use crate::api::session::{
     CreateSessionResponse, ExecuteResponse, ExecutionResult, MessageRole, SessionState,
     SessionStateResponse, SessionStore,
 };
+use crate::database::derive_semantic_state;
 use crate::database::generation_log_repository::{
     CompileResult, GenerationAttempt, GenerationLogRepository, LintResult, ParseResult,
 };
@@ -29,6 +31,7 @@ use crate::dsl_v2::{
     compile, parse_program, verb_registry::registry, DslExecutor, ExecutionContext,
     ExecutionResult as DslV2Result, SemanticValidator,
 };
+use crate::ontology::SemanticStageRegistry;
 
 use axum::{
     extract::{Path, Query, State},
@@ -349,6 +352,8 @@ pub fn create_agent_router_with_sessions(pool: PgPool, sessions: SessionStore) -
         .route("/api/session/:id/execute", post(execute_session_dsl))
         .route("/api/session/:id/clear", post(clear_session_dsl))
         .route("/api/session/:id/bind", post(set_session_binding))
+        .route("/api/session/:id/context", get(get_session_context))
+        .route("/api/session/:id/focus", post(set_session_focus))
         .route("/api/session/:id/dsl/enrich", get(get_enriched_dsl))
         // DSL parsing and entity reference resolution
         .route("/api/dsl/parse", post(parse_dsl))
@@ -1457,6 +1462,27 @@ pub struct SetBindingResponse {
     pub bindings: std::collections::HashMap<String, Uuid>,
 }
 
+/// Request to set stage focus in a session
+#[derive(Debug, Deserialize)]
+pub struct SetFocusRequest {
+    /// The stage code to focus on (e.g., "KYC_REVIEW")
+    /// Pass None or empty string to clear focus
+    #[serde(default)]
+    pub stage_code: Option<String>,
+}
+
+/// Response from setting stage focus
+#[derive(Debug, Serialize)]
+pub struct SetFocusResponse {
+    pub success: bool,
+    /// The stage that is now focused (None if cleared)
+    pub stage_code: Option<String>,
+    /// Stage name for display
+    pub stage_name: Option<String>,
+    /// Verbs relevant to this stage (for agent filtering)
+    pub relevant_verbs: Vec<String>,
+}
+
 /// POST /api/session/:id/bind - Set a binding in the session context
 ///
 /// This allows the UI to register external entities (like a selected CBU)
@@ -1504,6 +1530,169 @@ async fn set_session_binding(
         binding_name: actual_name_clone,
         bindings: bindings_clone,
     }))
+}
+
+/// POST /api/session/:id/focus - Set stage focus for verb filtering
+///
+/// When a stage is focused, the agent will prioritize verbs relevant to that stage.
+/// Pass an empty or null stage_code to clear the focus.
+async fn set_session_focus(
+    State(state): State<AgentState>,
+    Path(session_id): Path<Uuid>,
+    Json(req): Json<SetFocusRequest>,
+) -> Result<Json<SetFocusResponse>, StatusCode> {
+    // Normalize empty string to None
+    let stage_code = req.stage_code.filter(|s| !s.is_empty());
+
+    // Update session
+    {
+        let mut sessions = state.sessions.write().await;
+        let session = sessions.get_mut(&session_id).ok_or(StatusCode::NOT_FOUND)?;
+        session.context.stage_focus = stage_code.clone();
+    }
+
+    // Get stage info and relevant verbs if focused
+    let (stage_name, relevant_verbs) = if let Some(ref code) = stage_code {
+        // Load registry to get stage info
+        // Use .ok() to avoid holding Box<dyn Error> across await
+        let registry_opt = SemanticStageRegistry::load_default().ok();
+        if let Some(registry) = registry_opt {
+            if let Some(stage) = registry.get_stage(code) {
+                let name = stage.name.clone();
+                // Get relevant verbs from stage config (if defined)
+                let verbs = stage.relevant_verbs.clone().unwrap_or_default();
+                (Some(name), verbs)
+            } else {
+                (None, vec![])
+            }
+        } else {
+            (None, vec![])
+        }
+    } else {
+        (None, vec![])
+    };
+
+    tracing::debug!(
+        "Focus set: session={} stage={:?} verbs={}",
+        session_id,
+        stage_code,
+        relevant_verbs.len()
+    );
+
+    Ok(Json(SetFocusResponse {
+        success: true,
+        stage_code,
+        stage_name,
+        relevant_verbs,
+    }))
+}
+
+/// GET /api/session/:id/context - Get session context for agent and UI
+///
+/// Returns the session's context including:
+/// - Active CBU with entity/role counts
+/// - Linked KYC cases, ISDA agreements, products
+/// - Trading profile if available
+/// - Symbol table from DSL execution
+///
+/// This enables both the agent (for prompt context) and UI (for context panel)
+/// to understand "where we are" in the workflow.
+async fn get_session_context(
+    State(state): State<AgentState>,
+    Path(session_id): Path<Uuid>,
+) -> Result<Json<ob_poc_types::GetContextResponse>, StatusCode> {
+    // Get session to find active CBU
+    let active_cbu_id = {
+        let sessions = state.sessions.read().await;
+        let session = sessions.get(&session_id).ok_or(StatusCode::NOT_FOUND)?;
+        session.context.active_cbu.as_ref().map(|cbu| cbu.id)
+    };
+
+    // If we have an active CBU, discover linked contexts from DB
+    let context = if let Some(cbu_id) = active_cbu_id {
+        let discovery_service = crate::database::ContextDiscoveryService::new(state.pool.clone());
+
+        match discovery_service.discover_for_cbu(cbu_id).await {
+            Ok(discovered) => {
+                let mut ctx: ob_poc_types::SessionContext = discovered.into();
+
+                // Merge in symbols and stage_focus from session
+                let sessions = state.sessions.read().await;
+                if let Some(session) = sessions.get(&session_id) {
+                    // Convert session bindings to SymbolValue
+                    for (name, binding) in &session.context.bindings {
+                        ctx.symbols.insert(
+                            name.clone(),
+                            ob_poc_types::SymbolValue {
+                                id: binding.id.to_string(),
+                                entity_type: binding.entity_type.clone(),
+                                display_name: binding.display_name.clone(),
+                                source: Some("execution".to_string()),
+                            },
+                        );
+                    }
+
+                    // Set active scope if we have an active CBU
+                    if let Some(cbu) = &ctx.cbu {
+                        ctx.active_scope = Some(ob_poc_types::ActiveScope::Cbu {
+                            cbu_id: cbu.id.clone(),
+                            cbu_name: cbu.name.clone(),
+                        });
+                    }
+
+                    // Copy stage focus from session
+                    ctx.stage_focus = session.context.stage_focus.clone();
+                }
+
+                // Derive semantic state for the CBU (onboarding journey progress)
+                // Note: We load the registry and immediately extract it to avoid
+                // holding Box<dyn Error> across await points (not Send)
+                let registry_opt = SemanticStageRegistry::load_default().ok();
+                if let Some(registry) = registry_opt {
+                    match derive_semantic_state(&state.pool, &registry, cbu_id).await {
+                        Ok(semantic_state) => {
+                            ctx.semantic_state = Some(semantic_state);
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                "Failed to derive semantic state for CBU {}: {}",
+                                cbu_id,
+                                e
+                            );
+                        }
+                    }
+                }
+
+                ctx
+            }
+            Err(e) => {
+                tracing::warn!("Context discovery failed for CBU {}: {}", cbu_id, e);
+                ob_poc_types::SessionContext::default()
+            }
+        }
+    } else {
+        // No active CBU, return empty context with just symbols
+        let sessions = state.sessions.read().await;
+        let mut ctx = ob_poc_types::SessionContext::default();
+
+        if let Some(session) = sessions.get(&session_id) {
+            for (name, binding) in &session.context.bindings {
+                ctx.symbols.insert(
+                    name.clone(),
+                    ob_poc_types::SymbolValue {
+                        id: binding.id.to_string(),
+                        entity_type: binding.entity_type.clone(),
+                        display_name: binding.display_name.clone(),
+                        source: Some("execution".to_string()),
+                    },
+                );
+            }
+        }
+
+        ctx
+    };
+
+    Ok(Json(ob_poc_types::GetContextResponse { context }))
 }
 
 /// GET /api/session/:id/dsl/enrich - Get enriched DSL with binding info for display

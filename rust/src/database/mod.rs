@@ -12,11 +12,13 @@ use std::time::Duration;
 pub mod attribute_values_service;
 pub mod cbu_entity_roles_service;
 pub mod cbu_service;
+pub mod context_discovery_service;
 pub mod crud_service;
 pub mod dictionary_service;
 pub mod document_service;
 pub mod dsl_repository;
 pub mod entity_service;
+pub mod semantic_state_service;
 // Fuzzy search is now handled by EntityGateway gRPC service.
 // See rust/crates/entity-gateway/ for the central lookup service.
 pub mod generation_log_repository;
@@ -73,6 +75,12 @@ pub use session_repository::{
     detect_domain, extract_domains, CbuDslState, DslSnapshot, EntityCreated, PersistedSession,
     SessionEventType, SessionRepository, SessionStatus,
 };
+
+pub use context_discovery_service::{
+    CbuContextRow, ContextDiscoveryService, DiscoveredContext, LinkedContextRow,
+};
+
+pub use semantic_state_service::derive_semantic_state;
 
 /// Database configuration
 #[derive(Debug, Clone)]

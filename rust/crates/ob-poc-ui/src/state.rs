@@ -17,7 +17,7 @@ use crate::tokens::TokenRegistry;
 use ob_poc_graph::{CbuGraphData, CbuGraphWidget, ViewMode};
 use ob_poc_types::{
     CbuSummary, ExecuteResponse, ResolutionSearchResponse, ResolutionSessionResponse,
-    SessionStateResponse, ValidateDslResponse,
+    SessionContext, SessionStateResponse, ValidateDslResponse,
 };
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
@@ -83,6 +83,10 @@ pub struct AppState {
     /// Available CBUs for selector dropdown
     pub cbu_list: Vec<CbuSummary>,
 
+    /// Session context (CBU info, linked entities, symbols)
+    /// Set via fetch_session_context(), never modified directly
+    pub session_context: Option<SessionContext>,
+
     // =========================================================================
     // UI-ONLY STATE (ephemeral, not persisted)
     // =========================================================================
@@ -136,6 +140,7 @@ impl Default for AppState {
             resolution: None,
             messages: Vec::new(),
             cbu_list: Vec::new(),
+            session_context: None,
 
             // UI-only state
             buffers: TextBuffers::default(),
@@ -288,6 +293,7 @@ pub struct AsyncState {
     pub pending_resolution: Option<Result<ResolutionSessionResponse, String>>,
     pub pending_resolution_search: Option<Result<ResolutionSearchResponse, String>>,
     pub pending_cbu_search: Option<Result<crate::api::CbuSearchResponse, String>>,
+    pub pending_session_context: Option<Result<SessionContext, String>>,
 
     // Command triggers (from agent commands)
     pub pending_execute: Option<Uuid>, // Session ID to execute
@@ -295,6 +301,7 @@ pub struct AsyncState {
     // State change flags (set by actions, processed centrally in update loop)
     // These are checked ONCE in update() AFTER process_async_results()
     pub needs_graph_refetch: bool, // CBU selected or view mode changed
+    pub needs_context_refetch: bool, // CBU selected, fetch session context
     pub pending_cbu_id: Option<Uuid>, // CBU to fetch graph for (set by select_cbu)
 
     // Execution tracking - prevents repeated refetch
@@ -307,6 +314,7 @@ pub struct AsyncState {
     pub executing: bool,
     pub loading_resolution: bool,
     pub searching_resolution: bool,
+    pub loading_session_context: bool,
 
     // Chat focus tracking - set when chat completes to refocus input
     pub chat_just_finished: bool,
@@ -460,6 +468,17 @@ impl AppState {
                 Err(e) => state.last_error = Some(format!("CBU search failed: {}", e)),
             }
         }
+
+        // Process session context
+        if let Some(result) = state.pending_session_context.take() {
+            state.loading_session_context = false;
+            match result {
+                Ok(context) => {
+                    self.session_context = Some(context);
+                }
+                Err(e) => state.last_error = Some(format!("Session context fetch failed: {}", e)),
+            }
+        }
     }
 
     /// Check if any async operation is in progress
@@ -521,6 +540,22 @@ impl AppState {
         // Fall back to current session_id (for view mode changes, execution complete)
         drop(state); // Release lock before accessing self
         self.session_id
+    }
+
+    /// Check if context refetch is needed and return true if so
+    /// Called ONCE per frame in update() - the single central place for context fetches
+    pub fn take_pending_context_refetch(&self) -> bool {
+        let Ok(mut state) = self.async_state.lock() else {
+            return false;
+        };
+
+        if !state.needs_context_refetch {
+            return false;
+        }
+
+        // Clear the flag
+        state.needs_context_refetch = false;
+        true
     }
 
     /// Add a user message to the chat history
@@ -589,6 +624,32 @@ impl AppState {
         }
 
         None
+    }
+
+    /// Fetch session context for the current session
+    /// Called when a CBU is selected or context may have changed
+    pub fn fetch_session_context(&mut self, session_id: Uuid) {
+        use crate::api;
+        use wasm_bindgen_futures::spawn_local;
+
+        let async_state = std::sync::Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+
+        {
+            let mut state = async_state.lock().unwrap();
+            state.loading_session_context = true;
+        }
+
+        spawn_local(async move {
+            let result = api::get_session_context(session_id).await;
+            if let Ok(mut state) = async_state.lock() {
+                state.pending_session_context = Some(result);
+                state.loading_session_context = false;
+            }
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
     }
 
     /// Execute DSL with explicit content (for agent Execute command)

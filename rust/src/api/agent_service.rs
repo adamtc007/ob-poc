@@ -107,12 +107,14 @@ use crate::api::intent::{IntentValidation, ParamValue, VerbIntent};
 use crate::api::session::{
     AgentSession, DisambiguationItem, DisambiguationRequest, EntityMatchOption, SessionState,
 };
+use crate::database::derive_semantic_state;
 use crate::dsl_v2::gateway_resolver::{gateway_addr, GatewayRefResolver};
 use crate::dsl_v2::ref_resolver::ResolveResult;
 use crate::dsl_v2::semantic_validator::SemanticValidator;
 use crate::dsl_v2::validation::{RefType, Severity, ValidationContext, ValidationRequest};
 use crate::dsl_v2::verb_registry::registry;
 use crate::dsl_v2::Statement;
+use crate::ontology::SemanticStageRegistry;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::collections::HashMap;
@@ -406,6 +408,42 @@ impl AgentService {
         }
     }
 
+    /// Derive semantic state for the active CBU and format it for the agent prompt.
+    /// Returns a formatted string showing onboarding journey progress.
+    ///
+    /// This helps the agent understand:
+    /// - What stages are complete, in progress, or blocked
+    /// - What entities are missing
+    /// - What the next actionable steps are
+    async fn derive_semantic_context(&self, active_cbu_id: Uuid) -> Option<String> {
+        let pool = self.pool.as_ref()?;
+
+        // Load the semantic stage registry
+        let registry = match SemanticStageRegistry::load_default() {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::warn!("Failed to load semantic stage registry: {}", e);
+                return None;
+            }
+        };
+
+        // Derive semantic state for this CBU
+        match derive_semantic_state(pool, &registry, active_cbu_id).await {
+            Ok(state) => {
+                // Use the built-in to_prompt_context method
+                Some(state.to_prompt_context())
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to derive semantic state for CBU {}: {}",
+                    active_cbu_id,
+                    e
+                );
+                None
+            }
+        }
+    }
+
     /// Process a chat message and return response (with disambiguation if needed)
     ///
     /// This is the main entry point for agent chat. It:
@@ -461,17 +499,60 @@ impl AgentService {
         };
         let pre_resolved_context = self.format_pre_resolved_context(&pre_resolved);
 
-        // Build prompts with pre-resolved data
-        let vocab = self.build_vocab_prompt(None);
+        // Get relevant verbs filter from stage focus (if set)
+        let stage_verb_filter: Option<Vec<String>> =
+            if let Some(ref stage_code) = session.context.stage_focus {
+                // Load the semantic stage registry to get relevant verbs
+                match SemanticStageRegistry::load_default() {
+                    Ok(registry) => registry
+                        .get_stage(stage_code)
+                        .and_then(|s| s.relevant_verbs.clone()),
+                    Err(e) => {
+                        tracing::warn!(
+                            "Failed to load semantic stage registry for verb filtering: {}",
+                            e
+                        );
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+
+        // Build prompts with pre-resolved data and optional verb filtering
+        let vocab = self.build_vocab_prompt(None, stage_verb_filter.as_deref());
+
+        // Add stage focus context to the prompt if filtering is active
+        let stage_focus_context = if let Some(ref stage_code) = session.context.stage_focus {
+            format!(
+                "\n\n## FOCUS: {} Stage\nYou are focused on the {} stage. Prioritize verbs relevant to this stage.",
+                stage_code, stage_code
+            )
+        } else {
+            String::new()
+        };
+
         let system_prompt = format!(
-            "{}{}",
+            "{}{}{}",
             self.build_intent_extraction_prompt(&vocab),
-            pre_resolved_context
+            pre_resolved_context,
+            stage_focus_context
         );
 
-        // Build session context for LLM - include active CBU and bindings
+        // Build session context for LLM - include active CBU, bindings, and semantic state
         let active_cbu_context = session.context.active_cbu_for_llm();
-        let bindings_context = if !session_bindings.is_empty() || active_cbu_context.is_some() {
+
+        // Derive semantic state if we have an active CBU
+        let semantic_context = if let Some(ref cbu) = session.context.active_cbu {
+            self.derive_semantic_context(cbu.id).await
+        } else {
+            None
+        };
+
+        let bindings_context = if !session_bindings.is_empty()
+            || active_cbu_context.is_some()
+            || semantic_context.is_some()
+        {
             let mut parts = Vec::new();
             if let Some(cbu) = active_cbu_context {
                 parts.push(cbu);
@@ -482,9 +563,18 @@ impl AgentService {
                     session_bindings.join(", ")
                 ));
             }
+
+            // Add semantic stage context if available
+            let semantic_section = if let Some(ref sem_ctx) = semantic_context {
+                format!("\n\n{}", sem_ctx)
+            } else {
+                String::new()
+            };
+
             format!(
-                "\n\n[SESSION CONTEXT: {}. Use the active CBU for operations that need a CBU. Use exact @names in the refs field when referring to entities.]",
-                parts.join(". ")
+                "\n\n[SESSION CONTEXT: {}. Use the active CBU for operations that need a CBU. Use exact @names in the refs field when referring to entities.]{}",
+                parts.join(". "),
+                semantic_section
             )
         } else {
             String::new()
@@ -1440,12 +1530,26 @@ impl AgentService {
     }
 
     /// Build vocabulary prompt from verb registry
-    fn build_vocab_prompt(&self, domain_filter: Option<&str>) -> String {
+    ///
+    /// If `verb_filter` is provided, only include those specific verbs.
+    /// Otherwise, if `domain_filter` is provided, filter by domain.
+    fn build_vocab_prompt(
+        &self,
+        domain_filter: Option<&str>,
+        verb_filter: Option<&[String]>,
+    ) -> String {
         let reg = registry();
         let mut lines = Vec::new();
 
         for verb in reg.all_verbs() {
-            if let Some(domain) = domain_filter {
+            // First check verb filter (most specific)
+            if let Some(verbs) = verb_filter {
+                let full_name = format!("{}.{}", verb.domain, verb.verb);
+                if !verbs.iter().any(|v| v == &full_name) {
+                    continue;
+                }
+            } else if let Some(domain) = domain_filter {
+                // Fall back to domain filter
                 if verb.domain != domain {
                     continue;
                 }

@@ -18,6 +18,7 @@
 //! 3. UUIDs as strings for JSON compatibility
 
 pub mod resolution;
+pub mod semantic_stage;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -827,6 +828,163 @@ pub struct BindingSummary {
     pub entity_id: String,
     /// Is this the active/primary binding (e.g., active_cbu)
     pub is_primary: bool,
+}
+
+// ============================================================================
+// SESSION CONTEXT API (for agent prompt and UI context panel)
+// ============================================================================
+
+/// Context surfaced to agent and UI - what the session knows about
+/// This is the UI-facing context, distinct from server-side SessionContext
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SessionContext {
+    /// Active CBU context (if a CBU is selected)
+    #[serde(default)]
+    pub cbu: Option<CbuContext>,
+    /// Linked onboarding request (if in onboarding flow)
+    #[serde(default)]
+    pub onboarding_request: Option<LinkedContext>,
+    /// Linked KYC cases
+    #[serde(default)]
+    pub kyc_cases: Vec<LinkedContext>,
+    /// Trading matrix context (if available)
+    #[serde(default)]
+    pub trading_matrix: Option<LinkedContext>,
+    /// ISDA agreements
+    #[serde(default)]
+    pub isda_agreements: Vec<LinkedContext>,
+    /// Product subscriptions
+    #[serde(default)]
+    pub product_subscriptions: Vec<LinkedContext>,
+    /// Current active scope (what the user is "working on")
+    #[serde(default)]
+    pub active_scope: Option<ActiveScope>,
+    /// Symbol table - accumulated bindings from DSL execution
+    #[serde(default)]
+    pub symbols: std::collections::HashMap<String, SymbolValue>,
+    /// Semantic stage state - onboarding journey progress
+    /// Derived on-demand from entity tables, NOT stored
+    #[serde(default)]
+    pub semantic_state: Option<crate::semantic_stage::SemanticState>,
+    /// Currently focused stage (for verb filtering)
+    /// Set by user clicking on a stage in the UI
+    #[serde(default)]
+    pub stage_focus: Option<String>,
+}
+
+/// CBU-specific context with summary info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CbuContext {
+    /// CBU UUID
+    pub id: String,
+    /// CBU name
+    pub name: String,
+    /// Jurisdiction code (e.g., "LU", "US")
+    #[serde(default)]
+    pub jurisdiction: Option<String>,
+    /// Client type (e.g., "FUND", "CORPORATE")
+    #[serde(default)]
+    pub client_type: Option<String>,
+    /// Number of linked entities
+    #[serde(default)]
+    pub entity_count: i32,
+    /// Number of assigned roles
+    #[serde(default)]
+    pub role_count: i32,
+    /// KYC status summary
+    #[serde(default)]
+    pub kyc_status: Option<String>,
+    /// Risk rating
+    #[serde(default)]
+    pub risk_rating: Option<String>,
+}
+
+/// Generic linked context for related entities (cases, agreements, etc.)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LinkedContext {
+    /// Entity UUID
+    pub id: String,
+    /// Context type (e.g., "kyc_case", "isda_agreement", "onboarding_request")
+    pub context_type: String,
+    /// Display name/label
+    pub label: String,
+    /// Status (e.g., "ACTIVE", "PENDING", "CLOSED")
+    #[serde(default)]
+    pub status: Option<String>,
+    /// Created date (ISO 8601)
+    #[serde(default)]
+    pub created_at: Option<String>,
+    /// Additional metadata
+    #[serde(default)]
+    pub metadata: Option<serde_json::Value>,
+}
+
+/// Current active scope - what the user is focused on
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ActiveScope {
+    /// Working on a CBU
+    Cbu { cbu_id: String, cbu_name: String },
+    /// Working on a KYC case
+    KycCase {
+        case_id: String,
+        case_type: String,
+        cbu_id: String,
+    },
+    /// Working on an entity within a CBU
+    Entity {
+        entity_id: String,
+        entity_name: String,
+        cbu_id: String,
+    },
+    /// Working on onboarding
+    Onboarding {
+        request_id: String,
+        cbu_id: Option<String>,
+    },
+    /// Bulk/batch mode
+    Bulk { template_id: Option<String> },
+}
+
+/// Symbol binding value - what a @symbol resolves to
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SymbolValue {
+    /// Resolved UUID
+    pub id: String,
+    /// Entity type (e.g., "cbu", "proper_person", "limited_company")
+    pub entity_type: String,
+    /// Display name for UI
+    pub display_name: String,
+    /// Source of the binding (e.g., "execution", "user_selection", "default")
+    #[serde(default)]
+    pub source: Option<String>,
+}
+
+/// Request to set the active scope
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetScopeRequest {
+    pub scope: ActiveScope,
+}
+
+/// Response after setting scope
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetScopeResponse {
+    pub success: bool,
+    pub context: SessionContext,
+}
+
+/// Request to get session context
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetContextRequest {
+    /// Optional CBU ID to get context for (if not using session's active CBU)
+    #[serde(default)]
+    pub cbu_id: Option<String>,
+}
+
+/// Response with session context
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetContextResponse {
+    pub context: SessionContext,
 }
 
 // ============================================================================

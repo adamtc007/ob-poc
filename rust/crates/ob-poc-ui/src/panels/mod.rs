@@ -8,6 +8,7 @@ mod ast;
 mod cbu_search;
 mod chat;
 mod container_browse;
+mod context;
 mod dsl_editor;
 mod entity_detail;
 mod repl;
@@ -20,6 +21,7 @@ pub use chat::chat_panel;
 pub use container_browse::{
     container_browse_panel, ContainerBrowseAction, ContainerBrowseData, ContainerBrowseState,
 };
+pub use context::{context_panel, ContextPanelAction};
 pub use dsl_editor::{dsl_editor_panel, DslEditorAction};
 pub use entity_detail::entity_detail_panel;
 pub use repl::repl_panel;

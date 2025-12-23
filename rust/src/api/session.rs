@@ -1060,6 +1060,10 @@ pub struct SessionContext {
     /// When set, operations like cbu.add-product will auto-use this CBU ID
     #[serde(skip_serializing_if = "Option::is_none")]
     pub active_cbu: Option<BoundEntity>,
+    /// Currently focused stage in the onboarding journey
+    /// When set, agent verb suggestions are filtered to this stage's relevant verbs
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stage_focus: Option<String>,
     /// Primary domain keys - the main identifiers for this onboarding session
     #[serde(default)]
     pub primary_keys: PrimaryDomainKeys,

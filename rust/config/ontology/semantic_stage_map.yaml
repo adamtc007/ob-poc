@@ -1,0 +1,310 @@
+# Semantic Stage Map
+#
+# Defines the onboarding journey stages and maps Products -> Stages -> Entity Types.
+# This is the third instance of the Common Taxonomy Model pattern:
+#   - Product -> Service -> Resource
+#   - Instrument -> Lifecycle -> Resource
+#   - Product -> Stage -> Entity Type (this file)
+#
+# Key distinction:
+#   - This file: CONFIGURATION (static, deployed with code)
+#   - SemanticState: DERIVED at runtime (computed from entity tables, not stored)
+
+stages:
+  - code: CLIENT_SETUP
+    name: "Client Setup"
+    description: "Establish the client entity and basic structure"
+    required_entities:
+      - cbu
+    depends_on: []
+    relevant_verbs:
+      - cbu.ensure
+      - cbu.create
+      - cbu.assign-role
+      - entity.create-limited-company
+      - entity.create-proper-person
+      - entity.create-partnership-limited
+      - entity.create-trust-discretionary
+
+  - code: PRODUCT_SELECTION
+    name: "Product Selection"
+    description: "Define what services the client needs"
+    required_entities:
+      - cbu_product_subscription
+    depends_on: [CLIENT_SETUP]
+    relevant_verbs:
+      - cbu.add-product
+      - product.list
+      - service.list
+
+  - code: KYC_REVIEW
+    name: "KYC Review"
+    description: "Know your customer - regulatory requirement"
+    required_entities:
+      - kyc_case
+      - entity_workstream # At least one per party
+    depends_on: [CLIENT_SETUP]
+    blocking: true # Can't proceed to trading without completing
+    relevant_verbs:
+      - kyc-case.create
+      - kyc-case.update-status
+      - kyc-case.escalate
+      - kyc-case.close
+      - entity-workstream.create
+      - entity-workstream.update-status
+      - entity-workstream.complete
+      - doc-request.create
+      - doc-request.receive
+      - doc-request.verify
+      - case-screening.run
+      - case-screening.complete
+      - red-flag.raise
+      - red-flag.mitigate
+      - document.catalog
+
+  - code: INSTRUMENT_UNIVERSE
+    name: "Instrument Universe"
+    description: "Define what instruments the client trades"
+    required_entities:
+      - trading_profile
+      - cbu_instrument_universe # At least one entry
+    depends_on: [PRODUCT_SELECTION]
+    relevant_verbs:
+      - trading-profile.import
+      - trading-profile.activate
+      - cbu-custody.add-universe
+      - cbu-custody.list-universe
+
+  - code: SETTLEMENT_INSTRUCTIONS
+    name: "Settlement Instructions"
+    description: "Standing Settlement Instructions for custody operations"
+    required_entities:
+      - cbu_ssi
+      - ssi_booking_rule # Routing rules
+    depends_on: [INSTRUMENT_UNIVERSE]
+    relevant_verbs:
+      - cbu-custody.create-ssi
+      - cbu-custody.activate-ssi
+      - cbu-custody.add-booking-rule
+      - cbu-custody.list-ssis
+      - cbu-custody.list-booking-rules
+      - cbu-custody.validate-booking-coverage
+      - cbu-custody.lookup-ssi
+
+  - code: LIFECYCLE_RESOURCES
+    name: "Lifecycle Resources"
+    description: "Operational infrastructure for instrument lifecycle"
+    required_entities:
+      - cbu_lifecycle_instance
+    depends_on: [INSTRUMENT_UNIVERSE]
+    relevant_verbs:
+      - service-resource.provision
+      - service-resource.set-attr
+      - service-resource.activate
+      - service-resource.list
+
+  - code: ISDA_SETUP
+    name: "ISDA/CSA Setup"
+    description: "Legal framework for OTC derivatives"
+    required_entities:
+      - isda_agreement
+      - csa_agreement
+    depends_on: [KYC_REVIEW]
+    conditional: has_otc_instruments
+    relevant_verbs:
+      - isda.create
+      - isda.add-coverage
+      - isda.add-csa
+      - isda.list
+
+  - code: PRICING_SETUP
+    name: "Pricing Configuration"
+    description: "Price sources and NAV calculation setup"
+    required_entities:
+      - cbu_pricing_config
+    depends_on: [INSTRUMENT_UNIVERSE]
+    relevant_verbs:
+      - pricing-config.set
+      - pricing-config.list
+
+  - code: TRANSFER_AGENCY_SETUP
+    name: "Transfer Agency Setup"
+    description: "Share class and investor registry configuration"
+    required_entities:
+      - share_class
+      - holding # At least one investor holding
+    depends_on: [CLIENT_SETUP, PRODUCT_SELECTION]
+    relevant_verbs:
+      - share-class.create
+      - share-class.ensure
+      - share-class.update-nav
+      - holding.create
+      - holding.ensure
+      - movement.subscribe
+      - movement.redeem
+
+  - code: COLLATERAL_SETUP
+    name: "Collateral Management Setup"
+    description: "Margin and collateral agreement configuration"
+    required_entities:
+      - collateral_agreement
+    depends_on: [ISDA_SETUP]
+    conditional: has_collateral_product
+    relevant_verbs:
+      - collateral.configure
+
+# Product -> Stage requirements (M:N mapping)
+# Each product defines which stages are mandatory/conditional
+
+product_stages:
+  CUSTODY:
+    mandatory:
+      - CLIENT_SETUP
+      - PRODUCT_SELECTION
+      - KYC_REVIEW
+      - INSTRUMENT_UNIVERSE
+      - SETTLEMENT_INSTRUCTIONS
+      - LIFECYCLE_RESOURCES
+    conditional:
+      - stage: ISDA_SETUP
+        when: has_otc_instruments
+
+  FUND_ACCOUNTING:
+    mandatory:
+      - CLIENT_SETUP
+      - PRODUCT_SELECTION
+      - KYC_REVIEW
+      - INSTRUMENT_UNIVERSE
+      - PRICING_SETUP
+    adds_to_stage:
+      PRICING_SETUP:
+        extra_entities:
+          - nav_calculation_config
+          - benchmark_config
+
+  TRANSFER_AGENCY:
+    mandatory:
+      - CLIENT_SETUP
+      - PRODUCT_SELECTION
+      - KYC_REVIEW
+      - TRANSFER_AGENCY_SETUP
+    adds_to_stage:
+      TRANSFER_AGENCY_SETUP:
+        extra_entities:
+          - investor_registry_config
+
+  MIDDLE_OFFICE:
+    mandatory:
+      - CLIENT_SETUP
+      - PRODUCT_SELECTION
+      - KYC_REVIEW
+      - INSTRUMENT_UNIVERSE
+      - LIFECYCLE_RESOURCES
+    adds_to_stage:
+      LIFECYCLE_RESOURCES:
+        extra_entities:
+          - trade_capture_config
+          - reconciliation_config
+
+  ALTS:
+    mandatory:
+      - CLIENT_SETUP
+      - PRODUCT_SELECTION
+      - KYC_REVIEW
+      - INSTRUMENT_UNIVERSE
+      - LIFECYCLE_RESOURCES
+      - PRICING_SETUP
+    adds_to_stage:
+      PRICING_SETUP:
+        extra_entities:
+          - private_asset_valuation_config
+
+  COLLATERAL_MGMT:
+    mandatory:
+      - CLIENT_SETUP
+      - PRODUCT_SELECTION
+      - KYC_REVIEW
+      - ISDA_SETUP
+      - COLLATERAL_SETUP
+    adds_to_stage:
+      COLLATERAL_SETUP:
+        extra_entities:
+          - margin_call_config
+          - eligible_collateral_schedule
+
+  MARKETS_FX:
+    mandatory:
+      - CLIENT_SETUP
+      - PRODUCT_SELECTION
+      - KYC_REVIEW
+      - INSTRUMENT_UNIVERSE
+      - ISDA_SETUP # FX typically needs ISDA
+      - SETTLEMENT_INSTRUCTIONS
+    adds_to_stage:
+      SETTLEMENT_INSTRUCTIONS:
+        extra_entities:
+          - fx_settlement_config
+
+# Entity type -> Stage mapping (reverse lookup for agent context)
+# Used to answer: "Which stage does entity type X belong to?"
+
+entity_stage_mapping:
+  # CLIENT_SETUP
+  cbu: CLIENT_SETUP
+
+  # PRODUCT_SELECTION
+  cbu_product_subscription: PRODUCT_SELECTION
+
+  # KYC_REVIEW
+  kyc_case: KYC_REVIEW
+  entity_workstream: KYC_REVIEW
+  case_screening: KYC_REVIEW
+  doc_request: KYC_REVIEW
+  red_flag: KYC_REVIEW
+
+  # INSTRUMENT_UNIVERSE
+  trading_profile: INSTRUMENT_UNIVERSE
+  cbu_instrument_universe: INSTRUMENT_UNIVERSE
+
+  # SETTLEMENT_INSTRUCTIONS
+  cbu_ssi: SETTLEMENT_INSTRUCTIONS
+  ssi_booking_rule: SETTLEMENT_INSTRUCTIONS
+  ssi_agent_override: SETTLEMENT_INSTRUCTIONS
+
+  # LIFECYCLE_RESOURCES
+  cbu_lifecycle_instance: LIFECYCLE_RESOURCES
+  cbu_resource_instance: LIFECYCLE_RESOURCES
+
+  # ISDA_SETUP
+  isda_agreement: ISDA_SETUP
+  csa_agreement: ISDA_SETUP
+  isda_product_coverage: ISDA_SETUP
+
+  # PRICING_SETUP
+  cbu_pricing_config: PRICING_SETUP
+  nav_calculation_config: PRICING_SETUP
+  benchmark_config: PRICING_SETUP
+
+  # TRANSFER_AGENCY_SETUP
+  share_class: TRANSFER_AGENCY_SETUP
+  holding: TRANSFER_AGENCY_SETUP
+  movement: TRANSFER_AGENCY_SETUP
+
+  # COLLATERAL_SETUP
+  collateral_agreement: COLLATERAL_SETUP
+  margin_call_config: COLLATERAL_SETUP
+  eligible_collateral_schedule: COLLATERAL_SETUP
+
+# Condition definitions (for conditional stages)
+# Maps condition names to how they should be evaluated
+
+condition_definitions:
+  has_otc_instruments:
+    description: "CBU has OTC derivative instruments in their universe"
+    check_entity: cbu_instrument_universe
+    check_field: instrument_class_code
+    check_values: [SWAP, SWAPTION, OPTION_OTC, FORWARD, CDS]
+
+  has_collateral_product:
+    description: "CBU has Collateral Management product"
+    check_product: COLLATERAL_MGMT

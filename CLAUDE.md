@@ -369,9 +369,10 @@ The web UI is split into three crates:
 - `rust/crates/ob-poc-ui/` - Pure egui/WASM application (main UI)
 - `rust/crates/ob-poc-graph/` - Reusable graph widget (used by ob-poc-ui)
 
-The UI uses a 4-panel layout with multiple layout modes (FourPanel, EditorFocus, GraphFocus, GraphFullSize).
+The UI uses a 5-panel layout: context panel (left) + 4-panel main area with multiple layout modes (FourPanel, EditorFocus, GraphFocus, GraphFullSize).
 
 **Key features:**
+- Context panel (left): Session context, semantic stages with stage focus
 - 4 view modes: KYC_UBO, SERVICE_DELIVERY, CUSTODY, PRODUCTS_ONLY
 - Multiple layout orientations
 - Node drag/resize with layout persistence
@@ -2124,6 +2125,7 @@ Sessions are managed server-side with a shared in-memory store. The UI sends sta
 │  - messages: Vec<Message>                                       │
 │  - context.active_cbu: Option<BoundEntity>                      │
 │  - context.bindings: HashMap<String, BoundEntity>               │
+│  - context.stage_focus: Option<String>  (semantic stage code)   │
 │  - pending/ast state for DSL execution                          │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -2133,13 +2135,65 @@ Sessions are managed server-side with a shared in-memory store. The UI sends sta
 | Endpoint | Purpose |
 |----------|---------|
 | `POST /api/session` | Create new session, returns `session_id` |
-| `GET /api/session/:id` | Get session state with `active_cbu` and `bindings` |
+| `GET /api/session/:id` | Get session state with `active_cbu`, `bindings`, `stage_focus` |
 | `POST /api/session/:id/bind` | Bind entity (CBU, etc.) to session context |
-| `POST /api/session/:id/chat` | Chat with agent (uses `active_cbu` in prompt) |
+| `POST /api/session/:id/chat` | Chat with agent (uses `active_cbu` and `stage_focus` in prompt) |
+| `POST /api/session/:id/focus` | Set stage focus for verb filtering |
 
 **Session auto-recovery:** When the UI gets a 404 on bind (e.g., after server restart), it automatically recreates the session and retries.
 
 **Active CBU context:** When a CBU is bound to the session, the agent receives it in the system prompt, enabling context-aware responses like "Add a director to [CBU Name]".
+
+**Stage Focus:** When a semantic stage is focused via the context panel, the agent's vocabulary is filtered to only the `relevant_verbs` defined for that stage. This guides the agent toward stage-appropriate actions.
+
+### Context Panel
+
+The context panel (`rust/crates/ob-poc-ui/src/panels/context.rs`) displays session context and semantic stages in a left side panel.
+
+**Features:**
+- Shows active CBU and session bindings
+- Displays semantic stages from `SemanticStageRegistry`
+- Clickable stages set `stage_focus` on the session
+- Focused stage filters agent verb vocabulary
+
+**Architecture:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Context Panel (left)                          │
+│  - Session context (active CBU, bindings)                       │
+│  - Semantic stages (clickable)                                  │
+│  - Returns ContextPanelAction                                   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    App.handle_context_panel_action()             │
+│  FocusStage → state.set_stage_focus(Some(code))                 │
+│  ClearStageFocus → state.set_stage_focus(None)                  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    POST /api/session/:id/focus                   │
+│  Updates session.context.stage_focus                            │
+│  Returns relevant_verbs for the stage                           │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Agent Chat (filtered verbs)                   │
+│  build_vocab_prompt() only includes relevant_verbs              │
+│  Agent focuses on stage-appropriate actions                     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key files:**
+| File | Purpose |
+|------|---------|
+| `rust/crates/ob-poc-ui/src/panels/context.rs` | Context panel UI with stage list |
+| `rust/config/agent/semantic_stages.yaml` | Stage definitions with `relevant_verbs` |
+| `rust/src/api/session_routes.rs` | `/focus` endpoint handler |
+| `rust/src/api/agent_service.rs` | `build_vocab_prompt()` with verb filtering |
 
 ## DSL Syntax
 
