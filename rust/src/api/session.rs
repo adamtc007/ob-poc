@@ -1022,6 +1022,15 @@ impl ActiveBatchState {
 /// Context maintained across the session for reference resolution
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SessionContext {
+    /// Version of business_reference when loaded (for optimistic locking)
+    /// When saving, this version must match the DB version or we get a conflict
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loaded_dsl_version: Option<i32>,
+
+    /// Business reference for this session's DSL instance (e.g., CBU name)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub business_reference: Option<String>,
+
     /// Most recently created CBU
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_cbu_id: Option<Uuid>,

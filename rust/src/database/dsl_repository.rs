@@ -7,11 +7,37 @@
 //! Canonical schema:
 //! - dsl_instances: instance_id, domain_name, business_reference, current_version, status
 //! - dsl_instance_versions: version_id, instance_id, version_number, dsl_content, ast_json, operation_type
+//!
+//! Optimistic Locking:
+//! - Sessions track `loaded_dsl_version` when they load a business_reference
+//! - On save, `expected_version` must match `current_version` in DB
+//! - Mismatch = another session modified the data → VersionConflict error
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
+use thiserror::Error;
 use uuid::Uuid;
+
+// ============================================================================
+// Error Types
+// ============================================================================
+
+/// Error type for DSL save operations with optimistic locking support
+#[derive(Debug, Error)]
+pub enum DslSaveError {
+    /// Version conflict - another session modified the data
+    #[error("Version conflict for '{business_reference}': expected version {expected}, found {actual}. Another session has modified this data. Please refresh and retry.")]
+    VersionConflict {
+        expected: i32,
+        actual: i32,
+        business_reference: String,
+    },
+
+    /// Database error
+    #[error("Database error: {0}")]
+    Database(#[from] sqlx::Error),
+}
 
 /// Result of saving a DSL instance
 #[derive(Debug, Clone)]
@@ -111,6 +137,13 @@ impl DslRepository {
 
     /// Save DSL instance with version atomically in a transaction
     /// Returns the instance_id and version number
+    ///
+    /// # Optimistic Locking
+    /// - `expected_version`: None = no version check (create new or force update)
+    /// - `expected_version`: Some(n) = must match current DB version or error
+    ///
+    /// When updating an existing instance with `expected_version`, this performs
+    /// a double-check in the UPDATE statement to prevent race conditions.
     pub async fn save_dsl_instance(
         &self,
         business_reference: &str,
@@ -118,7 +151,8 @@ impl DslRepository {
         dsl_content: &str,
         ast_json: Option<&serde_json::Value>,
         operation_type: &str,
-    ) -> Result<DslSaveResult, sqlx::Error> {
+        expected_version: Option<i32>,
+    ) -> Result<DslSaveResult, DslSaveError> {
         // Start transaction
         let mut tx = self.pool.begin().await?;
 
@@ -135,22 +169,45 @@ impl DslRepository {
         .await?;
 
         let (instance_id, version) = if let Some((id, current_ver)) = existing {
+            // OPTIMISTIC LOCK CHECK
+            if let Some(expected) = expected_version {
+                if current_ver != expected {
+                    return Err(DslSaveError::VersionConflict {
+                        expected,
+                        actual: current_ver,
+                        business_reference: business_reference.to_string(),
+                    });
+                }
+            }
+
             // Update existing instance version
+            // Double-check in UPDATE prevents race between check and update
             let new_version = current_ver + 1;
-            sqlx::query(
+            let result = sqlx::query(
                 r#"
                 UPDATE "ob-poc".dsl_instances
                 SET current_version = $1, updated_at = NOW()
-                WHERE instance_id = $2
+                WHERE instance_id = $2 AND current_version = $3
                 "#,
             )
             .bind(new_version)
             .bind(id)
+            .bind(current_ver)
             .execute(&mut *tx)
             .await?;
+
+            // If no rows updated, another transaction snuck in between our check and update
+            if result.rows_affected() == 0 {
+                return Err(DslSaveError::VersionConflict {
+                    expected: expected_version.unwrap_or(current_ver),
+                    actual: current_ver + 1, // Best guess - someone else incremented
+                    business_reference: business_reference.to_string(),
+                });
+            }
+
             (id, new_version)
         } else {
-            // Create new instance
+            // Create new instance - no lock needed
             let new_id = Uuid::new_v4();
             sqlx::query(
                 r#"
@@ -194,7 +251,30 @@ impl DslRepository {
         })
     }
 
+    /// Save DSL instance without optimistic locking (legacy compatibility)
+    /// Use `save_dsl_instance` with `expected_version` for new code
+    pub async fn save_dsl_instance_unchecked(
+        &self,
+        business_reference: &str,
+        domain_name: &str,
+        dsl_content: &str,
+        ast_json: Option<&serde_json::Value>,
+        operation_type: &str,
+    ) -> Result<DslSaveResult, DslSaveError> {
+        self.save_dsl_instance(
+            business_reference,
+            domain_name,
+            dsl_content,
+            ast_json,
+            operation_type,
+            None, // No version check
+        )
+        .await
+    }
+
     /// Save DSL execution (simplified interface)
+    /// Note: This uses unchecked save (no optimistic locking) for backward compatibility
+    /// For optimistic locking, use `save_execution_checked` instead
     pub async fn save_execution(
         &self,
         dsl_content: &str,
@@ -202,13 +282,41 @@ impl DslRepository {
         business_reference: &str,
         _cbu_id: Option<Uuid>,
         ast_json: &serde_json::Value,
-    ) -> Result<DslSaveResult, sqlx::Error> {
+    ) -> Result<DslSaveResult, DslSaveError> {
+        self.save_dsl_instance_unchecked(
+            business_reference,
+            domain,
+            dsl_content,
+            Some(ast_json),
+            "EXECUTE",
+        )
+        .await
+    }
+
+    /// Save DSL execution with optimistic locking
+    ///
+    /// # Arguments
+    /// * `expected_version` - The version loaded by the session. Must match DB version.
+    ///
+    /// # Returns
+    /// * `Ok(DslSaveResult)` - Success with new version number
+    /// * `Err(DslSaveError::VersionConflict)` - Another session modified the data
+    pub async fn save_execution_checked(
+        &self,
+        dsl_content: &str,
+        domain: &str,
+        business_reference: &str,
+        _cbu_id: Option<Uuid>,
+        ast_json: &serde_json::Value,
+        expected_version: Option<i32>,
+    ) -> Result<DslSaveResult, DslSaveError> {
         self.save_dsl_instance(
             business_reference,
             domain,
             dsl_content,
             Some(ast_json),
             "EXECUTE",
+            expected_version,
         )
         .await
     }

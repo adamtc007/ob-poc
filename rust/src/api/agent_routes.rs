@@ -1487,11 +1487,52 @@ pub struct SetFocusResponse {
 ///
 /// This allows the UI to register external entities (like a selected CBU)
 /// as available symbols for DSL generation and execution.
+///
+/// For CBU bindings, this also loads the current DSL version for optimistic locking.
+/// The version is stored in `session.context.loaded_dsl_version` and used when
+/// saving DSL to detect concurrent modifications.
 async fn set_session_binding(
     State(state): State<AgentState>,
     Path(session_id): Path<Uuid>,
     Json(req): Json<SetBindingRequest>,
 ) -> Result<Json<SetBindingResponse>, StatusCode> {
+    // For CBU bindings, load the current DSL version for optimistic locking
+    let (loaded_version, business_ref) = if req.entity_type == "cbu" {
+        // Use display_name as the business_reference (CBU name is the canonical key)
+        let business_ref = req.display_name.clone();
+        match state
+            .dsl_repo
+            .get_instance_by_reference(&business_ref)
+            .await
+        {
+            Ok(Some(instance)) => {
+                tracing::debug!(
+                    "Loaded DSL version {} for CBU '{}' (optimistic locking)",
+                    instance.current_version,
+                    business_ref
+                );
+                (Some(instance.current_version), Some(business_ref))
+            }
+            Ok(None) => {
+                tracing::debug!(
+                    "No existing DSL instance for CBU '{}' (will create new)",
+                    business_ref
+                );
+                (None, Some(business_ref))
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to load DSL version for CBU '{}': {} (continuing without lock)",
+                    business_ref,
+                    e
+                );
+                (None, Some(business_ref))
+            }
+        }
+    } else {
+        (None, None)
+    };
+
     let mut sessions = state.sessions.write().await;
     let session = sessions.get_mut(&session_id).ok_or(StatusCode::NOT_FOUND)?;
 
@@ -1509,14 +1550,19 @@ async fn set_session_binding(
             .named_refs
             .insert("cbu_id".to_string(), req.id);
         session.context.set_active_cbu(req.id, &req.display_name);
+
+        // Store version info for optimistic locking
+        session.context.loaded_dsl_version = loaded_version;
+        session.context.business_reference = business_ref;
     }
 
     tracing::debug!(
-        "Bind success: session={} @{}={} type={}",
+        "Bind success: session={} @{}={} type={} dsl_version={:?}",
         session_id,
         actual_name,
         req.id,
-        req.entity_type
+        req.entity_type,
+        session.context.loaded_dsl_version
     );
 
     // Clone before dropping the lock to avoid holding it during response serialization
