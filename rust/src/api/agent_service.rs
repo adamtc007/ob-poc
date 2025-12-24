@@ -142,7 +142,7 @@ pub struct ResolvedEntityLookup {
     pub entity_id: Uuid,
 }
 
-/// Result of resolving entity lookups
+/// Result of resolving entity lookups (LEGACY - replaced by UnifiedResolution)
 #[derive(Debug)]
 pub enum LookupResolution {
     /// All lookups resolved to exactly one entity
@@ -151,6 +151,37 @@ pub enum LookupResolution {
     /// Some lookups are ambiguous - need disambiguation
     Ambiguous(Vec<DisambiguationItem>),
     /// Error during lookup
+    Error(String),
+}
+
+/// Parameters that should be resolved as codes (not raw strings) via EntityGateway.
+const CODE_PARAMS: &[(&str, RefType)] = &[
+    ("product", RefType::Product),
+    ("role", RefType::Role),
+    ("jurisdiction", RefType::Jurisdiction),
+    ("currency", RefType::Currency),
+    ("client-type", RefType::ClientType),
+];
+
+/// Unified result of resolving ALL references (entities + codes) in intents.
+/// Replaces the old 3-method approach (collect_lookups, resolve_lookups, inject_resolved_ids).
+#[derive(Debug)]
+pub enum UnifiedResolution {
+    /// All references resolved - intents are ready for DSL building
+    Resolved {
+        /// Modified intents with resolved entity IDs and canonical codes
+        intents: Vec<VerbIntent>,
+        /// Code corrections applied (param, original, canonical)
+        corrections: Vec<(String, String, String)>,
+    },
+    /// Some entity lookups are ambiguous - need user disambiguation
+    NeedsDisambiguation {
+        /// Disambiguation items to present to user
+        items: Vec<DisambiguationItem>,
+        /// Partially resolved intents (to resume after disambiguation)
+        partial_intents: Vec<VerbIntent>,
+    },
+    /// Error during resolution (invalid code with no good fuzzy match)
     Error(String),
 }
 
@@ -847,23 +878,22 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                 break;
             }
 
-            // Collect all lookups from intents
-            let all_lookups = self.collect_lookups(&intents);
-
-            // Resolve lookups via EntityGateway
-            let resolution = self.resolve_lookups(&all_lookups).await;
+            // Unified resolution: entities + codes in one pass
+            let resolution = self.resolve_all(intents).await;
 
             match resolution {
-                LookupResolution::Ambiguous(items) => {
+                UnifiedResolution::NeedsDisambiguation {
+                    items,
+                    partial_intents,
+                } => {
                     // Need disambiguation - store intents in session for retrieval after user selection
-                    // This is critical: the session persists intents so disambiguation response can use them
-                    session.pending_intents = intents.clone();
+                    session.pending_intents = partial_intents.clone();
 
                     let disambig = DisambiguationRequest {
                         request_id: Uuid::new_v4(),
                         items,
                         prompt: "Please select the correct entities:".to_string(),
-                        original_intents: Some(intents), // Also include in response for stateless clients
+                        original_intents: Some(partial_intents),
                     };
 
                     session.add_agent_message(explanation.clone(), None, None);
@@ -881,12 +911,20 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                         commands: None,
                     });
                 }
-                LookupResolution::Error(msg) => {
+                UnifiedResolution::Error(msg) => {
+                    // Could be entity lookup failure OR invalid code
                     return Err(msg);
                 }
-                LookupResolution::Resolved(resolved_ids) => {
-                    // All resolved - inject UUIDs and build DSL
-                    let modified_intents = self.inject_resolved_ids(intents, &resolved_ids);
+                UnifiedResolution::Resolved {
+                    intents: modified_intents,
+                    corrections,
+                } => {
+                    // Log any code corrections
+                    for (param, from, to) in &corrections {
+                        tracing::info!("Resolved {}: '{}' → '{}'", param, from, to);
+                    }
+
+                    let modified_intents = modified_intents;
 
                     // Validate intents against registry
                     validation_results.clear();
@@ -1063,14 +1101,36 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         }
 
         // Get original intents from session's pending disambiguation
-        let original_intents = session.pending_intents.clone();
+        let mut original_intents = session.pending_intents.clone();
 
         if original_intents.is_empty() {
             return Err("No original intents available for disambiguation".to_string());
         }
 
-        // Inject resolved lookups and build response
-        let modified_intents = self.inject_resolved_ids(original_intents, &resolved);
+        // Inject resolved entity lookups into intents
+        for intent in &mut original_intents {
+            for (param, lookup) in &resolved {
+                intent.params.insert(
+                    param.clone(),
+                    ParamValue::ResolvedEntity {
+                        display_name: lookup.display_name.clone(),
+                        resolved_id: lookup.entity_id,
+                    },
+                );
+            }
+            intent.lookups = None;
+        }
+
+        // Also resolve code values (products, roles, jurisdictions)
+        let modified_intents = match self.resolve_codes_only(&mut original_intents).await {
+            Ok(corrections) => {
+                for (param, from, to) in &corrections {
+                    tracing::info!("Resolved {}: '{}' → '{}'", param, from, to);
+                }
+                original_intents
+            }
+            Err(e) => return Err(e),
+        };
 
         // Validate
         let validation_results: Vec<IntentValidation> =
@@ -1438,6 +1498,295 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
     }
 
     /// Collect all entity lookups from intents
+    /// Unified reference resolution: resolves ALL references (entities + codes) in a single pass.
+    ///
+    /// This replaces the old 3-method approach:
+    /// - collect_lookups() → absorbed
+    /// - resolve_lookups() → absorbed
+    /// - inject_resolved_ids() → resolution modifies intents in place
+    ///
+    /// One method. One Gateway connection. One pattern.
+    async fn resolve_all(&self, mut intents: Vec<VerbIntent>) -> UnifiedResolution {
+        let mut resolver = match GatewayRefResolver::connect(&self.config.gateway_addr).await {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::warn!("EntityGateway not available: {}", e);
+                // Return intents as-is - CSG linter will catch issues later
+                return UnifiedResolution::Resolved {
+                    intents,
+                    corrections: vec![],
+                };
+            }
+        };
+
+        let mut disambiguations: Vec<DisambiguationItem> = Vec::new();
+        let mut corrections: Vec<(String, String, String)> = Vec::new();
+
+        for intent in &mut intents {
+            // 1. Resolve entity lookups → UUIDs
+            if let Some(lookups) = intent.lookups.take() {
+                for (param, lookup_val) in lookups {
+                    let lookup: EntityLookup = match serde_json::from_value(lookup_val) {
+                        Ok(l) => l,
+                        Err(_) => continue,
+                    };
+
+                    // Determine ref type from entity_type hint
+                    let ref_type = match lookup.entity_type.as_deref() {
+                        Some("person") | Some("proper_person") => RefType::Entity,
+                        Some("company") | Some("limited_company") | Some("legal_entity") => {
+                            RefType::Entity
+                        }
+                        Some("cbu") => RefType::Cbu,
+                        Some("product") => RefType::Product,
+                        Some("role") => RefType::Role,
+                        Some("jurisdiction") => RefType::Jurisdiction,
+                        _ => RefType::Entity,
+                    };
+
+                    match resolver.resolve(ref_type, &lookup.search_text).await {
+                        Ok(ResolveResult::Found { id, .. }) => {
+                            intent.params.insert(
+                                param,
+                                ParamValue::ResolvedEntity {
+                                    display_name: lookup.search_text,
+                                    resolved_id: id,
+                                },
+                            );
+                        }
+                        Ok(ResolveResult::FoundByCode { uuid: Some(id), .. }) => {
+                            intent.params.insert(
+                                param,
+                                ParamValue::ResolvedEntity {
+                                    display_name: lookup.search_text,
+                                    resolved_id: id,
+                                },
+                            );
+                        }
+                        Ok(ResolveResult::FoundByCode { uuid: None, .. }) => {
+                            tracing::debug!(
+                                "Found by code but no UUID for '{}' (param: {})",
+                                lookup.search_text,
+                                param
+                            );
+                        }
+                        Ok(ResolveResult::NotFound { suggestions }) if !suggestions.is_empty() => {
+                            let matches: Vec<EntityMatchOption> = suggestions
+                                .into_iter()
+                                .filter_map(|s| {
+                                    Uuid::parse_str(&s.value).ok().map(|id| EntityMatchOption {
+                                        entity_id: id,
+                                        name: s.display,
+                                        entity_type: lookup
+                                            .entity_type
+                                            .clone()
+                                            .unwrap_or_else(|| "entity".to_string()),
+                                        jurisdiction: None,
+                                        context: None,
+                                        score: Some(s.score),
+                                    })
+                                })
+                                .collect();
+
+                            if !matches.is_empty() {
+                                disambiguations.push(DisambiguationItem::EntityMatch {
+                                    param,
+                                    search_text: lookup.search_text,
+                                    matches,
+                                });
+                            }
+                        }
+                        Ok(ResolveResult::NotFound { .. }) => {
+                            tracing::debug!(
+                                "No matches for '{}' (param: {})",
+                                lookup.search_text,
+                                param
+                            );
+                        }
+                        Err(e) => {
+                            return UnifiedResolution::Error(format!("Lookup failed: {}", e));
+                        }
+                    }
+                }
+            }
+
+            // 2. Resolve code params → canonical codes
+            for (param_name, ref_type) in CODE_PARAMS {
+                let raw_value = match intent.params.get(*param_name) {
+                    Some(ParamValue::String(s)) if !s.trim().is_empty() => s.clone(),
+                    _ => continue,
+                };
+
+                match resolver.resolve(*ref_type, &raw_value).await {
+                    Ok(ResolveResult::Found { id, .. }) => {
+                        let canonical = id.to_string();
+                        if canonical != raw_value {
+                            corrections.push((
+                                param_name.to_string(),
+                                raw_value,
+                                canonical.clone(),
+                            ));
+                        }
+                        intent
+                            .params
+                            .insert(param_name.to_string(), ParamValue::String(canonical));
+                    }
+                    Ok(ResolveResult::FoundByCode { code, .. }) => {
+                        if code != raw_value {
+                            corrections.push((param_name.to_string(), raw_value, code.clone()));
+                        }
+                        intent
+                            .params
+                            .insert(param_name.to_string(), ParamValue::String(code));
+                    }
+                    Ok(ResolveResult::NotFound { suggestions })
+                        if suggestions.first().map(|s| s.score > 0.7).unwrap_or(false) =>
+                    {
+                        // High confidence fuzzy match - auto-correct
+                        let best = &suggestions[0];
+                        corrections.push((param_name.to_string(), raw_value, best.value.clone()));
+                        intent.params.insert(
+                            param_name.to_string(),
+                            ParamValue::String(best.value.clone()),
+                        );
+                    }
+                    Ok(ResolveResult::NotFound { suggestions }) if !suggestions.is_empty() => {
+                        // Low confidence - return error with suggestions
+                        let suggestion_list: Vec<&str> = suggestions
+                            .iter()
+                            .take(3)
+                            .map(|s| s.value.as_str())
+                            .collect();
+                        return UnifiedResolution::Error(format!(
+                            "Unknown {}: '{}'. Try: {}",
+                            param_name,
+                            raw_value,
+                            suggestion_list.join(", ")
+                        ));
+                    }
+                    Ok(ResolveResult::NotFound { .. }) => {
+                        return UnifiedResolution::Error(format!(
+                            "Unknown {} code: '{}'. Check available codes.",
+                            param_name, raw_value
+                        ));
+                    }
+                    Err(e) => {
+                        // Resolution error - log but continue (CSG linter will catch)
+                        tracing::warn!(
+                            "Code resolution failed for {} '{}': {}",
+                            param_name,
+                            raw_value,
+                            e
+                        );
+                    }
+                }
+            }
+        }
+
+        if disambiguations.is_empty() {
+            UnifiedResolution::Resolved {
+                intents,
+                corrections,
+            }
+        } else {
+            UnifiedResolution::NeedsDisambiguation {
+                items: disambiguations,
+                partial_intents: intents,
+            }
+        }
+    }
+
+    /// Resolve only code values (products, roles, jurisdictions, etc.) in intents.
+    /// Used after disambiguation when entities are already resolved.
+    async fn resolve_codes_only(
+        &self,
+        intents: &mut [VerbIntent],
+    ) -> Result<Vec<(String, String, String)>, String> {
+        let mut corrections: Vec<(String, String, String)> = Vec::new();
+
+        let mut resolver = match GatewayRefResolver::connect(&self.config.gateway_addr).await {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::warn!("EntityGateway not available for code resolution: {}", e);
+                return Ok(corrections);
+            }
+        };
+
+        for intent in intents.iter_mut() {
+            for (param_name, ref_type) in CODE_PARAMS {
+                let raw_value = match intent.params.get(*param_name) {
+                    Some(ParamValue::String(s)) if !s.trim().is_empty() => s.clone(),
+                    _ => continue,
+                };
+
+                match resolver.resolve(*ref_type, &raw_value).await {
+                    Ok(ResolveResult::Found { id, .. }) => {
+                        let canonical = id.to_string();
+                        if canonical != raw_value {
+                            corrections.push((
+                                param_name.to_string(),
+                                raw_value,
+                                canonical.clone(),
+                            ));
+                        }
+                        intent
+                            .params
+                            .insert(param_name.to_string(), ParamValue::String(canonical));
+                    }
+                    Ok(ResolveResult::FoundByCode { code, .. }) => {
+                        if code != raw_value {
+                            corrections.push((param_name.to_string(), raw_value, code.clone()));
+                        }
+                        intent
+                            .params
+                            .insert(param_name.to_string(), ParamValue::String(code));
+                    }
+                    Ok(ResolveResult::NotFound { suggestions })
+                        if suggestions.first().map(|s| s.score > 0.7).unwrap_or(false) =>
+                    {
+                        let best = &suggestions[0];
+                        corrections.push((param_name.to_string(), raw_value, best.value.clone()));
+                        intent.params.insert(
+                            param_name.to_string(),
+                            ParamValue::String(best.value.clone()),
+                        );
+                    }
+                    Ok(ResolveResult::NotFound { suggestions }) if !suggestions.is_empty() => {
+                        let suggestion_list: Vec<&str> = suggestions
+                            .iter()
+                            .take(3)
+                            .map(|s| s.value.as_str())
+                            .collect();
+                        return Err(format!(
+                            "Unknown {}: '{}'. Try: {}",
+                            param_name,
+                            raw_value,
+                            suggestion_list.join(", ")
+                        ));
+                    }
+                    Ok(ResolveResult::NotFound { .. }) => {
+                        return Err(format!(
+                            "Unknown {} code: '{}'. Check available codes.",
+                            param_name, raw_value
+                        ));
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Code resolution failed for {} '{}': {}",
+                            param_name,
+                            raw_value,
+                            e
+                        );
+                    }
+                }
+            }
+        }
+
+        Ok(corrections)
+    }
+
+    /// Collect all entity lookups from intents (LEGACY - kept for tests)
+    #[allow(dead_code)]
     fn collect_lookups(&self, intents: &[VerbIntent]) -> HashMap<String, EntityLookup> {
         let mut lookups = HashMap::new();
         for intent in intents {
@@ -1452,7 +1801,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         lookups
     }
 
-    /// Resolve entity lookups via EntityGateway
+    /// Resolve entity lookups via EntityGateway (LEGACY - kept for tests)
+    #[allow(dead_code)]
     async fn resolve_lookups(&self, lookups: &HashMap<String, EntityLookup>) -> LookupResolution {
         if lookups.is_empty() {
             return LookupResolution::Resolved(HashMap::new());
@@ -1549,8 +1899,9 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         }
     }
 
-    /// Inject resolved entity IDs into intents
+    /// Inject resolved entity IDs into intents (LEGACY - kept for tests)
     /// Uses ResolvedEntity to preserve display name for user-friendly DSL rendering
+    #[allow(dead_code)]
     fn inject_resolved_ids(
         &self,
         mut intents: Vec<VerbIntent>,
