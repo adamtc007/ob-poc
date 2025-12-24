@@ -23,8 +23,8 @@ use crate::state::AppState;
 
 // Import API routers from main ob-poc crate
 use ob_poc::api::{
-    create_agent_router_with_sessions, create_attribute_router, create_dsl_viewer_router,
-    create_entity_router, create_resolution_router, create_session_store,
+    create_agent_router_with_sessions, create_attribute_router, create_client_router,
+    create_dsl_viewer_router, create_entity_router, create_resolution_router, create_session_store,
 };
 
 // Import resolution store from services
@@ -225,7 +225,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(create_attribute_router(pool.clone()))
         .merge(create_entity_router())
         .merge(create_dsl_viewer_router(pool.clone()))
-        .merge(create_resolution_router(sessions, resolution_store));
+        .merge(create_resolution_router(sessions.clone(), resolution_store))
+        // Client portal router (separate auth, scoped access)
+        .merge(create_client_router(pool.clone(), sessions));
 
     // Build main app router with state
     // Session routes (including /bind) now share the same session store via create_agent_router_with_sessions
@@ -278,6 +280,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("  /api/agent/*          - DSL generation");
     tracing::info!("  /api/entity/search    - Entity search");
     tracing::info!("  /api/dsl/*            - DSL viewer");
+    tracing::info!("");
+    tracing::info!("Client Portal API:");
+    tracing::info!("  /api/client/login     - Client authentication");
+    tracing::info!("  /api/client/status    - Get CBU status");
+    tracing::info!("  /api/client/outstanding - List outstanding requests");
+    tracing::info!("  /api/client/chat      - Client chat endpoint");
     tracing::info!("");
 
     let listener = match tokio::net::TcpListener::bind(addr).await {

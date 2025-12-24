@@ -6729,3 +6729,202 @@ If uncertain about DSL semantics, CBU/UBO/KYC domain rules, graph invariants, or
 
 Never silently "guess and commit" on complex domain logic.
 
+
+
+## LLM Integration Patterns
+
+> **📘 Full documentation:** `docs/architecture/LLM-INTEGRATION-PATTERNS.md`
+
+The agent chat pipeline uses a set of patterns to constrain LLM output and prevent hallucination.
+
+### Core Principle
+
+**LLM as Intent Extractor, not Code Generator.**
+
+```
+User: "Add John as director of Apex Fund"
+            │
+            ▼
+┌───────────────────────────────────────────┐
+│              LLM (black box)              │
+│  Good at: Understanding intent            │
+│  Bad at: Valid UUIDs, exact codes         │
+└───────────────────────────────────────────┘
+            │
+            ▼
+     Structured Intent (JSON)
+            │
+            ▼
+┌───────────────────────────────────────────┐
+│         System (deterministic)            │
+│  - resolve_all() → UUIDs + canonical codes│
+│  - build_dsl_program() → valid DSL        │
+│  - CSG Linter → semantic validation       │
+└───────────────────────────────────────────┘
+            │
+            ▼
+     Valid, executable DSL
+```
+
+### The 7 Patterns
+
+| Pattern | Implementation |
+|---------|----------------|
+| **1. Constrained Output** | Tool-use with JSON schema, verb enum |
+| **2. Post-LLM Resolution** | `resolve_all()` - entities AND codes via EntityGateway |
+| **3. Deterministic Generation** | LLM → intent, Rust → DSL (never LLM writes DSL) |
+| **4. Validation with Retry** | CSG Linter errors fed back to LLM |
+| **5. Disambiguation as UX** | Ambiguous entities → user chooses |
+| **6. Context Injection** | Show available data, not rules |
+| **7. Confidence Scoring** | Low confidence triggers clarification |
+
+### Unified Reference Resolution
+
+All references (entities AND codes) flow through a single `resolve_all()` method:
+
+```rust
+// One method handles everything
+match self.resolve_all(intents).await {
+    UnifiedResolution::Resolved { intents, corrections } => {
+        // entities → UUIDs, codes → canonical values
+        let dsl = build_dsl_program(&intents);
+    }
+    UnifiedResolution::NeedsDisambiguation { items, .. } => {
+        // Return to UI for user selection
+    }
+    UnifiedResolution::Error(msg) => {
+        // Feed to retry loop
+    }
+}
+```
+
+**What gets resolved:**
+
+| Source | Type | Example | Resolves To |
+|--------|------|---------|-------------|
+| `intent.lookups` | Entity | "John Smith" | UUID |
+| `intent.params.product` | Code | "custody" | "CUSTODY" |
+| `intent.params.role` | Code | "director" | "DIRECTOR" |
+| `intent.params.jurisdiction` | Code | "Luxembourg" | "LU" |
+
+**Key insight:** The Gateway's fuzzy matching handles typos and natural language variations. "fund admin" → "FUND_ACCOUNTING" for free.
+
+> **📘 Implementation spec:** `rust/docs/TODO-UNIFIED-CODE-RESOLUTION.md`
+
+## Client Portal Architecture
+
+The system supports two portal modes using the same backend infrastructure:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        SAME BACKEND                              │
+│   AgentService ─── EntityGateway ─── PostgreSQL                 │
+│        │                                                         │
+│        ├──────────────────────┬──────────────────────┐          │
+│        ▼                      ▼                      ▼          │
+│   ┌─────────────┐       ┌─────────────┐       ┌──────────┐     │
+│   │ Internal UI │       │ Client UI   │       │ Shared   │     │
+│   │ :3000       │       │ :3001       │       │ API      │     │
+│   └─────────────┘       └─────────────┘       └──────────┘     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Portal Comparison
+
+| Aspect | Internal Portal | Client Portal |
+|--------|-----------------|---------------|
+| Users | KYC analysts, ops | Client contacts (e.g., Allianz) |
+| Scope | All CBUs, all operations | Their CBU(s) only |
+| Verb palette | Full DSL (~60+ verbs) | `client.*` domain (~8 verbs) |
+| Intent | Execute workflows | Respond to requests |
+| Mode | Command interface | Guided dialog |
+
+### Client Verb Domain
+
+```yaml
+domain: client
+verbs:
+  - client.get-status         # Onboarding progress
+  - client.get-outstanding    # Outstanding requests with WHY
+  - client.submit-document    # Upload document for request
+  - client.provide-info       # Guided data collection
+  - client.add-note           # "Accountant sending next week"
+  - client.escalate           # Request human assistance
+```
+
+### Guided Solicitation Dialog
+
+The client portal uses **chat for data collection**, not forms:
+
+```
+Agent: "I need to understand who ultimately controls Allianz Reinsurance. 
+        Can you tell me about the ownership structure?"
+
+Client: "It's wholly owned by Allianz SE, which is publicly traded"
+
+Agent: "Since Allianz SE is publicly traded, no single shareholder likely 
+        exceeds 25%. In this case, I need to identify individuals who 
+        exercise significant control. Who would that be?"
+
+Client: "The CEO Hans Weber and CFO Maria Schmidt have signing authority"
+
+Agent: "I'll record them as beneficial owners under 'significant control'.
+        For each, I'll need: DOB, nationality, tax residence.
+        Let's start with Hans Weber - what's his date of birth?"
+```
+
+**Why chat beats forms:**
+
+| Forms | Chat |
+|-------|------|
+| No context | Explains as it goes |
+| Client stuck on edge cases | Agent handles nuance |
+| Submit → errors → fix | Inline validation |
+| Feels bureaucratic | Feels conversational |
+
+### The WHY is Critical
+
+Outstanding requests include regulatory context (already in database):
+
+```sql
+-- Already exists in kyc.outstanding_requests
+reason_for_request TEXT,      -- "Verify source of funds for €50M investment"
+compliance_context TEXT,      -- "FCA SYSC 6.1.1 requires..."
+acceptable_document_types TEXT[],
+```
+
+Client sees:
+```
+"I need Source of Wealth documentation for Pierre Dupont.
+
+WHY: Pierre is investing €50M. FCA regulations require us to verify 
+how he accumulated this wealth (not just where the €50M came from).
+
+ACCEPTS: Tax returns, audited accounts, or letter from tax advisor."
+```
+
+### Implementation
+
+The client agent uses the same `process_chat()` pipeline with scope restrictions:
+
+```rust
+impl AgentService {
+    pub fn for_client(pool: PgPool, client_id: Uuid, accessible_cbus: Vec<Uuid>) -> Self {
+        Self {
+            pool: Some(pool),
+            config: AgentServiceConfig::default(),
+            client_scope: Some(ClientScope { client_id, accessible_cbus }),
+        }
+    }
+}
+```
+
+**What changes:**
+- Verb palette filtered to `client.*` domain
+- Entity resolution scoped to accessible CBUs
+- System prompt uses client-friendly tone
+- Pre-resolved context shows only their data
+
+> **📘 Full specification:** `docs/architecture/CLIENT-DIALOG-SPEC.md`  
+> **📘 Implementation TODO:** `rust/docs/TODO-DUAL-PORTAL-SETUP.md`
+

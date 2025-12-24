@@ -37,6 +37,12 @@ pub mod graph_routes;
 pub mod resolution_routes;
 
 #[cfg(feature = "server")]
+pub mod client_routes;
+
+#[cfg(feature = "server")]
+pub mod client_auth;
+
+#[cfg(feature = "server")]
 pub use attribute_routes::create_attribute_router;
 
 #[cfg(feature = "server")]
@@ -58,7 +64,12 @@ pub use session::{create_session_store, SessionStore};
 pub use intent::{AssembledDsl, IntentSequence, VerbIntent};
 
 #[cfg(feature = "server")]
-pub use agent_service::{AgentChatRequest, AgentChatResponse, AgentCommand, AgentService};
+pub use agent_service::{
+    AgentChatRequest, AgentChatResponse, AgentCommand, AgentService, ClientScope,
+};
 
 #[cfg(feature = "server")]
 pub use resolution_routes::create_resolution_router;
+
+#[cfg(feature = "server")]
+pub use client_routes::{create_client_router, AuthenticatedClient, ClientState};

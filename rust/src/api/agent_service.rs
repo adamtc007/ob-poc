@@ -252,6 +252,42 @@ impl Default for AgentServiceConfig {
     }
 }
 
+// ============================================================================
+// Client Scope (for client portal)
+// ============================================================================
+
+/// Client scope - restricts what a client can see and do
+#[derive(Debug, Clone)]
+pub struct ClientScope {
+    /// Client identity
+    pub client_id: Uuid,
+    /// CBUs this client has access to
+    pub accessible_cbus: Vec<Uuid>,
+    /// Client display name (for personalization)
+    pub client_name: Option<String>,
+}
+
+impl ClientScope {
+    /// Create a new client scope
+    pub fn new(client_id: Uuid, accessible_cbus: Vec<Uuid>) -> Self {
+        Self {
+            client_id,
+            accessible_cbus,
+            client_name: None,
+        }
+    }
+
+    /// Check if this client can access a specific CBU
+    pub fn can_access_cbu(&self, cbu_id: &Uuid) -> bool {
+        self.accessible_cbus.contains(cbu_id)
+    }
+
+    /// Get the default CBU for this client (first accessible)
+    pub fn default_cbu(&self) -> Option<Uuid> {
+        self.accessible_cbus.first().copied()
+    }
+}
+
 /// Pre-resolved entities available for the LLM to reference
 #[derive(Debug, Clone, Default)]
 pub struct PreResolvedContext {
@@ -289,6 +325,8 @@ pub struct AgentService {
     pool: Option<PgPool>,
     /// Configuration
     config: AgentServiceConfig,
+    /// Client scope (if operating in client portal mode)
+    client_scope: Option<ClientScope>,
 }
 
 impl AgentService {
@@ -297,6 +335,7 @@ impl AgentService {
         Self {
             pool: None,
             config: AgentServiceConfig::default(),
+            client_scope: None,
         }
     }
 
@@ -305,12 +344,57 @@ impl AgentService {
         Self {
             pool: Some(pool),
             config: AgentServiceConfig::default(),
+            client_scope: None,
         }
     }
 
     /// Create with custom configuration
     pub fn with_config(pool: Option<PgPool>, config: AgentServiceConfig) -> Self {
-        Self { pool, config }
+        Self {
+            pool,
+            config,
+            client_scope: None,
+        }
+    }
+
+    /// Create a client-scoped agent service for the client portal
+    ///
+    /// Client mode restricts:
+    /// - Only accessible CBUs are visible
+    /// - Limited verb palette (read + respond operations only)
+    /// - Different system prompt (client-friendly, explains WHY)
+    pub fn for_client(pool: PgPool, client_id: Uuid, accessible_cbus: Vec<Uuid>) -> Self {
+        Self {
+            pool: Some(pool),
+            config: AgentServiceConfig::default(),
+            client_scope: Some(ClientScope::new(client_id, accessible_cbus)),
+        }
+    }
+
+    /// Create a client-scoped agent service with name
+    pub fn for_client_named(
+        pool: PgPool,
+        client_id: Uuid,
+        accessible_cbus: Vec<Uuid>,
+        client_name: String,
+    ) -> Self {
+        let mut scope = ClientScope::new(client_id, accessible_cbus);
+        scope.client_name = Some(client_name);
+        Self {
+            pool: Some(pool),
+            config: AgentServiceConfig::default(),
+            client_scope: Some(scope),
+        }
+    }
+
+    /// Check if operating in client mode
+    pub fn is_client_mode(&self) -> bool {
+        self.client_scope.is_some()
+    }
+
+    /// Get the client scope (if in client mode)
+    pub fn client_scope(&self) -> Option<&ClientScope> {
+        self.client_scope.as_ref()
     }
 
     /// Pre-resolve available entities from EntityGateway before LLM call

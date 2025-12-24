@@ -1,0 +1,239 @@
+# Client Portal Verbs
+#
+# These verbs are available to clients via the client portal.
+# They follow the "read + respond" principle - clients can query their status
+# and submit responses, but cannot directly modify internal state.
+
+domain: client
+description: "Client-facing operations for responding to onboarding requests"
+
+verbs:
+  # ==========================================================================
+  # READ OPERATIONS
+  # ==========================================================================
+
+  - verb: get-status
+    description: "Get current onboarding status for client's accessible CBU(s)"
+    behavior: plugin
+    plugin: ClientGetStatus
+    args:
+      - name: cbu-id
+        type: uuid
+        required: false
+        description: "Specific CBU to check (optional if client has only one)"
+    returns:
+      type: object
+      description: "Onboarding status including progress, stages, and blockers"
+
+  - verb: get-outstanding
+    description: "Get list of outstanding requests with WHY context"
+    behavior: plugin
+    plugin: ClientGetOutstanding
+    args:
+      - name: cbu-id
+        type: uuid
+        required: false
+        description: "Specific CBU (optional)"
+      - name: include-completed
+        type: boolean
+        required: false
+        default: false
+        description: "Include completed requests in response"
+    returns:
+      type: array
+      description: "List of outstanding requests with reason_for_request, compliance_context"
+
+  - verb: get-request-detail
+    description: "Get full detail for a specific request including guidance"
+    behavior: plugin
+    plugin: ClientGetRequestDetail
+    args:
+      - name: request-id
+        type: uuid
+        required: true
+        description: "The request to get details for"
+    returns:
+      type: object
+      description: "Full request details including WHY, acceptable alternatives, progress"
+
+  - verb: get-entity-info
+    description: "Get summary information about an entity (for verification/update)"
+    behavior: plugin
+    plugin: ClientGetEntityInfo
+    args:
+      - name: entity-id
+        type: uuid
+        required: true
+        description: "Entity to get info about"
+    returns:
+      type: object
+      description: "Entity summary including name, type, roles, outstanding items"
+
+  # ==========================================================================
+  # RESPOND OPERATIONS
+  # ==========================================================================
+
+  - verb: submit-document
+    description: "Submit a document in response to a request"
+    behavior: plugin
+    plugin: ClientSubmitDocument
+    args:
+      - name: request-id
+        type: uuid
+        required: true
+        description: "The request this document fulfills"
+      - name: document-type
+        type: string
+        required: true
+        lookup:
+          entity_type: document_type
+          resolution_mode: reference
+        description: "Type of document being submitted"
+      - name: file-reference
+        type: string
+        required: true
+        description: "Reference to uploaded file (from upload service)"
+      - name: notes
+        type: string
+        required: false
+        description: "Optional notes about the submission"
+    effects:
+      - "Creates document submission record"
+      - "Updates outstanding request status"
+      - "Triggers internal review workflow"
+
+  - verb: provide-info
+    description: "Provide structured information in response to a request"
+    behavior: plugin
+    plugin: ClientProvideInfo
+    args:
+      - name: request-id
+        type: uuid
+        required: true
+        description: "The request this information fulfills"
+      - name: info-type
+        type: string
+        required: true
+        description: "Type of information being provided"
+      - name: data
+        type: object
+        required: true
+        description: "The collected data (schema depends on info-type)"
+      - name: notes
+        type: string
+        required: false
+        description: "Optional notes"
+    effects:
+      - "Creates info submission record"
+      - "Updates outstanding request"
+      - "May trigger follow-up questions"
+
+  - verb: add-note
+    description: "Add a note to a request (e.g., 'accountant sending next week')"
+    behavior: plugin
+    plugin: ClientAddNote
+    args:
+      - name: request-id
+        type: uuid
+        required: true
+        description: "The request to add note to"
+      - name: note
+        type: string
+        required: true
+        description: "The note text"
+      - name: expected-date
+        type: date
+        required: false
+        description: "Expected date of fulfillment (creates reminder)"
+    effects:
+      - "Updates request client_notes"
+      - "May create commitment/reminder"
+
+  - verb: request-clarification
+    description: "Ask for clarification about a request"
+    behavior: plugin
+    plugin: ClientRequestClarification
+    args:
+      - name: request-id
+        type: uuid
+        required: true
+        description: "The request needing clarification"
+      - name: question
+        type: string
+        required: true
+        description: "The clarification question"
+    effects:
+      - "Creates clarification request"
+      - "Notifies assigned analyst"
+
+  # ==========================================================================
+  # GUIDED COLLECTION
+  # ==========================================================================
+
+  - verb: start-collection
+    description: "Begin guided collection for a structured info request"
+    behavior: plugin
+    plugin: ClientStartCollection
+    args:
+      - name: request-id
+        type: uuid
+        required: true
+        description: "The request to start collecting for"
+    effects:
+      - "Sets session.collection_mode = true"
+      - "Returns first question in collection schema"
+
+  - verb: collection-response
+    description: "Provide a response during guided collection"
+    behavior: plugin
+    plugin: ClientCollectionResponse
+    args:
+      - name: field
+        type: string
+        required: true
+        description: "Field being answered"
+      - name: value
+        type: any
+        required: true
+        description: "The value provided"
+    effects:
+      - "Validates value against field schema"
+      - "Stores partial collection progress"
+      - "Returns next question, validation error, or complete signal"
+
+  - verb: collection-confirm
+    description: "Confirm collected data before submission"
+    behavior: plugin
+    plugin: ClientCollectionConfirm
+    args:
+      - name: confirmed
+        type: boolean
+        required: true
+        description: "Whether to submit the collected data"
+    effects:
+      - "If true: generates provide-info, submits"
+      - "If false: returns to editing"
+
+  # ==========================================================================
+  # ESCALATION
+  # ==========================================================================
+
+  - verb: escalate
+    description: "Request human assistance from relationship manager"
+    behavior: plugin
+    plugin: ClientEscalate
+    args:
+      - name: reason
+        type: string
+        required: false
+        description: "Why escalation is needed"
+      - name: preferred-contact
+        type: string
+        required: false
+        enum: ["CALL", "EMAIL", "VIDEO"]
+        description: "Preferred contact method"
+    effects:
+      - "Creates escalation request"
+      - "Attaches full conversation context"
+      - "Notifies relationship manager"
+      - "Returns escalation confirmation"
