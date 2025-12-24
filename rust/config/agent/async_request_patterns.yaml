@@ -1,0 +1,289 @@
+# Async Request Patterns Knowledge
+#
+# This file provides agent knowledge about the fire-and-forget request pattern.
+# Requests are domain objects that appear as child nodes of workstreams,
+# NOT as a separate list. The agent should check domain state to see awaiting items.
+#
+# Key Principle: Domain Coherence
+# - Requests appear in workstream.awaiting arrays
+# - ONE state model (kyc-case.state), NOT separate "case" + "requests"
+# - Agent checks state → sees awaiting → decides action
+
+version: "1.0"
+description: "Fire-and-forget async request patterns for KYC agent"
+
+# ==========================================================================
+# REQUEST TYPES
+# ==========================================================================
+request_types:
+  document:
+    code: DOCUMENT
+    description: "Request for document upload from client"
+    typical_due_days: 14
+    subtypes:
+      - PASSPORT
+      - CERTIFICATE_OF_INCORPORATION
+      - REGISTER_OF_DIRECTORS
+      - PROOF_OF_ADDRESS
+      - SOURCE_OF_FUNDS
+      - UBO_DECLARATION
+      - BANK_STATEMENT
+    auto_fulfill_on: document.upload
+
+  information:
+    code: INFORMATION
+    description: "Request for information/clarification from client"
+    typical_due_days: 7
+    subtypes:
+      - CONTACT_DETAILS
+      - OWNERSHIP_STRUCTURE
+      - BUSINESS_NATURE
+      - SOURCE_OF_WEALTH
+    auto_fulfill_on: null  # Manual fulfillment only
+
+  approval:
+    code: APPROVAL
+    description: "Internal approval request"
+    typical_due_days: 3
+    subtypes:
+      - SENIOR_APPROVAL
+      - MLRO_APPROVAL
+      - COMMITTEE_APPROVAL
+    auto_fulfill_on: null
+
+  verification:
+    code: VERIFICATION
+    description: "External verification request"
+    typical_due_days: 5
+    subtypes:
+      - REGISTRY_CHECK
+      - REFERENCE_CHECK
+      - BANK_CONFIRMATION
+    auto_fulfill_on: null
+
+# ==========================================================================
+# FIRE-AND-FORGET PATTERNS
+# ==========================================================================
+fire_and_forget_verbs:
+  # Primary request creation verbs
+  document.request:
+    description: "Request document from client - creates outstanding request"
+    pattern: fire_and_forget
+    creates_request_type: DOCUMENT
+    example: |
+      (document.request :workstream-id @ws-john :doc-type "PASSPORT"
+                        :due-days 14 :message "Please provide passport copy")
+    result: "Request created, workstream blocked until fulfilled"
+    next_action: "Check kyc-case.state later to see if fulfilled"
+
+  request.create:
+    description: "Create any type of outstanding request"
+    pattern: fire_and_forget
+    example: |
+      (request.create :workstream-id @ws-company :type "INFORMATION"
+                      :subtype "OWNERSHIP_STRUCTURE" :due-days 7)
+    result: "Request created with PENDING status"
+
+  # Lifecycle management verbs
+  request.remind:
+    description: "Send reminder for pending request"
+    trigger_condition: "due_date approaching or past"
+    example: |
+      (request.remind :request-id @req)
+
+  request.extend:
+    description: "Extend due date for request"
+    trigger_condition: "client requests more time"
+    example: |
+      (request.extend :request-id @req :additional-days 7 :reason "Client traveling")
+
+  request.escalate:
+    description: "Escalate overdue request"
+    trigger_condition: "overdue and reminders exhausted"
+    example: |
+      (request.escalate :request-id @req :escalate-to "SENIOR_ANALYST")
+
+  request.waive:
+    description: "Waive request requirement"
+    trigger_condition: "alternative evidence accepted or risk-based waiver"
+    example: |
+      (request.waive :request-id @req :reason "Existing passport on file from previous onboarding")
+
+# ==========================================================================
+# AUTO-FULFILLMENT RULES
+# ==========================================================================
+auto_fulfillment:
+  document_upload:
+    trigger: "document.upload verb with matching doc-type"
+    matching_logic: |
+      When document.upload is called:
+      1. Look for PENDING requests on same workstream with matching subtype
+      2. If found, auto-fulfill the request
+      3. Unblock workstream if all blocking requests fulfilled
+    example: |
+      # Request created
+      (document.request :workstream-id @ws-john :doc-type "PASSPORT")
+
+      # Later, client uploads
+      (document.upload :workstream-id @ws-john :doc-type "PASSPORT"
+                       :document-id @uploaded-doc)
+
+      # Request auto-fulfilled, workstream unblocked
+
+# ==========================================================================
+# STATE VISIBILITY
+# ==========================================================================
+state_queries:
+  kyc-case.state:
+    description: "Primary state query - returns case with embedded awaiting requests"
+    structure: |
+      {
+        "case_id": "uuid",
+        "status": "DISCOVERY",
+        "workstreams": [
+          {
+            "workstream_id": "uuid",
+            "entity": {"name": "John Smith", "role": "DIRECTOR"},
+            "status": "COLLECT",
+            "awaiting": [
+              {
+                "request_id": "uuid",
+                "type": "DOCUMENT",
+                "subtype": "PASSPORT",
+                "due_date": "2024-01-15",
+                "days_overdue": 3,
+                "overdue": true,
+                "actions": ["remind", "extend", "escalate", "waive"]
+              }
+            ]
+          }
+        ],
+        "summary": {
+          "total_workstreams": 3,
+          "complete": 1,
+          "in_progress": 1,
+          "blocked": 1,
+          "total_awaiting": 4,
+          "overdue": 2
+        },
+        "attention": [
+          {
+            "workstream": "uuid",
+            "entity": "John Smith",
+            "issue": "PASSPORT overdue 3 days",
+            "priority": "MEDIUM",
+            "actions": ["remind", "extend", "escalate", "waive"]
+          }
+        ]
+      }
+
+  entity-workstream.state:
+    description: "Single workstream state with embedded awaiting"
+    structure: |
+      {
+        "workstream_id": "uuid",
+        "entity": {"name": "John Smith", "role": "DIRECTOR"},
+        "status": "COLLECT",
+        "awaiting": [...],
+        "checks_complete": [
+          {"type": "SANCTIONS", "result": "CLEAR", "date": "..."}
+        ],
+        "documents_received": [
+          {"type": "PROOF_OF_ADDRESS", "document_id": "uuid", "date": "..."}
+        ]
+      }
+
+# ==========================================================================
+# AGENT DECISION PATTERNS
+# ==========================================================================
+decision_patterns:
+  on_workstream_blocked:
+    condition: "workstream.status == 'BLOCKED' && awaiting.length > 0"
+    actions:
+      - "Check what's awaiting (already in state)"
+      - "If overdue > 7 days: escalate"
+      - "If overdue 1-7 days: remind"
+      - "If not due yet: wait"
+
+  on_case_stalled:
+    condition: "summary.overdue > 0"
+    actions:
+      - "Review attention items"
+      - "Prioritize HIGH priority items"
+      - "Consider batch remind for MEDIUM items"
+
+  on_document_received:
+    condition: "document.upload called"
+    result: "System auto-fulfills matching request"
+    agent_action: "Check case state to confirm unblock"
+
+  on_escalation_needed:
+    triggers:
+      - "overdue > 7 days"
+      - "reminder_count >= 3"
+      - "client unresponsive pattern detected"
+    action: "request.escalate with appropriate level"
+
+# ==========================================================================
+# ATTENTION PRIORITY RULES
+# ==========================================================================
+attention_priority:
+  HIGH:
+    conditions:
+      - "days_overdue > 7"
+      - "escalation_level >= 2"
+      - "blocking SLA deadline"
+    action: "Immediate escalation or decision"
+
+  MEDIUM:
+    conditions:
+      - "days_overdue 1-7"
+      - "reminder_count >= 2"
+    action: "Send reminder or extend"
+
+  LOW:
+    conditions:
+      - "approaching due date (< 3 days)"
+    action: "Monitor, prepare reminder"
+
+# ==========================================================================
+# EXAMPLE WORKFLOWS
+# ==========================================================================
+example_workflows:
+  director_onboarding:
+    description: "Onboard a director with document requests"
+    steps:
+      - verb: "entity-workstream.create"
+        params: ":case-id @case :entity-id @director"
+        result: "@ws-director"
+
+      - verb: "document.request"
+        params: ":workstream-id @ws-director :doc-type PASSPORT"
+        pattern: "fire-and-forget"
+
+      - verb: "document.request"
+        params: ":workstream-id @ws-director :doc-type PROOF_OF_ADDRESS"
+        pattern: "fire-and-forget"
+
+      - note: "Agent moves on, checks state later"
+
+      - verb: "kyc-case.state"
+        params: ":case-id @case"
+        check: "See awaiting array in workstream"
+
+      - note: "When documents uploaded, requests auto-fulfilled"
+
+  handling_overdue:
+    description: "Handle overdue request"
+    steps:
+      - verb: "kyc-case.state"
+        check: "attention array shows overdue items"
+
+      - condition: "days_overdue > 7"
+        action: "request.escalate :escalate-to SENIOR_ANALYST"
+
+      - condition: "days_overdue 1-7"
+        action: "request.remind"
+
+      - condition: "client requests extension"
+        action: "request.extend :additional-days 7"

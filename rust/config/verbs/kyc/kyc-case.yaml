@@ -332,3 +332,24 @@ domains:
               - DISCOVERY
         returns:
           type: affected
+      state:
+        description: Get full case state with workstreams and embedded awaiting requests
+        behavior: plugin
+        handler: KycCaseStateOp
+        args:
+          - name: case-id
+            type: uuid
+            required: true
+            lookup:
+              table: cases
+              entity_type: kyc_case
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
+        returns:
+          type: record
+          description: |
+            Returns domain-coherent case state with workstreams containing
+            embedded `awaiting` arrays. Requests appear as child nodes of
+            workstreams, not as a separate list. Includes summary counts
+            and attention items for overdue requests.

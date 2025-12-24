@@ -6,38 +6,38 @@ domains:
         description: Catalog a document for an entity within a CBU
         behavior: plugin
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
-        - name: entity-id
-          type: uuid
-          required: true
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
-        - name: document-type
-          type: lookup
-          required: true
-          lookup:
-            table: document_types
-            entity_type: document_type
-            code_column: type_code
-            id_column: type_id
-        - name: file-path
-          type: string
-          required: false
-        - name: metadata
-          type: json
-          required: false
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: document-type
+            type: lookup
+            required: true
+            lookup:
+              table: document_types
+              entity_type: document_type
+              code_column: type_code
+              id_column: type_id
+          - name: file-path
+            type: string
+            required: false
+          - name: metadata
+            type: json
+            required: false
         returns:
           type: uuid
           name: doc_id
@@ -46,22 +46,22 @@ domains:
         description: Extract attributes from a cataloged document
         behavior: plugin
         args:
-        - name: document-id
-          type: uuid
-          required: true
-          lookup:
-            table: document_catalog
-            entity_type: document
-            schema: ob-poc
-            search_key: document_name
-            primary_key: doc_id
-        - name: attributes
-          type: string_list
-          required: false
-        - name: use-ocr
-          type: boolean
-          required: false
-          default: false
+          - name: document-id
+            type: uuid
+            required: true
+            lookup:
+              table: document_catalog
+              entity_type: document
+              schema: ob-poc
+              search_key: document_name
+              primary_key: doc_id
+          - name: attributes
+            type: string_list
+            required: false
+          - name: use-ocr
+            type: boolean
+            required: false
+            default: false
         returns:
           type: record
       extract-to-observations:
@@ -69,27 +69,179 @@ domains:
         behavior: plugin
         handler: document_extract_observations
         args:
-        - name: document-id
-          type: uuid
-          required: true
-          lookup:
-            table: document_catalog
-            entity_type: document
-            schema: ob-poc
-            search_key: document_name
-            primary_key: doc_id
-        - name: entity-id
-          type: uuid
-          required: true
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
-        - name: auto-verify-allegations
-          type: boolean
-          required: false
-          default: true
+          - name: document-id
+            type: uuid
+            required: true
+            lookup:
+              table: document_catalog
+              entity_type: document
+              schema: ob-poc
+              search_key: document_name
+              primary_key: doc_id
+          - name: entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: auto-verify-allegations
+            type: boolean
+            required: false
+            default: true
         returns:
           type: record_set
+
+      # ═══════════════════════════════════════════════════════════════════════════
+      # Outstanding Request Integration (fire-and-forget pattern)
+      # ═══════════════════════════════════════════════════════════════════════════
+
+      request:
+        description: Request a document (creates outstanding request, fire-and-forget)
+        behavior: plugin
+        plugin:
+          handler: DocumentRequestOp
+        args:
+          - name: workstream-id
+            type: uuid
+            required: false
+            lookup:
+              table: entity_workstreams
+              entity_type: entity_workstream
+              schema: kyc
+              search_key: workstream_id
+              primary_key: workstream_id
+          - name: entity-id
+            type: uuid
+            required: false
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: case-id
+            type: uuid
+            required: false
+            lookup:
+              table: cases
+              entity_type: kyc_case
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
+          - name: type
+            type: string
+            required: true
+            description: Document type code
+            valid_values:
+              - ID_DOCUMENT
+              - PROOF_OF_ADDRESS
+              - SOURCE_OF_WEALTH
+              - SOURCE_OF_FUNDS
+              - CERTIFICATE_OF_INCORPORATION
+              - ARTICLES_OF_ASSOCIATION
+              - REGISTER_OF_MEMBERS
+              - REGISTER_OF_DIRECTORS
+              - FINANCIAL_STATEMENTS
+              - OWNERSHIP_STRUCTURE
+              - BOARD_RESOLUTION
+              - POWER_OF_ATTORNEY
+              - TAX_FORMS
+              - REGULATORY_LICENSE
+              - OTHER
+          - name: from
+            type: string
+            required: false
+            default: client
+          - name: due-in-days
+            type: integer
+            required: false
+          - name: notes
+            type: string
+            required: false
+        returns:
+          type: record
+        example: |
+          (document.request :workstream-id @ws-003 :type "SOURCE_OF_WEALTH" :from "client" :due-in-days 14)
+
+      upload:
+        description: Upload a document (auto-fulfills matching outstanding request)
+        behavior: plugin
+        plugin:
+          handler: DocumentUploadOp
+        args:
+          - name: workstream-id
+            type: uuid
+            required: false
+            lookup:
+              table: entity_workstreams
+              entity_type: entity_workstream
+              schema: kyc
+              search_key: workstream_id
+              primary_key: workstream_id
+          - name: entity-id
+            type: uuid
+            required: false
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: case-id
+            type: uuid
+            required: false
+            lookup:
+              table: cases
+              entity_type: kyc_case
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
+          - name: type
+            type: string
+            required: true
+            description: Document type code
+          - name: file-path
+            type: string
+            required: true
+          - name: notes
+            type: string
+            required: false
+        returns:
+          type: record
+          description: |
+            Returns document_id, fulfilled_request_id (if matched), workstream_unblocked (boolean)
+
+      waive-request:
+        description: Waive document requirement (for outstanding requests)
+        behavior: plugin
+        plugin:
+          handler: DocumentWaiveOp
+        args:
+          - name: workstream-id
+            type: uuid
+            required: true
+            lookup:
+              table: entity_workstreams
+              entity_type: entity_workstream
+              schema: kyc
+              search_key: workstream_id
+              primary_key: workstream_id
+          - name: type
+            type: string
+            required: true
+            description: Document type to waive
+          - name: reason
+            type: string
+            required: true
+          - name: approved-by
+            type: uuid
+            required: true
+            description: Senior user approving waiver
+        returns:
+          type: affected
+        example: |
+          (document.waive-request :workstream-id @ws-003 :type "SOURCE_OF_WEALTH"
+             :reason "Low value account, low risk" :approved-by @senior-analyst)

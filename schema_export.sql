@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 22jlzLbJ2qcooDwvhX34xahZUvCPKfv0ScrJe0oKBMmXKpK4F1yuFP62f2NCkMo
+\restrict ab7XxYKf1d7XFzHqhiwm2CL490PbqxkfZ5Ga5jNQFegrhcDevOmOFtIo7VD8LDA
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -406,6 +406,38 @@ BEGIN
         WHEN 'REFERRED' THEN p_to_status IN ('SCREEN', 'ASSESS', 'COMPLETE', 'PROHIBITED')
         ELSE false
     END;
+END;
+$$;
+
+
+--
+-- Name: update_outstanding_request_timestamp(); Type: FUNCTION; Schema: kyc; Owner: -
+--
+
+CREATE FUNCTION kyc.update_outstanding_request_timestamp() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: update_workstream_blocked_days(); Type: FUNCTION; Schema: kyc; Owner: -
+--
+
+CREATE FUNCTION kyc.update_workstream_blocked_days() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- When transitioning from BLOCKED to another status, calculate total blocked days
+    IF OLD.status = 'BLOCKED' AND NEW.status != 'BLOCKED' THEN
+        NEW.blocked_days_total = COALESCE(OLD.blocked_days_total, 0) +
+            EXTRACT(DAY FROM NOW() - COALESCE(OLD.blocked_at, NOW()))::INTEGER;
+    END IF;
+    RETURN NEW;
 END;
 $$;
 
@@ -2600,7 +2632,12 @@ CREATE TABLE kyc.entity_workstreams (
     ownership_percentage numeric(5,2),
     discovery_depth integer DEFAULT 1,
     updated_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT chk_workstream_status CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'COLLECT'::character varying, 'VERIFY'::character varying, 'SCREEN'::character varying, 'ASSESS'::character varying, 'COMPLETE'::character varying, 'BLOCKED'::character varying, 'ENHANCED_DD'::character varying, 'REFERRED'::character varying, 'PROHIBITED'::character varying])::text[])))
+    blocker_type character varying(50),
+    blocker_request_id uuid,
+    blocker_message character varying(500),
+    blocked_days_total integer DEFAULT 0,
+    CONSTRAINT chk_workstream_status CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'COLLECT'::character varying, 'VERIFY'::character varying, 'SCREEN'::character varying, 'ASSESS'::character varying, 'COMPLETE'::character varying, 'BLOCKED'::character varying, 'ENHANCED_DD'::character varying, 'REFERRED'::character varying, 'PROHIBITED'::character varying])::text[]))),
+    CONSTRAINT chk_ws_blocker_type CHECK (((blocker_type IS NULL) OR ((blocker_type)::text = ANY ((ARRAY['AWAITING_DOCUMENT'::character varying, 'AWAITING_INFORMATION'::character varying, 'AWAITING_VERIFICATION'::character varying, 'AWAITING_APPROVAL'::character varying, 'AWAITING_SIGNATURE'::character varying, 'SCREENING_HIT'::character varying, 'MANUAL_BLOCK'::character varying])::text[]))))
 );
 
 
@@ -2609,6 +2646,34 @@ CREATE TABLE kyc.entity_workstreams (
 --
 
 COMMENT ON TABLE kyc.entity_workstreams IS 'Per-entity work items within a KYC case';
+
+
+--
+-- Name: COLUMN entity_workstreams.blocker_type; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.entity_workstreams.blocker_type IS 'Type of blocker: AWAITING_DOCUMENT, AWAITING_VERIFICATION, etc.';
+
+
+--
+-- Name: COLUMN entity_workstreams.blocker_request_id; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.entity_workstreams.blocker_request_id IS 'FK to outstanding_requests if blocked by a pending request';
+
+
+--
+-- Name: COLUMN entity_workstreams.blocker_message; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.entity_workstreams.blocker_message IS 'Human-readable description of what is blocking progress';
+
+
+--
+-- Name: COLUMN entity_workstreams.blocked_days_total; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.entity_workstreams.blocked_days_total IS 'Cumulative days spent in BLOCKED status (for SLA tracking)';
 
 
 --
@@ -2664,6 +2729,101 @@ CREATE TABLE kyc.movements (
 --
 
 COMMENT ON TABLE kyc.movements IS 'Subscription, redemption, and transfer transactions';
+
+
+--
+-- Name: outstanding_requests; Type: TABLE; Schema: kyc; Owner: -
+--
+
+CREATE TABLE kyc.outstanding_requests (
+    request_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    subject_type character varying(50) NOT NULL,
+    subject_id uuid NOT NULL,
+    workstream_id uuid,
+    case_id uuid,
+    cbu_id uuid,
+    entity_id uuid,
+    request_type character varying(50) NOT NULL,
+    request_subtype character varying(100) NOT NULL,
+    request_details jsonb DEFAULT '{}'::jsonb,
+    requested_from_type character varying(50),
+    requested_from_entity_id uuid,
+    requested_from_label character varying(255),
+    requested_by_user_id uuid,
+    requested_by_agent boolean DEFAULT false,
+    requested_at timestamp with time zone DEFAULT now(),
+    due_date date,
+    grace_period_days integer DEFAULT 3,
+    last_reminder_at timestamp with time zone,
+    reminder_count integer DEFAULT 0,
+    max_reminders integer DEFAULT 3,
+    communication_log jsonb DEFAULT '[]'::jsonb,
+    status character varying(50) DEFAULT 'PENDING'::character varying,
+    status_reason text,
+    fulfilled_at timestamp with time zone,
+    fulfilled_by_user_id uuid,
+    fulfillment_type character varying(50),
+    fulfillment_reference_type character varying(50),
+    fulfillment_reference_id uuid,
+    fulfillment_notes text,
+    escalated_at timestamp with time zone,
+    escalation_level integer DEFAULT 0,
+    escalation_reason character varying(255),
+    escalated_to_user_id uuid,
+    blocks_subject boolean DEFAULT true,
+    blocker_message character varying(500),
+    created_by_verb character varying(100),
+    created_by_execution_id uuid,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT chk_oreq_fulfillment_type CHECK (((fulfillment_type IS NULL) OR ((fulfillment_type)::text = ANY ((ARRAY['DOCUMENT_UPLOAD'::character varying, 'MANUAL_ENTRY'::character varying, 'API_RESPONSE'::character varying, 'WAIVER'::character varying])::text[])))),
+    CONSTRAINT chk_oreq_request_type CHECK (((request_type)::text = ANY ((ARRAY['DOCUMENT'::character varying, 'INFORMATION'::character varying, 'VERIFICATION'::character varying, 'APPROVAL'::character varying, 'SIGNATURE'::character varying])::text[]))),
+    CONSTRAINT chk_oreq_requested_from_type CHECK (((requested_from_type IS NULL) OR ((requested_from_type)::text = ANY ((ARRAY['CLIENT'::character varying, 'ENTITY'::character varying, 'EXTERNAL_PROVIDER'::character varying, 'INTERNAL'::character varying])::text[])))),
+    CONSTRAINT chk_oreq_status CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'FULFILLED'::character varying, 'PARTIAL'::character varying, 'CANCELLED'::character varying, 'ESCALATED'::character varying, 'EXPIRED'::character varying, 'WAIVED'::character varying])::text[]))),
+    CONSTRAINT chk_oreq_subject_type CHECK (((subject_type)::text = ANY ((ARRAY['WORKSTREAM'::character varying, 'KYC_CASE'::character varying, 'ENTITY'::character varying, 'CBU'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE outstanding_requests; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON TABLE kyc.outstanding_requests IS 'Fire-and-forget operations awaiting response (document requests, verifications, etc.)';
+
+
+--
+-- Name: COLUMN outstanding_requests.subject_type; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.outstanding_requests.subject_type IS 'What is this request attached to: WORKSTREAM, KYC_CASE, ENTITY, CBU';
+
+
+--
+-- Name: COLUMN outstanding_requests.request_type; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.outstanding_requests.request_type IS 'Category of request: DOCUMENT, INFORMATION, VERIFICATION, APPROVAL, SIGNATURE';
+
+
+--
+-- Name: COLUMN outstanding_requests.request_subtype; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.outstanding_requests.request_subtype IS 'Specific type within category, e.g., SOURCE_OF_WEALTH, ID_DOCUMENT';
+
+
+--
+-- Name: COLUMN outstanding_requests.grace_period_days; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.outstanding_requests.grace_period_days IS 'Days after due_date before auto-escalation';
+
+
+--
+-- Name: COLUMN outstanding_requests.blocks_subject; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.outstanding_requests.blocks_subject IS 'Whether this pending request blocks the subject from progressing';
 
 
 --
@@ -7793,6 +7953,55 @@ CREATE TABLE ob_ref.registration_types (
 
 
 --
+-- Name: request_types; Type: TABLE; Schema: ob_ref; Owner: -
+--
+
+CREATE TABLE ob_ref.request_types (
+    request_type character varying(50) NOT NULL,
+    request_subtype character varying(100) NOT NULL,
+    description character varying(255),
+    default_due_days integer DEFAULT 7,
+    default_grace_days integer DEFAULT 3,
+    max_reminders integer DEFAULT 3,
+    blocks_by_default boolean DEFAULT true,
+    fulfillment_sources character varying(50)[] DEFAULT ARRAY['CLIENT'::text, 'USER'::text],
+    auto_fulfill_on_upload boolean DEFAULT true,
+    escalation_enabled boolean DEFAULT true,
+    escalation_after_days integer DEFAULT 10,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE request_types; Type: COMMENT; Schema: ob_ref; Owner: -
+--
+
+COMMENT ON TABLE ob_ref.request_types IS 'Configuration for different request types and subtypes';
+
+
+--
+-- Name: COLUMN request_types.fulfillment_sources; Type: COMMENT; Schema: ob_ref; Owner: -
+--
+
+COMMENT ON COLUMN ob_ref.request_types.fulfillment_sources IS 'Who can fulfill this request: CLIENT, USER, SYSTEM, EXTERNAL_PROVIDER';
+
+
+--
+-- Name: COLUMN request_types.auto_fulfill_on_upload; Type: COMMENT; Schema: ob_ref; Owner: -
+--
+
+COMMENT ON COLUMN ob_ref.request_types.auto_fulfill_on_upload IS 'Whether uploading a matching document auto-fulfills the request';
+
+
+--
+-- Name: COLUMN request_types.escalation_after_days; Type: COMMENT; Schema: ob_ref; Owner: -
+--
+
+COMMENT ON COLUMN ob_ref.request_types.escalation_after_days IS 'Days past due date before auto-escalation';
+
+
+--
 -- Name: role_types; Type: TABLE; Schema: ob_ref; Owner: -
 --
 
@@ -8584,6 +8793,14 @@ ALTER TABLE ONLY kyc.holdings
 
 ALTER TABLE ONLY kyc.movements
     ADD CONSTRAINT movements_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: outstanding_requests outstanding_requests_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.outstanding_requests
+    ADD CONSTRAINT outstanding_requests_pkey PRIMARY KEY (request_id);
 
 
 --
@@ -10187,6 +10404,14 @@ ALTER TABLE ONLY ob_ref.regulatory_tiers
 
 
 --
+-- Name: request_types request_types_pkey; Type: CONSTRAINT; Schema: ob_ref; Owner: -
+--
+
+ALTER TABLE ONLY ob_ref.request_types
+    ADD CONSTRAINT request_types_pkey PRIMARY KEY (request_type, request_subtype);
+
+
+--
 -- Name: role_types role_types_code_key; Type: CONSTRAINT; Schema: ob_ref; Owner: -
 --
 
@@ -10555,6 +10780,62 @@ CREATE INDEX idx_movements_status ON kyc.movements USING btree (status);
 --
 
 CREATE INDEX idx_movements_trade_date ON kyc.movements USING btree (trade_date);
+
+
+--
+-- Name: idx_oreq_case; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_oreq_case ON kyc.outstanding_requests USING btree (case_id) WHERE (case_id IS NOT NULL);
+
+
+--
+-- Name: idx_oreq_cbu; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_oreq_cbu ON kyc.outstanding_requests USING btree (cbu_id) WHERE (cbu_id IS NOT NULL);
+
+
+--
+-- Name: idx_oreq_entity; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_oreq_entity ON kyc.outstanding_requests USING btree (entity_id) WHERE (entity_id IS NOT NULL);
+
+
+--
+-- Name: idx_oreq_status; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_oreq_status ON kyc.outstanding_requests USING btree (status);
+
+
+--
+-- Name: idx_oreq_status_pending; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_oreq_status_pending ON kyc.outstanding_requests USING btree (due_date) WHERE ((status)::text = 'PENDING'::text);
+
+
+--
+-- Name: idx_oreq_subject; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_oreq_subject ON kyc.outstanding_requests USING btree (subject_type, subject_id);
+
+
+--
+-- Name: idx_oreq_type; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_oreq_type ON kyc.outstanding_requests USING btree (request_type, request_subtype);
+
+
+--
+-- Name: idx_oreq_workstream; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_oreq_workstream ON kyc.outstanding_requests USING btree (workstream_id) WHERE (workstream_id IS NOT NULL);
 
 
 --
@@ -13111,6 +13392,20 @@ CREATE TRIGGER sync_counterparty_key_trigger BEFORE INSERT OR UPDATE ON custody.
 
 
 --
+-- Name: outstanding_requests trg_outstanding_requests_updated; Type: TRIGGER; Schema: kyc; Owner: -
+--
+
+CREATE TRIGGER trg_outstanding_requests_updated BEFORE UPDATE ON kyc.outstanding_requests FOR EACH ROW EXECUTE FUNCTION kyc.update_outstanding_request_timestamp();
+
+
+--
+-- Name: entity_workstreams trg_workstream_blocked_days; Type: TRIGGER; Schema: kyc; Owner: -
+--
+
+CREATE TRIGGER trg_workstream_blocked_days BEFORE UPDATE ON kyc.entity_workstreams FOR EACH ROW EXECUTE FUNCTION kyc.update_workstream_blocked_days();
+
+
+--
 -- Name: cbu_product_subscriptions trg_auto_create_product_overlay; Type: TRIGGER; Schema: ob-poc; Owner: -
 --
 
@@ -13673,6 +13968,14 @@ ALTER TABLE ONLY kyc.doc_requests
 
 
 --
+-- Name: entity_workstreams entity_workstreams_blocker_request_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.entity_workstreams
+    ADD CONSTRAINT entity_workstreams_blocker_request_id_fkey FOREIGN KEY (blocker_request_id) REFERENCES kyc.outstanding_requests(request_id);
+
+
+--
 -- Name: entity_workstreams entity_workstreams_case_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
 --
 
@@ -13718,6 +14021,38 @@ ALTER TABLE ONLY kyc.holdings
 
 ALTER TABLE ONLY kyc.movements
     ADD CONSTRAINT movements_holding_id_fkey FOREIGN KEY (holding_id) REFERENCES kyc.holdings(id);
+
+
+--
+-- Name: outstanding_requests outstanding_requests_case_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.outstanding_requests
+    ADD CONSTRAINT outstanding_requests_case_id_fkey FOREIGN KEY (case_id) REFERENCES kyc.cases(case_id);
+
+
+--
+-- Name: outstanding_requests outstanding_requests_cbu_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.outstanding_requests
+    ADD CONSTRAINT outstanding_requests_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id);
+
+
+--
+-- Name: outstanding_requests outstanding_requests_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.outstanding_requests
+    ADD CONSTRAINT outstanding_requests_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: outstanding_requests outstanding_requests_workstream_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.outstanding_requests
+    ADD CONSTRAINT outstanding_requests_workstream_id_fkey FOREIGN KEY (workstream_id) REFERENCES kyc.entity_workstreams(workstream_id);
 
 
 --
@@ -15476,5 +15811,5 @@ ALTER TABLE ONLY public.rules
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 22jlzLbJ2qcooDwvhX34xahZUvCPKfv0ScrJe0oKBMmXKpK4F1yuFP62f2NCkMo
+\unrestrict ab7XxYKf1d7XFzHqhiwm2CL490PbqxkfZ5Ga5jNQFegrhcDevOmOFtIo7VD8LDA
 

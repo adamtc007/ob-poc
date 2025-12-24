@@ -21,6 +21,9 @@ The system prompt is built from multiple layers, injected in order:
 │  LAYER 5: Domain Knowledge (domain_knowledge.md)                           │
 │  Market codes, products, roles, jurisdictions                              │
 ├─────────────────────────────────────────────────────────────────────────────┤
+│  LAYER 5b: KYC Async Patterns (kyc_async_patterns.md)                      │
+│  Fire-and-forget requests, domain coherence, state queries                 │
+├─────────────────────────────────────────────────────────────────────────────┤
 │  LAYER 6: Entity Context (pre_resolve_entities output)                     │
 │  Available CBUs, entities, products in scope                               │
 ├─────────────────────────────────────────────────────────────────────────────┤
@@ -43,8 +46,9 @@ The system prompt is built from multiple layers, injected in order:
 ```
 rust/src/api/prompts/
 ├── role.md                 # Layer 1: Agent role and constraints
-├── dag_dependencies.md     # Layer 4: NEW - DAG semantics
+├── dag_dependencies.md     # Layer 4: DAG semantics
 ├── domain_knowledge.md     # Layer 5: Financial domain knowledge
+├── kyc_async_patterns.md   # Layer 5b: KYC fire-and-forget patterns
 ├── ambiguity_detection.md  # Layer 8: Clarification patterns
 └── few_shot_examples.md    # Layer 9: Input/output examples
 ```
@@ -102,6 +106,7 @@ fn build_intent_extraction_prompt(session: &AgentSession) -> String {
 | Verb Registry | Valid verbs only | No hallucinated verbs |
 | **DAG Dependencies** | **@result_N semantics** | **Correct multi-intent** |
 | Domain Knowledge | Business terminology | Accurate mapping |
+| **KYC Async Patterns** | **Fire-and-forget, state queries** | **Correct async handling** |
 | Entity Context | What exists | No hallucinated entities |
 | Session State | Current focus | Context-aware refs |
 | Ambiguity | When to ask | Fewer wrong guesses |

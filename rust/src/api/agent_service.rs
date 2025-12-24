@@ -444,6 +444,137 @@ impl AgentService {
         }
     }
 
+    /// Derive KYC case context when a case is active in the session.
+    /// Returns a formatted string showing case state with embedded workstream requests.
+    ///
+    /// This implements the "Domain Coherence" principle: requests appear as child
+    /// nodes of workstreams in `awaiting` arrays, not as a separate list.
+    async fn derive_kyc_case_context(&self, kyc_case_id: Uuid) -> Option<String> {
+        let pool = self.pool.as_ref()?;
+
+        // Query case state with workstreams and embedded awaiting requests
+        let case_row = sqlx::query!(
+            r#"
+            SELECT
+                c.case_id,
+                c.status,
+                c.risk_rating,
+                c.case_type,
+                c.escalation_level,
+                cb.name as cbu_name
+            FROM kyc.cases c
+            JOIN "ob-poc".cbus cb ON c.cbu_id = cb.cbu_id
+            WHERE c.case_id = $1
+            "#,
+            kyc_case_id
+        )
+        .fetch_optional(pool)
+        .await
+        .ok()
+        .flatten()?;
+
+        // Get workstreams with awaiting counts
+        let workstreams = sqlx::query!(
+            r#"
+            SELECT
+                w.workstream_id,
+                w.status,
+                w.blocker_type,
+                e.name as entity_name,
+                (SELECT COUNT(*) FROM kyc.outstanding_requests r
+                 WHERE r.workstream_id = w.workstream_id
+                 AND r.status IN ('PENDING', 'ESCALATED')) as awaiting_count,
+                (SELECT COUNT(*) FROM kyc.outstanding_requests r
+                 WHERE r.workstream_id = w.workstream_id
+                 AND r.status IN ('PENDING', 'ESCALATED')
+                 AND r.due_date < CURRENT_DATE) as overdue_count
+            FROM kyc.entity_workstreams w
+            JOIN "ob-poc".entities e ON w.entity_id = e.entity_id
+            WHERE w.case_id = $1
+            ORDER BY w.created_at
+            "#,
+            kyc_case_id
+        )
+        .fetch_all(pool)
+        .await
+        .ok()?;
+
+        // Build workstream summary lines
+        let mut ws_lines = Vec::new();
+        let mut total_awaiting = 0i64;
+        let mut total_overdue = 0i64;
+
+        for ws in &workstreams {
+            let awaiting = ws.awaiting_count.unwrap_or(0);
+            let overdue = ws.overdue_count.unwrap_or(0);
+            total_awaiting += awaiting;
+            total_overdue += overdue;
+
+            let status_icon = match ws.status.as_str() {
+                "COMPLETE" => "✓",
+                "BLOCKED" => "⛔",
+                _ if overdue > 0 => "⚠️",
+                _ if awaiting > 0 => "⏳",
+                _ => "→",
+            };
+
+            let awaiting_info = if awaiting > 0 {
+                if overdue > 0 {
+                    format!(" [{} awaiting, {} OVERDUE]", awaiting, overdue)
+                } else {
+                    format!(" [{} awaiting]", awaiting)
+                }
+            } else {
+                String::new()
+            };
+
+            let blocker_info = ws
+                .blocker_type
+                .as_ref()
+                .map(|b| format!(" BLOCKED: {}", b))
+                .unwrap_or_default();
+
+            ws_lines.push(format!(
+                "  {} {} ({}){}{}",
+                status_icon, ws.entity_name, ws.status, awaiting_info, blocker_info
+            ));
+        }
+
+        // Build attention section if there are overdue items
+        let attention_section = if total_overdue > 0 {
+            format!(
+                "\n\n⚠️ ATTENTION: {} overdue request(s) need action. Use `(kyc-case.state :case-id @case)` for details.",
+                total_overdue
+            )
+        } else {
+            String::new()
+        };
+
+        let context = format!(
+            r#"# KYC CASE CONTEXT
+
+Case: {} ({})
+Status: {} | Risk: {} | Type: {}
+
+## Workstreams ({} total, {} awaiting, {} overdue):
+{}{}
+
+Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting requests."#,
+            case_row.cbu_name,
+            kyc_case_id,
+            case_row.status,
+            case_row.risk_rating.as_deref().unwrap_or("unrated"),
+            case_row.case_type.as_deref().unwrap_or("unknown"),
+            workstreams.len(),
+            total_awaiting,
+            total_overdue,
+            ws_lines.join("\n"),
+            attention_section
+        );
+
+        Some(context)
+    }
+
     /// Process a chat message and return response (with disambiguation if needed)
     ///
     /// This is the main entry point for agent chat. It:
@@ -549,9 +680,17 @@ impl AgentService {
             None
         };
 
+        // Derive KYC case context if a case is active in the session
+        let kyc_case_context = if let Some(case_id) = session.context.primary_keys.kyc_case_id {
+            self.derive_kyc_case_context(case_id).await
+        } else {
+            None
+        };
+
         let bindings_context = if !session_bindings.is_empty()
             || active_cbu_context.is_some()
             || semantic_context.is_some()
+            || kyc_case_context.is_some()
         {
             let mut parts = Vec::new();
             if let Some(cbu) = active_cbu_context {
@@ -571,10 +710,18 @@ impl AgentService {
                 String::new()
             };
 
+            // Add KYC case context if available (domain-coherent view with embedded requests)
+            let kyc_section = if let Some(ref kyc_ctx) = kyc_case_context {
+                format!("\n\n{}", kyc_ctx)
+            } else {
+                String::new()
+            };
+
             format!(
-                "\n\n[SESSION CONTEXT: {}. Use the active CBU for operations that need a CBU. Use exact @names in the refs field when referring to entities.]{}",
+                "\n\n[SESSION CONTEXT: {}. Use the active CBU for operations that need a CBU. Use exact @names in the refs field when referring to entities.]{}{}",
                 parts.join(". "),
-                semantic_section
+                semantic_section,
+                kyc_section
             )
         } else {
             String::new()
@@ -1655,6 +1802,9 @@ Rate your confidence in each interpretation:
         // Layer 5: Domain knowledge (code mappings)
         let domain_knowledge = include_str!("prompts/domain_knowledge.md");
 
+        // Layer 5b: KYC async patterns (fire-and-forget, domain coherence)
+        let kyc_async_patterns = include_str!("prompts/kyc_async_patterns.md");
+
         // Layer 8: Ambiguity detection rules
         let ambiguity_rules = include_str!("prompts/ambiguity_detection.md");
 
@@ -1673,6 +1823,8 @@ Rate your confidence in each interpretation:
 {dag_dependencies}
 
 {domain_knowledge}
+
+{kyc_async_patterns}
 
 {ambiguity_rules}
 

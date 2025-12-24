@@ -2383,6 +2383,25 @@ The KYC system includes a YAML-driven rules engine that automatically triggers a
 | screenings | Sanctions/PEP/adverse media checks |
 | case_events | Audit trail of all activities |
 | rule_executions | Audit log of rule engine runs |
+| outstanding_requests | Async fire-and-forget requests (documents, approvals, verifications) |
+| request_types | Request type definitions with SLA and auto-fulfillment rules |
+
+### Async Request System
+
+The `outstanding_requests` table implements a **fire-and-forget** pattern for KYC requests:
+
+```
+Agent creates request → Returns immediately → Checks state later
+```
+
+**Key columns:**
+- `subject_type`: WORKSTREAM, CASE, or ENTITY (polymorphic target)
+- `request_type`: DOCUMENT, VERIFICATION, APPROVAL, INFORMATION
+- `status`: PENDING, ESCALATED, FULFILLED, CANCELLED, EXPIRED
+- `due_date`: Calculated from request_type SLA
+- `auto_fulfill_on`: Event that auto-completes (e.g., "document.catalog:PASSPORT")
+
+**Domain Coherence**: Requests appear as `awaiting` arrays embedded in workstreams via `kyc-case.state`, not as a separate list.
 
 
 ## Adversarial Verification Module
@@ -4644,9 +4663,9 @@ Subscription, redemption, and transfer transactions.
 | Other | 32 | Various support tables |
 | **ob-poc Total** | **83** | |
 | **Custody** | **17** | cbu_instrument_universe, cbu_ssi, ssi_booking_rules, isda_agreements, csa_agreements |
-| **KYC** | **12** | cases, entity_workstreams, red_flags, doc_requests, screenings, share_classes, holdings, movements |
+| **KYC** | **14** | cases, entity_workstreams, red_flags, doc_requests, screenings, outstanding_requests, request_types, share_classes, holdings, movements |
 | **Public** | **10** | rules, rule_versions, business_attributes, derived_attributes, credentials_vault |
-| **Grand Total** | **122** | |
+| **Grand Total** | **124** | |
 
 ## Rebuilding the Schema
 
@@ -5882,6 +5901,7 @@ Per-entity workstream within a KYC case
 | `entity-workstream.read` | Read workstream details |
 | `entity-workstream.set-enhanced-dd` | Flag workstream for enhanced due diligence |
 | `entity-workstream.set-ubo` | Mark workstream entity as UBO |
+| `entity-workstream.state` | Get workstream state with embedded awaiting requests |
 | `entity-workstream.update-status` | Update workstream status |
 
 ### fund
@@ -5958,6 +5978,7 @@ KYC case lifecycle management
 | `kyc-case.list-by-cbu` | List cases for a CBU |
 | `kyc-case.read` | Read case details |
 | `kyc-case.set-risk-rating` | Set case risk rating |
+| `kyc-case.state` | Get full case state with workstreams and embedded awaiting requests |
 | `kyc-case.update-status` | Update case status |
 
 ### market
@@ -6023,6 +6044,23 @@ Risk indicators and issues requiring attention
 | `red-flag.raise` | Raise a new red flag |
 | `red-flag.set-blocking` | Set red flag as blocking the case |
 | `red-flag.waive` | Waive red flag with justification |
+
+### request
+
+Async fire-and-forget requests for KYC workflows (documents, approvals, verifications)
+
+| Verb | Description |
+|------|-------------|
+| `request.create` | Create an async request (generic) |
+| `request.create-document` | Request document from client |
+| `request.create-approval` | Request internal approval |
+| `request.create-verification` | Request external verification |
+| `request.fulfill` | Mark request as fulfilled |
+| `request.cancel` | Cancel a pending request |
+| `request.remind` | Send reminder for overdue request |
+| `request.escalate` | Escalate overdue request |
+| `request.extend-due` | Extend due date |
+| `request.waive` | Waive request with justification |
 
 ### rfi
 

@@ -24,12 +24,14 @@ mod custody;
 mod document_ops;
 mod entity_ops;
 pub mod entity_query;
+mod kyc_case_ops;
 mod lifecycle_ops;
 mod matrix_overlay_ops;
 mod observation_ops;
 mod onboarding;
 mod refdata_loader;
 mod regulatory_ops;
+mod request_ops;
 mod resource_ops;
 mod rfi;
 mod screening_ops;
@@ -59,6 +61,7 @@ pub use custody::{
     ValidateBookingCoverageOp,
 };
 pub use entity_query::{EntityQueryOp, EntityQueryResult};
+pub use kyc_case_ops::{KycCaseStateOp, WorkstreamStateOp};
 pub use lifecycle_ops::{
     LifecycleAnalyzeGapsOp, LifecycleCheckReadinessOp, LifecycleDiscoverOp, LifecycleExecutePlanOp,
     LifecycleGeneratePlanOp, LifecycleProvisionOp,
@@ -71,6 +74,11 @@ pub use onboarding::{
 pub use refdata_loader::{
     get_refdata_operations, LoadAllRefdataOp, LoadInstrumentClassesOp, LoadMarketsOp,
     LoadSlaTemplatesOp, LoadSubcustodiansOp,
+};
+pub use request_ops::{
+    DocumentRequestOp, DocumentUploadOp, DocumentWaiveOp, RequestCancelOp, RequestCreateOp,
+    RequestEscalateOp, RequestExtendOp, RequestFulfillOp, RequestOverdueOp, RequestRemindOp,
+    RequestWaiveOp,
 };
 pub use rfi::{RfiCheckCompletionOp, RfiGenerateOp, RfiListByCaseOp};
 pub use semantic_ops::{
@@ -323,6 +331,25 @@ impl CustomOperationRegistry {
             registry.register(Arc::from(op));
         }
 
+        // Outstanding Request operations (async fire-and-forget pattern)
+        registry.register(Arc::new(RequestCreateOp));
+        registry.register(Arc::new(RequestOverdueOp));
+        registry.register(Arc::new(RequestFulfillOp));
+        registry.register(Arc::new(RequestCancelOp));
+        registry.register(Arc::new(RequestExtendOp));
+        registry.register(Arc::new(RequestRemindOp));
+        registry.register(Arc::new(RequestEscalateOp));
+        registry.register(Arc::new(RequestWaiveOp));
+
+        // Document request operations (integrate with outstanding requests)
+        registry.register(Arc::new(DocumentRequestOp));
+        registry.register(Arc::new(DocumentUploadOp));
+        registry.register(Arc::new(DocumentWaiveOp));
+
+        // KYC case state operations (domain-embedded requests)
+        registry.register(Arc::new(KycCaseStateOp));
+        registry.register(Arc::new(WorkstreamStateOp));
+
         registry
     }
 
@@ -406,6 +433,22 @@ mod tests {
         // Regulatory operations
         assert!(registry.has("regulatory.registration", "verify"));
         assert!(registry.has("regulatory.status", "check"));
+        // Outstanding Request operations
+        assert!(registry.has("request", "create"));
+        assert!(registry.has("request", "overdue"));
+        assert!(registry.has("request", "fulfill"));
+        assert!(registry.has("request", "cancel"));
+        assert!(registry.has("request", "extend"));
+        assert!(registry.has("request", "remind"));
+        assert!(registry.has("request", "escalate"));
+        assert!(registry.has("request", "waive"));
+        // Document request operations
+        assert!(registry.has("document", "request"));
+        assert!(registry.has("document", "upload"));
+        assert!(registry.has("document", "waive-request"));
+        // KYC case state operations
+        assert!(registry.has("kyc-case", "state"));
+        assert!(registry.has("entity-workstream", "state"));
     }
 
     #[test]

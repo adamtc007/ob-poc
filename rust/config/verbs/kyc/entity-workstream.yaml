@@ -269,3 +269,23 @@ domains:
               primary_key: workstream_id
         returns:
           type: record
+      state:
+        description: Get workstream state with embedded awaiting requests, checks, and documents
+        behavior: plugin
+        handler: WorkstreamStateOp
+        args:
+          - name: workstream-id
+            type: uuid
+            required: true
+            lookup:
+              table: entity_workstreams
+              entity_type: entity_workstream
+              schema: kyc
+              search_key: workstream_id
+              primary_key: workstream_id
+        returns:
+          type: record
+          description: |
+            Returns workstream with embedded `awaiting` array of pending requests,
+            plus completed checks and received documents. Domain-coherent view
+            where requests are child nodes, not a separate list.

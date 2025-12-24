@@ -1,0 +1,328 @@
+domains:
+  request:
+    description: Outstanding request operations (fire-and-forget pattern)
+    verbs:
+      # ═══════════════════════════════════════════════════════════════════════════
+      # Core request operations
+      # ═══════════════════════════════════════════════════════════════════════════
+
+      create:
+        description: Create an outstanding request (generic)
+        behavior: plugin
+        plugin:
+          handler: RequestCreateOp
+        args:
+        - name: subject-type
+          type: string
+          required: true
+          valid_values:
+          - WORKSTREAM
+          - KYC_CASE
+          - ENTITY
+          - CBU
+        - name: subject-id
+          type: uuid
+          required: true
+        - name: type
+          type: string
+          required: true
+          maps_to: request_type
+          valid_values:
+          - DOCUMENT
+          - INFORMATION
+          - VERIFICATION
+          - APPROVAL
+          - SIGNATURE
+        - name: subtype
+          type: string
+          required: true
+          maps_to: request_subtype
+        - name: from
+          type: string
+          required: false
+          maps_to: requested_from_label
+          description: Who should provide this
+        - name: from-entity
+          type: uuid
+          required: false
+          maps_to: requested_from_entity_id
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        - name: due-in-days
+          type: integer
+          required: false
+          default: 7
+        - name: due-date
+          type: date
+          required: false
+        - name: blocks
+          type: boolean
+          required: false
+          default: true
+          maps_to: blocks_subject
+        - name: message
+          type: string
+          required: false
+          maps_to: blocker_message
+        - name: details
+          type: json
+          required: false
+          maps_to: request_details
+        returns:
+          type: uuid
+          name: request_id
+          capture: true
+
+      list:
+        description: List outstanding requests
+        behavior: crud
+        crud:
+          operation: select
+          table: outstanding_requests
+          schema: kyc
+          multiple: true
+        args:
+        - name: case-id
+          type: uuid
+          required: false
+          maps_to: case_id
+          lookup:
+            table: cases
+            entity_type: kyc_case
+            schema: kyc
+            search_key: case_id
+            primary_key: case_id
+        - name: workstream-id
+          type: uuid
+          required: false
+          maps_to: workstream_id
+          lookup:
+            table: entity_workstreams
+            entity_type: entity_workstream
+            schema: kyc
+            search_key: workstream_id
+            primary_key: workstream_id
+        - name: cbu-id
+          type: uuid
+          required: false
+          maps_to: cbu_id
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: status
+          type: string
+          required: false
+          maps_to: status
+          default: PENDING
+        returns:
+          type: record_set
+
+      overdue:
+        description: List overdue requests
+        behavior: plugin
+        plugin:
+          handler: RequestOverdueOp
+        args:
+        - name: case-id
+          type: uuid
+          required: false
+          lookup:
+            table: cases
+            entity_type: kyc_case
+            schema: kyc
+            search_key: case_id
+            primary_key: case_id
+        - name: cbu-id
+          type: uuid
+          required: false
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: include-grace-period
+          type: boolean
+          required: false
+          default: false
+        returns:
+          type: record_set
+
+      # ═══════════════════════════════════════════════════════════════════════════
+      # Request lifecycle
+      # ═══════════════════════════════════════════════════════════════════════════
+
+      fulfill:
+        description: Mark request as fulfilled
+        behavior: plugin
+        plugin:
+          handler: RequestFulfillOp
+        args:
+        - name: request-id
+          type: uuid
+          required: true
+          lookup:
+            table: outstanding_requests
+            entity_type: outstanding_request
+            schema: kyc
+            search_key: request_id
+            primary_key: request_id
+        - name: fulfillment-type
+          type: string
+          required: false
+          valid_values:
+          - DOCUMENT_UPLOAD
+          - MANUAL_ENTRY
+          - API_RESPONSE
+          - WAIVER
+        - name: reference-id
+          type: uuid
+          required: false
+          maps_to: fulfillment_reference_id
+        - name: reference-type
+          type: string
+          required: false
+          maps_to: fulfillment_reference_type
+        - name: notes
+          type: string
+          required: false
+          maps_to: fulfillment_notes
+        returns:
+          type: affected
+
+      cancel:
+        description: Cancel a pending request
+        behavior: plugin
+        plugin:
+          handler: RequestCancelOp
+        args:
+        - name: request-id
+          type: uuid
+          required: true
+          lookup:
+            table: outstanding_requests
+            entity_type: outstanding_request
+            schema: kyc
+            search_key: request_id
+            primary_key: request_id
+        - name: reason
+          type: string
+          required: true
+          maps_to: status_reason
+        returns:
+          type: affected
+
+      extend:
+        description: Extend request due date
+        behavior: plugin
+        plugin:
+          handler: RequestExtendOp
+        args:
+        - name: request-id
+          type: uuid
+          required: true
+          lookup:
+            table: outstanding_requests
+            entity_type: outstanding_request
+            schema: kyc
+            search_key: request_id
+            primary_key: request_id
+        - name: days
+          type: integer
+          required: false
+        - name: new-due-date
+          type: date
+          required: false
+        - name: reason
+          type: string
+          required: true
+        returns:
+          type: affected
+
+      remind:
+        description: Send reminder for pending request
+        behavior: plugin
+        plugin:
+          handler: RequestRemindOp
+        args:
+        - name: request-id
+          type: uuid
+          required: true
+          lookup:
+            table: outstanding_requests
+            entity_type: outstanding_request
+            schema: kyc
+            search_key: request_id
+            primary_key: request_id
+        - name: channel
+          type: string
+          required: false
+          valid_values:
+          - EMAIL
+          - PORTAL
+          - SMS
+          default: EMAIL
+        - name: message
+          type: string
+          required: false
+        returns:
+          type: affected
+
+      escalate:
+        description: Escalate overdue request
+        behavior: plugin
+        plugin:
+          handler: RequestEscalateOp
+        args:
+        - name: request-id
+          type: uuid
+          required: true
+          lookup:
+            table: outstanding_requests
+            entity_type: outstanding_request
+            schema: kyc
+            search_key: request_id
+            primary_key: request_id
+        - name: escalate-to
+          type: uuid
+          required: false
+          maps_to: escalated_to_user_id
+        - name: reason
+          type: string
+          required: false
+          maps_to: escalation_reason
+        returns:
+          type: affected
+
+      waive:
+        description: Waive a request requirement
+        behavior: plugin
+        plugin:
+          handler: RequestWaiveOp
+        args:
+        - name: request-id
+          type: uuid
+          required: true
+          lookup:
+            table: outstanding_requests
+            entity_type: outstanding_request
+            schema: kyc
+            search_key: request_id
+            primary_key: request_id
+        - name: reason
+          type: string
+          required: true
+          maps_to: status_reason
+        - name: approved-by
+          type: uuid
+          required: true
+          description: Senior user approving waiver
+        returns:
+          type: affected
