@@ -1,0 +1,196 @@
+# Regulators Reference Data
+# Used for regulatory profile verification and simplified DD eligibility
+
+regulators:
+  # European Union
+  CSSF:
+    name: "Commission de Surveillance du Secteur Financier"
+    jurisdiction: LU
+    tier: EQUIVALENT
+    registry_url: "https://www.cssf.lu/en/supervised-entities/"
+
+  CBI:
+    name: "Central Bank of Ireland"
+    jurisdiction: IE
+    tier: EQUIVALENT
+    registry_url: "https://registers.centralbank.ie/"
+
+  BaFin:
+    name: "Bundesanstalt für Finanzdienstleistungsaufsicht"
+    jurisdiction: DE
+    tier: EQUIVALENT
+    registry_url: "https://portal.mvp.bafin.de/database/InstInfo/"
+
+  AMF:
+    name: "Autorité des marchés financiers"
+    jurisdiction: FR
+    tier: EQUIVALENT
+    registry_url: "https://www.amf-france.org/en/professionals"
+
+  CONSOB:
+    name: "Commissione Nazionale per le Società e la Borsa"
+    jurisdiction: IT
+    tier: EQUIVALENT
+    registry_url: "https://www.consob.it/web/area-pubblica/elenchi"
+
+  AFM:
+    name: "Autoriteit Financiële Markten"
+    jurisdiction: NL
+    tier: EQUIVALENT
+    registry_url: "https://www.afm.nl/en/sector/registers"
+
+  CNMV:
+    name: "Comisión Nacional del Mercado de Valores"
+    jurisdiction: ES
+    tier: EQUIVALENT
+    registry_url: "https://www.cnmv.es/portal/home.aspx"
+
+  # United Kingdom
+  FCA:
+    name: "Financial Conduct Authority"
+    jurisdiction: GB
+    tier: EQUIVALENT
+    registry_url: "https://register.fca.org.uk/s/"
+
+  PRA:
+    name: "Prudential Regulation Authority"
+    jurisdiction: GB
+    tier: EQUIVALENT
+    registry_url: "https://www.bankofengland.co.uk/prudential-regulation"
+
+  # United States
+  SEC:
+    name: "Securities and Exchange Commission"
+    jurisdiction: US
+    tier: EQUIVALENT
+    registry_url: "https://www.sec.gov/cgi-bin/browse-edgar"
+
+  FINRA:
+    name: "Financial Industry Regulatory Authority"
+    jurisdiction: US
+    tier: EQUIVALENT
+    registry_url: "https://brokercheck.finra.org/"
+
+  CFTC:
+    name: "Commodity Futures Trading Commission"
+    jurisdiction: US
+    tier: EQUIVALENT
+    registry_url: "https://www.cftc.gov/"
+
+  # Switzerland
+  FINMA:
+    name: "Swiss Financial Market Supervisory Authority"
+    jurisdiction: CH
+    tier: EQUIVALENT
+    registry_url: "https://www.finma.ch/en/authorisation/"
+
+  # Asia Pacific
+  MAS:
+    name: "Monetary Authority of Singapore"
+    jurisdiction: SG
+    tier: EQUIVALENT
+    registry_url: "https://eservices.mas.gov.sg/fid"
+
+  SFC:
+    name: "Securities and Futures Commission"
+    jurisdiction: HK
+    tier: EQUIVALENT
+    registry_url: "https://www.sfc.hk/publicregWeb/searchByName"
+
+  ASIC:
+    name: "Australian Securities and Investments Commission"
+    jurisdiction: AU
+    tier: EQUIVALENT
+    registry_url: "https://connectonline.asic.gov.au/"
+
+  JFSA:
+    name: "Japan Financial Services Agency"
+    jurisdiction: JP
+    tier: EQUIVALENT
+    registry_url: "https://www.fsa.go.jp/en/"
+
+  # Channel Islands / Offshore
+  GFSC:
+    name: "Guernsey Financial Services Commission"
+    jurisdiction: GG
+    tier: EQUIVALENT
+    registry_url: "https://www.gfsc.gg/commission/registry"
+
+  JFSC:
+    name: "Jersey Financial Services Commission"
+    jurisdiction: JE
+    tier: EQUIVALENT
+    registry_url: "https://www.jerseyfsc.org/registry/"
+
+  CIMA:
+    name: "Cayman Islands Monetary Authority"
+    jurisdiction: KY
+    tier: ACCEPTABLE
+    registry_url: "https://www.cima.ky/regulated-entities"
+
+  BMA:
+    name: "Bermuda Monetary Authority"
+    jurisdiction: BM
+    tier: ACCEPTABLE
+    registry_url: "https://www.bma.bm/regulated-entities"
+
+  # Other
+  CySEC:
+    name: "Cyprus Securities and Exchange Commission"
+    jurisdiction: CY
+    tier: EQUIVALENT
+    registry_url: "https://www.cysec.gov.cy/en-GB/entities/investment-firms/"
+
+  MFSA:
+    name: "Malta Financial Services Authority"
+    jurisdiction: MT
+    tier: EQUIVALENT
+    registry_url: "https://www.mfsa.mt/financial-services-register/"
+
+# Regulatory Tiers
+regulatory_tiers:
+  EQUIVALENT:
+    description: "Full reliance permitted - equivalent regulatory standard"
+    allows_simplified_dd: true
+    requires_enhanced_screening: false
+    reliance_level: "full"
+
+  ACCEPTABLE:
+    description: "Partial reliance - enhanced checks required"
+    allows_simplified_dd: true
+    requires_enhanced_screening: true
+    reliance_level: "partial"
+
+  LIMITED:
+    description: "Limited reliance - additional verification required"
+    allows_simplified_dd: false
+    requires_enhanced_screening: true
+    reliance_level: "limited"
+
+  NONE:
+    description: "No reliance - full KYC required regardless of regulation"
+    allows_simplified_dd: false
+    requires_enhanced_screening: true
+    reliance_level: "none"
+
+# Verification methods
+verification_methods:
+  REGISTRY_API:
+    description: "Automated check against regulator's public API/database"
+    confidence: high
+
+  MANUAL_REGISTRY:
+    description: "Manual verification against regulator's public register"
+    confidence: high
+
+  DOCUMENT:
+    description: "Verification via official regulatory document/certificate"
+    confidence: high
+
+  THIRD_PARTY:
+    description: "Verification via third-party data provider"
+    confidence: medium
+
+  SELF_DECLARATION:
+    description: "Client self-declaration (requires corroboration)"
+    confidence: low

@@ -1,0 +1,159 @@
+# Admin Verbs - Regulators
+# Manage recognized regulators reference data
+
+domains:
+  admin.regulators:
+    description: "Regulators reference data management"
+    verbs:
+      list:
+        description: "List recognized regulators"
+        behavior: crud
+        crud:
+          operation: select
+          table: regulators
+          schema: ob_ref
+          multiple: true
+        args:
+          - name: jurisdiction
+            type: string
+            required: false
+            maps_to: jurisdiction
+          - name: tier
+            type: string
+            required: false
+            maps_to: regulatory_tier
+          - name: active-only
+            type: boolean
+            required: false
+            default: true
+            maps_to: active
+        returns:
+          type: record_set
+
+      read:
+        description: "Get regulator by code"
+        behavior: crud
+        crud:
+          operation: select
+          table: regulators
+          schema: ob_ref
+        args:
+          - name: code
+            type: string
+            required: true
+            maps_to: regulator_code
+        returns:
+          type: record
+
+      create:
+        description: "Add new recognized regulator"
+        behavior: crud
+        crud:
+          operation: insert
+          table: regulators
+          schema: ob_ref
+          returning: regulator_code
+        args:
+          - name: code
+            type: string
+            required: true
+            maps_to: regulator_code
+          - name: name
+            type: string
+            required: true
+            maps_to: regulator_name
+          - name: jurisdiction
+            type: string
+            required: true
+            maps_to: jurisdiction
+          - name: tier
+            type: string
+            required: true
+            maps_to: regulatory_tier
+          - name: type
+            type: string
+            required: false
+            default: "GOVERNMENT"
+            maps_to: regulator_type
+          - name: registry-url
+            type: string
+            required: false
+            maps_to: registry_url
+        returns:
+          type: string
+          capture: true
+
+      update:
+        description: "Update regulator"
+        behavior: crud
+        crud:
+          operation: update
+          table: regulators
+          schema: ob_ref
+        args:
+          - name: code
+            type: string
+            required: true
+            maps_to: regulator_code
+          - name: tier
+            type: string
+            required: false
+            maps_to: regulatory_tier
+          - name: registry-url
+            type: string
+            required: false
+            maps_to: registry_url
+          - name: active
+            type: boolean
+            required: false
+            maps_to: active
+        returns:
+          type: string
+
+      deactivate:
+        description: "Deactivate regulator"
+        behavior: crud
+        crud:
+          operation: update
+          table: regulators
+          schema: ob_ref
+        args:
+          - name: code
+            type: string
+            required: true
+            maps_to: regulator_code
+        computed:
+          - column: active
+            value: false
+        returns:
+          type: string
+
+  admin.regulatory-tiers:
+    description: "Regulatory tiers reference data"
+    verbs:
+      list:
+        description: "List regulatory tiers"
+        behavior: crud
+        crud:
+          operation: select
+          table: regulatory_tiers
+          schema: ob_ref
+          multiple: true
+        args: []
+        returns:
+          type: record_set
+
+      read:
+        description: "Get tier by code"
+        behavior: crud
+        crud:
+          operation: select
+          table: regulatory_tiers
+          schema: ob_ref
+        args:
+          - name: code
+            type: string
+            required: true
+            maps_to: tier_code
+        returns:
+          type: record

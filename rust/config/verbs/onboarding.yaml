@@ -14,6 +14,8 @@ domains:
             description: "The CBU to auto-complete onboarding for"
             lookup:
               entity_type: cbu
+              table: cbus
+              schema: ob-poc
               search_key: name
               primary_key: cbu_id
           - name: max-steps
@@ -31,5 +33,5 @@ domains:
             required: false
             description: "Optional: stop when this stage is complete (e.g., 'kyc_case', 'trading_profile')"
         returns:
-          type: object
+          type: record
           description: "Summary of actions taken or DSL generated"

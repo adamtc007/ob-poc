@@ -29,6 +29,7 @@ mod matrix_overlay_ops;
 mod observation_ops;
 mod onboarding;
 mod refdata_loader;
+mod regulatory_ops;
 mod resource_ops;
 mod rfi;
 mod screening_ops;
@@ -313,6 +314,10 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(MatrixUnifiedGapsOp));
         registry.register(Arc::new(MatrixCompareProductsOp));
 
+        // Regulatory operations (multi-regulator support)
+        registry.register(Arc::new(regulatory_ops::RegistrationVerifyOp));
+        registry.register(Arc::new(regulatory_ops::RegulatoryStatusCheckOp));
+
         // Reference Data bulk loading operations
         for op in get_refdata_operations() {
             registry.register(Arc::from(op));
@@ -398,6 +403,9 @@ mod tests {
         assert!(registry.has("matrix-overlay", "effective-matrix"));
         assert!(registry.has("matrix-overlay", "unified-gaps"));
         assert!(registry.has("matrix-overlay", "compare-products"));
+        // Regulatory operations
+        assert!(registry.has("regulatory.registration", "verify"));
+        assert!(registry.has("regulatory.status", "check"));
     }
 
     #[test]

@@ -1,0 +1,118 @@
+# Fund Investor Verbs
+# For Transfer Agency context - investor registration and KYC
+
+domains:
+  fund-investor:
+    description: "Fund investor management for Transfer Agency context"
+    verbs:
+      create:
+        description: "Register investor in fund"
+        behavior: plugin
+        plugin:
+          handler: FundInvestorCreateOp
+        args:
+          - name: fund-cbu-id
+            type: uuid
+            required: true
+            lookup:
+              entity_type: cbu
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: investor-entity-id
+            type: uuid
+            required: true
+            lookup:
+              entity_type: entity
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: investor-type
+            type: string
+            required: true
+            description: "RETAIL, INSTITUTIONAL, NOMINEE"
+          - name: investment-amount
+            type: decimal
+            required: true
+          - name: currency
+            type: string
+            required: false
+            default: "EUR"
+          - name: subscription-date
+            type: date
+            required: false
+        returns:
+          type: uuid
+          capture: true
+
+      list:
+        description: "List investors for a fund"
+        behavior: crud
+        crud:
+          operation: select
+          table: fund_investors
+          schema: ob-poc
+          multiple: true
+        args:
+          - name: fund-cbu-id
+            type: uuid
+            required: true
+            maps_to: fund_cbu_id
+          - name: kyc-status
+            type: string
+            required: false
+            maps_to: kyc_status
+          - name: investor-type
+            type: string
+            required: false
+            maps_to: investor_type
+        returns:
+          type: record_set
+
+      update-kyc-status:
+        description: "Update investor KYC status"
+        behavior: crud
+        crud:
+          operation: update
+          table: fund_investors
+          schema: ob-poc
+        args:
+          - name: investor-id
+            type: uuid
+            required: true
+            maps_to: investor_id
+          - name: kyc-status
+            type: string
+            required: true
+            maps_to: kyc_status
+          - name: kyc-case-id
+            type: uuid
+            required: false
+            maps_to: kyc_case_id
+        returns:
+          type: uuid
+
+      get:
+        description: "Get investor details"
+        behavior: crud
+        crud:
+          operation: select
+          table: fund_investors
+          schema: ob-poc
+        args:
+          - name: investor-id
+            type: uuid
+            required: false
+            maps_to: investor_id
+          - name: fund-cbu-id
+            type: uuid
+            required: false
+            maps_to: fund_cbu_id
+          - name: investor-entity-id
+            type: uuid
+            required: false
+            maps_to: investor_entity_id
+        returns:
+          type: record

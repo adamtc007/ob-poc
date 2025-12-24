@@ -1,0 +1,200 @@
+# KYC Scope Templates
+# Defines what entities need what level of KYC based on CBU type
+
+scope_templates:
+  FUND:
+    description: "Pooled investment fund (UCITS, AIF, etc.)"
+    account_holder_is: FUND_ENTITY
+    ubo_rules:
+      applies: conditional
+      threshold_pct: 25
+      note: "Funds rarely have >25% owners - typically ManCo/sponsor"
+    cascade_rules:
+      chase_manco_ubos: false
+      chase_im_ubos: false
+      chase_fund_investors: false  # NOT our job as custodian
+    role_obligations:
+      ACCOUNT_HOLDER: FULL_KYC
+      ASSET_OWNER: FULL_KYC
+      UBO: FULL_KYC
+      CONTROLLER: FULL_KYC
+      MANCO: CHECK_REGULATORY
+      INVESTMENT_MGR: CHECK_REGULATORY
+      DIRECTOR: SCREEN_AND_ID
+      SIGNATORY: SCREEN_AND_ID
+      DELEGATE: CHECK_REGULATORY
+
+  HEDGE_FUND:
+    description: "Hedge fund with enhanced scrutiny"
+    inherits: FUND
+    risk_floor: MEDIUM
+    role_obligations:
+      CONTROLLER: FULL_KYC_ENHANCED
+      INVESTMENT_MGR: FULL_KYC  # Override - always full KYC for hedge fund IM
+    additional_checks:
+      - STRATEGY_RISK_ASSESSMENT
+      - INVESTOR_CONCENTRATION
+      - LEVERAGE_REVIEW
+
+  CORPORATE:
+    description: "Corporate entity as direct client"
+    account_holder_is: COMPANY_ENTITY
+    ubo_rules:
+      applies: always
+      threshold_pct: 25
+      max_chain_depth: 4
+    cascade_rules:
+      chase_parent_ubos: true
+      stop_at_regulated: true
+      stop_at_listed: true
+    role_obligations:
+      ACCOUNT_HOLDER: FULL_KYC
+      UBO: FULL_KYC
+      CONTROLLER: FULL_KYC
+      DIRECTOR: SCREEN_AND_ID
+      SIGNATORY: SCREEN_AND_ID
+      PRINCIPAL: FULL_KYC
+      BENEFICIAL_OWNER: FULL_KYC
+
+  INDIVIDUAL:
+    description: "Natural person - retail client"
+    account_holder_is: PERSON_ENTITY
+    ubo_rules:
+      applies: false  # The individual IS the beneficial owner
+    role_obligations:
+      ACCOUNT_HOLDER: FULL_KYC
+      SIGNATORY: SCREEN_AND_ID
+    required_checks:
+      - ID_VERIFICATION
+      - ADDRESS_VERIFICATION
+      - SOURCE_OF_FUNDS
+      - PEP_SCREENING
+      - SANCTIONS_SCREENING
+
+  FUND_INVESTOR_RETAIL:
+    description: "Retail investor in fund (TA context)"
+    service_context: TRANSFER_AGENT
+    kyc_on_behalf_of: FUND
+    ubo_rules:
+      applies: false
+    threshold_based_kyc:
+      - threshold: 15000
+        currency: EUR
+        obligation: SIMPLIFIED
+      - threshold: 150000
+        currency: EUR
+        obligation: FULL_KYC
+      - threshold: 1000000
+        currency: EUR
+        obligation: FULL_KYC_ENHANCED
+
+  FUND_INVESTOR_INSTITUTIONAL:
+    description: "Institutional investor in fund (TA context)"
+    service_context: TRANSFER_AGENT
+    kyc_on_behalf_of: FUND
+    ubo_rules:
+      applies: conditional
+      threshold_pct: 25
+    role_obligations:
+      ACCOUNT_HOLDER: CHECK_REGULATORY
+      UBO: FULL_KYC
+      SIGNATORY: SCREEN_AND_ID
+
+  PENSION_FUND:
+    description: "Pension fund client"
+    inherits: FUND
+    regulatory_assumption: true
+    role_obligations:
+      ACCOUNT_HOLDER: SIMPLIFIED  # Pension funds are typically regulated
+      MANCO: CHECK_REGULATORY
+      INVESTMENT_MGR: CHECK_REGULATORY
+
+  INSURANCE:
+    description: "Insurance company client"
+    account_holder_is: COMPANY_ENTITY
+    regulatory_assumption: true
+    role_obligations:
+      ACCOUNT_HOLDER: SIMPLIFIED
+      DIRECTOR: SCREEN_AND_ID
+      SIGNATORY: SCREEN_AND_ID
+
+  BANK:
+    description: "Bank or financial institution"
+    account_holder_is: COMPANY_ENTITY
+    regulatory_assumption: true
+    role_obligations:
+      ACCOUNT_HOLDER: SIMPLIFIED
+      DIRECTOR: RECORD_ONLY  # Regulated entities don't need director KYC
+      SIGNATORY: SCREEN_AND_ID
+
+# Obligation definitions
+obligation_definitions:
+  FULL_KYC:
+    description: "Full due diligence"
+    creates_workstream: true
+    includes:
+      - identity_verification
+      - address_verification
+      - source_of_funds
+      - source_of_wealth
+      - pep_screening
+      - sanctions_screening
+      - adverse_media
+      - document_collection
+
+  FULL_KYC_ENHANCED:
+    description: "Enhanced due diligence"
+    creates_workstream: true
+    requires_senior_approval: true
+    includes:
+      - identity_verification
+      - address_verification
+      - source_of_funds
+      - source_of_wealth_enhanced
+      - pep_screening
+      - sanctions_screening
+      - adverse_media
+      - document_collection
+      - site_visit_consideration
+      - ongoing_monitoring
+
+  CHECK_REGULATORY:
+    description: "Check regulatory status - simplified if regulated"
+    creates_workstream: conditional
+    logic: |
+      IF entity.is_regulated AND entity.regulatory_tier IN (EQUIVALENT, ACCEPTABLE):
+        IF entity.registration_verified:
+          THEN: SIMPLIFIED
+        ELSE:
+          THEN: FULL_KYC (until verified)
+      ELSE:
+        THEN: FULL_KYC
+
+  SIMPLIFIED:
+    description: "Simplified due diligence for regulated entities"
+    creates_workstream: true
+    includes:
+      - regulatory_verification
+      - sanctions_screening
+      - basic_document_collection
+
+  SCREEN_AND_ID:
+    description: "Identity verification and screening"
+    creates_workstream: true
+    includes:
+      - identity_verification
+      - pep_screening
+      - sanctions_screening
+
+  SCREEN_ONLY:
+    description: "Screening only"
+    creates_workstream: false
+    run_immediately: true
+    includes:
+      - pep_screening
+      - sanctions_screening
+
+  RECORD_ONLY:
+    description: "Record relationship only"
+    creates_workstream: false
+    includes: []

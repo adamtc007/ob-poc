@@ -1,0 +1,159 @@
+# Role Types Configuration
+# Defines KYC obligations per role type within a CBU
+
+role_types:
+  ACCOUNT_HOLDER:
+    name: "Account Holder"
+    description: "The primary legal entity holding the account"
+    triggers_full_kyc: true
+    triggers_screening: true
+    triggers_id_verification: true
+    check_regulatory_status: false
+    cascade_to_entity_ubos: true
+
+  UBO:
+    name: "Ultimate Beneficial Owner"
+    description: "Natural person with 25%+ ownership or control"
+    triggers_full_kyc: true
+    triggers_screening: true
+    triggers_id_verification: true
+    check_regulatory_status: false
+    cascade_to_entity_ubos: false
+
+  CONTROLLER:
+    name: "Controller"
+    description: "Person with significant control (non-ownership)"
+    triggers_full_kyc: true
+    triggers_screening: true
+    triggers_id_verification: true
+    check_regulatory_status: false
+
+  MANCO:
+    name: "Management Company"
+    description: "Fund management company (UCITS/AIF ManCo)"
+    triggers_full_kyc: true
+    triggers_screening: true
+    triggers_id_verification: false
+    check_regulatory_status: true
+    if_regulated_obligation: SIMPLIFIED
+
+  INVESTMENT_MGR:
+    name: "Investment Manager"
+    description: "Discretionary investment manager"
+    triggers_full_kyc: true
+    triggers_screening: true
+    triggers_id_verification: false
+    check_regulatory_status: true
+    if_regulated_obligation: SIMPLIFIED
+
+  DIRECTOR:
+    name: "Director"
+    description: "Board director of entity"
+    triggers_full_kyc: false
+    triggers_screening: true
+    triggers_id_verification: true
+    check_regulatory_status: false
+
+  SIGNATORY:
+    name: "Authorized Signatory"
+    description: "Person authorized to sign on behalf of entity"
+    triggers_full_kyc: false
+    triggers_screening: true
+    triggers_id_verification: true
+    check_regulatory_status: false
+
+  DELEGATE:
+    name: "Delegate/Service Provider"
+    description: "Third-party service provider with delegated functions"
+    triggers_full_kyc: false
+    triggers_screening: true
+    triggers_id_verification: false
+    check_regulatory_status: true
+    if_regulated_obligation: RECORD_ONLY
+
+  INVESTOR:
+    name: "Fund Investor"
+    description: "Investor in a fund (TA context)"
+    triggers_full_kyc: true
+    triggers_screening: true
+    triggers_id_verification: true
+    check_regulatory_status: true
+    if_regulated_obligation: SIMPLIFIED
+    threshold_based: true
+
+  ASSET_OWNER:
+    name: "Asset Owner"
+    description: "Entity that owns the assets (often same as account holder)"
+    triggers_full_kyc: true
+    triggers_screening: true
+    triggers_id_verification: true
+    check_regulatory_status: false
+    cascade_to_entity_ubos: true
+
+  PRINCIPAL:
+    name: "Principal"
+    description: "Principal shareholder or partner"
+    triggers_full_kyc: true
+    triggers_screening: true
+    triggers_id_verification: true
+    check_regulatory_status: false
+
+  BENEFICIAL_OWNER:
+    name: "Beneficial Owner"
+    description: "Beneficial owner (may be below UBO threshold)"
+    triggers_full_kyc: true
+    triggers_screening: true
+    triggers_id_verification: true
+    check_regulatory_status: false
+
+# KYC Obligation levels (from most to least stringent)
+kyc_obligations:
+  FULL_KYC:
+    description: "Full due diligence required"
+    includes:
+      - identity_verification
+      - address_verification
+      - source_of_funds
+      - source_of_wealth
+      - pep_screening
+      - sanctions_screening
+      - adverse_media
+      - document_collection
+
+  FULL_KYC_ENHANCED:
+    description: "Full KYC with enhanced due diligence"
+    includes:
+      - identity_verification
+      - address_verification
+      - source_of_funds
+      - source_of_wealth
+      - pep_screening
+      - sanctions_screening
+      - adverse_media
+      - document_collection
+      - enhanced_source_of_wealth
+      - senior_management_approval
+
+  SIMPLIFIED:
+    description: "Simplified due diligence for regulated entities"
+    includes:
+      - regulatory_verification
+      - sanctions_screening
+      - basic_document_collection
+
+  SCREEN_AND_ID:
+    description: "Screening plus identity verification"
+    includes:
+      - identity_verification
+      - pep_screening
+      - sanctions_screening
+
+  SCREEN_ONLY:
+    description: "PEP and sanctions screening only"
+    includes:
+      - pep_screening
+      - sanctions_screening
+
+  RECORD_ONLY:
+    description: "Record relationship only, no active KYC"
+    includes: []

@@ -1,0 +1,124 @@
+# KYC Service Agreement Verbs
+# For KYC-as-a-Service sponsor relationships
+
+domains:
+  kyc-agreement:
+    description: "KYC service agreement management for sponsor relationships"
+    verbs:
+      create:
+        description: "Create KYC service agreement with sponsor"
+        behavior: crud
+        crud:
+          operation: insert
+          table: kyc_service_agreements
+          schema: ob-poc
+          returning: agreement_id
+        args:
+          - name: sponsor-cbu-id
+            type: uuid
+            required: true
+            maps_to: sponsor_cbu_id
+            lookup:
+              entity_type: cbu
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: sponsor-entity-id
+            type: uuid
+            required: false
+            maps_to: sponsor_entity_id
+            lookup:
+              entity_type: entity
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: agreement-reference
+            type: string
+            required: true
+            maps_to: agreement_reference
+          - name: kyc-standard
+            type: string
+            required: true
+            maps_to: kyc_standard
+            default: "BNY_STANDARD"
+          - name: auto-accept-threshold
+            type: string
+            required: false
+            maps_to: auto_accept_threshold
+          - name: sponsor-review-required
+            type: boolean
+            required: false
+            maps_to: sponsor_review_required
+            default: true
+          - name: target-turnaround-days
+            type: integer
+            required: false
+            maps_to: target_turnaround_days
+            default: 5
+          - name: effective-date
+            type: date
+            required: true
+            maps_to: effective_date
+        returns:
+          type: uuid
+          capture: true
+
+      read:
+        description: "Get service agreement details"
+        behavior: crud
+        crud:
+          operation: select
+          table: kyc_service_agreements
+          schema: ob-poc
+        args:
+          - name: agreement-id
+            type: uuid
+            required: false
+            maps_to: agreement_id
+          - name: sponsor-cbu-id
+            type: uuid
+            required: false
+            maps_to: sponsor_cbu_id
+        returns:
+          type: record
+
+      list:
+        description: "List service agreements for a sponsor"
+        behavior: crud
+        crud:
+          operation: select
+          table: kyc_service_agreements
+          schema: ob-poc
+          multiple: true
+        args:
+          - name: sponsor-cbu-id
+            type: uuid
+            required: true
+            maps_to: sponsor_cbu_id
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+        returns:
+          type: record_set
+
+      update-status:
+        description: "Update agreement status"
+        behavior: crud
+        crud:
+          operation: update
+          table: kyc_service_agreements
+          schema: ob-poc
+        args:
+          - name: agreement-id
+            type: uuid
+            required: true
+            maps_to: agreement_id
+          - name: status
+            type: string
+            required: true
+            maps_to: status
+        returns:
+          type: uuid

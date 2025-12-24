@@ -1,0 +1,103 @@
+# Product KYC Configuration
+# Maps products to their KYC risk ratings and contexts
+
+products:
+  CUSTODY:
+    kyc_risk_rating: HIGH
+    requires_kyc: true
+    kyc_context: CUSTODY
+    description: "Safekeeping and settlement of securities"
+
+  PRIME_BROKERAGE:
+    kyc_risk_rating: HIGH
+    requires_kyc: true
+    kyc_context: CUSTODY
+    description: "Prime brokerage services including margin lending"
+
+  DERIVATIVES_CLEARING:
+    kyc_risk_rating: HIGH
+    requires_kyc: true
+    kyc_context: CUSTODY
+    description: "OTC and listed derivatives clearing"
+
+  FUND_ACCOUNTING:
+    kyc_risk_rating: MEDIUM
+    requires_kyc: true
+    kyc_context: CUSTODY
+    description: "NAV calculation and fund accounting"
+
+  TRANSFER_AGENCY:
+    kyc_risk_rating: MEDIUM
+    requires_kyc: true
+    kyc_context: TRANSFER_AGENT
+    includes_investor_kyc: true
+    description: "Investor registry and transaction processing"
+
+  KYC_AS_A_SERVICE:
+    kyc_risk_rating: MEDIUM
+    requires_kyc: true
+    kyc_context: KYC_AS_A_SERVICE
+    requires_sponsor: true
+    requires_service_agreement: true
+    description: "KYC performed on behalf of sponsor"
+
+  REPORTING_ONLY:
+    kyc_risk_rating: LOW
+    requires_kyc: false
+    description: "Reporting and analytics only"
+
+  SECURITIES_LENDING:
+    kyc_risk_rating: MEDIUM
+    requires_kyc: true
+    kyc_context: CUSTODY
+    description: "Securities lending and borrowing"
+
+  COLLATERAL_MANAGEMENT:
+    kyc_risk_rating: HIGH
+    requires_kyc: true
+    kyc_context: CUSTODY
+    description: "Collateral management and optimization"
+
+# Risk rating definitions
+risk_ratings:
+  HIGH:
+    description: "High risk - full KYC always required"
+    base_risk_score: 3
+    default_review_frequency_months: 12
+    requires_senior_approval: true
+
+  MEDIUM:
+    description: "Medium risk - standard KYC, regulatory reliance possible"
+    base_risk_score: 2
+    default_review_frequency_months: 24
+    requires_senior_approval: false
+
+  LOW:
+    description: "Low risk - simplified procedures may apply"
+    base_risk_score: 1
+    default_review_frequency_months: 36
+    requires_senior_approval: false
+
+# Service contexts and their implications
+service_contexts:
+  CUSTODY:
+    description: "Custody and related services"
+    primary_kyc_obligation: "on_client"
+    investor_kyc_required: false
+
+  TRANSFER_AGENT:
+    description: "Transfer agency services"
+    primary_kyc_obligation: "on_fund"
+    investor_kyc_required: true
+    investor_kyc_on_behalf_of: "fund"
+
+  BROKER_DEALER:
+    description: "Broker-dealer services"
+    primary_kyc_obligation: "on_client"
+    investor_kyc_required: false
+
+  KYC_AS_A_SERVICE:
+    description: "Outsourced KYC services"
+    primary_kyc_obligation: "on_subject"
+    sponsor_required: true
+    sponsor_decision_required: true

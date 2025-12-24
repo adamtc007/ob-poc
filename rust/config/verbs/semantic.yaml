@@ -37,7 +37,7 @@ domains:
               primary_key: cbu_id
               resolution_mode: entity
         returns:
-          type: semantic_state
+          type: record
           capture: true
           description: "Full semantic state including stages, progress, and next actions"
 
@@ -52,7 +52,7 @@ domains:
           handler: SemanticListStagesOp
         args: []
         returns:
-          type: stage_list
+          type: record_set
           capture: true
           description: "All stage definitions in dependency order"
 
@@ -74,7 +74,7 @@ domains:
               primary_key: product_code
               resolution_mode: reference
         returns:
-          type: stage_list
+          type: record_set
           capture: true
           description: "Stages required for this product"
 
@@ -100,7 +100,7 @@ domains:
               primary_key: cbu_id
               resolution_mode: entity
         returns:
-          type: action_list
+          type: record_set
           capture: true
           description: "List of actionable stages with suggested verbs"
 
@@ -126,7 +126,7 @@ domains:
             required: false
             description: "Specific stage to check (omit for all stages)"
         returns:
-          type: missing_entity_list
+          type: record_set
           capture: true
           description: "List of missing entities with suggestions for creation"
 

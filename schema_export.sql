@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict QWasXxgQBbcdLeMg0aGV0mTaeMgiEJpaeWJPhGRGN63YydxMK0pSwSOP438c1IZ
+\restrict 22jlzLbJ2qcooDwvhX34xahZUvCPKfv0ScrJe0oKBMmXKpK4F1yuFP62f2NCkMo
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -38,6 +38,20 @@ CREATE SCHEMA kyc;
 --
 
 CREATE SCHEMA "ob-poc";
+
+
+--
+-- Name: ob_kyc; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA ob_kyc;
+
+
+--
+-- Name: ob_ref; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA ob_ref;
 
 
 --
@@ -1730,6 +1744,28 @@ $$;
 
 
 --
+-- Name: entity_allows_simplified_dd(uuid); Type: FUNCTION; Schema: ob_kyc; Owner: -
+--
+
+CREATE FUNCTION ob_kyc.entity_allows_simplified_dd(p_entity_id uuid) RETURNS boolean
+    LANGUAGE plpgsql STABLE
+    AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1
+        FROM ob_kyc.entity_regulatory_registrations r
+        JOIN ob_ref.regulators reg ON r.regulator_code = reg.regulator_code
+        JOIN ob_ref.regulatory_tiers rt ON reg.regulatory_tier = rt.tier_code
+        WHERE r.entity_id = p_entity_id
+          AND r.status = 'ACTIVE'
+          AND r.registration_verified = TRUE
+          AND rt.allows_simplified_dd = TRUE
+    );
+END;
+$$;
+
+
+--
 -- Name: ensure_entity_exists(character varying, character varying, character varying); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -2447,6 +2483,11 @@ CREATE TABLE kyc.cases (
     case_type character varying(30) DEFAULT 'NEW_CLIENT'::character varying,
     notes text,
     updated_at timestamp with time zone DEFAULT now(),
+    service_context character varying(50),
+    sponsor_cbu_id uuid,
+    service_agreement_id uuid,
+    kyc_standard character varying(50),
+    subject_entity_id uuid,
     CONSTRAINT chk_case_status CHECK (((status)::text = ANY ((ARRAY['INTAKE'::character varying, 'DISCOVERY'::character varying, 'ASSESSMENT'::character varying, 'REVIEW'::character varying, 'APPROVED'::character varying, 'REJECTED'::character varying, 'BLOCKED'::character varying, 'WITHDRAWN'::character varying, 'EXPIRED'::character varying, 'REFER_TO_REGULATOR'::character varying, 'DO_NOT_ONBOARD'::character varying])::text[]))),
     CONSTRAINT chk_case_type CHECK (((case_type)::text = ANY ((ARRAY['NEW_CLIENT'::character varying, 'PERIODIC_REVIEW'::character varying, 'EVENT_DRIVEN'::character varying, 'REMEDIATION'::character varying])::text[]))),
     CONSTRAINT chk_escalation_level CHECK (((escalation_level)::text = ANY ((ARRAY['STANDARD'::character varying, 'SENIOR_COMPLIANCE'::character varying, 'EXECUTIVE'::character varying, 'BOARD'::character varying])::text[]))),
@@ -3548,6 +3589,17 @@ COMMENT ON COLUMN "ob-poc".cbu_resource_instances.instance_url IS 'Unique URL/en
 
 
 --
+-- Name: cbu_service_contexts; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".cbu_service_contexts (
+    cbu_id uuid NOT NULL,
+    service_context character varying(50) NOT NULL,
+    effective_date date DEFAULT CURRENT_DATE
+);
+
+
+--
 -- Name: cbu_sla_commitments; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -3661,6 +3713,7 @@ CREATE TABLE "ob-poc".cbus (
     cbu_category character varying(50),
     product_id uuid,
     status character varying(30) DEFAULT 'DISCOVERED'::character varying,
+    kyc_scope_template character varying(50),
     CONSTRAINT chk_cbu_category CHECK (((cbu_category IS NULL) OR ((cbu_category)::text = ANY ((ARRAY['FUND_MANDATE'::character varying, 'CORPORATE_GROUP'::character varying, 'INSTITUTIONAL_ACCOUNT'::character varying, 'RETAIL_CLIENT'::character varying, 'FAMILY_TRUST'::character varying, 'CORRESPONDENT_BANK'::character varying, 'INTERNAL_TEST'::character varying])::text[])))),
     CONSTRAINT chk_cbu_status CHECK (((status)::text = ANY ((ARRAY['DISCOVERED'::character varying, 'VALIDATION_PENDING'::character varying, 'VALIDATED'::character varying, 'UPDATE_PENDING_PROOF'::character varying, 'VALIDATION_FAILED'::character varying])::text[])))
 );
@@ -4643,6 +4696,26 @@ CREATE TABLE "ob-poc".entity_proper_persons (
 
 
 --
+-- Name: entity_regulatory_profiles; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".entity_regulatory_profiles (
+    entity_id uuid NOT NULL,
+    is_regulated boolean DEFAULT false,
+    regulator_code character varying(20),
+    registration_number character varying(100),
+    registration_verified boolean DEFAULT false,
+    verification_date date,
+    verification_method character varying(50),
+    verification_reference character varying(500),
+    regulatory_tier character varying(20) DEFAULT 'NONE'::character varying,
+    next_verification_due date,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
 -- Name: entity_relationships_current; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
@@ -4884,6 +4957,27 @@ CREATE TABLE "ob-poc".fund_investments (
 
 
 --
+-- Name: fund_investors; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".fund_investors (
+    investor_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    fund_cbu_id uuid NOT NULL,
+    investor_entity_id uuid NOT NULL,
+    investor_type character varying(50) NOT NULL,
+    investment_amount numeric(20,2),
+    currency character varying(3) DEFAULT 'EUR'::character varying,
+    subscription_date date,
+    kyc_tier character varying(50),
+    kyc_status character varying(50) DEFAULT 'PENDING'::character varying,
+    kyc_case_id uuid,
+    last_kyc_date date,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
 -- Name: fund_structure; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -4969,6 +5063,27 @@ CREATE VIEW "ob-poc".jurisdictions AS
 
 
 --
+-- Name: kyc_case_sponsor_decisions; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".kyc_case_sponsor_decisions (
+    decision_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    case_id uuid NOT NULL,
+    our_recommendation character varying(50),
+    our_recommendation_date timestamp with time zone,
+    our_recommendation_by uuid,
+    our_findings jsonb,
+    sponsor_decision character varying(50),
+    sponsor_decision_date timestamp with time zone,
+    sponsor_decision_by character varying(255),
+    sponsor_comments text,
+    final_status character varying(50),
+    effective_date date,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
 -- Name: kyc_decisions; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -4995,6 +5110,27 @@ CREATE TABLE "ob-poc".kyc_decisions (
 --
 
 COMMENT ON TABLE "ob-poc".kyc_decisions IS 'Final KYC decisions with complete evaluation snapshot';
+
+
+--
+-- Name: kyc_service_agreements; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".kyc_service_agreements (
+    agreement_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    sponsor_cbu_id uuid NOT NULL,
+    sponsor_entity_id uuid,
+    agreement_reference character varying(100),
+    effective_date date NOT NULL,
+    termination_date date,
+    kyc_standard character varying(50) DEFAULT 'BNY_STANDARD'::character varying NOT NULL,
+    auto_accept_threshold character varying(50),
+    sponsor_review_required boolean DEFAULT true,
+    target_turnaround_days integer DEFAULT 5,
+    status character varying(50) DEFAULT 'ACTIVE'::character varying,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
 
 
 --
@@ -5296,7 +5432,10 @@ CREATE TABLE "ob-poc".products (
     regulatory_framework character varying(100),
     min_asset_requirement numeric(20,2),
     is_active boolean DEFAULT true,
-    metadata jsonb
+    metadata jsonb,
+    kyc_risk_rating character varying(20),
+    kyc_context character varying(50),
+    requires_kyc boolean DEFAULT true
 );
 
 
@@ -5365,6 +5504,35 @@ CREATE TABLE "ob-poc".redflag_score_config (
 --
 
 COMMENT ON TABLE "ob-poc".redflag_score_config IS 'Red-flag severity weights for score calculation';
+
+
+--
+-- Name: regulators; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".regulators (
+    regulator_code character varying(20) NOT NULL,
+    name character varying(255) NOT NULL,
+    jurisdiction character varying(10) NOT NULL,
+    tier character varying(20) DEFAULT 'NONE'::character varying NOT NULL,
+    registry_url character varying(500),
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: regulatory_tiers; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".regulatory_tiers (
+    tier_code character varying(20) NOT NULL,
+    description text,
+    allows_simplified_dd boolean DEFAULT false,
+    requires_enhanced_screening boolean DEFAULT false,
+    reliance_level character varying(20) DEFAULT 'none'::character varying,
+    created_at timestamp with time zone DEFAULT now()
+);
 
 
 --
@@ -5517,6 +5685,25 @@ CREATE TABLE "ob-poc".risk_ratings (
     severity_level integer DEFAULT 0,
     is_active boolean DEFAULT true,
     display_order integer DEFAULT 0
+);
+
+
+--
+-- Name: role_types; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".role_types (
+    role_code character varying(50) NOT NULL,
+    name character varying(100) NOT NULL,
+    description text,
+    triggers_full_kyc boolean DEFAULT false,
+    triggers_screening boolean DEFAULT false,
+    triggers_id_verification boolean DEFAULT false,
+    check_regulatory_status boolean DEFAULT false,
+    if_regulated_obligation character varying(50),
+    cascade_to_entity_ubos boolean DEFAULT false,
+    threshold_based boolean DEFAULT false,
+    created_at timestamp with time zone DEFAULT now()
 );
 
 
@@ -6576,6 +6763,41 @@ CREATE VIEW "ob-poc".v_cbu_investor_groups AS
 
 
 --
+-- Name: v_cbu_kyc_scope; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_cbu_kyc_scope AS
+ SELECT c.cbu_id,
+    c.name AS cbu_name,
+    c.client_type,
+    c.kyc_scope_template,
+    cer.entity_id,
+    e.name AS entity_name,
+    et.name AS entity_type,
+    ro.name AS role_name,
+    ro.role_id,
+    rtypes.role_code,
+    rtypes.triggers_full_kyc,
+    rtypes.triggers_screening,
+    rtypes.triggers_id_verification,
+    rtypes.check_regulatory_status,
+    rtypes.if_regulated_obligation,
+    COALESCE(erp.is_regulated, false) AS is_regulated,
+    erp.regulator_code,
+    erp.registration_verified,
+    erp.regulatory_tier,
+    COALESCE(regtier.allows_simplified_dd, false) AS allows_simplified_dd
+   FROM ((((((("ob-poc".cbus c
+     JOIN "ob-poc".cbu_entity_roles cer ON ((c.cbu_id = cer.cbu_id)))
+     JOIN "ob-poc".entities e ON ((cer.entity_id = e.entity_id)))
+     JOIN "ob-poc".entity_types et ON ((e.entity_type_id = et.entity_type_id)))
+     JOIN "ob-poc".roles ro ON ((cer.role_id = ro.role_id)))
+     LEFT JOIN "ob-poc".role_types rtypes ON ((upper((ro.name)::text) = (rtypes.role_code)::text)))
+     LEFT JOIN "ob-poc".entity_regulatory_profiles erp ON ((e.entity_id = erp.entity_id)))
+     LEFT JOIN "ob-poc".regulatory_tiers regtier ON (((erp.regulatory_tier)::text = (regtier.tier_code)::text)));
+
+
+--
 -- Name: v_cbu_kyc_summary; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
@@ -7122,6 +7344,29 @@ CREATE VIEW "ob-poc".v_document_extraction_map AS
 
 
 --
+-- Name: v_entity_regulatory_status; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_entity_regulatory_status AS
+ SELECT e.entity_id,
+    e.name AS entity_name,
+    et.name AS entity_type,
+    COALESCE(erp.is_regulated, false) AS is_regulated,
+    erp.regulator_code,
+    r.name AS regulator_name,
+    erp.registration_number,
+    erp.registration_verified,
+    erp.regulatory_tier,
+    rt.allows_simplified_dd,
+    rt.requires_enhanced_screening
+   FROM (((("ob-poc".entities e
+     JOIN "ob-poc".entity_types et ON ((e.entity_type_id = et.entity_type_id)))
+     LEFT JOIN "ob-poc".entity_regulatory_profiles erp ON ((e.entity_id = erp.entity_id)))
+     LEFT JOIN "ob-poc".regulators r ON (((erp.regulator_code)::text = (r.regulator_code)::text)))
+     LEFT JOIN "ob-poc".regulatory_tiers rt ON (((erp.regulatory_tier)::text = (rt.tier_code)::text)));
+
+
+--
 -- Name: v_open_discrepancies; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
@@ -7454,6 +7699,119 @@ CREATE TABLE "ob-poc".workstream_statuses (
     is_terminal boolean DEFAULT false,
     is_active boolean DEFAULT true,
     display_order integer DEFAULT 0
+);
+
+
+--
+-- Name: entity_regulatory_registrations; Type: TABLE; Schema: ob_kyc; Owner: -
+--
+
+CREATE TABLE ob_kyc.entity_regulatory_registrations (
+    registration_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    entity_id uuid NOT NULL,
+    regulator_code character varying(50) NOT NULL,
+    registration_number character varying(100),
+    registration_type character varying(50) NOT NULL,
+    activity_scope text,
+    home_regulator_code character varying(50),
+    passport_reference character varying(100),
+    registration_verified boolean DEFAULT false,
+    verification_date date,
+    verification_method character varying(50),
+    verification_reference character varying(500),
+    verification_expires date,
+    status character varying(50) DEFAULT 'ACTIVE'::character varying,
+    effective_date date DEFAULT CURRENT_DATE,
+    expiry_date date,
+    created_at timestamp without time zone DEFAULT now(),
+    updated_at timestamp without time zone DEFAULT now(),
+    created_by uuid,
+    updated_by uuid
+);
+
+
+--
+-- Name: regulators; Type: TABLE; Schema: ob_ref; Owner: -
+--
+
+CREATE TABLE ob_ref.regulators (
+    regulator_code character varying(50) NOT NULL,
+    regulator_name character varying(255) NOT NULL,
+    jurisdiction character varying(2) NOT NULL,
+    regulatory_tier character varying(50) NOT NULL,
+    regulator_type character varying(50) DEFAULT 'GOVERNMENT'::character varying,
+    registry_url character varying(500),
+    active boolean DEFAULT true,
+    created_at timestamp without time zone DEFAULT now(),
+    updated_at timestamp without time zone DEFAULT now()
+);
+
+
+--
+-- Name: regulatory_tiers; Type: TABLE; Schema: ob_ref; Owner: -
+--
+
+CREATE TABLE ob_ref.regulatory_tiers (
+    tier_code character varying(50) NOT NULL,
+    description character varying(255) NOT NULL,
+    allows_simplified_dd boolean DEFAULT false,
+    requires_enhanced_screening boolean DEFAULT false
+);
+
+
+--
+-- Name: v_entity_regulatory_summary; Type: VIEW; Schema: ob_kyc; Owner: -
+--
+
+CREATE VIEW ob_kyc.v_entity_regulatory_summary AS
+ SELECT e.entity_id,
+    e.name AS entity_name,
+    count(r.registration_id) AS registration_count,
+    count(r.registration_id) FILTER (WHERE (r.registration_verified AND ((r.status)::text = 'ACTIVE'::text))) AS verified_count,
+    bool_or((r.registration_verified AND ((r.status)::text = 'ACTIVE'::text) AND rt.allows_simplified_dd)) AS allows_simplified_dd,
+    array_agg(DISTINCT r.regulator_code) FILTER (WHERE ((r.status)::text = 'ACTIVE'::text)) AS active_regulators,
+    array_agg(DISTINCT r.regulator_code) FILTER (WHERE (r.registration_verified AND ((r.status)::text = 'ACTIVE'::text))) AS verified_regulators,
+    max(r.verification_date) AS last_verified,
+    min(r.verification_expires) FILTER (WHERE (r.verification_expires > CURRENT_DATE)) AS next_expiry
+   FROM ((("ob-poc".entities e
+     LEFT JOIN ob_kyc.entity_regulatory_registrations r ON ((e.entity_id = r.entity_id)))
+     LEFT JOIN ob_ref.regulators reg ON (((r.regulator_code)::text = (reg.regulator_code)::text)))
+     LEFT JOIN ob_ref.regulatory_tiers rt ON (((reg.regulatory_tier)::text = (rt.tier_code)::text)))
+  GROUP BY e.entity_id, e.name;
+
+
+--
+-- Name: registration_types; Type: TABLE; Schema: ob_ref; Owner: -
+--
+
+CREATE TABLE ob_ref.registration_types (
+    registration_type character varying(50) NOT NULL,
+    description character varying(255) NOT NULL,
+    is_primary boolean DEFAULT false,
+    allows_reliance boolean DEFAULT true
+);
+
+
+--
+-- Name: role_types; Type: TABLE; Schema: ob_ref; Owner: -
+--
+
+CREATE TABLE ob_ref.role_types (
+    role_type_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    code character varying(50) NOT NULL,
+    name character varying(255) NOT NULL,
+    description text,
+    category character varying(50),
+    triggers_full_kyc boolean DEFAULT false,
+    triggers_screening boolean DEFAULT false,
+    triggers_id_verification boolean DEFAULT false,
+    check_regulatory_status boolean DEFAULT false,
+    if_regulated_obligation character varying(50),
+    cascade_to_entity_ubos boolean DEFAULT false,
+    threshold_based boolean DEFAULT false,
+    active boolean DEFAULT true,
+    created_at timestamp without time zone DEFAULT now(),
+    updated_at timestamp without time zone DEFAULT now()
 );
 
 
@@ -8493,6 +8851,14 @@ ALTER TABLE ONLY "ob-poc".cbu_resource_instances
 
 
 --
+-- Name: cbu_service_contexts cbu_service_contexts_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_service_contexts
+    ADD CONSTRAINT cbu_service_contexts_pkey PRIMARY KEY (cbu_id, service_context);
+
+
+--
 -- Name: cbu_sla_commitments cbu_sla_commitments_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -8877,6 +9243,14 @@ ALTER TABLE ONLY "ob-poc".entity_proper_persons
 
 
 --
+-- Name: entity_regulatory_profiles entity_regulatory_profiles_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_regulatory_profiles
+    ADD CONSTRAINT entity_regulatory_profiles_pkey PRIMARY KEY (entity_id);
+
+
+--
 -- Name: entity_relationships entity_relationships_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -8965,6 +9339,14 @@ ALTER TABLE ONLY "ob-poc".fund_investments
 
 
 --
+-- Name: fund_investors fund_investors_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".fund_investors
+    ADD CONSTRAINT fund_investors_pkey PRIMARY KEY (investor_id);
+
+
+--
 -- Name: fund_structure fund_structure_parent_entity_id_child_entity_id_relationshi_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -8997,11 +9379,27 @@ ALTER TABLE ONLY "ob-poc".instrument_lifecycles
 
 
 --
+-- Name: kyc_case_sponsor_decisions kyc_case_sponsor_decisions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".kyc_case_sponsor_decisions
+    ADD CONSTRAINT kyc_case_sponsor_decisions_pkey PRIMARY KEY (decision_id);
+
+
+--
 -- Name: kyc_decisions kyc_decisions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
 ALTER TABLE ONLY "ob-poc".kyc_decisions
     ADD CONSTRAINT kyc_decisions_pkey PRIMARY KEY (decision_id);
+
+
+--
+-- Name: kyc_service_agreements kyc_service_agreements_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".kyc_service_agreements
+    ADD CONSTRAINT kyc_service_agreements_pkey PRIMARY KEY (agreement_id);
 
 
 --
@@ -9205,6 +9603,22 @@ ALTER TABLE ONLY "ob-poc".redflag_score_config
 
 
 --
+-- Name: regulators regulators_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".regulators
+    ADD CONSTRAINT regulators_pkey PRIMARY KEY (regulator_code);
+
+
+--
+-- Name: regulatory_tiers regulatory_tiers_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".regulatory_tiers
+    ADD CONSTRAINT regulatory_tiers_pkey PRIMARY KEY (tier_code);
+
+
+--
 -- Name: requirement_acceptable_docs requirement_acceptable_docs_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -9290,6 +9704,14 @@ ALTER TABLE ONLY "ob-poc".risk_bands
 
 ALTER TABLE ONLY "ob-poc".risk_ratings
     ADD CONSTRAINT risk_ratings_pkey PRIMARY KEY (code);
+
+
+--
+-- Name: role_types role_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".role_types
+    ADD CONSTRAINT role_types_pkey PRIMARY KEY (role_code);
 
 
 --
@@ -9645,6 +10067,14 @@ ALTER TABLE ONLY "ob-poc".document_attribute_links
 
 
 --
+-- Name: fund_investors uq_fund_investor; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".fund_investors
+    ADD CONSTRAINT uq_fund_investor UNIQUE (fund_cbu_id, investor_entity_id);
+
+
+--
 -- Name: redflag_score_config uq_redflag_severity; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -9714,6 +10144,62 @@ ALTER TABLE ONLY "ob-poc".workflow_instances
 
 ALTER TABLE ONLY "ob-poc".workstream_statuses
     ADD CONSTRAINT workstream_statuses_pkey PRIMARY KEY (code);
+
+
+--
+-- Name: entity_regulatory_registrations entity_regulatory_registrations_pkey; Type: CONSTRAINT; Schema: ob_kyc; Owner: -
+--
+
+ALTER TABLE ONLY ob_kyc.entity_regulatory_registrations
+    ADD CONSTRAINT entity_regulatory_registrations_pkey PRIMARY KEY (registration_id);
+
+
+--
+-- Name: entity_regulatory_registrations uq_entity_regulator; Type: CONSTRAINT; Schema: ob_kyc; Owner: -
+--
+
+ALTER TABLE ONLY ob_kyc.entity_regulatory_registrations
+    ADD CONSTRAINT uq_entity_regulator UNIQUE (entity_id, regulator_code);
+
+
+--
+-- Name: registration_types registration_types_pkey; Type: CONSTRAINT; Schema: ob_ref; Owner: -
+--
+
+ALTER TABLE ONLY ob_ref.registration_types
+    ADD CONSTRAINT registration_types_pkey PRIMARY KEY (registration_type);
+
+
+--
+-- Name: regulators regulators_pkey; Type: CONSTRAINT; Schema: ob_ref; Owner: -
+--
+
+ALTER TABLE ONLY ob_ref.regulators
+    ADD CONSTRAINT regulators_pkey PRIMARY KEY (regulator_code);
+
+
+--
+-- Name: regulatory_tiers regulatory_tiers_pkey; Type: CONSTRAINT; Schema: ob_ref; Owner: -
+--
+
+ALTER TABLE ONLY ob_ref.regulatory_tiers
+    ADD CONSTRAINT regulatory_tiers_pkey PRIMARY KEY (tier_code);
+
+
+--
+-- Name: role_types role_types_code_key; Type: CONSTRAINT; Schema: ob_ref; Owner: -
+--
+
+ALTER TABLE ONLY ob_ref.role_types
+    ADD CONSTRAINT role_types_code_key UNIQUE (code);
+
+
+--
+-- Name: role_types role_types_pkey; Type: CONSTRAINT; Schema: ob_ref; Owner: -
+--
+
+ALTER TABLE ONLY ob_ref.role_types
+    ADD CONSTRAINT role_types_pkey PRIMARY KEY (role_type_id);
 
 
 --
@@ -11241,6 +11727,20 @@ CREATE INDEX idx_entity_funds_parent ON "ob-poc".entity_funds USING btree (paren
 
 
 --
+-- Name: idx_entity_reg_profile_regulated; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_reg_profile_regulated ON "ob-poc".entity_regulatory_profiles USING btree (is_regulated);
+
+
+--
+-- Name: idx_entity_reg_profile_regulator; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_reg_profile_regulator ON "ob-poc".entity_regulatory_profiles USING btree (regulator_code);
+
+
+--
 -- Name: idx_entity_rel_from; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -11367,6 +11867,27 @@ CREATE INDEX idx_fund_investments_investor ON "ob-poc".fund_investments USING bt
 
 
 --
+-- Name: idx_fund_investor_entity; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_fund_investor_entity ON "ob-poc".fund_investors USING btree (investor_entity_id);
+
+
+--
+-- Name: idx_fund_investor_fund; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_fund_investor_fund ON "ob-poc".fund_investors USING btree (fund_cbu_id);
+
+
+--
+-- Name: idx_fund_investor_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_fund_investor_status ON "ob-poc".fund_investors USING btree (kyc_status);
+
+
+--
 -- Name: idx_fund_structure_child; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -11441,6 +11962,13 @@ CREATE INDEX idx_instrument_lifecycles_class ON "ob-poc".instrument_lifecycles U
 --
 
 CREATE INDEX idx_instrument_lifecycles_lifecycle ON "ob-poc".instrument_lifecycles USING btree (lifecycle_id);
+
+
+--
+-- Name: idx_kyc_agreement_sponsor; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_kyc_agreement_sponsor ON "ob-poc".kyc_service_agreements USING btree (sponsor_cbu_id);
 
 
 --
@@ -12025,6 +12553,13 @@ CREATE INDEX idx_sla_meas_period ON "ob-poc".sla_measurements USING btree (perio
 
 
 --
+-- Name: idx_sponsor_decision_case; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_sponsor_decision_case ON "ob-poc".kyc_case_sponsor_decisions USING btree (case_id);
+
+
+--
 -- Name: idx_taxonomy_crud_entity; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -12344,6 +12879,76 @@ CREATE INDEX idx_workflow_subject ON "ob-poc".workflow_instances USING btree (su
 --
 
 CREATE INDEX idx_workflow_updated ON "ob-poc".workflow_instances USING btree (updated_at DESC);
+
+
+--
+-- Name: idx_ereg_entity; Type: INDEX; Schema: ob_kyc; Owner: -
+--
+
+CREATE INDEX idx_ereg_entity ON ob_kyc.entity_regulatory_registrations USING btree (entity_id);
+
+
+--
+-- Name: idx_ereg_expires; Type: INDEX; Schema: ob_kyc; Owner: -
+--
+
+CREATE INDEX idx_ereg_expires ON ob_kyc.entity_regulatory_registrations USING btree (verification_expires);
+
+
+--
+-- Name: idx_ereg_regulator; Type: INDEX; Schema: ob_kyc; Owner: -
+--
+
+CREATE INDEX idx_ereg_regulator ON ob_kyc.entity_regulatory_registrations USING btree (regulator_code);
+
+
+--
+-- Name: idx_ereg_status; Type: INDEX; Schema: ob_kyc; Owner: -
+--
+
+CREATE INDEX idx_ereg_status ON ob_kyc.entity_regulatory_registrations USING btree (status);
+
+
+--
+-- Name: idx_ereg_type; Type: INDEX; Schema: ob_kyc; Owner: -
+--
+
+CREATE INDEX idx_ereg_type ON ob_kyc.entity_regulatory_registrations USING btree (registration_type);
+
+
+--
+-- Name: idx_ereg_verified; Type: INDEX; Schema: ob_kyc; Owner: -
+--
+
+CREATE INDEX idx_ereg_verified ON ob_kyc.entity_regulatory_registrations USING btree (registration_verified);
+
+
+--
+-- Name: idx_ob_ref_regulators_jurisdiction; Type: INDEX; Schema: ob_ref; Owner: -
+--
+
+CREATE INDEX idx_ob_ref_regulators_jurisdiction ON ob_ref.regulators USING btree (jurisdiction);
+
+
+--
+-- Name: idx_ob_ref_regulators_tier; Type: INDEX; Schema: ob_ref; Owner: -
+--
+
+CREATE INDEX idx_ob_ref_regulators_tier ON ob_ref.regulators USING btree (regulatory_tier);
+
+
+--
+-- Name: idx_ob_ref_role_types_category; Type: INDEX; Schema: ob_ref; Owner: -
+--
+
+CREATE INDEX idx_ob_ref_role_types_category ON ob_ref.role_types USING btree (category);
+
+
+--
+-- Name: idx_ob_ref_role_types_code; Type: INDEX; Schema: ob_ref; Owner: -
+--
+
+CREATE INDEX idx_ob_ref_role_types_code ON ob_ref.role_types USING btree (code);
 
 
 --
@@ -13020,6 +13625,30 @@ ALTER TABLE ONLY kyc.cases
 
 
 --
+-- Name: cases cases_service_agreement_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.cases
+    ADD CONSTRAINT cases_service_agreement_id_fkey FOREIGN KEY (service_agreement_id) REFERENCES "ob-poc".kyc_service_agreements(agreement_id);
+
+
+--
+-- Name: cases cases_sponsor_cbu_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.cases
+    ADD CONSTRAINT cases_sponsor_cbu_id_fkey FOREIGN KEY (sponsor_cbu_id) REFERENCES "ob-poc".cbus(cbu_id);
+
+
+--
+-- Name: cases cases_subject_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.cases
+    ADD CONSTRAINT cases_subject_entity_id_fkey FOREIGN KEY (subject_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
 -- Name: doc_request_acceptable_types doc_request_acceptable_types_document_type_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
 --
 
@@ -13428,6 +14057,14 @@ ALTER TABLE ONLY "ob-poc".cbu_resource_instances
 
 
 --
+-- Name: cbu_service_contexts cbu_service_contexts_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_service_contexts
+    ADD CONSTRAINT cbu_service_contexts_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
 -- Name: cbu_sla_commitments cbu_sla_commitments_bound_resource_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -13812,6 +14449,30 @@ ALTER TABLE ONLY "ob-poc".entity_proper_persons
 
 
 --
+-- Name: entity_regulatory_profiles entity_regulatory_profiles_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_regulatory_profiles
+    ADD CONSTRAINT entity_regulatory_profiles_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
+
+
+--
+-- Name: entity_regulatory_profiles entity_regulatory_profiles_regulator_code_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_regulatory_profiles
+    ADD CONSTRAINT entity_regulatory_profiles_regulator_code_fkey FOREIGN KEY (regulator_code) REFERENCES "ob-poc".regulators(regulator_code);
+
+
+--
+-- Name: entity_regulatory_profiles entity_regulatory_profiles_regulatory_tier_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_regulatory_profiles
+    ADD CONSTRAINT entity_regulatory_profiles_regulatory_tier_fkey FOREIGN KEY (regulatory_tier) REFERENCES "ob-poc".regulatory_tiers(tier_code);
+
+
+--
 -- Name: entity_relationships entity_relationships_from_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -13988,6 +14649,30 @@ ALTER TABLE ONLY "ob-poc".fund_investments
 
 
 --
+-- Name: fund_investors fund_investors_fund_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".fund_investors
+    ADD CONSTRAINT fund_investors_fund_cbu_id_fkey FOREIGN KEY (fund_cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
+-- Name: fund_investors fund_investors_investor_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".fund_investors
+    ADD CONSTRAINT fund_investors_investor_entity_id_fkey FOREIGN KEY (investor_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: fund_investors fund_investors_kyc_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".fund_investors
+    ADD CONSTRAINT fund_investors_kyc_case_id_fkey FOREIGN KEY (kyc_case_id) REFERENCES kyc.cases(case_id);
+
+
+--
 -- Name: fund_structure fund_structure_child_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -14012,6 +14697,14 @@ ALTER TABLE ONLY "ob-poc".instrument_lifecycles
 
 
 --
+-- Name: kyc_case_sponsor_decisions kyc_case_sponsor_decisions_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".kyc_case_sponsor_decisions
+    ADD CONSTRAINT kyc_case_sponsor_decisions_case_id_fkey FOREIGN KEY (case_id) REFERENCES kyc.cases(case_id) ON DELETE CASCADE;
+
+
+--
 -- Name: kyc_decisions kyc_decisions_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -14025,6 +14718,22 @@ ALTER TABLE ONLY "ob-poc".kyc_decisions
 
 ALTER TABLE ONLY "ob-poc".kyc_decisions
     ADD CONSTRAINT kyc_decisions_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
+-- Name: kyc_service_agreements kyc_service_agreements_sponsor_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".kyc_service_agreements
+    ADD CONSTRAINT kyc_service_agreements_sponsor_cbu_id_fkey FOREIGN KEY (sponsor_cbu_id) REFERENCES "ob-poc".cbus(cbu_id);
+
+
+--
+-- Name: kyc_service_agreements kyc_service_agreements_sponsor_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".kyc_service_agreements
+    ADD CONSTRAINT kyc_service_agreements_sponsor_entity_id_fkey FOREIGN KEY (sponsor_entity_id) REFERENCES "ob-poc".entities(entity_id);
 
 
 --
@@ -14652,6 +15361,46 @@ ALTER TABLE ONLY "ob-poc".workflow_audit_log
 
 
 --
+-- Name: entity_regulatory_registrations entity_regulatory_registrations_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob_kyc; Owner: -
+--
+
+ALTER TABLE ONLY ob_kyc.entity_regulatory_registrations
+    ADD CONSTRAINT entity_regulatory_registrations_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
+
+
+--
+-- Name: entity_regulatory_registrations entity_regulatory_registrations_home_regulator_code_fkey; Type: FK CONSTRAINT; Schema: ob_kyc; Owner: -
+--
+
+ALTER TABLE ONLY ob_kyc.entity_regulatory_registrations
+    ADD CONSTRAINT entity_regulatory_registrations_home_regulator_code_fkey FOREIGN KEY (home_regulator_code) REFERENCES ob_ref.regulators(regulator_code);
+
+
+--
+-- Name: entity_regulatory_registrations entity_regulatory_registrations_registration_type_fkey; Type: FK CONSTRAINT; Schema: ob_kyc; Owner: -
+--
+
+ALTER TABLE ONLY ob_kyc.entity_regulatory_registrations
+    ADD CONSTRAINT entity_regulatory_registrations_registration_type_fkey FOREIGN KEY (registration_type) REFERENCES ob_ref.registration_types(registration_type);
+
+
+--
+-- Name: entity_regulatory_registrations entity_regulatory_registrations_regulator_code_fkey; Type: FK CONSTRAINT; Schema: ob_kyc; Owner: -
+--
+
+ALTER TABLE ONLY ob_kyc.entity_regulatory_registrations
+    ADD CONSTRAINT entity_regulatory_registrations_regulator_code_fkey FOREIGN KEY (regulator_code) REFERENCES ob_ref.regulators(regulator_code);
+
+
+--
+-- Name: regulators regulators_regulatory_tier_fkey; Type: FK CONSTRAINT; Schema: ob_ref; Owner: -
+--
+
+ALTER TABLE ONLY ob_ref.regulators
+    ADD CONSTRAINT regulators_regulatory_tier_fkey FOREIGN KEY (regulatory_tier) REFERENCES ob_ref.regulatory_tiers(tier_code);
+
+
+--
 -- Name: business_attributes business_attributes_domain_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -14727,5 +15476,5 @@ ALTER TABLE ONLY public.rules
 -- PostgreSQL database dump complete
 --
 
-\unrestrict QWasXxgQBbcdLeMg0aGV0mTaeMgiEJpaeWJPhGRGN63YydxMK0pSwSOP438c1IZ
+\unrestrict 22jlzLbJ2qcooDwvhX34xahZUvCPKfv0ScrJe0oKBMmXKpK4F1yuFP62f2NCkMo
 
