@@ -21,6 +21,7 @@ docs/runbook/
 ├── 03-individual-onboarding.md  # Runbook: Individual client
 ├── 04-corporate-onboarding.md   # Runbook: Corporate with UBO
 ├── 05-kyc-workflow.md           # Runbook: KYC case lifecycle
+├── 05a-kyc-async-requests.md    # Runbook: Fire-and-forget document requests
 ├── 06-product-subscription.md   # Runbook: Adding products
 ├── 07-trading-setup.md          # Runbook: Trading profile & SSIs
 ├── 08-auto-onboarding.md        # Runbook: Auto-complete feature
@@ -567,6 +568,240 @@ If a step fails, previously created entities remain. Use dry-run first.
 
 ### Sequential Execution
 Steps run one at a time. A future enhancement could parallelize independent stages.
+```
+
+### 05a-kyc-async-requests.md (RUNBOOK)
+
+```markdown
+# Runbook: Fire-and-Forget Document Requests
+
+## Overview
+The async request system uses a **fire-and-forget** pattern for document collection.
+Instead of blocking workflows, you create requests that are tracked independently
+and can be checked via case state queries.
+
+## Key Concept: Domain Coherence
+Requests are **embedded in their parent workstreams**, not returned as flat lists.
+When you query case state, each workstream shows its `awaiting` requests inline:
+
+```json
+{
+  "case_status": "DISCOVERY",
+  "workstreams": [
+    {
+      "entity_name": "John Smith",
+      "status": "COLLECT",
+      "awaiting": [
+        {"type": "PASSPORT", "due": "2024-02-01", "overdue": false},
+        {"type": "ADDRESS_PROOF", "due": "2024-01-15", "overdue": true}
+      ]
+    }
+  ]
+}
+```
+
+## Request Types
+
+| Type | Description | Typical Due Period |
+|------|-------------|-------------------|
+| `PASSPORT` | Identity document | 5 days |
+| `ADDRESS_PROOF` | Utility bill, bank statement | 5 days |
+| `CERT_OF_INC` | Certificate of incorporation | 7 days |
+| `REG_OF_DIRS` | Register of directors | 7 days |
+| `OWNERSHIP_CHART` | UBO structure diagram | 10 days |
+| `SOURCE_OF_WEALTH` | Wealth origin documentation | 14 days |
+| `BANK_STATEMENT` | Financial statements | 7 days |
+| `TAX_RESIDENCY_CERT` | Tax domicile proof | 10 days |
+
+## Step-by-Step Workflow
+
+### 1. Create Requests (Fire)
+**Chat:** "Request passport and address proof from John Smith's workstream"
+
+**DSL Generated:**
+```lisp
+(request.create
+  workstream-id:@ws-john
+  request-type:PASSPORT
+  due-in-days:5) -> @req-passport
+
+(request.create
+  workstream-id:@ws-john
+  request-type:ADDRESS_PROOF
+  due-in-days:5) -> @req-address
+```
+
+**Result:** Requests created with PENDING status, timestamps set
+
+---
+
+### 2. Check Case State (Forget... then Remember)
+**Chat:** "What's the status of the KYC case?"
+
+**DSL Generated:**
+```lisp
+(kyc-case.state case-id:@kyc-case)
+```
+
+**Response:**
+```
+KYC Case: NEW_CLIENT | Status: DISCOVERY
+
+Entity Workstreams:
+├─ John Smith [COLLECT] ⏳
+│  └─ awaiting: PASSPORT (due 2024-02-01), ADDRESS_PROOF (due 2024-02-01)
+├─ Acme Holdings [VERIFY] ✓
+│  └─ awaiting: (none)
+└─ Sarah Jones [COLLECT] ⚠️
+   └─ awaiting: PASSPORT (due 2024-01-20) ⚠️ OVERDUE
+```
+
+---
+
+### 3. Fulfill a Request
+When document is received and cataloged, it auto-fulfills matching requests:
+
+**Chat:** "Catalog John's passport"
+
+**DSL Generated:**
+```lisp
+(document.catalog
+  cbu-id:@acme
+  entity-id:@john
+  doc-type:PASSPORT
+  title:"John Smith Passport"
+  file-path:"/uploads/john-passport.pdf")
+```
+
+**Result:** 
+- Document cataloged
+- Matching PASSPORT request auto-fulfilled
+- Workstream `awaiting` count decreases
+
+---
+
+### 4. Handle Overdue Requests
+
+**Remind:**
+```lisp
+(request.remind request-id:@req-address)
+```
+
+**Extend deadline:**
+```lisp
+(request.extend request-id:@req-address extend-days:7)
+```
+
+**Escalate:**
+```lisp
+(request.escalate request-id:@req-address reason:"No response after 3 reminders")
+```
+
+**Waive (with justification):**
+```lisp
+(request.waive request-id:@req-address reason:"Alternative verification via bank")
+```
+
+---
+
+### 5. Bulk Request Creation
+For standard document sets:
+
+**Chat:** "Request all standard KYC documents for corporate workstreams"
+
+**DSL Generated:**
+```lisp
+(request.create-batch
+  workstream-ids:[@ws-acme @ws-subsidiary]
+  request-types:[CERT_OF_INC REG_OF_DIRS OWNERSHIP_CHART]
+  due-in-days:7)
+```
+
+---
+
+### 6. Workstream-Level State Query
+For detailed workstream view:
+
+**DSL:**
+```lisp
+(entity-workstream.state workstream-id:@ws-john)
+```
+
+**Response:**
+```json
+{
+  "entity_name": "John Smith",
+  "entity_type": "PROPER_PERSON",
+  "status": "COLLECT",
+  "awaiting_requests": [
+    {
+      "request_id": "...",
+      "type": "ADDRESS_PROOF",
+      "status": "PENDING",
+      "due_date": "2024-02-01",
+      "is_overdue": false,
+      "remind_count": 0
+    }
+  ],
+  "screenings": [
+    {"type": "PEP", "status": "CLEAR"},
+    {"type": "SANCTIONS", "status": "CLEAR"}
+  ]
+}
+```
+
+## Status Flow
+
+```
+PENDING → REMINDED → ESCALATED → FULFILLED
+                  ↘           ↗
+                   WAIVED ───┘
+```
+
+| Status | Meaning |
+|--------|---------|
+| `PENDING` | Request created, awaiting response |
+| `REMINDED` | Follow-up reminder sent |
+| `ESCALATED` | Escalated to senior analyst/manager |
+| `FULFILLED` | Document received and linked |
+| `WAIVED` | Requirement waived with justification |
+
+## Integration with Journey
+
+The journey stage map considers outstanding requests:
+
+```
+◐ KYC Review (in progress)
+    └─ awaiting 3 documents across 2 workstreams
+```
+
+When all workstreams have no awaiting requests and screening is complete,
+the KYC stage can advance to APPROVED.
+
+## Symbols Created
+
+| Symbol | Entity Type | Description |
+|--------|-------------|-------------|
+| @req-passport | Request | Document request for passport |
+| @req-address | Request | Document request for address proof |
+
+## Agent Prompt Context
+
+When a KYC case is linked to the session, the agent automatically receives
+embedded request context in its prompt:
+
+```
+KYC Context:
+├─ Case: NEW_CLIENT | DISCOVERY
+├─ Workstream: John Smith [COLLECT]
+│  └─ awaiting: PASSPORT, ADDRESS_PROOF
+└─ 2 total requests pending
+```
+
+This enables natural conversation:
+- "What documents are we still waiting for?"
+- "Remind John about his passport"
+- "Waive the address proof - we verified via bank"
 ```
 
 ### appendix-a-verb-dictionary.md
