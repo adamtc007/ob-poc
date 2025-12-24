@@ -2195,6 +2195,81 @@ The context panel (`rust/crates/ob-poc-ui/src/panels/context.rs`) displays sessi
 | `rust/src/api/session_routes.rs` | `/focus` endpoint handler |
 | `rust/src/api/agent_service.rs` | `build_vocab_prompt()` with verb filtering |
 
+### Optimistic Locking for DSL Execution
+
+When multiple agent sessions work on the same CBU simultaneously, the system uses **optimistic locking** to detect conflicts and prevent silent data overwrites.
+
+**Problem:** Two agents load the same CBU, both make changes, second save silently overwrites first.
+
+**Solution:** Track version when loading, check version when saving.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Session A binds CBU                           │
+│  1. Load CBU "Apex Fund"                                        │
+│  2. Get current_version = 5 from dsl_instances                  │
+│  3. Store in session.context.loaded_dsl_version = 5             │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼ (later)
+┌─────────────────────────────────────────────────────────────────┐
+│                    Session A saves changes                       │
+│  1. Call save_dsl_instance(..., expected_version: Some(5))      │
+│  2. UPDATE ... WHERE current_version = 5                        │
+│  3. If rows_affected = 0 → VersionConflict error                │
+│  4. If success → version becomes 6                              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key Types:**
+
+```rust
+// In SessionContext (rust/src/api/session.rs)
+pub struct SessionContext {
+    /// Version of business_reference when loaded (for optimistic locking)
+    pub loaded_dsl_version: Option<i32>,
+    /// Business reference for this session's DSL instance (e.g., CBU name)
+    pub business_reference: Option<String>,
+    // ... other fields
+}
+
+// In DslRepository (rust/src/database/dsl_repository.rs)
+pub enum DslSaveError {
+    /// Version conflict - another session modified the data
+    VersionConflict {
+        expected: i32,
+        actual: i32,
+        business_reference: String,
+    },
+    Database(sqlx::Error),
+}
+```
+
+**Key Files:**
+
+| File | Purpose |
+|------|---------|
+| `rust/src/api/session.rs` | SessionContext with `loaded_dsl_version` |
+| `rust/src/database/dsl_repository.rs` | `DslSaveError`, `save_dsl_instance()` with version check |
+| `rust/src/api/agent_routes.rs` | `set_session_binding()` loads version when binding CBU |
+
+**API Methods:**
+
+| Method | Description |
+|--------|-------------|
+| `save_dsl_instance(..., expected_version)` | Save with optimistic lock check |
+| `save_dsl_instance_unchecked(...)` | Save without version check (backward compat) |
+| `save_execution_checked(...)` | Execute and save with version check |
+
+**Error Handling:**
+
+When a version conflict occurs, the error message includes:
+- Expected version (what the session thought was current)
+- Actual version (what the database has now)
+- Business reference (CBU name) for context
+
+The UI should prompt the user to refresh and retry their changes.
+
 ## DSL Syntax
 
 ```clojure
