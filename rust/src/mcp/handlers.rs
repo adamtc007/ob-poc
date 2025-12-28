@@ -695,7 +695,7 @@ impl ToolHandlers {
             Value::Array(arr) => arr
                 .iter()
                 .filter_map(|v| v.as_str())
-                .map(|s| Uuid::parse_str(s))
+                .map(Uuid::parse_str)
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|e| anyhow!("Invalid UUID: {}", e))?,
             Value::String(s) => {

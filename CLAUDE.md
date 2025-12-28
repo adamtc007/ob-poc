@@ -183,6 +183,81 @@ args:
 | `reference` | Roles, jurisdictions, currencies | Autocomplete dropdown |
 | `entity` | CBUs, people, funds, cases | Search modal with refinement |
 
+### Unified DSL Submission Model
+
+The `DslSubmission` type provides a unified execution model where **binding cardinality determines behavior**:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    DSL SOURCE TEXT                               │
+│  (cbu.ensure :name "Fund" :as @fund)                            │
+│  (cbu.assign-role :cbu-id @fund :entity-id @person :role "DIR") │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    DslSubmission                                 │
+│  statements: Vec<Statement>                                     │
+│  bindings: HashMap<String, SymbolBinding>                       │
+│    @fund   → Unresolved (0 UUIDs)                              │
+│    @person → Singleton (1 UUID)                                 │
+│    @roles  → Batch ([uuid1, uuid2, uuid3])                     │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┴───────────────┐
+              │                               │
+              ▼                               ▼
+┌─────────────────────────┐     ┌─────────────────────────┐
+│  Cardinality 0: DRAFT   │     │  Cardinality 1: READY   │
+│  Unresolved symbols     │     │  Singleton execution    │
+│  Valid REPL state       │     │  One iteration          │
+└─────────────────────────┘     └─────────────────────────┘
+                                              │
+                              ┌───────────────┴───────────────┐
+                              ▼                               ▼
+                ┌─────────────────────────┐     ┌─────────────────────────┐
+                │  Cardinality N: BATCH   │     │  execute_submission()   │
+                │  N iterations           │     │  Atomic transaction     │
+                │  Cartesian product      │     │  All-or-nothing         │
+                └─────────────────────────┘     └─────────────────────────┘
+```
+
+**Key Types** (`rust/src/dsl_v2/submission.rs`):
+
+| Type | Description |
+|------|-------------|
+| `SymbolBinding` | 0/1/N UUIDs with optional display names |
+| `DslSubmission` | Statements + symbol bindings container |
+| `SubmissionState` | Draft, Ready, ReadyWithWarning, TooLarge |
+| `SubmissionLimits` | Thresholds (warn=100, max=10,000 iterations) |
+| `IterationKey` | Unique key for batch iteration (id, name, symbol) |
+
+**Key Types** (`rust/src/dsl_v2/domain_context.rs`):
+
+| Type | Description |
+|------|-------------|
+| `DomainContext` | Tracks current iteration during batch execution |
+| `IterationInfo` | Index, key_name, key_id, symbol for current iteration |
+
+**Execution Entry Point** (`rust/src/dsl_v2/executor.rs`):
+
+```rust
+// Unified execution - handles singleton and batch
+pub async fn execute_submission(
+    &self,
+    submission: &DslSubmission,
+    domain_ctx: &mut DomainContext,
+    limits: &SubmissionLimits,
+) -> Result<SubmissionResult, SubmissionError>
+```
+
+**MCP Tools** (`rust/src/mcp/handlers.rs`):
+
+| Tool | Description |
+|------|-------------|
+| `dsl_execute_submission` | Execute with bindings, handles draft/warning states |
+| `dsl_bind` | Incrementally bind symbols, returns updated state |
+
 ### Composite Search Keys (S-Expression Syntax)
 
 For tables with 100k+ records (e.g., persons, companies), a simple name search returns too many matches. The `search_key` config uses **s-expression syntax** to define composite keys with discriminators:
