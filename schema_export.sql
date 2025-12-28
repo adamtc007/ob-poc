@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 2dPtjKhtDQ2gKiHFSlC1tnjZ8La99tCcuyxNifBQrbG78iUY26XaM0vdnCWCqoB
+\restrict Rlz8wIfJ6wRsO9uBUFHjP5hjAgBWXetfwOdeuDW4jbbRI88tcc6mj40iBdoG5gA
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -3858,7 +3858,15 @@ CREATE TABLE "ob-poc".cbu_entity_roles (
     cbu_id uuid NOT NULL,
     entity_id uuid NOT NULL,
     role_id uuid NOT NULL,
-    created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text)
+    created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    authority_limit numeric(18,2),
+    authority_currency character varying(3) DEFAULT 'USD'::character varying,
+    requires_co_signatory boolean DEFAULT false,
+    target_entity_id uuid,
+    ownership_percentage numeric(5,2),
+    effective_from date,
+    effective_to date,
+    updated_at timestamp with time zone DEFAULT now()
 );
 
 
@@ -3988,6 +3996,10 @@ CREATE TABLE "ob-poc".entity_relationships (
     created_at timestamp with time zone DEFAULT now(),
     created_by uuid,
     updated_at timestamp with time zone DEFAULT now(),
+    trust_interest_type character varying(30),
+    trust_class_description text,
+    is_regulated boolean DEFAULT true,
+    regulatory_jurisdiction character varying(20),
     CONSTRAINT chk_er_no_self_reference CHECK ((from_entity_id <> to_entity_id)),
     CONSTRAINT chk_er_ownership_has_percentage CHECK ((((relationship_type)::text <> 'ownership'::text) OR (percentage IS NOT NULL))),
     CONSTRAINT chk_er_relationship_type CHECK (((relationship_type)::text = ANY ((ARRAY['ownership'::character varying, 'control'::character varying, 'trust_role'::character varying, 'employment'::character varying, 'management'::character varying])::text[]))),
@@ -7323,7 +7335,7 @@ COMMENT ON VIEW "ob-poc".v_cbu_entity_graph IS 'Complete CBU entity relationship
 --
 
 CREATE VIEW "ob-poc".v_cbu_entity_with_roles AS
- WITH role_priorities AS (
+ WITH role_data AS (
          SELECT cer.cbu_id,
             cer.entity_id,
             e.name AS entity_name,
@@ -7333,26 +7345,10 @@ CREATE VIEW "ob-poc".v_cbu_entity_with_roles AS
             r.name AS role_name,
             r.role_category,
             r.layout_category,
+            r.display_priority,
             r.ubo_treatment,
-            r.kyc_obligation,
-            COALESCE(r.display_priority,
-                CASE r.role_category
-                    WHEN 'OWNERSHIP_CHAIN'::text THEN 100
-                    WHEN 'OWNERSHIP_CONTROL'::text THEN 100
-                    WHEN 'CONTROL_CHAIN'::text THEN 90
-                    WHEN 'TRUST_ROLES'::text THEN 85
-                    WHEN 'FUND_STRUCTURE'::text THEN 80
-                    WHEN 'FUND_MANAGEMENT'::text THEN 70
-                    WHEN 'INVESTOR_CHAIN'::text THEN 60
-                    WHEN 'BOTH'::text THEN 50
-                    WHEN 'SERVICE_PROVIDER'::text THEN 30
-                    WHEN 'TRADING_EXECUTION'::text THEN 20
-                    WHEN 'FUND_OPERATIONS'::text THEN 20
-                    WHEN 'DISTRIBUTION'::text THEN 15
-                    WHEN 'FINANCING'::text THEN 15
-                    WHEN 'RELATED_PARTY'::text THEN 10
-                    ELSE 5
-                END) AS role_priority
+            r.requires_percentage,
+            r.kyc_obligation
            FROM ((((((("ob-poc".cbu_entity_roles cer
              JOIN "ob-poc".entities e ON ((cer.entity_id = e.entity_id)))
              JOIN "ob-poc".entity_types et ON ((e.entity_type_id = et.entity_type_id)))
@@ -7368,15 +7364,29 @@ CREATE VIEW "ob-poc".v_cbu_entity_with_roles AS
     entity_type,
     entity_category,
     jurisdiction,
-    array_agg(role_name ORDER BY role_priority DESC) AS roles,
-    array_agg(DISTINCT role_category) AS role_categories,
-    (array_agg(role_name ORDER BY role_priority DESC))[1] AS primary_role,
-    max(role_priority) AS max_role_priority,
-    (array_agg(role_category ORDER BY role_priority DESC))[1] AS primary_role_category,
-    (array_agg(layout_category ORDER BY role_priority DESC))[1] AS primary_layout_category,
-    (array_agg(ubo_treatment ORDER BY role_priority DESC))[1] AS effective_ubo_treatment,
-    (array_agg(kyc_obligation ORDER BY role_priority DESC))[1] AS effective_kyc_obligation
-   FROM role_priorities
+    array_agg(role_name ORDER BY display_priority DESC) AS roles,
+    array_agg(DISTINCT role_category) FILTER (WHERE (role_category IS NOT NULL)) AS role_categories,
+    array_agg(DISTINCT layout_category) FILTER (WHERE (layout_category IS NOT NULL)) AS layout_categories,
+    (array_agg(role_name ORDER BY display_priority DESC))[1] AS primary_role,
+    (array_agg(role_category ORDER BY display_priority DESC) FILTER (WHERE (role_category IS NOT NULL)))[1] AS primary_role_category,
+    (array_agg(layout_category ORDER BY display_priority DESC) FILTER (WHERE (layout_category IS NOT NULL)))[1] AS primary_layout_category,
+    max(display_priority) AS max_role_priority,
+        CASE
+            WHEN ('ALWAYS_UBO'::text = ANY ((array_agg(ubo_treatment))::text[])) THEN 'ALWAYS_UBO'::text
+            WHEN ('TERMINUS'::text = ANY ((array_agg(ubo_treatment))::text[])) THEN 'TERMINUS'::text
+            WHEN ('CONTROL_PRONG'::text = ANY ((array_agg(ubo_treatment))::text[])) THEN 'CONTROL_PRONG'::text
+            WHEN ('BY_PERCENTAGE'::text = ANY ((array_agg(ubo_treatment))::text[])) THEN 'BY_PERCENTAGE'::text
+            WHEN ('LOOK_THROUGH'::text = ANY ((array_agg(ubo_treatment))::text[])) THEN 'LOOK_THROUGH'::text
+            ELSE 'NOT_APPLICABLE'::text
+        END AS effective_ubo_treatment,
+        CASE
+            WHEN ('FULL_KYC'::text = ANY ((array_agg(kyc_obligation))::text[])) THEN 'FULL_KYC'::text
+            WHEN ('SCREEN_AND_ID'::text = ANY ((array_agg(kyc_obligation))::text[])) THEN 'SCREEN_AND_ID'::text
+            WHEN ('SIMPLIFIED'::text = ANY ((array_agg(kyc_obligation))::text[])) THEN 'SIMPLIFIED'::text
+            WHEN ('SCREEN_ONLY'::text = ANY ((array_agg(kyc_obligation))::text[])) THEN 'SCREEN_ONLY'::text
+            ELSE 'RECORD_ONLY'::text
+        END AS effective_kyc_obligation
+   FROM role_data
   GROUP BY cbu_id, entity_id, entity_name, entity_type, entity_category, jurisdiction;
 
 
@@ -7384,7 +7394,8 @@ CREATE VIEW "ob-poc".v_cbu_entity_with_roles AS
 -- Name: VIEW v_cbu_entity_with_roles; Type: COMMENT; Schema: ob-poc; Owner: -
 --
 
-COMMENT ON VIEW "ob-poc".v_cbu_entity_with_roles IS 'Aggregated view of entities with their roles, categories, and effective KYC/UBO treatment. Used for visualization.';
+COMMENT ON VIEW "ob-poc".v_cbu_entity_with_roles IS 'Aggregated view of entities with their roles, categories, and effective KYC/UBO treatment.
+Fixed in V2.1: Added primary_role_category, renamed primary_layout to primary_layout_category.';
 
 
 --
@@ -10914,6 +10925,22 @@ ALTER TABLE ONLY "ob-poc".attribute_registry
 
 ALTER TABLE ONLY "ob-poc".document_attribute_links
     ADD CONSTRAINT unique_doc_attr_direction UNIQUE (document_type_id, attribute_id, direction);
+
+
+--
+-- Name: cbu_entity_roles uq_cbu_entity_role; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_entity_roles
+    ADD CONSTRAINT uq_cbu_entity_role UNIQUE (cbu_id, entity_id, role_id);
+
+
+--
+-- Name: entity_relationships uq_entity_relationship; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_relationships
+    ADD CONSTRAINT uq_entity_relationship UNIQUE (from_entity_id, to_entity_id, relationship_type);
 
 
 --
@@ -14998,6 +15025,14 @@ ALTER TABLE ONLY "ob-poc".cbu_entity_roles
 
 
 --
+-- Name: cbu_entity_roles cbu_entity_roles_target_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_entity_roles
+    ADD CONSTRAINT cbu_entity_roles_target_entity_id_fkey FOREIGN KEY (target_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
 -- Name: cbu_evidence cbu_evidence_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -16609,5 +16644,5 @@ ALTER TABLE ONLY public.rules
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 2dPtjKhtDQ2gKiHFSlC1tnjZ8La99tCcuyxNifBQrbG78iUY26XaM0vdnCWCqoB
+\unrestrict Rlz8wIfJ6wRsO9uBUFHjP5hjAgBWXetfwOdeuDW4jbbRI88tcc6mj40iBdoG5gA
 

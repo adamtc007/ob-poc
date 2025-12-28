@@ -20,6 +20,7 @@
 
 pub mod batch_control_ops;
 mod cbu_ops;
+mod cbu_role_ops;
 mod custody;
 mod document_ops;
 mod entity_ops;
@@ -101,6 +102,10 @@ pub use ubo_analysis::{
 
 // Domain-specific operation modules
 pub use cbu_ops::{CbuAddProductOp, CbuDecideOp, CbuDeleteCascadeOp, CbuShowOp};
+pub use cbu_role_ops::{
+    CbuRoleAssignControlOp, CbuRoleAssignFundOp, CbuRoleAssignOp, CbuRoleAssignOwnershipOp,
+    CbuRoleAssignServiceOp, CbuRoleAssignSignatoryOp, CbuRoleAssignTrustOp, CbuRoleValidateAllOp,
+};
 pub use document_ops::{DocumentCatalogOp, DocumentExtractOp};
 pub use entity_ops::EntityCreateOp;
 pub use observation_ops::{
@@ -198,6 +203,16 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(CbuShowOp));
         registry.register(Arc::new(CbuDecideOp));
         registry.register(Arc::new(CbuDeleteCascadeOp));
+
+        // CBU Role operations (Role Taxonomy V2)
+        registry.register(Arc::new(CbuRoleAssignOp));
+        registry.register(Arc::new(CbuRoleAssignOwnershipOp));
+        registry.register(Arc::new(CbuRoleAssignControlOp));
+        registry.register(Arc::new(CbuRoleAssignTrustOp));
+        registry.register(Arc::new(CbuRoleAssignFundOp));
+        registry.register(Arc::new(CbuRoleAssignServiceOp));
+        registry.register(Arc::new(CbuRoleAssignSignatoryOp));
+        registry.register(Arc::new(CbuRoleValidateAllOp));
 
         // NOTE: delivery.record, delivery.complete, delivery.fail are now CRUD verbs
         // defined in config/verbs/delivery.yaml - no plugin needed
@@ -415,6 +430,15 @@ mod tests {
         assert!(registry.has("cbu", "add-product"));
         assert!(registry.has("cbu", "show"));
         assert!(registry.has("cbu", "delete-cascade"));
+        // CBU Role operations (Role Taxonomy V2)
+        assert!(registry.has("cbu.role", "assign"));
+        assert!(registry.has("cbu.role", "assign-ownership"));
+        assert!(registry.has("cbu.role", "assign-control"));
+        assert!(registry.has("cbu.role", "assign-trust-role"));
+        assert!(registry.has("cbu.role", "assign-fund-role"));
+        assert!(registry.has("cbu.role", "assign-service-provider"));
+        assert!(registry.has("cbu.role", "assign-signatory"));
+        assert!(registry.has("cbu.role", "validate"));
         // Trading Matrix operations
         assert!(registry.has("investment-manager", "find-for-trade"));
         assert!(registry.has("pricing-config", "find-for-instrument"));

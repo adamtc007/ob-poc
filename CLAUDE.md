@@ -3958,11 +3958,15 @@ Unified table for all entity-to-entity relationships (ownership, control, trust 
 | to_entity_id | uuid | Owned/controlled entity |
 | relationship_type | varchar(30) | 'ownership', 'control', 'trust_role' |
 | percentage | decimal(5,2) | Ownership percentage (NULL for non-ownership) |
+| ownership_type | varchar(30) | For ownership: direct, indirect, beneficial, nominee |
 | control_type | varchar(30) | For control: board_member, executive, voting_rights, etc. |
 | trust_role | varchar(30) | For trust: settlor, trustee, beneficiary, protector |
+| trust_interest_type | varchar(30) | For trust: fixed, discretionary, contingent |
 | effective_from | date | Start date |
 | effective_to | date | End date (NULL = active) |
 | source | varchar(100) | Data source reference |
+| created_at | timestamptz | Creation timestamp |
+| updated_at | timestamptz | Last update timestamp |
 
 ### cbu_relationship_verification
 
@@ -4009,15 +4013,20 @@ Service provider delegation chains (ManCo to sub-advisor, administrator to sub-c
 
 ### cbu_entity_roles (CBU-Entity-Role Junction)
 
-Links entities to CBUs with specific roles.
+Links entities to CBUs with specific roles. For ownership/control roles, also tracks target entity and percentage.
 
 | Column | Type | Nullable | Default | Description |
 |--------|------|----------|---------|-------------|
 | cbu_entity_role_id | uuid | NOT NULL | gen_random_uuid() | Primary key |
 | cbu_id | uuid | NOT NULL | | FK to cbus |
-| entity_id | uuid | NOT NULL | | FK to entities |
+| entity_id | uuid | NOT NULL | | FK to entities (the role holder) |
 | role_id | uuid | NOT NULL | | FK to roles |
+| target_entity_id | uuid | YES | | FK to entities (for ownership/control: the owned entity) |
+| ownership_percentage | decimal(5,2) | YES | | Percentage for ownership roles |
+| effective_from | date | YES | | Role effective date |
+| effective_to | date | YES | | Role end date (NULL = active) |
 | created_at | timestamptz | | now() | |
+| updated_at | timestamptz | | now() | |
 
 ## Document Management
 
