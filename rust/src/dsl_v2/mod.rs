@@ -78,6 +78,7 @@ pub mod applicability_rules;
 pub mod batch_executor;
 pub mod csg_linter;
 pub mod custom_ops;
+pub mod domain_context;
 pub mod enrichment;
 pub mod entity_deps;
 pub mod execution_plan;
@@ -103,6 +104,7 @@ pub mod runtime_registry;
 pub mod semantic_context;
 #[cfg(feature = "database")]
 pub mod semantic_validator;
+pub mod submission;
 pub mod suggestions;
 pub mod topo_sort;
 pub mod validation;
@@ -115,6 +117,7 @@ pub use batch_executor::{
     BatchExecutionResult, BatchExecutor, BatchResultAccumulator, OnErrorMode,
 };
 pub use csg_linter::{CsgLinter, InferredContext, LintResult};
+pub use domain_context::{ActiveDomain, DomainContext, IterationContext};
 pub use enrichment::{enrich_program, EnrichmentError, EnrichmentResult};
 #[cfg(feature = "database")]
 pub use entity_deps::init_entity_deps;
@@ -153,6 +156,10 @@ pub use runtime_registry::{runtime_registry, runtime_registry_arc, RuntimeVerbRe
 pub use semantic_context::SemanticContextStore;
 #[cfg(feature = "database")]
 pub use semantic_validator::{validate_dsl, validate_dsl_with_csg, SemanticValidator};
+pub use submission::{
+    DslSubmission, ExpandedSubmission, IterationKey, IterationStatements, SubmissionError,
+    SubmissionLimits, SubmissionState, SymbolBinding,
+};
 pub use topo_sort::{
     emit_dsl, topological_sort, topological_sort_with_lifecycle, TopoSortError, TopoSortResult,
 };
