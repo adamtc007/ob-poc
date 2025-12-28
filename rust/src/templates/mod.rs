@@ -1,5 +1,8 @@
 //! Workflow Templates for DSL Generation
 //!
+//! This module re-exports types from the `ob-templates` crate and provides
+//! integration with the main crate's session types.
+//!
 //! Templates capture domain lifecycle patterns - chained verb sequences that
 //! accomplish business goals. They serve as prompt enhancement for agent DSL
 //! generation.
@@ -8,42 +11,23 @@
 //! - Templates expand to DSL TEXT - agent sees exactly what will run
 //! - Two-phase entity resolution: NL names → UUIDs in dsl_generate, then DSL pipeline
 //! - Existing entity = simple verb, new entity = template
-//!
-//! # Example
-//!
-//! ```yaml
-//! template: onboard-director
-//! metadata:
-//!   name: Onboard Director
-//!   summary: Add a natural person as director with full KYC setup
-//! params:
-//!   cbu_id:
-//!     type: cbu_ref
-//!     source: session
-//!   name:
-//!     type: string
-//!     required: true
-//!     prompt: "Director's full legal name"
-//! body: |
-//!   (let [person (entity.create-proper-person :name "$name" ...)]
-//!     (cbu.assign-role :cbu "$cbu_id" :entity person :role DIRECTOR)
-//!     ...)
-//! ```
 
-mod definition;
-mod error;
-mod expander;
-pub mod harness;
-mod registry;
-
-pub use definition::{
-    EntityDependencySummary, EntityParamInfo, OutputDefinition, ParamCardinality, ParamDefinition,
-    PrimaryEntity, PrimaryEntityType, TemplateDefinition, TemplateMetadata, WorkflowContext,
+// Re-export everything from ob-templates crate
+pub use ob_templates::{
+    EntityDependencySummary, EntityParamInfo, ExpansionContext, ExpansionResult, MissingParam,
+    OutputDefinition, ParamCardinality, ParamDefinition, PrimaryEntity, PrimaryEntityType,
+    TemplateDefinition, TemplateError, TemplateExpander, TemplateMetadata, TemplateRegistry,
+    WorkflowContext,
 };
-pub use error::TemplateError;
-pub use expander::{ExpansionContext, ExpansionResult, MissingParam, TemplateExpander};
+
+// Keep harness module in main crate (has heavy dsl_v2 dependencies)
+pub mod harness;
+
 pub use harness::{
     get_sample_params, run_harness_from_registry, run_harness_no_db, HarnessResult,
     TemplateTestResult,
 };
-pub use registry::TemplateRegistry;
+
+// Extension trait for ExpansionContext integration with main crate session types
+mod context_ext;
+pub use context_ext::ExpansionContextExt;

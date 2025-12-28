@@ -45,34 +45,64 @@
 //! let instance = engine.try_advance(instance.instance_id).await?;
 //! ```
 
-// Re-export everything from ob-workflow crate
-pub use ob_workflow::{
-    // Definition types
-    ActionDef,
-    // Engine types
-    AvailableAction,
-    AvailableTransition,
-    // State types
-    Blocker,
-    BlockerType,
-    // Guard types
-    GuardEvaluator,
-    GuardResult,
-    GuardStatus,
-    RequirementDef,
-    // Requirements
-    RequirementEvaluator,
-    StateDef,
-    StateTransition,
-    TransitionDef,
-    TriggerDef,
-    WorkflowDefinition,
-    WorkflowEngine,
-    // Error type
-    WorkflowError,
-    WorkflowInstance,
+mod definition;
+mod requirements;
+mod state;
+
+#[cfg(feature = "database")]
+mod engine;
+#[cfg(feature = "database")]
+mod guards;
+#[cfg(feature = "database")]
+mod repository;
+
+pub use definition::{
+    ActionDef, RequirementDef, StateDef, TransitionDef, TriggerDef, WorkflowDefinition,
     WorkflowLoader,
-    // Repository
-    WorkflowRepository,
-    WorkflowStatus,
 };
+pub use requirements::RequirementEvaluator;
+pub use state::{Blocker, BlockerType, StateTransition, WorkflowInstance};
+
+#[cfg(feature = "database")]
+pub use engine::{
+    AvailableAction, AvailableTransition, GuardStatus, WorkflowEngine, WorkflowStatus,
+};
+#[cfg(feature = "database")]
+pub use guards::{GuardEvaluator, GuardResult};
+#[cfg(feature = "database")]
+pub use repository::WorkflowRepository;
+
+/// Workflow-related errors
+#[derive(Debug, thiserror::Error)]
+pub enum WorkflowError {
+    #[error("Unknown workflow: {0}")]
+    UnknownWorkflow(String),
+
+    #[error("No initial state defined for workflow")]
+    NoInitialState,
+
+    #[error("Invalid transition from '{from}' to '{to}'")]
+    InvalidTransition { from: String, to: String },
+
+    #[error("Guard '{guard}' failed: {blockers:?}")]
+    GuardFailed {
+        guard: String,
+        blockers: Vec<Blocker>,
+    },
+
+    #[error("Workflow instance not found: {0}")]
+    InstanceNotFound(uuid::Uuid),
+
+    #[cfg(feature = "database")]
+    #[error("Database error: {0}")]
+    Database(#[from] sqlx::Error),
+
+    #[error("YAML parse error: {0}")]
+    YamlParse(#[from] serde_yaml::Error),
+
+    #[error("JSON serialization error: {0}")]
+    JsonSerialize(#[from] serde_json::Error),
+
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+}

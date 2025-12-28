@@ -13,6 +13,8 @@ rust-version = "1.84"
 # Workspace crates
 dsl-core = { path = "crates/dsl-core" }
 ob-agentic = { path = "crates/ob-agentic", features = ["gateway"] }
+ob-templates = { path = "crates/ob-templates" }
+ob-workflow = { path = "crates/ob-workflow", features = ["database"] }
 dsl_types = { path = "../dsl_types" }
 entity-gateway = { path = "crates/entity-gateway", optional = true }
 ob-poc-types = { path = "crates/ob-poc-types" }
@@ -139,6 +141,9 @@ members = [
     ".",
     "crates/dsl-core",
     "crates/ob-agentic",
+    "crates/ob-execution-types",
+    "crates/ob-templates",
+    "crates/ob-workflow",
     "crates/dsl-lsp",
     "crates/ob-poc-graph",
     "crates/ob-poc-ui",

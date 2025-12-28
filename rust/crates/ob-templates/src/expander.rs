@@ -6,10 +6,12 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use super::definition::{ParamDefinition, TemplateDefinition};
-use crate::api::session::SessionContext;
-use crate::dsl_v2::repl_session::ReplSession;
 
 /// Session context for template expansion
+///
+/// This is a standalone context type that can be populated from various sources.
+/// Integration with specific session types (e.g., ReplSession, SessionContext) is
+/// provided via extension traits in the main crate.
 #[derive(Debug, Clone, Default)]
 pub struct ExpansionContext {
     /// Current CBU (if any)
@@ -38,81 +40,13 @@ impl ExpansionContext {
         }
     }
 
-    /// Create context from a ReplSession
-    ///
-    /// Automatically populates:
-    /// - All executed bindings (name → UUID)
-    /// - Entity types for each binding
-    /// - Extracts current_cbu from bindings named "cbu" or "fund"
-    /// - Extracts current_case from bindings named "case" or "kyc_case"
-    pub fn from_repl_session(session: &ReplSession) -> Self {
-        let mut ctx = Self::new();
-
-        // Populate bindings from session
-        for name in session.binding_names() {
-            if let Some(pk) = session.get_binding(name) {
-                ctx.bindings.insert(name.to_string(), pk.to_string());
-
-                // Also track entity type
-                if let Some(ty) = session.get_binding_type(name) {
-                    ctx.binding_types.insert(name.to_string(), ty.to_string());
-                }
-
-                // Extract current_cbu from common binding names
-                match name {
-                    "cbu" | "fund" | "active_cbu" => {
-                        if ctx.current_cbu.is_none() {
-                            ctx.current_cbu = Some(pk);
-                        }
-                    }
-                    "case" | "kyc_case" | "active_case" => {
-                        if ctx.current_case.is_none() {
-                            ctx.current_case = Some(pk);
-                        }
-                    }
-                    _ => {}
-                }
-            }
+    /// Create context with CBU and case
+    pub fn with_cbu_and_case(cbu_id: Uuid, case_id: Uuid) -> Self {
+        Self {
+            current_cbu: Some(cbu_id),
+            current_case: Some(case_id),
+            ..Default::default()
         }
-
-        ctx
-    }
-
-    /// Create context from an AgentSession's SessionContext
-    ///
-    /// Uses the session's bound entities and active CBU/case.
-    pub fn from_session_context(session_ctx: &SessionContext) -> Self {
-        let mut ctx = Self::new();
-
-        // Set active CBU if present
-        if let Some(ref active_cbu) = session_ctx.active_cbu {
-            ctx.current_cbu = Some(active_cbu.id);
-            ctx.bindings
-                .insert("cbu".to_string(), active_cbu.id.to_string());
-            ctx.binding_types
-                .insert("cbu".to_string(), "cbu".to_string());
-        }
-
-        // Populate from bindings
-        for (name, bound) in &session_ctx.bindings {
-            ctx.bindings.insert(name.clone(), bound.id.to_string());
-            ctx.binding_types
-                .insert(name.clone(), bound.entity_type.clone());
-        }
-
-        // Also include named_refs for backward compat
-        for (name, pk) in &session_ctx.named_refs {
-            if !ctx.bindings.contains_key(name) {
-                ctx.bindings.insert(name.clone(), pk.to_string());
-            }
-        }
-
-        // Set current_case from primary keys if available
-        if let Some(case_id) = session_ctx.primary_keys.kyc_case_id {
-            ctx.current_case = Some(case_id);
-        }
-
-        ctx
     }
 
     /// Add a binding
@@ -161,6 +95,23 @@ impl ExpansionContext {
                 false
             }
         }
+    }
+
+    /// Set current CBU and add it as a binding
+    pub fn set_current_cbu(&mut self, cbu_id: Uuid) {
+        self.current_cbu = Some(cbu_id);
+        self.bindings.insert("cbu".to_string(), cbu_id.to_string());
+        self.binding_types
+            .insert("cbu".to_string(), "cbu".to_string());
+    }
+
+    /// Set current case and add it as a binding
+    pub fn set_current_case(&mut self, case_id: Uuid) {
+        self.current_case = Some(case_id);
+        self.bindings
+            .insert("case".to_string(), case_id.to_string());
+        self.binding_types
+            .insert("case".to_string(), "kyc_case".to_string());
     }
 }
 
@@ -534,5 +485,21 @@ body: |
         assert!(prompt.contains("Enter name"));
         assert!(prompt.contains("John"));
         assert!(prompt.contains("Enter date"));
+    }
+
+    #[test]
+    fn test_context_binding_type_matching() {
+        let mut ctx = ExpansionContext::new();
+        ctx.bind_typed("company", "uuid-123", "entity.limited_company");
+
+        // Exact match
+        assert!(ctx.binding_matches_type("company", "entity.limited_company"));
+
+        // Base type match
+        assert!(ctx.binding_matches_type("company", "entity"));
+
+        // Non-match
+        assert!(!ctx.binding_matches_type("company", "cbu"));
+        assert!(!ctx.binding_matches_type("nonexistent", "entity"));
     }
 }
