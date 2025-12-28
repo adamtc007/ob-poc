@@ -6,13 +6,17 @@ domains:
     description: "Entity regulatory registration management (multi-regulator)"
     verbs:
       add:
-        description: "Add regulatory registration for an entity"
+        description: "Add regulatory registration for an entity (idempotent by entity+regulator+type)"
         behavior: crud
         crud:
-          operation: insert
+          operation: upsert
           table: entity_regulatory_registrations
           schema: ob_kyc
           returning: registration_id
+          conflict_keys:
+            - entity_id
+            - regulator_code
+            - registration_type
         args:
           - name: entity-id
             type: uuid

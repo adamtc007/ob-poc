@@ -1,0 +1,521 @@
+# CBU Role Assignment Verbs - V2
+# Updated to use role taxonomy with validation
+# Supports ownership chains, trust structures, fund hierarchies
+
+domains:
+  cbu.role:
+    description: "CBU entity role management with validation"
+
+    verbs:
+      # ═══════════════════════════════════════════════════════════════════════
+      # CORE ROLE ASSIGNMENT
+      # ═══════════════════════════════════════════════════════════════════════
+
+      assign:
+        description: |
+          Assign a role to an entity within a CBU.
+          Validates entity type compatibility and role conflicts before assignment.
+        behavior: plugin
+        custom_handler: cbu_role_assign
+
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU to assign role within"
+
+          - name: entity-id
+            type: uuid
+            required: true
+            description: "Entity receiving the role"
+
+          - name: role
+            type: string
+            required: true
+            description: "Role code (e.g., SHAREHOLDER, DIRECTOR, MANAGEMENT_COMPANY)"
+
+          - name: target-entity-id
+            type: uuid
+            required: false
+            description: "Target entity for directional roles (e.g., shareholder OF this entity)"
+
+          - name: percentage
+            type: decimal
+            required: false
+            description: "Ownership/interest percentage (required for OWNERSHIP_CHAIN roles)"
+
+          - name: effective-from
+            type: date
+            required: false
+            description: "When role became effective"
+
+          - name: effective-to
+            type: date
+            required: false
+            description: "When role ends (NULL = ongoing)"
+
+          - name: skip-validation
+            type: boolean
+            required: false
+            default: false
+            description: "Skip validation checks (use with caution)"
+
+        returns:
+          type: uuid
+          name: cbu_entity_role_id
+          capture: true
+
+        validation:
+          pre_checks:
+            - check: role_exists
+              error: "Role '{role}' does not exist in role taxonomy"
+            - check: validate_role_assignment
+              error: "Role assignment failed validation"
+
+      assign-ownership:
+        description: |
+          Specialized verb for assigning ownership roles with percentage.
+          Creates both the role assignment AND the ownership relationship edge.
+        behavior: plugin
+        custom_handler: cbu_role_assign_ownership
+
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+
+          - name: owner-entity-id
+            type: uuid
+            required: true
+            description: "The entity that OWNS (shareholder/LP/member)"
+
+          - name: owned-entity-id
+            type: uuid
+            required: true
+            description: "The entity being OWNED"
+
+          - name: percentage
+            type: decimal
+            required: true
+            description: "Ownership percentage (0-100)"
+
+          - name: ownership-type
+            type: string
+            required: false
+            default: "DIRECT"
+            enum_values:
+              - DIRECT
+              - INDIRECT
+              - BENEFICIAL
+              - VOTING
+            description: "Type of ownership interest"
+
+          - name: role
+            type: string
+            required: false
+            default: "SHAREHOLDER"
+            enum_values:
+              - SHAREHOLDER
+              - LIMITED_PARTNER
+              - GENERAL_PARTNER
+              - MEMBER
+              - PARTNER
+              - BENEFICIAL_OWNER
+              - NOMINEE_SHAREHOLDER
+            description: "Specific ownership role type"
+
+          - name: effective-from
+            type: date
+            required: false
+
+        returns:
+          type: record
+          fields:
+            - name: role_id
+              type: uuid
+            - name: relationship_id
+              type: uuid
+
+      assign-control:
+        description: |
+          Assign control role (director, officer, etc.) to an entity.
+          Control roles don't require ownership percentage.
+        behavior: plugin
+        custom_handler: cbu_role_assign_control
+
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+
+          - name: controller-entity-id
+            type: uuid
+            required: true
+            description: "Person/entity with control"
+
+          - name: controlled-entity-id
+            type: uuid
+            required: true
+            description: "Entity being controlled"
+
+          - name: role
+            type: string
+            required: true
+            enum_values:
+              - DIRECTOR
+              - CHAIRMAN
+              - MANAGING_DIRECTOR
+              - CHIEF_EXECUTIVE
+              - OFFICER
+              - CONDUCTING_OFFICER
+              - COMPANY_SECRETARY
+              - CONTROLLING_PERSON
+            description: "Control role type"
+
+          - name: control-type
+            type: string
+            required: false
+            enum_values:
+              - BOARD_MEMBER
+              - EXECUTIVE
+              - VOTING_RIGHTS
+              - APPOINTMENT_RIGHTS
+              - VETO_RIGHTS
+              - MANAGING_PARTNER
+            description: "Nature of control"
+
+          - name: appointment-date
+            type: date
+            required: false
+
+        returns:
+          type: record
+          fields:
+            - name: role_id
+              type: uuid
+            - name: relationship_id
+              type: uuid
+
+      # ═══════════════════════════════════════════════════════════════════════
+      # TRUST ROLE ASSIGNMENT
+      # ═══════════════════════════════════════════════════════════════════════
+
+      assign-trust-role:
+        description: |
+          Assign trust-specific role (settlor, trustee, beneficiary, protector).
+          Handles special UBO treatment for trust participants.
+        behavior: plugin
+        custom_handler: cbu_role_assign_trust
+
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+
+          - name: trust-entity-id
+            type: uuid
+            required: true
+            description: "The trust entity"
+
+          - name: participant-entity-id
+            type: uuid
+            required: true
+            description: "Person/entity with role in trust"
+
+          - name: role
+            type: string
+            required: true
+            enum_values:
+              - SETTLOR
+              - TRUSTEE
+              - PROTECTOR
+              - BENEFICIARY_FIXED
+              - BENEFICIARY_DISCRETIONARY
+              - BENEFICIARY_CONTINGENT
+              - ENFORCER
+              - APPOINTOR
+            description: "Trust role type"
+
+          - name: interest-percentage
+            type: decimal
+            required: false
+            description: "For BENEFICIARY_FIXED - the fixed percentage entitlement"
+
+          - name: interest-type
+            type: string
+            required: false
+            enum_values:
+              - FIXED
+              - DISCRETIONARY
+              - CONTINGENT
+              - REMAINDER
+            description: "Nature of beneficial interest"
+
+          - name: class-description
+            type: string
+            required: false
+            description: "For discretionary beneficiaries - describe the class"
+
+        returns:
+          type: record
+          fields:
+            - name: role_id
+              type: uuid
+            - name: relationship_id
+              type: uuid
+
+      # ═══════════════════════════════════════════════════════════════════════
+      # FUND STRUCTURE ROLES
+      # ═══════════════════════════════════════════════════════════════════════
+
+      assign-fund-role:
+        description: |
+          Assign fund structure or management role.
+          Handles ManCo, IM, depositary, and fund hierarchy relationships.
+        behavior: plugin
+        custom_handler: cbu_role_assign_fund
+
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+
+          - name: entity-id
+            type: uuid
+            required: true
+            description: "Entity receiving the role"
+
+          - name: fund-entity-id
+            type: uuid
+            required: false
+            description: "Fund entity (for fund structure roles)"
+
+          - name: role
+            type: string
+            required: true
+            enum_values:
+              # Fund structure
+              - MASTER_FUND
+              - FEEDER_FUND
+              - UMBRELLA_FUND
+              - SUB_FUND
+              - PARALLEL_FUND
+              - CO_INVESTMENT_VEHICLE
+              - ASSET_OWNER
+              - FUND_INVESTOR
+              # Fund management
+              - MANAGEMENT_COMPANY
+              - INVESTMENT_MANAGER
+              - INVESTMENT_ADVISOR
+              - SUB_ADVISOR
+              - SPONSOR
+              - PROMOTER
+            description: "Fund role type"
+
+          - name: investment-percentage
+            type: decimal
+            required: false
+            description: "For FUND_INVESTOR, FEEDER_FUND - investment percentage"
+
+          - name: is-regulated
+            type: boolean
+            required: false
+            default: true
+            description: "Whether entity is regulated (affects KYC obligation)"
+
+          - name: regulatory-jurisdiction
+            type: string
+            required: false
+            description: "Jurisdiction of regulation (e.g., LU-CSSF, IE-CBI)"
+
+        returns:
+          type: record
+          fields:
+            - name: role_id
+              type: uuid
+            - name: relationship_id
+              type: uuid
+
+      # ═══════════════════════════════════════════════════════════════════════
+      # SERVICE PROVIDER ROLES
+      # ═══════════════════════════════════════════════════════════════════════
+
+      assign-service-provider:
+        description: |
+          Assign service provider role (depositary, custodian, admin, etc.).
+          These are flat relationships with no ownership implications.
+        behavior: plugin
+        custom_handler: cbu_role_assign_service
+
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+
+          - name: provider-entity-id
+            type: uuid
+            required: true
+            description: "Service provider entity"
+
+          - name: client-entity-id
+            type: uuid
+            required: false
+            description: "Specific entity receiving service (if not whole CBU)"
+
+          - name: role
+            type: string
+            required: true
+            enum_values:
+              - DEPOSITARY
+              - CUSTODIAN
+              - PRIME_BROKER
+              - SUB_CUSTODIAN
+              - ADMINISTRATOR
+              - TRANSFER_AGENT
+              - PAYING_AGENT
+              - AUDITOR
+              - LEGAL_COUNSEL
+              - TAX_ADVISOR
+              - COMPLIANCE_CONSULTANT
+              - VALUATION_AGENT
+              - SERVICE_PROVIDER
+            description: "Service provider role"
+
+          - name: service-agreement-date
+            type: date
+            required: false
+
+          - name: is-regulated
+            type: boolean
+            required: false
+            default: true
+
+        returns:
+          type: uuid
+          name: role_id
+
+      # ═══════════════════════════════════════════════════════════════════════
+      # TRADING/EXECUTION ROLES
+      # ═══════════════════════════════════════════════════════════════════════
+
+      assign-signatory:
+        description: |
+          Assign authorized signatory, trader, or other operational role.
+          These are always natural persons.
+        behavior: plugin
+        custom_handler: cbu_role_assign_signatory
+
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+
+          - name: person-entity-id
+            type: uuid
+            required: true
+            description: "Natural person entity"
+
+          - name: for-entity-id
+            type: uuid
+            required: false
+            description: "Entity they can sign/trade for (if not whole CBU)"
+
+          - name: role
+            type: string
+            required: true
+            enum_values:
+              - AUTHORIZED_SIGNATORY
+              - AUTHORIZED_TRADER
+              - AUTHORIZED_REPRESENTATIVE
+              - POWER_OF_ATTORNEY
+              - ACCOUNT_OPERATOR
+              - SETTLEMENT_CONTACT
+            description: "Signatory/operational role"
+
+          - name: authority-limit
+            type: decimal
+            required: false
+            description: "Maximum transaction value (if applicable)"
+
+          - name: authority-currency
+            type: string
+            required: false
+            default: "USD"
+
+          - name: requires-co-signatory
+            type: boolean
+            required: false
+            default: false
+
+        returns:
+          type: uuid
+          name: role_id
+
+      # ═══════════════════════════════════════════════════════════════════════
+      # BULK OPERATIONS
+      # ═══════════════════════════════════════════════════════════════════════
+
+      remove:
+        description: "Remove a role assignment from entity within CBU"
+        behavior: crud
+        crud:
+          operation: delete
+          table: cbu_entity_roles
+          schema: ob-poc
+
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+
+          - name: role
+            type: string
+            required: true
+            description: "Role to remove"
+            # Note: role_id resolved via lookup
+
+        returns:
+          type: affected
+
+      list:
+        description: "List all role assignments for a CBU"
+        behavior: crud
+        crud:
+          operation: select
+          table: v_cbu_entity_with_roles
+          schema: ob-poc
+          multiple: true
+
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+
+          - name: category
+            type: string
+            required: false
+            maps_to: role_category
+            description: "Filter by role category"
+
+        returns:
+          type: record_set
+
+      validate:
+        description: "Validate all role assignments for a CBU (check requirements)"
+        behavior: plugin
+        custom_handler: cbu_role_validate_all
+
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+
+        returns:
+          type: record

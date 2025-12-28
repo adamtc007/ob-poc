@@ -6,13 +6,16 @@ domains:
     description: "KYC service agreement management for sponsor relationships"
     verbs:
       create:
-        description: "Create KYC service agreement with sponsor"
+        description: "Create KYC service agreement with sponsor (idempotent by sponsor+reference)"
         behavior: crud
         crud:
-          operation: insert
+          operation: upsert
           table: kyc_service_agreements
           schema: ob-poc
           returning: agreement_id
+          conflict_keys:
+            - sponsor_cbu_id
+            - agreement_reference
         args:
           - name: sponsor-cbu-id
             type: uuid

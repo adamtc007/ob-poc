@@ -3,13 +3,17 @@ domains:
     description: UBO ownership and control chain management
     verbs:
       add-ownership:
-        description: Add ownership relationship between entities
+        description: Add ownership relationship between entities (idempotent by owner+owned)
         behavior: crud
         crud:
-          operation: insert
+          operation: upsert
           table: entity_relationships
           schema: ob-poc
           returning: relationship_id
+          conflict_keys:
+            - from_entity_id
+            - to_entity_id
+            - relationship_type
         args:
           - name: owner-entity-id
             type: uuid

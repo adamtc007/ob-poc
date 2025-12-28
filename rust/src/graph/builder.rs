@@ -176,6 +176,13 @@ impl CbuGraphBuilder {
 
             // Each entity appears once with all roles aggregated
             if !graph.has_node(&entity_id) {
+                // Compute layout behavior from primary role category
+                let layout_behavior = ent
+                    .primary_role_category
+                    .as_ref()
+                    .and_then(|cat| crate::graph::RoleCategory::from_str(cat))
+                    .map(|cat| format!("{:?}", cat.layout_behavior()).to_lowercase());
+
                 graph.add_node(GraphNode {
                     id: entity_id.clone(),
                     node_type: NodeType::Entity,
@@ -190,6 +197,11 @@ impl CbuGraphBuilder {
                     jurisdiction: ent.jurisdiction.clone(),
                     role_priority: ent.role_priority,
                     entity_category: ent.entity_category.clone(),
+                    // Role Taxonomy V2 fields
+                    primary_role_category: ent.primary_role_category.clone(),
+                    layout_behavior,
+                    ubo_treatment: ent.ubo_treatment.clone(),
+                    kyc_obligation: ent.kyc_obligation.clone(),
                     data: serde_json::json!({
                         "entity_id": ent.entity_id,
                         "entity_category": ent.entity_category,
@@ -197,7 +209,10 @@ impl CbuGraphBuilder {
                         "role_categories": ent.role_categories,
                         "primary_role": ent.primary_role,
                         "jurisdiction": ent.jurisdiction,
-                        "role_priority": ent.role_priority
+                        "role_priority": ent.role_priority,
+                        "primary_role_category": ent.primary_role_category,
+                        "ubo_treatment": ent.ubo_treatment,
+                        "kyc_obligation": ent.kyc_obligation
                     }),
                     ..Default::default()
                 });

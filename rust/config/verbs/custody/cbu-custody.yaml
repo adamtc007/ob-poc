@@ -109,13 +109,16 @@ domains:
         returns:
           type: affected
       create-ssi:
-        description: Create a Standing Settlement Instruction (pure account data)
+        description: Create a Standing Settlement Instruction (idempotent by cbu+name)
         behavior: crud
         crud:
-          operation: insert
+          operation: upsert
           table: cbu_ssi
           schema: custody
           returning: ssi_id
+          conflict_keys:
+            - cbu_id
+            - ssi_name
         args:
           - name: cbu-id
             type: uuid
@@ -338,13 +341,16 @@ domains:
         returns:
           type: affected
       add-booking-rule:
-        description: Add ALERT-style booking rule for SSI routing
+        description: Add ALERT-style booking rule for SSI routing (idempotent by cbu+name)
         behavior: crud
         crud:
-          operation: insert
+          operation: upsert
           table: ssi_booking_rules
           schema: custody
           returning: rule_id
+          conflict_keys:
+            - cbu_id
+            - rule_name
         args:
           - name: cbu-id
             type: uuid
@@ -682,13 +688,17 @@ domains:
         returns:
           type: record
       add-agent-override:
-        description: Add intermediary agent to SSI settlement chain
+        description: Add intermediary agent to SSI settlement chain (idempotent by ssi+role+sequence)
         behavior: crud
         crud:
-          operation: insert
+          operation: upsert
           table: cbu_ssi_agent_override
           schema: custody
           returning: override_id
+          conflict_keys:
+            - ssi_id
+            - agent_role
+            - sequence_order
         args:
           - name: ssi-id
             type: uuid

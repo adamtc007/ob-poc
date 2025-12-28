@@ -1008,8 +1008,6 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                         tracing::info!("Resolved {}: '{}' → '{}'", param, from, to);
                     }
 
-                    let modified_intents = modified_intents;
-
                     // Validate intents against registry
                     validation_results.clear();
                     let mut has_errors = false;

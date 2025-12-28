@@ -246,6 +246,15 @@ pub struct GraphEntityView {
     pub role_categories: Vec<String>,
     pub primary_role: Option<String>,
     pub role_priority: Option<i32>,
+    // Role Taxonomy V2 fields
+    /// Primary role category from taxonomy (e.g., "OWNERSHIP_CHAIN", "CONTROL_CHAIN")
+    pub primary_role_category: Option<String>,
+    /// Layout behavior hint from taxonomy (e.g., "PYRAMID_UP", "OVERLAY")
+    pub layout_category: Option<String>,
+    /// UBO treatment code (e.g., "TERMINUS", "LOOK_THROUGH")
+    pub ubo_treatment: Option<String>,
+    /// KYC obligation level (e.g., "FULL_KYC", "SIMPLIFIED")
+    pub kyc_obligation: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -1131,7 +1140,11 @@ impl VisualizationRepository {
                 roles,
                 role_categories,
                 primary_role,
-                max_role_priority as role_priority
+                max_role_priority as role_priority,
+                primary_role_category,
+                primary_layout_category,
+                effective_ubo_treatment,
+                effective_kyc_obligation
                FROM "ob-poc".v_cbu_entity_with_roles
                WHERE cbu_id = $1"#,
             cbu_id
@@ -1155,6 +1168,11 @@ impl VisualizationRepository {
                 role_categories: r.role_categories.unwrap_or_default(),
                 primary_role: r.primary_role,
                 role_priority: r.role_priority,
+                // Role Taxonomy V2 fields
+                primary_role_category: r.primary_role_category,
+                layout_category: r.primary_layout_category,
+                ubo_treatment: r.effective_ubo_treatment,
+                kyc_obligation: r.effective_kyc_obligation,
             })
             .collect())
     }

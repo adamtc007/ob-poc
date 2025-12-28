@@ -2,15 +2,19 @@ domains:
   delegation:
     description: Service provider delegation chains - ManCo to sub-advisor, administrator to sub-contractor
     verbs:
-
       add:
-        description: Add a delegation relationship
+        description: Add a delegation relationship (idempotent by delegator+delegate+scope+cbu)
         behavior: crud
         crud:
-          operation: insert
+          operation: upsert
           table: delegation_relationships
           schema: ob-poc
           returning: delegation_id
+          conflict_keys:
+            - delegator_entity_id
+            - delegate_entity_id
+            - delegation_scope
+            - applies_to_cbu_id
         args:
           - name: delegator-entity-id
             type: uuid

@@ -3,71 +3,74 @@ domains:
     description: Document collection and verification for KYC workstreams
     verbs:
       create:
-        description: Create a document request
+        description: Create a document request (idempotent by workstream+doc_type)
         behavior: crud
         crud:
-          operation: insert
+          operation: upsert
           table: doc_requests
           schema: kyc
           returning: request_id
+          conflict_keys:
+            - workstream_id
+            - doc_type
         emits_event: doc-request.created
         args:
-        - name: workstream-id
-          type: uuid
-          required: true
-          maps_to: workstream_id
-          lookup:
-            table: entity_workstreams
-            entity_type: entity_workstream
-            schema: kyc
-            search_key: workstream_id
-            primary_key: workstream_id
-        - name: doc-type
-          type: string
-          required: true
-          maps_to: doc_type
-          valid_values:
-          - PASSPORT
-          - NATIONAL_ID
-          - DRIVERS_LICENSE
-          - PROOF_OF_ADDRESS
-          - CERT_OF_INCORPORATION
-          - CERT_OF_GOOD_STANDING
-          - MEMORANDUM_ARTICLES
-          - REGISTER_OF_DIRECTORS
-          - REGISTER_OF_SHAREHOLDERS
-          - ANNUAL_RETURN
-          - TRUST_DEED
-          - LETTER_OF_WISHES
-          - DEED_OF_APPOINTMENT
-          - BANK_STATEMENT
-          - SOURCE_OF_WEALTH
-          - SOURCE_OF_FUNDS
-          - FINANCIAL_STATEMENTS
-          - TAX_RETURN
-          - REGULATORY_LICENSE
-          - POWER_OF_ATTORNEY
-          - BOARD_RESOLUTION
-          - SIGNATORY_LIST
-        - name: due-date
-          type: date
-          required: false
-          maps_to: due_date
-        - name: is-mandatory
-          type: boolean
-          required: false
-          maps_to: is_mandatory
-          default: true
-        - name: priority
-          type: string
-          required: false
-          maps_to: priority
-          default: NORMAL
-          valid_values:
-          - LOW
-          - NORMAL
-          - HIGH
-          - URGENT
+          - name: workstream-id
+            type: uuid
+            required: true
+            maps_to: workstream_id
+            lookup:
+              table: entity_workstreams
+              entity_type: entity_workstream
+              schema: kyc
+              search_key: workstream_id
+              primary_key: workstream_id
+          - name: doc-type
+            type: string
+            required: true
+            maps_to: doc_type
+            valid_values:
+              - PASSPORT
+              - NATIONAL_ID
+              - DRIVERS_LICENSE
+              - PROOF_OF_ADDRESS
+              - CERT_OF_INCORPORATION
+              - CERT_OF_GOOD_STANDING
+              - MEMORANDUM_ARTICLES
+              - REGISTER_OF_DIRECTORS
+              - REGISTER_OF_SHAREHOLDERS
+              - ANNUAL_RETURN
+              - TRUST_DEED
+              - LETTER_OF_WISHES
+              - DEED_OF_APPOINTMENT
+              - BANK_STATEMENT
+              - SOURCE_OF_WEALTH
+              - SOURCE_OF_FUNDS
+              - FINANCIAL_STATEMENTS
+              - TAX_RETURN
+              - REGULATORY_LICENSE
+              - POWER_OF_ATTORNEY
+              - BOARD_RESOLUTION
+              - SIGNATORY_LIST
+          - name: due-date
+            type: date
+            required: false
+            maps_to: due_date
+          - name: is-mandatory
+            type: boolean
+            required: false
+            maps_to: is_mandatory
+            default: true
+          - name: priority
+            type: string
+            required: false
+            maps_to: priority
+            default: NORMAL
+            valid_values:
+              - LOW
+              - NORMAL
+              - HIGH
+              - URGENT
         returns:
           type: uuid
           name: request_id
@@ -85,16 +88,16 @@ domains:
             requested_at: now()
         emits_event: doc-request.requested
         args:
-        - name: request-id
-          type: uuid
-          required: true
-          maps_to: request_id
-          lookup:
-            table: doc_requests
-            entity_type: doc_request
-            schema: kyc
-            search_key: request_id
-            primary_key: request_id
+          - name: request-id
+            type: uuid
+            required: true
+            maps_to: request_id
+            lookup:
+              table: doc_requests
+              entity_type: doc_request
+              schema: kyc
+              search_key: request_id
+              primary_key: request_id
         returns:
           type: affected
       receive:
@@ -110,26 +113,26 @@ domains:
             received_at: now()
         emits_event: doc-request.received
         args:
-        - name: request-id
-          type: uuid
-          required: true
-          maps_to: request_id
-          lookup:
-            table: doc_requests
-            entity_type: doc_request
-            schema: kyc
-            search_key: request_id
-            primary_key: request_id
-        - name: document-id
-          type: uuid
-          required: true
-          maps_to: document_id
-          lookup:
-            table: document_catalog
-            entity_type: document
-            schema: ob-poc
-            search_key: document_name
-            primary_key: doc_id
+          - name: request-id
+            type: uuid
+            required: true
+            maps_to: request_id
+            lookup:
+              table: doc_requests
+              entity_type: doc_request
+              schema: kyc
+              search_key: request_id
+              primary_key: request_id
+          - name: document-id
+            type: uuid
+            required: true
+            maps_to: document_id
+            lookup:
+              table: document_catalog
+              entity_type: document
+              schema: ob-poc
+              search_key: document_name
+              primary_key: doc_id
         returns:
           type: affected
       verify:
@@ -145,20 +148,20 @@ domains:
             verified_at: now()
         emits_event: doc-request.verified
         args:
-        - name: request-id
-          type: uuid
-          required: true
-          maps_to: request_id
-          lookup:
-            table: doc_requests
-            entity_type: doc_request
-            schema: kyc
-            search_key: request_id
-            primary_key: request_id
-        - name: notes
-          type: string
-          required: false
-          maps_to: verification_notes
+          - name: request-id
+            type: uuid
+            required: true
+            maps_to: request_id
+            lookup:
+              table: doc_requests
+              entity_type: doc_request
+              schema: kyc
+              search_key: request_id
+              primary_key: request_id
+          - name: notes
+            type: string
+            required: false
+            maps_to: verification_notes
         returns:
           type: affected
       reject:
@@ -173,20 +176,20 @@ domains:
             status: REJECTED
         emits_event: doc-request.rejected
         args:
-        - name: request-id
-          type: uuid
-          required: true
-          maps_to: request_id
-          lookup:
-            table: doc_requests
-            entity_type: doc_request
-            schema: kyc
-            search_key: request_id
-            primary_key: request_id
-        - name: reason
-          type: string
-          required: true
-          maps_to: rejection_reason
+          - name: request-id
+            type: uuid
+            required: true
+            maps_to: request_id
+            lookup:
+              table: doc_requests
+              entity_type: doc_request
+              schema: kyc
+              search_key: request_id
+              primary_key: request_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: rejection_reason
         returns:
           type: affected
       waive:
@@ -201,20 +204,20 @@ domains:
             status: WAIVED
         emits_event: doc-request.waived
         args:
-        - name: request-id
-          type: uuid
-          required: true
-          maps_to: request_id
-          lookup:
-            table: doc_requests
-            entity_type: doc_request
-            schema: kyc
-            search_key: request_id
-            primary_key: request_id
-        - name: notes
-          type: string
-          required: true
-          maps_to: verification_notes
+          - name: request-id
+            type: uuid
+            required: true
+            maps_to: request_id
+            lookup:
+              table: doc_requests
+              entity_type: doc_request
+              schema: kyc
+              search_key: request_id
+              primary_key: request_id
+          - name: notes
+            type: string
+            required: true
+            maps_to: verification_notes
         returns:
           type: affected
       list-by-workstream:
@@ -226,18 +229,18 @@ domains:
           schema: kyc
           fk_col: workstream_id
         args:
-        - name: workstream-id
-          type: uuid
-          required: true
-          lookup:
-            table: entity_workstreams
-            entity_type: entity_workstream
-            schema: kyc
-            search_key: workstream_id
-            primary_key: workstream_id
-        - name: status
-          type: string
-          required: false
-          maps_to: status
+          - name: workstream-id
+            type: uuid
+            required: true
+            lookup:
+              table: entity_workstreams
+              entity_type: entity_workstream
+              schema: kyc
+              search_key: workstream_id
+              primary_key: workstream_id
+          - name: status
+            type: string
+            required: false
+            maps_to: status
         returns:
           type: record_set

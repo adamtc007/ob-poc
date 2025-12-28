@@ -2,8 +2,24 @@
 //!
 //! Computes x, y positions for graph nodes based on view mode and graph semantics.
 //! The UI receives pre-positioned nodes and just renders them.
+//!
+//! ## Role Taxonomy V2
+//!
+//! Layout decisions are driven by `RoleCategory` and `LayoutBehavior` rather than
+//! numeric role_priority values. Each entity's `primary_role_category` determines
+//! its `layout_behavior` which controls placement:
+//!
+//! | LayoutBehavior | Placement |
+//! |----------------|-----------|
+//! | PyramidUp      | Tier 2-3, ownership chain (SHELL left, PERSON right) |
+//! | PyramidDown    | Tier 2-3, control chain (SHELL left, PERSON right) |
+//! | TreeDown       | Tier 3, fund structure hierarchy |
+//! | Overlay        | Tier 3, service providers overlay on structure |
+//! | Satellite      | Tier 4, trading/execution entities |
+//! | FlatBottom     | Tier 5, investor chain |
+//! | Peripheral     | Edge, related parties |
 
-use super::types::{CbuGraph, GraphNode, NodeType};
+use super::types::{CbuGraph, GraphNode, LayoutBehavior, NodeType, RoleCategory};
 
 /// View modes determine which layers are visible and how they're laid out
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -136,6 +152,40 @@ impl LayoutEngine {
         }
     }
 
+    /// Get the layout behavior for a node, using the new taxonomy fields
+    /// with fallback to legacy role_priority for backward compatibility
+    fn get_layout_behavior(&self, node: &GraphNode) -> LayoutBehavior {
+        // First, try to get behavior from the node's layout_behavior field (set by builder)
+        if let Some(ref behavior_str) = node.layout_behavior {
+            if let Some(behavior) = LayoutBehavior::from_str(behavior_str) {
+                return behavior;
+            }
+        }
+
+        // Second, try to derive from primary_role_category
+        if let Some(ref category_str) = node.primary_role_category {
+            if let Some(category) = RoleCategory::from_str(category_str) {
+                return category.layout_behavior();
+            }
+        }
+
+        // Fallback: use legacy role_priority for backward compatibility
+        let priority = node.role_priority.unwrap_or(0);
+        if priority >= 100 {
+            // OWNERSHIP_CONTROL legacy category
+            LayoutBehavior::PyramidUp
+        } else if priority >= 50 {
+            // BOTH legacy category (directors, signatories)
+            LayoutBehavior::Overlay
+        } else if priority >= 10 {
+            // TRADING_EXECUTION legacy category
+            LayoutBehavior::Satellite
+        } else {
+            // Unknown/peripheral
+            LayoutBehavior::Peripheral
+        }
+    }
+
     /// Apply layout to the graph, computing x/y positions for all nodes
     pub fn layout(&self, graph: &mut CbuGraph) {
         match (self.view_mode, self.orientation) {
@@ -158,65 +208,89 @@ impl LayoutEngine {
         }
     }
 
-    /// KYC/UBO layout (VERTICAL - top to bottom): Hierarchical by role priority with SHELL/PERSON split
+    /// KYC/UBO layout (VERTICAL - top to bottom): Hierarchical by LayoutBehavior with SHELL/PERSON split
+    ///
+    /// Uses RoleCategory → LayoutBehavior mapping for tier placement:
     ///
     /// ```text
     /// Tier 0: CBU (center)
     /// Tier 1: Products (center-right, if any)
-    /// Tier 2: OWNERSHIP_CONTROL entities (SHELL left, PERSON right)
-    /// Tier 3: BOTH entities (SHELL left, PERSON right)
-    /// Tier 4: TRADING_EXECUTION entities (SHELL left, PERSON right)
+    /// Tier 2: PyramidUp/PyramidDown (ownership/control chains) - SHELL left, PERSON right
+    /// Tier 3: TreeDown/Overlay (fund structure, service providers) - SHELL left, PERSON right
+    /// Tier 4: Satellite/Radial (trading, trust roles) - SHELL left, PERSON right
+    /// Tier 5: FlatBottom/FlatRight (investor chain) - SHELL left, PERSON right
+    /// Tier 6: Peripheral (related parties) and other nodes
     /// ```
     fn layout_kyc_ubo_vertical(&self, graph: &mut CbuGraph) {
         let center_x = self.config.canvas_width / 2.0;
 
-        // Collect nodes by tier
+        // Collect nodes by tier based on LayoutBehavior
         let mut tier_0: Vec<usize> = Vec::new(); // CBU
         let mut tier_1: Vec<usize> = Vec::new(); // Products
-        let mut tier_2_shell: Vec<usize> = Vec::new(); // OWNERSHIP_CONTROL + SHELL
-        let mut tier_2_person: Vec<usize> = Vec::new(); // OWNERSHIP_CONTROL + PERSON
-        let mut tier_3_shell: Vec<usize> = Vec::new(); // BOTH + SHELL
-        let mut tier_3_person: Vec<usize> = Vec::new(); // BOTH + PERSON
-        let mut tier_4_shell: Vec<usize> = Vec::new(); // TRADING + SHELL
-        let mut tier_4_person: Vec<usize> = Vec::new(); // TRADING + PERSON
-        let mut other: Vec<usize> = Vec::new(); // KYC, documents, etc.
+        let mut tier_2_shell: Vec<usize> = Vec::new(); // PyramidUp/PyramidDown + SHELL
+        let mut tier_2_person: Vec<usize> = Vec::new(); // PyramidUp/PyramidDown + PERSON
+        let mut tier_3_shell: Vec<usize> = Vec::new(); // TreeDown/Overlay + SHELL
+        let mut tier_3_person: Vec<usize> = Vec::new(); // TreeDown/Overlay + PERSON
+        let mut tier_4_shell: Vec<usize> = Vec::new(); // Satellite/Radial + SHELL
+        let mut tier_4_person: Vec<usize> = Vec::new(); // Satellite/Radial + PERSON
+        let mut tier_5_shell: Vec<usize> = Vec::new(); // FlatBottom/FlatRight + SHELL
+        let mut tier_5_person: Vec<usize> = Vec::new(); // FlatBottom/FlatRight + PERSON
+        let mut tier_6: Vec<usize> = Vec::new(); // Peripheral and other nodes
 
         for (idx, node) in graph.nodes.iter().enumerate() {
             match node.node_type {
                 NodeType::Cbu => tier_0.push(idx),
                 NodeType::Product => tier_1.push(idx),
                 NodeType::Entity => {
-                    let priority = node.role_priority.unwrap_or(0);
                     let is_shell = node.entity_category.as_deref() == Some("SHELL");
 
-                    if priority >= 100 {
-                        // OWNERSHIP_CONTROL
-                        if is_shell {
-                            tier_2_shell.push(idx);
-                        } else {
-                            tier_2_person.push(idx);
+                    // Get layout behavior from the node, or derive from role category
+                    let behavior = self.get_layout_behavior(node);
+
+                    match behavior {
+                        LayoutBehavior::PyramidUp | LayoutBehavior::PyramidDown => {
+                            // Ownership/control chains - highest tier
+                            if is_shell {
+                                tier_2_shell.push(idx);
+                            } else {
+                                tier_2_person.push(idx);
+                            }
                         }
-                    } else if priority >= 50 {
-                        // BOTH
-                        if is_shell {
-                            tier_3_shell.push(idx);
-                        } else {
-                            tier_3_person.push(idx);
+                        LayoutBehavior::TreeDown | LayoutBehavior::Overlay => {
+                            // Fund structure, service providers
+                            if is_shell {
+                                tier_3_shell.push(idx);
+                            } else {
+                                tier_3_person.push(idx);
+                            }
                         }
-                    } else {
-                        // TRADING_EXECUTION or unknown
-                        if is_shell {
-                            tier_4_shell.push(idx);
-                        } else {
-                            tier_4_person.push(idx);
+                        LayoutBehavior::Satellite | LayoutBehavior::Radial => {
+                            // Trading execution, trust roles
+                            if is_shell {
+                                tier_4_shell.push(idx);
+                            } else {
+                                tier_4_person.push(idx);
+                            }
+                        }
+                        LayoutBehavior::FlatBottom | LayoutBehavior::FlatRight => {
+                            // Investor chain
+                            if is_shell {
+                                tier_5_shell.push(idx);
+                            } else {
+                                tier_5_person.push(idx);
+                            }
+                        }
+                        LayoutBehavior::Peripheral => {
+                            // Related parties, edge entities
+                            tier_6.push(idx);
                         }
                     }
                 }
                 NodeType::Service | NodeType::Resource => {
                     // Skip in KYC view, or place below products
-                    other.push(idx);
+                    tier_6.push(idx);
                 }
-                _ => other.push(idx),
+                _ => tier_6.push(idx),
             }
         }
 
@@ -224,23 +298,28 @@ impl LayoutEngine {
         self.layout_tier_centered(&mut graph.nodes, &tier_0, 0, center_x);
         self.layout_tier_centered(&mut graph.nodes, &tier_1, 1, center_x + 200.0);
 
-        // Tier 2: OWNERSHIP_CONTROL - shells left, persons right
+        // Tier 2: Ownership/Control chains (PyramidUp/PyramidDown)
         let tier_2_y = 2.0 * self.config.tier_spacing_y;
         self.layout_tier_left(&mut graph.nodes, &tier_2_shell, 2, tier_2_y);
         self.layout_tier_right(&mut graph.nodes, &tier_2_person, 2, tier_2_y);
 
-        // Tier 3: BOTH
+        // Tier 3: Fund structure/Service providers (TreeDown/Overlay)
         let tier_3_y = 3.0 * self.config.tier_spacing_y;
         self.layout_tier_left(&mut graph.nodes, &tier_3_shell, 3, tier_3_y);
         self.layout_tier_right(&mut graph.nodes, &tier_3_person, 3, tier_3_y);
 
-        // Tier 4: TRADING_EXECUTION
+        // Tier 4: Trading/Trust roles (Satellite/Radial)
         let tier_4_y = 4.0 * self.config.tier_spacing_y;
         self.layout_tier_left(&mut graph.nodes, &tier_4_shell, 4, tier_4_y);
         self.layout_tier_right(&mut graph.nodes, &tier_4_person, 4, tier_4_y);
 
-        // Other nodes (KYC, documents) - place at bottom
-        self.layout_tier_centered(&mut graph.nodes, &other, 5, center_x);
+        // Tier 5: Investor chain (FlatBottom/FlatRight)
+        let tier_5_y = 5.0 * self.config.tier_spacing_y;
+        self.layout_tier_left(&mut graph.nodes, &tier_5_shell, 5, tier_5_y);
+        self.layout_tier_right(&mut graph.nodes, &tier_5_person, 5, tier_5_y);
+
+        // Tier 6: Peripheral and other nodes
+        self.layout_tier_centered(&mut graph.nodes, &tier_6, 6, center_x);
     }
 
     /// UBO Only layout (VERTICAL): Pure ownership/control graph
@@ -398,55 +477,77 @@ impl LayoutEngine {
 
     /// KYC/UBO layout (HORIZONTAL - left to right): Tiers flow horizontally, splits are top/bottom
     ///
+    /// Uses RoleCategory → LayoutBehavior mapping for tier placement:
+    ///
     /// ```text
     /// Tier 0: CBU (left, center-y)
     /// Tier 1: Products (next column)
-    /// Tier 2: OWNERSHIP_CONTROL entities (SHELL top, PERSON bottom)
-    /// Tier 3: BOTH entities (SHELL top, PERSON bottom)
-    /// Tier 4: TRADING_EXECUTION entities (SHELL top, PERSON bottom)
+    /// Tier 2: PyramidUp/PyramidDown (ownership/control) - SHELL top, PERSON bottom
+    /// Tier 3: TreeDown/Overlay (fund structure, service providers) - SHELL top, PERSON bottom
+    /// Tier 4: Satellite/Radial (trading, trust roles) - SHELL top, PERSON bottom
+    /// Tier 5: FlatBottom/FlatRight (investor chain) - SHELL top, PERSON bottom
+    /// Tier 6: Peripheral (related parties) and other nodes
     /// ```
     fn layout_kyc_ubo_horizontal(&self, graph: &mut CbuGraph) {
         let center_y = 300.0; // Vertical center for the layout
 
-        // Collect nodes by tier (same logic as vertical)
-        let mut tier_0: Vec<usize> = Vec::new();
-        let mut tier_1: Vec<usize> = Vec::new();
-        let mut tier_2_shell: Vec<usize> = Vec::new();
-        let mut tier_2_person: Vec<usize> = Vec::new();
-        let mut tier_3_shell: Vec<usize> = Vec::new();
-        let mut tier_3_person: Vec<usize> = Vec::new();
-        let mut tier_4_shell: Vec<usize> = Vec::new();
-        let mut tier_4_person: Vec<usize> = Vec::new();
-        let mut other: Vec<usize> = Vec::new();
+        // Collect nodes by tier based on LayoutBehavior (same logic as vertical)
+        let mut tier_0: Vec<usize> = Vec::new(); // CBU
+        let mut tier_1: Vec<usize> = Vec::new(); // Products
+        let mut tier_2_shell: Vec<usize> = Vec::new(); // PyramidUp/PyramidDown + SHELL
+        let mut tier_2_person: Vec<usize> = Vec::new(); // PyramidUp/PyramidDown + PERSON
+        let mut tier_3_shell: Vec<usize> = Vec::new(); // TreeDown/Overlay + SHELL
+        let mut tier_3_person: Vec<usize> = Vec::new(); // TreeDown/Overlay + PERSON
+        let mut tier_4_shell: Vec<usize> = Vec::new(); // Satellite/Radial + SHELL
+        let mut tier_4_person: Vec<usize> = Vec::new(); // Satellite/Radial + PERSON
+        let mut tier_5_shell: Vec<usize> = Vec::new(); // FlatBottom/FlatRight + SHELL
+        let mut tier_5_person: Vec<usize> = Vec::new(); // FlatBottom/FlatRight + PERSON
+        let mut tier_6: Vec<usize> = Vec::new(); // Peripheral and other nodes
 
         for (idx, node) in graph.nodes.iter().enumerate() {
             match node.node_type {
                 NodeType::Cbu => tier_0.push(idx),
                 NodeType::Product => tier_1.push(idx),
                 NodeType::Entity => {
-                    let priority = node.role_priority.unwrap_or(0);
                     let is_shell = node.entity_category.as_deref() == Some("SHELL");
+                    let behavior = self.get_layout_behavior(node);
 
-                    if priority >= 100 {
-                        if is_shell {
-                            tier_2_shell.push(idx);
-                        } else {
-                            tier_2_person.push(idx);
+                    match behavior {
+                        LayoutBehavior::PyramidUp | LayoutBehavior::PyramidDown => {
+                            if is_shell {
+                                tier_2_shell.push(idx);
+                            } else {
+                                tier_2_person.push(idx);
+                            }
                         }
-                    } else if priority >= 50 {
-                        if is_shell {
-                            tier_3_shell.push(idx);
-                        } else {
-                            tier_3_person.push(idx);
+                        LayoutBehavior::TreeDown | LayoutBehavior::Overlay => {
+                            if is_shell {
+                                tier_3_shell.push(idx);
+                            } else {
+                                tier_3_person.push(idx);
+                            }
                         }
-                    } else if is_shell {
-                        tier_4_shell.push(idx);
-                    } else {
-                        tier_4_person.push(idx);
+                        LayoutBehavior::Satellite | LayoutBehavior::Radial => {
+                            if is_shell {
+                                tier_4_shell.push(idx);
+                            } else {
+                                tier_4_person.push(idx);
+                            }
+                        }
+                        LayoutBehavior::FlatBottom | LayoutBehavior::FlatRight => {
+                            if is_shell {
+                                tier_5_shell.push(idx);
+                            } else {
+                                tier_5_person.push(idx);
+                            }
+                        }
+                        LayoutBehavior::Peripheral => {
+                            tier_6.push(idx);
+                        }
                     }
                 }
-                NodeType::Service | NodeType::Resource => other.push(idx),
-                _ => other.push(idx),
+                NodeType::Service | NodeType::Resource => tier_6.push(idx),
+                _ => tier_6.push(idx),
             }
         }
 
@@ -454,23 +555,28 @@ impl LayoutEngine {
         self.layout_tier_horizontal_centered(&mut graph.nodes, &tier_0, 0, center_y);
         self.layout_tier_horizontal_centered(&mut graph.nodes, &tier_1, 1, center_y - 80.0);
 
-        // Tier 2: OWNERSHIP_CONTROL - shells top, persons bottom
+        // Tier 2: Ownership/Control chains (PyramidUp/PyramidDown) - shells top, persons bottom
         let tier_2_x = 2.0 * self.config.node_spacing_x + 100.0;
         self.layout_tier_horizontal_top(&mut graph.nodes, &tier_2_shell, 2, tier_2_x);
         self.layout_tier_horizontal_bottom(&mut graph.nodes, &tier_2_person, 2, tier_2_x);
 
-        // Tier 3: BOTH
+        // Tier 3: Fund structure/Service providers (TreeDown/Overlay)
         let tier_3_x = 3.0 * self.config.node_spacing_x + 100.0;
         self.layout_tier_horizontal_top(&mut graph.nodes, &tier_3_shell, 3, tier_3_x);
         self.layout_tier_horizontal_bottom(&mut graph.nodes, &tier_3_person, 3, tier_3_x);
 
-        // Tier 4: TRADING_EXECUTION
+        // Tier 4: Trading/Trust roles (Satellite/Radial)
         let tier_4_x = 4.0 * self.config.node_spacing_x + 100.0;
         self.layout_tier_horizontal_top(&mut graph.nodes, &tier_4_shell, 4, tier_4_x);
         self.layout_tier_horizontal_bottom(&mut graph.nodes, &tier_4_person, 4, tier_4_x);
 
-        // Other nodes - far right
-        self.layout_tier_horizontal_centered(&mut graph.nodes, &other, 5, center_y);
+        // Tier 5: Investor chain (FlatBottom/FlatRight)
+        let tier_5_x = 5.0 * self.config.node_spacing_x + 100.0;
+        self.layout_tier_horizontal_top(&mut graph.nodes, &tier_5_shell, 5, tier_5_x);
+        self.layout_tier_horizontal_bottom(&mut graph.nodes, &tier_5_person, 5, tier_5_x);
+
+        // Tier 6: Peripheral and other nodes - far right
+        self.layout_tier_horizontal_centered(&mut graph.nodes, &tier_6, 6, center_y);
     }
 
     /// Service Delivery layout (HORIZONTAL): Tree flows left to right

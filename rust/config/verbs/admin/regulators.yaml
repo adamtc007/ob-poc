@@ -46,13 +46,15 @@ domains:
           type: record
 
       create:
-        description: "Add new recognized regulator"
+        description: "Add new recognized regulator (idempotent by code)"
         behavior: crud
         crud:
-          operation: insert
+          operation: upsert
           table: regulators
           schema: ob_ref
           returning: regulator_code
+          conflict_keys:
+            - regulator_code
         args:
           - name: code
             type: string

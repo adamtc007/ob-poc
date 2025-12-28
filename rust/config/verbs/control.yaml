@@ -3,13 +3,17 @@ domains:
     description: Control relationships (distinct from ownership) - voting rights, board control, veto powers
     verbs:
       add:
-        description: Add a control relationship between entities
+        description: Add a control relationship between entities (idempotent by controller+controlled+type)
         behavior: crud
         crud:
-          operation: insert
+          operation: upsert
           table: entity_relationships
           schema: ob-poc
           returning: relationship_id
+          conflict_keys:
+            - from_entity_id
+            - to_entity_id
+            - control_type
         args:
           - name: controller-entity-id
             type: uuid

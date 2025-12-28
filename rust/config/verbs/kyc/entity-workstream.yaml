@@ -3,7 +3,7 @@ domains:
     description: Per-entity workstream within a KYC case
     verbs:
       create:
-        description: Create a new entity workstream
+        description: Create a new entity workstream (idempotent by case+entity)
         behavior: crud
         produces:
           type: workstream
@@ -16,10 +16,13 @@ domains:
             type: entity
             required: true
         crud:
-          operation: insert
+          operation: upsert
           table: entity_workstreams
           schema: kyc
           returning: workstream_id
+          conflict_keys:
+            - case_id
+            - entity_id
         emits_event: workstream.created
         args:
           - name: case-id

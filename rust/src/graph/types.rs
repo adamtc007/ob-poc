@@ -7,6 +7,153 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
+// =============================================================================
+// ROLE TAXONOMY V2 - Layout behavior hints from role categories
+// =============================================================================
+
+/// Role category from taxonomy - determines layout behavior
+/// Maps to role_category column in ob-poc.roles table
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum RoleCategory {
+    /// Ownership chain - pyramid layout with UBOs at apex
+    OwnershipChain,
+    /// Control chain - overlay on owned entities (directors, officers)
+    ControlChain,
+    /// Fund structure - tree layout (umbrella → subfund → share class)
+    FundStructure,
+    /// Fund management - satellite around fund (ManCo, admin, depositary)
+    FundManagement,
+    /// Trust roles - radial around trust entity (settlor, trustee, beneficiary)
+    TrustRoles,
+    /// Service providers - flat row at bottom (custodian, auditor)
+    ServiceProvider,
+    /// Trading execution - flat column at right (signatories, traders)
+    TradingExecution,
+    /// Investor chain - pyramid down below fund (LP investors)
+    InvestorChain,
+    /// Related parties - peripheral (affiliated entities)
+    RelatedParty,
+    /// Legacy categories for backward compatibility
+    OwnershipControl,
+    Both,
+    FundOperations,
+    Distribution,
+    Financing,
+}
+
+impl RoleCategory {
+    /// Parse from database string value
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_uppercase().as_str() {
+            "OWNERSHIP_CHAIN" => Some(Self::OwnershipChain),
+            "CONTROL_CHAIN" => Some(Self::ControlChain),
+            "FUND_STRUCTURE" => Some(Self::FundStructure),
+            "FUND_MANAGEMENT" => Some(Self::FundManagement),
+            "TRUST_ROLES" => Some(Self::TrustRoles),
+            "SERVICE_PROVIDER" => Some(Self::ServiceProvider),
+            "TRADING_EXECUTION" => Some(Self::TradingExecution),
+            "INVESTOR_CHAIN" => Some(Self::InvestorChain),
+            "RELATED_PARTY" => Some(Self::RelatedParty),
+            // Legacy mappings
+            "OWNERSHIP_CONTROL" => Some(Self::OwnershipControl),
+            "BOTH" => Some(Self::Both),
+            "FUND_OPERATIONS" => Some(Self::FundOperations),
+            "DISTRIBUTION" => Some(Self::Distribution),
+            "FINANCING" => Some(Self::Financing),
+            _ => None,
+        }
+    }
+
+    /// Get the layout behavior for this role category
+    pub fn layout_behavior(&self) -> LayoutBehavior {
+        match self {
+            Self::OwnershipChain | Self::OwnershipControl => LayoutBehavior::PyramidUp,
+            Self::ControlChain => LayoutBehavior::Overlay,
+            Self::FundStructure => LayoutBehavior::TreeDown,
+            Self::FundManagement => LayoutBehavior::Satellite,
+            Self::TrustRoles => LayoutBehavior::Radial,
+            Self::ServiceProvider => LayoutBehavior::FlatBottom,
+            Self::TradingExecution | Self::FundOperations | Self::Distribution => {
+                LayoutBehavior::FlatRight
+            }
+            Self::InvestorChain | Self::Financing => LayoutBehavior::PyramidDown,
+            Self::RelatedParty => LayoutBehavior::Peripheral,
+            Self::Both => LayoutBehavior::Overlay, // Dual-purpose defaults to overlay
+        }
+    }
+
+    /// Check if this category represents ownership/control (for UBO views)
+    pub fn is_ownership_or_control(&self) -> bool {
+        matches!(
+            self,
+            Self::OwnershipChain
+                | Self::ControlChain
+                | Self::OwnershipControl
+                | Self::TrustRoles
+                | Self::Both
+        )
+    }
+
+    /// Check if this category should appear in service delivery views
+    pub fn is_service_or_trading(&self) -> bool {
+        matches!(
+            self,
+            Self::ServiceProvider
+                | Self::TradingExecution
+                | Self::FundOperations
+                | Self::Distribution
+                | Self::Financing
+                | Self::Both
+        )
+    }
+}
+
+/// Layout behavior hint for node positioning
+/// Computed from RoleCategory, used by LayoutEngine
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LayoutBehavior {
+    /// Ownership pyramid - UBOs at apex, working down to commercial client
+    PyramidUp,
+    /// Investor pyramid - fund at top, investors below
+    PyramidDown,
+    /// Fund hierarchy - parent to children (umbrella → subfund)
+    TreeDown,
+    /// Control overlay - adjacent to owned entity (directors)
+    Overlay,
+    /// Management satellite - orbit around fund entity
+    Satellite,
+    /// Trust radial - around central trust entity
+    Radial,
+    /// Services flat - row at bottom of canvas
+    FlatBottom,
+    /// Trading flat - column at right of canvas
+    FlatRight,
+    /// Related parties - outer edges, peripheral
+    Peripheral,
+}
+
+impl LayoutBehavior {
+    /// Parse from database string value
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "pyramid_up" => Some(Self::PyramidUp),
+            "pyramid_down" => Some(Self::PyramidDown),
+            "tree_down" => Some(Self::TreeDown),
+            "overlay" => Some(Self::Overlay),
+            "satellite" => Some(Self::Satellite),
+            "radial" => Some(Self::Radial),
+            "flat_bottom" => Some(Self::FlatBottom),
+            "flat_right" => Some(Self::FlatRight),
+            "peripheral" => Some(Self::Peripheral),
+            _ => None,
+        }
+    }
+}
+
 /// Graph projection of a CBU for visualization
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CbuGraph {
@@ -52,6 +199,27 @@ pub struct GraphNode {
     /// Entity category: SHELL (legal vehicles) or PERSON (natural persons)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub entity_category: Option<String>,
+
+    // =========================================================================
+    // ROLE TAXONOMY V2 FIELDS - from role table taxonomy columns
+    // =========================================================================
+    /// Primary role category from taxonomy (e.g., "OWNERSHIP_CHAIN", "CONTROL_CHAIN")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub primary_role_category: Option<String>,
+
+    /// Layout behavior hint computed from role_category
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub layout_behavior: Option<String>,
+
+    /// UBO treatment code from role taxonomy
+    /// Values: TERMINUS, LOOK_THROUGH, CONTROL_PRONG, NOT_APPLICABLE, etc.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ubo_treatment: Option<String>,
+
+    /// KYC obligation level from role taxonomy
+    /// Values: FULL_KYC, SIMPLIFIED, SCREEN_ONLY, RECORD_ONLY, NOT_REQUIRED
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kyc_obligation: Option<String>,
 
     // =========================================================================
     // LAYOUT FIELDS - computed by server-side LayoutEngine

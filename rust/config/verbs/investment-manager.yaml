@@ -8,13 +8,17 @@ domains:
     description: "Investment manager assignment and scope management"
     verbs:
       assign:
-        description: Assign investment manager to CBU with trading scope
+        description: Assign investment manager to CBU with trading scope (idempotent by cbu+manager_lei+role)
         behavior: crud
         crud:
-          operation: insert
+          operation: upsert
           table: cbu_im_assignments
           schema: custody
           returning: assignment_id
+          conflict_keys:
+            - cbu_id
+            - manager_lei
+            - manager_role
         args:
           - name: cbu-id
             type: uuid

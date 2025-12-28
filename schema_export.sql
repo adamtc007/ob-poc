@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict tPrbk8vcbETcBDqhJ4U1pK0XzDL4jWTlAIsNUinbzyvR8sAQGMWiODlOt5sDRPI
+\restrict 2dPtjKhtDQ2gKiHFSlC1tnjZ8La99tCcuyxNifBQrbG78iUY26XaM0vdnCWCqoB
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -18,6 +18,13 @@ SET check_function_bodies = false;
 SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
+
+--
+-- Name: client_portal; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA client_portal;
+
 
 --
 -- Name: custody; Type: SCHEMA; Schema: -; Owner: -
@@ -836,6 +843,46 @@ $$;
 --
 
 COMMENT ON FUNCTION "ob-poc".check_cbu_invariants() IS 'Checks CBU data integrity. Run periodically or before major operations. Returns violations.';
+
+
+--
+-- Name: check_cbu_role_requirements(uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".check_cbu_role_requirements(p_cbu_id uuid) RETURNS TABLE(requirement_type character varying, requiring_role character varying, required_role character varying, is_satisfied boolean, message text)
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RETURN QUERY
+    WITH cbu_roles AS (
+        SELECT DISTINCT r.name AS role_name
+        FROM "ob-poc".cbu_entity_roles cer
+        JOIN "ob-poc".roles r ON cer.role_id = r.role_id
+        WHERE cer.cbu_id = p_cbu_id
+    )
+    SELECT 
+        rr.requirement_type,
+        rr.requiring_role,
+        rr.required_role,
+        EXISTS (SELECT 1 FROM cbu_roles WHERE role_name = rr.required_role) AS is_satisfied,
+        CASE 
+            WHEN EXISTS (SELECT 1 FROM cbu_roles WHERE role_name = rr.required_role)
+            THEN format('Requirement satisfied: %s present', rr.required_role)
+            ELSE format('Missing required role %s for %s: %s', 
+                        rr.required_role, rr.requiring_role, rr.condition_description)
+        END AS message
+    FROM "ob-poc".role_requirements rr
+    WHERE rr.scope = 'SAME_CBU'
+      AND EXISTS (SELECT 1 FROM cbu_roles WHERE role_name = rr.requiring_role);
+END;
+$$;
+
+
+--
+-- Name: FUNCTION check_cbu_role_requirements(p_cbu_id uuid); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".check_cbu_role_requirements(p_cbu_id uuid) IS 'Checks if all role requirements are satisfied for a CBU (e.g., feeder needs master).';
 
 
 --
@@ -1736,6 +1783,153 @@ $$;
 
 
 --
+-- Name: upsert_role(character varying, text, character varying, character varying, character varying, boolean, boolean, boolean, jsonb, integer, character varying, integer); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".upsert_role(p_name character varying, p_description text, p_role_category character varying, p_layout_category character varying, p_ubo_treatment character varying, p_requires_percentage boolean, p_natural_person_only boolean, p_legal_entity_only boolean, p_compatible_entity_categories jsonb, p_display_priority integer, p_kyc_obligation character varying, p_sort_order integer) RETURNS uuid
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_role_id UUID;
+BEGIN
+    INSERT INTO "ob-poc".roles (
+        name, description, role_category, layout_category, ubo_treatment,
+        requires_percentage, natural_person_only, legal_entity_only,
+        compatible_entity_categories, display_priority, kyc_obligation,
+        sort_order, is_active, created_at, updated_at
+    ) VALUES (
+        UPPER(p_name), p_description, p_role_category, p_layout_category, p_ubo_treatment,
+        p_requires_percentage, p_natural_person_only, p_legal_entity_only,
+        p_compatible_entity_categories, p_display_priority, p_kyc_obligation,
+        p_sort_order, TRUE, NOW(), NOW()
+    )
+    ON CONFLICT (name) DO UPDATE SET
+        description = EXCLUDED.description,
+        role_category = EXCLUDED.role_category,
+        layout_category = EXCLUDED.layout_category,
+        ubo_treatment = EXCLUDED.ubo_treatment,
+        requires_percentage = EXCLUDED.requires_percentage,
+        natural_person_only = EXCLUDED.natural_person_only,
+        legal_entity_only = EXCLUDED.legal_entity_only,
+        compatible_entity_categories = EXCLUDED.compatible_entity_categories,
+        display_priority = EXCLUDED.display_priority,
+        kyc_obligation = EXCLUDED.kyc_obligation,
+        sort_order = EXCLUDED.sort_order,
+        updated_at = NOW()
+    RETURNING role_id INTO v_role_id;
+    
+    RETURN v_role_id;
+END;
+$$;
+
+
+--
+-- Name: validate_role_assignment(uuid, character varying, uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".validate_role_assignment(p_entity_id uuid, p_role_name character varying, p_cbu_id uuid) RETURNS TABLE(is_valid boolean, error_code character varying, error_message text)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_role RECORD;
+    v_entity RECORD;
+    v_existing_roles TEXT[];
+    v_incompatible RECORD;
+BEGIN
+    -- Get role details
+    SELECT * INTO v_role FROM "ob-poc".roles WHERE name = UPPER(p_role_name);
+    IF NOT FOUND THEN
+        RETURN QUERY SELECT FALSE, 'ROLE_NOT_FOUND'::VARCHAR(50), 
+            format('Role %s does not exist', p_role_name);
+        RETURN;
+    END IF;
+    
+    -- Get entity details
+    SELECT e.entity_id, e.name, et.entity_category, et.type_code
+    INTO v_entity
+    FROM "ob-poc".entities e
+    JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
+    WHERE e.entity_id = p_entity_id;
+    
+    IF NOT FOUND THEN
+        RETURN QUERY SELECT FALSE, 'ENTITY_NOT_FOUND'::VARCHAR(50),
+            format('Entity %s does not exist', p_entity_id);
+        RETURN;
+    END IF;
+    
+    -- Check natural person constraint
+    IF v_role.natural_person_only AND v_entity.entity_category != 'PERSON' THEN
+        RETURN QUERY SELECT FALSE, 'NATURAL_PERSON_REQUIRED'::VARCHAR(50),
+            format('Role %s can only be assigned to natural persons, but %s is %s',
+                   p_role_name, v_entity.name, v_entity.entity_category);
+        RETURN;
+    END IF;
+    
+    -- Check legal entity constraint
+    IF v_role.legal_entity_only AND v_entity.entity_category = 'PERSON' THEN
+        RETURN QUERY SELECT FALSE, 'LEGAL_ENTITY_REQUIRED'::VARCHAR(50),
+            format('Role %s can only be assigned to legal entities, but %s is a person',
+                   p_role_name, v_entity.name);
+        RETURN;
+    END IF;
+    
+    -- Check entity category compatibility
+    IF v_role.compatible_entity_categories IS NOT NULL THEN
+        IF NOT (v_role.compatible_entity_categories ? v_entity.entity_category) THEN
+            RETURN QUERY SELECT FALSE, 'INCOMPATIBLE_ENTITY_TYPE'::VARCHAR(50),
+                format('Role %s is not compatible with entity category %s. Compatible: %s',
+                       p_role_name, v_entity.entity_category, v_role.compatible_entity_categories);
+            RETURN;
+        END IF;
+    END IF;
+    
+    -- Get existing roles for this entity in this CBU
+    SELECT array_agg(r.name) INTO v_existing_roles
+    FROM "ob-poc".cbu_entity_roles cer
+    JOIN "ob-poc".roles r ON cer.role_id = r.role_id
+    WHERE cer.entity_id = p_entity_id AND cer.cbu_id = p_cbu_id;
+    
+    -- Check for incompatible role combinations
+    FOR v_incompatible IN
+        SELECT ri.role_a, ri.role_b, ri.reason, ri.exception_allowed
+        FROM "ob-poc".role_incompatibilities ri
+        WHERE (ri.role_a = UPPER(p_role_name) OR ri.role_b = UPPER(p_role_name))
+    LOOP
+        IF v_incompatible.role_a = UPPER(p_role_name) THEN
+            IF v_incompatible.role_b = ANY(v_existing_roles) THEN
+                IF NOT v_incompatible.exception_allowed THEN
+                    RETURN QUERY SELECT FALSE, 'INCOMPATIBLE_ROLES'::VARCHAR(50),
+                        format('Role %s is incompatible with existing role %s: %s',
+                               p_role_name, v_incompatible.role_b, v_incompatible.reason);
+                    RETURN;
+                END IF;
+            END IF;
+        ELSE
+            IF v_incompatible.role_a = ANY(v_existing_roles) THEN
+                IF NOT v_incompatible.exception_allowed THEN
+                    RETURN QUERY SELECT FALSE, 'INCOMPATIBLE_ROLES'::VARCHAR(50),
+                        format('Role %s is incompatible with existing role %s: %s',
+                               p_role_name, v_incompatible.role_a, v_incompatible.reason);
+                    RETURN;
+                END IF;
+            END IF;
+        END IF;
+    END LOOP;
+    
+    -- All checks passed
+    RETURN QUERY SELECT TRUE, NULL::VARCHAR(50), NULL::TEXT;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION validate_role_assignment(p_entity_id uuid, p_role_name character varying, p_cbu_id uuid); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".validate_role_assignment(p_entity_id uuid, p_role_name character varying, p_cbu_id uuid) IS 'Validates that a role can be assigned to an entity, checking entity type compatibility and role conflicts.';
+
+
+--
 -- Name: validate_ubo_status_transition(); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -1918,6 +2112,300 @@ $$;
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: clients; Type: TABLE; Schema: client_portal; Owner: -
+--
+
+CREATE TABLE client_portal.clients (
+    client_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name character varying(255) NOT NULL,
+    email character varying(255) NOT NULL,
+    accessible_cbus uuid[] DEFAULT '{}'::uuid[] NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_login_at timestamp with time zone
+);
+
+
+--
+-- Name: commitments; Type: TABLE; Schema: client_portal; Owner: -
+--
+
+CREATE TABLE client_portal.commitments (
+    commitment_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    client_id uuid NOT NULL,
+    request_id uuid NOT NULL,
+    commitment_text text NOT NULL,
+    expected_date date,
+    reminder_date date,
+    reminder_sent_at timestamp with time zone,
+    status character varying(20) DEFAULT 'PENDING'::character varying NOT NULL,
+    fulfilled_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT commitments_status_check CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'FULFILLED'::character varying, 'OVERDUE'::character varying, 'CANCELLED'::character varying])::text[])))
+);
+
+
+--
+-- Name: credentials; Type: TABLE; Schema: client_portal; Owner: -
+--
+
+CREATE TABLE client_portal.credentials (
+    credential_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    client_id uuid NOT NULL,
+    credential_hash text NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    expires_at timestamp with time zone
+);
+
+
+--
+-- Name: escalations; Type: TABLE; Schema: client_portal; Owner: -
+--
+
+CREATE TABLE client_portal.escalations (
+    escalation_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    client_id uuid NOT NULL,
+    session_id uuid,
+    cbu_id uuid,
+    reason text,
+    preferred_contact character varying(20),
+    conversation_context jsonb,
+    assigned_to_user_id uuid,
+    assigned_at timestamp with time zone,
+    status character varying(20) DEFAULT 'OPEN'::character varying NOT NULL,
+    resolution_notes text,
+    resolved_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT escalations_preferred_contact_check CHECK (((preferred_contact)::text = ANY ((ARRAY['CALL'::character varying, 'EMAIL'::character varying, 'VIDEO'::character varying])::text[]))),
+    CONSTRAINT escalations_status_check CHECK (((status)::text = ANY ((ARRAY['OPEN'::character varying, 'ASSIGNED'::character varying, 'IN_PROGRESS'::character varying, 'RESOLVED'::character varying, 'CLOSED'::character varying])::text[])))
+);
+
+
+--
+-- Name: sessions; Type: TABLE; Schema: client_portal; Owner: -
+--
+
+CREATE TABLE client_portal.sessions (
+    session_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    client_id uuid NOT NULL,
+    active_cbu_id uuid,
+    collection_state jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_active_at timestamp with time zone DEFAULT now() NOT NULL,
+    expires_at timestamp with time zone DEFAULT (now() + '24:00:00'::interval) NOT NULL
+);
+
+
+--
+-- Name: submissions; Type: TABLE; Schema: client_portal; Owner: -
+--
+
+CREATE TABLE client_portal.submissions (
+    submission_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    client_id uuid NOT NULL,
+    request_id uuid NOT NULL,
+    submission_type character varying(50) NOT NULL,
+    document_type character varying(100),
+    file_reference text,
+    file_name character varying(255),
+    file_size_bytes bigint,
+    mime_type character varying(100),
+    info_type character varying(100),
+    info_data jsonb,
+    note_text text,
+    status character varying(20) DEFAULT 'SUBMITTED'::character varying NOT NULL,
+    review_notes text,
+    reviewed_by uuid,
+    reviewed_at timestamp with time zone,
+    cataloged_document_id uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT submissions_status_check CHECK (((status)::text = ANY ((ARRAY['SUBMITTED'::character varying, 'UNDER_REVIEW'::character varying, 'ACCEPTED'::character varying, 'REJECTED'::character varying, 'SUPERSEDED'::character varying])::text[]))),
+    CONSTRAINT submissions_submission_type_check CHECK (((submission_type)::text = ANY ((ARRAY['DOCUMENT'::character varying, 'INFORMATION'::character varying, 'NOTE'::character varying, 'CLARIFICATION'::character varying])::text[])))
+);
+
+
+--
+-- Name: outstanding_requests; Type: TABLE; Schema: kyc; Owner: -
+--
+
+CREATE TABLE kyc.outstanding_requests (
+    request_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    subject_type character varying(50) NOT NULL,
+    subject_id uuid NOT NULL,
+    workstream_id uuid,
+    case_id uuid,
+    cbu_id uuid,
+    entity_id uuid,
+    request_type character varying(50) NOT NULL,
+    request_subtype character varying(100) NOT NULL,
+    request_details jsonb DEFAULT '{}'::jsonb,
+    requested_from_type character varying(50),
+    requested_from_entity_id uuid,
+    requested_from_label character varying(255),
+    requested_by_user_id uuid,
+    requested_by_agent boolean DEFAULT false,
+    requested_at timestamp with time zone DEFAULT now(),
+    due_date date,
+    grace_period_days integer DEFAULT 3,
+    last_reminder_at timestamp with time zone,
+    reminder_count integer DEFAULT 0,
+    max_reminders integer DEFAULT 3,
+    communication_log jsonb DEFAULT '[]'::jsonb,
+    status character varying(50) DEFAULT 'PENDING'::character varying,
+    status_reason text,
+    fulfilled_at timestamp with time zone,
+    fulfilled_by_user_id uuid,
+    fulfillment_type character varying(50),
+    fulfillment_reference_type character varying(50),
+    fulfillment_reference_id uuid,
+    fulfillment_notes text,
+    escalated_at timestamp with time zone,
+    escalation_level integer DEFAULT 0,
+    escalation_reason character varying(255),
+    escalated_to_user_id uuid,
+    blocks_subject boolean DEFAULT true,
+    blocker_message character varying(500),
+    created_by_verb character varying(100),
+    created_by_execution_id uuid,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    reason_for_request text,
+    compliance_context text,
+    acceptable_alternatives text[],
+    client_visible boolean DEFAULT true NOT NULL,
+    client_notes text,
+    CONSTRAINT chk_oreq_fulfillment_type CHECK (((fulfillment_type IS NULL) OR ((fulfillment_type)::text = ANY ((ARRAY['DOCUMENT_UPLOAD'::character varying, 'MANUAL_ENTRY'::character varying, 'API_RESPONSE'::character varying, 'WAIVER'::character varying])::text[])))),
+    CONSTRAINT chk_oreq_request_type CHECK (((request_type)::text = ANY ((ARRAY['DOCUMENT'::character varying, 'INFORMATION'::character varying, 'VERIFICATION'::character varying, 'APPROVAL'::character varying, 'SIGNATURE'::character varying])::text[]))),
+    CONSTRAINT chk_oreq_requested_from_type CHECK (((requested_from_type IS NULL) OR ((requested_from_type)::text = ANY ((ARRAY['CLIENT'::character varying, 'ENTITY'::character varying, 'EXTERNAL_PROVIDER'::character varying, 'INTERNAL'::character varying])::text[])))),
+    CONSTRAINT chk_oreq_status CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'FULFILLED'::character varying, 'PARTIAL'::character varying, 'CANCELLED'::character varying, 'ESCALATED'::character varying, 'EXPIRED'::character varying, 'WAIVED'::character varying])::text[]))),
+    CONSTRAINT chk_oreq_subject_type CHECK (((subject_type)::text = ANY ((ARRAY['WORKSTREAM'::character varying, 'KYC_CASE'::character varying, 'ENTITY'::character varying, 'CBU'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE outstanding_requests; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON TABLE kyc.outstanding_requests IS 'Fire-and-forget operations awaiting response (document requests, verifications, etc.)';
+
+
+--
+-- Name: COLUMN outstanding_requests.subject_type; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.outstanding_requests.subject_type IS 'What is this request attached to: WORKSTREAM, KYC_CASE, ENTITY, CBU';
+
+
+--
+-- Name: COLUMN outstanding_requests.request_type; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.outstanding_requests.request_type IS 'Category of request: DOCUMENT, INFORMATION, VERIFICATION, APPROVAL, SIGNATURE';
+
+
+--
+-- Name: COLUMN outstanding_requests.request_subtype; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.outstanding_requests.request_subtype IS 'Specific type within category, e.g., SOURCE_OF_WEALTH, ID_DOCUMENT';
+
+
+--
+-- Name: COLUMN outstanding_requests.grace_period_days; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.outstanding_requests.grace_period_days IS 'Days after due_date before auto-escalation';
+
+
+--
+-- Name: COLUMN outstanding_requests.blocks_subject; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.outstanding_requests.blocks_subject IS 'Whether this pending request blocks the subject from progressing';
+
+
+--
+-- Name: COLUMN outstanding_requests.reason_for_request; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.outstanding_requests.reason_for_request IS 'Plain English explanation of why this is needed';
+
+
+--
+-- Name: COLUMN outstanding_requests.compliance_context; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.outstanding_requests.compliance_context IS 'Regulatory/legal basis for the request';
+
+
+--
+-- Name: COLUMN outstanding_requests.acceptable_alternatives; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.outstanding_requests.acceptable_alternatives IS 'Alternative document types that would satisfy this request';
+
+
+--
+-- Name: COLUMN outstanding_requests.client_visible; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.outstanding_requests.client_visible IS 'Whether this request should be shown to the client';
+
+
+--
+-- Name: COLUMN outstanding_requests.client_notes; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.outstanding_requests.client_notes IS 'Notes from the client about this request';
+
+
+--
+-- Name: entities; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".entities (
+    entity_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    entity_type_id uuid NOT NULL,
+    external_id character varying(255),
+    name character varying(255) NOT NULL,
+    created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text)
+);
+
+
+--
+-- Name: v_client_outstanding; Type: VIEW; Schema: client_portal; Owner: -
+--
+
+CREATE VIEW client_portal.v_client_outstanding AS
+ SELECT r.request_id,
+    r.cbu_id,
+    r.entity_id,
+    e.name AS entity_name,
+    r.request_type,
+    r.request_subtype,
+    r.reason_for_request,
+    r.compliance_context,
+    r.acceptable_alternatives,
+    r.status,
+    r.due_date,
+    r.client_notes,
+    r.created_at,
+    r.updated_at,
+    ( SELECT count(*) AS count
+           FROM client_portal.submissions s
+          WHERE (s.request_id = r.request_id)) AS submission_count
+   FROM (kyc.outstanding_requests r
+     LEFT JOIN "ob-poc".entities e ON ((r.entity_id = e.entity_id)))
+  WHERE ((r.client_visible = true) AND ((r.status)::text <> ALL ((ARRAY['FULFILLED'::character varying, 'CANCELLED'::character varying, 'WAIVED'::character varying])::text[])));
+
 
 --
 -- Name: cbu_cash_sweep_config; Type: TABLE; Schema: custody; Owner: -
@@ -2732,101 +3220,6 @@ COMMENT ON TABLE kyc.movements IS 'Subscription, redemption, and transfer transa
 
 
 --
--- Name: outstanding_requests; Type: TABLE; Schema: kyc; Owner: -
---
-
-CREATE TABLE kyc.outstanding_requests (
-    request_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    subject_type character varying(50) NOT NULL,
-    subject_id uuid NOT NULL,
-    workstream_id uuid,
-    case_id uuid,
-    cbu_id uuid,
-    entity_id uuid,
-    request_type character varying(50) NOT NULL,
-    request_subtype character varying(100) NOT NULL,
-    request_details jsonb DEFAULT '{}'::jsonb,
-    requested_from_type character varying(50),
-    requested_from_entity_id uuid,
-    requested_from_label character varying(255),
-    requested_by_user_id uuid,
-    requested_by_agent boolean DEFAULT false,
-    requested_at timestamp with time zone DEFAULT now(),
-    due_date date,
-    grace_period_days integer DEFAULT 3,
-    last_reminder_at timestamp with time zone,
-    reminder_count integer DEFAULT 0,
-    max_reminders integer DEFAULT 3,
-    communication_log jsonb DEFAULT '[]'::jsonb,
-    status character varying(50) DEFAULT 'PENDING'::character varying,
-    status_reason text,
-    fulfilled_at timestamp with time zone,
-    fulfilled_by_user_id uuid,
-    fulfillment_type character varying(50),
-    fulfillment_reference_type character varying(50),
-    fulfillment_reference_id uuid,
-    fulfillment_notes text,
-    escalated_at timestamp with time zone,
-    escalation_level integer DEFAULT 0,
-    escalation_reason character varying(255),
-    escalated_to_user_id uuid,
-    blocks_subject boolean DEFAULT true,
-    blocker_message character varying(500),
-    created_by_verb character varying(100),
-    created_by_execution_id uuid,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT chk_oreq_fulfillment_type CHECK (((fulfillment_type IS NULL) OR ((fulfillment_type)::text = ANY ((ARRAY['DOCUMENT_UPLOAD'::character varying, 'MANUAL_ENTRY'::character varying, 'API_RESPONSE'::character varying, 'WAIVER'::character varying])::text[])))),
-    CONSTRAINT chk_oreq_request_type CHECK (((request_type)::text = ANY ((ARRAY['DOCUMENT'::character varying, 'INFORMATION'::character varying, 'VERIFICATION'::character varying, 'APPROVAL'::character varying, 'SIGNATURE'::character varying])::text[]))),
-    CONSTRAINT chk_oreq_requested_from_type CHECK (((requested_from_type IS NULL) OR ((requested_from_type)::text = ANY ((ARRAY['CLIENT'::character varying, 'ENTITY'::character varying, 'EXTERNAL_PROVIDER'::character varying, 'INTERNAL'::character varying])::text[])))),
-    CONSTRAINT chk_oreq_status CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'FULFILLED'::character varying, 'PARTIAL'::character varying, 'CANCELLED'::character varying, 'ESCALATED'::character varying, 'EXPIRED'::character varying, 'WAIVED'::character varying])::text[]))),
-    CONSTRAINT chk_oreq_subject_type CHECK (((subject_type)::text = ANY ((ARRAY['WORKSTREAM'::character varying, 'KYC_CASE'::character varying, 'ENTITY'::character varying, 'CBU'::character varying])::text[])))
-);
-
-
---
--- Name: TABLE outstanding_requests; Type: COMMENT; Schema: kyc; Owner: -
---
-
-COMMENT ON TABLE kyc.outstanding_requests IS 'Fire-and-forget operations awaiting response (document requests, verifications, etc.)';
-
-
---
--- Name: COLUMN outstanding_requests.subject_type; Type: COMMENT; Schema: kyc; Owner: -
---
-
-COMMENT ON COLUMN kyc.outstanding_requests.subject_type IS 'What is this request attached to: WORKSTREAM, KYC_CASE, ENTITY, CBU';
-
-
---
--- Name: COLUMN outstanding_requests.request_type; Type: COMMENT; Schema: kyc; Owner: -
---
-
-COMMENT ON COLUMN kyc.outstanding_requests.request_type IS 'Category of request: DOCUMENT, INFORMATION, VERIFICATION, APPROVAL, SIGNATURE';
-
-
---
--- Name: COLUMN outstanding_requests.request_subtype; Type: COMMENT; Schema: kyc; Owner: -
---
-
-COMMENT ON COLUMN kyc.outstanding_requests.request_subtype IS 'Specific type within category, e.g., SOURCE_OF_WEALTH, ID_DOCUMENT';
-
-
---
--- Name: COLUMN outstanding_requests.grace_period_days; Type: COMMENT; Schema: kyc; Owner: -
---
-
-COMMENT ON COLUMN kyc.outstanding_requests.grace_period_days IS 'Days after due_date before auto-escalation';
-
-
---
--- Name: COLUMN outstanding_requests.blocks_subject; Type: COMMENT; Schema: kyc; Owner: -
---
-
-COMMENT ON COLUMN kyc.outstanding_requests.blocks_subject IS 'Whether this pending request blocks the subject from progressing';
-
-
---
 -- Name: red_flags; Type: TABLE; Schema: kyc; Owner: -
 --
 
@@ -3570,20 +3963,6 @@ CREATE TABLE "ob-poc".cbu_matrix_product_overlay (
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
     CONSTRAINT cbu_matrix_product_overlay_status_check CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'ACTIVE'::character varying, 'SUSPENDED'::character varying])::text[])))
-);
-
-
---
--- Name: entities; Type: TABLE; Schema: ob-poc; Owner: -
---
-
-CREATE TABLE "ob-poc".entities (
-    entity_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    entity_type_id uuid NOT NULL,
-    external_id character varying(255),
-    name character varying(255) NOT NULL,
-    created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
-    updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text)
 );
 
 
@@ -5849,6 +6228,71 @@ CREATE TABLE "ob-poc".risk_ratings (
 
 
 --
+-- Name: role_categories; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".role_categories (
+    category_code character varying(30) NOT NULL,
+    category_name character varying(100) NOT NULL,
+    description text,
+    layout_behavior character varying(30) NOT NULL,
+    sort_order integer DEFAULT 100
+);
+
+
+--
+-- Name: TABLE role_categories; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".role_categories IS 'Reference table for role categories with layout behavior hints for visualization.';
+
+
+--
+-- Name: role_incompatibilities; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".role_incompatibilities (
+    incompatibility_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    role_a character varying(255) NOT NULL,
+    role_b character varying(255) NOT NULL,
+    reason text NOT NULL,
+    exception_allowed boolean DEFAULT false,
+    exception_condition text,
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT chk_role_order CHECK (((role_a)::text < (role_b)::text))
+);
+
+
+--
+-- Name: TABLE role_incompatibilities; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".role_incompatibilities IS 'Defines invalid role combinations that cannot coexist on same entity within same CBU.';
+
+
+--
+-- Name: role_requirements; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".role_requirements (
+    requirement_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    requiring_role character varying(255) NOT NULL,
+    required_role character varying(255) NOT NULL,
+    requirement_type character varying(30) NOT NULL,
+    scope character varying(30) NOT NULL,
+    condition_description text,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE role_requirements; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".role_requirements IS 'Defines role dependencies - when one role requires another to be present.';
+
+
+--
 -- Name: role_types; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -5878,8 +6322,25 @@ CREATE TABLE "ob-poc".roles (
     created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
     updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
     role_category character varying(30),
+    layout_category character varying(30),
+    ubo_treatment character varying(30),
+    requires_percentage boolean DEFAULT false,
+    natural_person_only boolean DEFAULT false,
+    legal_entity_only boolean DEFAULT false,
+    compatible_entity_categories jsonb,
+    display_priority integer DEFAULT 50,
+    kyc_obligation character varying(30) DEFAULT 'FULL_KYC'::character varying,
+    is_active boolean DEFAULT true,
+    sort_order integer DEFAULT 100,
     CONSTRAINT role_name_uppercase CHECK (((name)::text = upper((name)::text)))
 );
+
+
+--
+-- Name: TABLE roles; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".roles IS 'Master role taxonomy with visualization metadata, UBO treatment rules, and entity compatibility constraints. Version 2.0.';
 
 
 --
@@ -6659,6 +7120,26 @@ COMMENT ON TABLE "ob-poc".ubo_snapshots IS 'Point-in-time snapshots of UBO owner
 
 
 --
+-- Name: ubo_treatments; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".ubo_treatments (
+    treatment_code character varying(30) NOT NULL,
+    treatment_name character varying(100) NOT NULL,
+    description text,
+    terminates_chain boolean DEFAULT false,
+    requires_lookthrough boolean DEFAULT false
+);
+
+
+--
+-- Name: TABLE ubo_treatments; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".ubo_treatments IS 'Reference table for UBO calculation behaviors (terminus, look-through, etc.).';
+
+
+--
 -- Name: v_active_trading_profiles; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
@@ -6851,12 +7332,27 @@ CREATE VIEW "ob-poc".v_cbu_entity_with_roles AS
             COALESCE(lc.jurisdiction, p.jurisdiction, t.jurisdiction, pp.nationality) AS jurisdiction,
             r.name AS role_name,
             r.role_category,
+            r.layout_category,
+            r.ubo_treatment,
+            r.kyc_obligation,
+            COALESCE(r.display_priority,
                 CASE r.role_category
+                    WHEN 'OWNERSHIP_CHAIN'::text THEN 100
                     WHEN 'OWNERSHIP_CONTROL'::text THEN 100
+                    WHEN 'CONTROL_CHAIN'::text THEN 90
+                    WHEN 'TRUST_ROLES'::text THEN 85
+                    WHEN 'FUND_STRUCTURE'::text THEN 80
+                    WHEN 'FUND_MANAGEMENT'::text THEN 70
+                    WHEN 'INVESTOR_CHAIN'::text THEN 60
                     WHEN 'BOTH'::text THEN 50
-                    WHEN 'TRADING_EXECUTION'::text THEN 10
+                    WHEN 'SERVICE_PROVIDER'::text THEN 30
+                    WHEN 'TRADING_EXECUTION'::text THEN 20
+                    WHEN 'FUND_OPERATIONS'::text THEN 20
+                    WHEN 'DISTRIBUTION'::text THEN 15
+                    WHEN 'FINANCING'::text THEN 15
+                    WHEN 'RELATED_PARTY'::text THEN 10
                     ELSE 5
-                END AS role_priority
+                END) AS role_priority
            FROM ((((((("ob-poc".cbu_entity_roles cer
              JOIN "ob-poc".entities e ON ((cer.entity_id = e.entity_id)))
              JOIN "ob-poc".entity_types et ON ((e.entity_type_id = et.entity_type_id)))
@@ -6875,9 +7371,20 @@ CREATE VIEW "ob-poc".v_cbu_entity_with_roles AS
     array_agg(role_name ORDER BY role_priority DESC) AS roles,
     array_agg(DISTINCT role_category) AS role_categories,
     (array_agg(role_name ORDER BY role_priority DESC))[1] AS primary_role,
-    max(role_priority) AS max_role_priority
+    max(role_priority) AS max_role_priority,
+    (array_agg(role_category ORDER BY role_priority DESC))[1] AS primary_role_category,
+    (array_agg(layout_category ORDER BY role_priority DESC))[1] AS primary_layout_category,
+    (array_agg(ubo_treatment ORDER BY role_priority DESC))[1] AS effective_ubo_treatment,
+    (array_agg(kyc_obligation ORDER BY role_priority DESC))[1] AS effective_kyc_obligation
    FROM role_priorities
   GROUP BY cbu_id, entity_id, entity_name, entity_type, entity_category, jurisdiction;
+
+
+--
+-- Name: VIEW v_cbu_entity_with_roles; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_cbu_entity_with_roles IS 'Aggregated view of entities with their roles, categories, and effective KYC/UBO treatment. Used for visualization.';
 
 
 --
@@ -7569,6 +8076,44 @@ CREATE VIEW "ob-poc".v_open_discrepancies AS
             WHEN 'LOW'::text THEN 4
             ELSE 5
         END, od.detected_at;
+
+
+--
+-- Name: v_role_taxonomy; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_role_taxonomy AS
+ SELECT r.role_id,
+    r.name AS role_code,
+    r.description,
+    r.role_category,
+    rc.category_name,
+    rc.layout_behavior,
+    r.layout_category,
+    r.ubo_treatment,
+    ut.treatment_name,
+    ut.terminates_chain,
+    ut.requires_lookthrough,
+    r.display_priority,
+    r.requires_percentage,
+    r.natural_person_only,
+    r.legal_entity_only,
+    r.compatible_entity_categories,
+    r.kyc_obligation,
+    r.sort_order,
+    r.is_active
+   FROM (("ob-poc".roles r
+     LEFT JOIN "ob-poc".role_categories rc ON (((r.role_category)::text = (rc.category_code)::text)))
+     LEFT JOIN "ob-poc".ubo_treatments ut ON (((r.ubo_treatment)::text = (ut.treatment_code)::text)))
+  WHERE (r.is_active = true)
+  ORDER BY rc.sort_order, r.sort_order, r.display_priority DESC;
+
+
+--
+-- Name: VIEW v_role_taxonomy; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_role_taxonomy IS 'Complete role taxonomy reference with category and treatment details.';
 
 
 --
@@ -8433,6 +8978,62 @@ ALTER TABLE ONLY public.rule_versions ALTER COLUMN id SET DEFAULT nextval('publi
 --
 
 ALTER TABLE ONLY public.rules ALTER COLUMN id SET DEFAULT nextval('public.rules_id_seq'::regclass);
+
+
+--
+-- Name: clients clients_email_key; Type: CONSTRAINT; Schema: client_portal; Owner: -
+--
+
+ALTER TABLE ONLY client_portal.clients
+    ADD CONSTRAINT clients_email_key UNIQUE (email);
+
+
+--
+-- Name: clients clients_pkey; Type: CONSTRAINT; Schema: client_portal; Owner: -
+--
+
+ALTER TABLE ONLY client_portal.clients
+    ADD CONSTRAINT clients_pkey PRIMARY KEY (client_id);
+
+
+--
+-- Name: commitments commitments_pkey; Type: CONSTRAINT; Schema: client_portal; Owner: -
+--
+
+ALTER TABLE ONLY client_portal.commitments
+    ADD CONSTRAINT commitments_pkey PRIMARY KEY (commitment_id);
+
+
+--
+-- Name: credentials credentials_pkey; Type: CONSTRAINT; Schema: client_portal; Owner: -
+--
+
+ALTER TABLE ONLY client_portal.credentials
+    ADD CONSTRAINT credentials_pkey PRIMARY KEY (credential_id);
+
+
+--
+-- Name: escalations escalations_pkey; Type: CONSTRAINT; Schema: client_portal; Owner: -
+--
+
+ALTER TABLE ONLY client_portal.escalations
+    ADD CONSTRAINT escalations_pkey PRIMARY KEY (escalation_id);
+
+
+--
+-- Name: sessions sessions_pkey; Type: CONSTRAINT; Schema: client_portal; Owner: -
+--
+
+ALTER TABLE ONLY client_portal.sessions
+    ADD CONSTRAINT sessions_pkey PRIMARY KEY (session_id);
+
+
+--
+-- Name: submissions submissions_pkey; Type: CONSTRAINT; Schema: client_portal; Owner: -
+--
+
+ALTER TABLE ONLY client_portal.submissions
+    ADD CONSTRAINT submissions_pkey PRIMARY KEY (submission_id);
 
 
 --
@@ -9924,6 +10525,30 @@ ALTER TABLE ONLY "ob-poc".risk_ratings
 
 
 --
+-- Name: role_categories role_categories_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".role_categories
+    ADD CONSTRAINT role_categories_pkey PRIMARY KEY (category_code);
+
+
+--
+-- Name: role_incompatibilities role_incompatibilities_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".role_incompatibilities
+    ADD CONSTRAINT role_incompatibilities_pkey PRIMARY KEY (incompatibility_id);
+
+
+--
+-- Name: role_requirements role_requirements_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".role_requirements
+    ADD CONSTRAINT role_requirements_pkey PRIMARY KEY (requirement_id);
+
+
+--
 -- Name: role_types role_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -10268,6 +10893,14 @@ ALTER TABLE ONLY "ob-poc".ubo_snapshots
 
 
 --
+-- Name: ubo_treatments ubo_treatments_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".ubo_treatments
+    ADD CONSTRAINT ubo_treatments_pkey PRIMARY KEY (treatment_code);
+
+
+--
 -- Name: attribute_registry uk_attribute_uuid; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -10297,6 +10930,14 @@ ALTER TABLE ONLY "ob-poc".fund_investors
 
 ALTER TABLE ONLY "ob-poc".redflag_score_config
     ADD CONSTRAINT uq_redflag_severity UNIQUE (severity);
+
+
+--
+-- Name: role_incompatibilities uq_role_pair; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".role_incompatibilities
+    ADD CONSTRAINT uq_role_pair UNIQUE (role_a, role_b);
 
 
 --
@@ -10577,6 +11218,83 @@ ALTER TABLE ONLY public.rules
 
 ALTER TABLE ONLY public.rules
     ADD CONSTRAINT rules_rule_id_key UNIQUE (rule_id);
+
+
+--
+-- Name: idx_commitments_client; Type: INDEX; Schema: client_portal; Owner: -
+--
+
+CREATE INDEX idx_commitments_client ON client_portal.commitments USING btree (client_id);
+
+
+--
+-- Name: idx_commitments_request; Type: INDEX; Schema: client_portal; Owner: -
+--
+
+CREATE INDEX idx_commitments_request ON client_portal.commitments USING btree (request_id);
+
+
+--
+-- Name: idx_commitments_status; Type: INDEX; Schema: client_portal; Owner: -
+--
+
+CREATE INDEX idx_commitments_status ON client_portal.commitments USING btree (status) WHERE ((status)::text = 'PENDING'::text);
+
+
+--
+-- Name: idx_credentials_client; Type: INDEX; Schema: client_portal; Owner: -
+--
+
+CREATE INDEX idx_credentials_client ON client_portal.credentials USING btree (client_id);
+
+
+--
+-- Name: idx_escalations_client; Type: INDEX; Schema: client_portal; Owner: -
+--
+
+CREATE INDEX idx_escalations_client ON client_portal.escalations USING btree (client_id);
+
+
+--
+-- Name: idx_escalations_status; Type: INDEX; Schema: client_portal; Owner: -
+--
+
+CREATE INDEX idx_escalations_status ON client_portal.escalations USING btree (status) WHERE ((status)::text <> ALL ((ARRAY['RESOLVED'::character varying, 'CLOSED'::character varying])::text[]));
+
+
+--
+-- Name: idx_sessions_client; Type: INDEX; Schema: client_portal; Owner: -
+--
+
+CREATE INDEX idx_sessions_client ON client_portal.sessions USING btree (client_id);
+
+
+--
+-- Name: idx_sessions_expires; Type: INDEX; Schema: client_portal; Owner: -
+--
+
+CREATE INDEX idx_sessions_expires ON client_portal.sessions USING btree (expires_at);
+
+
+--
+-- Name: idx_submissions_client; Type: INDEX; Schema: client_portal; Owner: -
+--
+
+CREATE INDEX idx_submissions_client ON client_portal.submissions USING btree (client_id);
+
+
+--
+-- Name: idx_submissions_request; Type: INDEX; Schema: client_portal; Owner: -
+--
+
+CREATE INDEX idx_submissions_request ON client_portal.submissions USING btree (request_id);
+
+
+--
+-- Name: idx_submissions_status; Type: INDEX; Schema: client_portal; Owner: -
+--
+
+CREATE INDEX idx_submissions_status ON client_portal.submissions USING btree (status);
 
 
 --
@@ -13504,6 +14222,54 @@ CREATE TRIGGER update_rules_updated_at BEFORE UPDATE ON public.rules FOR EACH RO
 
 
 --
+-- Name: commitments commitments_client_id_fkey; Type: FK CONSTRAINT; Schema: client_portal; Owner: -
+--
+
+ALTER TABLE ONLY client_portal.commitments
+    ADD CONSTRAINT commitments_client_id_fkey FOREIGN KEY (client_id) REFERENCES client_portal.clients(client_id) ON DELETE CASCADE;
+
+
+--
+-- Name: credentials credentials_client_id_fkey; Type: FK CONSTRAINT; Schema: client_portal; Owner: -
+--
+
+ALTER TABLE ONLY client_portal.credentials
+    ADD CONSTRAINT credentials_client_id_fkey FOREIGN KEY (client_id) REFERENCES client_portal.clients(client_id) ON DELETE CASCADE;
+
+
+--
+-- Name: escalations escalations_client_id_fkey; Type: FK CONSTRAINT; Schema: client_portal; Owner: -
+--
+
+ALTER TABLE ONLY client_portal.escalations
+    ADD CONSTRAINT escalations_client_id_fkey FOREIGN KEY (client_id) REFERENCES client_portal.clients(client_id);
+
+
+--
+-- Name: escalations escalations_session_id_fkey; Type: FK CONSTRAINT; Schema: client_portal; Owner: -
+--
+
+ALTER TABLE ONLY client_portal.escalations
+    ADD CONSTRAINT escalations_session_id_fkey FOREIGN KEY (session_id) REFERENCES client_portal.sessions(session_id);
+
+
+--
+-- Name: sessions sessions_client_id_fkey; Type: FK CONSTRAINT; Schema: client_portal; Owner: -
+--
+
+ALTER TABLE ONLY client_portal.sessions
+    ADD CONSTRAINT sessions_client_id_fkey FOREIGN KEY (client_id) REFERENCES client_portal.clients(client_id) ON DELETE CASCADE;
+
+
+--
+-- Name: submissions submissions_client_id_fkey; Type: FK CONSTRAINT; Schema: client_portal; Owner: -
+--
+
+ALTER TABLE ONLY client_portal.submissions
+    ADD CONSTRAINT submissions_client_id_fkey FOREIGN KEY (client_id) REFERENCES client_portal.clients(client_id);
+
+
+--
 -- Name: cbu_cash_sweep_config cbu_cash_sweep_config_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
 --
 
@@ -14928,6 +15694,38 @@ ALTER TABLE ONLY "ob-poc".dsl_instance_versions
 
 
 --
+-- Name: role_requirements fk_required_role; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".role_requirements
+    ADD CONSTRAINT fk_required_role FOREIGN KEY (required_role) REFERENCES "ob-poc".roles(name);
+
+
+--
+-- Name: role_requirements fk_requiring_role; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".role_requirements
+    ADD CONSTRAINT fk_requiring_role FOREIGN KEY (requiring_role) REFERENCES "ob-poc".roles(name);
+
+
+--
+-- Name: role_incompatibilities fk_role_a; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".role_incompatibilities
+    ADD CONSTRAINT fk_role_a FOREIGN KEY (role_a) REFERENCES "ob-poc".roles(name);
+
+
+--
+-- Name: role_incompatibilities fk_role_b; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".role_incompatibilities
+    ADD CONSTRAINT fk_role_b FOREIGN KEY (role_b) REFERENCES "ob-poc".roles(name);
+
+
+--
 -- Name: trust_parties fk_trust_parties_entity_id; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -15811,5 +16609,5 @@ ALTER TABLE ONLY public.rules
 -- PostgreSQL database dump complete
 --
 
-\unrestrict tPrbk8vcbETcBDqhJ4U1pK0XzDL4jWTlAIsNUinbzyvR8sAQGMWiODlOt5sDRPI
+\unrestrict 2dPtjKhtDQ2gKiHFSlC1tnjZ8La99tCcuyxNifBQrbG78iUY26XaM0vdnCWCqoB
 

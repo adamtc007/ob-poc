@@ -758,13 +758,17 @@ domains:
           capture: true
 
       link-feeder:
-        description: Link an existing feeder fund to a master fund
+        description: Link an existing feeder fund to a master fund (idempotent by parent+child+type)
         behavior: crud
         crud:
-          operation: insert
+          operation: upsert
           table: fund_structure
           schema: ob-poc
           returning: structure_id
+          conflict_keys:
+            - parent_entity_id
+            - child_entity_id
+            - relationship_type
         args:
           - name: feeder-id
             type: uuid
@@ -799,13 +803,17 @@ domains:
       # =========================================================================
 
       add-to-umbrella:
-        description: Add an existing sub-fund to an umbrella (if created separately)
+        description: Add an existing sub-fund to an umbrella (idempotent by parent+child+type)
         behavior: crud
         crud:
-          operation: insert
+          operation: upsert
           table: fund_structure
           schema: ob-poc
           returning: structure_id
+          conflict_keys:
+            - parent_entity_id
+            - child_entity_id
+            - relationship_type
         args:
           - name: umbrella-id
             type: uuid
@@ -836,13 +844,17 @@ domains:
           name: structure_id
 
       add-share-class:
-        description: Add a share class to a sub-fund (structural link)
+        description: Add a share class to a sub-fund (idempotent by parent+child+type)
         behavior: crud
         crud:
-          operation: insert
+          operation: upsert
           table: fund_structure
           schema: ob-poc
           returning: structure_id
+          conflict_keys:
+            - parent_entity_id
+            - child_entity_id
+            - relationship_type
         args:
           - name: subfund-id
             type: uuid
@@ -943,13 +955,16 @@ domains:
       # =========================================================================
 
       add-investment:
-        description: Record a fund's investment in another fund (Fund-of-Funds)
+        description: Record a fund's investment in another fund (idempotent by investor+investee)
         behavior: crud
         crud:
-          operation: insert
+          operation: upsert
           table: fund_investments
           schema: ob-poc
           returning: investment_id
+          conflict_keys:
+            - investor_entity_id
+            - investee_entity_id
         args:
           - name: investor-fund-id
             type: uuid

@@ -55,13 +55,17 @@ domains:
 
       # === Commitment Operations ===
       commit:
-        description: Create SLA commitment for CBU
+        description: Create SLA commitment for CBU (idempotent by cbu+template+profile)
         behavior: crud
         crud:
-          operation: insert
+          operation: upsert
           table: cbu_sla_commitments
           schema: ob-poc
           returning: commitment_id
+          conflict_keys:
+            - cbu_id
+            - template_id
+            - profile_id
         args:
           - name: cbu-id
             type: uuid

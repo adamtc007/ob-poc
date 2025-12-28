@@ -45,13 +45,18 @@ domains:
           name: identity_id
           capture: true
       add-ssi:
-        description: Add counterparty SSI (from ALERT or manual)
+        description: Add counterparty SSI (idempotent by entity+counterparty_bic+market+currency)
         behavior: crud
         crud:
-          operation: insert
+          operation: upsert
           table: entity_ssi
           schema: custody
           returning: entity_ssi_id
+          conflict_keys:
+            - entity_id
+            - counterparty_bic
+            - market_id
+            - currency
         args:
           - name: entity-id
             type: uuid

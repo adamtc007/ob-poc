@@ -3,16 +3,18 @@ domains:
     description: Client Business Unit operations
     verbs:
       create:
-        description: Create a new Client Business Unit
+        description: Create a new Client Business Unit (idempotent by name)
         behavior: crud
         produces:
           type: cbu
           resolved: false
         crud:
-          operation: insert
+          operation: upsert
           table: cbus
           schema: ob-poc
           returning: cbu_id
+          conflict_keys:
+            - name
         args:
           - name: name
             type: string

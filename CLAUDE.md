@@ -3458,17 +3458,46 @@ CBU (artificial focal point)
 | `entity_relationships` | Entity | Entity | Ownership, control, trust_role relationships (unified table) |
 | `cbu_relationship_verification` | CBU | Relationship | CBU-specific verification state for relationships |
 
-### Role Categories
+### Role Taxonomy V2
 
-Roles describe an entity's **function** within a CBU, not ownership structure:
+Roles describe an entity's **function** within a CBU. The taxonomy uses `RoleCategory` and `LayoutBehavior` enums for visualization.
 
-| Category | Priority | Roles |
-|----------|----------|-------|
-| OWNERSHIP_CONTROL | 100 | BENEFICIAL_OWNER, SHAREHOLDER, PRINCIPAL, SETTLOR, PROTECTOR |
-| BOTH | 50 | DIRECTOR, AUTHORIZED_SIGNATORY, POWER_OF_ATTORNEY |
-| TRADING_EXECUTION | 10 | ASSET_OWNER, INVESTMENT_MANAGER, PORTFOLIO_MANAGER, TRADER |
+**RoleCategory** (14 variants - 9 new + 5 legacy):
 
-**View**: `v_cbu_entity_with_roles` sorts entities by role priority (ownership at top, trading at bottom).
+| Category | LayoutBehavior | Description |
+|----------|----------------|-------------|
+| OWNERSHIP_CHAIN | PyramidUp | Shareholders, LPs, members - trace upward to UBOs |
+| CONTROL_CHAIN | PyramidUp | Directors, officers, controllers - overlaid on ownership |
+| FUND_STRUCTURE | TreeDown | Master/feeder, umbrella/subfund relationships |
+| FUND_MANAGEMENT | Overlay | ManCo, IM, advisor - overlaid on fund structure |
+| TRUST_ROLES | Radial | Settlor, trustee, beneficiary, protector |
+| SERVICE_PROVIDER | FlatBottom | Depositary, custodian, admin, auditor |
+| TRADING_EXECUTION | FlatRight | Signatories, traders, operators |
+| INVESTOR_CHAIN | Satellite | Fund investors, LP investors |
+| RELATED_PARTY | Peripheral | Connected parties, associates |
+| *OWNERSHIP_CONTROL* | PyramidUp | Legacy: maps to OWNERSHIP_CHAIN |
+| *BOTH* | Overlay | Legacy: maps to CONTROL_CHAIN |
+| *FUND_OPERATIONS* | FlatBottom | Legacy: maps to SERVICE_PROVIDER |
+| *DISTRIBUTION* | Satellite | Legacy: maps to INVESTOR_CHAIN |
+| *FINANCING* | Peripheral | Legacy: maps to RELATED_PARTY |
+
+**LayoutBehavior** (9 variants):
+
+| Behavior | Description |
+|----------|-------------|
+| PyramidUp | Ownership chains - natural persons at apex |
+| PyramidDown | Fund structure - umbrella at top, subfunds below |
+| TreeDown | Hierarchical tree flowing downward |
+| Overlay | Control roles overlaid on ownership nodes |
+| Satellite | Investors orbiting the fund structure |
+| Radial | Trust roles radiating from trust entity |
+| FlatBottom | Service providers in horizontal row at bottom |
+| FlatRight | Trading/execution roles in vertical column at right |
+| Peripheral | Related parties at outer edges |
+
+**Database columns**: `roles.role_category`, `roles.layout_behavior`
+
+**View**: `v_cbu_entity_with_roles` includes `role_category` and `layout_behavior` for visualization.
 
 ### Fund Ownership: Management Shares vs Investor Shares
 
@@ -6809,8 +6838,6 @@ match self.resolve_all(intents).await {
 
 **Key insight:** The Gateway's fuzzy matching handles typos and natural language variations. "fund admin" → "FUND_ACCOUNTING" for free.
 
-> **📘 Implementation spec:** `rust/docs/TODO-UNIFIED-CODE-RESOLUTION.md`
-
 ## Client Portal Architecture
 
 The system supports two portal modes using the same backend infrastructure:
@@ -6925,6 +6952,5 @@ impl AgentService {
 - System prompt uses client-friendly tone
 - Pre-resolved context shows only their data
 
-> **📘 Full specification:** `docs/architecture/CLIENT-DIALOG-SPEC.md`  
-> **📘 Implementation TODO:** `rust/docs/TODO-DUAL-PORTAL-SETUP.md`
+> **📘 Full specification:** `docs/architecture/CLIENT-DIALOG-SPEC.md`
 

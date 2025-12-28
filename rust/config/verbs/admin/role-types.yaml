@@ -42,13 +42,15 @@ domains:
           type: record
 
       create:
-        description: "Create new role type"
+        description: "Create new role type (idempotent by code)"
         behavior: crud
         crud:
-          operation: insert
+          operation: upsert
           table: role_types
           schema: ob_ref
           returning: role_type_id
+          conflict_keys:
+            - code
         args:
           - name: code
             type: string
