@@ -5,9 +5,9 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::agentic::generator::DslGenerator;
-use crate::agentic::planner::OnboardingPlan;
-use crate::agentic::validator::{AgentValidator, ValidationResult};
+use crate::generator::DslGenerator;
+use crate::planner::OnboardingPlan;
+use crate::validator::{AgentValidator, ValidationResult};
 
 /// Validated DSL with attempt count
 #[derive(Debug, Clone, Serialize, Deserialize)]

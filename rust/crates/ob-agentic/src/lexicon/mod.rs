@@ -40,6 +40,7 @@
 //! }
 //! ```
 
+#[cfg(feature = "gateway")]
 mod db_resolver;
 mod intent_ast;
 mod intent_parser;
@@ -48,6 +49,7 @@ mod pipeline;
 mod tokenizer;
 mod tokens;
 
+#[cfg(feature = "gateway")]
 pub use db_resolver::{CompositeEntityResolver, DatabaseEntityResolver};
 pub use intent_ast::{
     CsaType, CurrencyCode, EntityRef, GoverningLaw, InstrumentCode, IntentAst, MarketCode, RoleCode,

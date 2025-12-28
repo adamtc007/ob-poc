@@ -4,7 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::agentic::patterns::OnboardingPattern;
+use crate::patterns::OnboardingPattern;
 
 /// Result of intent extraction - either clear intent or needs clarification
 #[derive(Debug, Clone, Serialize, Deserialize)]

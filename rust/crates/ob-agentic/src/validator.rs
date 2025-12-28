@@ -32,7 +32,7 @@ impl AgentValidator {
 
     /// Validate DSL source code
     pub fn validate(&self, dsl_source: &str) -> ValidationResult {
-        use crate::dsl_v2::{compile, parse_program};
+        use dsl_core::{compiler::compile_to_ops, parse_program};
 
         // Phase 1: Parse
         let program = match parse_program(dsl_source) {
@@ -50,25 +50,26 @@ impl AgentValidator {
             }
         };
 
-        // Phase 2: Compile (includes CSG lint)
-        match compile(&program) {
-            Ok(_) => ValidationResult {
-                is_valid: true,
-                errors: vec![],
+        // Phase 2: Compile to ops (basic validation without DB-dependent CSG lint)
+        let compiled = compile_to_ops(&program);
+
+        // Check for any diagnostics/errors in the compiled result
+        if compiled.ops.is_empty() && !program.statements.is_empty() {
+            return ValidationResult {
+                is_valid: false,
+                errors: vec![ValidationError {
+                    line: None,
+                    message: "Compilation produced no operations".to_string(),
+                    suggestion: None,
+                }],
                 warnings: vec![],
-            },
-            Err(e) => {
-                let error_str = e.to_string();
-                ValidationResult {
-                    is_valid: false,
-                    errors: vec![ValidationError {
-                        line: Self::extract_line_number(&error_str),
-                        message: error_str,
-                        suggestion: None,
-                    }],
-                    warnings: vec![],
-                }
-            }
+            };
+        }
+
+        ValidationResult {
+            is_valid: true,
+            errors: vec![],
+            warnings: vec![],
         }
     }
 

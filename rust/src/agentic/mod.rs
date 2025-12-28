@@ -3,73 +3,48 @@
 //! This module implements AI-powered DSL generation from natural language instructions.
 //! It uses a lexicon-based tokenizer with formal grammar parsing for intent classification.
 //!
-//! ## Architecture
-//!
-//! ```text
-//! User Request → Tokenizer → Nom Parser → IntentAst → DSL Generation → Validation
-//! ```
-//!
-//! ### Lexicon Pipeline
-//!
-//! The pipeline uses configuration-driven tokenization and grammar parsing:
-//!
-//! 1. **Tokenization** (`lexicon/tokenizer.rs`):
-//!    - Lexicon lookup for verbs, roles, instruments, prepositions
-//!    - EntityGateway lookup for counterparties, CBUs, persons
-//!    - Session context for coreference resolution
-//!
-//! 2. **Grammar Parsing** (`lexicon/intent_parser.rs`):
-//!    - Nom combinators match token patterns to intent structures
-//!    - Builds typed IntentAst nodes
-//!    - Handles domain detection (OTC vs Exchange-Traded)
-//!
-//! 3. **DSL Generation** (`lexicon/pipeline.rs`):
-//!    - IntentAst → DSL source code
-//!    - Entity reference resolution to UUIDs
-//!    - Symbol binding generation
-//!
-//! ## Backend Selection
-//!
-//! Set `AGENT_BACKEND` environment variable to switch providers:
-//! - `anthropic` or `claude` (default): Use Anthropic Claude API
-//! - `openai` or `gpt`: Use OpenAI API
+//! Most functionality is in the `ob-agentic` crate (no DB dependencies).
+//! The orchestrator module stays here as it requires the DB executor.
 
-// LLM client abstraction
-pub mod anthropic_client;
-pub mod backend;
-pub mod client_factory;
-pub mod llm_client;
-pub mod openai_client;
+// Re-export everything from ob-agentic crate
+pub use ob_agentic::anthropic_client;
+pub use ob_agentic::backend;
+pub use ob_agentic::client_factory;
+pub use ob_agentic::context_builder;
+pub use ob_agentic::feedback;
+pub use ob_agentic::generator;
+pub use ob_agentic::intent;
+pub use ob_agentic::lexicon;
+pub use ob_agentic::llm_client;
+pub use ob_agentic::openai_client;
+pub use ob_agentic::patterns;
+pub use ob_agentic::planner;
+pub use ob_agentic::validator;
 
-// Core agentic modules (legacy custody pipeline)
-pub mod context_builder;
-pub mod feedback;
-pub mod generator;
-pub mod intent;
+// Orchestrator stays local (has DB dependencies)
 pub mod orchestrator;
-pub mod patterns;
-pub mod planner;
-pub mod validator;
 
-// Lexicon-based pipeline (primary)
-pub mod lexicon;
-pub mod lexicon_agent;
+// Lexicon agent requires gateway feature in ob-agentic
+#[cfg(feature = "database")]
+pub mod lexicon_agent {
+    pub use ob_agentic::lexicon_agent::*;
+}
 
 // Re-export LLM client types
-pub use backend::AgentBackend;
-pub use client_factory::{create_llm_client, create_llm_client_with_key, current_backend};
-pub use llm_client::LlmClient;
+pub use client_factory::{create_llm_client_with_key, current_backend};
+pub use ob_agentic::create_llm_client;
+pub use ob_agentic::AgentBackend;
+pub use ob_agentic::LlmClient;
 
-// Re-export legacy custody types
-pub use intent::{
-    ClientIntent, CounterpartyIntent, InstrumentIntent, MarketIntent, OnboardingIntent,
+// Re-export intent types
+pub use intent::{ClientIntent, CounterpartyIntent, InstrumentIntent, MarketIntent};
+pub use ob_agentic::intent::{
+    ClarificationRequest as IntentClarificationRequest, IntentResult, OnboardingIntent,
 };
+
+// Re-export orchestrator
 pub use orchestrator::{AgentOrchestrator, GenerationResult, OrchestratorBuilder};
-pub use patterns::OnboardingPattern;
-pub use planner::{OnboardingPlan, RequirementPlanner};
 
-// Re-export lexicon-based pipeline (primary)
-pub use lexicon_agent::{
-    AgentResponse, ClarificationRequest, ExecutionResult, LexiconAgentPipeline, ResponseType,
-    SessionContext,
-};
+// Re-export patterns and planner
+pub use ob_agentic::patterns::OnboardingPattern;
+pub use ob_agentic::planner::{OnboardingPlan, RequirementPlanner};

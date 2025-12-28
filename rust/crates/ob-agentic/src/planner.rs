@@ -7,8 +7,8 @@ use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
 
-use crate::agentic::intent::OnboardingIntent;
-use crate::agentic::patterns::OnboardingPattern;
+use crate::intent::OnboardingIntent;
+use crate::patterns::OnboardingPattern;
 
 /// Complete onboarding plan derived from intent
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -387,7 +387,7 @@ impl RequirementPlanner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::agentic::intent::*;
+    use crate::intent::*;
 
     fn simple_intent() -> OnboardingIntent {
         OnboardingIntent {

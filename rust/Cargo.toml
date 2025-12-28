@@ -12,6 +12,7 @@ rust-version = "1.84"
 [dependencies]
 # Workspace crates
 dsl-core = { path = "crates/dsl-core" }
+ob-agentic = { path = "crates/ob-agentic", features = ["gateway"] }
 dsl_types = { path = "../dsl_types" }
 entity-gateway = { path = "crates/entity-gateway", optional = true }
 ob-poc-types = { path = "crates/ob-poc-types" }
@@ -137,6 +138,7 @@ mcp = ["database"]  # MCP server for Claude integration
 members = [
     ".",
     "crates/dsl-core",
+    "crates/ob-agentic",
     "crates/dsl-lsp",
     "crates/ob-poc-graph",
     "crates/ob-poc-ui",

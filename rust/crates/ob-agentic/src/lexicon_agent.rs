@@ -18,9 +18,10 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::lexicon::{
-    DatabaseEntityResolver, EntityResolver, Lexicon, LexiconPipeline, LexiconPipelineResult,
-};
+use super::lexicon::{EntityResolver, Lexicon, LexiconPipeline, LexiconPipelineResult};
+
+#[cfg(feature = "gateway")]
+use super::lexicon::DatabaseEntityResolver;
 
 // ============================================================================
 // Response Types
@@ -146,7 +147,7 @@ impl LexiconAgentPipeline {
     }
 
     /// Set the entity resolver from an EntityGateway URL.
-    #[cfg(feature = "database")]
+    #[cfg(feature = "gateway")]
     pub async fn with_gateway_resolver(mut self, gateway_url: &str) -> Result<Self> {
         let resolver = DatabaseEntityResolver::connect(gateway_url).await?;
         self.entity_resolver = Some(Arc::new(resolver));
@@ -240,7 +241,7 @@ impl LexiconAgentPipeline {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::agentic::lexicon::{
+    use crate::lexicon::{
         EntitiesConfig, InstrumentsConfig, LexiconConfig, PrepositionsConfig, VerbsConfig,
     };
 

@@ -756,7 +756,7 @@ fn extract_string_list(node: &AstNode) -> Result<Vec<String>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dsl_v2::parser::parse_program;
+    use crate::parser::parse_program;
 
     #[test]
     fn test_compile_cbu_ensure() {

@@ -5,10 +5,10 @@
 use anyhow::{anyhow, Result};
 use std::sync::Arc;
 
-use crate::agentic::client_factory::{create_llm_client, create_llm_client_with_key};
-use crate::agentic::llm_client::LlmClient;
-use crate::agentic::patterns::OnboardingPattern;
-use crate::agentic::planner::OnboardingPlan;
+use crate::client_factory::{create_llm_client, create_llm_client_with_key};
+use crate::llm_client::LlmClient;
+use crate::patterns::OnboardingPattern;
+use crate::planner::OnboardingPlan;
 
 /// DSL generator using LLM API
 pub struct DslGenerator {
@@ -267,7 +267,7 @@ impl IntentExtractor {
     pub async fn extract(
         &self,
         user_request: &str,
-    ) -> Result<crate::agentic::intent::IntentResult> {
+    ) -> Result<crate::intent::IntentResult> {
         let system_prompt = include_str!("prompts/intent_extraction_system.md");
         let user_prompt = format!(
             "Extract the onboarding intent from this request:\n\n{}",
@@ -279,7 +279,7 @@ impl IntentExtractor {
 
         // Parse JSON response - IntentResult uses untagged enum so serde picks the right variant
         let clean_json = Self::extract_json(&response)?;
-        let result: crate::agentic::intent::IntentResult = serde_json::from_str(&clean_json)
+        let result: crate::intent::IntentResult = serde_json::from_str(&clean_json)
             .map_err(|e| {
                 anyhow!(
                     "Failed to parse intent JSON: {}\n\nJSON was:\n{}",
@@ -296,9 +296,9 @@ impl IntentExtractor {
     pub async fn extract_with_clarification(
         &self,
         original_request: &str,
-        clarification: &crate::agentic::intent::ClarificationRequest,
+        clarification: &crate::intent::ClarificationRequest,
         user_choice: &str,
-    ) -> Result<crate::agentic::intent::IntentResult> {
+    ) -> Result<crate::intent::IntentResult> {
         // Build a clarified prompt incorporating the user's choice
         let system_prompt = include_str!("prompts/intent_extraction_system.md");
 
@@ -319,7 +319,7 @@ Return the structured intent JSON (not a clarification request)."#,
 
         let response = self.client.chat_json(system_prompt, &user_prompt).await?;
         let clean_json = Self::extract_json(&response)?;
-        let result: crate::agentic::intent::IntentResult = serde_json::from_str(&clean_json)
+        let result: crate::intent::IntentResult = serde_json::from_str(&clean_json)
             .map_err(|e| {
                 anyhow!(
                     "Failed to parse clarified intent: {}\n\nJSON: {}",

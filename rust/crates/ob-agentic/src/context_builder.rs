@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::dsl_v2::BindingContext;
+use dsl_core::BindingContext;
 
 /// Context for agent DSL generation
 #[derive(Debug, Clone)]
