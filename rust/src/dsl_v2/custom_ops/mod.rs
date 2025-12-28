@@ -25,6 +25,7 @@ mod custody;
 mod document_ops;
 mod entity_ops;
 pub mod entity_query;
+pub mod helpers;
 mod kyc_case_ops;
 mod lifecycle_ops;
 mod matrix_overlay_ops;

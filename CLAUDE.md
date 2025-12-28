@@ -586,6 +586,7 @@ ob-poc/
 │   │   │   ├── execution_plan.rs   # AST → ExecutionPlan compiler
 │   │   │   └── custom_ops/         # Plugin handlers for non-CRUD ops
 │   │   │       ├── mod.rs          # Registry + re-exports only (~370 lines)
+│   │   │       ├── helpers.rs      # Shared argument extraction helpers
 │   │   │       ├── entity_ops.rs   # EntityCreateOp
 │   │   │       ├── document_ops.rs # DocumentCatalogOp, DocumentExtractOp
 │   │   │       ├── screening_ops.rs # PEP, Sanctions, AdverseMedia ops

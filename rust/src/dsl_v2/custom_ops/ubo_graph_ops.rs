@@ -14,6 +14,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use crate::dsl_v2::ast::VerbCall;
+use crate::dsl_v2::custom_ops::helpers::{extract_cbu_id, extract_entity_ref};
 use crate::dsl_v2::custom_ops::CustomOperation;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 
@@ -56,18 +57,7 @@ impl CustomOperation for UboAllegeOp {
         use serde_json::json;
 
         // Extract CBU ID
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu" || a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu argument"))?;
+        let cbu_id = extract_cbu_id(verb_call, ctx)?;
 
         // Extract from entity (supports both @symbol and entity ref tuple)
         let from_entity_id: Uuid = extract_entity_ref(verb_call, "from", ctx, pool).await?;
@@ -267,18 +257,7 @@ impl CustomOperation for UboLinkProofOp {
         use serde_json::json;
 
         // Extract CBU ID
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu" || a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu argument"))?;
+        let cbu_id = extract_cbu_id(verb_call, ctx)?;
 
         // Extract edge/relationship ID (can be @symbol or UUID)
         let relationship_id: Uuid = verb_call
@@ -628,123 +607,6 @@ impl CustomOperation for UboRemoveEdgeOp {
 // HELPER FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// Extract entity reference from verb arguments
-///
-/// Supports:
-/// - @symbol reference
-/// - UUID directly
-/// - Entity ref tuple: ("entity_type" "name" "uuid")
-#[cfg(feature = "database")]
-async fn extract_entity_ref(
-    verb_call: &VerbCall,
-    arg_name: &str,
-    ctx: &mut ExecutionContext,
-    pool: &PgPool,
-) -> Result<Uuid> {
-    let arg = verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == arg_name)
-        .ok_or_else(|| anyhow::anyhow!("Missing {} argument", arg_name))?;
-
-    // Try symbol reference first
-    if let Some(symbol) = arg.value.as_symbol() {
-        return ctx
-            .resolve(symbol)
-            .ok_or_else(|| anyhow::anyhow!("Unresolved symbol: @{}", symbol));
-    }
-
-    // Try direct UUID
-    if let Some(uuid) = arg.value.as_uuid() {
-        return Ok(uuid);
-    }
-
-    // Try entity ref tuple: ("entity_type" "name" "uuid_or_nil")
-    if let Some(items) = arg.value.as_list() {
-        if items.len() >= 2 {
-            // If third item is a UUID, use it
-            if items.len() >= 3 {
-                if let Some(uuid) = items[2].as_uuid() {
-                    return Ok(uuid);
-                }
-            }
-
-            // Otherwise, look up by entity_type and name
-            let entity_type = items[0].as_string().ok_or_else(|| {
-                anyhow::anyhow!("Invalid entity ref: expected entity_type string")
-            })?;
-            let name = items[1]
-                .as_string()
-                .ok_or_else(|| anyhow::anyhow!("Invalid entity ref: expected name string"))?;
-
-            // Look up entity by type and name
-            let entity_id: Option<Uuid> = match entity_type {
-                "proper_person" | "person" => {
-                    sqlx::query_scalar(
-                        r#"SELECT e.entity_id FROM "ob-poc".entities e
-                           JOIN "ob-poc".entity_proper_persons p ON p.entity_id = e.entity_id
-                           WHERE CONCAT(p.first_name, ' ', p.last_name) ILIKE $1
-                           LIMIT 1"#,
-                    )
-                    .bind(name)
-                    .fetch_optional(pool)
-                    .await?
-                }
-                "fund" => {
-                    sqlx::query_scalar(
-                        r#"SELECT e.entity_id FROM "ob-poc".entities e
-                           JOIN "ob-poc".entity_funds f ON f.entity_id = e.entity_id
-                           WHERE e.name ILIKE $1
-                           LIMIT 1"#,
-                    )
-                    .bind(name)
-                    .fetch_optional(pool)
-                    .await?
-                }
-                "manco" => {
-                    sqlx::query_scalar(
-                        r#"SELECT e.entity_id FROM "ob-poc".entities e
-                           JOIN "ob-poc".entity_manco m ON m.entity_id = e.entity_id
-                           WHERE e.name ILIKE $1
-                           LIMIT 1"#,
-                    )
-                    .bind(name)
-                    .fetch_optional(pool)
-                    .await?
-                }
-                "company" | "limited_company" => {
-                    sqlx::query_scalar(
-                        r#"SELECT e.entity_id FROM "ob-poc".entities e
-                           JOIN "ob-poc".entity_limited_companies c ON c.entity_id = e.entity_id
-                           WHERE c.company_name ILIKE $1
-                           LIMIT 1"#,
-                    )
-                    .bind(name)
-                    .fetch_optional(pool)
-                    .await?
-                }
-                _ => {
-                    // Generic entity lookup by name
-                    sqlx::query_scalar(
-                        r#"SELECT entity_id FROM "ob-poc".entities WHERE name ILIKE $1 LIMIT 1"#,
-                    )
-                    .bind(name)
-                    .fetch_optional(pool)
-                    .await?
-                }
-            };
-
-            return entity_id
-                .ok_or_else(|| anyhow::anyhow!("Entity not found: {} '{}'", entity_type, name));
-        }
-    }
-
-    Err(anyhow::anyhow!(
-        "Invalid {} argument: expected @symbol, UUID, or entity ref tuple",
-        arg_name
-    ))
-}
-
 /// Sync entity_workstreams.is_ubo based on proven ownership in ubo_edges
 ///
 /// When an edge is verified:
@@ -931,18 +793,7 @@ impl CustomOperation for UboVerifyOp {
         use serde_json::json;
 
         // Extract CBU ID
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu" || a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu argument"))?;
+        let cbu_id = extract_cbu_id(verb_call, ctx)?;
 
         // Extract edge/relationship ID
         let relationship_id: Uuid = verb_call
@@ -1149,18 +1000,7 @@ impl CustomOperation for UboStatusOp {
         use serde_json::json;
 
         // Extract CBU ID
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu" || a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu argument"))?;
+        let cbu_id = extract_cbu_id(verb_call, ctx)?;
 
         // ═══════════════════════════════════════════════════════════════════════
         // NEW ARCHITECTURE: Query cbu_convergence_status view
@@ -1291,18 +1131,7 @@ impl CustomOperation for UboAssertOp {
         use serde_json::json;
 
         // Extract CBU ID
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu" || a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu argument"))?;
+        let cbu_id = extract_cbu_id(verb_call, ctx)?;
 
         // Check which assertion is being made
         let converged = verb_call
@@ -1546,18 +1375,7 @@ impl CustomOperation for UboEvaluateOp {
         use serde_json::json;
 
         // Extract CBU ID
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu" || a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu argument"))?;
+        let cbu_id = extract_cbu_id(verb_call, ctx)?;
 
         // Get case ID (required for evaluation) - try from args first, then lookup active case
         let case_id: Uuid = match verb_call
@@ -1752,18 +1570,7 @@ impl CustomOperation for UboTraverseOp {
         use serde_json::json;
 
         // Extract CBU ID
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu" || a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu argument"))?;
+        let cbu_id = extract_cbu_id(verb_call, ctx)?;
 
         // ═══════════════════════════════════════════════════════════════════════
         // NEW ARCHITECTURE: Query entity_relationships + cbu_relationship_verification
@@ -1886,18 +1693,7 @@ impl CustomOperation for KycDecisionOp {
         use serde_json::json;
 
         // Extract CBU ID
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu" || a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu argument"))?;
+        let cbu_id = extract_cbu_id(verb_call, ctx)?;
 
         // Extract decision
         let decision = verb_call
@@ -2197,18 +1993,7 @@ impl CustomOperation for UboScheduleReviewOp {
         use serde_json::json;
 
         // Extract CBU ID
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu" || a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu argument"))?;
+        let cbu_id = extract_cbu_id(verb_call, ctx)?;
 
         // Extract review date
         let review_date: chrono::NaiveDate = verb_call
@@ -2544,18 +2329,7 @@ impl CustomOperation for UboConvergenceSupersedeOp {
         use serde_json::json;
 
         // Extract CBU ID
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu" || a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu argument"))?;
+        let cbu_id = extract_cbu_id(verb_call, ctx)?;
 
         // Extract old relationship ID
         let old_relationship_id: Uuid = verb_call
@@ -2767,18 +2541,7 @@ impl CustomOperation for UboTransferControlOp {
         use serde_json::json;
 
         // Extract CBU ID
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu" || a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu argument"))?;
+        let cbu_id = extract_cbu_id(verb_call, ctx)?;
 
         // Extract from controller
         let from_controller_id: Uuid = extract_entity_ref(verb_call, "from", ctx, pool).await?;
@@ -2993,18 +2756,7 @@ impl CustomOperation for UboWaiveVerificationOp {
         use serde_json::json;
 
         // Extract CBU ID
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu" || a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu argument"))?;
+        let cbu_id = extract_cbu_id(verb_call, ctx)?;
 
         // Extract relationship ID
         let relationship_id: Uuid = verb_call

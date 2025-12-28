@@ -15,6 +15,7 @@ use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
+use super::helpers::{extract_string_list, extract_uuid, extract_uuid_opt, resolve_cbu_id};
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 use crate::dsl_v2::entity_deps::EntityDependencyRegistry;
 #[allow(unused_imports)]
@@ -157,93 +158,6 @@ impl ResourceDependencyGraph {
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
-
-/// Extract UUID from verb argument (handles @symbol and literal)
-fn extract_uuid(verb_call: &VerbCall, ctx: &ExecutionContext, arg_name: &str) -> Result<Uuid> {
-    verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == arg_name)
-        .and_then(|a| {
-            // Try symbol reference first
-            if let Some(sym) = a.value.as_symbol() {
-                return ctx.resolve(sym);
-            }
-            // Try literal UUID
-            a.value.as_uuid()
-        })
-        .ok_or_else(|| anyhow!("Missing {} argument", arg_name))
-}
-
-/// Extract optional UUID from verb argument (handles @symbol and literal)
-fn extract_uuid_opt(verb_call: &VerbCall, ctx: &ExecutionContext, arg_name: &str) -> Option<Uuid> {
-    verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == arg_name)
-        .and_then(|a| {
-            // Try symbol reference first
-            if let Some(sym) = a.value.as_symbol() {
-                return ctx.resolve(sym);
-            }
-            // Try literal UUID
-            a.value.as_uuid()
-        })
-}
-
-/// Extract optional string from verb argument
-fn extract_string_opt(verb_call: &VerbCall, arg_name: &str) -> Option<String> {
-    verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == arg_name)
-        .and_then(|a| a.value.as_string().map(|s| s.to_string()))
-}
-
-/// Resolve CBU by either cbu-id or cbu-name
-#[cfg(feature = "database")]
-async fn resolve_cbu_id(
-    verb_call: &VerbCall,
-    ctx: &ExecutionContext,
-    pool: &PgPool,
-) -> Result<Uuid> {
-    // First try cbu-id (direct UUID or @symbol reference)
-    if let Some(cbu_id) = extract_uuid_opt(verb_call, ctx, "cbu-id") {
-        return Ok(cbu_id);
-    }
-
-    // Fall back to cbu-name lookup
-    if let Some(cbu_name) = extract_string_opt(verb_call, "cbu-name") {
-        let row: Option<(Uuid,)> =
-            sqlx::query_as(r#"SELECT cbu_id FROM "ob-poc".cbus WHERE name = $1"#)
-                .bind(&cbu_name)
-                .fetch_optional(pool)
-                .await?;
-
-        return row
-            .map(|(id,)| id)
-            .ok_or_else(|| anyhow!("CBU not found: {}", cbu_name));
-    }
-
-    Err(anyhow!("Missing cbu-id or cbu-name argument"))
-}
-
-/// Extract string list from verb argument
-fn extract_string_list(verb_call: &VerbCall, arg_name: &str) -> Result<Vec<String>> {
-    verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == arg_name)
-        .and_then(|a| {
-            a.value.as_list().map(|items| {
-                items
-                    .iter()
-                    .filter_map(|item| item.as_string().map(|s| s.to_string()))
-                    .collect()
-            })
-        })
-        .ok_or_else(|| anyhow!("Missing {} argument", arg_name))
-}
 
 /// Normalize products array for consistent comparison (sort alphabetically)
 fn normalize_products(products: &[String]) -> Vec<String> {

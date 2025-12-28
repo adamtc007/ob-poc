@@ -7,43 +7,12 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use sqlx::PgPool;
-use uuid::Uuid;
 
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 
+use super::helpers::extract_uuid;
 use super::CustomOperation;
-
-// ============================================================================
-// Helper: Extract UUID from verb call argument
-// ============================================================================
-
-fn extract_uuid_arg(verb_call: &VerbCall, arg_name: &str, ctx: &ExecutionContext) -> Result<Uuid> {
-    let arg = verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == arg_name)
-        .ok_or_else(|| anyhow!("{} is required", arg_name))?;
-
-    // Try symbol reference first
-    if let Some(symbol) = arg.value.as_symbol() {
-        if let Some(uuid) = ctx.symbols.get(symbol) {
-            return Ok(*uuid);
-        }
-    }
-
-    // Try direct UUID
-    if let Some(uuid) = arg.value.as_uuid() {
-        return Ok(uuid);
-    }
-
-    // Try string
-    if let Some(s) = arg.value.as_string() {
-        return Uuid::parse_str(s).map_err(|e| anyhow!("Invalid UUID: {}", e));
-    }
-
-    Err(anyhow!("{} must be a valid UUID", arg_name))
-}
 
 // ============================================================================
 // KycCaseStateOp - Returns case with workstreams and embedded awaiting requests
@@ -75,7 +44,7 @@ impl CustomOperation for KycCaseStateOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        let case_id = extract_uuid_arg(verb_call, "case-id", ctx)?;
+        let case_id = extract_uuid(verb_call, ctx, "case-id")?;
 
         // Load case with CBU info
         let case_row = sqlx::query!(
@@ -334,7 +303,7 @@ impl CustomOperation for WorkstreamStateOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        let workstream_id = extract_uuid_arg(verb_call, "workstream-id", ctx)?;
+        let workstream_id = extract_uuid(verb_call, ctx, "workstream-id")?;
 
         // Load workstream with entity info
         let ws = sqlx::query!(

@@ -10,6 +10,7 @@ use chrono::{Duration, NaiveDate, Utc};
 use serde_json::json;
 use uuid::Uuid;
 
+use super::helpers::{extract_uuid, extract_uuid_opt};
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
@@ -53,7 +54,7 @@ impl CustomOperation for RequestCreateOp {
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow!("subject-type is required"))?;
 
-        let subject_id = extract_uuid_arg(verb_call, "subject-id", ctx)?;
+        let subject_id = extract_uuid(verb_call, ctx, "subject-id")?;
 
         let request_type = verb_call
             .arguments
@@ -137,11 +138,7 @@ impl CustomOperation for RequestCreateOp {
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string());
 
-        let requested_from_entity_id = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "from-entity")
-            .and_then(|a| extract_uuid_value(&a.value, ctx));
+        let requested_from_entity_id = extract_uuid_opt(verb_call, ctx, "from-entity");
 
         let request_details: serde_json::Value = verb_call
             .arguments
@@ -291,17 +288,9 @@ impl CustomOperation for RequestOverdueOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        let case_id = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "case-id")
-            .and_then(|a| extract_uuid_value(&a.value, ctx));
+        let case_id = extract_uuid_opt(verb_call, ctx, "case-id");
 
-        let cbu_id = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu-id")
-            .and_then(|a| extract_uuid_value(&a.value, ctx));
+        let cbu_id = extract_uuid_opt(verb_call, ctx, "cbu-id");
 
         let include_grace = verb_call
             .arguments
@@ -415,7 +404,7 @@ impl CustomOperation for RequestFulfillOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        let request_id = extract_uuid_arg(verb_call, "request-id", ctx)?;
+        let request_id = extract_uuid(verb_call, ctx, "request-id")?;
 
         let fulfillment_type = verb_call
             .arguments
@@ -424,11 +413,7 @@ impl CustomOperation for RequestFulfillOp {
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string());
 
-        let reference_id = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "reference-id")
-            .and_then(|a| extract_uuid_value(&a.value, ctx));
+        let reference_id = extract_uuid_opt(verb_call, ctx, "reference-id");
 
         let reference_type = verb_call
             .arguments
@@ -526,7 +511,7 @@ impl CustomOperation for RequestCancelOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        let request_id = extract_uuid_arg(verb_call, "request-id", ctx)?;
+        let request_id = extract_uuid(verb_call, ctx, "request-id")?;
 
         let reason = verb_call
             .arguments
@@ -604,7 +589,7 @@ impl CustomOperation for RequestExtendOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        let request_id = extract_uuid_arg(verb_call, "request-id", ctx)?;
+        let request_id = extract_uuid(verb_call, ctx, "request-id")?;
 
         let reason = verb_call
             .arguments
@@ -724,7 +709,7 @@ impl CustomOperation for RequestRemindOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        let request_id = extract_uuid_arg(verb_call, "request-id", ctx)?;
+        let request_id = extract_uuid(verb_call, ctx, "request-id")?;
 
         let channel = verb_call
             .arguments
@@ -823,13 +808,9 @@ impl CustomOperation for RequestEscalateOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        let request_id = extract_uuid_arg(verb_call, "request-id", ctx)?;
+        let request_id = extract_uuid(verb_call, ctx, "request-id")?;
 
-        let escalate_to = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "escalate-to")
-            .and_then(|a| extract_uuid_value(&a.value, ctx));
+        let escalate_to = extract_uuid_opt(verb_call, ctx, "escalate-to");
 
         let reason = verb_call
             .arguments
@@ -903,7 +884,7 @@ impl CustomOperation for RequestWaiveOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        let request_id = extract_uuid_arg(verb_call, "request-id", ctx)?;
+        let request_id = extract_uuid(verb_call, ctx, "request-id")?;
 
         let reason = verb_call
             .arguments
@@ -912,7 +893,7 @@ impl CustomOperation for RequestWaiveOp {
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow!("reason is required"))?;
 
-        let approved_by = extract_uuid_arg(verb_call, "approved-by", ctx)?;
+        let approved_by = extract_uuid(verb_call, ctx, "approved-by")?;
 
         let updated = sqlx::query!(
             r#"
@@ -1321,7 +1302,7 @@ impl CustomOperation for DocumentWaiveOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        let workstream_id = extract_uuid_arg(verb_call, "workstream-id", ctx)?;
+        let workstream_id = extract_uuid(verb_call, ctx, "workstream-id")?;
 
         let doc_type = verb_call
             .arguments
@@ -1337,7 +1318,7 @@ impl CustomOperation for DocumentWaiveOp {
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow!("reason is required"))?;
 
-        let approved_by = extract_uuid_arg(verb_call, "approved-by", ctx)?;
+        let approved_by = extract_uuid(verb_call, ctx, "approved-by")?;
 
         // Find and waive matching request
         let updated = sqlx::query!(
@@ -1391,31 +1372,6 @@ impl CustomOperation for DocumentWaiveOp {
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helper Functions
 // ═══════════════════════════════════════════════════════════════════════════════
-
-use crate::dsl_v2::ast::AstNode;
-
-fn extract_uuid_value(value: &AstNode, ctx: &ExecutionContext) -> Option<Uuid> {
-    if let Some(ref_name) = value.as_symbol() {
-        ctx.resolve(ref_name)
-    } else if let Some(uuid_val) = value.as_uuid() {
-        Some(uuid_val)
-    } else if let Some(str_val) = value.as_string() {
-        Uuid::parse_str(str_val).ok()
-    } else {
-        None
-    }
-}
-
-fn extract_uuid_arg(verb_call: &VerbCall, arg_name: &str, ctx: &ExecutionContext) -> Result<Uuid> {
-    let arg = verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == arg_name)
-        .ok_or_else(|| anyhow!("{} is required", arg_name))?;
-
-    extract_uuid_value(&arg.value, ctx)
-        .ok_or_else(|| anyhow!("{} must be a valid UUID or @reference", arg_name))
-}
 
 #[cfg(feature = "database")]
 async fn derive_linked_ids(
@@ -1476,12 +1432,7 @@ async fn resolve_document_subject(
     Option<Uuid>,
 )> {
     // Try workstream first
-    if let Some(ws_id) = verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == "workstream-id")
-        .and_then(|a| extract_uuid_value(&a.value, ctx))
-    {
+    if let Some(ws_id) = extract_uuid_opt(verb_call, ctx, "workstream-id") {
         let row = sqlx::query!(
             r#"
             SELECT w.workstream_id, w.entity_id, c.case_id, c.cbu_id
@@ -1506,12 +1457,7 @@ async fn resolve_document_subject(
     }
 
     // Try entity
-    if let Some(entity_id) = verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == "entity-id")
-        .and_then(|a| extract_uuid_value(&a.value, ctx))
-    {
+    if let Some(entity_id) = extract_uuid_opt(verb_call, ctx, "entity-id") {
         return Ok((
             "ENTITY".to_string(),
             entity_id,
@@ -1523,12 +1469,7 @@ async fn resolve_document_subject(
     }
 
     // Try case
-    if let Some(case_id) = verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == "case-id")
-        .and_then(|a| extract_uuid_value(&a.value, ctx))
-    {
+    if let Some(case_id) = extract_uuid_opt(verb_call, ctx, "case-id") {
         let row = sqlx::query!(
             r#"SELECT case_id, cbu_id FROM kyc.cases WHERE case_id = $1"#,
             case_id
