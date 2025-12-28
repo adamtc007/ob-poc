@@ -1,0 +1,640 @@
+domains:
+  team:
+    description: "Team and organizational unit management"
+
+    verbs:
+      # =========================================================================
+      # TEAM LIFECYCLE
+      # =========================================================================
+
+      create:
+        description: "Create a new team with delegated authority"
+        behavior: crud
+        crud:
+          operation: insert
+          table: teams
+          schema: teams
+          returning: team_id
+        args:
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+          - name: team-type
+            type: string
+            required: true
+            maps_to: team_type
+            valid_values:
+              [
+                fund-ops,
+                manco-oversight,
+                im-trading,
+                spv-admin,
+                client-service,
+                accounting,
+                reporting,
+                board,
+                investment-committee,
+                conducting-officers,
+                executive,
+              ]
+          - name: delegating-entity
+            type: uuid
+            required: true
+            maps_to: delegating_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: authority-type
+            type: string
+            required: true
+            maps_to: authority_type
+            valid_values:
+              [operational, oversight, trading, administrative, governance]
+          - name: access-mode
+            type: string
+            required: true
+            maps_to: access_mode
+            valid_values: [explicit, by-manco, by-im, by-filter]
+          - name: authority-scope
+            type: json
+            required: false
+            maps_to: authority_scope
+        produces:
+          binding: team
+          type: uuid
+
+      read:
+        description: "Read team details"
+        behavior: crud
+        crud:
+          operation: select
+          table: teams
+          schema: teams
+          key: team_id
+        args:
+          - name: team
+            type: uuid
+            required: true
+            maps_to: team_id
+            lookup:
+              table: teams
+              entity_type: team
+              schema: teams
+              search_key: name
+              primary_key: team_id
+
+      archive:
+        description: "Archive team (soft delete)"
+        behavior: crud
+        crud:
+          operation: update
+          table: teams
+          schema: teams
+          key: team_id
+          set_values:
+            is_active: false
+            archived_at: now()
+        args:
+          - name: team
+            type: uuid
+            required: true
+            maps_to: team_id
+            lookup:
+              table: teams
+              entity_type: team
+              schema: teams
+              search_key: name
+              primary_key: team_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: archive_reason
+
+      # =========================================================================
+      # MEMBERSHIP
+      # =========================================================================
+
+      add-member:
+        description: "Add user to team with role"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: memberships
+          schema: teams
+          conflict_keys: [team_id, user_id, role_key]
+          returning: membership_id
+        args:
+          - name: team
+            type: uuid
+            required: true
+            maps_to: team_id
+            lookup:
+              table: teams
+              entity_type: team
+              schema: teams
+              search_key: name
+              primary_key: team_id
+          - name: user
+            type: uuid
+            required: true
+            maps_to: user_id
+            lookup:
+              table: clients
+              entity_type: user
+              schema: client_portal
+              search_key: email
+              primary_key: client_id
+          - name: role
+            type: string
+            required: true
+            maps_to: role_key
+            description: "Role key: {team-type}.{function}:{level}"
+          - name: effective-from
+            type: date
+            required: false
+            maps_to: effective_from
+          - name: effective-to
+            type: date
+            required: false
+            maps_to: effective_to
+        produces:
+          binding: membership
+          type: uuid
+
+      remove-member:
+        description: "Remove user from team (specific role)"
+        behavior: crud
+        crud:
+          operation: delete
+          table: memberships
+          schema: teams
+        args:
+          - name: team
+            type: uuid
+            required: true
+            maps_to: team_id
+            lookup:
+              table: teams
+              entity_type: team
+              schema: teams
+              search_key: name
+              primary_key: team_id
+          - name: user
+            type: uuid
+            required: true
+            maps_to: user_id
+            lookup:
+              table: clients
+              entity_type: user
+              schema: client_portal
+              search_key: email
+              primary_key: client_id
+          - name: role
+            type: string
+            required: true
+            maps_to: role_key
+            description: "Role key to remove"
+
+      update-member:
+        description: "Update member's role key"
+        behavior: crud
+        crud:
+          operation: update
+          table: memberships
+          schema: teams
+          key: membership_id
+        args:
+          - name: membership
+            type: uuid
+            required: true
+            maps_to: membership_id
+          - name: new-role
+            type: string
+            required: true
+            maps_to: role_key
+
+      transfer-member:
+        description: "Move user from one team to another (end old, create new)"
+        behavior: plugin
+        handler: team_transfer_member
+        args:
+          - name: from-team
+            type: uuid
+            required: true
+            lookup:
+              table: teams
+              entity_type: team
+              schema: teams
+              search_key: name
+              primary_key: team_id
+          - name: to-team
+            type: uuid
+            required: true
+            lookup:
+              table: teams
+              entity_type: team
+              schema: teams
+              search_key: name
+              primary_key: team_id
+          - name: user
+            type: uuid
+            required: true
+            lookup:
+              table: clients
+              entity_type: user
+              schema: client_portal
+              search_key: email
+              primary_key: client_id
+          - name: new-role
+            type: string
+            required: true
+
+      # =========================================================================
+      # GOVERNANCE MEMBERSHIP (Part 6)
+      # =========================================================================
+
+      add-governance-member:
+        description: "Add governance member with optional legal appointment link"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: memberships
+          schema: teams
+          conflict_keys: [team_id, user_id, role_key]
+          returning: membership_id
+        args:
+          - name: team
+            type: uuid
+            required: true
+            maps_to: team_id
+            lookup:
+              table: teams
+              entity_type: team
+              schema: teams
+              search_key: name
+              primary_key: team_id
+          - name: user
+            type: uuid
+            required: true
+            maps_to: user_id
+            lookup:
+              table: clients
+              entity_type: user
+              schema: client_portal
+              search_key: email
+              primary_key: client_id
+          - name: role
+            type: string
+            required: true
+            maps_to: role_key
+            description: "Governance role key: governance.{function}:{level}"
+          - name: legal-appointment
+            type: uuid
+            required: false
+            maps_to: legal_appointment_id
+            description: "Link to cbu_entity_roles record"
+          - name: requires-legal-link
+            type: boolean
+            required: false
+            maps_to: requires_legal_appointment
+            description: "Flag to require legal appointment"
+        produces:
+          binding: membership
+          type: uuid
+
+      verify-governance-access:
+        description: "Audit governance access against legal appointments"
+        behavior: crud
+        crud:
+          operation: select
+          table: v_governance_access
+          schema: teams
+        args:
+          - name: team
+            type: uuid
+            required: false
+            maps_to: team_id
+            description: "Specific team (optional - all governance teams if omitted)"
+
+      # =========================================================================
+      # CBU ACCESS
+      # =========================================================================
+
+      add-cbu-access:
+        description: "Add CBU to team's explicit access list"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: team_cbu_access
+          schema: teams
+          conflict_keys: [team_id, cbu_id]
+          returning: access_id
+        args:
+          - name: team
+            type: uuid
+            required: true
+            maps_to: team_id
+          - name: cbu
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+
+      remove-cbu-access:
+        description: "Remove CBU from team's access"
+        behavior: crud
+        crud:
+          operation: delete
+          table: team_cbu_access
+          schema: teams
+        args:
+          - name: team
+            type: uuid
+            required: true
+            maps_to: team_id
+          - name: cbu
+            type: uuid
+            required: true
+            maps_to: cbu_id
+
+      # =========================================================================
+      # ENTITLEMENTS
+      # =========================================================================
+
+      grant-service:
+        description: "Grant service entitlement to team"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: team_entitlements
+          schema: teams
+          conflict_keys: [team_id, service_code]
+          returning: entitlement_id
+        args:
+          - name: team
+            type: uuid
+            required: true
+            maps_to: team_id
+            lookup:
+              table: teams
+              entity_type: team
+              schema: teams
+              search_key: name
+              primary_key: team_id
+          - name: service
+            type: string
+            required: true
+            maps_to: service_code
+            valid_values:
+              [client-portal, reporting-portal, repair-queue, trade-instruction]
+          - name: config
+            type: json
+            required: false
+            maps_to: entitlement_config
+        produces:
+          binding: entitlement
+          type: uuid
+
+      revoke-service:
+        description: "Revoke service entitlement"
+        behavior: crud
+        crud:
+          operation: delete
+          table: team_entitlements
+          schema: teams
+        args:
+          - name: team
+            type: uuid
+            required: true
+            maps_to: team_id
+            lookup:
+              table: teams
+              entity_type: team
+              schema: teams
+              search_key: name
+              primary_key: team_id
+          - name: service
+            type: string
+            required: true
+            maps_to: service_code
+
+      # =========================================================================
+      # QUERIES
+      # =========================================================================
+
+      list-members:
+        description: "List team members"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: v_effective_memberships
+          schema: teams
+          fk_col: team_id
+        args:
+          - name: team
+            type: uuid
+            required: true
+          - name: role-pattern
+            type: string
+            required: false
+          - name: include-inactive
+            type: boolean
+            default: false
+
+      list-cbus:
+        description: "List CBUs team can access"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: v_team_cbu_access
+          schema: teams
+          fk_col: team_id
+        args:
+          - name: team
+            type: uuid
+            required: true
+            maps_to: team_id
+            lookup:
+              table: teams
+              entity_type: team
+              schema: teams
+              search_key: name
+              primary_key: team_id
+
+  # ===========================================================================
+  # USER DOMAIN
+  # ===========================================================================
+
+  user:
+    description: "User lifecycle management"
+
+    verbs:
+      create:
+        description: "Create portal user"
+        behavior: crud
+        crud:
+          operation: insert
+          table: clients
+          schema: client_portal
+          returning: client_id
+        args:
+          - name: email
+            type: string
+            required: true
+            maps_to: email
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+          - name: employer
+            type: uuid
+            required: false
+            maps_to: employer_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: identity-provider
+            type: string
+            required: false
+            maps_to: identity_provider
+            default: local
+        produces:
+          binding: user
+          type: uuid
+
+      suspend:
+        description: "Suspend user access"
+        behavior: crud
+        crud:
+          operation: update
+          table: clients
+          schema: client_portal
+          key: client_id
+          set_values:
+            status: SUSPENDED
+        args:
+          - name: user
+            type: uuid
+            required: true
+            maps_to: client_id
+
+      reactivate:
+        description: "Reactivate suspended user"
+        behavior: crud
+        crud:
+          operation: update
+          table: clients
+          schema: client_portal
+          key: client_id
+          set_values:
+            status: ACTIVE
+        args:
+          - name: user
+            type: uuid
+            required: true
+            maps_to: client_id
+
+      offboard:
+        description: "Offboard user completely (left company)"
+        behavior: crud
+        crud:
+          operation: update
+          table: clients
+          schema: client_portal
+          key: client_id
+          set_values:
+            status: OFFBOARDED
+        args:
+          - name: user
+            type: uuid
+            required: true
+            maps_to: client_id
+            lookup:
+              table: clients
+              entity_type: user
+              schema: client_portal
+              search_key: email
+              primary_key: client_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: offboard_reason
+            valid_values: [resigned, terminated, retired, deceased, other]
+          - name: notes
+            type: string
+            required: false
+            maps_to: offboard_notes
+
+      list-teams:
+        description: "List user's team memberships"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: v_effective_memberships
+          schema: teams
+          fk_col: user_id
+        args:
+          - name: user
+            type: uuid
+            required: true
+
+      list-cbus:
+        description: "List all CBUs user can access"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: v_user_cbu_access
+          schema: teams
+          fk_col: user_id
+        args:
+          - name: user
+            type: uuid
+            required: true
+            maps_to: user_id
+            lookup:
+              table: clients
+              entity_type: user
+              schema: client_portal
+              search_key: email
+              primary_key: client_id
+
+      check-access:
+        description: "Check user access to specific CBU"
+        behavior: crud
+        crud:
+          operation: select
+          table: v_user_cbu_access
+          schema: teams
+        args:
+          - name: user
+            type: uuid
+            required: true
+            maps_to: user_id
+            lookup:
+              table: clients
+              entity_type: user
+              schema: client_portal
+              search_key: email
+              primary_key: client_id
+          - name: cbu
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id

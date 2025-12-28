@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict YCqX35TEcO4dYfL5cEohEHA4kfaiPOc9Rqh6PXwjLpnUIQE3INy4eQ5KiKYe82s
+\restrict aVm5ARkNirTm6VbEE3huwGP6nXmuetH4WdmDIduE0Qu6UXBrOwtc6towbZwF2N6
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -73,6 +73,13 @@ CREATE SCHEMA ob_ref;
 --
 
 COMMENT ON SCHEMA public IS 'Runtime API Endpoints System - Phase 1 Foundation';
+
+
+--
+-- Name: teams; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA teams;
 
 
 --
@@ -2109,6 +2116,125 @@ END;
 $$;
 
 
+--
+-- Name: generate_attestation_signature(uuid, uuid, uuid[], text, timestamp with time zone); Type: FUNCTION; Schema: teams; Owner: -
+--
+
+CREATE FUNCTION teams.generate_attestation_signature(p_attester_id uuid, p_campaign_id uuid, p_item_ids uuid[], p_attestation_text text, p_timestamp timestamp with time zone) RETURNS text
+    LANGUAGE plpgsql IMMUTABLE
+    AS $$
+DECLARE
+    v_input TEXT;
+BEGIN
+    v_input := p_attester_id::text || '|' ||
+               p_campaign_id::text || '|' ||
+               array_to_string(p_item_ids, ',') || '|' ||
+               p_attestation_text || '|' ||
+               p_timestamp::text;
+
+    RETURN 'sha256:' || encode(sha256(v_input::bytea), 'hex');
+END;
+$$;
+
+
+--
+-- Name: get_user_access_domains(uuid); Type: FUNCTION; Schema: teams; Owner: -
+--
+
+CREATE FUNCTION teams.get_user_access_domains(p_user_id uuid) RETURNS character varying[]
+    LANGUAGE sql STABLE
+    AS $$
+    SELECT array_agg(DISTINCT unnest_domain)
+    FROM teams.v_effective_memberships m
+    CROSS JOIN LATERAL unnest(COALESCE(m.access_domains, ARRAY[]::varchar[])) as unnest_domain
+    WHERE m.user_id = p_user_id;
+$$;
+
+
+--
+-- Name: get_user_cbu_access(uuid); Type: FUNCTION; Schema: teams; Owner: -
+--
+
+CREATE FUNCTION teams.get_user_cbu_access(p_user_id uuid) RETURNS TABLE(cbu_id uuid, cbu_name character varying, access_domains character varying[], via_teams uuid[], roles character varying[])
+    LANGUAGE sql STABLE
+    AS $$
+    SELECT cbu_id, cbu_name, access_domains, via_teams, roles
+    FROM teams.v_user_cbu_access
+    WHERE user_id = p_user_id;
+$$;
+
+
+--
+-- Name: log_membership_change(); Type: FUNCTION; Schema: teams; Owner: -
+--
+
+CREATE FUNCTION teams.log_membership_change() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        INSERT INTO teams.membership_history
+            (membership_id, team_id, user_id, action, new_role_key, changed_by_user_id)
+        VALUES
+            (NEW.membership_id, NEW.team_id, NEW.user_id, 'ADDED', NEW.role_key, NEW.delegated_by_user_id);
+    ELSIF TG_OP = 'UPDATE' THEN
+        IF OLD.role_key != NEW.role_key THEN
+            INSERT INTO teams.membership_history
+                (membership_id, team_id, user_id, action, old_role_key, new_role_key)
+            VALUES
+                (NEW.membership_id, NEW.team_id, NEW.user_id, 'UPDATED', OLD.role_key, NEW.role_key);
+        END IF;
+        IF NEW.effective_to IS NOT NULL AND OLD.effective_to IS NULL THEN
+            INSERT INTO teams.membership_history
+                (membership_id, team_id, user_id, action, old_role_key)
+            VALUES
+                (NEW.membership_id, NEW.team_id, NEW.user_id, 'REMOVED', OLD.role_key);
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: update_timestamp(); Type: FUNCTION; Schema: teams; Owner: -
+--
+
+CREATE FUNCTION teams.update_timestamp() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: user_can_access_cbu(uuid, uuid); Type: FUNCTION; Schema: teams; Owner: -
+--
+
+CREATE FUNCTION teams.user_can_access_cbu(p_user_id uuid, p_cbu_id uuid) RETURNS boolean
+    LANGUAGE sql STABLE
+    AS $$
+    SELECT EXISTS (
+        SELECT 1 FROM teams.v_user_cbu_access
+        WHERE user_id = p_user_id AND cbu_id = p_cbu_id
+    );
+$$;
+
+
+--
+-- Name: user_has_domain(uuid, character varying); Type: FUNCTION; Schema: teams; Owner: -
+--
+
+CREATE FUNCTION teams.user_has_domain(p_user_id uuid, p_domain character varying) RETURNS boolean
+    LANGUAGE sql STABLE
+    AS $$
+    SELECT p_domain = ANY(COALESCE(teams.get_user_access_domains(p_user_id), ARRAY[]::varchar[]));
+$$;
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -2125,7 +2251,15 @@ CREATE TABLE client_portal.clients (
     is_active boolean DEFAULT true NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    last_login_at timestamp with time zone
+    last_login_at timestamp with time zone,
+    employer_entity_id uuid,
+    identity_provider character varying(50) DEFAULT 'local'::character varying,
+    status character varying(50) DEFAULT 'ACTIVE'::character varying,
+    offboarded_at timestamp with time zone,
+    offboard_reason character varying(50),
+    CONSTRAINT chk_identity_provider CHECK (((identity_provider)::text = ANY ((ARRAY['local'::character varying, 'saml'::character varying, 'oidc'::character varying])::text[]))),
+    CONSTRAINT chk_offboard_reason CHECK (((offboard_reason IS NULL) OR ((offboard_reason)::text = ANY ((ARRAY['resigned'::character varying, 'terminated'::character varying, 'retired'::character varying, 'deceased'::character varying, 'other'::character varying])::text[])))),
+    CONSTRAINT chk_user_status CHECK (((status)::text = ANY ((ARRAY['ACTIVE'::character varying, 'SUSPENDED'::character varying, 'OFFBOARDED'::character varying])::text[])))
 );
 
 
@@ -2229,6 +2363,27 @@ CREATE TABLE client_portal.submissions (
     CONSTRAINT submissions_status_check CHECK (((status)::text = ANY ((ARRAY['SUBMITTED'::character varying, 'UNDER_REVIEW'::character varying, 'ACCEPTED'::character varying, 'REJECTED'::character varying, 'SUPERSEDED'::character varying])::text[]))),
     CONSTRAINT submissions_submission_type_check CHECK (((submission_type)::text = ANY ((ARRAY['DOCUMENT'::character varying, 'INFORMATION'::character varying, 'NOTE'::character varying, 'CLARIFICATION'::character varying])::text[])))
 );
+
+
+--
+-- Name: users; Type: VIEW; Schema: client_portal; Owner: -
+--
+
+CREATE VIEW client_portal.users AS
+ SELECT client_id AS user_id,
+    name,
+    email,
+    accessible_cbus,
+    is_active,
+    created_at,
+    updated_at,
+    last_login_at,
+    employer_entity_id,
+    identity_provider,
+    status,
+    offboarded_at,
+    offboard_reason
+   FROM client_portal.clients;
 
 
 --
@@ -8922,6 +9077,493 @@ ALTER SEQUENCE public.rules_id_seq OWNED BY public.rules.id;
 
 
 --
+-- Name: access_attestations; Type: TABLE; Schema: teams; Owner: -
+--
+
+CREATE TABLE teams.access_attestations (
+    attestation_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    campaign_id uuid NOT NULL,
+    attester_user_id uuid NOT NULL,
+    attester_name character varying(255) NOT NULL,
+    attester_email character varying(255) NOT NULL,
+    attester_role character varying(100),
+    attestation_scope character varying(50) NOT NULL,
+    team_id uuid,
+    item_ids uuid[],
+    items_count integer NOT NULL,
+    attestation_text text NOT NULL,
+    attestation_version character varying(20) DEFAULT 'v1'::character varying,
+    attested_at timestamp with time zone DEFAULT now() NOT NULL,
+    signature_hash text NOT NULL,
+    signature_input text,
+    ip_address inet,
+    user_agent text,
+    session_id uuid,
+    CONSTRAINT chk_attestation_scope CHECK (((attestation_scope)::text = ANY ((ARRAY['FULL_CAMPAIGN'::character varying, 'MY_REVIEWS'::character varying, 'SPECIFIC_TEAM'::character varying, 'SPECIFIC_ITEMS'::character varying])::text[])))
+);
+
+
+--
+-- Name: access_domains; Type: TABLE; Schema: teams; Owner: -
+--
+
+CREATE TABLE teams.access_domains (
+    domain_code character varying(50) NOT NULL,
+    name character varying(100) NOT NULL,
+    description text,
+    visualizer_views text[] DEFAULT '{}'::text[] NOT NULL,
+    is_active boolean DEFAULT true
+);
+
+
+--
+-- Name: access_review_campaigns; Type: TABLE; Schema: teams; Owner: -
+--
+
+CREATE TABLE teams.access_review_campaigns (
+    campaign_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name character varying(255) NOT NULL,
+    review_type character varying(50) NOT NULL,
+    scope_type character varying(50) NOT NULL,
+    scope_filter jsonb,
+    review_period_start date DEFAULT CURRENT_DATE NOT NULL,
+    review_period_end date DEFAULT CURRENT_DATE NOT NULL,
+    deadline date NOT NULL,
+    reminder_days integer[] DEFAULT ARRAY[7, 3, 1],
+    status character varying(50) DEFAULT 'DRAFT'::character varying,
+    total_items integer DEFAULT 0,
+    reviewed_items integer DEFAULT 0,
+    confirmed_items integer DEFAULT 0,
+    revoked_items integer DEFAULT 0,
+    extended_items integer DEFAULT 0,
+    escalated_items integer DEFAULT 0,
+    pending_items integer DEFAULT 0,
+    created_at timestamp with time zone DEFAULT now(),
+    created_by_user_id uuid,
+    launched_at timestamp with time zone,
+    completed_at timestamp with time zone,
+    CONSTRAINT chk_campaign_status CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'POPULATING'::character varying, 'ACTIVE'::character varying, 'IN_REVIEW'::character varying, 'PAST_DEADLINE'::character varying, 'COMPLETED'::character varying, 'CANCELLED'::character varying])::text[]))),
+    CONSTRAINT chk_review_type CHECK (((review_type)::text = ANY ((ARRAY['QUARTERLY'::character varying, 'ANNUAL'::character varying, 'TRIGGERED'::character varying, 'JOINER_MOVER_LEAVER'::character varying])::text[]))),
+    CONSTRAINT chk_scope_type CHECK (((scope_type)::text = ANY ((ARRAY['ALL'::character varying, 'BY_TEAM_TYPE'::character varying, 'BY_DELEGATING_ENTITY'::character varying, 'SPECIFIC_TEAMS'::character varying, 'GOVERNANCE_ONLY'::character varying])::text[])))
+);
+
+
+--
+-- Name: access_review_items; Type: TABLE; Schema: teams; Owner: -
+--
+
+CREATE TABLE teams.access_review_items (
+    item_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    campaign_id uuid NOT NULL,
+    membership_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    team_id uuid NOT NULL,
+    role_key character varying(100) NOT NULL,
+    user_name character varying(255),
+    user_email character varying(255),
+    user_employer character varying(255),
+    team_name character varying(255),
+    team_type character varying(50),
+    delegating_entity_name character varying(255),
+    access_domains character varying(50)[],
+    legal_appointment_id uuid,
+    legal_position character varying(100),
+    legal_entity_name character varying(255),
+    legal_effective_from date,
+    legal_effective_to date,
+    last_login_at timestamp with time zone,
+    days_since_login integer,
+    membership_created_at timestamp with time zone,
+    membership_age_days integer,
+    flag_no_legal_link boolean DEFAULT false,
+    flag_legal_expired boolean DEFAULT false,
+    flag_legal_expiring_soon boolean DEFAULT false,
+    flag_dormant_account boolean DEFAULT false,
+    flag_never_logged_in boolean DEFAULT false,
+    flag_role_mismatch boolean DEFAULT false,
+    flag_orphaned_membership boolean DEFAULT false,
+    flags_json jsonb DEFAULT '{}'::jsonb,
+    recommendation character varying(50),
+    recommendation_reason text,
+    risk_score integer DEFAULT 0,
+    reviewer_user_id uuid,
+    reviewer_email character varying(255),
+    reviewer_name character varying(255),
+    status character varying(50) DEFAULT 'PENDING'::character varying,
+    reviewed_at timestamp with time zone,
+    reviewer_notes text,
+    extended_to date,
+    extension_reason text,
+    escalated_to_user_id uuid,
+    escalation_reason text,
+    escalated_at timestamp with time zone,
+    auto_action_at timestamp with time zone,
+    auto_action_reason text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT chk_item_status CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'CONFIRMED'::character varying, 'REVOKED'::character varying, 'EXTENDED'::character varying, 'ESCALATED'::character varying, 'AUTO_SUSPENDED'::character varying, 'SKIPPED'::character varying])::text[]))),
+    CONSTRAINT chk_recommendation CHECK (((recommendation)::text = ANY ((ARRAY['CONFIRM'::character varying, 'REVOKE'::character varying, 'EXTEND'::character varying, 'REVIEW'::character varying, 'ESCALATE'::character varying])::text[])))
+);
+
+
+--
+-- Name: access_review_log; Type: TABLE; Schema: teams; Owner: -
+--
+
+CREATE TABLE teams.access_review_log (
+    log_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    campaign_id uuid,
+    item_id uuid,
+    action character varying(50) NOT NULL,
+    action_detail jsonb,
+    actor_user_id uuid,
+    actor_email character varying(255),
+    actor_type character varying(50),
+    created_at timestamp with time zone DEFAULT now(),
+    ip_address inet
+);
+
+
+--
+-- Name: function_domains; Type: TABLE; Schema: teams; Owner: -
+--
+
+CREATE TABLE teams.function_domains (
+    function_name character varying(100) NOT NULL,
+    access_domains character varying(50)[] NOT NULL,
+    description text
+);
+
+
+--
+-- Name: membership_audit_log; Type: TABLE; Schema: teams; Owner: -
+--
+
+CREATE TABLE teams.membership_audit_log (
+    log_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    team_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    action character varying(50) NOT NULL,
+    reason text,
+    performed_at timestamp with time zone DEFAULT now(),
+    performed_by_user_id uuid
+);
+
+
+--
+-- Name: membership_history; Type: TABLE; Schema: teams; Owner: -
+--
+
+CREATE TABLE teams.membership_history (
+    history_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    membership_id uuid NOT NULL,
+    team_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    action character varying(50) NOT NULL,
+    old_role_key character varying(100),
+    new_role_key character varying(100),
+    reason text,
+    changed_by_user_id uuid,
+    changed_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: memberships; Type: TABLE; Schema: teams; Owner: -
+--
+
+CREATE TABLE teams.memberships (
+    membership_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    team_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    role_key character varying(100) NOT NULL,
+    team_type character varying(50) GENERATED ALWAYS AS (split_part((role_key)::text, '.'::text, 1)) STORED,
+    function_name character varying(50) GENERATED ALWAYS AS (split_part(split_part((role_key)::text, '.'::text, 2), ':'::text, 1)) STORED,
+    role_level character varying(50) GENERATED ALWAYS AS (split_part((role_key)::text, ':'::text, 2)) STORED,
+    effective_from date DEFAULT CURRENT_DATE NOT NULL,
+    effective_to date,
+    permission_overrides jsonb DEFAULT '{}'::jsonb,
+    legal_appointment_id uuid,
+    requires_legal_appointment boolean DEFAULT false,
+    delegated_by_user_id uuid,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: COLUMN memberships.legal_appointment_id; Type: COMMENT; Schema: teams; Owner: -
+--
+
+COMMENT ON COLUMN teams.memberships.legal_appointment_id IS 'Links portal access to legal appointment (DIRECTOR, CONDUCTING_OFFICER, etc.)';
+
+
+--
+-- Name: COLUMN memberships.requires_legal_appointment; Type: COMMENT; Schema: teams; Owner: -
+--
+
+COMMENT ON COLUMN teams.memberships.requires_legal_appointment IS 'If true, warns when no legal appointment linked';
+
+
+--
+-- Name: team_cbu_access; Type: TABLE; Schema: teams; Owner: -
+--
+
+CREATE TABLE teams.team_cbu_access (
+    access_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    team_id uuid NOT NULL,
+    cbu_id uuid NOT NULL,
+    access_restrictions jsonb DEFAULT '{}'::jsonb,
+    granted_at timestamp with time zone DEFAULT now(),
+    granted_by_user_id uuid
+);
+
+
+--
+-- Name: team_service_entitlements; Type: TABLE; Schema: teams; Owner: -
+--
+
+CREATE TABLE teams.team_service_entitlements (
+    entitlement_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    team_id uuid NOT NULL,
+    service_code character varying(100) NOT NULL,
+    config jsonb DEFAULT '{}'::jsonb,
+    granted_at timestamp with time zone DEFAULT now(),
+    granted_by_user_id uuid,
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: teams; Type: TABLE; Schema: teams; Owner: -
+--
+
+CREATE TABLE teams.teams (
+    team_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name character varying(255) NOT NULL,
+    team_type character varying(50) NOT NULL,
+    delegating_entity_id uuid NOT NULL,
+    authority_type character varying(50) NOT NULL,
+    authority_scope jsonb DEFAULT '{}'::jsonb,
+    access_mode character varying(50) NOT NULL,
+    explicit_cbus uuid[],
+    scope_filter jsonb,
+    service_entitlements jsonb DEFAULT '{}'::jsonb,
+    is_active boolean DEFAULT true,
+    archived_at timestamp with time zone,
+    archive_reason text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    created_by_user_id uuid,
+    CONSTRAINT chk_access_mode CHECK (((access_mode)::text = ANY ((ARRAY['explicit'::character varying, 'by-manco'::character varying, 'by-im'::character varying, 'by-filter'::character varying])::text[]))),
+    CONSTRAINT chk_authority_type CHECK (((authority_type)::text = ANY ((ARRAY['operational'::character varying, 'oversight'::character varying, 'trading'::character varying, 'administrative'::character varying, 'governance'::character varying])::text[]))),
+    CONSTRAINT chk_team_type CHECK (((team_type)::text = ANY ((ARRAY['fund-ops'::character varying, 'manco-oversight'::character varying, 'im-trading'::character varying, 'spv-admin'::character varying, 'client-service'::character varying, 'accounting'::character varying, 'reporting'::character varying, 'board'::character varying, 'investment-committee'::character varying, 'conducting-officers'::character varying, 'executive'::character varying])::text[])))
+);
+
+
+--
+-- Name: v_campaign_dashboard; Type: VIEW; Schema: teams; Owner: -
+--
+
+CREATE VIEW teams.v_campaign_dashboard AS
+ SELECT campaign_id,
+    name,
+    review_type,
+    scope_type,
+    scope_filter,
+    review_period_start,
+    review_period_end,
+    deadline,
+    reminder_days,
+    status,
+    total_items,
+    reviewed_items,
+    confirmed_items,
+    revoked_items,
+    extended_items,
+    escalated_items,
+    pending_items,
+    created_at,
+    created_by_user_id,
+    launched_at,
+    completed_at,
+    round((((reviewed_items)::numeric / (NULLIF(total_items, 0))::numeric) * (100)::numeric), 1) AS progress_percent,
+    (deadline - CURRENT_DATE) AS days_until_deadline,
+        CASE
+            WHEN ((status)::text = 'COMPLETED'::text) THEN 'COMPLETED'::text
+            WHEN (CURRENT_DATE > deadline) THEN 'OVERDUE'::text
+            WHEN ((deadline - CURRENT_DATE) <= 3) THEN 'URGENT'::text
+            WHEN ((deadline - CURRENT_DATE) <= 7) THEN 'DUE_SOON'::text
+            ELSE 'ON_TRACK'::text
+        END AS urgency
+   FROM teams.access_review_campaigns c;
+
+
+--
+-- Name: v_effective_memberships; Type: VIEW; Schema: teams; Owner: -
+--
+
+CREATE VIEW teams.v_effective_memberships AS
+ SELECT m.membership_id,
+    m.team_id,
+    m.user_id,
+    m.role_key,
+    m.team_type,
+    m.function_name,
+    m.role_level,
+    m.effective_from,
+    m.effective_to,
+    m.permission_overrides,
+    m.legal_appointment_id,
+    m.requires_legal_appointment,
+    m.delegated_by_user_id,
+    m.created_at,
+    m.updated_at,
+    t.name AS team_name,
+    t.delegating_entity_id,
+    e.name AS delegating_entity_name,
+    c.name AS user_name,
+    c.email AS user_email,
+    fd.access_domains
+   FROM ((((teams.memberships m
+     JOIN teams.teams t ON ((m.team_id = t.team_id)))
+     JOIN "ob-poc".entities e ON ((t.delegating_entity_id = e.entity_id)))
+     JOIN client_portal.clients c ON ((m.user_id = c.client_id)))
+     LEFT JOIN teams.function_domains fd ON (((m.function_name)::text = (fd.function_name)::text)))
+  WHERE ((t.is_active = true) AND ((c.status)::text = 'ACTIVE'::text) AND (m.effective_from <= CURRENT_DATE) AND ((m.effective_to IS NULL) OR (m.effective_to >= CURRENT_DATE)));
+
+
+--
+-- Name: v_flagged_items_summary; Type: VIEW; Schema: teams; Owner: -
+--
+
+CREATE VIEW teams.v_flagged_items_summary AS
+ SELECT campaign_id,
+    count(*) FILTER (WHERE flag_legal_expired) AS legal_expired_count,
+    count(*) FILTER (WHERE flag_legal_expiring_soon) AS legal_expiring_count,
+    count(*) FILTER (WHERE flag_no_legal_link) AS no_legal_link_count,
+    count(*) FILTER (WHERE flag_dormant_account) AS dormant_count,
+    count(*) FILTER (WHERE flag_never_logged_in) AS never_logged_in_count,
+    count(*) FILTER (WHERE flag_role_mismatch) AS role_mismatch_count,
+    count(*) FILTER (WHERE (risk_score >= 70)) AS high_risk_count,
+    count(*) FILTER (WHERE ((risk_score >= 40) AND (risk_score <= 69))) AS medium_risk_count,
+    count(*) FILTER (WHERE (risk_score < 40)) AS low_risk_count
+   FROM teams.access_review_items
+  GROUP BY campaign_id;
+
+
+--
+-- Name: v_governance_access; Type: VIEW; Schema: teams; Owner: -
+--
+
+CREATE VIEW teams.v_governance_access AS
+ SELECT m.membership_id,
+    m.user_id,
+    c.name AS user_name,
+    c.email AS user_email,
+    m.team_id,
+    t.name AS team_name,
+    t.team_type,
+    m.role_key,
+    m.function_name,
+    m.role_level,
+    fd.access_domains,
+    m.legal_appointment_id,
+        CASE
+            WHEN (m.requires_legal_appointment AND (m.legal_appointment_id IS NULL)) THEN true
+            ELSE false
+        END AS missing_legal_appointment
+   FROM (((teams.memberships m
+     JOIN teams.teams t ON ((m.team_id = t.team_id)))
+     JOIN client_portal.clients c ON ((m.user_id = c.client_id)))
+     LEFT JOIN teams.function_domains fd ON (((m.function_name)::text = (fd.function_name)::text)))
+  WHERE (((t.team_type)::text = ANY ((ARRAY['board'::character varying, 'investment-committee'::character varying, 'conducting-officers'::character varying, 'executive'::character varying])::text[])) AND (t.is_active = true) AND ((c.status)::text = 'ACTIVE'::text) AND (m.effective_from <= CURRENT_DATE) AND ((m.effective_to IS NULL) OR (m.effective_to >= CURRENT_DATE)));
+
+
+--
+-- Name: v_reviewer_workload; Type: VIEW; Schema: teams; Owner: -
+--
+
+CREATE VIEW teams.v_reviewer_workload AS
+ SELECT campaign_id,
+    reviewer_user_id,
+    reviewer_email,
+    reviewer_name,
+    count(*) AS total_items,
+    count(*) FILTER (WHERE ((status)::text = 'PENDING'::text)) AS pending_items,
+    count(*) FILTER (WHERE ((status)::text = 'CONFIRMED'::text)) AS confirmed_items,
+    count(*) FILTER (WHERE ((status)::text = 'REVOKED'::text)) AS revoked_items,
+    count(*) FILTER (WHERE (flag_legal_expired OR flag_no_legal_link OR flag_dormant_account)) AS flagged_items,
+    (EXISTS ( SELECT 1
+           FROM teams.access_attestations a
+          WHERE ((a.campaign_id = i.campaign_id) AND (a.attester_user_id = i.reviewer_user_id)))) AS has_attested
+   FROM teams.access_review_items i
+  GROUP BY campaign_id, reviewer_user_id, reviewer_email, reviewer_name;
+
+
+--
+-- Name: v_user_cbu_access; Type: VIEW; Schema: teams; Owner: -
+--
+
+CREATE VIEW teams.v_user_cbu_access AS
+ WITH user_teams AS (
+         SELECT m.user_id,
+            t.team_id,
+            t.name AS team_name,
+            m.role_key,
+            fd.access_domains,
+            t.access_mode,
+            t.explicit_cbus,
+            t.delegating_entity_id,
+            t.scope_filter,
+            t.authority_scope
+           FROM ((teams.v_effective_memberships m
+             JOIN teams.teams t ON ((m.team_id = t.team_id)))
+             LEFT JOIN teams.function_domains fd ON (((m.function_name)::text = (fd.function_name)::text)))
+        ), resolved_cbus AS (
+         SELECT ut.user_id,
+            ut.team_id,
+            ut.team_name,
+            ut.role_key,
+            ut.access_domains,
+            unnest(ut.explicit_cbus) AS cbu_id
+           FROM user_teams ut
+          WHERE (((ut.access_mode)::text = 'explicit'::text) AND (ut.explicit_cbus IS NOT NULL))
+        UNION ALL
+         SELECT ut.user_id,
+            ut.team_id,
+            ut.team_name,
+            ut.role_key,
+            ut.access_domains,
+            cer.cbu_id
+           FROM ((user_teams ut
+             JOIN "ob-poc".cbu_entity_roles cer ON ((cer.entity_id = ut.delegating_entity_id)))
+             JOIN "ob-poc".roles r ON (((cer.role_id = r.role_id) AND ((r.name)::text = 'MANAGEMENT_COMPANY'::text))))
+          WHERE ((ut.access_mode)::text = 'by-manco'::text)
+        UNION ALL
+         SELECT ut.user_id,
+            ut.team_id,
+            ut.team_name,
+            ut.role_key,
+            ut.access_domains,
+            a.cbu_id
+           FROM (user_teams ut
+             JOIN custody.cbu_im_assignments a ON ((a.manager_entity_id = ut.delegating_entity_id)))
+          WHERE (((ut.access_mode)::text = 'by-im'::text) AND ((a.status)::text = 'ACTIVE'::text))
+        )
+ SELECT rc.user_id,
+    rc.cbu_id,
+    c.name AS cbu_name,
+    array_agg(DISTINCT rc.team_id) AS via_teams,
+    array_agg(DISTINCT rc.role_key) AS roles,
+    array_agg(DISTINCT unnest_domain.unnest_domain) AS access_domains
+   FROM ((resolved_cbus rc
+     JOIN "ob-poc".cbus c ON ((rc.cbu_id = c.cbu_id)))
+     CROSS JOIN LATERAL unnest(COALESCE(rc.access_domains, ARRAY[]::character varying[])) unnest_domain(unnest_domain))
+  GROUP BY rc.user_id, rc.cbu_id, c.name;
+
+
+--
 -- Name: attribute_values_typed id; Type: DEFAULT; Schema: ob-poc; Owner: -
 --
 
@@ -11317,6 +11959,126 @@ ALTER TABLE ONLY public.rules
 
 ALTER TABLE ONLY public.rules
     ADD CONSTRAINT rules_rule_id_key UNIQUE (rule_id);
+
+
+--
+-- Name: access_attestations access_attestations_pkey; Type: CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.access_attestations
+    ADD CONSTRAINT access_attestations_pkey PRIMARY KEY (attestation_id);
+
+
+--
+-- Name: access_domains access_domains_pkey; Type: CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.access_domains
+    ADD CONSTRAINT access_domains_pkey PRIMARY KEY (domain_code);
+
+
+--
+-- Name: access_review_campaigns access_review_campaigns_pkey; Type: CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.access_review_campaigns
+    ADD CONSTRAINT access_review_campaigns_pkey PRIMARY KEY (campaign_id);
+
+
+--
+-- Name: access_review_items access_review_items_pkey; Type: CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.access_review_items
+    ADD CONSTRAINT access_review_items_pkey PRIMARY KEY (item_id);
+
+
+--
+-- Name: access_review_log access_review_log_pkey; Type: CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.access_review_log
+    ADD CONSTRAINT access_review_log_pkey PRIMARY KEY (log_id);
+
+
+--
+-- Name: function_domains function_domains_pkey; Type: CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.function_domains
+    ADD CONSTRAINT function_domains_pkey PRIMARY KEY (function_name);
+
+
+--
+-- Name: membership_audit_log membership_audit_log_pkey; Type: CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.membership_audit_log
+    ADD CONSTRAINT membership_audit_log_pkey PRIMARY KEY (log_id);
+
+
+--
+-- Name: membership_history membership_history_pkey; Type: CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.membership_history
+    ADD CONSTRAINT membership_history_pkey PRIMARY KEY (history_id);
+
+
+--
+-- Name: memberships memberships_pkey; Type: CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.memberships
+    ADD CONSTRAINT memberships_pkey PRIMARY KEY (membership_id);
+
+
+--
+-- Name: memberships memberships_team_id_user_id_role_key_key; Type: CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.memberships
+    ADD CONSTRAINT memberships_team_id_user_id_role_key_key UNIQUE (team_id, user_id, role_key);
+
+
+--
+-- Name: team_cbu_access team_cbu_access_pkey; Type: CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.team_cbu_access
+    ADD CONSTRAINT team_cbu_access_pkey PRIMARY KEY (access_id);
+
+
+--
+-- Name: team_cbu_access team_cbu_access_team_id_cbu_id_key; Type: CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.team_cbu_access
+    ADD CONSTRAINT team_cbu_access_team_id_cbu_id_key UNIQUE (team_id, cbu_id);
+
+
+--
+-- Name: team_service_entitlements team_service_entitlements_pkey; Type: CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.team_service_entitlements
+    ADD CONSTRAINT team_service_entitlements_pkey PRIMARY KEY (entitlement_id);
+
+
+--
+-- Name: team_service_entitlements team_service_entitlements_team_id_service_code_key; Type: CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.team_service_entitlements
+    ADD CONSTRAINT team_service_entitlements_team_id_service_code_key UNIQUE (team_id, service_code);
+
+
+--
+-- Name: teams teams_pkey; Type: CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.teams
+    ADD CONSTRAINT teams_pkey PRIMARY KEY (team_id);
 
 
 --
@@ -14155,6 +14917,181 @@ CREATE INDEX idx_rules_target ON public.rules USING btree (target_attribute_id);
 
 
 --
+-- Name: idx_attestations_attester; Type: INDEX; Schema: teams; Owner: -
+--
+
+CREATE INDEX idx_attestations_attester ON teams.access_attestations USING btree (attester_user_id);
+
+
+--
+-- Name: idx_attestations_campaign; Type: INDEX; Schema: teams; Owner: -
+--
+
+CREATE INDEX idx_attestations_campaign ON teams.access_attestations USING btree (campaign_id);
+
+
+--
+-- Name: idx_campaigns_deadline; Type: INDEX; Schema: teams; Owner: -
+--
+
+CREATE INDEX idx_campaigns_deadline ON teams.access_review_campaigns USING btree (deadline);
+
+
+--
+-- Name: idx_campaigns_status; Type: INDEX; Schema: teams; Owner: -
+--
+
+CREATE INDEX idx_campaigns_status ON teams.access_review_campaigns USING btree (status);
+
+
+--
+-- Name: idx_membership_active; Type: INDEX; Schema: teams; Owner: -
+--
+
+CREATE INDEX idx_membership_active ON teams.memberships USING btree (effective_from, effective_to) WHERE (effective_to IS NULL);
+
+
+--
+-- Name: idx_membership_audit_team; Type: INDEX; Schema: teams; Owner: -
+--
+
+CREATE INDEX idx_membership_audit_team ON teams.membership_audit_log USING btree (team_id);
+
+
+--
+-- Name: idx_membership_audit_user; Type: INDEX; Schema: teams; Owner: -
+--
+
+CREATE INDEX idx_membership_audit_user ON teams.membership_audit_log USING btree (user_id);
+
+
+--
+-- Name: idx_membership_function; Type: INDEX; Schema: teams; Owner: -
+--
+
+CREATE INDEX idx_membership_function ON teams.memberships USING btree (function_name);
+
+
+--
+-- Name: idx_membership_history_team; Type: INDEX; Schema: teams; Owner: -
+--
+
+CREATE INDEX idx_membership_history_team ON teams.membership_history USING btree (team_id);
+
+
+--
+-- Name: idx_membership_history_user; Type: INDEX; Schema: teams; Owner: -
+--
+
+CREATE INDEX idx_membership_history_user ON teams.membership_history USING btree (user_id);
+
+
+--
+-- Name: idx_membership_team; Type: INDEX; Schema: teams; Owner: -
+--
+
+CREATE INDEX idx_membership_team ON teams.memberships USING btree (team_id);
+
+
+--
+-- Name: idx_membership_type; Type: INDEX; Schema: teams; Owner: -
+--
+
+CREATE INDEX idx_membership_type ON teams.memberships USING btree (team_type);
+
+
+--
+-- Name: idx_membership_user; Type: INDEX; Schema: teams; Owner: -
+--
+
+CREATE INDEX idx_membership_user ON teams.memberships USING btree (user_id);
+
+
+--
+-- Name: idx_review_items_campaign; Type: INDEX; Schema: teams; Owner: -
+--
+
+CREATE INDEX idx_review_items_campaign ON teams.access_review_items USING btree (campaign_id);
+
+
+--
+-- Name: idx_review_items_flagged; Type: INDEX; Schema: teams; Owner: -
+--
+
+CREATE INDEX idx_review_items_flagged ON teams.access_review_items USING btree (campaign_id) WHERE (flag_no_legal_link OR flag_legal_expired OR flag_dormant_account);
+
+
+--
+-- Name: idx_review_items_membership; Type: INDEX; Schema: teams; Owner: -
+--
+
+CREATE INDEX idx_review_items_membership ON teams.access_review_items USING btree (membership_id);
+
+
+--
+-- Name: idx_review_items_pending; Type: INDEX; Schema: teams; Owner: -
+--
+
+CREATE INDEX idx_review_items_pending ON teams.access_review_items USING btree (campaign_id, status) WHERE ((status)::text = 'PENDING'::text);
+
+
+--
+-- Name: idx_review_items_reviewer; Type: INDEX; Schema: teams; Owner: -
+--
+
+CREATE INDEX idx_review_items_reviewer ON teams.access_review_items USING btree (reviewer_user_id);
+
+
+--
+-- Name: idx_review_items_status; Type: INDEX; Schema: teams; Owner: -
+--
+
+CREATE INDEX idx_review_items_status ON teams.access_review_items USING btree (status);
+
+
+--
+-- Name: idx_review_log_campaign; Type: INDEX; Schema: teams; Owner: -
+--
+
+CREATE INDEX idx_review_log_campaign ON teams.access_review_log USING btree (campaign_id);
+
+
+--
+-- Name: idx_review_log_item; Type: INDEX; Schema: teams; Owner: -
+--
+
+CREATE INDEX idx_review_log_item ON teams.access_review_log USING btree (item_id);
+
+
+--
+-- Name: idx_review_log_time; Type: INDEX; Schema: teams; Owner: -
+--
+
+CREATE INDEX idx_review_log_time ON teams.access_review_log USING btree (created_at);
+
+
+--
+-- Name: idx_teams_active; Type: INDEX; Schema: teams; Owner: -
+--
+
+CREATE INDEX idx_teams_active ON teams.teams USING btree (is_active) WHERE (is_active = true);
+
+
+--
+-- Name: idx_teams_entity; Type: INDEX; Schema: teams; Owner: -
+--
+
+CREATE INDEX idx_teams_entity ON teams.teams USING btree (delegating_entity_id);
+
+
+--
+-- Name: idx_teams_type; Type: INDEX; Schema: teams; Owner: -
+--
+
+CREATE INDEX idx_teams_type ON teams.teams USING btree (team_type);
+
+
+--
 -- Name: v_case_summary _RETURN; Type: RULE; Schema: kyc; Owner: -
 --
 
@@ -14325,6 +15262,35 @@ CREATE TRIGGER update_derived_attributes_updated_at BEFORE UPDATE ON public.deri
 --
 
 CREATE TRIGGER update_rules_updated_at BEFORE UPDATE ON public.rules FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
+-- Name: memberships trg_membership_history; Type: TRIGGER; Schema: teams; Owner: -
+--
+
+CREATE TRIGGER trg_membership_history AFTER INSERT OR UPDATE ON teams.memberships FOR EACH ROW EXECUTE FUNCTION teams.log_membership_change();
+
+
+--
+-- Name: memberships trg_memberships_updated; Type: TRIGGER; Schema: teams; Owner: -
+--
+
+CREATE TRIGGER trg_memberships_updated BEFORE UPDATE ON teams.memberships FOR EACH ROW EXECUTE FUNCTION teams.update_timestamp();
+
+
+--
+-- Name: teams trg_teams_updated; Type: TRIGGER; Schema: teams; Owner: -
+--
+
+CREATE TRIGGER trg_teams_updated BEFORE UPDATE ON teams.teams FOR EACH ROW EXECUTE FUNCTION teams.update_timestamp();
+
+
+--
+-- Name: clients clients_employer_entity_id_fkey; Type: FK CONSTRAINT; Schema: client_portal; Owner: -
+--
+
+ALTER TABLE ONLY client_portal.clients
+    ADD CONSTRAINT clients_employer_entity_id_fkey FOREIGN KEY (employer_entity_id) REFERENCES "ob-poc".entities(entity_id);
 
 
 --
@@ -16720,8 +17686,104 @@ ALTER TABLE ONLY public.rules
 
 
 --
+-- Name: access_attestations access_attestations_campaign_id_fkey; Type: FK CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.access_attestations
+    ADD CONSTRAINT access_attestations_campaign_id_fkey FOREIGN KEY (campaign_id) REFERENCES teams.access_review_campaigns(campaign_id);
+
+
+--
+-- Name: access_review_items access_review_items_campaign_id_fkey; Type: FK CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.access_review_items
+    ADD CONSTRAINT access_review_items_campaign_id_fkey FOREIGN KEY (campaign_id) REFERENCES teams.access_review_campaigns(campaign_id);
+
+
+--
+-- Name: access_review_items access_review_items_membership_id_fkey; Type: FK CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.access_review_items
+    ADD CONSTRAINT access_review_items_membership_id_fkey FOREIGN KEY (membership_id) REFERENCES teams.memberships(membership_id);
+
+
+--
+-- Name: access_review_log access_review_log_campaign_id_fkey; Type: FK CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.access_review_log
+    ADD CONSTRAINT access_review_log_campaign_id_fkey FOREIGN KEY (campaign_id) REFERENCES teams.access_review_campaigns(campaign_id);
+
+
+--
+-- Name: access_review_log access_review_log_item_id_fkey; Type: FK CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.access_review_log
+    ADD CONSTRAINT access_review_log_item_id_fkey FOREIGN KEY (item_id) REFERENCES teams.access_review_items(item_id);
+
+
+--
+-- Name: membership_audit_log membership_audit_log_team_id_fkey; Type: FK CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.membership_audit_log
+    ADD CONSTRAINT membership_audit_log_team_id_fkey FOREIGN KEY (team_id) REFERENCES teams.teams(team_id);
+
+
+--
+-- Name: memberships memberships_team_id_fkey; Type: FK CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.memberships
+    ADD CONSTRAINT memberships_team_id_fkey FOREIGN KEY (team_id) REFERENCES teams.teams(team_id);
+
+
+--
+-- Name: memberships memberships_user_id_fkey; Type: FK CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.memberships
+    ADD CONSTRAINT memberships_user_id_fkey FOREIGN KEY (user_id) REFERENCES client_portal.clients(client_id);
+
+
+--
+-- Name: team_cbu_access team_cbu_access_cbu_id_fkey; Type: FK CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.team_cbu_access
+    ADD CONSTRAINT team_cbu_access_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id);
+
+
+--
+-- Name: team_cbu_access team_cbu_access_team_id_fkey; Type: FK CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.team_cbu_access
+    ADD CONSTRAINT team_cbu_access_team_id_fkey FOREIGN KEY (team_id) REFERENCES teams.teams(team_id);
+
+
+--
+-- Name: team_service_entitlements team_service_entitlements_team_id_fkey; Type: FK CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.team_service_entitlements
+    ADD CONSTRAINT team_service_entitlements_team_id_fkey FOREIGN KEY (team_id) REFERENCES teams.teams(team_id);
+
+
+--
+-- Name: teams teams_delegating_entity_id_fkey; Type: FK CONSTRAINT; Schema: teams; Owner: -
+--
+
+ALTER TABLE ONLY teams.teams
+    ADD CONSTRAINT teams_delegating_entity_id_fkey FOREIGN KEY (delegating_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict YCqX35TEcO4dYfL5cEohEHA4kfaiPOc9Rqh6PXwjLpnUIQE3INy4eQ5KiKYe82s
+\unrestrict aVm5ARkNirTm6VbEE3huwGP6nXmuetH4WdmDIduE0Qu6UXBrOwtc6towbZwF2N6
 

@@ -18,6 +18,7 @@
 //! 3. Keep operations focused and single-purpose
 //! 4. Ensure operations are testable in isolation
 
+mod access_review_ops;
 pub mod batch_control_ops;
 mod cbu_ops;
 mod cbu_role_ops;
@@ -38,6 +39,7 @@ mod resource_ops;
 mod rfi;
 mod screening_ops;
 mod semantic_ops;
+mod team_ops;
 pub mod template_ops;
 mod threshold;
 mod trading_matrix;
@@ -141,6 +143,16 @@ pub use ubo_graph_ops::{
     // Phase 3: Verification & convergence
     UboVerifyOp,
     UboWaiveVerificationOp,
+};
+
+// Team operations (only transfer-member needs plugin, others are CRUD)
+pub use team_ops::TeamTransferMemberOp;
+
+// Access Review operations (complex multi-step transactional operations only)
+pub use access_review_ops::{
+    AccessReviewAttestOp, AccessReviewBulkConfirmOp, AccessReviewConfirmCleanOp,
+    AccessReviewLaunchOp, AccessReviewPopulateOp, AccessReviewProcessDeadlineOp,
+    AccessReviewRevokeOp, AccessReviewSendRemindersOp,
 };
 
 #[cfg(feature = "database")]
@@ -376,6 +388,19 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(KycCaseStateOp));
         registry.register(Arc::new(WorkstreamStateOp));
 
+        // Team operations (only transfer-member needs plugin, others are CRUD)
+        registry.register(Arc::new(TeamTransferMemberOp));
+
+        // Access Review operations (complex multi-step transactional operations)
+        registry.register(Arc::new(AccessReviewPopulateOp));
+        registry.register(Arc::new(AccessReviewLaunchOp));
+        registry.register(Arc::new(AccessReviewRevokeOp));
+        registry.register(Arc::new(AccessReviewBulkConfirmOp));
+        registry.register(Arc::new(AccessReviewConfirmCleanOp));
+        registry.register(Arc::new(AccessReviewAttestOp));
+        registry.register(Arc::new(AccessReviewProcessDeadlineOp));
+        registry.register(Arc::new(AccessReviewSendRemindersOp));
+
         registry
     }
 
@@ -489,6 +514,17 @@ mod tests {
         assert!(registry.has("ubo", "convergence-supersede"));
         assert!(registry.has("ubo", "transfer-control"));
         assert!(registry.has("ubo", "waive-verification"));
+        // Team operations (only transfer-member is a plugin, rest are CRUD)
+        assert!(registry.has("team", "transfer-member"));
+        // Access Review operations (complex multi-step transactional operations)
+        assert!(registry.has("access-review", "populate-campaign"));
+        assert!(registry.has("access-review", "launch-campaign"));
+        assert!(registry.has("access-review", "revoke-access"));
+        assert!(registry.has("access-review", "bulk-confirm"));
+        assert!(registry.has("access-review", "confirm-all-clean"));
+        assert!(registry.has("access-review", "attest"));
+        assert!(registry.has("access-review", "process-deadline"));
+        assert!(registry.has("access-review", "send-reminders"));
     }
 
     #[test]

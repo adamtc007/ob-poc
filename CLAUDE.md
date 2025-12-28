@@ -6556,6 +6556,59 @@ SSI type reference data (SECURITIES, CASH, COLLATERAL)
 | `ssi-type.list` | List all SSI types |
 | `ssi-type.deactivate` | Deactivate an SSI type |
 
+### team
+
+Team and user access management for multi-tenant client portal
+
+| Verb | Description |
+|------|-------------|
+| `team.create` | Create a new team with access configuration |
+| `team.update` | Update team settings |
+| `team.archive` | Archive a team (soft delete) |
+| `team.add-member` | Add user to team with role |
+| `team.remove-member` | Remove user from team |
+| `team.update-member` | Update user's role within team |
+| `team.transfer-member` | Atomically transfer user between teams |
+| `team.grant-service` | Grant service entitlement to team |
+| `team.revoke-service` | Revoke service entitlement from team |
+| `team.list-cbus` | List CBUs accessible to team |
+| `team.add-cbu-access` | Add explicit CBU access to team |
+| `team.remove-cbu-access` | Remove explicit CBU access from team |
+
+### user
+
+User lifecycle and access operations (extends client_portal.clients)
+
+| Verb | Description |
+|------|-------------|
+| `user.offboard` | Offboard user (set status to OFFBOARDED) |
+| `user.list-cbus` | List CBUs accessible to user across all teams |
+| `user.check-access` | Check if user can access specific CBU |
+
+### access-review
+
+Periodic access review automation with detection, attestation, and enforcement
+
+| Verb | Description |
+|------|-------------|
+| `access-review.create-campaign` | Create a new access review campaign |
+| `access-review.update-campaign` | Update campaign settings |
+| `access-review.populate-campaign` | Populate campaign with review items from memberships |
+| `access-review.launch-campaign` | Launch campaign (set to ACTIVE) |
+| `access-review.confirm-item` | Confirm access for a review item |
+| `access-review.revoke-access` | Revoke access (ends membership) |
+| `access-review.extend-item` | Extend access with new expiry date |
+| `access-review.escalate-item` | Escalate item to higher authority |
+| `access-review.bulk-confirm` | Confirm multiple items at once |
+| `access-review.confirm-all-clean` | Auto-confirm all unflagged low-risk items |
+| `access-review.attest` | Create formal attestation with digital signature |
+| `access-review.process-deadline` | Process items past deadline (suspend/escalate/report) |
+| `access-review.send-reminders` | Send reminders to reviewers with pending items |
+| `access-review.my-pending` | Get current user's pending review items |
+| `access-review.campaign-status` | Get campaign status and statistics |
+| `access-review.list-items` | List review items for a campaign |
+| `access-review.audit-report` | Get attestation audit report for a campaign |
+
 
 ## Adding New Verbs
 
