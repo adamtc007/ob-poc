@@ -129,6 +129,8 @@ impl ToolHandlers {
         match name {
             "dsl_validate" => self.dsl_validate(args).await,
             "dsl_execute" => self.dsl_execute(args).await,
+            "dsl_execute_submission" => self.dsl_execute_submission(args).await,
+            "dsl_bind" => self.dsl_bind(args).await,
             "dsl_plan" => self.dsl_plan(args).await,
             "dsl_generate" => self.dsl_generate(args).await,
             "cbu_get" => self.cbu_get(args).await,
@@ -226,7 +228,7 @@ impl ToolHandlers {
                 }
 
                 AgentDiagnostic {
-                    severity: d.severity.into(),
+                    severity: crate::mcp::types::severity_to_string(d.severity),
                     message: d.message.clone(),
                     location: d.span.clone().map(|s| s.into()),
                     code: format!("{:?}", d.code),
@@ -573,6 +575,243 @@ impl ToolHandlers {
                     "completed": ctx.symbols.len()
                 }))
             }
+        }
+    }
+
+    /// Execute DSL using the unified submission model
+    ///
+    /// Supports:
+    /// - Singleton execution (one UUID per symbol)
+    /// - Batch execution (multiple UUIDs for one symbol)
+    /// - Draft state (unresolved symbols, can bind later)
+    async fn dsl_execute_submission(&self, args: Value) -> Result<Value> {
+        use crate::dsl_v2::{DomainContext, DslSubmission, SubmissionLimits, SubmissionState};
+
+        let source = args["source"]
+            .as_str()
+            .ok_or_else(|| anyhow!("source required"))?;
+
+        // Parse bindings from JSON
+        let bindings_json = args["bindings"].as_object();
+        let confirmed = args["confirmed"].as_bool().unwrap_or(false);
+
+        // Parse DSL
+        let program = parse_program(source).map_err(|e| anyhow!("Parse error: {:?}", e))?;
+
+        // Build submission
+        let mut submission = DslSubmission::new(program.statements);
+
+        // Parse and add bindings
+        if let Some(bindings_obj) = bindings_json {
+            for (symbol, value) in bindings_obj {
+                let binding = Self::parse_binding_value(value)?;
+                submission.set_binding(symbol, binding);
+            }
+        }
+
+        let limits = SubmissionLimits::default();
+        let state = submission.state(&limits);
+
+        // Return state info for draft or warning states
+        match &state {
+            SubmissionState::Draft { unresolved } => {
+                return Ok(json!({
+                    "state": "draft",
+                    "unresolved": unresolved,
+                    "message": "Resolve symbols before executing"
+                }));
+            }
+            SubmissionState::TooLarge {
+                message,
+                suggestion,
+            } => {
+                return Ok(json!({
+                    "state": "too_large",
+                    "message": message,
+                    "suggestion": suggestion
+                }));
+            }
+            SubmissionState::ReadyWithWarning {
+                message,
+                iterations,
+                total_ops,
+            } if !confirmed => {
+                return Ok(json!({
+                    "state": "warning",
+                    "message": message,
+                    "iterations": iterations,
+                    "total_ops": total_ops,
+                    "hint": "Set confirmed=true to proceed"
+                }));
+            }
+            _ => {} // Ready or confirmed warning - proceed to execution
+        }
+
+        // Execute
+        let executor = DslExecutor::new(self.pool.clone());
+        let mut domain_ctx = DomainContext::new();
+
+        match executor
+            .execute_submission(&submission, &mut domain_ctx, &limits)
+            .await
+        {
+            Ok(result) => Ok(json!({
+                "success": true,
+                "state": "executed",
+                "is_batch": result.is_batch,
+                "total_executed": result.total_executed,
+                "iterations": result.iterations.iter().map(|i| json!({
+                    "index": i.index,
+                    "success": i.success,
+                    "bindings": i.bindings.iter()
+                        .map(|(k, v)| (k.clone(), json!(v.to_string())))
+                        .collect::<serde_json::Map<_, _>>(),
+                    "error": i.error
+                })).collect::<Vec<_>>()
+            })),
+            Err(e) => Ok(json!({
+                "success": false,
+                "state": "error",
+                "error": e.to_string()
+            })),
+        }
+    }
+
+    /// Bind symbols to UUIDs for a pending submission
+    ///
+    /// Used to incrementally resolve symbols in draft submissions.
+    async fn dsl_bind(&self, args: Value) -> Result<Value> {
+        use crate::dsl_v2::{DslSubmission, SubmissionLimits, SymbolBinding};
+
+        let source = args["source"]
+            .as_str()
+            .ok_or_else(|| anyhow!("source required"))?;
+        let symbol = args["symbol"]
+            .as_str()
+            .ok_or_else(|| anyhow!("symbol required"))?;
+
+        // Parse IDs
+        let ids: Vec<Uuid> = match &args["ids"] {
+            Value::Array(arr) => arr
+                .iter()
+                .filter_map(|v| v.as_str())
+                .map(|s| Uuid::parse_str(s))
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| anyhow!("Invalid UUID: {}", e))?,
+            Value::String(s) => {
+                vec![Uuid::parse_str(s).map_err(|e| anyhow!("Invalid UUID: {}", e))?]
+            }
+            _ => return Err(anyhow!("ids must be a string or array of strings")),
+        };
+
+        // Parse optional names
+        let names: Vec<String> = args["names"]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str())
+                    .map(|s| s.to_string())
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        // Parse DSL and build submission
+        let program = parse_program(source).map_err(|e| anyhow!("Parse error: {:?}", e))?;
+        let mut submission = DslSubmission::new(program.statements);
+
+        // Apply existing bindings if provided
+        if let Some(bindings_obj) = args["bindings"].as_object() {
+            for (sym, value) in bindings_obj {
+                let binding = Self::parse_binding_value(value)?;
+                submission.set_binding(sym, binding);
+            }
+        }
+
+        // Add the new binding
+        let binding = if names.is_empty() {
+            SymbolBinding::multiple(ids)
+        } else {
+            SymbolBinding::multiple_named(ids.into_iter().zip(names).collect())
+        };
+        submission.set_binding(symbol, binding);
+
+        // Return updated state
+        let limits = SubmissionLimits::default();
+        let state = submission.state(&limits);
+        let unresolved = submission.unresolved_symbols();
+
+        // Serialize bindings for return
+        let bindings_out: serde_json::Map<_, _> = submission
+            .bindings
+            .iter()
+            .map(|(k, v)| {
+                (
+                    k.clone(),
+                    json!({
+                        "ids": v.ids.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
+                        "names": v.names,
+                        "count": v.len()
+                    }),
+                )
+            })
+            .collect();
+
+        Ok(json!({
+            "state": match state {
+                crate::dsl_v2::SubmissionState::Draft { .. } => "draft",
+                crate::dsl_v2::SubmissionState::Ready => "ready",
+                crate::dsl_v2::SubmissionState::ReadyWithWarning { .. } => "warning",
+                crate::dsl_v2::SubmissionState::TooLarge { .. } => "too_large",
+            },
+            "unresolved": unresolved,
+            "bindings": bindings_out,
+            "iteration_count": submission.iteration_count(),
+            "total_ops": submission.total_operations()
+        }))
+    }
+
+    /// Parse a JSON value into a SymbolBinding
+    fn parse_binding_value(value: &Value) -> Result<crate::dsl_v2::SymbolBinding> {
+        use crate::dsl_v2::SymbolBinding;
+
+        match value {
+            Value::Null => Ok(SymbolBinding::unresolved()),
+            Value::Array(arr) if arr.is_empty() => Ok(SymbolBinding::unresolved()),
+            Value::String(s) => {
+                let id = Uuid::parse_str(s).map_err(|e| anyhow!("Invalid UUID: {}", e))?;
+                Ok(SymbolBinding::singleton(id))
+            }
+            Value::Array(arr) => {
+                let mut ids = vec![];
+                let mut names = vec![];
+                for item in arr {
+                    match item {
+                        Value::String(s) => {
+                            ids.push(
+                                Uuid::parse_str(s).map_err(|e| anyhow!("Invalid UUID: {}", e))?,
+                            );
+                        }
+                        Value::Object(obj) => {
+                            if let Some(id_str) = obj.get("id").and_then(|v| v.as_str()) {
+                                ids.push(
+                                    Uuid::parse_str(id_str)
+                                        .map_err(|e| anyhow!("Invalid UUID: {}", e))?,
+                                );
+                                if let Some(name) = obj.get("name").and_then(|v| v.as_str()) {
+                                    names.push(name.to_string());
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                Ok(SymbolBinding {
+                    ids,
+                    names,
+                    entity_type: None,
+                })
+            }
+            _ => Ok(SymbolBinding::unresolved()),
         }
     }
 

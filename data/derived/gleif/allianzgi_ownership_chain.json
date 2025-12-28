@@ -1,0 +1,158 @@
+{
+  "generated": "2025-12-28T17:43:19.915615",
+  "source": "GLEIF API",
+  "ownership_chain": [
+    {
+      "lei": "OJ2TIQSVQND4IZYYK658",
+      "legal_name": "Allianz Global Investors GmbH",
+      "jurisdiction": "DE",
+      "category": "GENERAL",
+      "legal_form_code": "2HBR",
+      "status": "ACTIVE",
+      "registration_number": "HRB 9340",
+      "country": "DE",
+      "city": "Frankfurt am Main",
+      "address": "Bockenheimer Landstra\u00dfe 42-44",
+      "creation_date": "1956-03-19T23:00:00Z",
+      "bic": [
+        "AGIDDEFBXXX"
+      ]
+    },
+    {
+      "lei": "529900K9B0N5BT694847",
+      "legal_name": "Allianz SE",
+      "jurisdiction": "DE",
+      "category": "GENERAL",
+      "legal_form_code": "SGST",
+      "status": "ACTIVE",
+      "registration_number": "HRB 164232",
+      "country": "DE",
+      "city": "M\u00fcnchen",
+      "address": "K\u00f6niginstr. 28",
+      "creation_date": "2006-10-12T22:00:00Z",
+      "bic": [
+        "AZSEDEMMXXX"
+      ],
+      "ubo_terminus": true,
+      "terminus_reason": "NO_KNOWN_PERSON"
+    }
+  ],
+  "relationships": [
+    {
+      "child_lei": "OJ2TIQSVQND4IZYYK658",
+      "parent_lei": "529900K9B0N5BT694847",
+      "type": "IS_DIRECTLY_CONSOLIDATED_BY",
+      "status": "ACTIVE",
+      "corroboration": "FULLY_CORROBORATED"
+    },
+    {
+      "child_lei": "5493005JTEV4OVDVNH32",
+      "parent_lei": "OJ2TIQSVQND4IZYYK658",
+      "type": "IS_DIRECTLY_CONSOLIDATED_BY",
+      "status": "ACTIVE"
+    },
+    {
+      "child_lei": "353800NVWWGOB9JXQZ47",
+      "parent_lei": "OJ2TIQSVQND4IZYYK658",
+      "type": "IS_DIRECTLY_CONSOLIDATED_BY",
+      "status": "ACTIVE"
+    }
+  ],
+  "subsidiaries": [
+    {
+      "lei": "5493005JTEV4OVDVNH32",
+      "legal_name": "ALLIANZ CAPITAL PARTNERS OF AMERICA LLC",
+      "jurisdiction": "US-DE",
+      "category": "GENERAL",
+      "legal_form_code": "HZEH",
+      "status": "ACTIVE",
+      "registration_number": "3600054",
+      "country": "US",
+      "city": "DOVER",
+      "address": "C/O REGISTERED AGENT SOLUTIONS, INC., 838 WALKER ROAD, SUITE 21-2",
+      "creation_date": "2002-12-09T00:00:00Z",
+      "bic": null,
+      "parent_lei": "OJ2TIQSVQND4IZYYK658",
+      "depth": 1
+    },
+    {
+      "lei": "353800NVWWGOB9JXQZ47",
+      "legal_name": "\u30a2\u30ea\u30a2\u30f3\u30c4\u30fb\u30b0\u30ed\u30fc\u30d0\u30eb\u30fb\u30a4\u30f3\u30d9\u30b9\u30bf\u30fc\u30ba\u30fb\u30b8\u30e3\u30d1\u30f3\u682a\u5f0f\u4f1a\u793e",
+      "jurisdiction": "JP",
+      "category": "GENERAL",
+      "legal_form_code": "T417",
+      "status": "ACTIVE",
+      "registration_number": "0104-01-053740",
+      "country": "JP",
+      "city": "\u6771\u4eac\u90fd \u6e2f\u533a",
+      "address": "\u516d\u672c\u6728\u4e00\u4e01\u76ee\uff14\u756a\uff15\u53f7",
+      "creation_date": "2004-04-29T15:00:00Z",
+      "bic": null,
+      "parent_lei": "OJ2TIQSVQND4IZYYK658",
+      "depth": 1
+    }
+  ],
+  "managed_funds_count": 300,
+  "managed_funds_sample": [
+    {
+      "manco_lei": "OJ2TIQSVQND4IZYYK658",
+      "fund_lei": "529900LSFQ65EMQNBP87",
+      "fund_name": "Allianz Asia Pacific Secured Lending Fund III S.A., SICAV-RAIF",
+      "fund_jurisdiction": "LU"
+    },
+    {
+      "manco_lei": "OJ2TIQSVQND4IZYYK658",
+      "fund_lei": "529900O2D7WTTP2ECM60",
+      "fund_name": "Allianz Global Enhanced Equity Income",
+      "fund_jurisdiction": "LU"
+    },
+    {
+      "manco_lei": "OJ2TIQSVQND4IZYYK658",
+      "fund_lei": "529900A4N4FMRF1QIT75",
+      "fund_name": "Allianz EuropEquity Crescendo",
+      "fund_jurisdiction": "LU"
+    },
+    {
+      "manco_lei": "OJ2TIQSVQND4IZYYK658",
+      "fund_lei": "529900ZWZD2XKZ3GFO55",
+      "fund_name": "OCIRP Actions Multifacteurs",
+      "fund_jurisdiction": "FR"
+    },
+    {
+      "manco_lei": "OJ2TIQSVQND4IZYYK658",
+      "fund_lei": "5299007D2Y764JWNW850",
+      "fund_name": "CAPVIVA Infrastructure",
+      "fund_jurisdiction": "LU"
+    },
+    {
+      "manco_lei": "OJ2TIQSVQND4IZYYK658",
+      "fund_lei": "529900E5TEG9CGU33298",
+      "fund_name": "Allianz European Autonomy",
+      "fund_jurisdiction": "LU"
+    },
+    {
+      "manco_lei": "OJ2TIQSVQND4IZYYK658",
+      "fund_lei": "529900NSPM728J89YR40",
+      "fund_name": "Aktien Dividende Global",
+      "fund_jurisdiction": "DE"
+    },
+    {
+      "manco_lei": "OJ2TIQSVQND4IZYYK658",
+      "fund_lei": "529900UD1FMOKR9RN344",
+      "fund_name": "Allianz Private Debt Secondary Fund II EUR Feeder Fund (Germany)",
+      "fund_jurisdiction": "DE"
+    },
+    {
+      "manco_lei": "OJ2TIQSVQND4IZYYK658",
+      "fund_lei": "5299008BUZ4793QZRD79",
+      "fund_name": "Allianz Best Styles US Small Cap Equity",
+      "fund_jurisdiction": "LU"
+    },
+    {
+      "manco_lei": "OJ2TIQSVQND4IZYYK658",
+      "fund_lei": "529900KP3L513IRKR804",
+      "fund_name": "Allianz Private Debt Secondary Fund II SCSp, SICAV-RAIF",
+      "fund_jurisdiction": "LU"
+    }
+  ]
+}

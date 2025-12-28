@@ -157,14 +157,13 @@ pub struct BindingInfo {
 // Conversion helpers
 // ============================================================================
 
-impl From<crate::dsl_v2::diagnostics::Severity> for String {
-    fn from(s: crate::dsl_v2::diagnostics::Severity) -> Self {
-        match s {
-            crate::dsl_v2::diagnostics::Severity::Error => "error".to_string(),
-            crate::dsl_v2::diagnostics::Severity::Warning => "warning".to_string(),
-            crate::dsl_v2::diagnostics::Severity::Hint => "hint".to_string(),
-            crate::dsl_v2::diagnostics::Severity::Info => "info".to_string(),
-        }
+/// Convert Severity to string representation (helper to avoid orphan rule)
+pub fn severity_to_string(s: crate::dsl_v2::diagnostics::Severity) -> String {
+    match s {
+        crate::dsl_v2::diagnostics::Severity::Error => "error".to_string(),
+        crate::dsl_v2::diagnostics::Severity::Warning => "warning".to_string(),
+        crate::dsl_v2::diagnostics::Severity::Hint => "hint".to_string(),
+        crate::dsl_v2::diagnostics::Severity::Info => "info".to_string(),
     }
 }
 

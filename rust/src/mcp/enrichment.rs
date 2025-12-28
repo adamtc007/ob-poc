@@ -155,7 +155,7 @@ impl EntityEnricher {
                         .ownership_percent
                         .map(|p| p.to_string().parse().unwrap_or(0.0))
                         .unwrap_or(0.0),
-                    ownership_type: own_row.ownership_type.clone(),
+                    ownership_type: own_row.ownership_type.clone().unwrap_or_default(),
                 });
             }
         }
