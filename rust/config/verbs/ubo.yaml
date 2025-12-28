@@ -451,3 +451,190 @@ domains:
               primary_key: ubo_id
         returns:
           type: affected
+
+      # =========================================================================
+      # Phase 7: UBO Removal Operations (Convergence Model)
+      # These plugin handlers manage lifecycle events that affect UBO status
+      # =========================================================================
+
+      mark-deceased:
+        description: Mark a person as deceased and cascade effects to ownership/control relationships
+        behavior: plugin
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            description: The natural person entity to mark as deceased
+            lookup:
+              table: entities
+              entity_type: proper_person
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: date-of-death
+            type: date
+            required: true
+            description: Date of death
+          - name: reason
+            type: string
+            required: false
+            description: Documentation reference (e.g., "Death certificate received")
+        returns:
+          type: record
+
+      convergence-supersede:
+        description: Atomically supersede an ownership relationship with a new one in the convergence model
+        behavior: plugin
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: CBU context for the supersession
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: old-relationship-id
+            type: uuid
+            required: true
+            description: The relationship being superseded
+            lookup:
+              table: entity_relationships
+              schema: ob-poc
+              search_key: relationship_id
+              primary_key: relationship_id
+          - name: new-owner-entity-id
+            type: uuid
+            required: true
+            description: The new owner entity
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: percentage
+            type: decimal
+            required: true
+            description: New ownership percentage
+          - name: reason
+            type: string
+            required: true
+            description: Reason for supersession (e.g., "Share transfer", "Inheritance")
+          - name: effective-date
+            type: date
+            required: false
+            description: Effective date (defaults to today)
+        returns:
+          type: record
+
+      transfer-control:
+        description: Transfer control relationship from one entity to another
+        behavior: plugin
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: CBU context for the transfer
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: from-entity-id
+            type: uuid
+            required: true
+            description: Entity giving up control
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: to-entity-id
+            type: uuid
+            required: true
+            description: Entity receiving control
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: controlled-entity-id
+            type: uuid
+            required: true
+            description: The entity being controlled
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: control-type
+            type: string
+            required: true
+            description: Type of control relationship
+            valid_values:
+              - board_member
+              - executive
+              - voting_rights
+              - veto_rights
+              - appointee
+          - name: reason
+            type: string
+            required: true
+            description: Reason for transfer (e.g., "Board resignation", "Appointment")
+          - name: effective-date
+            type: date
+            required: false
+            description: Effective date (defaults to today)
+        returns:
+          type: record
+
+      waive-verification:
+        description: Waive verification requirement for a relationship with documented justification
+        behavior: plugin
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: CBU context
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: relationship-id
+            type: uuid
+            required: true
+            description: The relationship whose verification is being waived
+            lookup:
+              table: entity_relationships
+              schema: ob-poc
+              search_key: relationship_id
+              primary_key: relationship_id
+          - name: reason
+            type: string
+            required: true
+            description: Justification for waiver
+          - name: approved-by
+            type: string
+            required: true
+            description: Email/ID of approving authority
+          - name: waiver-type
+            type: string
+            required: false
+            description: Type of waiver
+            valid_values:
+              - REGULATORY_EXEMPTION
+              - LISTED_COMPANY
+              - GOVERNMENT_ENTITY
+              - LOW_RISK
+              - SENIOR_APPROVAL
+        returns:
+          type: record

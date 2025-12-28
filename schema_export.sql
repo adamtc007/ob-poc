@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Rlz8wIfJ6wRsO9uBUFHjP5hjAgBWXetfwOdeuDW4jbbRI88tcc6mj40iBdoG5gA
+\restrict BAeop7aqzhdO6e5BVPiagQgH6TanyNBfjwoQ5YABmsRw7QjQtSdsei7CasgGdYe
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -9376,6 +9376,14 @@ ALTER TABLE ONLY kyc.doc_requests
 
 
 --
+-- Name: doc_requests doc_requests_workstream_doc_type_uniq; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.doc_requests
+    ADD CONSTRAINT doc_requests_workstream_doc_type_uniq UNIQUE (workstream_id, doc_type);
+
+
+--
 -- Name: entity_workstreams entity_workstreams_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
 --
 
@@ -9437,6 +9445,14 @@ ALTER TABLE ONLY kyc.rule_executions
 
 ALTER TABLE ONLY kyc.screenings
     ADD CONSTRAINT screenings_pkey PRIMARY KEY (screening_id);
+
+
+--
+-- Name: screenings screenings_workstream_type_uniq; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.screenings
+    ADD CONSTRAINT screenings_workstream_type_uniq UNIQUE (workstream_id, screening_type);
 
 
 --
@@ -10032,11 +10048,27 @@ ALTER TABLE ONLY "ob-poc".entity_crud_rules
 
 
 --
+-- Name: entity_funds entity_funds_entity_id_uniq; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_funds
+    ADD CONSTRAINT entity_funds_entity_id_uniq UNIQUE (entity_id);
+
+
+--
 -- Name: entity_funds entity_funds_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
 ALTER TABLE ONLY "ob-poc".entity_funds
     ADD CONSTRAINT entity_funds_pkey PRIMARY KEY (entity_id);
+
+
+--
+-- Name: entity_limited_companies entity_limited_companies_entity_id_uniq; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_limited_companies
+    ADD CONSTRAINT entity_limited_companies_entity_id_uniq UNIQUE (entity_id);
 
 
 --
@@ -10048,6 +10080,14 @@ ALTER TABLE ONLY "ob-poc".entity_limited_companies
 
 
 --
+-- Name: entity_manco entity_manco_entity_id_uniq; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_manco
+    ADD CONSTRAINT entity_manco_entity_id_uniq UNIQUE (entity_id);
+
+
+--
 -- Name: entity_manco entity_manco_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -10056,11 +10096,27 @@ ALTER TABLE ONLY "ob-poc".entity_manco
 
 
 --
+-- Name: entity_partnerships entity_partnerships_entity_id_uniq; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_partnerships
+    ADD CONSTRAINT entity_partnerships_entity_id_uniq UNIQUE (entity_id);
+
+
+--
 -- Name: entity_partnerships entity_partnerships_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
 ALTER TABLE ONLY "ob-poc".entity_partnerships
     ADD CONSTRAINT entity_partnerships_pkey PRIMARY KEY (partnership_id);
+
+
+--
+-- Name: entity_proper_persons entity_proper_persons_entity_id_uniq; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_proper_persons
+    ADD CONSTRAINT entity_proper_persons_entity_id_uniq UNIQUE (entity_id);
 
 
 --
@@ -10088,6 +10144,14 @@ ALTER TABLE ONLY "ob-poc".entity_relationships
 
 
 --
+-- Name: entity_share_classes entity_share_classes_entity_id_uniq; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_share_classes
+    ADD CONSTRAINT entity_share_classes_entity_id_uniq UNIQUE (entity_id);
+
+
+--
 -- Name: entity_share_classes entity_share_classes_isin_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -10101,6 +10165,14 @@ ALTER TABLE ONLY "ob-poc".entity_share_classes
 
 ALTER TABLE ONLY "ob-poc".entity_share_classes
     ADD CONSTRAINT entity_share_classes_pkey PRIMARY KEY (entity_id);
+
+
+--
+-- Name: entity_trusts entity_trusts_entity_id_uniq; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_trusts
+    ADD CONSTRAINT entity_trusts_entity_id_uniq UNIQUE (entity_id);
 
 
 --
@@ -11399,6 +11471,13 @@ CREATE INDEX idx_cbu_ssi_lookup ON custody.cbu_ssi USING btree (cbu_id, status);
 --
 
 CREATE INDEX idx_cbu_sweep_cbu ON custody.cbu_cash_sweep_config USING btree (cbu_id);
+
+
+--
+-- Name: cases_cbu_type_active_uniq; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE UNIQUE INDEX cases_cbu_type_active_uniq ON kyc.cases USING btree (cbu_id, case_type) WHERE (closed_at IS NULL);
 
 
 --
@@ -16644,5 +16723,5 @@ ALTER TABLE ONLY public.rules
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Rlz8wIfJ6wRsO9uBUFHjP5hjAgBWXetfwOdeuDW4jbbRI88tcc6mj40iBdoG5gA
+\unrestrict BAeop7aqzhdO6e5BVPiagQgH6TanyNBfjwoQ5YABmsRw7QjQtSdsei7CasgGdYe
 

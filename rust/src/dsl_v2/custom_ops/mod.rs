@@ -124,17 +124,22 @@ pub use ubo_graph_ops::{
     UboAllegeOp,
     // Phase 4: Assertions
     UboAssertOp,
+    UboConvergenceSupersedeOp,
     // Phase 5: Evaluation
     UboEvaluateOp,
     UboLinkProofOp,
+    // Phase 7: Removal operations
+    UboMarkDeceasedOp,
     UboMarkDirtyOp,
     UboRemoveEdgeOp,
     UboScheduleReviewOp,
     UboStatusOp,
+    UboTransferControlOp,
     UboTraverseOp,
     UboUpdateAllegationOp,
     // Phase 3: Verification & convergence
     UboVerifyOp,
+    UboWaiveVerificationOp,
 };
 
 #[cfg(feature = "database")]
@@ -278,6 +283,11 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(KycDecisionOp));
         registry.register(Arc::new(UboMarkDirtyOp));
         registry.register(Arc::new(UboScheduleReviewOp));
+        // Phase 7: Removal operations
+        registry.register(Arc::new(UboMarkDeceasedOp));
+        registry.register(Arc::new(UboConvergenceSupersedeOp));
+        registry.register(Arc::new(UboTransferControlOp));
+        registry.register(Arc::new(UboWaiveVerificationOp));
 
         // Onboarding operations (Terraform-like resource provisioning with dependencies)
         registry.register(Arc::new(OnboardingPlanOp));
@@ -473,6 +483,11 @@ mod tests {
         // KYC case state operations
         assert!(registry.has("kyc-case", "state"));
         assert!(registry.has("entity-workstream", "state"));
+        // UBO removal operations (Phase 7)
+        assert!(registry.has("ubo", "mark-deceased"));
+        assert!(registry.has("ubo", "convergence-supersede"));
+        assert!(registry.has("ubo", "transfer-control"));
+        assert!(registry.has("ubo", "waive-verification"));
     }
 
     #[test]

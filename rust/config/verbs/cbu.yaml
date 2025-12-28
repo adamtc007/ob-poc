@@ -15,6 +15,7 @@ domains:
           returning: cbu_id
           conflict_keys:
             - name
+            - jurisdiction
         args:
           - name: name
             type: string
