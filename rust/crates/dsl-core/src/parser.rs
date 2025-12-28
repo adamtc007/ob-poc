@@ -29,7 +29,7 @@ use rust_decimal::Decimal;
 use std::str::FromStr;
 use uuid::Uuid;
 
-use super::ast::*;
+use crate::ast::*;
 
 // ============================================================================
 // Public API

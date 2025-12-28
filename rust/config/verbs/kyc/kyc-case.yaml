@@ -3,7 +3,7 @@ domains:
     description: KYC case lifecycle management
     verbs:
       create:
-        description: Create a new KYC case for a CBU (idempotent by cbu+case_type for active cases)
+        description: Create a new KYC case for a CBU
         behavior: crud
         produces:
           type: case
@@ -13,14 +13,10 @@ domains:
             type: cbu
             required: true
         crud:
-          operation: upsert
+          operation: insert
           table: cases
           schema: kyc
           returning: case_id
-          conflict_keys:
-            - cbu_id
-            - case_type
-          conflict_where: "closed_at IS NULL"
         emits_event: case.created
         args:
           - name: cbu-id

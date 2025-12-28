@@ -2,13 +2,14 @@
 //!
 //! Tracks bindings produced by DSL statements and validates that
 //! references to bindings are satisfied before use.
+//!
+//! This module contains the core data types. The functions that depend
+//! on RuntimeVerbRegistry remain in ob-poc.
 
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use super::ast::{Program, Statement};
-use super::config::types::VerbProduces;
-use super::runtime_registry::RuntimeVerbRegistry;
+use crate::config::types::VerbProduces;
 
 // =============================================================================
 // BINDING INFO
@@ -100,62 +101,6 @@ pub struct BindingContext {
 impl BindingContext {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Extract bindings from AST statements using verb registry
-    ///
-    /// This is for pending/unexecuted DSL - entity_pk will be Uuid::nil()
-    pub fn from_ast(ast: &Program, registry: &RuntimeVerbRegistry) -> Self {
-        let mut ctx = Self::new();
-
-        for stmt in &ast.statements {
-            if let Statement::VerbCall(vc) = stmt {
-                // Only process if statement has a binding
-                if let Some(ref binding_name) = vc.binding {
-                    // Get the verb's produces declaration
-                    if let Some(produces) = registry.get_produces(&vc.domain, &vc.verb) {
-                        ctx.insert(BindingInfo::from_produces(binding_name, produces));
-                    }
-                }
-            }
-        }
-
-        ctx
-    }
-
-    /// Extract bindings from executed AST with resolved PKs
-    ///
-    /// This reads the resolved entity_pk from executed results
-    pub fn from_executed(
-        ast: &Program,
-        registry: &RuntimeVerbRegistry,
-        resolved_pks: &HashMap<String, Uuid>,
-    ) -> Self {
-        let mut ctx = Self::new();
-
-        for stmt in &ast.statements {
-            if let Statement::VerbCall(vc) = stmt {
-                if let Some(ref binding_name) = vc.binding {
-                    if let Some(produces) = registry.get_produces(&vc.domain, &vc.verb) {
-                        let pk = resolved_pks
-                            .get(binding_name)
-                            .copied()
-                            .unwrap_or(Uuid::nil());
-
-                        ctx.insert(BindingInfo {
-                            name: binding_name.clone(),
-                            produced_type: produces.produced_type.clone(),
-                            subtype: produces.subtype.clone(),
-                            entity_pk: pk,
-                            resolved: produces.resolved,
-                            source_sheet_id: None,
-                        });
-                    }
-                }
-            }
-        }
-
-        ctx
     }
 
     /// Merge another context into this one

@@ -5,7 +5,7 @@
 //! - Stable sort (preserves source order when no dependency relationship)
 //! - Execution phases for optional grouped execution
 
-use crate::dsl_v2::ops::{Op, OpRef};
+use crate::ops::{Op, OpRef};
 use std::collections::{BinaryHeap, HashMap, HashSet};
 
 /// Execution plan with topologically sorted ops
@@ -315,7 +315,7 @@ pub fn collect_external_refs(ops: &[Op]) -> HashSet<OpRef> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dsl_v2::ops::EntityKey;
+    use crate::ops::EntityKey;
     use std::collections::HashMap;
 
     fn make_ensure_entity(name: &str, stmt: usize, binding: Option<&str>) -> Op {

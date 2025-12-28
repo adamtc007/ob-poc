@@ -18,11 +18,8 @@
 //! Entities are created with null FKs (Phase 1), then FKs are populated
 //! by SetFK ops (Phase 2). This eliminates most circular dependencies.
 
-use crate::dsl_v2::ast::{AstNode, Literal, Program, Statement, VerbCall};
-use crate::dsl_v2::ops::{DocKey, EntityKey, Op};
-// Note: RuntimeVerbRegistry import reserved for future GenericCrud support
-#[allow(unused_imports)]
-use crate::dsl_v2::runtime_registry::RuntimeVerbRegistry;
+use crate::ast::{AstNode, Literal, Program, Statement, VerbCall};
+use crate::ops::{DocKey, EntityKey, Op};
 use rust_decimal::Decimal;
 use std::collections::HashMap;
 use std::str::FromStr;
