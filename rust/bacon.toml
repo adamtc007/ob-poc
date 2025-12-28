@@ -1,4 +1,8 @@
-# Bacon configuration for ob-poc
+# Bacon configuration for ob-poc workspace
+
+# =============================================================================
+# MAIN CRATE JOBS (ob-poc)
+# =============================================================================
 
 [jobs.check]
 command = ["cargo", "check", "--features", "database", "--color", "always"]
@@ -52,15 +56,136 @@ need_stdout = true
 command = ["cargo", "doc", "--features", "database", "--color", "always"]
 need_stdout = false
 
+# =============================================================================
+# WORKSPACE JOBS (all crates)
+# =============================================================================
+
+[jobs.check-workspace]
+command = ["cargo", "check", "--workspace", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-workspace]
+command = ["cargo", "clippy", "--workspace", "--color", "always"]
+need_stdout = false
+
+[jobs.test-workspace]
+command = ["cargo", "test", "--workspace", "--color", "always"]
+need_stdout = true
+
+# =============================================================================
+# INDIVIDUAL CRATE JOBS
+# =============================================================================
+
+# dsl-core (no features)
+[jobs.check-dsl-core]
+command = ["cargo", "check", "-p", "dsl-core", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-dsl-core]
+command = ["cargo", "clippy", "-p", "dsl-core", "--color", "always"]
+need_stdout = false
+
+[jobs.test-dsl-core]
+command = ["cargo", "test", "-p", "dsl-core", "--color", "always"]
+need_stdout = true
+
+# entity-gateway
+[jobs.check-gateway]
+command = ["cargo", "check", "-p", "entity-gateway", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-gateway]
+command = ["cargo", "clippy", "-p", "entity-gateway", "--color", "always"]
+need_stdout = false
+
+# ob-agentic
+[jobs.check-agentic]
+command = ["cargo", "check", "-p", "ob-agentic", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-agentic]
+command = ["cargo", "clippy", "-p", "ob-agentic", "--color", "always"]
+need_stdout = false
+
+# ob-templates
+[jobs.check-templates]
+command = ["cargo", "check", "-p", "ob-templates", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-templates]
+command = ["cargo", "clippy", "-p", "ob-templates", "--color", "always"]
+need_stdout = false
+
+# ob-workflow
+[jobs.check-workflow]
+command = ["cargo", "check", "-p", "ob-workflow", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-workflow]
+command = ["cargo", "clippy", "-p", "ob-workflow", "--color", "always"]
+need_stdout = false
+
+# ob-poc-web (web server)
+[jobs.check-web]
+command = ["cargo", "check", "-p", "ob-poc-web", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-web]
+command = ["cargo", "clippy", "-p", "ob-poc-web", "--color", "always"]
+need_stdout = false
+
+# ob-poc-ui (WASM UI)
+[jobs.check-ui]
+command = ["cargo", "check", "-p", "ob-poc-ui", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-ui]
+command = ["cargo", "clippy", "-p", "ob-poc-ui", "--color", "always"]
+need_stdout = false
+
+# ob-poc-graph (graph widget)
+[jobs.check-graph]
+command = ["cargo", "check", "-p", "ob-poc-graph", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-graph]
+command = ["cargo", "clippy", "-p", "ob-poc-graph", "--color", "always"]
+need_stdout = false
+
+# dsl-lsp (LSP server)
+[jobs.check-lsp]
+command = ["cargo", "check", "-p", "dsl-lsp", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-lsp]
+command = ["cargo", "clippy", "-p", "dsl-lsp", "--color", "always"]
+need_stdout = false
+
+# =============================================================================
+# DEFAULTS AND KEYBINDINGS
+# =============================================================================
+
 default_job = "check"
 
 [keybindings]
+# Main crate
 c = "job:check"
 l = "job:clippy"
 t = "job:test"
 a = "job:check-all"
 s = "job:clippy-server"
 m = "job:clippy-mcp"
+
+# Workspace
+w = "job:check-workspace"
+W = "job:clippy-workspace"
+
+# Individual crates (Shift + letter)
+D = "job:clippy-dsl-core"
+G = "job:clippy-gateway"
+A = "job:clippy-agentic"
+T = "job:clippy-templates"
+L = "job:clippy-lsp"
 
 [settings]
 on_change_strategy = "restart"
