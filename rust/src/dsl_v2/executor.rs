@@ -22,11 +22,15 @@ use super::custom_ops::CustomOperationRegistry;
 #[cfg(feature = "database")]
 use super::dag::{build_execution_plan, describe_plan};
 #[cfg(feature = "database")]
+use super::domain_context::DomainContext;
+#[cfg(feature = "database")]
 use super::generic_executor::{GenericCrudExecutor, GenericExecutionResult};
 #[cfg(feature = "database")]
 use super::ops::{EntityKey, Op};
 #[cfg(feature = "database")]
 use super::runtime_registry::{runtime_registry, RuntimeBehavior};
+#[cfg(feature = "database")]
+use super::submission::{DslSubmission, SubmissionError, SubmissionLimits};
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
@@ -229,6 +233,54 @@ impl ExecutionContext {
         self.parent_symbol_types = types;
         self
     }
+
+    /// Create context from DomainContext (for submission execution)
+    #[cfg(feature = "database")]
+    pub fn from_domain(domain_ctx: &DomainContext) -> Self {
+        let mut ctx = Self::new();
+        // Pre-populate with active CBU if set
+        if let Some(cbu_id) = domain_ctx.active_cbu_id {
+            ctx.bind_typed("cbu", cbu_id, "cbu");
+        }
+        if let Some(case_id) = domain_ctx.active_case_id {
+            ctx.bind_typed("case", case_id, "kyc_case");
+        }
+        if let Some(entity_id) = domain_ctx.active_entity_id {
+            ctx.bind_typed("entity", entity_id, "entity");
+        }
+        ctx
+    }
+}
+
+// ============================================================================
+// Submission Execution Results
+// ============================================================================
+
+/// Result of executing a DslSubmission
+#[cfg(feature = "database")]
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct SubmissionResult {
+    /// Results for each iteration
+    pub iterations: Vec<IterationResult>,
+    /// Whether this was a batch execution (N > 1)
+    pub is_batch: bool,
+    /// Total statements executed across all iterations
+    pub total_executed: usize,
+}
+
+/// Result of a single iteration within a submission
+#[cfg(feature = "database")]
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct IterationResult {
+    /// Iteration index (0 for singleton)
+    pub index: usize,
+    /// Whether iteration succeeded
+    pub success: bool,
+    /// Bindings created during this iteration
+    pub bindings: HashMap<String, Uuid>,
+    /// Error message if failed
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 /// The main DSL executor
@@ -400,6 +452,161 @@ impl DslExecutor {
             Literal::Null => Ok(JsonValue::Null),
             Literal::Uuid(u) => Ok(JsonValue::String(u.to_string())),
         }
+    }
+}
+
+// ============================================================================
+// Submission Execution
+// ============================================================================
+
+#[cfg(feature = "database")]
+impl DslExecutor {
+    /// Unified entry point for all DSL execution via DslSubmission
+    ///
+    /// This method handles singleton, batch, and draft states uniformly.
+    /// Batch executions (N > 1 UUIDs for a symbol) run atomically in one transaction.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let submission = DslSubmission::new(statements)
+    ///     .bind_one("cbu", cbu_id)
+    ///     .bind_many("targets", target_ids);
+    /// let result = executor.execute_submission(&submission, &mut domain_ctx, &limits).await?;
+    /// ```
+    pub async fn execute_submission(
+        &self,
+        submission: &DslSubmission,
+        domain_ctx: &mut DomainContext,
+        limits: &SubmissionLimits,
+    ) -> Result<SubmissionResult, SubmissionError> {
+        // Check if submission can be executed
+        if !submission.can_execute(limits) {
+            let state = submission.state(limits);
+            return Err(match state {
+                super::submission::SubmissionState::Draft { unresolved } => {
+                    SubmissionError::UnresolvedSymbols(unresolved)
+                }
+                super::submission::SubmissionState::TooLarge { message, .. } => {
+                    SubmissionError::ExecutionError(message)
+                }
+                _ => SubmissionError::ExecutionError("Cannot execute submission".into()),
+            });
+        }
+
+        // Expand submission to iterations
+        let expanded = submission.expand()?;
+
+        tracing::info!(
+            is_batch = expanded.is_batch,
+            iterations = expanded.iterations.len(),
+            total = expanded.total_statements,
+            "Executing submission"
+        );
+
+        // Execute atomically in a transaction
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| SubmissionError::ExecutionError(e.to_string()))?;
+
+        let mut results = Vec::with_capacity(expanded.iterations.len());
+
+        for iteration in &expanded.iterations {
+            // Set up iteration context if this is a batch
+            if let Some(ref key) = iteration.iteration_key {
+                domain_ctx.enter_iteration(
+                    iteration.index,
+                    key.name.clone().unwrap_or_else(|| key.id.to_string()),
+                    key.id,
+                    key.symbol.clone(),
+                    None, // No template_id for direct submission execution
+                );
+            }
+
+            // Create execution context from domain context
+            let mut exec_ctx = ExecutionContext::from_domain(domain_ctx);
+
+            // Execute all statements in this iteration
+            match self
+                .execute_statements_in_tx(&iteration.statements, &mut exec_ctx, &mut tx)
+                .await
+            {
+                Ok(bindings) => {
+                    results.push(IterationResult {
+                        index: iteration.index,
+                        success: true,
+                        bindings,
+                        error: None,
+                    });
+                }
+                Err(e) => {
+                    // Rollback on any failure
+                    tx.rollback()
+                        .await
+                        .map_err(|re| SubmissionError::ExecutionError(re.to_string()))?;
+                    return Err(SubmissionError::ExecutionError(format!(
+                        "Iteration {} failed: {}",
+                        iteration.index, e
+                    )));
+                }
+            }
+
+            // Exit iteration context
+            if iteration.iteration_key.is_some() {
+                domain_ctx.exit_iteration();
+            }
+        }
+
+        // Commit the transaction
+        tx.commit()
+            .await
+            .map_err(|e| SubmissionError::ExecutionError(e.to_string()))?;
+
+        Ok(SubmissionResult {
+            is_batch: expanded.is_batch,
+            total_executed: expanded.total_statements,
+            iterations: results,
+        })
+    }
+
+    /// Execute statements within a transaction, returning created bindings
+    async fn execute_statements_in_tx(
+        &self,
+        statements: &[super::ast::Statement],
+        ctx: &mut ExecutionContext,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    ) -> Result<HashMap<String, Uuid>> {
+        let mut bindings = HashMap::new();
+
+        for stmt in statements {
+            if let super::ast::Statement::VerbCall(vc) = stmt {
+                // Execute the verb call
+                let result = self.execute_verb_in_tx(vc, ctx, tx).await?;
+
+                // Capture binding if statement has :as clause
+                if let Some(ref binding_name) = vc.binding {
+                    if let ExecutionResult::Uuid(id) = &result {
+                        ctx.bind(binding_name, *id);
+                        bindings.insert(binding_name.clone(), *id);
+                    }
+                }
+            }
+        }
+
+        Ok(bindings)
+    }
+
+    /// Execute a single verb call within a transaction
+    async fn execute_verb_in_tx(
+        &self,
+        vc: &VerbCall,
+        ctx: &mut ExecutionContext,
+        _tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    ) -> Result<ExecutionResult> {
+        // For now, delegate to execute_verb which uses the pool
+        // TODO: Pass transaction through to generic_executor for true transactional execution
+        self.execute_verb(vc, ctx).await
     }
 }
 

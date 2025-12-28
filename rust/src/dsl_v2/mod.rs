@@ -136,6 +136,8 @@ pub use executor::{
     ReturnType,
 };
 #[cfg(feature = "database")]
+pub use executor::{IterationResult, SubmissionResult};
+#[cfg(feature = "database")]
 pub use gateway_resolver::GatewayRefResolver;
 #[cfg(feature = "database")]
 pub use generic_executor::{GenericCrudExecutor, GenericExecutionResult};
