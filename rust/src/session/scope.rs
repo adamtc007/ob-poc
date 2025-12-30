@@ -53,9 +53,10 @@ pub struct ScopeSummary {
 }
 
 /// Load status indicating how much data is in memory
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum LoadStatus {
     /// All data loaded in memory
+    #[default]
     Full,
 
     /// Only summary loaded, expand on demand
@@ -73,12 +74,6 @@ pub enum LoadStatus {
         /// Total entities reachable (but not loaded)
         total_reachable: usize,
     },
-}
-
-impl Default for LoadStatus {
-    fn default() -> Self {
-        Self::Full
-    }
 }
 
 /// A node that can be expanded to load more data

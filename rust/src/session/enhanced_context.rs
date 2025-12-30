@@ -236,7 +236,7 @@ fn build_prompt_section(base: &AgentContext, verbs: Option<&AgentVerbContext>) -
     }
 
     // 4. Base suggestions (fallback if no verb context)
-    if verbs.map_or(true, |v| v.is_empty()) && !base.suggestions.is_empty() {
+    if verbs.is_none_or(|v| v.is_empty()) && !base.suggestions.is_empty() {
         let suggestions_str = format!("[SUGGESTIONS: {}]", base.suggestions.join(" | "));
         parts.push(suggestions_str);
     }

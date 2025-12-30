@@ -78,6 +78,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // =========================================================================
     // Sync verb definitions from YAML to database
+    // With DYNAMIC VERB EXPANSION from entity_types table
     // =========================================================================
     tracing::info!("Syncing verb definitions to database...");
 
@@ -86,7 +87,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match config_loader.load_verbs() {
         Ok(verbs_config) => {
-            let registry = ob_poc::dsl_v2::RuntimeVerbRegistry::from_config(&verbs_config);
+            // Use from_config_with_db to expand dynamic verbs from entity_types table
+            // This generates entity.create-{type_code} verbs for ALL entity types in DB
+            let registry = match ob_poc::dsl_v2::RuntimeVerbRegistry::from_config_with_db(
+                &verbs_config,
+                &pool,
+            )
+            .await
+            {
+                Ok(r) => {
+                    tracing::info!(
+                        "Verb registry loaded with {} verbs (including dynamic expansion)",
+                        r.len()
+                    );
+                    r
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Dynamic verb expansion failed, falling back to static config: {}",
+                        e
+                    );
+                    ob_poc::dsl_v2::RuntimeVerbRegistry::from_config(&verbs_config)
+                }
+            };
+
             match verb_sync_service.sync_all(&registry).await {
                 Ok(result) => {
                     tracing::info!(
@@ -96,6 +120,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         result.verbs_unchanged,
                         result.duration_ms
                     );
+
+                    // Populate RAG metadata (intent patterns, workflow phases, etc.)
+                    match verb_sync_service.populate_rag_metadata().await {
+                        Ok(count) => {
+                            tracing::info!("RAG metadata populated for {} verbs", count);
+                        }
+                        Err(e) => {
+                            tracing::warn!("RAG metadata population failed (non-fatal): {}", e);
+                        }
+                    }
                 }
                 Err(e) => {
                     tracing::warn!("Verb sync failed (non-fatal): {}", e);

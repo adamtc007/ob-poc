@@ -320,9 +320,35 @@ impl LayoutEngine {
                 child_count: node.child_count,
                 browse_nickname: node.browse_nickname.clone(),
                 parent_key: node.parent_key.clone(),
+                // Container parent (set below for SERVICE_DELIVERY view)
+                container_parent_id: None,
             };
 
             graph.nodes.insert(node.id.clone(), layout_node);
+        }
+
+        // For TRADING view, set container_parent_id on trading entity nodes
+        // This shows the CBU as an outer container with entities inside
+        if self.view_mode == super::ViewMode::Trading {
+            // Find the CBU node ID
+            let cbu_id = graph
+                .nodes
+                .values()
+                .find(|n| n.is_cbu_root)
+                .map(|n| n.id.clone());
+
+            if let Some(ref cbu_id) = cbu_id {
+                // Set container_parent_id on all entity nodes (not products/services/resources)
+                for node in graph.nodes.values_mut() {
+                    if !node.is_cbu_root
+                        && node.entity_type != EntityType::Product
+                        && node.entity_type != EntityType::Service
+                        && node.entity_type != EntityType::Resource
+                    {
+                        node.container_parent_id = Some(cbu_id.clone());
+                    }
+                }
+            }
         }
 
         // Create edges
@@ -504,6 +530,7 @@ impl LayoutEngine {
                 child_count: node.child_count,
                 browse_nickname: node.browse_nickname.clone(),
                 parent_key: node.parent_key.clone(),
+                container_parent_id: None,
             };
 
             graph.nodes.insert(node.id.clone(), layout_node);
@@ -559,6 +586,7 @@ impl LayoutEngine {
                 child_count: node.child_count,
                 browse_nickname: node.browse_nickname.clone(),
                 parent_key: node.parent_key.clone(),
+                container_parent_id: None,
             };
 
             graph.nodes.insert(node.id.clone(), layout_node);
@@ -657,6 +685,7 @@ impl LayoutEngine {
                     child_count: None,
                     browse_nickname: None,
                     parent_key: None,
+                    container_parent_id: None,
                 };
                 graph.nodes.insert(product.id.clone(), layout_node);
 
@@ -710,6 +739,7 @@ impl LayoutEngine {
                             child_count: None,
                             browse_nickname: None,
                             parent_key: None,
+                            container_parent_id: None,
                         };
                         graph.nodes.insert(service.id.clone(), svc_node);
 
@@ -763,6 +793,7 @@ impl LayoutEngine {
                                     child_count: None,
                                     browse_nickname: None,
                                     parent_key: None,
+                                    container_parent_id: None,
                                 };
                                 graph.nodes.insert(resource.id.clone(), res_node);
                             }
@@ -831,6 +862,7 @@ impl LayoutEngine {
                     child_count: None,
                     browse_nickname: None,
                     parent_key: None,
+                    container_parent_id: None,
                 };
                 graph.nodes.insert(service.id.clone(), layout_node);
             }
@@ -895,6 +927,7 @@ impl LayoutEngine {
                     child_count: None,
                     browse_nickname: None,
                     parent_key: None,
+                    container_parent_id: None,
                 };
                 graph.nodes.insert(resource.id.clone(), layout_node);
             }
@@ -1343,6 +1376,11 @@ fn edge_style_for_type(edge_type: EdgeType) -> EdgeStyle {
         EdgeType::Controls => EdgeStyle {
             color: Color32::from_rgb(251, 191, 36),
             width: 2.0,
+            dashed: true,
+        },
+        EdgeType::UboTerminus => EdgeStyle {
+            color: Color32::from_rgb(239, 68, 68), // Red - terminus marker
+            width: 2.5,
             dashed: true,
         },
         EdgeType::Other => EdgeStyle::default(),

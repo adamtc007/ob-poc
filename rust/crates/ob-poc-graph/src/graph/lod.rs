@@ -70,10 +70,13 @@ impl DetailLevel {
             return DetailLevel::Focused;
         }
 
+        // screen_width = node.size.x * camera.zoom()
+        // Typical node is ~140px wide, so at zoom 1.0 screen_width=140
+        // At zoom 0.5, screen_width=70. At zoom 2.0, screen_width=280
         match screen_width {
-            w if w < 8.0 => DetailLevel::Micro,
-            w if w < 30.0 => DetailLevel::Icon,
-            w if w < 80.0 => DetailLevel::Compact,
+            w if w < 20.0 => DetailLevel::Micro,
+            w if w < 40.0 => DetailLevel::Icon,
+            w if w < 70.0 => DetailLevel::Compact,
             w if w < 120.0 => DetailLevel::Standard,
             _ => DetailLevel::Expanded,
         }
@@ -180,7 +183,8 @@ fn render_compact(painter: &egui::Painter, node: &LayoutNode, ctx: &RenderContex
     }
 }
 
-/// Standard: Full name + role badge + KYC completion bar
+/// Standard: Name at top (wrapped), role labels at bottom-right
+/// Clean layout - no jurisdiction or entity type clutter
 fn render_standard(painter: &egui::Painter, node: &LayoutNode, ctx: &RenderContext) {
     let rect = ctx.rect();
     let border_width = if node.is_cbu_root { 3.0 } else { 2.0 };
@@ -188,55 +192,25 @@ fn render_standard(painter: &egui::Painter, node: &LayoutNode, ctx: &RenderConte
     painter.rect_filled(rect, 8.0, ctx.fill);
     painter.rect_stroke(rect, 8.0, Stroke::new(border_width, ctx.border));
 
-    // Label - shift up slightly if we have a KYC bar
-    let has_kyc_bar = node.kyc_completion.is_some();
-    let label_offset = if has_kyc_bar { 0.18 } else { 0.15 };
-    let font_size = (ctx.size.y * 0.18).clamp(10.0, 13.0);
-    painter.text(
-        ctx.pos - Vec2::new(0.0, ctx.size.y * label_offset),
-        egui::Align2::CENTER_CENTER,
-        &node.label,
-        FontId::proportional(font_size),
-        ctx.text_color,
-    );
+    // Name at top - wrapped to fit
+    let font_size = (ctx.size.y * 0.18).clamp(10.0, 14.0);
+    let max_width = ctx.size.x - 16.0; // padding on each side
 
-    // Sublabel
-    if let Some(ref sublabel) = node.sublabel {
-        let sublabel_color = apply_opacity(Color32::from_rgb(180, 180, 180), ctx.opacity);
-        let sublabel_offset = if has_kyc_bar { 0.08 } else { 0.12 };
-        painter.text(
-            ctx.pos + Vec2::new(0.0, ctx.size.y * sublabel_offset),
-            egui::Align2::CENTER_CENTER,
-            sublabel,
-            FontId::proportional(font_size * 0.8),
-            sublabel_color,
-        );
-    }
+    let font = FontId::proportional(font_size);
+    let layout_job =
+        egui::text::LayoutJob::simple(node.label.clone(), font, ctx.text_color, max_width);
+    let galley = painter.layout_job(layout_job);
 
+    // Position name near top, centered horizontally
+    let text_pos = Pos2::new(ctx.pos.x - galley.size().x / 2.0, rect.top() + 8.0);
+    painter.galley(text_pos, galley, Color32::WHITE);
+
+    // Role labels at bottom-right
     if !node.is_cbu_root {
-        render_role_badge(painter, node, rect, ctx.opacity);
+        render_role_labels_bottom(painter, node, rect, ctx.opacity);
     }
 
-    // Entity category indicator (top-left) - only if no jurisdiction
-    if node.jurisdiction.is_none() {
-        if let Some(ref category) = node.entity_category {
-            render_entity_category_indicator(painter, rect, category, ctx.opacity);
-        }
-    }
-
-    // Jurisdiction (top-left)
-    if let Some(ref jurisdiction) = node.jurisdiction {
-        let flag_color = apply_opacity(Color32::from_rgb(120, 120, 120), ctx.opacity);
-        painter.text(
-            rect.left_top() + Vec2::new(5.0, 5.0),
-            egui::Align2::LEFT_TOP,
-            jurisdiction,
-            FontId::proportional(9.0),
-            flag_color,
-        );
-    }
-
-    // KYC completion bar at bottom
+    // KYC completion bar at bottom (above role labels)
     if let Some(completion) = node.kyc_completion {
         render_kyc_completion_bar(painter, rect, completion, ctx.opacity);
     }
@@ -297,22 +271,148 @@ fn render_expanded(painter: &egui::Painter, node: &LayoutNode, ctx: &RenderConte
 // HELPER RENDERERS
 // =============================================================================
 
-fn render_role_badge(painter: &egui::Painter, node: &LayoutNode, rect: egui::Rect, opacity: f32) {
-    let badge_text = role_badge_text(&node.primary_role);
-    if badge_text.is_empty() {
-        return;
+/// Render role labels at bottom-right of node, supporting multiple roles
+fn render_role_labels_bottom(
+    painter: &egui::Painter,
+    node: &LayoutNode,
+    rect: egui::Rect,
+    opacity: f32,
+) {
+    // Collect roles to display - prefer all_roles, fall back to primary_role
+    let roles: Vec<String> = if !node.all_roles.is_empty() {
+        node.all_roles.iter().map(|r| abbreviate_role(r)).collect()
+    } else {
+        let primary_text = role_badge_text(&node.primary_role);
+        if !primary_text.is_empty() {
+            vec![primary_text.to_string()]
+        } else {
+            return; // No roles to display
+        }
+    };
+
+    let font = FontId::proportional(9.0);
+    let padding = Vec2::new(3.0, 1.0);
+    let spacing = 3.0; // Space between role pills
+    let bottom_margin = 4.0;
+    let right_margin = 4.0;
+
+    // Calculate pill sizes
+    let mut pill_infos: Vec<(String, Vec2)> = Vec::new();
+    for role in &roles {
+        let galley = painter.layout_no_wrap(role.clone(), font.clone(), Color32::WHITE);
+        pill_infos.push((role.clone(), galley.size()));
     }
 
-    let text_color = apply_opacity(Color32::BLACK, opacity);
-    let badge_pos = rect.right_top() + Vec2::new(-5.0, 5.0);
+    // Position pills from right to left at bottom-right
+    let mut x_offset = rect.right() - right_margin;
+    let y_pos = rect.bottom() - bottom_margin;
 
+    let bg_color = apply_opacity(Color32::from_rgba_unmultiplied(0, 0, 0, 180), opacity);
+    let text_color = apply_opacity(Color32::from_rgb(220, 220, 220), opacity);
+
+    for (role_text, text_size) in pill_infos {
+        let pill_width = text_size.x + padding.x * 2.0;
+        let pill_height = text_size.y + padding.y * 2.0;
+
+        // Check if pill would go past left edge
+        if x_offset - pill_width < rect.left() + 4.0 {
+            break; // Stop adding pills if we run out of space
+        }
+
+        let pill_rect = egui::Rect::from_min_size(
+            Pos2::new(x_offset - pill_width, y_pos - pill_height),
+            Vec2::new(pill_width, pill_height),
+        );
+
+        // Draw background pill
+        painter.rect_filled(pill_rect, 3.0, bg_color);
+
+        // Draw text centered in pill
+        painter.text(
+            pill_rect.center(),
+            egui::Align2::CENTER_CENTER,
+            role_text,
+            font.clone(),
+            text_color,
+        );
+
+        // Move left for next pill
+        x_offset -= pill_width + spacing;
+    }
+}
+
+fn render_role_badge(painter: &egui::Painter, node: &LayoutNode, rect: egui::Rect, opacity: f32) {
+    // Try primary_role first, then fall back to first role in all_roles
+    let badge_text = {
+        let from_primary = role_badge_text(&node.primary_role);
+        if !from_primary.is_empty() {
+            from_primary.to_string()
+        } else if let Some(first_role) = node.all_roles.first() {
+            // Use abbreviated form of first role from all_roles
+            abbreviate_role(first_role)
+        } else {
+            return; // No role to display
+        }
+    };
+
+    // Use a subtle background pill for better visibility
+    let badge_pos = rect.right_top() + Vec2::new(-5.0, 5.0);
+    let font = FontId::proportional(11.0);
+
+    // Measure text for background
+    let galley = painter.layout_no_wrap(badge_text.clone(), font.clone(), Color32::WHITE);
+    let text_size = galley.size();
+    let padding = Vec2::new(4.0, 2.0);
+    let bg_rect = egui::Rect::from_min_size(
+        badge_pos - Vec2::new(text_size.x + padding.x, 0.0),
+        text_size + padding * 2.0,
+    );
+
+    // Draw background pill
+    let bg_color = apply_opacity(Color32::from_rgba_unmultiplied(0, 0, 0, 160), opacity);
+    painter.rect_filled(bg_rect, 3.0, bg_color);
+
+    // Draw text
+    let text_color = apply_opacity(Color32::from_rgb(220, 220, 220), opacity);
     painter.text(
         badge_pos,
         egui::Align2::RIGHT_TOP,
         badge_text,
-        FontId::proportional(9.0),
+        font,
         text_color,
     );
+}
+
+/// Abbreviate a role string (e.g., "MANAGEMENT_COMPANY" -> "ManCo")
+fn abbreviate_role(role: &str) -> String {
+    match role.to_uppercase().replace('-', "_").as_str() {
+        "MANAGEMENT_COMPANY" | "MANCO" => "ManCo".to_string(),
+        "INVESTMENT_MANAGER" => "IM".to_string(),
+        "ASSET_OWNER" => "AO".to_string(),
+        "ULTIMATE_BENEFICIAL_OWNER" | "UBO" => "UBO".to_string(),
+        "BENEFICIAL_OWNER" => "BO".to_string(),
+        "DIRECTOR" => "Dir".to_string(),
+        "SHAREHOLDER" => "SH".to_string(),
+        "AUTHORIZED_SIGNATORY" => "AS".to_string(),
+        "CUSTODIAN" => "Cust".to_string(),
+        "DEPOSITARY" => "Dep".to_string(),
+        "ADMINISTRATOR" => "Admin".to_string(),
+        "TRANSFER_AGENT" => "TA".to_string(),
+        "PRIME_BROKER" => "PB".to_string(),
+        "PRINCIPAL" => "Prin".to_string(),
+        "TRUSTEE" => "Trustee".to_string(),
+        "SETTLOR" => "Settlor".to_string(),
+        "BENEFICIARY" => "Ben".to_string(),
+        "PROTECTOR" => "Prot".to_string(),
+        _ => {
+            // For unknown roles, take first 6 chars or capitalize nicely
+            if role.len() <= 6 {
+                role.to_string()
+            } else {
+                role.chars().take(6).collect()
+            }
+        }
+    }
 }
 
 fn render_triangle(
@@ -380,31 +480,6 @@ fn render_kyc_completion_bar(
         };
 
         painter.rect_filled(fill_rect, bar_height / 2.0, fill_color);
-    }
-}
-
-/// Render entity category indicator (PERSON = circle, SHELL = square) at top-left
-fn render_entity_category_indicator(
-    painter: &egui::Painter,
-    rect: egui::Rect,
-    category: &str,
-    opacity: f32,
-) {
-    let indicator_size = 8.0;
-    let indicator_pos = rect.left_top() + Vec2::new(8.0, 8.0);
-
-    let color = if category == "PERSON" {
-        apply_opacity(Color32::from_rgb(96, 165, 250), opacity) // Blue for person
-    } else {
-        apply_opacity(Color32::from_rgb(168, 85, 247), opacity) // Purple for shell
-    };
-
-    if category == "PERSON" {
-        painter.circle_filled(indicator_pos, indicator_size / 2.0, color);
-    } else {
-        let indicator_rect =
-            egui::Rect::from_center_size(indicator_pos, Vec2::splat(indicator_size));
-        painter.rect_filled(indicator_rect, 2.0, color);
     }
 }
 

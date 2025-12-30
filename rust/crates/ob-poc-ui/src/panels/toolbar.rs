@@ -59,11 +59,7 @@ pub fn toolbar(ui: &mut Ui, data: &ToolbarData) -> ToolbarAction {
         ComboBox::from_id_salt("view_mode")
             .selected_text(view_mode_name(data.view_mode))
             .show_ui(ui, |ui| {
-                for mode in &[
-                    ViewMode::KycUbo,
-                    ViewMode::ServiceDelivery,
-                    ViewMode::ProductsOnly,
-                ] {
+                for mode in ViewMode::all() {
                     if ui
                         .selectable_label(data.view_mode == *mode, view_mode_name(*mode))
                         .clicked()
@@ -121,5 +117,6 @@ fn view_mode_name(mode: ViewMode) -> &'static str {
         ViewMode::KycUbo => "KYC/UBO",
         ViewMode::ServiceDelivery => "Services",
         ViewMode::ProductsOnly => "Products",
+        ViewMode::Trading => "Trading",
     }
 }

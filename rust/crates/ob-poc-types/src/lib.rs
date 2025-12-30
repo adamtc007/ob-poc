@@ -218,6 +218,27 @@ pub enum AgentCommand {
     NavigateDsl { line: u32 },
     /// Focus an AST node
     FocusAst { node_id: String },
+
+    // =========================================================================
+    // Graph Filtering Commands
+    // =========================================================================
+    /// Filter graph to show only specific entity types ("show only shells", "filter to people")
+    FilterByType {
+        /// Entity type codes to show (e.g., ["SHELL", "PERSON"])
+        type_codes: Vec<String>,
+    },
+    /// Highlight entities of a specific type without filtering others
+    HighlightType {
+        /// Entity type code to highlight (e.g., "SHELL")
+        type_code: String,
+    },
+    /// Clear all graph filters and highlights
+    ClearFilter,
+    /// Set the view mode ("show kyc view", "switch to custody")
+    SetViewMode {
+        /// View mode: "KYC_UBO", "SERVICE_DELIVERY", "CUSTODY"
+        view_mode: String,
+    },
 }
 
 // ============================================================================

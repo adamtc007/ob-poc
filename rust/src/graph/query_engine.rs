@@ -9,7 +9,11 @@ use anyhow::{anyhow, Result};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use super::types::{EdgeType, GraphEdge, GraphNode, LayerType, NodeType};
+// Use legacy types for backward compatibility during transition to EntityGraph
+use super::types::{EdgeType, GraphEdge, LayerType, LegacyGraphNode, NodeType};
+
+// Re-export as GraphNode for this module
+type GraphNode = LegacyGraphNode;
 use super::view_model::{
     GraphComparison, GraphFilter, GraphPath, GraphViewModel, NodeGroup, ViewModeInfo,
 };

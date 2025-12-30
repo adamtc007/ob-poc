@@ -37,38 +37,35 @@
 
 ;; === OWNERSHIP CHAIN ===
 ;; GLEIF reports 'IS_DIRECTLY_CONSOLIDATED_BY' = 100% accounting ownership
+;; Using ubo.add-ownership (idempotent via upsert on from_entity_id + to_entity_id + relationship_type)
 
-(cbu.role:assign-ownership
+(ubo.add-ownership
     :owner-entity-id @529900k9
     :owned-entity-id @oj2tiqsv
     :percentage 100.0
-    :ownership-type "ACCOUNTING_CONSOLIDATION"
-    :source "GLEIF"
-    :corroboration "FULLY_CORROBORATED")
+    :ownership-type "DIRECT")
 
-(cbu.role:assign-ownership
+(ubo.add-ownership
     :owner-entity-id @oj2tiqsv
     :owned-entity-id @5493005j
     :percentage 100.0
-    :ownership-type "ACCOUNTING_CONSOLIDATION"
-    :source "GLEIF"
-    :corroboration "UNKNOWN")
+    :ownership-type "DIRECT")
 
-(cbu.role:assign-ownership
+(ubo.add-ownership
     :owner-entity-id @oj2tiqsv
     :owned-entity-id @353800nv
     :percentage 100.0
-    :ownership-type "ACCOUNTING_CONSOLIDATION"
-    :source "GLEIF"
-    :corroboration "UNKNOWN")
+    :ownership-type "DIRECT")
 
 ;; === UBO TERMINUS ===
 ;; Allianz SE is publicly traded with dispersed ownership
+;; Chain terminates here - no natural person UBO (XETRA: ALV)
 
-(cbu.role:mark-ubo-terminus
+(ubo.mark-terminus
     :entity-id @529900k9
-    :reason "NO_KNOWN_PERSON"
-    :notes "GLEIF reporting exception - no consolidating parent")
+    :terminus-type "LISTED_COMPANY"
+    :exchange "XETRA"
+    :lei "529900K9B0N5BT694847")
 
 ;; === FUND MANAGEMENT (sample) ===
 ;; AllianzGI manages 300 funds registered in GLEIF

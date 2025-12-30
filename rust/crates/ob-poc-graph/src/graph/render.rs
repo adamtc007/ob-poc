@@ -19,6 +19,8 @@ use std::collections::HashMap;
 // =============================================================================
 
 const CORNER_RADIUS: f32 = 8.0;
+const CONTAINER_PADDING: f32 = 40.0;
+const CONTAINER_HEADER_HEIGHT: f32 = 30.0;
 
 // =============================================================================
 // GRAPH RENDERER
@@ -49,6 +51,15 @@ impl GraphRenderer {
     }
 
     /// Render the complete graph
+    ///
+    /// # Arguments
+    /// * `painter` - egui painter for drawing
+    /// * `graph` - the layout graph to render
+    /// * `camera` - camera for world-to-screen transformation
+    /// * `screen_rect` - visible screen area
+    /// * `focused_node` - currently focused node (highlighted with connected edges)
+    /// * `type_filter` - if set, only nodes matching this type are fully visible
+    /// * `highlighted_type` - if set, nodes of this type get a highlight effect
     pub fn render(
         &self,
         painter: &egui::Painter,
@@ -56,13 +67,58 @@ impl GraphRenderer {
         camera: &Camera2D,
         screen_rect: Rect,
         focused_node: Option<&str>,
+        type_filter: Option<&str>,
+        highlighted_type: Option<&str>,
     ) {
+        // Render container backgrounds first (below everything)
+        self.render_containers(painter, graph, camera, screen_rect);
+
         // Build parallel edge index: for each (source, target) pair, track edge indices
         // This allows us to offset edges that share the same endpoints
         let parallel_info = self.compute_parallel_edge_info(&graph.edges);
 
+        // Build map of node -> container for edge filtering
+        let node_containers: std::collections::HashMap<&str, Option<&str>> = graph
+            .nodes
+            .iter()
+            .map(|(id, n)| (id.as_str(), n.container_parent_id.as_deref()))
+            .collect();
+
         // Render edges first (below nodes)
+        // Skip edges where both endpoints are in the same container (redundant in container view)
         for (i, edge) in graph.edges.iter().enumerate() {
+            // Check if both nodes are in the same container
+            let source_container = node_containers
+                .get(edge.source_id.as_str())
+                .copied()
+                .flatten();
+            let target_container = node_containers
+                .get(edge.target_id.as_str())
+                .copied()
+                .flatten();
+
+            // Skip edge if both are in same container (or if edge goes to container itself)
+            if let (Some(src_c), Some(tgt_c)) = (source_container, target_container) {
+                if src_c == tgt_c {
+                    continue; // Both in same container, skip this edge
+                }
+            }
+            // Also skip edges from container to its children
+            if source_container.is_some() && target_container.is_none() {
+                if let Some(target_node) = graph.get_node(&edge.target_id) {
+                    if target_node.is_cbu_root {
+                        continue;
+                    }
+                }
+            }
+            if target_container.is_some() && source_container.is_none() {
+                if let Some(source_node) = graph.get_node(&edge.source_id) {
+                    if source_node.is_cbu_root {
+                        continue;
+                    }
+                }
+            }
+
             let in_focus = self.is_edge_in_focus(edge, focused_node, graph);
             let (edge_index, total_parallel) = parallel_info.get(&i).copied().unwrap_or((0, 1));
             self.render_edge_with_offset(
@@ -77,16 +133,186 @@ impl GraphRenderer {
             );
         }
 
-        // Render nodes
+        // Render nodes (skip nodes that are rendered as containers)
+        let container_ids: std::collections::HashSet<&str> = graph
+            .nodes
+            .values()
+            .filter_map(|n| n.container_parent_id.as_deref())
+            .collect();
+
         for node in graph.nodes.values() {
-            let in_focus = self.is_node_in_focus(&node.id, focused_node, graph);
+            // Skip CBU nodes that are being used as containers (they're drawn as backgrounds)
+            if node.is_cbu_root && container_ids.contains(node.id.as_str()) {
+                continue;
+            }
+
+            // Determine focus based on node focus AND type filter
+            let node_in_focus = self.is_node_in_focus(&node.id, focused_node, graph);
             let is_focused = focused_node == Some(node.id.as_str());
-            self.render_node(painter, node, camera, screen_rect, in_focus, is_focused);
+
+            // Check type filter - if set, nodes not matching get reduced opacity
+            let matches_type_filter = type_filter
+                .map(|filter| self.node_matches_type(node, filter))
+                .unwrap_or(true);
+
+            // Check highlighted type - nodes matching get a highlight effect
+            let is_highlighted = highlighted_type
+                .map(|hl| self.node_matches_type(node, hl))
+                .unwrap_or(false);
+
+            // Combine focus states: in_focus if (node focus AND type filter match)
+            // If type filter is set but node doesn't match, treat as not in focus
+            let in_focus = node_in_focus && matches_type_filter;
+
+            self.render_node(
+                painter,
+                node,
+                camera,
+                screen_rect,
+                in_focus,
+                is_focused,
+                is_highlighted,
+            );
         }
 
         // Render investor groups (collapsed)
         for group in &graph.investor_groups {
             self.render_investor_group(painter, group, camera, screen_rect);
+        }
+    }
+
+    /// Render container backgrounds for nodes that have container_parent_id set
+    fn render_containers(
+        &self,
+        painter: &egui::Painter,
+        graph: &LayoutGraph,
+        camera: &Camera2D,
+        screen_rect: Rect,
+    ) {
+        // Group nodes by their container_parent_id
+        let mut containers: HashMap<String, Vec<&LayoutNode>> = HashMap::new();
+
+        for node in graph.nodes.values() {
+            if let Some(ref parent_id) = node.container_parent_id {
+                containers.entry(parent_id.clone()).or_default().push(node);
+            }
+        }
+
+        // Render each container
+        for (container_id, child_nodes) in containers {
+            // Get the container node (CBU) for label
+            let container_node = graph.get_node(&container_id);
+            let container_label = container_node
+                .map(|n| n.label.as_str())
+                .unwrap_or("Container");
+
+            // Calculate bounding box of all child nodes
+            if let Some(bounds) = self.compute_container_bounds(&child_nodes, camera, screen_rect) {
+                self.render_container_background(
+                    painter,
+                    bounds,
+                    container_label,
+                    camera,
+                    screen_rect,
+                );
+            }
+        }
+    }
+
+    /// Compute the bounding box for a container's child nodes (in screen coordinates)
+    fn compute_container_bounds(
+        &self,
+        nodes: &[&LayoutNode],
+        camera: &Camera2D,
+        screen_rect: Rect,
+    ) -> Option<Rect> {
+        if nodes.is_empty() {
+            return None;
+        }
+
+        let padding = CONTAINER_PADDING * camera.zoom();
+        let header_height = CONTAINER_HEADER_HEIGHT * camera.zoom();
+
+        let mut min_x = f32::MAX;
+        let mut min_y = f32::MAX;
+        let mut max_x = f32::MIN;
+        let mut max_y = f32::MIN;
+
+        for node in nodes {
+            let screen_pos = camera.world_to_screen(node.position, screen_rect);
+            let screen_size = node.size * camera.zoom();
+
+            let node_left = screen_pos.x - screen_size.x / 2.0;
+            let node_right = screen_pos.x + screen_size.x / 2.0;
+            let node_top = screen_pos.y - screen_size.y / 2.0;
+            let node_bottom = screen_pos.y + screen_size.y / 2.0;
+
+            min_x = min_x.min(node_left);
+            max_x = max_x.max(node_right);
+            min_y = min_y.min(node_top);
+            max_y = max_y.max(node_bottom);
+        }
+
+        // Add padding and header space
+        Some(Rect::from_min_max(
+            Pos2::new(min_x - padding, min_y - padding - header_height),
+            Pos2::new(max_x + padding, max_y + padding),
+        ))
+    }
+
+    /// Render a container background with label
+    fn render_container_background(
+        &self,
+        painter: &egui::Painter,
+        bounds: Rect,
+        label: &str,
+        camera: &Camera2D,
+        _screen_rect: Rect,
+    ) {
+        let corner_radius = CORNER_RADIUS * camera.zoom();
+
+        // Container background - subtle dark fill
+        let fill_color = Color32::from_rgba_unmultiplied(30, 35, 45, 180);
+        let border_color = Color32::from_rgb(70, 80, 100);
+        let border_width = 2.0 * camera.zoom();
+
+        painter.rect_filled(bounds, corner_radius, fill_color);
+        painter.rect_stroke(
+            bounds,
+            corner_radius,
+            Stroke::new(border_width, border_color),
+        );
+
+        // Container label in top-left
+        let header_height = CONTAINER_HEADER_HEIGHT * camera.zoom();
+        let label_pos = Pos2::new(
+            bounds.left() + 12.0 * camera.zoom(),
+            bounds.top() + header_height / 2.0,
+        );
+
+        let font_size = 14.0 * camera.zoom();
+        let label_color = Color32::from_rgb(180, 190, 210);
+
+        painter.text(
+            label_pos,
+            egui::Align2::LEFT_CENTER,
+            label,
+            FontId::proportional(font_size),
+            label_color,
+        );
+
+        // Optional: render a subtle header divider line
+        let divider_y = bounds.top() + header_height;
+        if divider_y < bounds.bottom() {
+            let divider_start = Pos2::new(bounds.left() + corner_radius, divider_y);
+            let divider_end = Pos2::new(bounds.right() - corner_radius, divider_y);
+            painter.line_segment(
+                [divider_start, divider_end],
+                Stroke::new(
+                    1.0 * camera.zoom(),
+                    Color32::from_rgba_unmultiplied(70, 80, 100, 100),
+                ),
+            );
         }
     }
 
@@ -99,6 +325,7 @@ impl GraphRenderer {
         screen_rect: Rect,
         in_focus: bool,
         is_focused: bool,
+        is_highlighted: bool,
     ) {
         // Transform to screen coordinates
         let screen_pos = camera.world_to_screen(node.position, screen_rect);
@@ -110,12 +337,30 @@ impl GraphRenderer {
             return;
         }
 
-        // Apply focus opacity
-        let opacity = if in_focus { 1.0 } else { self.blur_opacity };
+        // Apply focus opacity (highlighted nodes always full opacity)
+        let opacity = if in_focus || is_highlighted {
+            1.0
+        } else {
+            self.blur_opacity
+        };
 
         if self.use_lod {
             // Use LOD system
             let lod = DetailLevel::from_screen_size(screen_size.x, is_focused);
+            #[cfg(target_arch = "wasm32")]
+            {
+                static LOGGED: std::sync::atomic::AtomicBool =
+                    std::sync::atomic::AtomicBool::new(false);
+                if !LOGGED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+                    web_sys::console::log_1(
+                        &format!(
+                            "LOD: screen_size.x={}, lod={:?}, use_lod={}",
+                            screen_size.x, lod, self.use_lod
+                        )
+                        .into(),
+                    );
+                }
+            }
             render_node_at_lod(painter, node, screen_pos, screen_size, lod, opacity);
         } else {
             // Legacy rendering
@@ -384,6 +629,75 @@ impl GraphRenderer {
                 || (edge.target_id == focus_id && edge.source_id == node_id)
             {
                 return true;
+            }
+        }
+
+        false
+    }
+
+    /// Check if a node matches a type code from the ontology
+    ///
+    /// Matches if the node's entity type or category matches the filter.
+    /// Also matches parent types (e.g., "SHELL" matches "LIMITED_COMPANY")
+    fn node_matches_type(&self, node: &LayoutNode, type_code: &str) -> bool {
+        // Direct match on entity_type enum
+        let node_type_str = match node.entity_type {
+            EntityType::ProperPerson => "PROPER_PERSON",
+            EntityType::LimitedCompany => "LIMITED_COMPANY",
+            EntityType::Partnership => "PARTNERSHIP",
+            EntityType::Trust => "TRUST",
+            EntityType::Fund => "FUND",
+            EntityType::Product => "PRODUCT",
+            EntityType::Service => "SERVICE",
+            EntityType::Resource => "RESOURCE",
+            EntityType::Unknown => "ENTITY",
+        };
+
+        if node_type_str == type_code {
+            return true;
+        }
+
+        // Check entity_category for parent type matching
+        if let Some(ref category) = node.entity_category {
+            let cat_upper = category.to_uppercase();
+            if cat_upper == type_code {
+                return true;
+            }
+
+            // Parent type matching: SHELL matches all shell subtypes
+            match type_code {
+                "SHELL" => {
+                    if cat_upper == "SHELL"
+                        || matches!(
+                            node.entity_type,
+                            EntityType::LimitedCompany
+                                | EntityType::Fund
+                                | EntityType::Trust
+                                | EntityType::Partnership
+                        )
+                    {
+                        return true;
+                    }
+                }
+                "PERSON" => {
+                    if cat_upper == "PERSON" || matches!(node.entity_type, EntityType::ProperPerson)
+                    {
+                        return true;
+                    }
+                }
+                "SERVICE_LAYER" => {
+                    if matches!(
+                        node.entity_type,
+                        EntityType::Product | EntityType::Service | EntityType::Resource
+                    ) {
+                        return true;
+                    }
+                }
+                "ENTITY" => {
+                    // Root type matches everything
+                    return true;
+                }
+                _ => {}
             }
         }
 

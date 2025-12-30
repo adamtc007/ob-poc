@@ -428,6 +428,13 @@ pub struct LayoutNode {
 
     /// Parent key for scoped queries (e.g., cbu_id)
     pub parent_key: Option<String>,
+
+    // =========================================================================
+    // CONTAINER PARENT - for nodes that visually belong inside a container
+    // =========================================================================
+    /// ID of the container node this node belongs to (for visual grouping)
+    /// Used in SERVICE_DELIVERY view to show entities inside the CBU container
+    pub container_parent_id: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -481,6 +488,8 @@ pub enum EdgeType {
     HasRole,
     Owns,
     Controls,
+    /// UBO chain terminus - ownership tracing stops here (public company, government, etc.)
+    UboTerminus,
     Other,
 }
 
@@ -492,6 +501,7 @@ impl std::str::FromStr for EdgeType {
             "has_role" | "hasrole" => Self::HasRole,
             "owns" => Self::Owns,
             "controls" => Self::Controls,
+            "ubo_terminus" | "uboterminus" => Self::UboTerminus,
             _ => Self::Other,
         })
     }

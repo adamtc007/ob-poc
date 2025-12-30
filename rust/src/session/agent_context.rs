@@ -416,8 +416,8 @@ impl AgentGraphContext {
         session
             .execution
             .symbols
-            .iter()
-            .map(|(name, _uuid)| BindingSummary {
+            .keys()
+            .map(|name| BindingSummary {
                 name: format!("@{}", name),
                 binding_type: session
                     .execution

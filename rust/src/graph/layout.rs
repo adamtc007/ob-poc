@@ -19,7 +19,11 @@
 //! | FlatBottom     | Tier 5, investor chain |
 //! | Peripheral     | Edge, related parties |
 
-use super::types::{CbuGraph, GraphNode, LayoutBehavior, NodeType, RoleCategory};
+// Use legacy types for backward compatibility during transition to EntityGraph
+use super::types::{CbuGraph, LayoutBehavior, LegacyGraphNode, NodeType, RoleCategory};
+
+// Re-export as GraphNode for this module
+type GraphNode = LegacyGraphNode;
 
 /// View modes determine which layers are visible and how they're laid out
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -35,6 +39,9 @@ pub enum ViewMode {
     /// Service Delivery view: Products → Services → Resources + Trading entities
     /// Shows: CBU → Products → Services → Resources, plus entities with TRADING_EXECUTION roles
     ServiceDelivery,
+    /// Trading view: CBU as container with trading entities inside (Asset Owner, IM, ManCo, etc.)
+    /// No products, no services - just the trading entities wrapped by the CBU
+    Trading,
 }
 
 impl ViewMode {
@@ -43,6 +50,7 @@ impl ViewMode {
             "UBO_ONLY" | "UBO" | "OWNERSHIP" => ViewMode::UboOnly,
             "PRODUCTS_ONLY" | "PRODUCTS" => ViewMode::ProductsOnly,
             "SERVICE_DELIVERY" | "SERVICES" => ViewMode::ServiceDelivery,
+            "TRADING" => ViewMode::Trading,
             _ => ViewMode::KycUbo, // Default
         }
     }
@@ -53,6 +61,7 @@ impl ViewMode {
             ViewMode::UboOnly => "UBO_ONLY",
             ViewMode::ProductsOnly => "PRODUCTS_ONLY",
             ViewMode::ServiceDelivery => "SERVICE_DELIVERY",
+            ViewMode::Trading => "TRADING",
         }
     }
 }
@@ -157,14 +166,14 @@ impl LayoutEngine {
     fn get_layout_behavior(&self, node: &GraphNode) -> LayoutBehavior {
         // First, try to get behavior from the node's layout_behavior field (set by builder)
         if let Some(ref behavior_str) = node.layout_behavior {
-            if let Some(behavior) = LayoutBehavior::from_str(behavior_str) {
+            if let Ok(behavior) = behavior_str.parse::<LayoutBehavior>() {
                 return behavior;
             }
         }
 
         // Second, try to derive from primary_role_category
         if let Some(ref category_str) = node.primary_role_category {
-            if let Some(category) = RoleCategory::from_str(category_str) {
+            if let Ok(category) = category_str.parse::<RoleCategory>() {
                 return category.layout_behavior();
             }
         }
@@ -205,6 +214,91 @@ impl LayoutEngine {
             (ViewMode::ServiceDelivery, Orientation::Horizontal) => {
                 self.layout_service_delivery_horizontal(graph)
             }
+            (ViewMode::Trading, Orientation::Vertical) => self.layout_trading_vertical(graph),
+            (ViewMode::Trading, Orientation::Horizontal) => self.layout_trading_horizontal(graph),
+        }
+    }
+
+    /// Trading layout (VERTICAL): CBU at top, trading entities arranged below
+    /// CBU acts as container, entities inside (Asset Owner, IM, ManCo, etc.)
+    fn layout_trading_vertical(&self, graph: &mut CbuGraph) {
+        let center_x = self.config.canvas_width / 2.0;
+        let mut y = self.config.tier_spacing_y;
+
+        // Find CBU node
+        let cbu_idx = graph
+            .nodes
+            .iter()
+            .position(|n| n.node_type == NodeType::Cbu);
+
+        // Position CBU at top center
+        if let Some(idx) = cbu_idx {
+            graph.nodes[idx].x = Some(center_x);
+            graph.nodes[idx].y = Some(y);
+        }
+
+        y += self.config.tier_spacing_y * 1.5;
+
+        // Collect trading entities (non-CBU, non-product)
+        let trading_entities: Vec<usize> = graph
+            .nodes
+            .iter()
+            .enumerate()
+            .filter(|(_, n)| n.node_type != NodeType::Cbu && n.node_type != NodeType::Product)
+            .map(|(i, _)| i)
+            .collect();
+
+        // Arrange trading entities in a grid
+        let cols = 3;
+        let spacing_x = self.config.node_spacing_x * 1.5;
+        let start_x = center_x - (cols as f32 - 1.0) * spacing_x / 2.0;
+
+        for (i, &idx) in trading_entities.iter().enumerate() {
+            let col = i % cols;
+            let row = i / cols;
+            graph.nodes[idx].x = Some(start_x + col as f32 * spacing_x);
+            graph.nodes[idx].y = Some(y + row as f32 * self.config.tier_spacing_y);
+        }
+    }
+
+    /// Trading layout (HORIZONTAL): CBU at left, trading entities to the right
+    fn layout_trading_horizontal(&self, graph: &mut CbuGraph) {
+        let center_y = self.config.canvas_width / 2.0; // Use same config for centering
+        let mut x = self.config.tier_spacing_y;
+
+        // Find CBU node
+        let cbu_idx = graph
+            .nodes
+            .iter()
+            .position(|n| n.node_type == NodeType::Cbu);
+
+        // Position CBU at left center
+        if let Some(idx) = cbu_idx {
+            graph.nodes[idx].x = Some(x);
+            graph.nodes[idx].y = Some(center_y);
+        }
+
+        x += self.config.tier_spacing_y * 1.5;
+
+        // Collect trading entities
+        let trading_entities: Vec<usize> = graph
+            .nodes
+            .iter()
+            .enumerate()
+            .filter(|(_, n)| n.node_type != NodeType::Cbu && n.node_type != NodeType::Product)
+            .map(|(i, _)| i)
+            .collect();
+
+        // Arrange in rows
+        let rows = 3;
+        let spacing_y = self.config.node_spacing_x * 1.5;
+        let start_y = center_y - (rows as f32 - 1.0) * spacing_y / 2.0;
+
+        for (i, &idx) in trading_entities.iter().enumerate() {
+            let row = i % rows;
+            let col = i / rows;
+            graph.nodes[idx].x = Some(x + col as f32 * self.config.tier_spacing_y);
+            graph.nodes[idx].y = Some(start_y + row as f32 * spacing_y);
         }
     }
 

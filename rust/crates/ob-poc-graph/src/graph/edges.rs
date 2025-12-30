@@ -94,7 +94,8 @@ pub fn curve_strength_for_edge(edge_type: EdgeType, _role: Option<&PrimaryRole>)
     match edge_type {
         EdgeType::Owns => 0.15,
         EdgeType::Controls => 0.25,
-        EdgeType::HasRole => 0.0, // straight lines for role edges
+        EdgeType::HasRole => 0.0,     // straight lines for role edges
+        EdgeType::UboTerminus => 0.0, // straight lines for terminus markers
         EdgeType::Other => 0.10,
     }
 }
@@ -125,6 +126,7 @@ pub fn edge_priority(edge_type: EdgeType) -> u32 {
     match edge_type {
         EdgeType::Owns => 100,
         EdgeType::Controls => 90,
+        EdgeType::UboTerminus => 80, // High priority for terminus markers
         EdgeType::HasRole => 50,
         EdgeType::Other => 30,
     }

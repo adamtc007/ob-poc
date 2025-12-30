@@ -715,6 +715,12 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             return Ok(cmd_response);
         }
 
+        // Check for graph filter/view commands (show only shells, filter by type, etc.)
+        if let Some(cmd_response) = self.handle_filter_command(&request.message) {
+            tracing::info!("Handled as filter command");
+            return Ok(cmd_response);
+        }
+
         // Check for DSL management commands (delete, undo, clear, execute)
         if let Some(cmd_response) = self.handle_dsl_command(session, &request.message).await? {
             tracing::info!("Handled as DSL command");
@@ -1239,6 +1245,229 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             "Entities resolved. DSL ready for execution.".to_string(),
         )
         .await
+    }
+
+    /// Handle graph filter and view mode commands.
+    ///
+    /// Recognized patterns:
+    /// - "show only shells" / "filter to shells" → FilterByType
+    /// - "show only people" / "filter to persons" → FilterByType
+    /// - "highlight shells" / "highlight people" → HighlightType
+    /// - "clear filter" / "show all" / "reset filter" → ClearFilter
+    /// - "show kyc view" / "switch to custody view" → SetViewMode
+    ///
+    /// These are deterministic commands (no LLM needed) that control graph visualization.
+    fn handle_filter_command(&self, message: &str) -> Option<AgentChatResponse> {
+        let lower_msg = message.to_lowercase();
+        let words: Vec<&str> = lower_msg.split_whitespace().collect();
+
+        if words.is_empty() {
+            return None;
+        }
+
+        // Clear filter commands
+        if lower_msg.contains("clear filter")
+            || lower_msg.contains("reset filter")
+            || lower_msg.contains("remove filter")
+            || (lower_msg.starts_with("show all") && !lower_msg.contains("show all "))
+            || lower_msg == "show everything"
+            || lower_msg == "unfilter"
+        {
+            tracing::info!("[FILTER_CMD] Matched clear filter command");
+            return Some(AgentChatResponse {
+                message: "Cleared graph filter. Showing all entities.".to_string(),
+                intents: vec![],
+                validation_results: vec![],
+                session_state: SessionState::New,
+                can_execute: false,
+                dsl_source: None,
+                ast: None,
+                disambiguation: None,
+                commands: Some(vec![AgentCommand::ClearFilter]),
+            });
+        }
+
+        // View mode commands: "show kyc view", "switch to custody", "custody view"
+        let view_mode = self.parse_view_mode(&lower_msg);
+        if let Some(mode) = view_mode {
+            tracing::info!("[FILTER_CMD] Matched view mode command: {}", mode);
+            return Some(AgentChatResponse {
+                message: format!("Switched to {} view.", mode),
+                intents: vec![],
+                validation_results: vec![],
+                session_state: SessionState::New,
+                can_execute: false,
+                dsl_source: None,
+                ast: None,
+                disambiguation: None,
+                commands: Some(vec![AgentCommand::SetViewMode { view_mode: mode }]),
+            });
+        }
+
+        // Filter/show only commands: "show only shells", "filter to people"
+        let is_filter_command = lower_msg.contains("show only")
+            || lower_msg.contains("filter to")
+            || lower_msg.contains("filter by")
+            || lower_msg.contains("only show")
+            || (lower_msg.starts_with("filter ") && !lower_msg.contains("filter by type"));
+
+        if is_filter_command {
+            if let Some(type_codes) = self.parse_entity_types(&lower_msg) {
+                tracing::info!("[FILTER_CMD] Matched filter command: {:?}", type_codes);
+                let type_names = type_codes.join(", ");
+                return Some(AgentChatResponse {
+                    message: format!("Filtering graph to show only: {}", type_names),
+                    intents: vec![],
+                    validation_results: vec![],
+                    session_state: SessionState::New,
+                    can_execute: false,
+                    dsl_source: None,
+                    ast: None,
+                    disambiguation: None,
+                    commands: Some(vec![AgentCommand::FilterByType { type_codes }]),
+                });
+            }
+        }
+
+        // Highlight commands: "highlight shells", "highlight the people"
+        let is_highlight_command = lower_msg.starts_with("highlight ")
+            || lower_msg.contains("emphasize ")
+            || lower_msg.contains("focus on ");
+
+        if is_highlight_command {
+            if let Some(type_codes) = self.parse_entity_types(&lower_msg) {
+                if let Some(type_code) = type_codes.into_iter().next() {
+                    tracing::info!("[FILTER_CMD] Matched highlight command: {}", type_code);
+                    return Some(AgentChatResponse {
+                        message: format!("Highlighting {} entities in the graph.", type_code),
+                        intents: vec![],
+                        validation_results: vec![],
+                        session_state: SessionState::New,
+                        can_execute: false,
+                        dsl_source: None,
+                        ast: None,
+                        disambiguation: None,
+                        commands: Some(vec![AgentCommand::HighlightType { type_code }]),
+                    });
+                }
+            }
+        }
+
+        // Not a filter command
+        None
+    }
+
+    /// Parse view mode from message text
+    fn parse_view_mode(&self, message: &str) -> Option<String> {
+        // KYC/UBO view
+        if message.contains("kyc view")
+            || message.contains("ubo view")
+            || message.contains("kyc_ubo")
+            || message.contains("ownership view")
+            || (message.contains("switch to") && message.contains("kyc"))
+        {
+            return Some("KYC_UBO".to_string());
+        }
+
+        // Service delivery view
+        if message.contains("service view")
+            || message.contains("service delivery")
+            || message.contains("services view")
+            || message.contains("product view")
+            || (message.contains("switch to") && message.contains("service"))
+        {
+            return Some("SERVICE_DELIVERY".to_string());
+        }
+
+        // Custody view
+        if message.contains("custody view")
+            || message.contains("settlement view")
+            || message.contains("ssi view")
+            || (message.contains("switch to") && message.contains("custody"))
+        {
+            return Some("CUSTODY".to_string());
+        }
+
+        None
+    }
+
+    /// Parse entity type codes from message text
+    /// Returns canonical type codes like "SHELL", "PERSON", "LIMITED_COMPANY"
+    fn parse_entity_types(&self, message: &str) -> Option<Vec<String>> {
+        let mut types = Vec::new();
+
+        // SHELL category and subtypes
+        if message.contains("shell")
+            || message.contains("legal entit")
+            || message.contains("companies")
+            || message.contains("corporations")
+            || message.contains("vehicles")
+        {
+            types.push("SHELL".to_string());
+        }
+
+        // Specific shell subtypes
+        if message.contains("limited compan") || message.contains("ltd") {
+            types.push("LIMITED_COMPANY".to_string());
+        }
+        if message.contains("partnership") {
+            types.push("PARTNERSHIP".to_string());
+        }
+        if message.contains("trust") && !message.contains("distrust") {
+            types.push("TRUST".to_string());
+        }
+        if message.contains("fund") && !message.contains("refund") {
+            types.push("FUND".to_string());
+        }
+        if message.contains("sicav") {
+            types.push("SICAV".to_string());
+        }
+
+        // PERSON category and subtypes
+        if message.contains("person")
+            || message.contains("people")
+            || message.contains("natural person")
+            || message.contains("individual")
+        {
+            types.push("PERSON".to_string());
+        }
+
+        // Specific person subtypes
+        if message.contains("proper person") {
+            types.push("PROPER_PERSON".to_string());
+        }
+        if message.contains("ubo") || message.contains("beneficial owner") {
+            types.push("UBO".to_string());
+        }
+        if message.contains("director") {
+            types.push("DIRECTOR".to_string());
+        }
+
+        // SERVICE_LAYER category
+        if message.contains("service") && !message.contains("service delivery") {
+            types.push("SERVICE_LAYER".to_string());
+        }
+        if message.contains("product") && !message.contains("product view") {
+            types.push("PRODUCT".to_string());
+        }
+        if message.contains("resource") {
+            types.push("RESOURCE".to_string());
+        }
+
+        // CBU
+        if message.contains("cbu") || message.contains("client business unit") {
+            types.push("CBU".to_string());
+        }
+
+        // Deduplicate and return
+        if types.is_empty() {
+            None
+        } else {
+            // Remove duplicates while preserving order
+            let mut seen = std::collections::HashSet::new();
+            types.retain(|t| seen.insert(t.clone()));
+            Some(types)
+        }
     }
 
     /// Handle "show/load/select CBU" commands

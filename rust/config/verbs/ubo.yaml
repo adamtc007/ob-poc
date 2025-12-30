@@ -129,26 +129,23 @@ domains:
         returns:
           type: affected
       list-owners:
-        description: List owners of an entity (who owns this entity)
-        behavior: crud
-        crud:
-          operation: list_by_fk
-          table: entity_relationships_current
-          schema: ob-poc
-          fk_col: to_entity_id
-          filter:
-            relationship_type: OWNERSHIP
+        description: List owners of an entity as of a specific date
+        behavior: plugin
         args:
           - name: entity-id
             type: uuid
             required: true
-            maps_to: to_entity_id
+            description: Entity to find owners for
             lookup:
               table: entities
               entity_type: entity
               schema: ob-poc
               search_key: name
               primary_key: entity_id
+          - name: as-of-date
+            type: date
+            required: false
+            description: Point-in-time date for temporal query (defaults to today)
         returns:
           type: record_set
       list-owned:
@@ -368,6 +365,43 @@ domains:
             default: 25.0
         returns:
           type: record_set
+
+      trace-chains:
+        description: Trace all ownership and control chains to natural persons for a CBU
+        behavior: plugin
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: CBU to trace ownership chains for
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: target-entity-id
+            type: uuid
+            required: false
+            description: Optional specific entity to trace from (defaults to CBU's main entity)
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: threshold
+            type: decimal
+            required: false
+            default: 25.0
+            description: Minimum ownership percentage to include (default 25%)
+          - name: as-of-date
+            type: date
+            required: false
+            description: Point-in-time date for temporal query (defaults to today)
+        returns:
+          type: record
+
       # DEPRECATED: With the new convergence model, ownership changes are handled by
       # ending the old relationship (ubo.end-ownership) and creating a new one (ubo.add-ownership).
       # Verification status is tracked per-CBU in cbu_relationship_verification.
@@ -638,3 +672,64 @@ domains:
               - SENIOR_APPROVAL
         returns:
           type: record
+
+      # =========================================================================
+      # UBO Chain Terminus - Mark where ownership chain terminates
+      # =========================================================================
+
+      mark-terminus:
+        description: Mark an entity as a UBO chain terminus (ownership tracing stops here)
+        behavior: crud
+        crud:
+          operation: upsert
+          table: entity_relationships
+          schema: ob-poc
+          returning: relationship_id
+          conflict_keys:
+            - from_entity_id
+            - to_entity_id
+            - relationship_type
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            description: The entity that is the terminus (e.g., public company, government)
+            maps_to: from_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: terminus-type
+            type: string
+            required: true
+            description: Why the chain terminates here
+            maps_to: control_type
+            valid_values:
+              - LISTED_COMPANY
+              - GOVERNMENT_ENTITY
+              - REGULATED_FUND
+              - WIDELY_HELD
+              - EXCHANGE_TRADED
+          - name: exchange
+            type: string
+            required: false
+            description: Stock exchange code if listed (e.g., NYSE, XETRA, LSE)
+            maps_to: notes
+          - name: lei
+            type: string
+            required: false
+            description: LEI of the public company
+          - name: effective-from
+            type: date
+            required: false
+            maps_to: effective_from
+        defaults:
+          relationship_type: UBO_TERMINUS
+          to_entity_id: "00000000-0000-0000-0000-000000000000"
+          source: DSL
+        returns:
+          type: uuid
+          name: relationship_id
+          capture: true

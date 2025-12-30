@@ -1078,26 +1078,38 @@ impl GenericCrudExecutor {
             .map(|c| format!("\"{}\"", c))
             .collect();
 
-        let update_clause = if updates.is_empty() {
-            format!("\"{}\" = EXCLUDED.\"{}\"", pk_col, pk_col)
-        } else {
-            updates.join(", ")
-        };
-
         let returning = crud.returning.as_deref().unwrap_or(pk_col);
 
-        let sql = format!(
-            r#"INSERT INTO "{}"."{}" ({}) VALUES ({})
-               ON CONFLICT ({}) DO UPDATE SET {}
-               RETURNING "{}""#,
-            crud.schema,
-            crud.table,
-            columns.join(", "),
-            placeholders.join(", "),
-            conflict_cols.join(", "),
-            update_clause,
-            returning
-        );
+        // If no columns to update, use DO UPDATE SET updated_at (harmless no-op that returns the row)
+        // We can't use DO NOTHING because it doesn't return the existing row
+        let sql = if updates.is_empty() {
+            format!(
+                r#"INSERT INTO "{}"."{}" ({}) VALUES ({})
+                   ON CONFLICT ({}) DO UPDATE SET "updated_at" = COALESCE("{}"."{}"."updated_at", now())
+                   RETURNING "{}""#,
+                crud.schema,
+                crud.table,
+                columns.join(", "),
+                placeholders.join(", "),
+                conflict_cols.join(", "),
+                crud.schema,
+                crud.table,
+                returning
+            )
+        } else {
+            format!(
+                r#"INSERT INTO "{}"."{}" ({}) VALUES ({})
+                   ON CONFLICT ({}) DO UPDATE SET {}
+                   RETURNING "{}""#,
+                crud.schema,
+                crud.table,
+                columns.join(", "),
+                placeholders.join(", "),
+                conflict_cols.join(", "),
+                updates.join(", "),
+                returning
+            )
+        };
 
         debug!("UPSERT SQL: {}", sql);
 
@@ -1566,7 +1578,14 @@ impl GenericCrudExecutor {
             .get(&fk_arg.name)
             .ok_or_else(|| anyhow!("Missing FK argument"))?;
 
-        // Join to get enriched party data
+        // Check for optional as-of-date parameter (defaults to today)
+        let as_of_date = args
+            .get("as-of-date")
+            .and_then(|v| v.as_str())
+            .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
+            .unwrap_or_else(|| chrono::Utc::now().date_naive());
+
+        // Join to get enriched party data with temporal filtering
         let sql = format!(
             r#"SELECT
                 cer.cbu_entity_role_id,
@@ -1583,14 +1602,18 @@ impl GenericCrudExecutor {
             JOIN "{}".entity_types et ON et.entity_type_id = e.entity_type_id
             JOIN "{}".roles r ON r.role_id = cer.role_id
             WHERE cer."{}" = $1
+            AND (cer.effective_from IS NULL OR cer.effective_from <= $2)
+            AND (cer.effective_to IS NULL OR cer.effective_to >= $2)
             ORDER BY e.name, r.name"#,
             crud.schema, junction, crud.schema, crud.schema, crud.schema, fk_col
         );
 
-        debug!("LIST_PARTIES SQL: {}", sql);
+        debug!("LIST_PARTIES SQL: {} (as_of: {})", sql, as_of_date);
 
         let sql_val = self.json_to_sql_value(fk_value, fk_arg)?;
-        let rows = self.execute_many_with_bindings(&sql, &[sql_val]).await?;
+        let rows = self
+            .execute_many_with_bindings(&sql, &[sql_val, SqlValue::Date(as_of_date)])
+            .await?;
 
         let records: Result<Vec<JsonValue>> = rows.iter().map(|r| self.row_to_json(r)).collect();
         Ok(GenericExecutionResult::RecordSet(records?))
@@ -1997,16 +2020,10 @@ impl GenericCrudExecutor {
         // Build UPSERT for extension table
         // Conflict key priority:
         // 1. ISIN if present (for share classes with unique ISIN constraint)
-        // 2. entity_id for shared PK tables
-        // 3. The extension table's own PK for separate PK tables
+        // 2. entity_id - always use this for entity extension tables since they have
+        //    a unique constraint on entity_id (the FK to base entities table)
         let has_isin = columns.iter().any(|c| c == "\"isin\"");
-        let conflict_col = if has_isin {
-            "isin"
-        } else if uses_shared_pk {
-            "entity_id"
-        } else {
-            ext_pk_col
-        };
+        let conflict_col = if has_isin { "isin" } else { "entity_id" };
 
         let ext_sql = if update_cols.is_empty() {
             // No updateable columns - just DO NOTHING on conflict

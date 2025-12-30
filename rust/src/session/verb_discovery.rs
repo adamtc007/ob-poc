@@ -115,6 +115,8 @@ impl DiscoveryQuery {
 }
 
 /// DB row for verb discovery
+/// Fields are required for SQLx query binding even if not directly used in Rust code
+#[allow(dead_code)]
 #[derive(Debug, Clone, sqlx::FromRow)]
 struct VerbRow {
     pub full_name: String,
@@ -131,6 +133,8 @@ struct VerbRow {
 }
 
 /// DB row for full-text search results (includes rank)
+/// Fields are required for SQLx query binding even if not directly used in Rust code
+#[allow(dead_code)]
 #[derive(Debug, Clone, sqlx::FromRow)]
 struct VerbRowWithRank {
     pub full_name: String,

@@ -14,7 +14,7 @@
 
 use crate::panels::ContainerBrowseState;
 use crate::tokens::TokenRegistry;
-use ob_poc_graph::{CbuGraphData, CbuGraphWidget, ViewMode};
+use ob_poc_graph::{CbuGraphData, CbuGraphWidget, EntityTypeOntology, TaxonomyState, ViewMode};
 use ob_poc_types::{
     CbuSummary, ExecuteResponse, ResolutionSearchResponse, ResolutionSessionResponse,
     SessionContext, SessionStateResponse, ValidateDslResponse,
@@ -118,6 +118,15 @@ pub struct AppState {
     /// Graph widget (owns camera, input state - rendering only)
     pub graph_widget: CbuGraphWidget,
 
+    /// Entity type ontology (hierarchical type classification)
+    pub entity_ontology: EntityTypeOntology,
+
+    /// Taxonomy browser state (expand/collapse, selection)
+    pub taxonomy_state: TaxonomyState,
+
+    /// Active type filter (None = show all, Some = filter to type)
+    pub type_filter: Option<String>,
+
     // =========================================================================
     // ASYNC COORDINATION
     // =========================================================================
@@ -157,6 +166,9 @@ impl Default for AppState {
                 TokenRegistry::new()
             }),
             graph_widget: CbuGraphWidget::new(),
+            entity_ontology: EntityTypeOntology::new(),
+            taxonomy_state: TaxonomyState::new(),
+            type_filter: None,
 
             // Async coordination
             async_state: Arc::new(Mutex::new(AsyncState::default())),
@@ -298,6 +310,12 @@ pub struct AsyncState {
     // Command triggers (from agent commands)
     pub pending_execute: Option<Uuid>, // Session ID to execute
 
+    // Graph filter commands (from agent chat)
+    pub pending_filter_by_type: Option<Vec<String>>, // Type codes to filter
+    pub pending_highlight_type: Option<String>,      // Type code to highlight
+    pub pending_clear_filter: bool,                  // Clear all filters
+    pub pending_view_mode: Option<String>,           // View mode to set
+
     // State change flags (set by actions, processed centrally in update loop)
     // These are checked ONCE in update() AFTER process_async_results()
     pub needs_graph_refetch: bool, // CBU selected or view mode changed
@@ -385,6 +403,18 @@ impl AppState {
                     );
                     self.graph_widget.set_data(data.clone());
                     self.graph_data = Some(data);
+
+                    // Populate ontology counts from graph data
+                    if let Some(layout_graph) = self.graph_widget.get_layout_graph() {
+                        self.entity_ontology.populate_counts(layout_graph);
+                        web_sys::console::log_1(
+                            &format!(
+                                "process_async_results: ontology populated, root count={}",
+                                self.entity_ontology.root.total_count
+                            )
+                            .into(),
+                        );
+                    }
                 }
                 Err(e) => {
                     web_sys::console::error_1(&format!("Graph fetch failed: {}", e).into());
@@ -558,6 +588,44 @@ impl AppState {
         true
     }
 
+    /// Check if a filter by type command is pending
+    pub fn take_pending_filter_by_type(&self) -> Option<Vec<String>> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_filter_by_type.take()
+        } else {
+            None
+        }
+    }
+
+    /// Check if a highlight type command is pending
+    pub fn take_pending_highlight_type(&self) -> Option<String> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_highlight_type.take()
+        } else {
+            None
+        }
+    }
+
+    /// Check if a clear filter command is pending
+    pub fn take_pending_clear_filter(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_clear_filter;
+            state.pending_clear_filter = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    /// Check if a view mode change command is pending
+    pub fn take_pending_view_mode(&self) -> Option<String> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_view_mode.take()
+        } else {
+            None
+        }
+    }
+
     /// Add a user message to the chat history
     pub fn add_user_message(&mut self, content: String) {
         self.messages.push(ChatMessage {
@@ -691,4 +759,13 @@ impl AppState {
             }
         });
     }
+}
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+/// Parse view mode from string (used by agent commands)
+pub fn parse_view_mode(s: &str) -> Option<ViewMode> {
+    ViewMode::from_str(s)
 }

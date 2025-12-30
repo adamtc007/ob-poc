@@ -195,6 +195,25 @@ enum Command {
         #[arg(long, short = 'n')]
         dry_run: bool,
     },
+
+    /// Load Allianz structure via DSL (clean + execute DSL file)
+    EtlAllianz {
+        /// DSL file to execute (default: data/derived/dsl/allianz_full_etl.dsl)
+        #[arg(long, short = 'f')]
+        file: Option<std::path::PathBuf>,
+
+        /// Skip cleaning existing data
+        #[arg(long)]
+        no_clean: bool,
+
+        /// Dry run - validate DSL without executing
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Skip regenerating DSL from sources (use existing file)
+        #[arg(long)]
+        no_regen: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -260,6 +279,12 @@ fn main() -> Result<()> {
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(gleif_import::gleif_import(&search, limit, dry_run))
         }
+        Command::EtlAllianz {
+            file,
+            no_clean,
+            dry_run,
+            no_regen,
+        } => etl_allianz(&sh, file, no_clean, dry_run, no_regen),
     }
 }
 
@@ -803,5 +828,86 @@ async fn execute_dsl_simple(dsl: &str, pool: &sqlx::PgPool) -> Result<()> {
         .await?;
 
     tx.commit().await?;
+    Ok(())
+}
+
+
+/// Load Allianz structure via DSL (clean existing data + execute DSL file)
+fn etl_allianz(
+    sh: &Shell,
+    file: Option<std::path::PathBuf>,
+    no_clean: bool,
+    dry_run: bool,
+    no_regen: bool,
+) -> Result<()> {
+    println!("===========================================");
+    println!("  Allianz ETL via DSL");
+    println!("===========================================\n");
+
+    let root = project_root()?;
+
+    // Default DSL file
+    let dsl_file = file.unwrap_or_else(|| {
+        root.join("data/derived/dsl/allianz_full_etl.dsl")
+    });
+
+    // Step 1: Regenerate DSL from sources (unless --no-regen)
+    if !no_regen {
+        println!("Step 1: Regenerating DSL from GLEIF + scraped fund data...");
+        sh.change_dir(&root);
+        cmd!(sh, "python3 scripts/generate_allianz_full_dsl.py")
+            .run()
+            .context("Failed to regenerate DSL")?;
+        println!();
+    } else {
+        println!("Step 1: Skipped regeneration (--no-regen)\n");
+    }
+
+    if !dsl_file.exists() {
+        anyhow::bail!("DSL file not found: {}", dsl_file.display());
+    }
+
+    println!("DSL file: {}\n", dsl_file.display());
+
+    // Step 2: Clean existing data (unless --no-clean)
+    if !no_clean {
+        println!("Step 2: Cleaning existing Allianz data...");
+        let rt = tokio::runtime::Runtime::new()?;
+        rt.block_on(seed_allianz::clean_allianz(false))?;
+        println!();
+    } else {
+        println!("Step 2: Skipped (--no-clean)\n");
+    }
+
+    // Step 3: Run DSL
+    let action = if dry_run { "Validating" } else { "Executing" };
+    println!("Step 3: {} DSL...\n", action);
+
+    sh.change_dir(root.join("rust"));
+
+    let dsl_path = dsl_file.to_str().context("Invalid DSL path")?;
+    let db_url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgresql:///data_designer".to_string());
+
+    if dry_run {
+        // Just validate/plan
+        cmd!(sh, "cargo run --bin dsl_cli --features database,cli -- plan --db-url {db_url} --file {dsl_path}")
+            .run()
+            .context("DSL validation failed")?;
+    } else {
+        // Execute
+        cmd!(sh, "cargo run --bin dsl_cli --features database,cli -- execute --db-url {db_url} --file {dsl_path}")
+            .run()
+            .context("DSL execution failed")?;
+    }
+
+    println!("\n===========================================");
+    if dry_run {
+        println!("  Validation complete (dry run)");
+    } else {
+        println!("  ETL complete");
+    }
+    println!("===========================================");
+
     Ok(())
 }

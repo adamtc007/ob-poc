@@ -41,6 +41,7 @@ mod screening_ops;
 mod semantic_ops;
 mod team_ops;
 pub mod template_ops;
+mod temporal_ops;
 mod threshold;
 mod trading_matrix;
 mod trading_profile;
@@ -92,6 +93,11 @@ pub use semantic_ops::{
 pub use template_ops::{
     TemplateBatchOp, TemplateBatchResult, TemplateInvokeOp, TemplateInvokeResult,
 };
+pub use temporal_ops::{
+    TemporalCbuRelationshipsAsOfOp, TemporalCbuRolesAsOfOp, TemporalCbuStateAtApprovalOp,
+    TemporalCompareOwnershipOp, TemporalEntityHistoryOp, TemporalOwnershipAsOfOp,
+    TemporalRelationshipHistoryOp, TemporalUboChainAsOfOp,
+};
 pub use threshold::{ThresholdCheckEntityOp, ThresholdDeriveOp, ThresholdEvaluateOp};
 pub use trading_matrix::{FindImForTradeOp, FindPricingForInstrumentOp, ListOpenSlaBreachesOp};
 pub use trading_profile::{
@@ -100,7 +106,7 @@ pub use trading_profile::{
 };
 pub use ubo_analysis::{
     UboCalculateOp, UboCheckCompletenessOp, UboCompareSnapshotOp, UboDiscoverOwnerOp,
-    UboInferChainOp, UboSnapshotCbuOp, UboSupersedeOp, UboTraceChainsOp,
+    UboInferChainOp, UboListOwnersOp, UboSnapshotCbuOp, UboSupersedeOp, UboTraceChainsOp,
 };
 
 // Domain-specific operation modules
@@ -273,6 +279,7 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(UboDiscoverOwnerOp));
         registry.register(Arc::new(UboInferChainOp));
         registry.register(Arc::new(UboTraceChainsOp));
+        registry.register(Arc::new(UboListOwnersOp));
         registry.register(Arc::new(UboCheckCompletenessOp));
         registry.register(Arc::new(UboSupersedeOp));
         registry.register(Arc::new(UboSnapshotCbuOp));
@@ -401,6 +408,16 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(AccessReviewProcessDeadlineOp));
         registry.register(Arc::new(AccessReviewSendRemindersOp));
 
+        // Temporal operations (point-in-time queries for regulatory lookback)
+        registry.register(Arc::new(TemporalOwnershipAsOfOp));
+        registry.register(Arc::new(TemporalUboChainAsOfOp));
+        registry.register(Arc::new(TemporalCbuRelationshipsAsOfOp));
+        registry.register(Arc::new(TemporalCbuRolesAsOfOp));
+        registry.register(Arc::new(TemporalCbuStateAtApprovalOp));
+        registry.register(Arc::new(TemporalRelationshipHistoryOp));
+        registry.register(Arc::new(TemporalEntityHistoryOp));
+        registry.register(Arc::new(TemporalCompareOwnershipOp));
+
         registry
     }
 
@@ -525,6 +542,15 @@ mod tests {
         assert!(registry.has("access-review", "attest"));
         assert!(registry.has("access-review", "process-deadline"));
         assert!(registry.has("access-review", "send-reminders"));
+        // Temporal operations (point-in-time queries)
+        assert!(registry.has("temporal", "ownership-as-of"));
+        assert!(registry.has("temporal", "ubo-chain-as-of"));
+        assert!(registry.has("temporal", "cbu-relationships-as-of"));
+        assert!(registry.has("temporal", "cbu-roles-as-of"));
+        assert!(registry.has("temporal", "cbu-state-at-approval"));
+        assert!(registry.has("temporal", "relationship-history"));
+        assert!(registry.has("temporal", "entity-history"));
+        assert!(registry.has("temporal", "compare-ownership"));
     }
 
     #[test]

@@ -10,7 +10,13 @@ use uuid::Uuid;
 
 use crate::database::VisualizationRepository;
 
-use super::types::*;
+// Use legacy types for backward compatibility during transition to EntityGraph
+use super::types::{
+    CbuGraph, EdgeType, GraphEdge, LayerType, LegacyGraphNode, NodeStatus, NodeType,
+};
+
+// Re-export as GraphNode for this module
+type GraphNode = LegacyGraphNode;
 
 /// Builder for constructing CbuGraph from database
 pub struct CbuGraphBuilder {
@@ -180,7 +186,7 @@ impl CbuGraphBuilder {
                 let layout_behavior = ent
                     .primary_role_category
                     .as_ref()
-                    .and_then(|cat| crate::graph::RoleCategory::from_str(cat))
+                    .and_then(|cat| cat.parse::<crate::graph::RoleCategory>().ok())
                     .map(|cat| format!("{:?}", cat.layout_behavior()).to_lowercase());
 
                 graph.add_node(GraphNode {

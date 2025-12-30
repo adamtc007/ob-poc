@@ -38,6 +38,8 @@ pub mod camera;
 pub mod colors;
 pub mod edges;
 pub mod focus_card;
+pub mod force_sim;
+pub mod galaxy;
 pub mod input;
 pub mod layout;
 pub mod lod;
@@ -48,6 +50,8 @@ pub mod types;
 pub use animation::{SpringConfig, SpringF32, SpringVec2};
 pub use astronomy::{AstronomyView, NavigationEntry, TransitionAction, ViewTransition};
 pub use camera::Camera2D;
+pub use force_sim::{ClusterNode, ForceConfig, ForceSimulation};
+pub use galaxy::{ClusterData, ClusterType, GalaxyAction, GalaxyView, RiskSummary};
 pub use input::{InputHandler, InputState};
 pub use layout::LayoutEngine;
 pub use ontology::{
@@ -67,6 +71,8 @@ pub enum ViewMode {
     ServiceDelivery,
     /// Products only view - simplified product overview
     ProductsOnly,
+    /// Trading view - CBU as container with trading entities (Asset Owner, IM, ManCo, etc.)
+    Trading,
 }
 
 impl ViewMode {
@@ -76,6 +82,7 @@ impl ViewMode {
             ViewMode::KycUbo => "KYC_UBO",
             ViewMode::ServiceDelivery => "SERVICE_DELIVERY",
             ViewMode::ProductsOnly => "PRODUCTS_ONLY",
+            ViewMode::Trading => "TRADING",
         }
     }
 
@@ -85,16 +92,29 @@ impl ViewMode {
             ViewMode::KycUbo => "KYC / UBO",
             ViewMode::ServiceDelivery => "Services",
             ViewMode::ProductsOnly => "Products",
+            ViewMode::Trading => "Trading",
         }
     }
 
-    /// Get all available view modes
+    /// Get all available view modes (in display order)
     pub fn all() -> &'static [ViewMode] {
         &[
             ViewMode::KycUbo,
-            ViewMode::ServiceDelivery,
+            ViewMode::Trading,
             ViewMode::ProductsOnly,
+            ViewMode::ServiceDelivery,
         ]
+    }
+
+    /// Parse from API string representation
+    pub fn from_str(s: &str) -> Option<ViewMode> {
+        match s.to_uppercase().as_str() {
+            "KYC_UBO" | "KYCUBO" | "KYC" | "UBO" => Some(ViewMode::KycUbo),
+            "SERVICE_DELIVERY" | "SERVICEDELIVERY" | "SERVICES" => Some(ViewMode::ServiceDelivery),
+            "PRODUCTS_ONLY" | "PRODUCTSONLY" | "PRODUCTS" => Some(ViewMode::ProductsOnly),
+            "TRADING" | "CUSTODY" => Some(ViewMode::Trading),
+            _ => None,
+        }
     }
 }
 
@@ -148,6 +168,10 @@ pub struct CbuGraphWidget {
     view_mode: ViewMode,
     /// Whether to auto-fit on first render
     needs_initial_fit: bool,
+    /// Type filter - if set, only show nodes matching this type (and their connected edges)
+    type_filter: Option<String>,
+    /// Highlighted type - nodes of this type are highlighted but others still visible
+    highlighted_type: Option<String>,
 }
 
 impl Default for CbuGraphWidget {
@@ -166,6 +190,8 @@ impl CbuGraphWidget {
             renderer: GraphRenderer::new(),
             view_mode: ViewMode::KycUbo,
             needs_initial_fit: true,
+            type_filter: None,
+            highlighted_type: None,
         }
     }
 
@@ -315,6 +341,38 @@ impl CbuGraphWidget {
         self.view_mode
     }
 
+    /// Set type filter - only nodes matching this type (and connected edges) are fully visible
+    /// Other nodes are rendered with reduced opacity
+    pub fn set_type_filter(&mut self, type_code: Option<String>) {
+        self.type_filter = type_code;
+    }
+
+    /// Get current type filter
+    pub fn type_filter(&self) -> Option<&str> {
+        self.type_filter.as_deref()
+    }
+
+    /// Set highlighted type - nodes of this type are highlighted but others still visible
+    pub fn set_highlighted_type(&mut self, type_code: Option<String>) {
+        self.highlighted_type = type_code;
+    }
+
+    /// Get current highlighted type
+    pub fn highlighted_type(&self) -> Option<&str> {
+        self.highlighted_type.as_deref()
+    }
+
+    /// Clear all type-based filtering and highlighting
+    pub fn clear_type_filter(&mut self) {
+        self.type_filter = None;
+        self.highlighted_type = None;
+    }
+
+    /// Get reference to layout graph (for ontology population)
+    pub fn get_layout_graph(&self) -> Option<&LayoutGraph> {
+        self.layout_graph.as_ref()
+    }
+
     /// Get focused node ID
     pub fn focused_node(&self) -> Option<&str> {
         self.input_state.focused_node.as_deref()
@@ -433,13 +491,15 @@ impl CbuGraphWidget {
         ui.ctx()
             .set_cursor_icon(input::cursor_for_state(&self.input_state));
 
-        // Render graph
+        // Render graph with type filter support
         self.renderer.render(
             &painter,
             graph,
             &self.camera,
             screen_rect,
             self.input_state.focused_node.as_deref(),
+            self.type_filter.as_deref(),
+            self.highlighted_type.as_deref(),
         );
 
         // Render UI chrome (stats, controls)

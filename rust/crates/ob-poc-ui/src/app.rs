@@ -8,9 +8,9 @@
 use crate::api;
 use crate::panels::{
     ast_panel, cbu_search_modal, chat_panel, container_browse_panel, context_panel,
-    dsl_editor_panel, entity_detail_panel, repl_panel, results_panel, toolbar, CbuSearchAction,
-    CbuSearchData, ContainerBrowseAction, ContainerBrowseData, ContextPanelAction, DslEditorAction,
-    ToolbarAction, ToolbarData,
+    dsl_editor_panel, entity_detail_panel, repl_panel, results_panel, taxonomy_panel, toolbar,
+    CbuSearchAction, CbuSearchData, ContainerBrowseAction, ContainerBrowseData, ContextPanelAction,
+    DslEditorAction, TaxonomyPanelAction, ToolbarAction, ToolbarData,
 };
 use crate::state::{AppState, AsyncState, CbuSearchUi, LayoutMode, PanelState, TextBuffers};
 use ob_poc_graph::{CbuGraphWidget, ViewMode};
@@ -53,6 +53,9 @@ impl App {
             graph_widget: CbuGraphWidget::new(),
             async_state: Arc::new(Mutex::new(AsyncState::default())),
             ctx: Some(cc.egui_ctx.clone()),
+            entity_ontology: ob_poc_graph::EntityTypeOntology::new(),
+            taxonomy_state: ob_poc_graph::TaxonomyState::new(),
+            type_filter: None,
         };
 
         // Try to restore session from localStorage
@@ -123,6 +126,60 @@ impl eframe::App for App {
                 // Fallback to server state
                 self.state.execute_session(session_id);
             }
+        }
+
+        // =================================================================
+        // Process graph filter commands from agent chat
+        // =================================================================
+
+        // Handle clear filter command
+        if self.state.take_pending_clear_filter() {
+            web_sys::console::log_1(&"update: clearing graph filter".into());
+            self.state.type_filter = None;
+            self.state.taxonomy_state.select(None);
+            self.state.graph_widget.clear_type_filter();
+        }
+
+        // Handle view mode change command
+        if let Some(view_mode_str) = self.state.take_pending_view_mode() {
+            web_sys::console::log_1(
+                &format!("update: setting view mode to {}", view_mode_str).into(),
+            );
+            if let Some(mode) = crate::state::parse_view_mode(&view_mode_str) {
+                self.state.set_view_mode(mode);
+            } else {
+                web_sys::console::warn_1(
+                    &format!("update: unknown view mode '{}'", view_mode_str).into(),
+                );
+            }
+        }
+
+        // Handle filter by type command
+        if let Some(type_codes) = self.state.take_pending_filter_by_type() {
+            web_sys::console::log_1(
+                &format!("update: filtering graph to types {:?}", type_codes).into(),
+            );
+            if let Some(first_code) = type_codes.first() {
+                // Apply the filter to graph (uses first type code for now)
+                self.state.type_filter = Some(first_code.clone());
+                self.state.taxonomy_state.select(Some(first_code));
+                self.state
+                    .graph_widget
+                    .set_type_filter(Some(first_code.clone()));
+                // Also highlight for visual emphasis
+                self.state
+                    .graph_widget
+                    .set_highlighted_type(Some(first_code.clone()));
+            }
+        }
+
+        // Handle highlight type command (no filter, just visual emphasis)
+        if let Some(type_code) = self.state.take_pending_highlight_type() {
+            web_sys::console::log_1(&format!("update: highlighting type {}", type_code).into());
+            self.state.taxonomy_state.select(Some(&type_code));
+            self.state
+                .graph_widget
+                .set_highlighted_type(Some(type_code));
         }
 
         // =================================================================
@@ -542,6 +599,51 @@ impl App {
         }
     }
 
+    /// Handle taxonomy browser actions (type selection, filtering)
+    fn handle_taxonomy_action(&mut self, action: TaxonomyPanelAction) {
+        match action {
+            TaxonomyPanelAction::None => {}
+            TaxonomyPanelAction::ToggleExpand { type_code } => {
+                self.state.taxonomy_state.toggle(&type_code);
+            }
+            TaxonomyPanelAction::SelectType { type_code } => {
+                web_sys::console::log_1(&format!("Taxonomy: Select type {}", type_code).into());
+                self.state.taxonomy_state.select(Some(&type_code));
+                // Highlight matching entities in graph (single-click = highlight, not filter)
+                self.state
+                    .graph_widget
+                    .set_highlighted_type(Some(type_code));
+            }
+            TaxonomyPanelAction::ClearSelection => {
+                self.state.taxonomy_state.select(None);
+                self.state.type_filter = None;
+                // Clear both highlight and filter on graph
+                self.state.graph_widget.clear_type_filter();
+            }
+            TaxonomyPanelAction::FilterToType { type_code } => {
+                web_sys::console::log_1(&format!("Taxonomy: Filter to type {}", type_code).into());
+                self.state.type_filter = Some(type_code.clone());
+                self.state.taxonomy_state.select(Some(&type_code));
+                // Apply hard filter to graph (double-click = filter, dims non-matching)
+                self.state
+                    .graph_widget
+                    .set_type_filter(Some(type_code.clone()));
+                // Also set as highlighted for visual emphasis
+                self.state
+                    .graph_widget
+                    .set_highlighted_type(Some(type_code));
+            }
+            TaxonomyPanelAction::ExpandAll => {
+                self.state
+                    .taxonomy_state
+                    .expand_to_depth(&self.state.entity_ontology, 10);
+            }
+            TaxonomyPanelAction::CollapseAll => {
+                self.state.taxonomy_state.collapse_all();
+            }
+        }
+    }
+
     /// Render layout:
     /// - Top 50%: Graph (full width)
     /// - Bottom left 60%: Unified REPL (chat + resolution + DSL)
@@ -551,15 +653,39 @@ impl App {
         let top_height = available.y * 0.5;
         let bottom_height = available.y * 0.5 - 4.0;
 
-        // Top: Graph (full width, 50% height)
-        ui.allocate_ui(egui::vec2(available.x, top_height), |ui| {
-            egui::Frame::default()
-                .inner_margin(0.0)
-                .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
-                .show(ui, |ui| {
-                    self.state.graph_widget.ui(ui);
-                });
-        });
+        // Top: Graph (full width, 50% height) with taxonomy browser overlay
+        let taxonomy_action = ui
+            .allocate_ui(egui::vec2(available.x, top_height), |ui| {
+                egui::Frame::default()
+                    .inner_margin(0.0)
+                    .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
+                    .show(ui, |ui| {
+                        // Horizontal split: taxonomy browser (left) + graph (right)
+                        ui.horizontal(|ui| {
+                            // Taxonomy browser (collapsible, 180px when open)
+                            let taxonomy_width = 180.0;
+                            let action = ui
+                                .allocate_ui(
+                                    egui::vec2(taxonomy_width, ui.available_height()),
+                                    |ui| taxonomy_panel(ui, &self.state, ui.available_height()),
+                                )
+                                .inner;
+
+                            // Graph takes remaining space
+                            ui.vertical(|ui| {
+                                self.state.graph_widget.ui(ui);
+                            });
+
+                            action
+                        })
+                        .inner
+                    })
+                    .inner
+            })
+            .inner;
+
+        // Handle taxonomy actions AFTER rendering (Rule 2)
+        self.handle_taxonomy_action(taxonomy_action);
 
         ui.separator();
 
@@ -1002,6 +1128,41 @@ impl AppState {
                                                 .into(),
                                         );
                                         // TODO: Focus AST node
+                                    }
+                                    // Graph filtering commands - store in AsyncState for processing in update loop
+                                    ob_poc_types::AgentCommand::FilterByType { type_codes } => {
+                                        web_sys::console::log_1(
+                                            &format!(
+                                                "Command: FilterByType type_codes={:?}",
+                                                type_codes
+                                            )
+                                            .into(),
+                                        );
+                                        state.pending_filter_by_type = Some(type_codes.clone());
+                                    }
+                                    ob_poc_types::AgentCommand::HighlightType { type_code } => {
+                                        web_sys::console::log_1(
+                                            &format!(
+                                                "Command: HighlightType type_code={}",
+                                                type_code
+                                            )
+                                            .into(),
+                                        );
+                                        state.pending_highlight_type = Some(type_code.clone());
+                                    }
+                                    ob_poc_types::AgentCommand::ClearFilter => {
+                                        web_sys::console::log_1(&"Command: ClearFilter".into());
+                                        state.pending_clear_filter = true;
+                                    }
+                                    ob_poc_types::AgentCommand::SetViewMode { view_mode } => {
+                                        web_sys::console::log_1(
+                                            &format!(
+                                                "Command: SetViewMode view_mode={}",
+                                                view_mode
+                                            )
+                                            .into(),
+                                        );
+                                        state.pending_view_mode = Some(view_mode.clone());
                                     }
                                 }
                             }

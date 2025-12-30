@@ -8,7 +8,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use super::types::{EdgeType, GraphEdge, GraphNode, LayerType, NodeType};
+// Use legacy types for backward compatibility during transition to EntityGraph
+use super::types::{EdgeType, GraphEdge, LayerType, LegacyGraphNode, NodeType};
+
+// Re-export as GraphNode for this module
+type GraphNode = LegacyGraphNode;
 
 // =============================================================================
 // GRAPH VIEW MODEL - Output of graph.* verbs

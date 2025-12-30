@@ -14,11 +14,20 @@ pub use graph::{
     // Core graph types
     CbuGraphData,
     CbuGraphWidget,
+    // Galaxy view (cluster visualization with force simulation)
+    ClusterData,
+    ClusterNode,
+    ClusterType,
     // Ontology (type hierarchy browser)
     EntityTypeOntology,
+    ForceConfig,
+    ForceSimulation,
+    GalaxyAction,
+    GalaxyView,
     GraphEdgeData,
     GraphNodeData,
     NavigationEntry,
+    RiskSummary,
     // Animation
     SpringConfig,
     SpringF32,

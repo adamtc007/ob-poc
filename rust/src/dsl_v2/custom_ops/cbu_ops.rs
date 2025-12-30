@@ -337,6 +337,7 @@ impl CustomOperation for CbuShowOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
+        use chrono::NaiveDate;
         use uuid::Uuid;
 
         // Get CBU ID
@@ -357,6 +358,15 @@ impl CustomOperation for CbuShowOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing or invalid cbu-id argument"))?;
 
+        // Get as-of-date (optional, defaults to today)
+        let as_of_date: NaiveDate = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "as-of-date")
+            .and_then(|a| a.value.as_string())
+            .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
+            .unwrap_or_else(|| chrono::Utc::now().date_naive());
+
         // Get basic CBU info
         let cbu = sqlx::query!(
             r#"SELECT cbu_id, name, jurisdiction, client_type, cbu_category,
@@ -368,7 +378,7 @@ impl CustomOperation for CbuShowOp {
         .await?
         .ok_or_else(|| anyhow::anyhow!("CBU not found: {}", cbu_id))?;
 
-        // Get entities with their roles
+        // Get entities with their roles (filtered by as_of_date)
         let entities = sqlx::query!(
             r#"SELECT DISTINCT e.entity_id, e.name, et.type_code as entity_type,
                       COALESCE(lc.jurisdiction, pp.nationality, p.jurisdiction, t.jurisdiction) as jurisdiction
@@ -380,20 +390,26 @@ impl CustomOperation for CbuShowOp {
                LEFT JOIN "ob-poc".entity_partnerships p ON e.entity_id = p.entity_id
                LEFT JOIN "ob-poc".entity_trusts t ON e.entity_id = t.entity_id
                WHERE cer.cbu_id = $1
+               AND (cer.effective_from IS NULL OR cer.effective_from <= $2)
+               AND (cer.effective_to IS NULL OR cer.effective_to >= $2)
                ORDER BY e.name"#,
-            cbu_id
+            cbu_id,
+            as_of_date
         )
         .fetch_all(pool)
         .await?;
 
-        // Get roles per entity
+        // Get roles per entity (filtered by as_of_date)
         let roles = sqlx::query!(
             r#"SELECT cer.entity_id, r.name as role_name
                FROM "ob-poc".cbu_entity_roles cer
                JOIN "ob-poc".roles r ON cer.role_id = r.role_id
                WHERE cer.cbu_id = $1
+               AND (cer.effective_from IS NULL OR cer.effective_from <= $2)
+               AND (cer.effective_to IS NULL OR cer.effective_to >= $2)
                ORDER BY cer.entity_id, r.name"#,
-            cbu_id
+            cbu_id,
+            as_of_date
         )
         .fetch_all(pool)
         .await?;
@@ -536,6 +552,7 @@ impl CustomOperation for CbuShowOp {
             "description": cbu.description,
             "created_at": cbu.created_at.map(|t| t.to_rfc3339()),
             "updated_at": cbu.updated_at.map(|t| t.to_rfc3339()),
+            "as_of_date": as_of_date.to_string(),
             "entities": entity_list,
             "documents": doc_list,
             "screenings": screening_list,

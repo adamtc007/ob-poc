@@ -54,8 +54,7 @@ domains:
             required: false
             maps_to: review_period_end
         produces:
-          binding: campaign
-          type: uuid
+          type: access_review_campaign
 
       populate-campaign:
         description: "Populate campaign with review items based on scope"

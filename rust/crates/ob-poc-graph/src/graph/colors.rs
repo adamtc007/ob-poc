@@ -201,6 +201,7 @@ pub fn edge_color(edge_type: EdgeType) -> Color32 {
         EdgeType::HasRole => Color32::from_rgb(107, 114, 128), // Gray
         EdgeType::Owns => Color32::from_rgb(34, 197, 94),      // Green
         EdgeType::Controls => Color32::from_rgb(251, 191, 36), // Amber
+        EdgeType::UboTerminus => Color32::from_rgb(239, 68, 68), // Red - terminus marker
         EdgeType::Other => Color32::from_rgb(156, 163, 175),   // Light gray
     }
 }

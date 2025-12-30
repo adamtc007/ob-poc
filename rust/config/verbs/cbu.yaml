@@ -370,6 +370,10 @@ domains:
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
+          - name: as-of-date
+            type: date
+            required: false
+            description: Point-in-time date for temporal query (defaults to today)
         returns:
           type: record_set
       set-category:
@@ -442,6 +446,10 @@ domains:
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
+          - name: as-of-date
+            type: date
+            required: false
+            description: Point-in-time date for temporal query (defaults to today)
         returns:
           type: record
           description: Full CBU structure with nested entities, roles, documents, screenings

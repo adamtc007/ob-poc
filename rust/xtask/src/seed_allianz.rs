@@ -410,6 +410,10 @@ async fn clean_allianz_internal(pool: &PgPool) -> Result<()> {
             r#"DELETE FROM "ob-poc".cbu_entity_roles WHERE cbu_id IN (SELECT cbu_id FROM "ob-poc".cbus WHERE name ILIKE 'Allianz%')"#,
             "cbu_entity_roles",
         ),
+        (
+            r#"DELETE FROM "ob-poc".cbu_relationship_verification WHERE cbu_id IN (SELECT cbu_id FROM "ob-poc".cbus WHERE name ILIKE 'Allianz%')"#,
+            "cbu_relationship_verification",
+        ),
     ];
 
     for (query, table_name) in cbu_dependent_tables {
@@ -482,6 +486,10 @@ async fn clean_allianz_internal(pool: &PgPool) -> Result<()> {
         ),
         // Delete ownership and control relationships
         (
+            r#"DELETE FROM "ob-poc".entity_relationships WHERE from_entity_id IN (SELECT entity_id FROM "ob-poc".entities WHERE name ILIKE 'Allianz%') OR to_entity_id IN (SELECT entity_id FROM "ob-poc".entities WHERE name ILIKE 'Allianz%')"#,
+            "entity_relationships",
+        ),
+        (
             r#"DELETE FROM "ob-poc".ownership_relationships WHERE owner_entity_id IN (SELECT entity_id FROM "ob-poc".entities WHERE name ILIKE 'Allianz%') OR owned_entity_id IN (SELECT entity_id FROM "ob-poc".entities WHERE name ILIKE 'Allianz%')"#,
             "ownership_relationships",
         ),
@@ -498,6 +506,11 @@ async fn clean_allianz_internal(pool: &PgPool) -> Result<()> {
         (
             r#"DELETE FROM "ob-poc".entity_kyc_status WHERE entity_id IN (SELECT entity_id FROM "ob-poc".entities WHERE name ILIKE 'Allianz%')"#,
             "entity_kyc_status",
+        ),
+        // Delete entity_relationships (the generic relationship table)
+        (
+            r#"DELETE FROM "ob-poc".entity_relationships WHERE from_entity_id IN (SELECT entity_id FROM "ob-poc".entities WHERE name ILIKE 'Allianz%') OR to_entity_id IN (SELECT entity_id FROM "ob-poc".entities WHERE name ILIKE 'Allianz%')"#,
+            "entity_relationships",
         ),
     ];
 

@@ -1,0 +1,232 @@
+# Temporal Query Domain
+#
+# Provides point-in-time queries for regulatory lookback.
+# Answers: "What did the structure look like on date X?"
+#
+# Uses SQL functions created in migrations/005_temporal_query_layer.sql
+
+domains:
+  temporal:
+    description: Point-in-time queries for historical state lookback
+
+    verbs:
+      # =========================================================================
+      # Ownership Queries
+      # =========================================================================
+
+      ownership-as-of:
+        description: Get ownership relationships for an entity as of a specific date
+        behavior: plugin
+        plugin:
+          handler: temporal_ownership_as_of
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            description: Entity to query ownership for
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: as-of-date
+            type: date
+            required: false
+            default: today
+            description: Point-in-time date (defaults to today)
+        returns:
+          type: record_set
+          description: Ownership relationships valid on that date
+
+      ubo-chain-as-of:
+        description: Trace ownership chain to UBOs as of a specific date
+        behavior: plugin
+        plugin:
+          handler: temporal_ubo_chain_as_of
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            description: Starting entity to trace ownership from
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: as-of-date
+            type: date
+            required: false
+            default: today
+            description: Point-in-time date
+          - name: threshold
+            type: decimal
+            required: false
+            default: 25.0
+            description: Minimum ownership percentage to qualify as UBO
+        returns:
+          type: record_set
+          description: UBO chains with effective percentages
+
+      # =========================================================================
+      # CBU State Queries
+      # =========================================================================
+
+      cbu-relationships-as-of:
+        description: Get all relationships (ownership, control, trust) for a CBU as of a date
+        behavior: plugin
+        plugin:
+          handler: temporal_cbu_relationships_as_of
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: CBU to query
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: as-of-date
+            type: date
+            required: false
+            default: today
+            description: Point-in-time date
+        returns:
+          type: record_set
+          description: All relationships for CBU entities on that date
+
+      cbu-roles-as-of:
+        description: Get entity roles within a CBU as of a specific date
+        behavior: plugin
+        plugin:
+          handler: temporal_cbu_roles_as_of
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: CBU to query
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: as-of-date
+            type: date
+            required: false
+            default: today
+            description: Point-in-time date
+        returns:
+          type: record_set
+          description: Entity-role assignments valid on that date
+
+      cbu-state-at-approval:
+        description: Get CBU state at the time its KYC case was approved
+        behavior: plugin
+        plugin:
+          handler: temporal_cbu_state_at_approval
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: CBU to query
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record_set
+          description: State snapshot from KYC approval date
+
+      # =========================================================================
+      # History/Audit Queries
+      # =========================================================================
+
+      relationship-history:
+        description: Get change history for a specific relationship
+        behavior: plugin
+        plugin:
+          handler: temporal_relationship_history
+        args:
+          - name: relationship-id
+            type: uuid
+            required: true
+            description: Relationship to get history for
+          - name: limit
+            type: integer
+            required: false
+            default: 50
+            description: Maximum records to return
+        returns:
+          type: record_set
+          description: Audit trail of changes to this relationship
+
+      entity-history:
+        description: Get all relationship changes involving an entity
+        behavior: plugin
+        plugin:
+          handler: temporal_entity_history
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            description: Entity to get history for
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: from-date
+            type: date
+            required: false
+            description: Start of date range
+          - name: to-date
+            type: date
+            required: false
+            description: End of date range
+          - name: limit
+            type: integer
+            required: false
+            default: 100
+            description: Maximum records to return
+        returns:
+          type: record_set
+          description: All relationship changes for this entity
+
+      # =========================================================================
+      # Comparison Queries
+      # =========================================================================
+
+      compare-ownership:
+        description: Compare ownership structure between two dates
+        behavior: plugin
+        plugin:
+          handler: temporal_compare_ownership
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            description: Entity to compare
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: date-a
+            type: date
+            required: true
+            description: First comparison date
+          - name: date-b
+            type: date
+            required: true
+            description: Second comparison date
+        returns:
+          type: record
+          description: Diff showing added, removed, and changed relationships

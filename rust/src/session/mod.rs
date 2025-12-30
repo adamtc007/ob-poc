@@ -20,6 +20,7 @@ pub mod agent_context;
 pub mod enhanced_context;
 pub mod scope;
 pub mod verb_discovery;
+pub mod verb_rag_metadata;
 pub mod verb_sync;
 
 use chrono::{DateTime, Utc};
