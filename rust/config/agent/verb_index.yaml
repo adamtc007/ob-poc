@@ -296,6 +296,220 @@ intents:
     priority: 80
 
   # ---------------------------------------------------------------------------
+  # TRADING MATRIX INTENTS
+  # ---------------------------------------------------------------------------
+  # The Trading Matrix consists of: IM Assignment, Pricing Config, SLA, Cash Sweep
+  # Together they define WHO executes trades, HOW pricing is sourced, WHAT service
+  # levels are committed, and HOW cash is managed for a given instrument/market scope.
+
+  assign_investment_manager:
+    patterns:
+      - "assign investment manager"
+      - "add IM"
+      - "link manager to fund"
+      - "set up IM assignment"
+      - "who trades for this fund"
+      - "assign manager"
+      - "configure IM"
+      - "set trading delegation"
+      - "who executes trades"
+    verbs:
+      - investment-manager.assign
+      - investment-manager.set-scope
+      - investment-manager.link-connectivity
+    context: |
+      IM assignments define WHO executes trades for a CBU. Each assignment has:
+      - Scope: which instruments/markets/currencies they trade
+      - Priority: lower = more specific, used for routing
+      - Instruction method: SWIFT, FIX, CTM, etc.
+      - Permissions: can_trade, can_settle, can_affirm
+    priority: 90
+
+  find_im_for_trade:
+    patterns:
+      - "which IM handles"
+      - "who trades equities"
+      - "find manager for"
+      - "route trade to"
+      - "IM routing"
+      - "trading delegation lookup"
+    verbs:
+      - investment-manager.find-for-trade
+      - investment-manager.list
+    context: |
+      Use find-for-trade to discover which IM assignment covers a specific
+      trade's characteristics (instrument class, market, currency, OTC asset class).
+      Returns the matching IM with instruction method for order routing.
+    priority: 85
+
+  configure_pricing:
+    patterns:
+      - "set pricing source"
+      - "configure pricing"
+      - "add pricing config"
+      - "where do we get prices"
+      - "pricing feed"
+      - "set up bloomberg pricing"
+      - "configure reuters"
+      - "valuation source"
+      - "NAV pricing"
+    verbs:
+      - pricing-config.set
+      - pricing-config.link-resource
+      - pricing-config.find-for-instrument
+    context: |
+      Pricing configs define WHERE prices come from for NAV calculation.
+      Key attributes:
+      - Source: BLOOMBERG, REUTERS, MARKIT, REFINITIV, ICE, MODEL, INTERNAL
+      - Price type: CLOSING, MID, BID, ASK, VWAP, OFFICIAL
+      - Fallback: what to use if primary stale
+      - Tolerance: acceptable variance before flagging
+      - Stale action: WARN, BLOCK, USE_FALLBACK, ESCALATE
+    priority: 85
+
+  setup_sla:
+    patterns:
+      - "add sla"
+      - "set service level"
+      - "configure sla"
+      - "sla commitment"
+      - "service level agreement"
+      - "commit to sla"
+      - "settlement sla"
+      - "reporting sla"
+    verbs:
+      - sla.commit
+      - sla.bind-to-service
+      - sla.bind-to-resource
+      - sla.list-templates
+    context: |
+      SLA commitments define WHAT service levels are promised to a client.
+      Templates exist for common SLAs (T+1 settlement, 99.9% uptime, etc.).
+      Commitments can be scoped to specific instruments/markets/currencies.
+      Targets can be overridden from template defaults per CBU.
+    priority: 80
+
+  track_sla:
+    patterns:
+      - "record sla measurement"
+      - "track sla"
+      - "sla breach"
+      - "report breach"
+      - "sla status"
+      - "are we meeting sla"
+      - "sla performance"
+    verbs:
+      - sla.record-measurement
+      - sla.report-breach
+      - sla.list-open-breaches
+      - sla.list-measurements
+    context: |
+      SLA tracking involves periodic measurements against committed targets.
+      Measurements can be MET, WARNING, or BREACH status.
+      Breaches require root cause categorization and remediation planning.
+      Common categories: SYSTEM, VENDOR, MARKET, CLIENT, INTERNAL, EXTERNAL
+    priority: 75
+
+  configure_cash_sweep:
+    patterns:
+      - "set up cash sweep"
+      - "configure sweep"
+      - "cash management"
+      - "stif setup"
+      - "overnight investment"
+      - "money market fund"
+      - "idle cash"
+      - "sweep threshold"
+    verbs:
+      - cash-sweep.configure
+      - cash-sweep.update-threshold
+      - cash-sweep.change-vehicle
+    context: |
+      Cash sweep configs define HOW idle cash is invested per currency.
+      Vehicle types: STIF, MMF, DEPOSIT, OVERNIGHT_REPO, TRI_PARTY_REPO, MANUAL
+      Key settings:
+      - Threshold: minimum balance before sweep
+      - Time/timezone: when sweep runs
+      - Frequency: INTRADAY, DAILY, WEEKLY, MONTHLY
+      - Interest allocation: ACCRUED, MONTHLY, QUARTERLY, REINVEST
+    priority: 75
+
+  # ---------------------------------------------------------------------------
+  # LIFECYCLE & GAP ANALYSIS INTENTS
+  # ---------------------------------------------------------------------------
+  analyze_lifecycle_gaps:
+    patterns:
+      - "what's missing"
+      - "analyze gaps"
+      - "readiness check"
+      - "can we trade"
+      - "what do we need to provision"
+      - "lifecycle gaps"
+      - "missing resources"
+    verbs:
+      - lifecycle.analyze-gaps
+      - lifecycle.check-readiness
+      - lifecycle.discover
+      - matrix-overlay.unified-gaps
+    context: |
+      Gap analysis compares what a CBU WANTS to trade (universe) against
+      what they HAVE provisioned. Identifies missing lifecycles, resources,
+      SSIs, and agreements needed before trading can begin.
+    priority: 85
+
+  provision_lifecycle:
+    patterns:
+      - "provision resources"
+      - "set up for trading"
+      - "provision lifecycle"
+      - "enable trading"
+      - "configure for"
+    verbs:
+      - lifecycle.provision
+      - lifecycle.activate
+      - lifecycle.generate-plan
+      - lifecycle.execute-plan
+    context: |
+      Lifecycle provisioning creates the operational infrastructure for trading:
+      accounts, SSIs, connectivity, data feeds, agreements. Uses dependency
+      graph to ensure correct ordering.
+    priority: 80
+
+  # ---------------------------------------------------------------------------
+  # PRODUCT OVERLAY INTENTS
+  # ---------------------------------------------------------------------------
+  subscribe_product:
+    patterns:
+      - "subscribe to product"
+      - "add product subscription"
+      - "enable product"
+      - "turn on custody"
+      - "add prime brokerage"
+    verbs:
+      - product-subscription.subscribe
+      - product-subscription.list
+    context: |
+      Product subscriptions link CBUs to products like Custody, Prime Brokerage,
+      Fund Accounting. Products ADD capabilities to the trading matrix.
+    priority: 85
+
+  configure_product_overlay:
+    patterns:
+      - "add product overlay"
+      - "configure product for instruments"
+      - "what products apply"
+      - "product scope"
+    verbs:
+      - matrix-overlay.add
+      - matrix-overlay.effective-matrix
+      - matrix-overlay.compare-products
+    context: |
+      Product overlays define how products apply to specific instrument/market
+      combinations. They ADD services, SLAs, and resources to the base matrix.
+      Use effective-matrix to see the combined result.
+    priority: 75
+
+  # ---------------------------------------------------------------------------
   # PRODUCT & SERVICE INTENTS
   # ---------------------------------------------------------------------------
   add_product:
@@ -466,6 +680,47 @@ categories:
       - holding.create
       - movement.subscribe
       - movement.redeem
+
+  trading_matrix:
+    label: "Trading Matrix"
+    description: "Investment Manager assignment, pricing sources, SLA commitments, and cash management - the operational backbone for trading"
+    verbs:
+      # Investment Manager
+      - investment-manager.assign
+      - investment-manager.set-scope
+      - investment-manager.link-connectivity
+      - investment-manager.list
+      - investment-manager.suspend
+      - investment-manager.terminate
+      - investment-manager.find-for-trade
+      # Pricing
+      - pricing-config.set
+      - pricing-config.link-resource
+      - pricing-config.list
+      - pricing-config.find-for-instrument
+      # SLA
+      - sla.commit
+      - sla.bind-to-service
+      - sla.bind-to-resource
+      - sla.override-target
+      - sla.list-commitments
+      - sla.record-measurement
+      - sla.report-breach
+      - sla.list-open-breaches
+      # Cash Sweep
+      - cash-sweep.configure
+      - cash-sweep.update-threshold
+      - cash-sweep.change-vehicle
+      - cash-sweep.list
+      # Lifecycle
+      - lifecycle.analyze-gaps
+      - lifecycle.check-readiness
+      - lifecycle.provision
+      - lifecycle.generate-plan
+      # Product Overlay
+      - matrix-overlay.add
+      - matrix-overlay.effective-matrix
+      - product-subscription.subscribe
 
 # =============================================================================
 # GRAPH CONTEXT MAPPINGS
@@ -701,7 +956,7 @@ examples:
 
   "ubo.trace-chains":
     short: "Trace all ownership to natural persons"
-    dsl: '(ubo.trace-chains :cbu-id @fund)'
+    dsl: "(ubo.trace-chains :cbu-id @fund)"
 
   "document.catalog":
     short: "Catalog a passport document"
@@ -726,3 +981,107 @@ examples:
   "service-resource.provision":
     short: "Provision custody account"
     dsl: '(service-resource.provision :cbu-id @fund :resource-type "CUSTODY_ACCT" :instance-url "https://custody.bank.com/12345")'
+
+  # ---------------------------------------------------------------------------
+  # TRADING MATRIX EXAMPLES
+  # ---------------------------------------------------------------------------
+  "investment-manager.assign":
+    short: "Assign IM for US equities"
+    dsl: |
+      (investment-manager.assign
+        :cbu-id @fund
+        :im-entity-id @blackrock
+        :scope {:instrument-class "EQUITY" :market "XNYS" :currency "USD"}
+        :priority 10
+        :instruction-method "FIX"
+        :can-trade true
+        :can-settle true)
+
+  "investment-manager.find-for-trade":
+    short: "Find IM for a specific trade"
+    dsl: |
+      (investment-manager.find-for-trade
+        :cbu-id @fund
+        :instrument-class "EQUITY"
+        :market "XNYS"
+        :currency "USD")
+
+  "pricing-config.set":
+    short: "Configure Bloomberg pricing for equities"
+    dsl: |
+      (pricing-config.set
+        :cbu-id @fund
+        :instrument-class "EQUITY"
+        :market "XNYS"
+        :source "BLOOMBERG"
+        :price-type "CLOSING"
+        :fallback-source "REUTERS"
+        :stale-threshold-hours 24
+        :stale-action "USE_FALLBACK")
+
+  "sla.commit":
+    short: "Commit to T+1 settlement SLA"
+    dsl: |
+      (sla.commit
+        :cbu-id @fund
+        :template-code "TRADE_SETTLEMENT_T1"
+        :scope {:instrument-class "EQUITY" :market "XNYS"}
+        :effective-date "2024-01-01")
+
+  "sla.record-measurement":
+    short: "Record daily settlement rate"
+    dsl: |
+      (sla.record-measurement
+        :commitment-id @sla
+        :metric-code "SETTLEMENT_RATE"
+        :value 99.7
+        :measurement-date "2024-12-30")
+
+  "sla.report-breach":
+    short: "Report an SLA breach"
+    dsl: |
+      (sla.report-breach
+        :commitment-id @sla
+        :metric-code "SETTLEMENT_RATE"
+        :target-value 99.5
+        :actual-value 98.2
+        :breach-date "2024-12-30"
+        :severity "WARNING"
+        :root-cause-category "VENDOR")
+
+  "cash-sweep.configure":
+    short: "Configure USD cash sweep to STIF"
+    dsl: |
+      (cash-sweep.configure
+        :cbu-id @fund
+        :currency "USD"
+        :vehicle "STIF"
+        :threshold 100000
+        :sweep-time "16:00"
+        :sweep-timezone "America/New_York"
+        :frequency "DAILY")
+
+  "lifecycle.analyze-gaps":
+    short: "Find missing resources for trading"
+    dsl: |
+      (lifecycle.analyze-gaps
+        :cbu-id @fund
+        :instrument-class "EQUITY"
+        :market "XNYS")
+
+  "lifecycle.provision":
+    short: "Provision missing lifecycle resources"
+    dsl: |
+      (lifecycle.provision
+        :cbu-id @fund
+        :lifecycle-id @lifecycle
+        :resources ["SSI" "BOOKING_RULE" "IM_CONNECTIVITY"])
+
+  "matrix-overlay.effective-matrix":
+    short: "See combined trading matrix for an instrument"
+    dsl: |
+      (matrix-overlay.effective-matrix
+        :cbu-id @fund
+        :instrument-class "EQUITY"
+        :market "XNYS"
+        :currency "USD")
