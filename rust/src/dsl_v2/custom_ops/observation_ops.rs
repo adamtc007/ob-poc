@@ -78,9 +78,9 @@ impl CustomOperation for ObservationFromDocumentOp {
             .ok_or_else(|| anyhow::anyhow!("Missing attribute argument"))?;
 
         let attribute_id: Option<Uuid> = sqlx::query_scalar(
-            r#"SELECT uuid FROM "ob-poc".attribute_registry WHERE id = $1 OR name = $1"#,
+            r#"SELECT uuid FROM "ob-poc".attribute_registry WHERE id = $1 OR display_name = $1"#,
         )
-        .bind(attr_name)
+        .bind(&attr_name)
         .fetch_optional(pool)
         .await?;
 
@@ -210,9 +210,9 @@ impl CustomOperation for ObservationGetCurrentOp {
             .ok_or_else(|| anyhow::anyhow!("Missing attribute argument"))?;
 
         let attribute_id: Option<Uuid> = sqlx::query_scalar(
-            r#"SELECT uuid FROM "ob-poc".attribute_registry WHERE id = $1 OR name = $1"#,
+            r#"SELECT uuid FROM "ob-poc".attribute_registry WHERE id = $1 OR display_name = $1"#,
         )
-        .bind(attr_name)
+        .bind(&attr_name)
         .fetch_optional(pool)
         .await?;
 
@@ -331,9 +331,9 @@ impl CustomOperation for ObservationReconcileOp {
 
         // Lookup attribute ID
         let attribute_id: Option<Uuid> = sqlx::query_scalar(
-            r#"SELECT uuid FROM "ob-poc".attribute_registry WHERE id = $1 OR name = $1"#,
+            r#"SELECT uuid FROM "ob-poc".attribute_registry WHERE id = $1 OR display_name = $1"#,
         )
-        .bind(attr_name)
+        .bind(&attr_name)
         .fetch_optional(pool)
         .await?;
 

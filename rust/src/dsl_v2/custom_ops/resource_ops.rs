@@ -282,11 +282,12 @@ impl CustomOperation for ResourceSetAttrOp {
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing value argument"))?;
 
-        let attribute_id: Option<Uuid> =
-            sqlx::query_scalar(r#"SELECT uuid FROM "ob-poc".attribute_registry WHERE name = $1"#)
-                .bind(attr_name)
-                .fetch_optional(pool)
-                .await?;
+        let attribute_id: Option<Uuid> = sqlx::query_scalar(
+            r#"SELECT uuid FROM "ob-poc".attribute_registry WHERE id = $1 OR display_name = $1"#,
+        )
+        .bind(attr_name)
+        .fetch_optional(pool)
+        .await?;
 
         let attribute_id =
             attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
@@ -404,7 +405,7 @@ impl CustomOperation for ResourceActivateOp {
             if !missing.is_empty() {
                 let missing_uuids: Vec<Uuid> = missing.iter().map(|u| **u).collect();
                 let missing_names: Vec<String> = sqlx::query_scalar(
-                    r#"SELECT name FROM "ob-poc".attribute_registry WHERE uuid = ANY($1)"#,
+                    r#"SELECT display_name FROM "ob-poc".attribute_registry WHERE uuid = ANY($1)"#,
                 )
                 .bind(missing_uuids)
                 .fetch_all(pool)
@@ -613,7 +614,7 @@ impl CustomOperation for ResourceValidateAttrsOp {
         };
 
         let required_attrs: Vec<(Uuid, String)> = sqlx::query_as(
-            r#"SELECT rar.attribute_id, ar.name
+            r#"SELECT rar.attribute_id, ar.display_name
                FROM "ob-poc".resource_attribute_requirements rar
                JOIN "ob-poc".attribute_registry ar ON rar.attribute_id = ar.uuid
                WHERE rar.resource_id = $1 AND rar.is_mandatory = true

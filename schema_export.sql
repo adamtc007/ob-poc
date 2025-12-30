@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict dOWqfShXY1xjdkQrhkJld1xVVCEpgKKkk0nRh5Y2T2zub1BLhXCDMnTLkxSaxyn
+\restrict RYmkBdlU5QKpjemop1mvGKZwPvCeZzoixwgubozR2mZfneH0mIWqI0fEAOErHVM
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -18697,5 +18697,5 @@ ALTER TABLE ONLY teams.teams
 -- PostgreSQL database dump complete
 --
 
-\unrestrict dOWqfShXY1xjdkQrhkJld1xVVCEpgKKkk0nRh5Y2T2zub1BLhXCDMnTLkxSaxyn
+\unrestrict RYmkBdlU5QKpjemop1mvGKZwPvCeZzoixwgubozR2mZfneH0mIWqI0fEAOErHVM
 

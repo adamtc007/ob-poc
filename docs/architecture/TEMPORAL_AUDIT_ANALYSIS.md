@@ -92,13 +92,28 @@ from_state, to_state, transitioned_at, transitioned_by
 
 ---
 
-## 2. What's Missing
+## 2. What's Missing (UPDATE: Some Functions EXIST!)
 
-### ❌ CRITICAL: Point-in-Time Query Support
+### ⚠️ UPDATE: Point-in-Time Functions Already Exist!
 
-**Cannot answer**: "What did the ownership structure look like on 2024-06-15?"
+**Found after deeper audit** - these SQL functions exist:
 
-**Current state**: All views filter for `effective_to IS NULL OR > CURRENT_DATE`
+| Function | Purpose | Status |
+|----------|---------|--------|
+| `cbu_relationships_as_of(cbu_id, date)` | Get ownership/control at date | ✅ EXISTS |
+| `cbu_roles_as_of(cbu_id, date)` | Get roles at date | ✅ EXISTS |
+| `ownership_as_of(...)` | Get ownership at date | ✅ EXISTS |
+| `ubo_chain_as_of(...)` | Get UBO chain at date | ✅ EXISTS |
+| `cbu_state_at_approval(cbu_id)` | State when KYC approved | ✅ EXISTS |
+
+**The REAL gap**: These functions exist but:
+1. No DSL verbs to invoke them
+2. GraphRepository doesn't use them
+3. UI has no date picker to trigger as-of queries
+
+### Remaining Gaps
+
+**Current state**: Views filter for `effective_to IS NULL OR > CURRENT_DATE` (current only)
 
 **Need**:
 ```sql
@@ -433,3 +448,38 @@ timeline:
 1. Query capability for historical data
 2. Automatic audit trail for edge changes
 3. Verb support for temporal operations
+
+
+---
+
+## 7. CORRECTION: Existing Temporal Functions Discovered
+
+After deeper investigation for the attribute/document audit, I found **several temporal functions already exist**:
+
+| Function | Purpose | Status |
+|----------|---------|--------|
+| `cbu_relationships_as_of(cbu_id, date)` | Get ownership/control at date | ✅ EXISTS |
+| `cbu_roles_as_of(cbu_id, date)` | Get roles at date | ✅ EXISTS |
+| `ownership_as_of(...)` | Get ownership at date | ✅ EXISTS |
+| `ubo_chain_as_of(...)` | Get UBO chain at date | ✅ EXISTS |
+| `cbu_state_at_approval(cbu_id)` | State when KYC approved | ✅ EXISTS |
+| `entity_relationships_history_trigger` | History capture trigger | ✅ EXISTS |
+| `cbu_entity_roles_history_trigger` | Role history trigger | ✅ EXISTS |
+
+### Updated Priority
+
+| Fix | Priority | Effort | Impact | Notes |
+|-----|----------|--------|--------|-------|
+| ~~Point-in-time function~~ | ~~P0~~ | - | - | **ALREADY EXISTS** |
+| Wire temporal verbs to existing functions | **P0** | 1 hr | Agent access to temporal data | Just YAML config |
+| Update GraphRepository to use functions | **P1** | 1 hr | UI date picker support | Simple delegation |
+| Timeline events view | **P2** | 2 hr | Animation view | New view |
+| ~~History trigger~~ | ~~P0~~ | - | - | **ALREADY EXISTS** |
+
+**Revised bottom line**: The temporal SQL infrastructure is **better than assessed**. The real gap is:
+1. ✅ SQL functions exist - ❌ but no DSL verbs to invoke them
+2. ✅ History triggers exist - ❌ but not verified they're attached
+3. ❌ GraphRepository doesn't use the as_of functions
+4. ❌ UI has no date picker integration
+
+This is a **wiring problem**, not a **capability gap**.
