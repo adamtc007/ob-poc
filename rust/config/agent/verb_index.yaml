@@ -1,0 +1,728 @@
+# Verb Index for RAG Discovery
+#
+# This file provides a semantic index for discovering DSL verbs based on
+# user intent, graph context, and workflow state. It enables the agent to:
+#
+# 1. Find relevant verbs for a given intent (semantic search)
+# 2. Suggest verbs based on cursor position in the graph
+# 3. Filter verbs by workflow phase or lifecycle stage
+# 4. Provide contextual examples for each verb
+#
+# Structure:
+#   - intents: Maps natural language intents to verb patterns
+#   - categories: Groups verbs by functional category
+#   - graph_context: Maps graph positions to relevant verbs
+#   - workflow_phases: Maps KYC workflow phases to applicable verbs
+
+version: "1.0"
+
+# =============================================================================
+# INTENT PATTERNS
+# =============================================================================
+# Maps natural language intent patterns to verbs. Used for semantic search.
+# Each intent has:
+#   - patterns: Natural language phrases that indicate this intent
+#   - verbs: List of verbs that can fulfill this intent
+#   - priority: Higher = more likely to be suggested first
+
+intents:
+  # ---------------------------------------------------------------------------
+  # ENTITY MANAGEMENT INTENTS
+  # ---------------------------------------------------------------------------
+  create_entity:
+    patterns:
+      - "create a person"
+      - "add a new entity"
+      - "create company"
+      - "add director"
+      - "create fund"
+      - "new trust"
+      - "add partnership"
+    verbs:
+      - entity.create-proper-person
+      - entity.create-limited-company
+      - entity.create-partnership-limited
+      - entity.create-trust-discretionary
+      - entity.ensure-proper-person
+      - entity.ensure-limited-company
+    priority: 100
+
+  find_entity:
+    patterns:
+      - "find entity"
+      - "search for person"
+      - "lookup company"
+      - "who is"
+      - "show entity"
+    verbs:
+      - entity.read
+      - entity.list
+    priority: 90
+
+  # ---------------------------------------------------------------------------
+  # CBU MANAGEMENT INTENTS
+  # ---------------------------------------------------------------------------
+  create_cbu:
+    patterns:
+      - "create client"
+      - "new cbu"
+      - "onboard client"
+      - "create business unit"
+      - "add new client"
+    verbs:
+      - cbu.create
+      - cbu.ensure
+    priority: 100
+
+  assign_role:
+    patterns:
+      - "assign role"
+      - "add as director"
+      - "make signatory"
+      - "set as ubo"
+      - "add role"
+      - "link entity to cbu"
+    verbs:
+      - cbu.assign-role
+    priority: 95
+
+  remove_role:
+    patterns:
+      - "remove role"
+      - "unassign"
+      - "revoke role"
+      - "remove from cbu"
+    verbs:
+      - cbu.remove-role
+    priority: 85
+
+  view_cbu:
+    patterns:
+      - "show cbu"
+      - "view client"
+      - "display structure"
+      - "show parties"
+      - "who are the parties"
+    verbs:
+      - cbu.show
+      - cbu.parties
+      - cbu.read
+    priority: 90
+
+  # ---------------------------------------------------------------------------
+  # OWNERSHIP & UBO INTENTS
+  # ---------------------------------------------------------------------------
+  add_ownership:
+    patterns:
+      - "add ownership"
+      - "owns"
+      - "shareholder"
+      - "add owner"
+      - "ownership stake"
+      - "percentage ownership"
+    verbs:
+      - ubo.add-ownership
+      - ubo.update-ownership
+    priority: 95
+
+  trace_ubo:
+    patterns:
+      - "trace ubo"
+      - "find beneficial owner"
+      - "who owns"
+      - "ownership chain"
+      - "ultimate owner"
+      - "trace ownership"
+    verbs:
+      - ubo.trace-chains
+      - ubo.infer-chain
+      - ubo.list-ubos
+    priority: 90
+
+  register_ubo:
+    patterns:
+      - "register ubo"
+      - "mark as ubo"
+      - "beneficial owner determination"
+    verbs:
+      - ubo.register-ubo
+      - ubo.verify-ubo
+    priority: 85
+
+  # ---------------------------------------------------------------------------
+  # DOCUMENT INTENTS
+  # ---------------------------------------------------------------------------
+  add_document:
+    patterns:
+      - "add document"
+      - "upload document"
+      - "catalog document"
+      - "attach passport"
+      - "add certificate"
+      - "submit document"
+    verbs:
+      - document.catalog
+    priority: 95
+
+  extract_document:
+    patterns:
+      - "extract from document"
+      - "read document"
+      - "parse document"
+      - "get data from document"
+    verbs:
+      - document.extract
+      - document.extract-to-observations
+    priority: 85
+
+  request_document:
+    patterns:
+      - "request document"
+      - "ask for document"
+      - "document request"
+      - "need document"
+    verbs:
+      - doc-request.create
+      - rfi.generate
+    priority: 90
+
+  # ---------------------------------------------------------------------------
+  # KYC & SCREENING INTENTS
+  # ---------------------------------------------------------------------------
+  create_case:
+    patterns:
+      - "create kyc case"
+      - "start investigation"
+      - "new case"
+      - "initiate review"
+      - "open case"
+    verbs:
+      - kyc-case.create
+    priority: 100
+
+  run_screening:
+    patterns:
+      - "run screening"
+      - "check sanctions"
+      - "pep check"
+      - "screen entity"
+      - "adverse media"
+      - "sanctions check"
+    verbs:
+      - case-screening.run
+      - screening.pep
+      - screening.sanctions
+      - screening.adverse-media
+    priority: 95
+
+  update_case:
+    patterns:
+      - "update case"
+      - "case status"
+      - "escalate case"
+      - "approve case"
+      - "close case"
+    verbs:
+      - kyc-case.update-status
+      - kyc-case.escalate
+      - kyc-case.close
+    priority: 85
+
+  # ---------------------------------------------------------------------------
+  # GRAPH NAVIGATION INTENTS
+  # ---------------------------------------------------------------------------
+  view_graph:
+    patterns:
+      - "show graph"
+      - "visualize"
+      - "view structure"
+      - "display network"
+      - "entity map"
+    verbs:
+      - graph.view
+      - graph.focus
+    priority: 90
+
+  filter_graph:
+    patterns:
+      - "filter graph"
+      - "show only"
+      - "filter by role"
+      - "filter by jurisdiction"
+    verbs:
+      - graph.filter
+      - graph.group-by
+    priority: 85
+
+  find_path:
+    patterns:
+      - "find path"
+      - "how connected"
+      - "relationship between"
+      - "trace connection"
+    verbs:
+      - graph.path
+      - graph.find-connected
+      - graph.ancestors
+      - graph.descendants
+    priority: 80
+
+  # ---------------------------------------------------------------------------
+  # CUSTODY & TRADING INTENTS
+  # ---------------------------------------------------------------------------
+  setup_custody:
+    patterns:
+      - "setup custody"
+      - "add trading universe"
+      - "configure settlement"
+      - "create ssi"
+      - "add booking rule"
+    verbs:
+      - cbu-custody.add-universe
+      - cbu-custody.create-ssi
+      - cbu-custody.add-booking-rule
+    priority: 85
+
+  isda_setup:
+    patterns:
+      - "create isda"
+      - "add csa"
+      - "derivative agreement"
+      - "otc setup"
+    verbs:
+      - isda.create
+      - isda.add-csa
+      - isda.add-coverage
+    priority: 80
+
+  # ---------------------------------------------------------------------------
+  # PRODUCT & SERVICE INTENTS
+  # ---------------------------------------------------------------------------
+  add_product:
+    patterns:
+      - "add product"
+      - "enable service"
+      - "subscribe to"
+      - "provision"
+    verbs:
+      - cbu.add-product
+      - service-resource.provision
+    priority: 85
+
+  configure_service:
+    patterns:
+      - "configure service"
+      - "set attribute"
+      - "activate resource"
+    verbs:
+      - service-resource.set-attr
+      - service-resource.activate
+    priority: 80
+
+# =============================================================================
+# VERB CATEGORIES
+# =============================================================================
+# Groups verbs by functional category for browsing and filtering
+
+categories:
+  entity_management:
+    label: "Entity Management"
+    description: "Create, update, and manage legal entities"
+    verbs:
+      - entity.create-proper-person
+      - entity.create-limited-company
+      - entity.create-partnership-limited
+      - entity.create-trust-discretionary
+      - entity.ensure-proper-person
+      - entity.ensure-limited-company
+      - entity.read
+      - entity.list
+      - entity.update
+      - entity.delete
+
+  cbu_operations:
+    label: "CBU Operations"
+    description: "Client Business Unit lifecycle and role management"
+    verbs:
+      - cbu.create
+      - cbu.ensure
+      - cbu.read
+      - cbu.update
+      - cbu.delete
+      - cbu.assign-role
+      - cbu.remove-role
+      - cbu.parties
+      - cbu.show
+      - cbu.add-product
+      - cbu.decide
+
+  ownership_control:
+    label: "Ownership & Control"
+    description: "Ownership chains, UBO determination, and control relationships"
+    verbs:
+      - ubo.add-ownership
+      - ubo.update-ownership
+      - ubo.end-ownership
+      - ubo.list-owners
+      - ubo.list-owned
+      - ubo.trace-chains
+      - ubo.infer-chain
+      - ubo.register-ubo
+      - ubo.verify-ubo
+      - ubo.list-ubos
+      - control.add-control
+      - control.list-controllers
+
+  document_management:
+    label: "Document Management"
+    description: "Document catalog, extraction, and requests"
+    verbs:
+      - document.catalog
+      - document.extract
+      - document.extract-to-observations
+      - doc-request.create
+      - doc-request.receive
+      - doc-request.verify
+      - rfi.generate
+      - rfi.check-completion
+
+  kyc_workflow:
+    label: "KYC Workflow"
+    description: "KYC case management, workstreams, and approvals"
+    verbs:
+      - kyc-case.create
+      - kyc-case.update-status
+      - kyc-case.escalate
+      - kyc-case.close
+      - kyc-case.assign
+      - kyc-case.state
+      - entity-workstream.create
+      - entity-workstream.update-status
+      - entity-workstream.complete
+      - red-flag.raise
+      - red-flag.mitigate
+
+  screening:
+    label: "Screening"
+    description: "Sanctions, PEP, and adverse media screening"
+    verbs:
+      - case-screening.run
+      - case-screening.complete
+      - case-screening.review-hit
+      - screening.pep
+      - screening.sanctions
+      - screening.adverse-media
+
+  graph_visualization:
+    label: "Graph Visualization"
+    description: "View and navigate entity graphs"
+    verbs:
+      - graph.view
+      - graph.focus
+      - graph.filter
+      - graph.group-by
+      - graph.path
+      - graph.find-connected
+      - graph.ancestors
+      - graph.descendants
+      - graph.compare
+
+  custody_settlement:
+    label: "Custody & Settlement"
+    description: "Trading universe, SSIs, and booking rules"
+    verbs:
+      - cbu-custody.add-universe
+      - cbu-custody.create-ssi
+      - cbu-custody.activate-ssi
+      - cbu-custody.add-booking-rule
+      - cbu-custody.lookup-ssi
+      - cbu-custody.validate-booking-coverage
+      - isda.create
+      - isda.add-csa
+      - isda.add-coverage
+
+  products_services:
+    label: "Products & Services"
+    description: "Product assignment and service resource management"
+    verbs:
+      - cbu.add-product
+      - cbu.remove-product
+      - service-resource.provision
+      - service-resource.set-attr
+      - service-resource.activate
+      - service-resource.suspend
+      - delivery.record
+      - delivery.complete
+
+  fund_structure:
+    label: "Fund Structure"
+    description: "Fund hierarchy, share classes, and investor registry"
+    verbs:
+      - fund.ensure-umbrella
+      - fund.ensure-subfund
+      - fund.ensure-share-class
+      - share-class.create
+      - share-class.update-nav
+      - holding.create
+      - movement.subscribe
+      - movement.redeem
+
+# =============================================================================
+# GRAPH CONTEXT MAPPINGS
+# =============================================================================
+# Maps cursor position in the graph to relevant verbs.
+# Used to suggest verbs based on what the user is looking at.
+
+graph_context:
+  # When cursor is on a CBU node
+  cursor_on_cbu:
+    verbs:
+      - cbu.show
+      - cbu.assign-role
+      - cbu.add-product
+      - cbu.parties
+      - kyc-case.create
+      - graph.view
+      - ubo.trace-chains
+    priority: 100
+
+  # When cursor is on an entity (person or company)
+  cursor_on_entity:
+    verbs:
+      - cbu.assign-role
+      - ubo.add-ownership
+      - document.catalog
+      - case-screening.run
+      - graph.focus
+      - graph.ancestors
+      - entity-workstream.create
+    priority: 95
+
+  # When cursor is on a person specifically
+  cursor_on_person:
+    verbs:
+      - cbu.assign-role
+      - ubo.register-ubo
+      - screening.pep
+      - document.catalog
+      - allegation.record
+    priority: 90
+
+  # When cursor is on an ownership edge
+  cursor_on_ownership:
+    verbs:
+      - ubo.update-ownership
+      - ubo.end-ownership
+      - ubo.infer-chain
+      - graph.ancestors
+    priority: 85
+
+  # When cursor is on a product node
+  cursor_on_product:
+    verbs:
+      - service-resource.provision
+      - cbu.remove-product
+      - delivery.record
+    priority: 80
+
+  # When viewing UBO layer
+  layer_ubo:
+    verbs:
+      - ubo.trace-chains
+      - ubo.register-ubo
+      - ubo.verify-ubo
+      - ubo.snapshot-cbu
+      - graph.ancestors
+    priority: 90
+
+  # When viewing KYC layer
+  layer_kyc:
+    verbs:
+      - kyc-case.state
+      - entity-workstream.update-status
+      - case-screening.run
+      - doc-request.create
+      - red-flag.raise
+    priority: 90
+
+  # When viewing service layer
+  layer_services:
+    verbs:
+      - service-resource.provision
+      - service-resource.activate
+      - delivery.record
+      - cbu.add-product
+    priority: 85
+
+  # When viewing custody layer
+  layer_custody:
+    verbs:
+      - cbu-custody.add-universe
+      - cbu-custody.create-ssi
+      - cbu-custody.add-booking-rule
+      - isda.create
+    priority: 85
+
+# =============================================================================
+# WORKFLOW PHASE MAPPINGS
+# =============================================================================
+# Maps KYC workflow phases to applicable verbs.
+# Used to filter verb suggestions based on current workflow state.
+
+workflow_phases:
+  intake:
+    label: "Intake"
+    description: "Initial client data collection"
+    verbs:
+      - cbu.create
+      - cbu.ensure
+      - entity.create-proper-person
+      - entity.create-limited-company
+      - cbu.assign-role
+      - allegation.record
+      - kyc-case.create
+    transitions_to:
+      - entity_collection
+
+  entity_collection:
+    label: "Entity Collection"
+    description: "Gathering all related entities and roles"
+    verbs:
+      - entity.create-proper-person
+      - entity.create-limited-company
+      - cbu.assign-role
+      - ubo.add-ownership
+      - ubo.trace-chains
+      - entity-workstream.create
+    required_before_advance:
+      - min_directors: 1
+      - min_signatories: 1
+    transitions_to:
+      - screening
+
+  screening:
+    label: "Screening"
+    description: "Running sanctions, PEP, and adverse media checks"
+    verbs:
+      - case-screening.run
+      - case-screening.complete
+      - case-screening.review-hit
+      - screening.pep
+      - screening.sanctions
+    required_before_advance:
+      - all_entities_screened: true
+    transitions_to:
+      - document_collection
+
+  document_collection:
+    label: "Document Collection"
+    description: "Collecting and verifying required documents"
+    verbs:
+      - doc-request.create
+      - document.catalog
+      - doc-request.receive
+      - doc-request.verify
+      - rfi.generate
+      - rfi.check-completion
+    required_before_advance:
+      - mandatory_docs_verified: true
+    transitions_to:
+      - ubo_determination
+
+  ubo_determination:
+    label: "UBO Determination"
+    description: "Calculating and verifying beneficial ownership"
+    verbs:
+      - ubo.trace-chains
+      - ubo.register-ubo
+      - ubo.verify-ubo
+      - ubo.check-completeness
+      - ubo.snapshot-cbu
+    required_before_advance:
+      - ubo_complete: true
+    transitions_to:
+      - review
+
+  review:
+    label: "Review"
+    description: "Final review and decision"
+    verbs:
+      - kyc-case.state
+      - cbu.show
+      - red-flag.raise
+      - red-flag.mitigate
+      - kyc-case.escalate
+      - cbu.decide
+    transitions_to:
+      - approved
+      - rejected
+
+  approved:
+    label: "Approved"
+    description: "Client approved, ready for products"
+    verbs:
+      - cbu.add-product
+      - service-resource.provision
+      - cbu-custody.add-universe
+      - cbu-custody.create-ssi
+
+  rejected:
+    label: "Rejected"
+    description: "Client rejected"
+    verbs:
+      - kyc-case.close
+
+# =============================================================================
+# VERB EXAMPLES
+# =============================================================================
+# Provides contextual examples for verb suggestions.
+# Used to help users understand how to use each verb.
+
+examples:
+  "cbu.create":
+    short: "Create a Luxembourg fund CBU"
+    dsl: '(cbu.create :name "Apex Fund" :jurisdiction "LU" :client-type "FUND")'
+
+  "cbu.assign-role":
+    short: "Assign John Smith as director"
+    dsl: '(cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")'
+
+  "entity.create-proper-person":
+    short: "Create a natural person"
+    dsl: '(entity.create-proper-person :first-name "John" :last-name "Smith" :date-of-birth "1980-01-15" :nationality "GB" :as @john)'
+
+  "entity.create-limited-company":
+    short: "Create a UK company"
+    dsl: '(entity.create-limited-company :name "Holdings Ltd" :jurisdiction "GB" :registration-number "12345678" :as @company)'
+
+  "ubo.add-ownership":
+    short: "Record 60% ownership"
+    dsl: '(ubo.add-ownership :owner-entity-id @person :owned-entity-id @company :percentage 60 :ownership-type "DIRECT")'
+
+  "ubo.trace-chains":
+    short: "Trace all ownership to natural persons"
+    dsl: '(ubo.trace-chains :cbu-id @fund)'
+
+  "document.catalog":
+    short: "Catalog a passport document"
+    dsl: '(document.catalog :cbu-id @fund :entity-id @john :doc-type "PASSPORT" :title "John Smith Passport")'
+
+  "kyc-case.create":
+    short: "Create new client KYC case"
+    dsl: '(kyc-case.create :cbu-id @fund :case-type "NEW_CLIENT" :as @case)'
+
+  "case-screening.run":
+    short: "Run PEP screening on entity"
+    dsl: '(case-screening.run :workstream-id @ws :screening-type "PEP")'
+
+  "graph.view":
+    short: "View CBU graph in KYC mode"
+    dsl: '(graph.view :cbu-id @fund :view-mode "KYC_UBO")'
+
+  "cbu-custody.add-universe":
+    short: "Add US equities to trading universe"
+    dsl: '(cbu-custody.add-universe :cbu-id @fund :instrument-class "EQUITY" :market "XNYS" :currencies ["USD"] :settlement-types ["DVP"])'
+
+  "service-resource.provision":
+    short: "Provision custody account"
+    dsl: '(service-resource.provision :cbu-id @fund :resource-type "CUSTODY_ACCT" :instance-url "https://custody.bank.com/12345")'

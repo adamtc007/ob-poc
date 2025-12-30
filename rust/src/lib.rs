@@ -56,6 +56,14 @@ pub mod agentic;
 #[cfg(feature = "database")]
 pub mod graph;
 
+// Navigation module - Nom-based parser for graph navigation commands
+#[cfg(feature = "database")]
+pub mod navigation;
+
+// Session module - unified session context for REPL + Graph + Viewport
+#[cfg(feature = "database")]
+pub mod session;
+
 // Workflow orchestration module
 #[cfg(feature = "database")]
 pub mod workflow;

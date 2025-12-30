@@ -22,6 +22,7 @@ pub mod semantic_state_service;
 // Fuzzy search is now handled by EntityGateway gRPC service.
 // See rust/crates/entity-gateway/ for the central lookup service.
 pub mod generation_log_repository;
+pub mod graph_repository;
 pub mod product_service;
 pub mod resource_instance_service;
 pub mod service_resource_service;
@@ -75,6 +76,8 @@ pub use session_repository::{
     detect_domain, extract_domains, CbuDslState, DslSnapshot, EntityCreated, PersistedSession,
     SessionEventType, SessionRepository, SessionStatus,
 };
+
+pub use graph_repository::{DerivedBook, GraphRepository, PgGraphRepository};
 
 pub use context_discovery_service::{
     CbuContextRow, ContextDiscoveryService, DiscoveredContext, LinkedContextRow,

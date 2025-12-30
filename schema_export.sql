@@ -227,7 +227,7 @@ $$;
 CREATE FUNCTION kyc.check_case_doc_completion(p_case_id uuid) RETURNS TABLE(total_requests integer, pending_requests integer, received_requests integer, verified_requests integer, mandatory_pending integer, all_mandatory_complete boolean)
     LANGUAGE sql STABLE
     AS $$
-SELECT 
+SELECT
     COUNT(*)::INTEGER as total_requests,
     COUNT(*) FILTER (WHERE dr.status IN ('REQUIRED', 'REQUESTED'))::INTEGER as pending_requests,
     COUNT(*) FILTER (WHERE dr.status = 'RECEIVED')::INTEGER as received_requests,
@@ -269,19 +269,19 @@ BEGIN
     IF v_cbu_id IS NULL THEN
         RAISE EXCEPTION 'Case not found: %', p_case_id;
     END IF;
-    
+
     -- Generate batch reference if not provided
-    v_batch_ref := COALESCE(p_batch_reference, 
+    v_batch_ref := COALESCE(p_batch_reference,
         'RFI-' || TO_CHAR(NOW(), 'YYYYMMDD') || '-' || LEFT(v_batch_id::TEXT, 8));
-    
+
     -- Get risk band for CBU
     SELECT COALESCE(
         (SELECT risk_band FROM "ob-poc".compute_cbu_risk_score(v_cbu_id)),
         'MEDIUM'
     ) INTO v_risk_band;
-    
+
     -- Process each workstream in the case
-    FOR v_workstream IN 
+    FOR v_workstream IN
         SELECT w.workstream_id, w.entity_id, e.name as entity_name,
                array_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL) as roles
         FROM kyc.entity_workstreams w
@@ -292,14 +292,14 @@ BEGIN
         GROUP BY w.workstream_id, w.entity_id, e.name
     LOOP
         v_entities_processed := v_entities_processed + 1;
-        
+
         -- Get missing requirements for this entity's roles
         FOR v_requirement IN
             SELECT tr.requirement_id, tr.requirement_type, tr.entity_role,
                    tr.document_count_required, tr.is_mandatory
             FROM "ob-poc".threshold_requirements tr
             JOIN "ob-poc".risk_bands rb ON tr.risk_band_id = rb.risk_band_id
-            WHERE rb.band_code = v_risk_band 
+            WHERE rb.band_code = v_risk_band
             AND tr.entity_role = ANY(v_workstream.roles)
             AND tr.is_mandatory = true
             AND NOT EXISTS (
@@ -333,17 +333,17 @@ BEGIN
                 'THRESHOLD',
                 CURRENT_DATE + INTERVAL '14 days'
             ) RETURNING request_id INTO v_request_id;
-            
+
             -- Link acceptable document types
             INSERT INTO kyc.doc_request_acceptable_types (request_id, document_type_id)
             SELECT v_request_id, rad.document_type_id
             FROM "ob-poc".requirement_acceptable_docs rad
             WHERE rad.requirement_id = v_requirement.requirement_id;
-            
+
             v_requests_created := v_requests_created + 1;
         END LOOP;
     END LOOP;
-    
+
     RETURN QUERY SELECT v_batch_id, v_requests_created, v_entities_processed;
 END;
 $$;
@@ -496,19 +496,19 @@ BEGIN
     -- Get current case status
     SELECT status INTO v_current_status
     FROM kyc.cases WHERE case_id = p_case_id;
-    
+
     -- Get latest evaluation
     SELECT * INTO v_latest_eval
     FROM "ob-poc".case_evaluation_snapshots
     WHERE case_id = p_case_id
     ORDER BY evaluated_at DESC
     LIMIT 1;
-    
+
     -- Validate decision against recommendation
     IF v_latest_eval.has_hard_stop AND p_decision NOT IN ('DO_NOT_ONBOARD', 'REJECT', 'REFER_TO_REGULATOR') THEN
         RAISE EXCEPTION 'Cannot approve case with unresolved hard stops. Recommended: %', v_latest_eval.recommended_action;
     END IF;
-    
+
     -- Map decision to case status
     v_new_status := CASE p_decision
         WHEN 'APPROVE' THEN 'APPROVED'
@@ -519,7 +519,7 @@ BEGIN
         WHEN 'ESCALATE' THEN 'REVIEW'  -- Stay in review but escalate
         ELSE v_current_status
     END;
-    
+
     -- Update evaluation snapshot with decision
     UPDATE "ob-poc".case_evaluation_snapshots
     SET decision_made = p_decision,
@@ -527,14 +527,14 @@ BEGIN
         decision_made_by = p_decided_by,
         decision_notes = p_notes
     WHERE snapshot_id = v_latest_eval.snapshot_id;
-    
+
     -- Update case status if changed
     IF v_new_status != v_current_status THEN
         UPDATE kyc.cases
         SET status = v_new_status,
             last_activity_at = now()
         WHERE case_id = p_case_id;
-        
+
         -- If closing, set closed_at
         IF v_new_status IN ('APPROVED', 'REJECTED', 'DO_NOT_ONBOARD') THEN
             UPDATE kyc.cases
@@ -542,12 +542,12 @@ BEGIN
             WHERE case_id = p_case_id;
         END IF;
     END IF;
-    
+
     -- Log case event
     INSERT INTO kyc.case_events (
         case_id, event_type, event_data, actor_type, comment
     ) VALUES (
-        p_case_id, 
+        p_case_id,
         'DECISION_APPLIED',
         jsonb_build_object(
             'decision', p_decision,
@@ -560,7 +560,7 @@ BEGIN
         'USER',
         p_notes
     );
-    
+
     RETURN true;
 END;
 $$;
@@ -594,7 +594,7 @@ BEGIN
           AND evidence_role = 'IDENTITY_PROOF'
           AND verification_status = 'VERIFIED'
     ) INTO v_has_identity;
-    
+
     -- Check for ownership proof
     SELECT EXISTS (
         SELECT 1 FROM "ob-poc".ubo_evidence
@@ -602,15 +602,15 @@ BEGIN
           AND evidence_role IN ('OWNERSHIP_PROOF', 'CHAIN_LINK')
           AND verification_status = 'VERIFIED'
     ) INTO v_has_ownership;
-    
+
     -- Count evidence
-    SELECT 
+    SELECT
         COUNT(*) FILTER (WHERE verification_status = 'VERIFIED'),
         COUNT(*) FILTER (WHERE verification_status = 'PENDING')
     INTO v_verified_count, v_pending_count
     FROM "ob-poc".ubo_evidence
     WHERE ubo_id = p_ubo_id;
-    
+
     -- Build missing list
     IF NOT v_has_identity THEN
         v_missing := array_append(v_missing, 'IDENTITY_PROOF');
@@ -618,8 +618,8 @@ BEGIN
     IF NOT v_has_ownership THEN
         v_missing := array_append(v_missing, 'OWNERSHIP_PROOF');
     END IF;
-    
-    RETURN QUERY SELECT 
+
+    RETURN QUERY SELECT
         (v_has_identity AND v_has_ownership),
         v_has_identity,
         v_has_ownership,
@@ -667,7 +667,7 @@ BEGIN
     WHERE ur.cbu_id = p_cbu_id
       AND ur.superseded_at IS NULL
       AND ur.closed_at IS NULL;
-    
+
     -- Get ownership chains
     SELECT COALESCE(jsonb_agg(jsonb_build_object(
         'ubo_person_id', chain.ubo_person_id,
@@ -680,7 +680,7 @@ BEGIN
     )), '[]'::JSONB)
     INTO v_chains
     FROM "ob-poc".compute_ownership_chains(p_cbu_id) chain;
-    
+
     -- Get control relationships
     SELECT COALESCE(jsonb_agg(jsonb_build_object(
         'control_id', cr.control_id,
@@ -694,11 +694,11 @@ BEGIN
     JOIN "ob-poc".cbu_entity_roles cer ON cr.controlled_entity_id = cer.entity_id
     WHERE cer.cbu_id = p_cbu_id
       AND cr.is_active = true;
-    
+
     -- Check completeness
     SELECT * INTO v_completeness
     FROM "ob-poc".check_ubo_completeness(p_cbu_id);
-    
+
     -- Insert snapshot
     INSERT INTO "ob-poc".ubo_snapshots (
         cbu_id, case_id, snapshot_type, snapshot_reason,
@@ -710,12 +710,12 @@ BEGIN
         v_ubos, v_chains, v_controls,
         v_completeness.total_identified_ownership,
         NOT v_completeness.is_complete,
-        CASE WHEN NOT v_completeness.is_complete 
-             THEN v_completeness.issues::TEXT 
+        CASE WHEN NOT v_completeness.is_complete
+             THEN v_completeness.issues::TEXT
              ELSE NULL END,
         p_captured_by
     ) RETURNING snapshot_id INTO v_snapshot_id;
-    
+
     RETURN v_snapshot_id;
 END;
 $$;
@@ -743,14 +743,14 @@ DECLARE
     v_rejected_count INTEGER;
 BEGIN
     -- Count evidence by status
-    SELECT 
+    SELECT
         COUNT(*) FILTER (WHERE verification_status = 'VERIFIED'),
         COUNT(*) FILTER (WHERE verification_status = 'PENDING'),
         COUNT(*) FILTER (WHERE verification_status = 'REJECTED')
     INTO v_verified_count, v_pending_count, v_rejected_count
     FROM "ob-poc".cbu_evidence
     WHERE cbu_id = p_cbu_id;
-    
+
     -- Get verified categories
     SELECT ARRAY_AGG(DISTINCT evidence_category)
     INTO v_verified_categories
@@ -758,13 +758,13 @@ BEGIN
     WHERE cbu_id = p_cbu_id
       AND verification_status = 'VERIFIED'
       AND evidence_category IS NOT NULL;
-    
+
     -- Handle NULL array
     IF v_verified_categories IS NULL THEN
         v_verified_categories := ARRAY[]::TEXT[];
     END IF;
-    
-    RETURN QUERY SELECT 
+
+    RETURN QUERY SELECT
         v_required_categories <@ v_verified_categories,  -- All required present in verified
         ARRAY(
             SELECT unnest(v_required_categories)
@@ -795,7 +795,7 @@ CREATE FUNCTION "ob-poc".check_cbu_invariants() RETURNS TABLE(cbu_id uuid, cbu_n
 BEGIN
     -- Check 1: commercial_client_entity_id without matching role
     RETURN QUERY
-    SELECT 
+    SELECT
         c.cbu_id,
         c.name,
         'COMMERCIAL_CLIENT_ROLE_MISSING'::VARCHAR,
@@ -805,34 +805,34 @@ BEGIN
       AND NOT EXISTS (
           SELECT 1 FROM "ob-poc".cbu_entity_roles cer
           JOIN "ob-poc".roles r ON cer.role_id = r.role_id
-          WHERE cer.cbu_id = c.cbu_id 
+          WHERE cer.cbu_id = c.cbu_id
             AND cer.entity_id = c.commercial_client_entity_id
             AND r.name = 'COMMERCIAL_CLIENT'
       );
-    
+
     -- Check 2: CBU with no cbu_category
     RETURN QUERY
-    SELECT 
+    SELECT
         c.cbu_id,
         c.name,
         'MISSING_CATEGORY'::VARCHAR,
         'cbu_category is NULL'::TEXT
     FROM "ob-poc".cbus c
     WHERE c.cbu_category IS NULL;
-    
+
     -- Check 3: CBU with no jurisdiction
     RETURN QUERY
-    SELECT 
+    SELECT
         c.cbu_id,
         c.name,
         'MISSING_JURISDICTION'::VARCHAR,
         'jurisdiction is NULL'::TEXT
     FROM "ob-poc".cbus c
     WHERE c.jurisdiction IS NULL;
-    
+
     -- Check 4: Active CBU with no entities (has KYC case but no entity roles)
     RETURN QUERY
-    SELECT 
+    SELECT
         c.cbu_id,
         c.name,
         'NO_ENTITIES_ASSIGNED'::VARCHAR,
@@ -840,7 +840,7 @@ BEGIN
     FROM "ob-poc".cbus c
     WHERE EXISTS (SELECT 1 FROM kyc.cases kc WHERE kc.cbu_id = c.cbu_id)
       AND NOT EXISTS (SELECT 1 FROM "ob-poc".cbu_entity_roles cer WHERE cer.cbu_id = c.cbu_id);
-    
+
 END;
 $$;
 
@@ -867,15 +867,15 @@ BEGIN
         JOIN "ob-poc".roles r ON cer.role_id = r.role_id
         WHERE cer.cbu_id = p_cbu_id
     )
-    SELECT 
+    SELECT
         rr.requirement_type,
         rr.requiring_role,
         rr.required_role,
         EXISTS (SELECT 1 FROM cbu_roles WHERE role_name = rr.required_role) AS is_satisfied,
-        CASE 
+        CASE
             WHEN EXISTS (SELECT 1 FROM cbu_roles WHERE role_name = rr.required_role)
             THEN format('Requirement satisfied: %s present', rr.required_role)
-            ELSE format('Missing required role %s for %s: %s', 
+            ELSE format('Missing required role %s for %s: %s',
                         rr.required_role, rr.requiring_role, rr.condition_description)
         END AS message
     FROM "ob-poc".role_requirements rr
@@ -909,13 +909,13 @@ BEGIN
     SELECT COALESCE(SUM(DISTINCT effective_ownership), 0)
     INTO v_total_ownership
     FROM "ob-poc".compute_ownership_chains(p_cbu_id);
-    
+
     -- Count UBOs above threshold
     SELECT COUNT(DISTINCT ubo_person_id)
     INTO v_ubos_count
     FROM "ob-poc".compute_ownership_chains(p_cbu_id)
     WHERE effective_ownership >= p_threshold;
-    
+
     -- Check for incomplete chains (entities with no further ownership but not persons)
     SELECT COUNT(*)
     INTO v_incomplete_chains
@@ -928,7 +928,7 @@ BEGIN
       AND o.is_active = true
       AND parent.ownership_id IS NULL
       AND et.type_code != 'proper_person';
-    
+
     -- Build issues array
     IF v_total_ownership < 100 THEN
         v_issues := v_issues || jsonb_build_object(
@@ -937,7 +937,7 @@ BEGIN
             'gap', 100 - v_total_ownership
         );
     END IF;
-    
+
     IF v_incomplete_chains > 0 THEN
         v_issues := v_issues || jsonb_build_object(
             'type', 'INCOMPLETE_CHAIN',
@@ -945,7 +945,7 @@ BEGIN
             'count', v_incomplete_chains
         );
     END IF;
-    
+
     RETURN QUERY SELECT
         (v_total_ownership >= 100 AND v_incomplete_chains = 0),
         v_total_ownership,
@@ -1017,13 +1017,13 @@ BEGIN
     -- Get weights from config
     SELECT weight INTO v_soft_weight FROM "ob-poc".redflag_score_config WHERE severity = 'SOFT';
     SELECT weight INTO v_escalate_weight FROM "ob-poc".redflag_score_config WHERE severity = 'ESCALATE';
-    
+
     -- Default weights if not configured
     v_soft_weight := COALESCE(v_soft_weight, 1);
     v_escalate_weight := COALESCE(v_escalate_weight, 2);
-    
+
     RETURN QUERY
-    SELECT 
+    SELECT
         COUNT(*) FILTER (WHERE rf.severity = 'SOFT')::INTEGER as soft_count,
         COUNT(*) FILTER (WHERE rf.severity = 'ESCALATE')::INTEGER as escalate_count,
         COUNT(*) FILTER (WHERE rf.severity = 'HARD_STOP')::INTEGER as hard_stop_count,
@@ -1033,7 +1033,7 @@ BEGIN
         (
             COUNT(*) FILTER (WHERE rf.severity = 'SOFT' AND rf.status = 'OPEN') * v_soft_weight +
             COUNT(*) FILTER (WHERE rf.severity = 'ESCALATE' AND rf.status = 'OPEN') * v_escalate_weight +
-            CASE WHEN COUNT(*) FILTER (WHERE rf.severity = 'HARD_STOP' AND rf.status IN ('OPEN', 'BLOCKING')) > 0 
+            CASE WHEN COUNT(*) FILTER (WHERE rf.severity = 'HARD_STOP' AND rf.status IN ('OPEN', 'BLOCKING')) > 0
                  THEN 1000 ELSE 0 END
         )::INTEGER as total_score,
         COUNT(*) FILTER (WHERE rf.status = 'OPEN')::INTEGER as open_flags,
@@ -1080,7 +1080,7 @@ BEGIN
         SELECT * INTO v_factor
         FROM "ob-poc".threshold_factors
         WHERE factor_type = 'CBU_TYPE' AND factor_code = v_cbu.client_type AND is_active = true;
-        
+
         IF FOUND THEN
             v_score := v_score + v_factor.risk_weight;
             v_factors := v_factors || jsonb_build_object('type', v_factor.factor_type, 'code', v_factor.factor_code, 'weight', v_factor.risk_weight);
@@ -1092,7 +1092,7 @@ BEGIN
         SELECT * INTO v_factor
         FROM "ob-poc".threshold_factors
         WHERE factor_type = 'SOURCE_OF_FUNDS' AND factor_code = v_cbu.source_of_funds AND is_active = true;
-        
+
         IF FOUND THEN
             v_score := v_score + v_factor.risk_weight;
             v_factors := v_factors || jsonb_build_object('type', v_factor.factor_type, 'code', v_factor.factor_code, 'weight', v_factor.risk_weight);
@@ -1104,7 +1104,7 @@ BEGIN
         SELECT * INTO v_factor
         FROM "ob-poc".threshold_factors
         WHERE factor_type = 'NATURE_PURPOSE' AND factor_code = v_cbu.nature_purpose AND is_active = true;
-        
+
         IF FOUND THEN
             v_score := v_score + v_factor.risk_weight;
             v_factors := v_factors || jsonb_build_object('type', v_factor.factor_type, 'code', v_factor.factor_code, 'weight', v_factor.risk_weight);
@@ -1261,7 +1261,7 @@ BEGIN
     -- Get current scores
     SELECT * INTO v_scores
     FROM "ob-poc".compute_case_redflag_score(p_case_id);
-    
+
     -- Find matching threshold (priority: hard_stop > escalate > score-based)
     IF v_scores.has_hard_stop THEN
         SELECT * INTO v_threshold
@@ -1283,7 +1283,7 @@ BEGIN
         ORDER BY COALESCE(min_score, 0) DESC
         LIMIT 1;
     END IF;
-    
+
     -- Create evaluation snapshot
     INSERT INTO "ob-poc".case_evaluation_snapshots (
         case_id,
@@ -1300,7 +1300,7 @@ BEGIN
         v_threshold.threshold_id, v_threshold.recommended_action, v_threshold.escalation_level,
         p_evaluator
     ) RETURNING snapshot_id INTO v_snapshot_id;
-    
+
     RETURN v_snapshot_id;
 END;
 $$;
@@ -1448,19 +1448,19 @@ BEGIN
     IF p_from_status = p_to_status THEN
         RETURN true;
     END IF;
-    
+
     RETURN CASE p_from_status
-        WHEN 'DISCOVERED' THEN 
+        WHEN 'DISCOVERED' THEN
             p_to_status IN ('VALIDATION_PENDING', 'VALIDATION_FAILED')
-        WHEN 'VALIDATION_PENDING' THEN 
+        WHEN 'VALIDATION_PENDING' THEN
             p_to_status IN ('VALIDATED', 'VALIDATION_FAILED', 'DISCOVERED')
-        WHEN 'VALIDATED' THEN 
+        WHEN 'VALIDATED' THEN
             p_to_status IN ('UPDATE_PENDING_PROOF')  -- Material change triggers re-validation
-        WHEN 'UPDATE_PENDING_PROOF' THEN 
+        WHEN 'UPDATE_PENDING_PROOF' THEN
             p_to_status IN ('VALIDATED', 'VALIDATION_FAILED')
-        WHEN 'VALIDATION_FAILED' THEN 
+        WHEN 'VALIDATION_FAILED' THEN
             p_to_status IN ('VALIDATION_PENDING', 'DISCOVERED')  -- Retry or start over
-        ELSE 
+        ELSE
             false
     END;
 END;
@@ -1486,28 +1486,28 @@ BEGIN
     IF p_from_status = p_to_status THEN
         RETURN true;
     END IF;
-    
+
     -- Handle NULL (new record) - can start as SUSPECTED or PENDING
     IF p_from_status IS NULL THEN
         RETURN p_to_status IN ('SUSPECTED', 'PENDING');
     END IF;
-    
+
     RETURN CASE p_from_status
-        WHEN 'SUSPECTED' THEN 
+        WHEN 'SUSPECTED' THEN
             p_to_status IN ('PROVEN', 'PENDING', 'FAILED', 'REMOVED')
-        WHEN 'PENDING' THEN 
+        WHEN 'PENDING' THEN
             p_to_status IN ('PROVEN', 'VERIFIED', 'FAILED', 'DISPUTED', 'REMOVED')
-        WHEN 'PROVEN' THEN 
+        WHEN 'PROVEN' THEN
             p_to_status IN ('VERIFIED', 'DISPUTED', 'REMOVED')
-        WHEN 'VERIFIED' THEN 
+        WHEN 'VERIFIED' THEN
             p_to_status IN ('DISPUTED', 'REMOVED')  -- Can be challenged or ownership changes
-        WHEN 'FAILED' THEN 
+        WHEN 'FAILED' THEN
             p_to_status IN ('SUSPECTED', 'PENDING')  -- Retry
-        WHEN 'DISPUTED' THEN 
+        WHEN 'DISPUTED' THEN
             p_to_status IN ('PROVEN', 'VERIFIED', 'REMOVED', 'FAILED')  -- Resolution
-        WHEN 'REMOVED' THEN 
+        WHEN 'REMOVED' THEN
             false  -- Terminal state
-        ELSE 
+        ELSE
             false
     END;
 END;
@@ -1533,8 +1533,8 @@ BEGIN
         INSERT INTO "ob-poc".cbu_change_log (
             cbu_id, change_type, field_name, old_value, new_value, changed_at
         ) VALUES (
-            NEW.cbu_id, 
-            'STATUS_CHANGE', 
+            NEW.cbu_id,
+            'STATUS_CHANGE',
             'status',
             to_jsonb(OLD.status),
             to_jsonb(NEW.status),
@@ -1673,7 +1673,7 @@ BEGIN
     IF NEW.commercial_client_entity_id IS NOT NULL THEN
         -- Ensure role exists (upsert)
         INSERT INTO "ob-poc".cbu_entity_roles (cbu_id, entity_id, role_id)
-        SELECT 
+        SELECT
             NEW.cbu_id,
             NEW.commercial_client_entity_id,
             r.role_id
@@ -1681,18 +1681,18 @@ BEGIN
         WHERE r.name = 'COMMERCIAL_CLIENT'
         ON CONFLICT (cbu_id, entity_id, role_id) DO NOTHING;
     END IF;
-    
+
     -- If commercial_client_entity_id is being cleared
-    IF OLD IS NOT NULL 
-       AND OLD.commercial_client_entity_id IS NOT NULL 
+    IF OLD IS NOT NULL
+       AND OLD.commercial_client_entity_id IS NOT NULL
        AND (NEW.commercial_client_entity_id IS NULL OR NEW.commercial_client_entity_id != OLD.commercial_client_entity_id) THEN
         -- Remove old role
-        DELETE FROM "ob-poc".cbu_entity_roles 
-        WHERE cbu_id = NEW.cbu_id 
+        DELETE FROM "ob-poc".cbu_entity_roles
+        WHERE cbu_id = NEW.cbu_id
           AND entity_id = OLD.commercial_client_entity_id
           AND role_id = (SELECT role_id FROM "ob-poc".roles WHERE name = 'COMMERCIAL_CLIENT');
     END IF;
-    
+
     RETURN NEW;
 END;
 $$;
@@ -1824,7 +1824,7 @@ BEGIN
         sort_order = EXCLUDED.sort_order,
         updated_at = NOW()
     RETURNING role_id INTO v_role_id;
-    
+
     RETURN v_role_id;
 END;
 $$;
@@ -1846,24 +1846,24 @@ BEGIN
     -- Get role details
     SELECT * INTO v_role FROM "ob-poc".roles WHERE name = UPPER(p_role_name);
     IF NOT FOUND THEN
-        RETURN QUERY SELECT FALSE, 'ROLE_NOT_FOUND'::VARCHAR(50), 
+        RETURN QUERY SELECT FALSE, 'ROLE_NOT_FOUND'::VARCHAR(50),
             format('Role %s does not exist', p_role_name);
         RETURN;
     END IF;
-    
+
     -- Get entity details
     SELECT e.entity_id, e.name, et.entity_category, et.type_code
     INTO v_entity
     FROM "ob-poc".entities e
     JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
     WHERE e.entity_id = p_entity_id;
-    
+
     IF NOT FOUND THEN
         RETURN QUERY SELECT FALSE, 'ENTITY_NOT_FOUND'::VARCHAR(50),
             format('Entity %s does not exist', p_entity_id);
         RETURN;
     END IF;
-    
+
     -- Check natural person constraint
     IF v_role.natural_person_only AND v_entity.entity_category != 'PERSON' THEN
         RETURN QUERY SELECT FALSE, 'NATURAL_PERSON_REQUIRED'::VARCHAR(50),
@@ -1871,7 +1871,7 @@ BEGIN
                    p_role_name, v_entity.name, v_entity.entity_category);
         RETURN;
     END IF;
-    
+
     -- Check legal entity constraint
     IF v_role.legal_entity_only AND v_entity.entity_category = 'PERSON' THEN
         RETURN QUERY SELECT FALSE, 'LEGAL_ENTITY_REQUIRED'::VARCHAR(50),
@@ -1879,7 +1879,7 @@ BEGIN
                    p_role_name, v_entity.name);
         RETURN;
     END IF;
-    
+
     -- Check entity category compatibility
     IF v_role.compatible_entity_categories IS NOT NULL THEN
         IF NOT (v_role.compatible_entity_categories ? v_entity.entity_category) THEN
@@ -1889,13 +1889,13 @@ BEGIN
             RETURN;
         END IF;
     END IF;
-    
+
     -- Get existing roles for this entity in this CBU
     SELECT array_agg(r.name) INTO v_existing_roles
     FROM "ob-poc".cbu_entity_roles cer
     JOIN "ob-poc".roles r ON cer.role_id = r.role_id
     WHERE cer.entity_id = p_entity_id AND cer.cbu_id = p_cbu_id;
-    
+
     -- Check for incompatible role combinations
     FOR v_incompatible IN
         SELECT ri.role_a, ri.role_b, ri.reason, ri.exception_allowed
@@ -1922,7 +1922,7 @@ BEGIN
             END IF;
         END IF;
     END LOOP;
-    
+
     -- All checks passed
     RETURN QUERY SELECT TRUE, NULL::VARCHAR(50), NULL::TEXT;
 END;
@@ -1946,10 +1946,10 @@ CREATE FUNCTION "ob-poc".validate_ubo_status_transition() RETURNS trigger
 BEGIN
     IF OLD.verification_status IS DISTINCT FROM NEW.verification_status THEN
         IF NOT "ob-poc".is_valid_ubo_transition(OLD.verification_status, NEW.verification_status) THEN
-            RAISE EXCEPTION 'Invalid UBO status transition from % to %', 
+            RAISE EXCEPTION 'Invalid UBO status transition from % to %',
                 OLD.verification_status, NEW.verification_status;
         END IF;
-        
+
         -- If transitioning to PROVEN, check evidence requirements
         IF NEW.verification_status = 'PROVEN' THEN
             DECLARE
@@ -1957,20 +1957,20 @@ BEGIN
             BEGIN
                 SELECT can_prove INTO v_can_prove
                 FROM "ob-poc".can_prove_ubo(NEW.ubo_id);
-                
+
                 IF NOT v_can_prove THEN
                     RAISE WARNING 'UBO % marked as PROVEN without complete evidence', NEW.ubo_id;
                     -- Note: Warning only, not blocking - allows override
                 END IF;
             END;
         END IF;
-        
+
         -- Set proof_date when transitioning to PROVEN
         IF NEW.verification_status = 'PROVEN' AND NEW.proof_date IS NULL THEN
             NEW.proof_date := now();
         END IF;
     END IF;
-    
+
     RETURN NEW;
 END;
 $$;
@@ -5252,6 +5252,123 @@ CREATE TABLE "ob-poc".dsl_snapshots (
     domains_used text[] DEFAULT '{}'::text[] NOT NULL,
     executed_at timestamp with time zone DEFAULT now() NOT NULL,
     execution_ms integer
+);
+
+
+--
+-- Name: dsl_verbs; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".dsl_verbs (
+    verb_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    domain text NOT NULL,
+    verb_name text NOT NULL,
+    full_name text GENERATED ALWAYS AS ((domain || '.'::text) || verb_name) STORED,
+    description text,
+    behavior text DEFAULT 'crud'::text NOT NULL,
+    category text,
+    search_text text,
+    intent_patterns text[],
+    workflow_phases text[],
+    graph_contexts text[],
+    example_short text,
+    example_dsl text,
+    typical_next text[],
+    produces_type text,
+    produces_subtype text,
+    consumes jsonb DEFAULT '[]'::jsonb,
+    lifecycle_entity_arg text,
+    requires_states text[],
+    transitions_to text,
+    source text DEFAULT 'yaml'::text NOT NULL,
+    yaml_hash text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE dsl_verbs; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".dsl_verbs IS 'DSL verb definitions synced from YAML, with RAG metadata for agent discovery';
+
+
+--
+-- Name: dsl_verb_categories; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".dsl_verb_categories (
+    category_code text NOT NULL,
+    label text NOT NULL,
+    description text,
+    display_order integer DEFAULT 100,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE dsl_verb_categories; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".dsl_verb_categories IS 'Verb category reference data for grouping';
+
+
+--
+-- Name: dsl_workflow_phases; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".dsl_workflow_phases (
+    phase_code text NOT NULL,
+    label text NOT NULL,
+    description text,
+    phase_order integer NOT NULL,
+    transitions_to text[],
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE dsl_workflow_phases; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".dsl_workflow_phases IS 'KYC workflow phase reference data';
+
+
+--
+-- Name: dsl_graph_contexts; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".dsl_graph_contexts (
+    context_code text NOT NULL,
+    label text NOT NULL,
+    description text,
+    priority integer DEFAULT 50,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE dsl_graph_contexts; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".dsl_graph_contexts IS 'Graph cursor context reference data';
+
+
+--
+-- Name: dsl_verb_sync_log; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".dsl_verb_sync_log (
+    sync_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    synced_at timestamp with time zone DEFAULT now() NOT NULL,
+    verbs_added integer DEFAULT 0 NOT NULL,
+    verbs_updated integer DEFAULT 0 NOT NULL,
+    verbs_unchanged integer DEFAULT 0 NOT NULL,
+    verbs_removed integer DEFAULT 0 NOT NULL,
+    source_hash text,
+    duration_ms integer,
+    error_message text
 );
 
 
@@ -10658,6 +10775,54 @@ ALTER TABLE ONLY "ob-poc".dsl_snapshots
 
 
 --
+-- Name: dsl_verbs dsl_verbs_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".dsl_verbs
+    ADD CONSTRAINT dsl_verbs_pkey PRIMARY KEY (verb_id);
+
+
+--
+-- Name: dsl_verbs dsl_verbs_domain_verb_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".dsl_verbs
+    ADD CONSTRAINT dsl_verbs_domain_verb_name_key UNIQUE (domain, verb_name);
+
+
+--
+-- Name: dsl_verb_categories dsl_verb_categories_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".dsl_verb_categories
+    ADD CONSTRAINT dsl_verb_categories_pkey PRIMARY KEY (category_code);
+
+
+--
+-- Name: dsl_workflow_phases dsl_workflow_phases_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".dsl_workflow_phases
+    ADD CONSTRAINT dsl_workflow_phases_pkey PRIMARY KEY (phase_code);
+
+
+--
+-- Name: dsl_graph_contexts dsl_graph_contexts_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".dsl_graph_contexts
+    ADD CONSTRAINT dsl_graph_contexts_pkey PRIMARY KEY (context_code);
+
+
+--
+-- Name: dsl_verb_sync_log dsl_verb_sync_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".dsl_verb_sync_log
+    ADD CONSTRAINT dsl_verb_sync_log_pkey PRIMARY KEY (sync_id);
+
+
+--
 -- Name: dsl_versions dsl_versions_domain_id_version_number_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -13451,6 +13616,41 @@ CREATE INDEX idx_dsl_sessions_status ON "ob-poc".dsl_sessions USING btree (statu
 --
 
 CREATE INDEX idx_dsl_snapshots_session ON "ob-poc".dsl_snapshots USING btree (session_id);
+
+
+--
+-- Name: idx_dsl_verbs_search; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_dsl_verbs_search ON "ob-poc".dsl_verbs USING gin (to_tsvector('english'::regconfig, COALESCE(search_text, ''::text)));
+
+
+--
+-- Name: idx_dsl_verbs_category; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_dsl_verbs_category ON "ob-poc".dsl_verbs USING btree (category);
+
+
+--
+-- Name: idx_dsl_verbs_workflow; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_dsl_verbs_workflow ON "ob-poc".dsl_verbs USING gin (workflow_phases);
+
+
+--
+-- Name: idx_dsl_verbs_graph_ctx; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_dsl_verbs_graph_ctx ON "ob-poc".dsl_verbs USING gin (graph_contexts);
+
+
+--
+-- Name: idx_dsl_verbs_domain; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_dsl_verbs_domain ON "ob-poc".dsl_verbs USING btree (domain);
 
 
 --
@@ -17786,4 +17986,3 @@ ALTER TABLE ONLY teams.teams
 --
 
 \unrestrict aVm5ARkNirTm6VbEE3huwGP6nXmuetH4WdmDIduE0Qu6UXBrOwtc6towbZwF2N6
-

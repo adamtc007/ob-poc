@@ -25,10 +25,15 @@ use crate::state::AppState;
 use ob_poc::api::{
     create_agent_router_with_sessions, create_attribute_router, create_client_router,
     create_dsl_viewer_router, create_entity_router, create_resolution_router, create_session_store,
+    create_verb_discovery_router,
 };
 
 // Import resolution store from services
 use ob_poc::services::create_resolution_store;
+
+// Import verb sync and config loader for startup sync
+use ob_poc::dsl_v2::ConfigLoader;
+use ob_poc::session::VerbSyncService;
 
 // EntityGateway for entity resolution
 use entity_gateway::{
@@ -70,6 +75,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Err(format!("Database connection failed: {}", e).into());
         }
     };
+
+    // =========================================================================
+    // Sync verb definitions from YAML to database
+    // =========================================================================
+    tracing::info!("Syncing verb definitions to database...");
+
+    let verb_sync_service = VerbSyncService::new(pool.clone());
+    let config_loader = ConfigLoader::from_env();
+
+    match config_loader.load_verbs() {
+        Ok(verbs_config) => {
+            let registry = ob_poc::dsl_v2::RuntimeVerbRegistry::from_config(&verbs_config);
+            match verb_sync_service.sync_all(&registry).await {
+                Ok(result) => {
+                    tracing::info!(
+                        "Verb sync complete: {} added, {} updated, {} unchanged in {}ms",
+                        result.verbs_added,
+                        result.verbs_updated,
+                        result.verbs_unchanged,
+                        result.duration_ms
+                    );
+                }
+                Err(e) => {
+                    tracing::warn!("Verb sync failed (non-fatal): {}", e);
+                    tracing::warn!("Verb discovery will use fallback behavior");
+                }
+            }
+        }
+        Err(e) => {
+            tracing::warn!("Failed to load verb config (non-fatal): {}", e);
+            tracing::warn!("Verb discovery will use fallback behavior");
+        }
+    }
 
     // =========================================================================
     // Start embedded EntityGateway gRPC service
@@ -227,7 +265,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(create_dsl_viewer_router(pool.clone()))
         .merge(create_resolution_router(sessions.clone(), resolution_store))
         // Client portal router (separate auth, scoped access)
-        .merge(create_client_router(pool.clone(), sessions));
+        .merge(create_client_router(pool.clone(), sessions))
+        // Verb discovery router (RAG-style verb suggestions)
+        .merge(create_verb_discovery_router(pool.clone()));
 
     // Build main app router with state
     // Session routes (including /bind) now share the same session store via create_agent_router_with_sessions
@@ -280,6 +320,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("  /api/agent/*          - DSL generation");
     tracing::info!("  /api/entity/search    - Entity search");
     tracing::info!("  /api/dsl/*            - DSL viewer");
+    tracing::info!("  /api/verbs/discover   - Verb discovery (RAG)");
+    tracing::info!("  /api/verbs/agent-context - Agent verb context");
     tracing::info!("");
     tracing::info!("Client Portal API:");
     tracing::info!("  /api/client/login     - Client authentication");

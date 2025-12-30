@@ -194,6 +194,17 @@ pub async fn get_cbu_graph(
                 .build(&repo)
                 .await
         }
+        ViewMode::Trading => {
+            // Trading view: CBU as container with trading entities (Asset Owner, IM, ManCo, etc.)
+            CbuGraphBuilder::new(cbu_id)
+                .with_custody(false)
+                .with_kyc(false)
+                .with_ubo(false)
+                .with_services(false)
+                .with_entities(true) // Load entities for trading roles
+                .build(&repo)
+                .await
+        }
     }
     .map_err(|e| {
         tracing::error!("Graph build error: {}", e);
@@ -210,6 +221,9 @@ pub async fn get_cbu_graph(
         }
         ViewMode::ProductsOnly => {
             graph.filter_to_products_only();
+        }
+        ViewMode::Trading => {
+            graph.filter_to_trading_entities();
         }
         ViewMode::KycUbo => {
             // No additional filtering

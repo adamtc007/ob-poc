@@ -2271,6 +2271,82 @@ The context panel (`rust/crates/ob-poc-ui/src/panels/context.rs`) displays sessi
 | `rust/src/api/session_routes.rs` | `/focus` endpoint handler |
 | `rust/src/api/agent_service.rs` | `build_vocab_prompt()` with verb filtering |
 
+### Unified Session Context & Verb Discovery
+
+The session module (`rust/src/session/`) provides a unified context model for agent interactions with automatic verb discovery.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    UnifiedSessionContext                         │
+│  - execution: ExecutionState (symbols, recent_commands)         │
+│  - graph: EntityGraph (cursor, depth, visible_types)            │
+│  - viewport: Viewport (layout, selection, zoom)                 │
+│  - scope: SessionScope (cbu_ids, entity_types, jurisdictions)   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   VerbDiscoveryService                           │
+│  Queries dsl_verbs table for contextual verb suggestions        │
+│  Filters by: intent, workflow_phase, graph_context, category    │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   EnhancedContextBuilder                         │
+│  Combines session bindings + verb discovery → LLM prompt        │
+│  Generates structured AgentVerbContext for DSL generation       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key Types:**
+
+| Type | Module | Purpose |
+|------|--------|---------|
+| `UnifiedSessionContext` | `session/mod.rs` | Complete session state container |
+| `VerbDiscoveryService` | `session/verb_discovery.rs` | Query contextual verb suggestions |
+| `AgentVerbContext` | `session/verb_discovery.rs` | Grouped verb suggestions with examples |
+| `EnhancedContextBuilder` | `session/enhanced_context.rs` | Build LLM context from session |
+| `VerbSyncService` | `session/verb_sync.rs` | Sync YAML verbs to `dsl_verbs` table |
+
+**Database Table: `dsl_verbs`**
+
+| Column | Type | Description |
+|--------|------|-------------|
+| verb_id | uuid | Primary key |
+| domain | varchar(50) | Domain name (cbu, entity, kyc-case) |
+| verb_name | varchar(100) | Full verb name (domain.action) |
+| description | text | Verb description |
+| example_short | text | Short usage example |
+| intent_patterns | text[] | Intent keywords for matching |
+| workflow_phases | text[] | Applicable phases (ENTITY_COLLECTION, SCREENING) |
+| graph_contexts | text[] | Graph contexts (has_cbu, has_entities) |
+| typical_next | text[] | Common follow-up verbs |
+| category | varchar(50) | Category (core, kyc, custody, etc.) |
+| config_hash | varchar(64) | SHA256 hash for change detection |
+
+**API Endpoints:**
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/session/:id/verbs` | Get contextual verb suggestions |
+| `POST /api/admin/verbs/sync` | Sync verb config to database |
+
+**Usage Example:**
+
+```rust
+// Build enhanced context from session
+let builder = EnhancedContextBuilder::from_session_context(pool.clone(), &session);
+let context = builder
+    .with_user_intent("add director")
+    .with_workflow_phase("ENTITY_COLLECTION")
+    .build()
+    .await?;
+
+// Get prompt section for LLM
+let prompt = context.prompt_section.unwrap_or_default();
+```
+
 ### Optimistic Locking for DSL Execution
 
 When multiple agent sessions work on the same CBU simultaneously, the system uses **optimistic locking** to detect conflicts and prevent silent data overwrites.
