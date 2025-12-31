@@ -517,27 +517,25 @@ impl VerbSyncService {
             }
         }
 
-        // Update workflow phases (reverse mapping: phase -> verbs)
+        // Update workflow phases (forward mapping: verb -> phase)
         let workflow_phases = get_workflow_phases();
-        for (phase, verbs) in workflow_phases {
-            for verb in verbs {
-                sqlx::query(
-                    r#"
-                    UPDATE "ob-poc".dsl_verbs
-                    SET workflow_phases = array_append(
-                        COALESCE(workflow_phases, ARRAY[]::text[]),
-                        $1
-                    ),
-                    updated_at = NOW()
-                    WHERE full_name = $2
-                      AND NOT ($1 = ANY(COALESCE(workflow_phases, ARRAY[]::text[])))
-                    "#,
-                )
-                .bind(phase)
-                .bind(verb)
-                .execute(&self.pool)
-                .await?;
-            }
+        for (verb, phase) in workflow_phases {
+            sqlx::query(
+                r#"
+                UPDATE "ob-poc".dsl_verbs
+                SET workflow_phases = array_append(
+                    COALESCE(workflow_phases, ARRAY[]::text[]),
+                    $1
+                ),
+                updated_at = NOW()
+                WHERE full_name = $2
+                  AND NOT ($1 = ANY(COALESCE(workflow_phases, ARRAY[]::text[])))
+                "#,
+            )
+            .bind(phase)
+            .bind(verb)
+            .execute(&self.pool)
+            .await?;
         }
 
         // Update graph contexts (reverse mapping)

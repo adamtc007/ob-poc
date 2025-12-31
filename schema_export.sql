@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict RYmkBdlU5QKpjemop1mvGKZwPvCeZzoixwgubozR2mZfneH0mIWqI0fEAOErHVM
+\restrict hZIPIScftbutj8CN4bJMxjcXwPDJrCGLl8f6WmPaSTgAwBTCdUPVz9DYohfN1o8
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -216,6 +216,20 @@ CREATE FUNCTION custody.sync_counterparty_key() RETURNS trigger
 BEGIN
   NEW.counterparty_key := COALESCE(NEW.counterparty_entity_id, '00000000-0000-0000-0000-000000000000'::uuid);
   RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: update_updated_at_column(); Type: FUNCTION; Schema: custody; Owner: -
+--
+
+CREATE FUNCTION custody.update_updated_at_column() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
 END;
 $$;
 
@@ -2913,6 +2927,36 @@ COMMENT ON TABLE custody.cbu_cash_sweep_config IS 'Cash sweep configuration for 
 
 
 --
+-- Name: cbu_cross_border_config; Type: TABLE; Schema: custody; Owner: -
+--
+
+CREATE TABLE custody.cbu_cross_border_config (
+    config_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cbu_id uuid NOT NULL,
+    source_market_id uuid NOT NULL,
+    target_market_id uuid NOT NULL,
+    settlement_method character varying(20) NOT NULL,
+    bridge_location_id uuid,
+    preferred_currency character varying(3),
+    fx_timing character varying(20),
+    additional_days integer DEFAULT 0,
+    special_instructions text,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT cbu_cross_border_config_fx_timing_check CHECK (((fx_timing)::text = ANY ((ARRAY['PRE_SETTLEMENT'::character varying, 'ON_SETTLEMENT'::character varying, 'POST_SETTLEMENT'::character varying])::text[]))),
+    CONSTRAINT cbu_cross_border_config_settlement_method_check CHECK (((settlement_method)::text = ANY ((ARRAY['BRIDGE'::character varying, 'DIRECT'::character varying, 'VIA_ICSD'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE cbu_cross_border_config; Type: COMMENT; Schema: custody; Owner: -
+--
+
+COMMENT ON TABLE custody.cbu_cross_border_config IS 'Cross-border settlement routing configuration';
+
+
+--
 -- Name: cbu_im_assignments; Type: TABLE; Schema: custody; Owner: -
 --
 
@@ -3020,6 +3064,59 @@ Links to provisioned pricing feed resource for traceability.';
 
 
 --
+-- Name: cbu_settlement_chains; Type: TABLE; Schema: custody; Owner: -
+--
+
+CREATE TABLE custody.cbu_settlement_chains (
+    chain_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cbu_id uuid NOT NULL,
+    chain_name character varying(100) NOT NULL,
+    market_id uuid,
+    instrument_class_id uuid,
+    currency character varying(3),
+    settlement_type character varying(10),
+    is_default boolean DEFAULT false NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    effective_date date,
+    notes text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE cbu_settlement_chains; Type: COMMENT; Schema: custody; Owner: -
+--
+
+COMMENT ON TABLE custody.cbu_settlement_chains IS 'Settlement chain definitions per CBU';
+
+
+--
+-- Name: cbu_settlement_location_preferences; Type: TABLE; Schema: custody; Owner: -
+--
+
+CREATE TABLE custody.cbu_settlement_location_preferences (
+    preference_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cbu_id uuid NOT NULL,
+    market_id uuid,
+    instrument_class_id uuid,
+    preferred_location_id uuid NOT NULL,
+    priority integer DEFAULT 50 NOT NULL,
+    reason text,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE cbu_settlement_location_preferences; Type: COMMENT; Schema: custody; Owner: -
+--
+
+COMMENT ON TABLE custody.cbu_settlement_location_preferences IS 'Preferred settlement locations per CBU/market/instrument';
+
+
+--
 -- Name: cbu_ssi; Type: TABLE; Schema: custody; Owner: -
 --
 
@@ -3074,6 +3171,100 @@ CREATE TABLE custody.cbu_ssi_agent_override (
     is_active boolean DEFAULT true,
     created_at timestamp with time zone DEFAULT now()
 );
+
+
+--
+-- Name: cbu_tax_reclaim_config; Type: TABLE; Schema: custody; Owner: -
+--
+
+CREATE TABLE custody.cbu_tax_reclaim_config (
+    config_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cbu_id uuid NOT NULL,
+    source_jurisdiction_id uuid NOT NULL,
+    reclaim_method character varying(20) NOT NULL,
+    service_provider_entity_id uuid,
+    minimum_reclaim_amount numeric(15,2),
+    minimum_reclaim_currency character varying(3),
+    batch_frequency character varying(20),
+    expected_recovery_days integer,
+    fee_structure jsonb,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT cbu_tax_reclaim_config_batch_frequency_check CHECK (((batch_frequency)::text = ANY ((ARRAY['IMMEDIATE'::character varying, 'WEEKLY'::character varying, 'MONTHLY'::character varying, 'QUARTERLY'::character varying])::text[]))),
+    CONSTRAINT cbu_tax_reclaim_config_reclaim_method_check CHECK (((reclaim_method)::text = ANY ((ARRAY['AUTOMATIC'::character varying, 'MANUAL'::character varying, 'OUTSOURCED'::character varying, 'NO_RECLAIM'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE cbu_tax_reclaim_config; Type: COMMENT; Schema: custody; Owner: -
+--
+
+COMMENT ON TABLE custody.cbu_tax_reclaim_config IS 'Tax reclaim processing configuration per CBU/jurisdiction';
+
+
+--
+-- Name: cbu_tax_reporting; Type: TABLE; Schema: custody; Owner: -
+--
+
+CREATE TABLE custody.cbu_tax_reporting (
+    reporting_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cbu_id uuid NOT NULL,
+    reporting_regime character varying(20) NOT NULL,
+    reporting_jurisdiction_id uuid NOT NULL,
+    reporting_status character varying(20) DEFAULT 'REQUIRED'::character varying,
+    giin character varying(30),
+    registration_date date,
+    reporting_entity_id uuid,
+    sponsor_entity_id uuid,
+    notes text,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT cbu_tax_reporting_reporting_regime_check CHECK (((reporting_regime)::text = ANY ((ARRAY['FATCA'::character varying, 'CRS'::character varying, 'DAC6'::character varying, 'UK_CDOT'::character varying, 'QI'::character varying, '871M'::character varying])::text[]))),
+    CONSTRAINT cbu_tax_reporting_reporting_status_check CHECK (((reporting_status)::text = ANY ((ARRAY['REQUIRED'::character varying, 'EXEMPT'::character varying, 'PARTICIPATING'::character varying, 'PENDING'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE cbu_tax_reporting; Type: COMMENT; Schema: custody; Owner: -
+--
+
+COMMENT ON TABLE custody.cbu_tax_reporting IS 'Tax reporting obligations (FATCA, CRS, etc.) per CBU';
+
+
+--
+-- Name: cbu_tax_status; Type: TABLE; Schema: custody; Owner: -
+--
+
+CREATE TABLE custody.cbu_tax_status (
+    status_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cbu_id uuid NOT NULL,
+    tax_jurisdiction_id uuid NOT NULL,
+    investor_type character varying(20) NOT NULL,
+    tax_exempt boolean DEFAULT false NOT NULL,
+    exempt_reason text,
+    documentation_status character varying(20) DEFAULT 'PENDING'::character varying,
+    documentation_expiry date,
+    applicable_treaty_rate numeric(5,3),
+    qualified_intermediary boolean DEFAULT false NOT NULL,
+    qi_ein character varying(20),
+    fatca_status character varying(20),
+    crs_status character varying(20),
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT cbu_tax_status_documentation_status_check CHECK (((documentation_status)::text = ANY ((ARRAY['PENDING'::character varying, 'SUBMITTED'::character varying, 'VALIDATED'::character varying, 'EXPIRED'::character varying])::text[]))),
+    CONSTRAINT cbu_tax_status_fatca_status_check CHECK (((fatca_status)::text = ANY ((ARRAY['EXEMPT'::character varying, 'PARTICIPATING'::character varying, 'NON_PARTICIPATING'::character varying])::text[]))),
+    CONSTRAINT cbu_tax_status_investor_type_check CHECK (((investor_type)::text = ANY ((ARRAY['PENSION'::character varying, 'SOVEREIGN'::character varying, 'CHARITY'::character varying, 'CORPORATE'::character varying, 'INDIVIDUAL'::character varying, 'FUND'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE cbu_tax_status; Type: COMMENT; Schema: custody; Owner: -
+--
+
+COMMENT ON TABLE custody.cbu_tax_status IS 'CBU tax status per jurisdiction';
 
 
 --
@@ -3331,6 +3522,61 @@ COMMENT ON TABLE custody.security_types IS 'SMPG/ALERT security type codes. Used
 
 
 --
+-- Name: settlement_chain_hops; Type: TABLE; Schema: custody; Owner: -
+--
+
+CREATE TABLE custody.settlement_chain_hops (
+    hop_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    chain_id uuid NOT NULL,
+    hop_sequence integer NOT NULL,
+    role character varying(20) NOT NULL,
+    intermediary_entity_id uuid,
+    intermediary_bic character varying(11),
+    intermediary_name character varying(200),
+    account_number character varying(50),
+    ssi_id uuid,
+    instructions text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT settlement_chain_hops_role_check CHECK (((role)::text = ANY ((ARRAY['CUSTODIAN'::character varying, 'SUBCUSTODIAN'::character varying, 'AGENT'::character varying, 'CSD'::character varying, 'ICSD'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE settlement_chain_hops; Type: COMMENT; Schema: custody; Owner: -
+--
+
+COMMENT ON TABLE custody.settlement_chain_hops IS 'Individual hops/intermediaries in a settlement chain';
+
+
+--
+-- Name: settlement_locations; Type: TABLE; Schema: custody; Owner: -
+--
+
+CREATE TABLE custody.settlement_locations (
+    location_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    location_code character varying(20) NOT NULL,
+    location_name character varying(200) NOT NULL,
+    location_type character varying(20) NOT NULL,
+    country_code character varying(2),
+    bic character varying(11),
+    operating_hours jsonb,
+    settlement_cycles jsonb,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT settlement_locations_location_type_check CHECK (((location_type)::text = ANY ((ARRAY['CSD'::character varying, 'ICSD'::character varying, 'CUSTODIAN'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE settlement_locations; Type: COMMENT; Schema: custody; Owner: -
+--
+
+COMMENT ON TABLE custody.settlement_locations IS 'Reference data for CSDs, ICSDs, and custodian locations';
+
+
+--
 -- Name: ssi_booking_rules; Type: TABLE; Schema: custody; Owner: -
 --
 
@@ -3410,6 +3656,65 @@ CREATE TABLE custody.subcustodian_network (
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now()
 );
+
+
+--
+-- Name: tax_jurisdictions; Type: TABLE; Schema: custody; Owner: -
+--
+
+CREATE TABLE custody.tax_jurisdictions (
+    jurisdiction_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    jurisdiction_code character varying(10) NOT NULL,
+    jurisdiction_name character varying(200) NOT NULL,
+    country_code character varying(2) NOT NULL,
+    default_withholding_rate numeric(5,3),
+    reclaim_available boolean DEFAULT true NOT NULL,
+    reclaim_deadline_days integer,
+    tax_authority_name character varying(200),
+    tax_authority_code character varying(50),
+    documentation_requirements jsonb,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE tax_jurisdictions; Type: COMMENT; Schema: custody; Owner: -
+--
+
+COMMENT ON TABLE custody.tax_jurisdictions IS 'Tax jurisdiction reference data with withholding rates';
+
+
+--
+-- Name: tax_treaty_rates; Type: TABLE; Schema: custody; Owner: -
+--
+
+CREATE TABLE custody.tax_treaty_rates (
+    treaty_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    source_jurisdiction_id uuid NOT NULL,
+    investor_jurisdiction_id uuid NOT NULL,
+    income_type character varying(20) NOT NULL,
+    instrument_class_id uuid,
+    standard_rate numeric(5,3) NOT NULL,
+    treaty_rate numeric(5,3) NOT NULL,
+    beneficial_owner_required boolean DEFAULT true NOT NULL,
+    documentation_codes text[],
+    effective_date date NOT NULL,
+    expiry_date date,
+    treaty_reference character varying(100),
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT tax_treaty_rates_income_type_check CHECK (((income_type)::text = ANY ((ARRAY['DIVIDEND'::character varying, 'INTEREST'::character varying, 'ROYALTY'::character varying, 'CAPITAL_GAIN'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE tax_treaty_rates; Type: COMMENT; Schema: custody; Owner: -
+--
+
+COMMENT ON TABLE custody.tax_treaty_rates IS 'Bilateral tax treaty rates between jurisdictions';
 
 
 --
@@ -10293,6 +10598,22 @@ ALTER TABLE ONLY custody.cbu_cash_sweep_config
 
 
 --
+-- Name: cbu_cross_border_config cbu_cross_border_config_cbu_id_source_market_id_target_mark_key; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_cross_border_config
+    ADD CONSTRAINT cbu_cross_border_config_cbu_id_source_market_id_target_mark_key UNIQUE (cbu_id, source_market_id, target_market_id);
+
+
+--
+-- Name: cbu_cross_border_config cbu_cross_border_config_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_cross_border_config
+    ADD CONSTRAINT cbu_cross_border_config_pkey PRIMARY KEY (config_id);
+
+
+--
 -- Name: cbu_im_assignments cbu_im_assignments_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
 --
 
@@ -10325,6 +10646,38 @@ ALTER TABLE ONLY custody.cbu_pricing_config
 
 
 --
+-- Name: cbu_settlement_chains cbu_settlement_chains_cbu_id_chain_name_key; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_settlement_chains
+    ADD CONSTRAINT cbu_settlement_chains_cbu_id_chain_name_key UNIQUE (cbu_id, chain_name);
+
+
+--
+-- Name: cbu_settlement_chains cbu_settlement_chains_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_settlement_chains
+    ADD CONSTRAINT cbu_settlement_chains_pkey PRIMARY KEY (chain_id);
+
+
+--
+-- Name: cbu_settlement_location_preferences cbu_settlement_location_prefe_cbu_id_market_id_instrument_c_key; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_settlement_location_preferences
+    ADD CONSTRAINT cbu_settlement_location_prefe_cbu_id_market_id_instrument_c_key UNIQUE (cbu_id, market_id, instrument_class_id, preferred_location_id);
+
+
+--
+-- Name: cbu_settlement_location_preferences cbu_settlement_location_preferences_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_settlement_location_preferences
+    ADD CONSTRAINT cbu_settlement_location_preferences_pkey PRIMARY KEY (preference_id);
+
+
+--
 -- Name: cbu_ssi_agent_override cbu_ssi_agent_override_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
 --
 
@@ -10354,6 +10707,54 @@ ALTER TABLE ONLY custody.cbu_ssi
 
 ALTER TABLE ONLY custody.cbu_ssi
     ADD CONSTRAINT cbu_ssi_pkey PRIMARY KEY (ssi_id);
+
+
+--
+-- Name: cbu_tax_reclaim_config cbu_tax_reclaim_config_cbu_id_source_jurisdiction_id_key; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_tax_reclaim_config
+    ADD CONSTRAINT cbu_tax_reclaim_config_cbu_id_source_jurisdiction_id_key UNIQUE (cbu_id, source_jurisdiction_id);
+
+
+--
+-- Name: cbu_tax_reclaim_config cbu_tax_reclaim_config_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_tax_reclaim_config
+    ADD CONSTRAINT cbu_tax_reclaim_config_pkey PRIMARY KEY (config_id);
+
+
+--
+-- Name: cbu_tax_reporting cbu_tax_reporting_cbu_id_reporting_regime_reporting_jurisdi_key; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_tax_reporting
+    ADD CONSTRAINT cbu_tax_reporting_cbu_id_reporting_regime_reporting_jurisdi_key UNIQUE (cbu_id, reporting_regime, reporting_jurisdiction_id);
+
+
+--
+-- Name: cbu_tax_reporting cbu_tax_reporting_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_tax_reporting
+    ADD CONSTRAINT cbu_tax_reporting_pkey PRIMARY KEY (reporting_id);
+
+
+--
+-- Name: cbu_tax_status cbu_tax_status_cbu_id_tax_jurisdiction_id_key; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_tax_status
+    ADD CONSTRAINT cbu_tax_status_cbu_id_tax_jurisdiction_id_key UNIQUE (cbu_id, tax_jurisdiction_id);
+
+
+--
+-- Name: cbu_tax_status cbu_tax_status_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_tax_status
+    ADD CONSTRAINT cbu_tax_status_pkey PRIMARY KEY (status_id);
 
 
 --
@@ -10517,6 +10918,38 @@ ALTER TABLE ONLY custody.security_types
 
 
 --
+-- Name: settlement_chain_hops settlement_chain_hops_chain_id_hop_sequence_key; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.settlement_chain_hops
+    ADD CONSTRAINT settlement_chain_hops_chain_id_hop_sequence_key UNIQUE (chain_id, hop_sequence);
+
+
+--
+-- Name: settlement_chain_hops settlement_chain_hops_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.settlement_chain_hops
+    ADD CONSTRAINT settlement_chain_hops_pkey PRIMARY KEY (hop_id);
+
+
+--
+-- Name: settlement_locations settlement_locations_location_code_key; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.settlement_locations
+    ADD CONSTRAINT settlement_locations_location_code_key UNIQUE (location_code);
+
+
+--
+-- Name: settlement_locations settlement_locations_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.settlement_locations
+    ADD CONSTRAINT settlement_locations_pkey PRIMARY KEY (location_id);
+
+
+--
 -- Name: ssi_booking_rules ssi_booking_rules_cbu_id_priority_rule_name_key; Type: CONSTRAINT; Schema: custody; Owner: -
 --
 
@@ -10554,6 +10987,38 @@ ALTER TABLE ONLY custody.subcustodian_network
 
 ALTER TABLE ONLY custody.subcustodian_network
     ADD CONSTRAINT subcustodian_network_pkey PRIMARY KEY (network_id);
+
+
+--
+-- Name: tax_jurisdictions tax_jurisdictions_jurisdiction_code_key; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.tax_jurisdictions
+    ADD CONSTRAINT tax_jurisdictions_jurisdiction_code_key UNIQUE (jurisdiction_code);
+
+
+--
+-- Name: tax_jurisdictions tax_jurisdictions_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.tax_jurisdictions
+    ADD CONSTRAINT tax_jurisdictions_pkey PRIMARY KEY (jurisdiction_id);
+
+
+--
+-- Name: tax_treaty_rates tax_treaty_rates_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.tax_treaty_rates
+    ADD CONSTRAINT tax_treaty_rates_pkey PRIMARY KEY (treaty_id);
+
+
+--
+-- Name: tax_treaty_rates tax_treaty_rates_source_jurisdiction_id_investor_jurisdicti_key; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.tax_treaty_rates
+    ADD CONSTRAINT tax_treaty_rates_source_jurisdiction_id_investor_jurisdicti_key UNIQUE (source_jurisdiction_id, investor_jurisdiction_id, income_type, instrument_class_id);
 
 
 --
@@ -12865,6 +13330,13 @@ CREATE INDEX idx_booking_rules_lookup ON custody.ssi_booking_rules USING btree (
 
 
 --
+-- Name: idx_cbu_cross_border_cbu; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_cbu_cross_border_cbu ON custody.cbu_cross_border_config USING btree (cbu_id);
+
+
+--
 -- Name: idx_cbu_im_active; Type: INDEX; Schema: custody; Owner: -
 --
 
@@ -12914,6 +13386,27 @@ CREATE INDEX idx_cbu_pricing_class ON custody.cbu_pricing_config USING btree (in
 
 
 --
+-- Name: idx_cbu_settlement_chains_cbu; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_cbu_settlement_chains_cbu ON custody.cbu_settlement_chains USING btree (cbu_id);
+
+
+--
+-- Name: idx_cbu_settlement_chains_market; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_cbu_settlement_chains_market ON custody.cbu_settlement_chains USING btree (market_id);
+
+
+--
+-- Name: idx_cbu_settlement_loc_prefs_cbu; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_cbu_settlement_loc_prefs_cbu ON custody.cbu_settlement_location_preferences USING btree (cbu_id);
+
+
+--
 -- Name: idx_cbu_ssi_active; Type: INDEX; Schema: custody; Owner: -
 --
 
@@ -12932,6 +13425,90 @@ CREATE INDEX idx_cbu_ssi_lookup ON custody.cbu_ssi USING btree (cbu_id, status);
 --
 
 CREATE INDEX idx_cbu_sweep_cbu ON custody.cbu_cash_sweep_config USING btree (cbu_id);
+
+
+--
+-- Name: idx_cbu_tax_reclaim_cbu; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_cbu_tax_reclaim_cbu ON custody.cbu_tax_reclaim_config USING btree (cbu_id);
+
+
+--
+-- Name: idx_cbu_tax_reporting_cbu; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_cbu_tax_reporting_cbu ON custody.cbu_tax_reporting USING btree (cbu_id);
+
+
+--
+-- Name: idx_cbu_tax_reporting_regime; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_cbu_tax_reporting_regime ON custody.cbu_tax_reporting USING btree (reporting_regime);
+
+
+--
+-- Name: idx_cbu_tax_status_cbu; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_cbu_tax_status_cbu ON custody.cbu_tax_status USING btree (cbu_id);
+
+
+--
+-- Name: idx_cbu_tax_status_jurisdiction; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_cbu_tax_status_jurisdiction ON custody.cbu_tax_status USING btree (tax_jurisdiction_id);
+
+
+--
+-- Name: idx_settlement_chain_hops_chain; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_settlement_chain_hops_chain ON custody.settlement_chain_hops USING btree (chain_id);
+
+
+--
+-- Name: idx_settlement_locations_code; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_settlement_locations_code ON custody.settlement_locations USING btree (location_code);
+
+
+--
+-- Name: idx_settlement_locations_type; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_settlement_locations_type ON custody.settlement_locations USING btree (location_type);
+
+
+--
+-- Name: idx_tax_jurisdictions_code; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_tax_jurisdictions_code ON custody.tax_jurisdictions USING btree (jurisdiction_code);
+
+
+--
+-- Name: idx_tax_jurisdictions_country; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_tax_jurisdictions_country ON custody.tax_jurisdictions USING btree (country_code);
+
+
+--
+-- Name: idx_tax_treaty_investor; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_tax_treaty_investor ON custody.tax_treaty_rates USING btree (investor_jurisdiction_id);
+
+
+--
+-- Name: idx_tax_treaty_source; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_tax_treaty_source ON custody.tax_treaty_rates USING btree (source_jurisdiction_id);
 
 
 --
@@ -16020,6 +16597,76 @@ CREATE TRIGGER sync_counterparty_key_trigger BEFORE INSERT OR UPDATE ON custody.
 
 
 --
+-- Name: cbu_cross_border_config update_cbu_cross_border_config_updated_at; Type: TRIGGER; Schema: custody; Owner: -
+--
+
+CREATE TRIGGER update_cbu_cross_border_config_updated_at BEFORE UPDATE ON custody.cbu_cross_border_config FOR EACH ROW EXECUTE FUNCTION custody.update_updated_at_column();
+
+
+--
+-- Name: cbu_settlement_chains update_cbu_settlement_chains_updated_at; Type: TRIGGER; Schema: custody; Owner: -
+--
+
+CREATE TRIGGER update_cbu_settlement_chains_updated_at BEFORE UPDATE ON custody.cbu_settlement_chains FOR EACH ROW EXECUTE FUNCTION custody.update_updated_at_column();
+
+
+--
+-- Name: cbu_settlement_location_preferences update_cbu_settlement_location_preferences_updated_at; Type: TRIGGER; Schema: custody; Owner: -
+--
+
+CREATE TRIGGER update_cbu_settlement_location_preferences_updated_at BEFORE UPDATE ON custody.cbu_settlement_location_preferences FOR EACH ROW EXECUTE FUNCTION custody.update_updated_at_column();
+
+
+--
+-- Name: cbu_tax_reclaim_config update_cbu_tax_reclaim_config_updated_at; Type: TRIGGER; Schema: custody; Owner: -
+--
+
+CREATE TRIGGER update_cbu_tax_reclaim_config_updated_at BEFORE UPDATE ON custody.cbu_tax_reclaim_config FOR EACH ROW EXECUTE FUNCTION custody.update_updated_at_column();
+
+
+--
+-- Name: cbu_tax_reporting update_cbu_tax_reporting_updated_at; Type: TRIGGER; Schema: custody; Owner: -
+--
+
+CREATE TRIGGER update_cbu_tax_reporting_updated_at BEFORE UPDATE ON custody.cbu_tax_reporting FOR EACH ROW EXECUTE FUNCTION custody.update_updated_at_column();
+
+
+--
+-- Name: cbu_tax_status update_cbu_tax_status_updated_at; Type: TRIGGER; Schema: custody; Owner: -
+--
+
+CREATE TRIGGER update_cbu_tax_status_updated_at BEFORE UPDATE ON custody.cbu_tax_status FOR EACH ROW EXECUTE FUNCTION custody.update_updated_at_column();
+
+
+--
+-- Name: settlement_chain_hops update_settlement_chain_hops_updated_at; Type: TRIGGER; Schema: custody; Owner: -
+--
+
+CREATE TRIGGER update_settlement_chain_hops_updated_at BEFORE UPDATE ON custody.settlement_chain_hops FOR EACH ROW EXECUTE FUNCTION custody.update_updated_at_column();
+
+
+--
+-- Name: settlement_locations update_settlement_locations_updated_at; Type: TRIGGER; Schema: custody; Owner: -
+--
+
+CREATE TRIGGER update_settlement_locations_updated_at BEFORE UPDATE ON custody.settlement_locations FOR EACH ROW EXECUTE FUNCTION custody.update_updated_at_column();
+
+
+--
+-- Name: tax_jurisdictions update_tax_jurisdictions_updated_at; Type: TRIGGER; Schema: custody; Owner: -
+--
+
+CREATE TRIGGER update_tax_jurisdictions_updated_at BEFORE UPDATE ON custody.tax_jurisdictions FOR EACH ROW EXECUTE FUNCTION custody.update_updated_at_column();
+
+
+--
+-- Name: tax_treaty_rates update_tax_treaty_rates_updated_at; Type: TRIGGER; Schema: custody; Owner: -
+--
+
+CREATE TRIGGER update_tax_treaty_rates_updated_at BEFORE UPDATE ON custody.tax_treaty_rates FOR EACH ROW EXECUTE FUNCTION custody.update_updated_at_column();
+
+
+--
 -- Name: outstanding_requests trg_outstanding_requests_updated; Type: TRIGGER; Schema: kyc; Owner: -
 --
 
@@ -16254,6 +16901,38 @@ ALTER TABLE ONLY custody.cbu_cash_sweep_config
 
 
 --
+-- Name: cbu_cross_border_config cbu_cross_border_config_bridge_location_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_cross_border_config
+    ADD CONSTRAINT cbu_cross_border_config_bridge_location_id_fkey FOREIGN KEY (bridge_location_id) REFERENCES custody.settlement_locations(location_id);
+
+
+--
+-- Name: cbu_cross_border_config cbu_cross_border_config_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_cross_border_config
+    ADD CONSTRAINT cbu_cross_border_config_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
+-- Name: cbu_cross_border_config cbu_cross_border_config_source_market_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_cross_border_config
+    ADD CONSTRAINT cbu_cross_border_config_source_market_id_fkey FOREIGN KEY (source_market_id) REFERENCES custody.markets(market_id);
+
+
+--
+-- Name: cbu_cross_border_config cbu_cross_border_config_target_market_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_cross_border_config
+    ADD CONSTRAINT cbu_cross_border_config_target_market_id_fkey FOREIGN KEY (target_market_id) REFERENCES custody.markets(market_id);
+
+
+--
 -- Name: cbu_im_assignments cbu_im_assignments_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
 --
 
@@ -16358,6 +17037,62 @@ ALTER TABLE ONLY custody.cbu_pricing_config
 
 
 --
+-- Name: cbu_settlement_chains cbu_settlement_chains_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_settlement_chains
+    ADD CONSTRAINT cbu_settlement_chains_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
+-- Name: cbu_settlement_chains cbu_settlement_chains_instrument_class_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_settlement_chains
+    ADD CONSTRAINT cbu_settlement_chains_instrument_class_id_fkey FOREIGN KEY (instrument_class_id) REFERENCES custody.instrument_classes(class_id);
+
+
+--
+-- Name: cbu_settlement_chains cbu_settlement_chains_market_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_settlement_chains
+    ADD CONSTRAINT cbu_settlement_chains_market_id_fkey FOREIGN KEY (market_id) REFERENCES custody.markets(market_id);
+
+
+--
+-- Name: cbu_settlement_location_preferences cbu_settlement_location_preferences_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_settlement_location_preferences
+    ADD CONSTRAINT cbu_settlement_location_preferences_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
+-- Name: cbu_settlement_location_preferences cbu_settlement_location_preferences_instrument_class_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_settlement_location_preferences
+    ADD CONSTRAINT cbu_settlement_location_preferences_instrument_class_id_fkey FOREIGN KEY (instrument_class_id) REFERENCES custody.instrument_classes(class_id);
+
+
+--
+-- Name: cbu_settlement_location_preferences cbu_settlement_location_preferences_market_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_settlement_location_preferences
+    ADD CONSTRAINT cbu_settlement_location_preferences_market_id_fkey FOREIGN KEY (market_id) REFERENCES custody.markets(market_id);
+
+
+--
+-- Name: cbu_settlement_location_preferences cbu_settlement_location_preferences_preferred_location_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_settlement_location_preferences
+    ADD CONSTRAINT cbu_settlement_location_preferences_preferred_location_id_fkey FOREIGN KEY (preferred_location_id) REFERENCES custody.settlement_locations(location_id);
+
+
+--
 -- Name: cbu_ssi_agent_override cbu_ssi_agent_override_ssi_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
 --
 
@@ -16379,6 +17114,78 @@ ALTER TABLE ONLY custody.cbu_ssi
 
 ALTER TABLE ONLY custody.cbu_ssi
     ADD CONSTRAINT cbu_ssi_market_id_fkey FOREIGN KEY (market_id) REFERENCES custody.markets(market_id);
+
+
+--
+-- Name: cbu_tax_reclaim_config cbu_tax_reclaim_config_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_tax_reclaim_config
+    ADD CONSTRAINT cbu_tax_reclaim_config_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
+-- Name: cbu_tax_reclaim_config cbu_tax_reclaim_config_service_provider_entity_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_tax_reclaim_config
+    ADD CONSTRAINT cbu_tax_reclaim_config_service_provider_entity_id_fkey FOREIGN KEY (service_provider_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: cbu_tax_reclaim_config cbu_tax_reclaim_config_source_jurisdiction_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_tax_reclaim_config
+    ADD CONSTRAINT cbu_tax_reclaim_config_source_jurisdiction_id_fkey FOREIGN KEY (source_jurisdiction_id) REFERENCES custody.tax_jurisdictions(jurisdiction_id);
+
+
+--
+-- Name: cbu_tax_reporting cbu_tax_reporting_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_tax_reporting
+    ADD CONSTRAINT cbu_tax_reporting_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
+-- Name: cbu_tax_reporting cbu_tax_reporting_reporting_entity_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_tax_reporting
+    ADD CONSTRAINT cbu_tax_reporting_reporting_entity_id_fkey FOREIGN KEY (reporting_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: cbu_tax_reporting cbu_tax_reporting_reporting_jurisdiction_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_tax_reporting
+    ADD CONSTRAINT cbu_tax_reporting_reporting_jurisdiction_id_fkey FOREIGN KEY (reporting_jurisdiction_id) REFERENCES custody.tax_jurisdictions(jurisdiction_id);
+
+
+--
+-- Name: cbu_tax_reporting cbu_tax_reporting_sponsor_entity_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_tax_reporting
+    ADD CONSTRAINT cbu_tax_reporting_sponsor_entity_id_fkey FOREIGN KEY (sponsor_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: cbu_tax_status cbu_tax_status_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_tax_status
+    ADD CONSTRAINT cbu_tax_status_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
+-- Name: cbu_tax_status cbu_tax_status_tax_jurisdiction_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_tax_status
+    ADD CONSTRAINT cbu_tax_status_tax_jurisdiction_id_fkey FOREIGN KEY (tax_jurisdiction_id) REFERENCES custody.tax_jurisdictions(jurisdiction_id);
 
 
 --
@@ -16550,6 +17357,30 @@ ALTER TABLE ONLY custody.security_types
 
 
 --
+-- Name: settlement_chain_hops settlement_chain_hops_chain_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.settlement_chain_hops
+    ADD CONSTRAINT settlement_chain_hops_chain_id_fkey FOREIGN KEY (chain_id) REFERENCES custody.cbu_settlement_chains(chain_id) ON DELETE CASCADE;
+
+
+--
+-- Name: settlement_chain_hops settlement_chain_hops_intermediary_entity_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.settlement_chain_hops
+    ADD CONSTRAINT settlement_chain_hops_intermediary_entity_id_fkey FOREIGN KEY (intermediary_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: settlement_chain_hops settlement_chain_hops_ssi_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.settlement_chain_hops
+    ADD CONSTRAINT settlement_chain_hops_ssi_id_fkey FOREIGN KEY (ssi_id) REFERENCES custody.cbu_ssi(ssi_id);
+
+
+--
 -- Name: ssi_booking_rules ssi_booking_rules_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
 --
 
@@ -16603,6 +17434,30 @@ ALTER TABLE ONLY custody.ssi_booking_rules
 
 ALTER TABLE ONLY custody.subcustodian_network
     ADD CONSTRAINT subcustodian_network_market_id_fkey FOREIGN KEY (market_id) REFERENCES custody.markets(market_id);
+
+
+--
+-- Name: tax_treaty_rates tax_treaty_rates_instrument_class_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.tax_treaty_rates
+    ADD CONSTRAINT tax_treaty_rates_instrument_class_id_fkey FOREIGN KEY (instrument_class_id) REFERENCES custody.instrument_classes(class_id);
+
+
+--
+-- Name: tax_treaty_rates tax_treaty_rates_investor_jurisdiction_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.tax_treaty_rates
+    ADD CONSTRAINT tax_treaty_rates_investor_jurisdiction_id_fkey FOREIGN KEY (investor_jurisdiction_id) REFERENCES custody.tax_jurisdictions(jurisdiction_id);
+
+
+--
+-- Name: tax_treaty_rates tax_treaty_rates_source_jurisdiction_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.tax_treaty_rates
+    ADD CONSTRAINT tax_treaty_rates_source_jurisdiction_id_fkey FOREIGN KEY (source_jurisdiction_id) REFERENCES custody.tax_jurisdictions(jurisdiction_id);
 
 
 --
@@ -18697,5 +19552,5 @@ ALTER TABLE ONLY teams.teams
 -- PostgreSQL database dump complete
 --
 
-\unrestrict RYmkBdlU5QKpjemop1mvGKZwPvCeZzoixwgubozR2mZfneH0mIWqI0fEAOErHVM
+\unrestrict hZIPIScftbutj8CN4bJMxjcXwPDJrCGLl8f6WmPaSTgAwBTCdUPVz9DYohfN1o8
 

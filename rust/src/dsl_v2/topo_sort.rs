@@ -260,6 +260,10 @@ pub fn topological_sort_with_lifecycle(
     // Key: (binding_name, target_state), Value: statement index
     let mut state_transitions: HashMap<(String, String), usize> = HashMap::new();
 
+    // Track which statements write to which tables (for table-level dependency ordering)
+    // Key: table name (e.g., "custody.cbu_ssi"), Value: statement indices that write to it
+    let mut table_writers: HashMap<String, Vec<usize>> = HashMap::new();
+
     // First pass: record what each statement produces and its state transitions
     for (idx, stmt) in statements.iter().enumerate() {
         deps.insert(idx, HashSet::new());
@@ -292,12 +296,24 @@ pub fn topological_sort_with_lifecycle(
                             state_transitions.insert((binding_name, target_state.clone()), idx);
                         }
                     }
+
+                    // Record table writes for table-level dependency ordering
+                    for table in &lifecycle.writes_tables {
+                        tracing::debug!(
+                            "Statement {} ({}.{}) writes to table: {}",
+                            idx,
+                            vc.domain,
+                            vc.verb,
+                            table
+                        );
+                        table_writers.entry(table.clone()).or_default().push(idx);
+                    }
                 }
             }
         }
     }
 
-    // Second pass: record dependencies (dataflow + lifecycle)
+    // Second pass: record dependencies (dataflow + lifecycle + table reads/writes)
     for (idx, stmt) in statements.iter().enumerate() {
         if let Statement::VerbCall(vc) = stmt {
             // Standard dataflow dependencies (symbol references)
@@ -408,6 +424,34 @@ pub fn topological_sort_with_lifecycle(
                                                 stmt_index: idx,
                                             },
                                         );
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Table-level dependencies: reads_tables
+                    // If this verb reads from tables, it must come AFTER any verb that writes to those tables
+                    for table in &lifecycle.reads_tables {
+                        tracing::debug!(
+                            "Statement {} ({}.{}) reads from table: {}",
+                            idx,
+                            vc.domain,
+                            vc.verb,
+                            table
+                        );
+                        if let Some(writer_indices) = table_writers.get(table) {
+                            for &writer_idx in writer_indices {
+                                if writer_idx != idx {
+                                    tracing::debug!(
+                                        "Adding table dependency edge: {} -> {} (table: {})",
+                                        idx,
+                                        writer_idx,
+                                        table
+                                    );
+                                    // Add dependency edge: this statement depends on the writer
+                                    if let Some(dep_set) = deps.get_mut(&idx) {
+                                        dep_set.insert(writer_idx);
                                     }
                                 }
                             }

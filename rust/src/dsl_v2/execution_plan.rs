@@ -828,12 +828,13 @@ fn collect_references_from_node<'a>(node: &'a AstNode, refs: &mut Vec<&'a str>) 
     }
 }
 
-/// Topologically sort statements based on @reference dependencies
+/// Topologically sort statements based on @reference dependencies AND table-level dependencies
 /// Returns indices in execution order, or error if circular dependency
 fn topological_sort(verb_calls: &[&VerbCall]) -> Result<Vec<usize>, CompileError> {
     use std::collections::{HashMap, VecDeque};
 
     let n = verb_calls.len();
+    let registry = runtime_registry();
 
     // Build symbol -> statement index map
     let mut symbol_to_idx: HashMap<&str, usize> = HashMap::new();
@@ -843,12 +844,28 @@ fn topological_sort(verb_calls: &[&VerbCall]) -> Result<Vec<usize>, CompileError
         }
     }
 
+    // Track which statements write to which tables (for table-level dependency ordering)
+    // Key: table name (e.g., "custody.cbu_ssi"), Value: statement indices that write to it
+    let mut table_writers: HashMap<String, Vec<usize>> = HashMap::new();
+
+    // First pass: record table writers
+    for (idx, vc) in verb_calls.iter().enumerate() {
+        if let Some(runtime_verb) = registry.get(&vc.domain, &vc.verb) {
+            if let Some(ref lifecycle) = runtime_verb.lifecycle {
+                for table in &lifecycle.writes_tables {
+                    table_writers.entry(table.clone()).or_default().push(idx);
+                }
+            }
+        }
+    }
+
     // Build adjacency list (edges from dependency to dependent)
     // If statement B uses @foo defined by statement A, then A -> B
     let mut adj: Vec<Vec<usize>> = vec![Vec::new(); n];
     let mut in_degree: Vec<usize> = vec![0; n];
 
     for (idx, vc) in verb_calls.iter().enumerate() {
+        // Symbol reference dependencies
         for ref_name in get_references(vc) {
             if let Some(&dep_idx) = symbol_to_idx.get(ref_name) {
                 // dep_idx defines the symbol, idx uses it
@@ -859,6 +876,25 @@ fn topological_sort(verb_calls: &[&VerbCall]) -> Result<Vec<usize>, CompileError
             // If reference not found in our statements, it might be:
             // - Pre-bound in context (e.g., @last_cbu)
             // - An error (caught at execution time)
+        }
+
+        // Table-level dependencies: reads_tables
+        // If this verb reads from tables, it must come AFTER any verb that writes to those tables
+        if let Some(runtime_verb) = registry.get(&vc.domain, &vc.verb) {
+            if let Some(ref lifecycle) = runtime_verb.lifecycle {
+                for table in &lifecycle.reads_tables {
+                    if let Some(writer_indices) = table_writers.get(table) {
+                        for &writer_idx in writer_indices {
+                            if writer_idx != idx {
+                                // writer_idx writes to the table, idx reads from it
+                                // So writer_idx must come before idx
+                                adj[writer_idx].push(idx);
+                                in_degree[idx] += 1;
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 

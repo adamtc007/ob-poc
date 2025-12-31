@@ -1,0 +1,571 @@
+domains:
+  trade-gateway:
+    description: "Trade gateway configuration - defines routing to external systems"
+
+    verbs:
+      # =========================================================================
+      # GATEWAY DEFINITIONS (Reference Data)
+      # =========================================================================
+
+      define-gateway:
+        description: "Define available trade gateway"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: trade_gateways
+          schema: custody
+          conflict_keys:
+            - gateway_code
+          returning: gateway_id
+        args:
+          - name: code
+            type: string
+            required: true
+            maps_to: gateway_code
+          - name: name
+            type: string
+            required: true
+            maps_to: gateway_name
+          - name: gateway-type
+            type: string
+            required: true
+            maps_to: gateway_type
+            description: "SWIFT_FIN, SWIFT_INTERACT, FIX, OMGEO_CTM, OMGEO_ALERT, BLOOMBERG_TOMS, TRADEWEB, MARKITWIRE, DTCC_GTR, PROPRIETARY, MANUAL"
+          - name: protocol
+            type: string
+            required: true
+            maps_to: protocol
+            description: "MT, MX, FIX_4_2, FIX_4_4, FIX_5_0, FPML, REST, SOAP, FILE, MANUAL"
+          - name: provider
+            type: string
+            required: false
+            maps_to: provider
+            description: "SWIFT, BLOOMBERG, REFINITIV, DIRECT"
+          - name: supported-events
+            type: string_list
+            required: true
+            maps_to: supported_events
+            description: "Lifecycle events this gateway supports"
+          - name: description
+            type: string
+            required: false
+            maps_to: description
+        returns:
+          type: uuid
+          name: gateway_id
+          capture: true
+        lifecycle:
+          writes_tables:
+            - custody.trade_gateways
+
+      read-gateway:
+        description: "Read gateway definition"
+        behavior: crud
+        crud:
+          operation: select
+          table: trade_gateways
+          schema: custody
+        args:
+          - name: gateway-id
+            type: uuid
+            required: false
+            maps_to: gateway_id
+          - name: code
+            type: string
+            required: false
+            maps_to: gateway_code
+        returns:
+          type: record
+        lifecycle:
+          reads_tables:
+            - custody.trade_gateways
+
+      list-gateways:
+        description: "List available gateways"
+        behavior: crud
+        crud:
+          operation: select
+          table: trade_gateways
+          schema: custody
+        args:
+          - name: gateway-type
+            type: string
+            required: false
+            maps_to: gateway_type
+          - name: protocol
+            type: string
+            required: false
+            maps_to: protocol
+        returns:
+          type: record_set
+        lifecycle:
+          reads_tables:
+            - custody.trade_gateways
+
+      # =========================================================================
+      # CBU GATEWAY CONNECTIVITY
+      # =========================================================================
+
+      enable-gateway:
+        description: "Enable gateway connectivity for CBU"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: cbu_gateway_connectivity
+          schema: custody
+          conflict_keys:
+            - cbu_id
+            - gateway_id
+          returning: connectivity_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: gateway-id
+            type: uuid
+            required: true
+            maps_to: gateway_id
+            lookup:
+              table: trade_gateways
+              schema: custody
+              search_key: gateway_code
+              primary_key: gateway_id
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+            default: PENDING
+            description: "PENDING, TESTING, ACTIVE, SUSPENDED, DECOMMISSIONED"
+          - name: connectivity-resource-id
+            type: uuid
+            required: false
+            maps_to: connectivity_resource_id
+            lookup:
+              table: cbu_resource_instances
+              entity_type: resource_instance
+              schema: ob-poc
+              search_key: instance_name
+              primary_key: instance_id
+            description: "Link to provisioned connectivity resource"
+          - name: credentials-reference
+            type: string
+            required: false
+            maps_to: credentials_reference
+            description: "Reference to secure credentials store"
+          - name: effective-date
+            type: date
+            required: false
+            maps_to: effective_date
+          - name: config
+            type: json
+            required: false
+            maps_to: gateway_config
+            description: "Gateway-specific configuration"
+        returns:
+          type: uuid
+          name: connectivity_id
+          capture: true
+        lifecycle:
+          writes_tables:
+            - custody.cbu_gateway_connectivity
+          reads_tables:
+            - custody.trade_gateways
+
+      activate-gateway:
+        description: "Activate gateway connectivity"
+        behavior: crud
+        crud:
+          operation: update
+          table: cbu_gateway_connectivity
+          schema: custody
+          key: connectivity_id
+          set_values:
+            status: ACTIVE
+            activated_at: now()
+        args:
+          - name: connectivity-id
+            type: uuid
+            required: true
+            maps_to: connectivity_id
+        returns:
+          type: affected
+        lifecycle:
+          writes_tables:
+            - custody.cbu_gateway_connectivity
+
+      suspend-gateway:
+        description: "Suspend gateway connectivity"
+        behavior: crud
+        crud:
+          operation: update
+          table: cbu_gateway_connectivity
+          schema: custody
+          key: connectivity_id
+          set_values:
+            status: SUSPENDED
+            suspended_at: now()
+        args:
+          - name: connectivity-id
+            type: uuid
+            required: true
+            maps_to: connectivity_id
+          - name: reason
+            type: string
+            required: false
+        returns:
+          type: affected
+        lifecycle:
+          writes_tables:
+            - custody.cbu_gateway_connectivity
+
+      list-cbu-gateways:
+        description: "List gateway connectivity for CBU"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: cbu_gateway_connectivity
+          schema: custody
+          fk_col: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+        returns:
+          type: record_set
+        lifecycle:
+          reads_tables:
+            - custody.cbu_gateway_connectivity
+
+      # =========================================================================
+      # GATEWAY ROUTING RULES
+      # =========================================================================
+
+      add-routing-rule:
+        description: "Add gateway routing rule for CBU"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: cbu_gateway_routing
+          schema: custody
+          conflict_keys:
+            - cbu_id
+            - gateway_id
+            - lifecycle_event
+            - instrument_class_id
+            - market_id
+            - counterparty_entity_id
+          returning: routing_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: gateway-id
+            type: uuid
+            required: true
+            maps_to: gateway_id
+            lookup:
+              table: trade_gateways
+              schema: custody
+              search_key: gateway_code
+              primary_key: gateway_id
+          - name: lifecycle-event
+            type: string
+            required: true
+            maps_to: lifecycle_event
+          - name: instrument-class
+            type: lookup
+            required: false
+            maps_to: instrument_class_id
+            lookup:
+              table: instrument_classes
+              entity_type: instrument_class
+              schema: custody
+              code_column: class_code
+              id_column: class_id
+          - name: market
+            type: lookup
+            required: false
+            maps_to: market_id
+            lookup:
+              table: markets
+              entity_type: market
+              schema: custody
+              code_column: mic
+              id_column: market_id
+          - name: counterparty
+            type: uuid
+            required: false
+            maps_to: counterparty_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: priority
+            type: integer
+            required: true
+            maps_to: priority
+            default: 50
+          - name: is-active
+            type: boolean
+            required: false
+            maps_to: is_active
+            default: true
+        returns:
+          type: uuid
+          name: routing_id
+          capture: true
+        lifecycle:
+          writes_tables:
+            - custody.cbu_gateway_routing
+          reads_tables:
+            - custody.trade_gateways
+
+      list-routing-rules:
+        description: "List gateway routing rules for CBU"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: cbu_gateway_routing
+          schema: custody
+          fk_col: cbu_id
+          order_by: priority
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: lifecycle-event
+            type: string
+            required: false
+            maps_to: lifecycle_event
+          - name: is-active
+            type: boolean
+            required: false
+            maps_to: is_active
+        returns:
+          type: record_set
+        lifecycle:
+          reads_tables:
+            - custody.cbu_gateway_routing
+
+      remove-routing-rule:
+        description: "Remove routing rule"
+        behavior: crud
+        crud:
+          operation: delete
+          table: cbu_gateway_routing
+          schema: custody
+        args:
+          - name: routing-id
+            type: uuid
+            required: true
+            maps_to: routing_id
+        returns:
+          type: affected
+
+      # =========================================================================
+      # FALLBACK CONFIGURATION
+      # =========================================================================
+
+      set-fallback:
+        description: "Configure fallback gateway"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: cbu_gateway_fallbacks
+          schema: custody
+          conflict_keys:
+            - cbu_id
+            - primary_gateway_id
+            - lifecycle_event
+          returning: fallback_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: primary-gateway-id
+            type: uuid
+            required: true
+            maps_to: primary_gateway_id
+            lookup:
+              table: trade_gateways
+              schema: custody
+              search_key: gateway_code
+              primary_key: gateway_id
+          - name: fallback-gateway-id
+            type: uuid
+            required: true
+            maps_to: fallback_gateway_id
+            lookup:
+              table: trade_gateways
+              schema: custody
+              search_key: gateway_code
+              primary_key: gateway_id
+          - name: lifecycle-event
+            type: string
+            required: false
+            maps_to: lifecycle_event
+            description: "NULL = all events"
+          - name: trigger-conditions
+            type: string_list
+            required: true
+            maps_to: trigger_conditions
+            description: "TIMEOUT, ERROR, REJECTION, MANUAL"
+          - name: priority
+            type: integer
+            required: true
+            maps_to: priority
+        returns:
+          type: uuid
+          name: fallback_id
+          capture: true
+        lifecycle:
+          writes_tables:
+            - custody.cbu_gateway_fallbacks
+          reads_tables:
+            - custody.trade_gateways
+
+      list-fallbacks:
+        description: "List fallback configurations"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: cbu_gateway_fallbacks
+          schema: custody
+          fk_col: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record_set
+        lifecycle:
+          reads_tables:
+            - custody.cbu_gateway_fallbacks
+
+      # =========================================================================
+      # RESOLUTION & VALIDATION
+      # =========================================================================
+
+      find-gateway:
+        description: "Find applicable gateway for trade"
+        behavior: plugin
+        handler: find_trade_gateway
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: lifecycle-event
+            type: string
+            required: true
+          - name: instrument-class
+            type: string
+            required: false
+          - name: market
+            type: string
+            required: false
+          - name: counterparty-bic
+            type: string
+            required: false
+        returns:
+          type: record
+          description: "Matching gateway with fallback chain"
+        lifecycle:
+          reads_tables:
+            - custody.cbu_gateway_routing
+            - custody.cbu_gateway_connectivity
+            - custody.cbu_gateway_fallbacks
+            - custody.trade_gateways
+
+      validate-routing:
+        description: "Validate gateway routing completeness"
+        behavior: plugin
+        handler: validate_gateway_routing
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record
+          description: "{ complete: bool, missing_routes: [...], inactive_gateways: [...] }"
+        lifecycle:
+          reads_tables:
+            - custody.cbu_gateway_routing
+            - custody.cbu_gateway_connectivity
+            - custody.cbu_instrument_universe
+
+      derive-required-routes:
+        description: "Derive required gateway routes from universe"
+        behavior: plugin
+        handler: derive_required_gateway_routes
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record_set
+        lifecycle:
+          reads_tables:
+            - custody.cbu_instrument_universe

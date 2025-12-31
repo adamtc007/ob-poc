@@ -158,6 +158,18 @@ pub struct VerbLifecycle {
     /// Precondition checks to run before execution
     #[serde(default)]
     pub precondition_checks: Vec<String>,
+
+    /// Tables this verb writes to (for DAG ordering).
+    /// Format: "schema.table" (e.g., "custody.cbu_ssi", "ob-poc.cbus")
+    /// Used by topo_sort to ensure write-before-read ordering.
+    #[serde(default)]
+    pub writes_tables: Vec<String>,
+
+    /// Tables this verb reads from (for DAG ordering).
+    /// Format: "schema.table" (e.g., "custody.cbu_ssi", "ob-poc.cbus")
+    /// Used by topo_sort to order this verb after any verb that writes to these tables.
+    #[serde(default)]
+    pub reads_tables: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]

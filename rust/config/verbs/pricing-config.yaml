@@ -242,3 +242,383 @@ domains:
         returns:
           type: record
           description: Matching pricing config with source and parameters
+        lifecycle:
+          reads_tables:
+            - custody.cbu_pricing_config
+
+      # =========================================================================
+      # VALUATION SCHEDULE
+      # =========================================================================
+
+      set-valuation-schedule:
+        description: "Set position valuation frequency and timing"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: cbu_valuation_schedule
+          schema: custody
+          conflict_keys:
+            - cbu_id
+            - instrument_class_id
+            - market_id
+          returning: schedule_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: instrument-class
+            type: lookup
+            required: false
+            maps_to: instrument_class_id
+            lookup:
+              table: instrument_classes
+              entity_type: instrument_class
+              schema: custody
+              code_column: class_code
+              id_column: class_id
+          - name: market
+            type: lookup
+            required: false
+            maps_to: market_id
+            lookup:
+              table: markets
+              entity_type: market
+              schema: custody
+              code_column: mic
+              id_column: market_id
+          - name: frequency
+            type: string
+            required: true
+            maps_to: valuation_frequency
+            description: "REAL_TIME, INTRADAY, EOD, T_PLUS_1, WEEKLY, MONTHLY"
+          - name: valuation-time
+            type: string
+            required: false
+            maps_to: valuation_time
+            description: "HH:MM in market timezone"
+          - name: timezone
+            type: string
+            required: false
+            maps_to: timezone
+          - name: business-days-only
+            type: boolean
+            required: false
+            maps_to: business_days_only
+            default: true
+        returns:
+          type: uuid
+          name: schedule_id
+          capture: true
+        lifecycle:
+          writes_tables:
+            - custody.cbu_valuation_schedule
+
+      list-valuation-schedules:
+        description: "List valuation schedules for CBU"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: cbu_valuation_schedule
+          schema: custody
+          fk_col: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record_set
+        lifecycle:
+          reads_tables:
+            - custody.cbu_valuation_schedule
+
+      # =========================================================================
+      # FALLBACK CHAIN
+      # =========================================================================
+
+      set-fallback-chain:
+        description: "Define multi-source pricing fallback chain"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: cbu_pricing_fallback_chains
+          schema: custody
+          conflict_keys:
+            - cbu_id
+            - instrument_class_id
+            - market_id
+          returning: chain_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: instrument-class
+            type: lookup
+            required: false
+            maps_to: instrument_class_id
+            lookup:
+              table: instrument_classes
+              entity_type: instrument_class
+              schema: custody
+              code_column: class_code
+              id_column: class_id
+          - name: market
+            type: lookup
+            required: false
+            maps_to: market_id
+            lookup:
+              table: markets
+              entity_type: market
+              schema: custody
+              code_column: mic
+              id_column: market_id
+          - name: fallback-sources
+            type: string_list
+            required: true
+            maps_to: fallback_sources
+            description: "Ordered list of fallback pricing sources"
+          - name: fallback-trigger
+            type: string
+            required: true
+            maps_to: fallback_trigger
+            description: "STALE, MISSING, THRESHOLD_BREACH, ANY_FAILURE"
+        returns:
+          type: uuid
+          name: chain_id
+          capture: true
+        lifecycle:
+          writes_tables:
+            - custody.cbu_pricing_fallback_chains
+
+      list-fallback-chains:
+        description: "List pricing fallback chains for CBU"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: cbu_pricing_fallback_chains
+          schema: custody
+          fk_col: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record_set
+        lifecycle:
+          reads_tables:
+            - custody.cbu_pricing_fallback_chains
+
+      # =========================================================================
+      # STALE PRICE POLICY
+      # =========================================================================
+
+      set-stale-policy:
+        description: "Configure stale price handling policy"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: cbu_stale_price_policies
+          schema: custody
+          conflict_keys:
+            - cbu_id
+            - instrument_class_id
+          returning: policy_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: instrument-class
+            type: lookup
+            required: false
+            maps_to: instrument_class_id
+            lookup:
+              table: instrument_classes
+              entity_type: instrument_class
+              schema: custody
+              code_column: class_code
+              id_column: class_id
+          - name: max-age-hours
+            type: integer
+            required: true
+            maps_to: max_age_hours
+          - name: stale-action
+            type: string
+            required: true
+            maps_to: stale_action
+            description: "USE_LAST, USE_FALLBACK, ESCALATE, SUSPEND_NAV, MANUAL_OVERRIDE"
+          - name: escalation-contact
+            type: string
+            required: false
+            maps_to: escalation_contact
+        returns:
+          type: uuid
+          name: policy_id
+          capture: true
+        lifecycle:
+          writes_tables:
+            - custody.cbu_stale_price_policies
+
+      list-stale-policies:
+        description: "List stale price policies for CBU"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: cbu_stale_price_policies
+          schema: custody
+          fk_col: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record_set
+        lifecycle:
+          reads_tables:
+            - custody.cbu_stale_price_policies
+
+      # =========================================================================
+      # NAV IMPACT THRESHOLDS
+      # =========================================================================
+
+      set-nav-threshold:
+        description: "Set NAV impact alert threshold"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: cbu_nav_impact_thresholds
+          schema: custody
+          conflict_keys:
+            - cbu_id
+            - instrument_class_id
+          returning: threshold_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: instrument-class
+            type: lookup
+            required: false
+            maps_to: instrument_class_id
+            lookup:
+              table: instrument_classes
+              entity_type: instrument_class
+              schema: custody
+              code_column: class_code
+              id_column: class_id
+          - name: threshold-pct
+            type: decimal
+            required: true
+            maps_to: threshold_pct
+            description: "Alert if price move exceeds this %"
+          - name: action
+            type: string
+            required: true
+            maps_to: threshold_action
+            description: "ALERT, MANUAL_REVIEW, SUSPEND_POSITION, ESCALATE"
+          - name: notification-email
+            type: string
+            required: false
+            maps_to: notification_email
+        returns:
+          type: uuid
+          name: threshold_id
+          capture: true
+        lifecycle:
+          writes_tables:
+            - custody.cbu_nav_impact_thresholds
+
+      list-nav-thresholds:
+        description: "List NAV impact thresholds for CBU"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: cbu_nav_impact_thresholds
+          schema: custody
+          fk_col: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record_set
+        lifecycle:
+          reads_tables:
+            - custody.cbu_nav_impact_thresholds
+
+      # =========================================================================
+      # VALIDATION
+      # =========================================================================
+
+      validate-pricing-config:
+        description: "Validate pricing configuration completeness"
+        behavior: plugin
+        handler: validate_pricing_configuration
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record
+          description: "{ complete: bool, missing_sources: [...], missing_schedules: [...] }"
+        lifecycle:
+          reads_tables:
+            - custody.cbu_pricing_config
+            - custody.cbu_valuation_schedule
+            - custody.cbu_instrument_universe

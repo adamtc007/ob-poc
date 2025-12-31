@@ -1,0 +1,658 @@
+domains:
+  tax-config:
+    description: "Tax withholding and reclaim configuration"
+
+    verbs:
+      # =========================================================================
+      # TAX JURISDICTION REFERENCE DATA
+      # =========================================================================
+
+      define-jurisdiction:
+        description: "Define tax jurisdiction with withholding rates"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: tax_jurisdictions
+          schema: custody
+          conflict_keys:
+            - jurisdiction_code
+          returning: jurisdiction_id
+        args:
+          - name: code
+            type: string
+            required: true
+            maps_to: jurisdiction_code
+          - name: name
+            type: string
+            required: true
+            maps_to: jurisdiction_name
+          - name: country-code
+            type: string
+            required: true
+            maps_to: country_code
+          - name: default-rate
+            type: decimal
+            required: false
+            maps_to: default_withholding_rate
+          - name: reclaim-available
+            type: boolean
+            required: false
+            maps_to: reclaim_available
+            default: true
+          - name: reclaim-deadline-days
+            type: integer
+            required: false
+            maps_to: reclaim_deadline_days
+          - name: tax-authority-name
+            type: string
+            required: false
+            maps_to: tax_authority_name
+          - name: tax-authority-code
+            type: string
+            required: false
+            maps_to: tax_authority_code
+          - name: documentation-requirements
+            type: json
+            required: false
+            maps_to: documentation_requirements
+        returns:
+          type: uuid
+          name: jurisdiction_id
+          capture: true
+        lifecycle:
+          writes_tables:
+            - custody.tax_jurisdictions
+
+      list-jurisdictions:
+        description: "List tax jurisdictions"
+        behavior: crud
+        crud:
+          operation: select
+          table: tax_jurisdictions
+          schema: custody
+        args:
+          - name: country-code
+            type: string
+            required: false
+            maps_to: country_code
+          - name: reclaim-available
+            type: boolean
+            required: false
+            maps_to: reclaim_available
+        returns:
+          type: record_set
+        lifecycle:
+          reads_tables:
+            - custody.tax_jurisdictions
+
+      # =========================================================================
+      # TAX TREATY RATES
+      # =========================================================================
+
+      set-treaty-rate:
+        description: "Set bilateral tax treaty rate"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: tax_treaty_rates
+          schema: custody
+          conflict_keys:
+            - source_jurisdiction_id
+            - investor_jurisdiction_id
+            - income_type
+            - instrument_class_id
+          returning: treaty_id
+        args:
+          - name: source-jurisdiction
+            type: lookup
+            required: true
+            maps_to: source_jurisdiction_id
+            lookup:
+              table: tax_jurisdictions
+              entity_type: tax_jurisdiction
+              schema: custody
+              code_column: jurisdiction_code
+              id_column: jurisdiction_id
+          - name: investor-jurisdiction
+            type: lookup
+            required: true
+            maps_to: investor_jurisdiction_id
+            lookup:
+              table: tax_jurisdictions
+              entity_type: tax_jurisdiction
+              schema: custody
+              code_column: jurisdiction_code
+              id_column: jurisdiction_id
+          - name: income-type
+            type: string
+            required: true
+            maps_to: income_type
+            valid_values:
+              - DIVIDEND
+              - INTEREST
+              - ROYALTY
+              - CAPITAL_GAIN
+          - name: instrument-class
+            type: lookup
+            required: false
+            maps_to: instrument_class_id
+            lookup:
+              table: instrument_classes
+              entity_type: instrument_class
+              schema: custody
+              code_column: code
+              id_column: class_id
+          - name: standard-rate
+            type: decimal
+            required: true
+            maps_to: standard_rate
+          - name: treaty-rate
+            type: decimal
+            required: true
+            maps_to: treaty_rate
+          - name: beneficial-owner-required
+            type: boolean
+            required: false
+            maps_to: beneficial_owner_required
+            default: true
+          - name: documentation-codes
+            type: string_list
+            required: false
+            maps_to: documentation_codes
+          - name: effective-date
+            type: date
+            required: true
+            maps_to: effective_date
+          - name: treaty-reference
+            type: string
+            required: false
+            maps_to: treaty_reference
+        returns:
+          type: uuid
+          name: treaty_id
+          capture: true
+        lifecycle:
+          writes_tables:
+            - custody.tax_treaty_rates
+          reads_tables:
+            - custody.tax_jurisdictions
+
+      list-treaty-rates:
+        description: "List treaty rates for jurisdiction pair"
+        behavior: crud
+        crud:
+          operation: select
+          table: tax_treaty_rates
+          schema: custody
+        args:
+          - name: source-jurisdiction
+            type: string
+            required: false
+          - name: investor-jurisdiction
+            type: string
+            required: false
+          - name: income-type
+            type: string
+            required: false
+            maps_to: income_type
+        returns:
+          type: record_set
+        lifecycle:
+          reads_tables:
+            - custody.tax_treaty_rates
+
+      # =========================================================================
+      # CBU TAX STATUS
+      # =========================================================================
+
+      set-tax-status:
+        description: "Set CBU tax status for jurisdiction"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: cbu_tax_status
+          schema: custody
+          conflict_keys:
+            - cbu_id
+            - tax_jurisdiction_id
+          returning: status_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: jurisdiction
+            type: lookup
+            required: true
+            maps_to: tax_jurisdiction_id
+            lookup:
+              table: tax_jurisdictions
+              entity_type: tax_jurisdiction
+              schema: custody
+              code_column: jurisdiction_code
+              id_column: jurisdiction_id
+          - name: investor-type
+            type: string
+            required: true
+            maps_to: investor_type
+            valid_values:
+              - PENSION
+              - SOVEREIGN
+              - CHARITY
+              - CORPORATE
+              - INDIVIDUAL
+              - FUND
+          - name: tax-exempt
+            type: boolean
+            required: false
+            maps_to: tax_exempt
+            default: false
+          - name: exempt-reason
+            type: string
+            required: false
+            maps_to: exempt_reason
+          - name: documentation-status
+            type: string
+            required: false
+            maps_to: documentation_status
+            default: PENDING
+            valid_values:
+              - PENDING
+              - SUBMITTED
+              - VALIDATED
+              - EXPIRED
+          - name: documentation-expiry
+            type: date
+            required: false
+            maps_to: documentation_expiry
+          - name: applicable-treaty-rate
+            type: decimal
+            required: false
+            maps_to: applicable_treaty_rate
+          - name: qualified-intermediary
+            type: boolean
+            required: false
+            maps_to: qualified_intermediary
+            default: false
+          - name: qi-ein
+            type: string
+            required: false
+            maps_to: qi_ein
+          - name: fatca-status
+            type: string
+            required: false
+            maps_to: fatca_status
+            valid_values:
+              - EXEMPT
+              - PARTICIPATING
+              - NON_PARTICIPATING
+          - name: crs-status
+            type: string
+            required: false
+            maps_to: crs_status
+        returns:
+          type: uuid
+          name: status_id
+          capture: true
+        lifecycle:
+          writes_tables:
+            - custody.cbu_tax_status
+          reads_tables:
+            - custody.tax_jurisdictions
+
+      list-tax-status:
+        description: "List tax status for CBU"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: cbu_tax_status
+          schema: custody
+          fk_col: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record_set
+        lifecycle:
+          reads_tables:
+            - custody.cbu_tax_status
+
+      # =========================================================================
+      # TAX RECLAIM CONFIGURATION
+      # =========================================================================
+
+      set-reclaim-config:
+        description: "Configure tax reclaim processing"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: cbu_tax_reclaim_config
+          schema: custody
+          conflict_keys:
+            - cbu_id
+            - source_jurisdiction_id
+          returning: config_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: source-jurisdiction
+            type: lookup
+            required: true
+            maps_to: source_jurisdiction_id
+            lookup:
+              table: tax_jurisdictions
+              entity_type: tax_jurisdiction
+              schema: custody
+              code_column: jurisdiction_code
+              id_column: jurisdiction_id
+          - name: reclaim-method
+            type: string
+            required: true
+            maps_to: reclaim_method
+            valid_values:
+              - AUTOMATIC
+              - MANUAL
+              - OUTSOURCED
+              - NO_RECLAIM
+          - name: service-provider
+            type: uuid
+            required: false
+            maps_to: service_provider_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: minimum-amount
+            type: decimal
+            required: false
+            maps_to: minimum_reclaim_amount
+          - name: minimum-currency
+            type: string
+            required: false
+            maps_to: minimum_reclaim_currency
+          - name: batch-frequency
+            type: string
+            required: false
+            maps_to: batch_frequency
+            valid_values:
+              - IMMEDIATE
+              - WEEKLY
+              - MONTHLY
+              - QUARTERLY
+          - name: expected-recovery-days
+            type: integer
+            required: false
+            maps_to: expected_recovery_days
+          - name: fee-structure
+            type: json
+            required: false
+            maps_to: fee_structure
+        returns:
+          type: uuid
+          name: config_id
+          capture: true
+        lifecycle:
+          writes_tables:
+            - custody.cbu_tax_reclaim_config
+          reads_tables:
+            - custody.tax_jurisdictions
+
+      list-reclaim-configs:
+        description: "List reclaim configurations for CBU"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: cbu_tax_reclaim_config
+          schema: custody
+          fk_col: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: is-active
+            type: boolean
+            required: false
+            maps_to: is_active
+        returns:
+          type: record_set
+        lifecycle:
+          reads_tables:
+            - custody.cbu_tax_reclaim_config
+
+      deactivate-reclaim:
+        description: "Deactivate reclaim configuration"
+        behavior: crud
+        crud:
+          operation: update
+          table: cbu_tax_reclaim_config
+          schema: custody
+          key: config_id
+          set_values:
+            is_active: false
+        args:
+          - name: config-id
+            type: uuid
+            required: true
+            maps_to: config_id
+        returns:
+          type: affected
+        lifecycle:
+          writes_tables:
+            - custody.cbu_tax_reclaim_config
+
+      # =========================================================================
+      # TAX REPORTING OBLIGATIONS
+      # =========================================================================
+
+      set-reporting:
+        description: "Set tax reporting obligation"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: cbu_tax_reporting
+          schema: custody
+          conflict_keys:
+            - cbu_id
+            - reporting_regime
+            - reporting_jurisdiction_id
+          returning: reporting_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: regime
+            type: string
+            required: true
+            maps_to: reporting_regime
+            valid_values:
+              - FATCA
+              - CRS
+              - DAC6
+              - UK_CDOT
+              - QI
+              - 871M
+          - name: jurisdiction
+            type: lookup
+            required: true
+            maps_to: reporting_jurisdiction_id
+            lookup:
+              table: tax_jurisdictions
+              entity_type: tax_jurisdiction
+              schema: custody
+              code_column: jurisdiction_code
+              id_column: jurisdiction_id
+          - name: status
+            type: string
+            required: false
+            maps_to: reporting_status
+            default: REQUIRED
+            valid_values:
+              - REQUIRED
+              - EXEMPT
+              - PARTICIPATING
+              - PENDING
+          - name: giin
+            type: string
+            required: false
+            maps_to: giin
+          - name: registration-date
+            type: date
+            required: false
+            maps_to: registration_date
+          - name: reporting-entity
+            type: uuid
+            required: false
+            maps_to: reporting_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: sponsor-entity
+            type: uuid
+            required: false
+            maps_to: sponsor_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+        returns:
+          type: uuid
+          name: reporting_id
+          capture: true
+        lifecycle:
+          writes_tables:
+            - custody.cbu_tax_reporting
+          reads_tables:
+            - custody.tax_jurisdictions
+
+      list-reporting:
+        description: "List tax reporting obligations for CBU"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: cbu_tax_reporting
+          schema: custody
+          fk_col: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: regime
+            type: string
+            required: false
+            maps_to: reporting_regime
+        returns:
+          type: record_set
+        lifecycle:
+          reads_tables:
+            - custody.cbu_tax_reporting
+
+      # =========================================================================
+      # TAX LOOKUP AND VALIDATION
+      # =========================================================================
+
+      find-applicable-rate:
+        description: "Find applicable tax rate for income event"
+        behavior: plugin
+        handler: find_applicable_tax_rate
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: source-jurisdiction
+            type: string
+            required: true
+          - name: income-type
+            type: string
+            required: true
+          - name: instrument-class
+            type: string
+            required: false
+        returns:
+          type: record
+          description: "{ standard_rate, treaty_rate, documentation_required, reclaim_available }"
+        lifecycle:
+          reads_tables:
+            - custody.cbu_tax_status
+            - custody.tax_treaty_rates
+            - custody.tax_jurisdictions
+
+      validate-tax-config:
+        description: "Validate tax configuration completeness"
+        behavior: plugin
+        handler: validate_tax_configuration
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record
+          description: "{ complete: bool, missing_status: [...], expired_docs: [...], missing_reporting: [...] }"
+        lifecycle:
+          reads_tables:
+            - custody.cbu_tax_status
+            - custody.cbu_tax_reclaim_config
+            - custody.cbu_tax_reporting
+            - custody.cbu_instrument_universe

@@ -1,0 +1,639 @@
+domains:
+  settlement-chain:
+    description: "Settlement chain configuration - multi-hop settlement paths and cross-border routing"
+
+    verbs:
+      # =========================================================================
+      # SETTLEMENT LOCATION REFERENCE DATA
+      # =========================================================================
+
+      define-location:
+        description: "Define settlement location (CSD/ICSD)"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: settlement_locations
+          schema: custody
+          conflict_keys:
+            - location_code
+          returning: location_id
+        args:
+          - name: code
+            type: string
+            required: true
+            maps_to: location_code
+          - name: name
+            type: string
+            required: true
+            maps_to: location_name
+          - name: location-type
+            type: string
+            required: true
+            maps_to: location_type
+            valid_values:
+              - CSD
+              - ICSD
+              - CUSTODIAN
+          - name: country-code
+            type: string
+            required: false
+            maps_to: country_code
+          - name: bic
+            type: string
+            required: false
+            maps_to: bic
+          - name: operating-hours
+            type: json
+            required: false
+            maps_to: operating_hours
+          - name: settlement-cycles
+            type: json
+            required: false
+            maps_to: settlement_cycles
+        returns:
+          type: uuid
+          name: location_id
+          capture: true
+        lifecycle:
+          writes_tables:
+            - custody.settlement_locations
+
+      list-locations:
+        description: "List settlement locations"
+        behavior: crud
+        crud:
+          operation: select
+          table: settlement_locations
+          schema: custody
+        args:
+          - name: location-type
+            type: string
+            required: false
+            maps_to: location_type
+          - name: country-code
+            type: string
+            required: false
+            maps_to: country_code
+        returns:
+          type: record_set
+        lifecycle:
+          reads_tables:
+            - custody.settlement_locations
+
+      # =========================================================================
+      # SETTLEMENT CHAINS
+      # =========================================================================
+
+      create-chain:
+        description: "Create settlement chain for CBU"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: cbu_settlement_chains
+          schema: custody
+          conflict_keys:
+            - cbu_id
+            - chain_name
+          returning: chain_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: name
+            type: string
+            required: true
+            maps_to: chain_name
+          - name: market
+            type: lookup
+            required: false
+            maps_to: market_id
+            lookup:
+              table: markets
+              entity_type: market
+              schema: custody
+              code_column: mic
+              id_column: market_id
+          - name: instrument-class
+            type: lookup
+            required: false
+            maps_to: instrument_class_id
+            lookup:
+              table: instrument_classes
+              entity_type: instrument_class
+              schema: custody
+              code_column: code
+              id_column: class_id
+          - name: currency
+            type: string
+            required: false
+            maps_to: currency
+          - name: settlement-type
+            type: string
+            required: false
+            maps_to: settlement_type
+          - name: is-default
+            type: boolean
+            required: false
+            maps_to: is_default
+            default: false
+          - name: effective-date
+            type: date
+            required: false
+            maps_to: effective_date
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+        returns:
+          type: uuid
+          name: chain_id
+          capture: true
+        lifecycle:
+          writes_tables:
+            - custody.cbu_settlement_chains
+
+      list-chains:
+        description: "List settlement chains for CBU"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: cbu_settlement_chains
+          schema: custody
+          fk_col: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: market
+            type: string
+            required: false
+          - name: is-active
+            type: boolean
+            required: false
+            maps_to: is_active
+        returns:
+          type: record_set
+        lifecycle:
+          reads_tables:
+            - custody.cbu_settlement_chains
+
+      deactivate-chain:
+        description: "Deactivate a settlement chain"
+        behavior: crud
+        crud:
+          operation: update
+          table: cbu_settlement_chains
+          schema: custody
+          key: chain_id
+          set_values:
+            is_active: false
+        args:
+          - name: chain-id
+            type: uuid
+            required: true
+            maps_to: chain_id
+        returns:
+          type: affected
+        lifecycle:
+          writes_tables:
+            - custody.cbu_settlement_chains
+
+      # =========================================================================
+      # CHAIN HOPS (INTERMEDIARIES)
+      # =========================================================================
+
+      add-hop:
+        description: "Add intermediary hop to settlement chain"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: settlement_chain_hops
+          schema: custody
+          conflict_keys:
+            - chain_id
+            - hop_sequence
+          returning: hop_id
+        args:
+          - name: chain-id
+            type: uuid
+            required: true
+            maps_to: chain_id
+          - name: sequence
+            type: integer
+            required: true
+            maps_to: hop_sequence
+          - name: role
+            type: string
+            required: true
+            maps_to: role
+            valid_values:
+              - CUSTODIAN
+              - SUBCUSTODIAN
+              - AGENT
+              - CSD
+              - ICSD
+          - name: intermediary-entity-id
+            type: uuid
+            required: false
+            maps_to: intermediary_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: intermediary-bic
+            type: string
+            required: false
+            maps_to: intermediary_bic
+          - name: intermediary-name
+            type: string
+            required: false
+            maps_to: intermediary_name
+          - name: account-number
+            type: string
+            required: false
+            maps_to: account_number
+          - name: ssi-id
+            type: uuid
+            required: false
+            maps_to: ssi_id
+            lookup:
+              table: cbu_ssi
+              entity_type: ssi
+              schema: custody
+              search_key: ssi_name
+              primary_key: ssi_id
+          - name: instructions
+            type: string
+            required: false
+            maps_to: instructions
+        returns:
+          type: uuid
+          name: hop_id
+          capture: true
+        lifecycle:
+          writes_tables:
+            - custody.settlement_chain_hops
+          reads_tables:
+            - custody.cbu_settlement_chains
+
+      list-hops:
+        description: "List hops in a settlement chain"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: settlement_chain_hops
+          schema: custody
+          fk_col: chain_id
+          order_by: hop_sequence
+        args:
+          - name: chain-id
+            type: uuid
+            required: true
+            maps_to: chain_id
+        returns:
+          type: record_set
+        lifecycle:
+          reads_tables:
+            - custody.settlement_chain_hops
+
+      remove-hop:
+        description: "Remove hop from settlement chain"
+        behavior: crud
+        crud:
+          operation: delete
+          table: settlement_chain_hops
+          schema: custody
+        args:
+          - name: hop-id
+            type: uuid
+            required: true
+            maps_to: hop_id
+        returns:
+          type: affected
+        lifecycle:
+          writes_tables:
+            - custody.settlement_chain_hops
+
+      # =========================================================================
+      # SETTLEMENT LOCATION PREFERENCES
+      # =========================================================================
+
+      set-location-preference:
+        description: "Set preferred settlement location for market/instrument"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: cbu_settlement_location_preferences
+          schema: custody
+          conflict_keys:
+            - cbu_id
+            - market_id
+            - instrument_class_id
+            - preferred_location_id
+          returning: preference_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: market
+            type: lookup
+            required: false
+            maps_to: market_id
+            lookup:
+              table: markets
+              entity_type: market
+              schema: custody
+              code_column: mic
+              id_column: market_id
+          - name: instrument-class
+            type: lookup
+            required: false
+            maps_to: instrument_class_id
+            lookup:
+              table: instrument_classes
+              entity_type: instrument_class
+              schema: custody
+              code_column: code
+              id_column: class_id
+          - name: location-id
+            type: uuid
+            required: true
+            maps_to: preferred_location_id
+            lookup:
+              table: settlement_locations
+              entity_type: settlement_location
+              schema: custody
+              search_key: location_code
+              primary_key: location_id
+          - name: priority
+            type: integer
+            required: false
+            maps_to: priority
+            default: 50
+          - name: reason
+            type: string
+            required: false
+            maps_to: reason
+        returns:
+          type: uuid
+          name: preference_id
+          capture: true
+        lifecycle:
+          writes_tables:
+            - custody.cbu_settlement_location_preferences
+          reads_tables:
+            - custody.settlement_locations
+
+      list-location-preferences:
+        description: "List settlement location preferences for CBU"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: cbu_settlement_location_preferences
+          schema: custody
+          fk_col: cbu_id
+          order_by: priority
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record_set
+        lifecycle:
+          reads_tables:
+            - custody.cbu_settlement_location_preferences
+
+      # =========================================================================
+      # CROSS-BORDER CONFIGURATION
+      # =========================================================================
+
+      set-cross-border:
+        description: "Configure cross-border settlement routing"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: cbu_cross_border_config
+          schema: custody
+          conflict_keys:
+            - cbu_id
+            - source_market_id
+            - target_market_id
+          returning: config_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: source-market
+            type: lookup
+            required: true
+            maps_to: source_market_id
+            lookup:
+              table: markets
+              entity_type: market
+              schema: custody
+              code_column: mic
+              id_column: market_id
+          - name: target-market
+            type: lookup
+            required: true
+            maps_to: target_market_id
+            lookup:
+              table: markets
+              entity_type: market
+              schema: custody
+              code_column: mic
+              id_column: market_id
+          - name: settlement-method
+            type: string
+            required: true
+            maps_to: settlement_method
+            valid_values:
+              - BRIDGE
+              - DIRECT
+              - VIA_ICSD
+          - name: bridge-location-id
+            type: uuid
+            required: false
+            maps_to: bridge_location_id
+            lookup:
+              table: settlement_locations
+              entity_type: settlement_location
+              schema: custody
+              search_key: location_code
+              primary_key: location_id
+          - name: preferred-currency
+            type: string
+            required: false
+            maps_to: preferred_currency
+          - name: fx-timing
+            type: string
+            required: false
+            maps_to: fx_timing
+            valid_values:
+              - PRE_SETTLEMENT
+              - ON_SETTLEMENT
+              - POST_SETTLEMENT
+          - name: additional-days
+            type: integer
+            required: false
+            maps_to: additional_days
+            default: 0
+          - name: special-instructions
+            type: string
+            required: false
+            maps_to: special_instructions
+        returns:
+          type: uuid
+          name: config_id
+          capture: true
+        lifecycle:
+          writes_tables:
+            - custody.cbu_cross_border_config
+          reads_tables:
+            - custody.settlement_locations
+
+      list-cross-border:
+        description: "List cross-border configurations for CBU"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: cbu_cross_border_config
+          schema: custody
+          fk_col: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: is-active
+            type: boolean
+            required: false
+            maps_to: is_active
+        returns:
+          type: record_set
+        lifecycle:
+          reads_tables:
+            - custody.cbu_cross_border_config
+
+      deactivate-cross-border:
+        description: "Deactivate cross-border configuration"
+        behavior: crud
+        crud:
+          operation: update
+          table: cbu_cross_border_config
+          schema: custody
+          key: config_id
+          set_values:
+            is_active: false
+        args:
+          - name: config-id
+            type: uuid
+            required: true
+            maps_to: config_id
+        returns:
+          type: affected
+        lifecycle:
+          writes_tables:
+            - custody.cbu_cross_border_config
+
+      # =========================================================================
+      # VALIDATION
+      # =========================================================================
+
+      validate-settlement-config:
+        description: "Validate settlement chain configuration completeness"
+        behavior: plugin
+        handler: validate_settlement_configuration
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record
+          description: "{ complete: bool, missing_chains: [...], missing_cross_border: [...] }"
+        lifecycle:
+          reads_tables:
+            - custody.cbu_settlement_chains
+            - custody.settlement_chain_hops
+            - custody.cbu_cross_border_config
+            - custody.cbu_instrument_universe
+
+      find-chain:
+        description: "Find applicable settlement chain for trade"
+        behavior: plugin
+        handler: find_settlement_chain
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: market
+            type: string
+            required: true
+          - name: instrument-class
+            type: string
+            required: false
+          - name: currency
+            type: string
+            required: false
+          - name: settlement-type
+            type: string
+            required: false
+        returns:
+          type: record
+          description: "Matching chain with all hops"
+        lifecycle:
+          reads_tables:
+            - custody.cbu_settlement_chains
+            - custody.settlement_chain_hops

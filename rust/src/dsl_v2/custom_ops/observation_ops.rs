@@ -80,7 +80,7 @@ impl CustomOperation for ObservationFromDocumentOp {
         let attribute_id: Option<Uuid> = sqlx::query_scalar(
             r#"SELECT uuid FROM "ob-poc".attribute_registry WHERE id = $1 OR display_name = $1"#,
         )
-        .bind(&attr_name)
+        .bind(attr_name)
         .fetch_optional(pool)
         .await?;
 
@@ -212,7 +212,7 @@ impl CustomOperation for ObservationGetCurrentOp {
         let attribute_id: Option<Uuid> = sqlx::query_scalar(
             r#"SELECT uuid FROM "ob-poc".attribute_registry WHERE id = $1 OR display_name = $1"#,
         )
-        .bind(&attr_name)
+        .bind(attr_name)
         .fetch_optional(pool)
         .await?;
 
@@ -333,7 +333,7 @@ impl CustomOperation for ObservationReconcileOp {
         let attribute_id: Option<Uuid> = sqlx::query_scalar(
             r#"SELECT uuid FROM "ob-poc".attribute_registry WHERE id = $1 OR display_name = $1"#,
         )
-        .bind(&attr_name)
+        .bind(attr_name)
         .fetch_optional(pool)
         .await?;
 

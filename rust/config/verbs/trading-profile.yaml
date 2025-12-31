@@ -121,6 +121,13 @@ domains:
         description: Materialize trading profile to operational tables (universe, SSIs, booking rules)
         behavior: plugin
         handler: materialize_trading_profile
+        lifecycle:
+          writes_tables:
+            - custody.cbu_instrument_universe
+            - custody.cbu_ssi
+            - custody.ssi_booking_rules
+            - custody.isda_agreements
+            - custody.csa_agreements
         args:
           - name: profile-id
             type: uuid
@@ -192,3 +199,329 @@ domains:
             description: Path to write output (if omitted, returns content)
         returns:
           type: record
+
+      # =========================================================================
+      # FULL MATRIX EXPORT (Phase 4)
+      # =========================================================================
+
+      export-full-matrix:
+        description: Export complete trading matrix document with all configuration sections
+        behavior: plugin
+        handler: export_full_trading_matrix
+        lifecycle:
+          reads_tables:
+            - custody.cbu_instrument_universe
+            - custody.cbu_ssi
+            - custody.ssi_booking_rules
+            - custody.cbu_instruction_assignments
+            - custody.cbu_gateway_routing
+            - custody.cbu_ca_preferences
+            - custody.cbu_pricing_configs
+            - custody.cbu_withholding_profiles
+            - custody.cbu_settlement_chains
+            - custody.cbu_tax_status
+            - custody.isda_agreements
+            - custody.csa_agreements
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: format
+            type: string
+            required: false
+            default: YAML
+            valid_values:
+              - YAML
+              - JSON
+              - PDF
+          - name: sections
+            type: string_list
+            required: false
+            description: "Sections to include (default: all)"
+            default:
+              - universe
+              - instruction_profile
+              - gateway_routing
+              - ssis
+              - booking_rules
+              - corporate_actions
+              - pricing
+              - settlement
+              - tax
+              - isda
+          - name: include-gaps
+            type: boolean
+            required: false
+            default: true
+            description: Include gap analysis results in export
+          - name: include-dependencies
+            type: boolean
+            required: false
+            default: true
+            description: Include resource dependency graph
+          - name: as-of-date
+            type: date
+            required: false
+            description: "Point-in-time export (default: now)"
+        returns:
+          type: record
+          description: "{ document: string, format: string, sections: [...], gaps: [...] }"
+
+      export-instruction-section:
+        description: Export instruction profile section only
+        behavior: plugin
+        handler: export_instruction_profile_section
+        lifecycle:
+          reads_tables:
+            - custody.cbu_instruction_assignments
+            - custody.cbu_instruction_field_overrides
+            - custody.instruction_templates
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: format
+            type: string
+            required: false
+            default: YAML
+            valid_values:
+              - YAML
+              - JSON
+        returns:
+          type: record
+
+      export-gateway-section:
+        description: Export gateway routing section only
+        behavior: plugin
+        handler: export_gateway_section
+        lifecycle:
+          reads_tables:
+            - custody.cbu_gateway_connectivity
+            - custody.cbu_gateway_routing
+            - custody.cbu_gateway_fallbacks
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: format
+            type: string
+            required: false
+            default: YAML
+            valid_values:
+              - YAML
+              - JSON
+        returns:
+          type: record
+
+      export-settlement-section:
+        description: Export settlement configuration section only
+        behavior: plugin
+        handler: export_settlement_section
+        lifecycle:
+          reads_tables:
+            - custody.cbu_ssi
+            - custody.ssi_booking_rules
+            - custody.cbu_settlement_chains
+            - custody.settlement_chain_hops
+            - custody.cbu_cross_border_config
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: format
+            type: string
+            required: false
+            default: YAML
+            valid_values:
+              - YAML
+              - JSON
+        returns:
+          type: record
+
+      export-pricing-section:
+        description: Export pricing configuration section only
+        behavior: plugin
+        handler: export_pricing_section
+        lifecycle:
+          reads_tables:
+            - custody.cbu_pricing_configs
+            - custody.cbu_valuation_schedule
+            - custody.cbu_pricing_fallback_chains
+            - custody.cbu_stale_price_policies
+            - custody.cbu_nav_impact_thresholds
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: format
+            type: string
+            required: false
+            default: YAML
+            valid_values:
+              - YAML
+              - JSON
+        returns:
+          type: record
+
+      export-tax-section:
+        description: Export tax configuration section only
+        behavior: plugin
+        handler: export_tax_section
+        lifecycle:
+          reads_tables:
+            - custody.cbu_tax_status
+            - custody.cbu_tax_reclaim_config
+            - custody.cbu_tax_reporting
+            - custody.tax_treaty_rates
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: format
+            type: string
+            required: false
+            default: YAML
+            valid_values:
+              - YAML
+              - JSON
+        returns:
+          type: record
+
+      export-corporate-actions-section:
+        description: Export corporate actions configuration section only
+        behavior: plugin
+        handler: export_corporate_actions_section
+        lifecycle:
+          reads_tables:
+            - custody.cbu_ca_preferences
+            - custody.cbu_ca_instruction_windows
+            - custody.cbu_ca_ssi_mappings
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: format
+            type: string
+            required: false
+            default: YAML
+            valid_values:
+              - YAML
+              - JSON
+        returns:
+          type: record
+
+      # =========================================================================
+      # VALIDATION & GAP ANALYSIS (Phase 4)
+      # =========================================================================
+
+      validate-matrix-completeness:
+        description: Validate entire trading matrix is complete for go-live
+        behavior: plugin
+        handler: validate_trading_matrix_completeness
+        lifecycle:
+          reads_tables:
+            - custody.cbu_instrument_universe
+            - custody.cbu_ssi
+            - custody.ssi_booking_rules
+            - custody.cbu_instruction_assignments
+            - custody.cbu_gateway_routing
+            - custody.cbu_pricing_configs
+            - custody.cbu_withholding_profiles
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: validation-level
+            type: string
+            required: false
+            default: STRICT
+            valid_values:
+              - STRICT
+              - STANDARD
+              - PERMISSIVE
+            description: "STRICT=all gaps are errors, STANDARD=critical gaps are errors, PERMISSIVE=all gaps are warnings"
+        returns:
+          type: record
+          description: "{ ready_for_golive: bool, critical_gaps: [...], warnings: [...], coverage_summary: {...} }"
+
+      generate-gap-remediation-plan:
+        description: Generate DSL plan to remediate matrix gaps
+        behavior: plugin
+        handler: generate_matrix_remediation_plan
+        lifecycle:
+          reads_tables:
+            - custody.cbu_instrument_universe
+            - custody.cbu_ssi
+            - custody.ssi_booking_rules
+            - custody.cbu_instruction_assignments
+            - custody.cbu_gateway_routing
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: priority
+            type: string
+            required: false
+            default: CRITICAL_FIRST
+            valid_values:
+              - CRITICAL_FIRST
+              - BY_SECTION
+              - DEPENDENCY_ORDER
+            description: Order in which to generate remediation steps
+        returns:
+          type: record
+          description: "{ dsl_statements: [...], pending_inputs: [...], estimated_effort: string }"

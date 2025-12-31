@@ -1,0 +1,430 @@
+domains:
+  corporate-action:
+    description: "Corporate action processing configuration"
+
+    verbs:
+      # =========================================================================
+      # CA EVENT TYPE REFERENCE DATA
+      # =========================================================================
+
+      define-event-type:
+        description: "Define corporate action event type"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: ca_event_types
+          schema: custody
+          conflict_keys:
+            - event_code
+          returning: event_type_id
+        args:
+          - name: code
+            type: string
+            required: true
+            maps_to: event_code
+          - name: name
+            type: string
+            required: true
+            maps_to: event_name
+          - name: category
+            type: string
+            required: true
+            maps_to: category
+            description: "INCOME, REORGANIZATION, VOLUNTARY, MANDATORY, INFORMATION"
+          - name: is-elective
+            type: boolean
+            required: true
+            maps_to: is_elective
+          - name: default-election
+            type: string
+            required: false
+            maps_to: default_election
+            description: "CASH, STOCK, ROLLOVER, LAPSE, DECLINE, NO_ACTION"
+          - name: iso-event-code
+            type: string
+            required: false
+            maps_to: iso_event_code
+            description: "ISO 15022/20022 event code"
+        returns:
+          type: uuid
+          name: event_type_id
+          capture: true
+        lifecycle:
+          writes_tables:
+            - custody.ca_event_types
+
+      list-event-types:
+        description: "List CA event types"
+        behavior: crud
+        crud:
+          operation: select
+          table: ca_event_types
+          schema: custody
+        args:
+          - name: category
+            type: string
+            required: false
+            maps_to: category
+          - name: is-elective
+            type: boolean
+            required: false
+            maps_to: is_elective
+        returns:
+          type: record_set
+        lifecycle:
+          reads_tables:
+            - custody.ca_event_types
+
+      # =========================================================================
+      # CBU CA PREFERENCES
+      # =========================================================================
+
+      set-preferences:
+        description: "Set corporate action processing preferences for CBU"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: cbu_ca_preferences
+          schema: custody
+          conflict_keys:
+            - cbu_id
+            - event_type_id
+            - instrument_class_id
+          returning: preference_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: event-type
+            type: lookup
+            required: true
+            maps_to: event_type_id
+            lookup:
+              table: ca_event_types
+              schema: custody
+              code_column: event_code
+              id_column: event_type_id
+          - name: instrument-class
+            type: lookup
+            required: false
+            maps_to: instrument_class_id
+            lookup:
+              table: instrument_classes
+              entity_type: instrument_class
+              schema: custody
+              code_column: class_code
+              id_column: class_id
+          - name: processing-mode
+            type: string
+            required: true
+            maps_to: processing_mode
+            description: "AUTO_INSTRUCT, MANUAL, DEFAULT_ONLY, THRESHOLD"
+          - name: default-election
+            type: string
+            required: false
+            maps_to: default_election
+            description: "Override event type default"
+          - name: threshold-value
+            type: decimal
+            required: false
+            maps_to: threshold_value
+            description: "Value threshold for THRESHOLD mode"
+          - name: threshold-currency
+            type: string
+            required: false
+            maps_to: threshold_currency
+          - name: notification-email
+            type: string
+            required: false
+            maps_to: notification_email
+        returns:
+          type: uuid
+          name: preference_id
+          capture: true
+        lifecycle:
+          writes_tables:
+            - custody.cbu_ca_preferences
+          reads_tables:
+            - custody.ca_event_types
+
+      list-preferences:
+        description: "List CA preferences for CBU"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: cbu_ca_preferences
+          schema: custody
+          fk_col: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: event-type
+            type: string
+            required: false
+        returns:
+          type: record_set
+        lifecycle:
+          reads_tables:
+            - custody.cbu_ca_preferences
+
+      remove-preference:
+        description: "Remove CA preference"
+        behavior: crud
+        crud:
+          operation: delete
+          table: cbu_ca_preferences
+          schema: custody
+        args:
+          - name: preference-id
+            type: uuid
+            required: true
+            maps_to: preference_id
+        returns:
+          type: affected
+
+      # =========================================================================
+      # INSTRUCTION WINDOWS
+      # =========================================================================
+
+      set-instruction-window:
+        description: "Configure CA instruction deadline rules"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: cbu_ca_instruction_windows
+          schema: custody
+          conflict_keys:
+            - cbu_id
+            - event_type_id
+            - market_id
+          returning: window_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: event-type
+            type: lookup
+            required: true
+            maps_to: event_type_id
+            lookup:
+              table: ca_event_types
+              schema: custody
+              code_column: event_code
+              id_column: event_type_id
+          - name: market
+            type: lookup
+            required: false
+            maps_to: market_id
+            lookup:
+              table: markets
+              entity_type: market
+              schema: custody
+              code_column: mic
+              id_column: market_id
+          - name: cutoff-days-before
+            type: integer
+            required: true
+            maps_to: cutoff_days_before
+            description: "Days before market deadline for internal cutoff"
+          - name: warning-days
+            type: integer
+            required: false
+            maps_to: warning_days
+            default: 3
+            description: "Days before internal cutoff for warning"
+          - name: escalation-days
+            type: integer
+            required: false
+            maps_to: escalation_days
+            default: 1
+            description: "Days before internal cutoff for escalation"
+          - name: escalation-contact
+            type: string
+            required: false
+            maps_to: escalation_contact
+        returns:
+          type: uuid
+          name: window_id
+          capture: true
+        lifecycle:
+          writes_tables:
+            - custody.cbu_ca_instruction_windows
+          reads_tables:
+            - custody.ca_event_types
+
+      list-instruction-windows:
+        description: "List instruction window configurations"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: cbu_ca_instruction_windows
+          schema: custody
+          fk_col: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record_set
+        lifecycle:
+          reads_tables:
+            - custody.cbu_ca_instruction_windows
+
+      # =========================================================================
+      # CA SSI MAPPING
+      # =========================================================================
+
+      link-ca-ssi:
+        description: "Link CA payment/delivery to specific SSI"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: cbu_ca_ssi_mappings
+          schema: custody
+          conflict_keys:
+            - cbu_id
+            - event_type_id
+            - currency
+          returning: mapping_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: event-type
+            type: lookup
+            required: true
+            maps_to: event_type_id
+            lookup:
+              table: ca_event_types
+              schema: custody
+              code_column: event_code
+              id_column: event_type_id
+          - name: currency
+            type: string
+            required: true
+            maps_to: currency
+          - name: ssi-id
+            type: uuid
+            required: true
+            maps_to: ssi_id
+            lookup:
+              table: cbu_ssi
+              entity_type: ssi
+              schema: custody
+              search_key: ssi_name
+              primary_key: ssi_id
+        returns:
+          type: uuid
+          name: mapping_id
+          capture: true
+        lifecycle:
+          writes_tables:
+            - custody.cbu_ca_ssi_mappings
+          reads_tables:
+            - custody.ca_event_types
+            - custody.cbu_ssi
+
+      list-ca-ssi-mappings:
+        description: "List CA SSI mappings"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: cbu_ca_ssi_mappings
+          schema: custody
+          fk_col: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record_set
+        lifecycle:
+          reads_tables:
+            - custody.cbu_ca_ssi_mappings
+
+      # =========================================================================
+      # VALIDATION
+      # =========================================================================
+
+      validate-ca-config:
+        description: "Validate corporate action configuration completeness"
+        behavior: plugin
+        handler: validate_ca_configuration
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record
+          description: "{ complete: bool, missing_preferences: [...], missing_ssi_mappings: [...] }"
+        lifecycle:
+          reads_tables:
+            - custody.cbu_ca_preferences
+            - custody.cbu_ca_ssi_mappings
+            - custody.cbu_instrument_universe
+
+      derive-required-config:
+        description: "Derive required CA config from universe"
+        behavior: plugin
+        handler: derive_required_ca_config
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record_set
+        lifecycle:
+          reads_tables:
+            - custody.cbu_instrument_universe

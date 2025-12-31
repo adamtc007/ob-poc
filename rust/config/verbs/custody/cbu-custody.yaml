@@ -396,6 +396,7 @@ domains:
             maps_to: security_type_id
             lookup:
               table: security_types
+              entity_type: security_type
               schema: custody
               code_column: code
               id_column: security_type_id
@@ -493,6 +494,7 @@ domains:
             maps_to: security_type_id
             lookup:
               table: security_types
+              entity_type: security_type
               schema: custody
               code_column: code
               id_column: security_type_id
@@ -641,6 +643,11 @@ domains:
         description: Validate that all universe entries have matching booking rules
         behavior: plugin
         handler: validate_booking_coverage
+        lifecycle:
+          reads_tables:
+            - custody.cbu_instrument_universe
+            - custody.cbu_ssi
+            - custody.ssi_booking_rules
         args:
           - name: cbu-id
             type: uuid
@@ -657,6 +664,10 @@ domains:
         description: Find SSI for given trade characteristics (simulate ALERT lookup)
         behavior: plugin
         handler: lookup_ssi_for_trade
+        lifecycle:
+          reads_tables:
+            - custody.cbu_ssi
+            - custody.ssi_booking_rules
         args:
           - name: cbu-id
             type: uuid

@@ -1838,6 +1838,58 @@ GROUP BY r.name;
 4. **Repeatable** - Clean + reimport cycle validates idempotency
 5. **Performance baseline** - ~100 CBUs/sec is the benchmark for batch operations
 
+## Allianz Trading Matrix Test Harness
+
+A comprehensive DSL test harness that creates and populates the full trading matrix for an Allianz fund CBU.
+
+**File:** `rust/tests/scenarios/allianz_trading_matrix_harness.dsl`
+
+### What It Creates
+
+| Category | Count | Details |
+|----------|-------|---------|
+| **Reference Data** | | |
+| Instrument Classes | 6 | EQUITY, GOVT_BOND, CORP_BOND, ETF, OTC_IRS, OTC_FX |
+| Markets | 8 | XETR, XLON, XNYS, XNAS, XHKG, XTKS, XSWX, XPAR |
+| Tax Jurisdictions | 7 | DE, GB, US, JP, HK, LU, CH |
+| Settlement Locations | 5 | Clearstream, Euroclear, DTC, CREST, CBF |
+| **CBU-Specific** | | |
+| CBU | 1 | "AllianzGI Global Multi-Asset Test Fund" (LU) |
+| Universe Entries | 14 | Equities (8 markets), Bonds (2), ETFs (2), OTC (2) |
+| SSIs | 10 | Regional equity, bonds, collateral accounts |
+| Booking Rules | ~14 | ALERT-style priority routing |
+| Settlement Chains | 3 | DE, UK, US with 6 hops total |
+| Cross-Border Configs | 2 | DE→US, UK→US via ICSDs |
+| Treaty Rates | 5 | DE, US, JP, CH dividend/interest rates |
+| Tax Statuses | 6 | Fund status per jurisdiction |
+| Reclaim Configs | 3 | DE, CH, US reclaim automation |
+| FATCA/CRS Reporting | 2 | Reporting obligations |
+
+### Running the Harness
+
+```bash
+cd rust/
+
+# Execute the harness
+DATABASE_URL="postgresql:///data_designer" \
+cargo run --features database,cli --bin dsl_cli -- execute \
+  -f tests/scenarios/allianz_trading_matrix_harness.dsl
+
+# Expected output:
+# ✓ Executed 111 step(s) successfully
+```
+
+### Idempotency
+
+All verbs use upsert operations with conflict keys. The harness can be run multiple times without errors - each run produces the same result.
+
+### Phases Covered
+
+1. **Phase 1**: Universe, SSIs, Booking Rules (`cbu-custody.*`)
+2. **Phase 2**: (Future) Instruction Profile, Gateway Routing, Corporate Actions
+3. **Phase 3**: Settlement Chains, Tax Configuration (`settlement-chain.*`, `tax-config.*`)
+4. **Phase 4**: Validation (`cbu-custody.validate-booking-coverage`)
+
 ### Manual Commands (Legacy)
 
 ```bash
@@ -6383,6 +6435,28 @@ Service resource type (read-only) and instance operations
 | `service-resource.suspend` | Suspend a service resource instance |
 | `service-resource.validate-attrs` | Validate that all required attributes are set for a resource instance |
 
+### settlement-chain
+
+Settlement chain configuration - multi-hop settlement paths and cross-border routing
+
+| Verb | Description |
+|------|-------------|
+| `settlement-chain.define-location` | Define a settlement location (CSD/ICSD) |
+| `settlement-chain.list-locations` | List all settlement locations |
+| `settlement-chain.create-chain` | Create a settlement chain for market/instrument/currency |
+| `settlement-chain.list-chains` | List settlement chains for a CBU |
+| `settlement-chain.deactivate-chain` | Deactivate a settlement chain |
+| `settlement-chain.add-hop` | Add intermediary hop to a settlement chain |
+| `settlement-chain.list-hops` | List hops in a settlement chain |
+| `settlement-chain.remove-hop` | Remove a hop from a settlement chain |
+| `settlement-chain.set-location-preference` | Set CBU preference for a settlement location |
+| `settlement-chain.list-location-preferences` | List location preferences for a CBU |
+| `settlement-chain.set-cross-border` | Configure cross-border settlement routing |
+| `settlement-chain.list-cross-border` | List cross-border configurations for a CBU |
+| `settlement-chain.deactivate-cross-border` | Deactivate a cross-border configuration |
+| `settlement-chain.validate-settlement-config` | Validate settlement configuration completeness |
+| `settlement-chain.find-chain` | Find settlement chain for given trade characteristics |
+
 ### share-class
 
 Fund share class management and investor registry (Clearstream-style)
@@ -6650,6 +6724,26 @@ Team and user access management for multi-tenant client portal
 | `team.list-cbus` | List CBUs accessible to team |
 | `team.add-cbu-access` | Add explicit CBU access to team |
 | `team.remove-cbu-access` | Remove explicit CBU access from team |
+
+### tax-config
+
+Withholding tax, treaty rates, and tax reclaim configuration
+
+| Verb | Description |
+|------|-------------|
+| `tax-config.define-jurisdiction` | Define a tax jurisdiction with default rates |
+| `tax-config.list-jurisdictions` | List all tax jurisdictions |
+| `tax-config.set-treaty-rate` | Set treaty rate between source and investor jurisdictions |
+| `tax-config.list-treaty-rates` | List treaty rates for a jurisdiction |
+| `tax-config.set-tax-status` | Set CBU's tax status in a jurisdiction |
+| `tax-config.list-tax-status` | List CBU's tax statuses across jurisdictions |
+| `tax-config.set-reclaim-config` | Configure tax reclaim settings for a CBU/jurisdiction |
+| `tax-config.list-reclaim-configs` | List reclaim configurations for a CBU |
+| `tax-config.deactivate-reclaim` | Deactivate a reclaim configuration |
+| `tax-config.set-reporting` | Set tax reporting obligations (FATCA/CRS) |
+| `tax-config.list-reporting` | List reporting obligations for a CBU |
+| `tax-config.find-applicable-rate` | Find applicable withholding rate for income |
+| `tax-config.validate-tax-config` | Validate tax configuration completeness |
 
 ### user
 

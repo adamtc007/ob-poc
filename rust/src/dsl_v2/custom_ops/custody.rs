@@ -353,7 +353,7 @@ impl CustomOperation for ValidateBookingCoverageOp {
             SELECT
                 u.universe_id,
                 ic.code as instrument_class,
-                m.mic as market,
+                m.mic as "market?",
                 u.currencies,
                 u.settlement_types
             FROM custody.cbu_instrument_universe u
@@ -380,8 +380,8 @@ impl CustomOperation for ValidateBookingCoverageOp {
             SELECT
                 r.rule_id,
                 r.rule_name,
-                ic.code as instrument_class,
-                m.mic as market
+                ic.code as "instrument_class?",
+                m.mic as "market?"
             FROM custody.ssi_booking_rules r
             LEFT JOIN custody.instrument_classes ic ON ic.class_id = r.instrument_class_id
             LEFT JOIN custody.markets m ON m.market_id = r.market_id
@@ -498,7 +498,7 @@ impl CustomOperation for DeriveRequiredCoverageOp {
             SELECT
                 u.universe_id,
                 ic.code as instrument_class,
-                m.mic as market,
+                m.mic as "market?",
                 u.currencies,
                 u.settlement_types,
                 CASE
