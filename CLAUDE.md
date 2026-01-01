@@ -6001,6 +6001,94 @@ ENTITY_GATEWAY_URL="http://[::1]:50051"  # EntityGateway gRPC endpoint
 - Pool exhausted → requests queue → `acquire_timeout` exceeded → 500 errors
 - Too many connections → PostgreSQL memory pressure → OOM or degraded performance
 
+### Production Deployment (1000+ Concurrent Users)
+
+Axum/Tokio handles high concurrency efficiently - each request is a lightweight async task (~KB, not ~MB threads). The real constraints are OS and database limits.
+
+**Capacity planning:**
+
+| Component | Default | Production (1000 users) |
+|-----------|---------|-------------------------|
+| Tokio worker threads | CPU cores | Auto (no change needed) |
+| OS file descriptors | 1024 | 65535 |
+| DATABASE_POOL_MAX | 50 | 150 |
+| PostgreSQL max_connections | 100 | 200+ |
+| Memory per connection | ~few KB | 1000 conn ≈ few MB |
+
+**OS-level tuning (Linux/Docker):**
+
+```bash
+# Increase file descriptor limit for the process
+ulimit -n 65535
+
+# Or permanently in /etc/security/limits.conf:
+* soft nofile 65535
+* hard nofile 65535
+```
+
+**Docker Compose example:**
+
+```yaml
+services:
+  ob-poc-web:
+    image: ob-poc-web:latest
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    environment:
+      DATABASE_URL: postgresql://postgres:password@db:5432/data_designer
+      DATABASE_POOL_MAX: 150
+      DATABASE_POOL_MIN: 20
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
+  db:
+    image: postgres:17
+    command: postgres -c max_connections=200 -c shared_buffers=256MB
+    environment:
+      POSTGRES_DB: data_designer
+```
+
+**Kubernetes pod spec:**
+
+```yaml
+spec:
+  containers:
+  - name: ob-poc-web
+    securityContext:
+      capabilities:
+        add: ["SYS_RESOURCE"]  # For ulimit
+    env:
+    - name: DATABASE_POOL_MAX
+      value: "150"
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "2000m"
+```
+
+**Bottleneck hierarchy** (what fails first):
+
+1. **Database pool** - Most likely bottleneck (we fixed this)
+2. **PostgreSQL connections** - Increase `max_connections`
+3. **File descriptors** - Increase `ulimit -n`
+4. **Memory** - Only if >10k connections or memory leaks
+5. **Tokio runtime** - Rarely the issue (handles 100k+ tasks)
+
+**Monitoring checklist:**
+- Pool utilization: `sqlx` logs connection acquire times
+- PostgreSQL: `SELECT count(*) FROM pg_stat_activity`
+- File descriptors: `ls /proc/<pid>/fd | wc -l`
+- Tokio tasks: Enable `tokio-console` for debugging
+
 ## LLM Backend Architecture
 
 The agentic DSL generation supports switchable LLM backends via the `AGENT_BACKEND` environment variable.
