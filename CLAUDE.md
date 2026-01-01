@@ -5963,6 +5963,12 @@ The agent chat pipeline uses a **two-pass architecture** to maintain both human-
 # Required
 DATABASE_URL="postgresql:///data_designer"
 
+# Database Connection Pool (production-critical)
+DATABASE_POOL_MAX=50          # Max concurrent connections (default: 50)
+DATABASE_POOL_MIN=5           # Pre-warmed connections (default: 5)
+DATABASE_ACQUIRE_TIMEOUT=5    # Seconds to wait for connection (default: 5)
+DATABASE_IDLE_TIMEOUT=600     # Seconds before idle connection closed (default: 600)
+
 # LLM Backend Selection (default: anthropic)
 AGENT_BACKEND=anthropic   # or "openai"
 
@@ -5978,6 +5984,22 @@ OPENAI_MODEL="gpt-4.1"  # optional, default: gpt-4.1
 DSL_CONFIG_DIR="/path/to/config"  # override config location
 ENTITY_GATEWAY_URL="http://[::1]:50051"  # EntityGateway gRPC endpoint
 ```
+
+### Database Pool Sizing Guide
+
+| Deployment | DATABASE_POOL_MAX | DATABASE_POOL_MIN | Notes |
+|------------|-------------------|-------------------|-------|
+| Development | 10 | 1 | Single user, laptop |
+| Staging | 25 | 5 | Testing with load |
+| Production | 50-100 | 10 | Based on expected concurrency |
+
+**Rule of thumb**: `max_connections` ≈ expected concurrent requests × 1.5
+
+**PostgreSQL side**: Ensure `max_connections` in `postgresql.conf` exceeds the sum of all application pools connecting to it. Default PostgreSQL max is 100.
+
+**Failure modes**:
+- Pool exhausted → requests queue → `acquire_timeout` exceeded → 500 errors
+- Too many connections → PostgreSQL memory pressure → OOM or degraded performance
 
 ## LLM Backend Architecture
 

@@ -1,0 +1,1302 @@
+{
+  "data": [
+    {
+      "attributes": {
+        "bic": null,
+        "conformityFlag": "CONFORMING",
+        "entity": {
+          "associatedEntity": {
+            "lei": null,
+            "name": null
+          },
+          "category": "GENERAL",
+          "creationDate": "2011-01-27T23:00:00Z",
+          "eventGroups": [],
+          "expiration": {
+            "date": null,
+            "reason": null
+          },
+          "headquartersAddress": {
+            "addressLines": [
+              "Windmühlenberg"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Sehestedt",
+            "country": "DE",
+            "language": "de",
+            "mailRouting": null,
+            "postalCode": "24814",
+            "region": "DE-SH"
+          },
+          "jurisdiction": "DE",
+          "legalAddress": {
+            "addressLines": [
+              "Windmühlenberg"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Sehestedt",
+            "country": "DE",
+            "language": "de",
+            "mailRouting": null,
+            "postalCode": "24814",
+            "region": "DE-SH"
+          },
+          "legalForm": {
+            "id": "8Z6G",
+            "other": null
+          },
+          "legalName": {
+            "language": "de",
+            "name": "Windpark Emmendorf GmbH & Co. KG"
+          },
+          "otherAddresses": [],
+          "otherNames": [],
+          "registeredAs": "HRA 7321 KI",
+          "registeredAt": {
+            "id": "RA000277",
+            "other": null
+          },
+          "status": "ACTIVE",
+          "subCategory": null,
+          "successorEntities": [],
+          "successorEntity": {
+            "lei": null,
+            "name": null
+          },
+          "transliteratedOtherNames": []
+        },
+        "lei": "529900KMPEUGWRAWBE94",
+        "mic": null,
+        "ocid": null,
+        "qcc": "QDE6SCFAM6",
+        "registration": {
+          "corroborationLevel": "FULLY_CORROBORATED",
+          "initialRegistrationDate": "2025-10-29T14:39:08Z",
+          "lastUpdateDate": "2025-10-29T14:39:08Z",
+          "managingLou": "5299000J2N45DDNE4Y28",
+          "nextRenewalDate": "2026-10-29T14:39:08Z",
+          "otherValidationAuthorities": [],
+          "status": "ISSUED",
+          "validatedAs": "HRA 7321 KI",
+          "validatedAt": {
+            "id": "RA000277",
+            "other": null
+          }
+        },
+        "spglobal": [
+          "595509297"
+        ]
+      },
+      "id": "529900KMPEUGWRAWBE94",
+      "links": {
+        "self": "https://api.gleif.org/api/v1/lei-records/529900KMPEUGWRAWBE94"
+      },
+      "relationships": {
+        "direct-parent": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/529900KMPEUGWRAWBE94/direct-parent",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/529900KMPEUGWRAWBE94/direct-parent-relationship"
+          }
+        },
+        "field-modifications": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/529900KMPEUGWRAWBE94/field-modifications"
+          }
+        },
+        "lei-issuer": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/529900KMPEUGWRAWBE94/lei-issuer"
+          }
+        },
+        "managing-lou": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/529900KMPEUGWRAWBE94/managing-lou"
+          }
+        },
+        "ultimate-parent": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/529900KMPEUGWRAWBE94/ultimate-parent",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/529900KMPEUGWRAWBE94/ultimate-parent-relationship"
+          }
+        }
+      },
+      "type": "lei-records"
+    },
+    {
+      "attributes": {
+        "bic": null,
+        "conformityFlag": "CONFORMING",
+        "entity": {
+          "associatedEntity": {
+            "lei": null,
+            "name": null
+          },
+          "category": "FUND",
+          "creationDate": "2013-10-01T22:00:00Z",
+          "eventGroups": [],
+          "expiration": {
+            "date": null,
+            "reason": null
+          },
+          "headquartersAddress": {
+            "addressLines": [
+              "c/o INVESTITORI SOCIETA' DI GESTIONE DEL RISPARMIO S.P.A.",
+              "Largo Domodossola 3"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "MILANO",
+            "country": "IT",
+            "language": "it-IT",
+            "mailRouting": null,
+            "postalCode": "20145",
+            "region": "IT-MI"
+          },
+          "jurisdiction": "IT",
+          "legalAddress": {
+            "addressLines": [
+              "LARGO DOMODOSSOLA, 3"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "MILANO",
+            "country": "IT",
+            "language": "it-IT",
+            "mailRouting": null,
+            "postalCode": "20145",
+            "region": "IT-MI"
+          },
+          "legalForm": {
+            "id": "9999",
+            "other": "FONDO"
+          },
+          "legalName": {
+            "language": "it-IT",
+            "name": "ALLIANZ PRIVATE EQUITY PARTNERS IV"
+          },
+          "otherAddresses": [],
+          "otherNames": [],
+          "registeredAs": "331200",
+          "registeredAt": {
+            "id": "RA000408",
+            "other": null
+          },
+          "status": "ACTIVE",
+          "subCategory": null,
+          "successorEntities": [],
+          "successorEntity": {
+            "lei": null,
+            "name": null
+          },
+          "transliteratedOtherNames": []
+        },
+        "lei": "815600DD525D8C02EE49",
+        "mic": null,
+        "ocid": null,
+        "qcc": null,
+        "registration": {
+          "corroborationLevel": "FULLY_CORROBORATED",
+          "initialRegistrationDate": "2025-08-01T14:22:06Z",
+          "lastUpdateDate": "2025-08-01T14:22:06Z",
+          "managingLou": "815600EAD78C57FCE690",
+          "nextRenewalDate": "2026-08-01T14:22:06Z",
+          "otherValidationAuthorities": [],
+          "status": "ISSUED",
+          "validatedAs": "331200",
+          "validatedAt": {
+            "id": "RA000408",
+            "other": null
+          }
+        },
+        "spglobal": [
+          "271268151"
+        ]
+      },
+      "id": "815600DD525D8C02EE49",
+      "links": {
+        "self": "https://api.gleif.org/api/v1/lei-records/815600DD525D8C02EE49"
+      },
+      "relationships": {
+        "direct-parent": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/815600DD525D8C02EE49/direct-parent",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/815600DD525D8C02EE49/direct-parent-relationship"
+          }
+        },
+        "field-modifications": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/815600DD525D8C02EE49/field-modifications"
+          }
+        },
+        "fund-manager": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/815600DD525D8C02EE49/fund-manager",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/815600DD525D8C02EE49/fund-manager-relationship"
+          }
+        },
+        "isins": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/815600DD525D8C02EE49/isins"
+          }
+        },
+        "lei-issuer": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/815600DD525D8C02EE49/lei-issuer"
+          }
+        },
+        "managing-lou": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/815600DD525D8C02EE49/managing-lou"
+          }
+        },
+        "ultimate-parent": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/815600DD525D8C02EE49/ultimate-parent",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/815600DD525D8C02EE49/ultimate-parent-relationship"
+          }
+        }
+      },
+      "type": "lei-records"
+    },
+    {
+      "attributes": {
+        "bic": null,
+        "conformityFlag": "CONFORMING",
+        "entity": {
+          "associatedEntity": {
+            "lei": null,
+            "name": null
+          },
+          "category": "FUND",
+          "creationDate": "2001-11-19T23:00:00Z",
+          "eventGroups": [],
+          "expiration": {
+            "date": null,
+            "reason": null
+          },
+          "headquartersAddress": {
+            "addressLines": [
+              "c/o ALLIANZ SOCIETA' PER AZIONI IN FORMA ABBREVIATA \"ALLIANZ S.P.A.\"",
+              "PIAZZA TRE TORRI, 3"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "MILANO",
+            "country": "IT",
+            "language": "it-IT",
+            "mailRouting": null,
+            "postalCode": "20145",
+            "region": "IT-MI"
+          },
+          "jurisdiction": "IT",
+          "legalAddress": {
+            "addressLines": [
+              "PIAZZA TRE TORRI, 3"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "MILANO",
+            "country": "IT",
+            "language": "it-IT",
+            "mailRouting": null,
+            "postalCode": "20145",
+            "region": "IT-MI"
+          },
+          "legalForm": {
+            "id": "OQ8C",
+            "other": null
+          },
+          "legalName": {
+            "language": "it-IT",
+            "name": "INSIEME - FONDO PENSIONE APERTO A CONTRIBUZIONE DEFINITA"
+          },
+          "otherAddresses": [],
+          "otherNames": [],
+          "registeredAs": "118",
+          "registeredAt": {
+            "id": "RA000409",
+            "other": null
+          },
+          "status": "ACTIVE",
+          "subCategory": null,
+          "successorEntities": [],
+          "successorEntity": {
+            "lei": null,
+            "name": null
+          },
+          "transliteratedOtherNames": []
+        },
+        "lei": "81560044F6DE4CDE9E77",
+        "mic": null,
+        "ocid": null,
+        "qcc": null,
+        "registration": {
+          "corroborationLevel": "FULLY_CORROBORATED",
+          "initialRegistrationDate": "2025-06-12T10:06:46Z",
+          "lastUpdateDate": "2025-06-12T10:06:46Z",
+          "managingLou": "815600EAD78C57FCE690",
+          "nextRenewalDate": "2026-06-12T10:06:46Z",
+          "otherValidationAuthorities": [],
+          "status": "ISSUED",
+          "validatedAs": "118",
+          "validatedAt": {
+            "id": "RA000409",
+            "other": null
+          }
+        },
+        "spglobal": [
+          "1948262496"
+        ]
+      },
+      "id": "81560044F6DE4CDE9E77",
+      "links": {
+        "self": "https://api.gleif.org/api/v1/lei-records/81560044F6DE4CDE9E77"
+      },
+      "relationships": {
+        "direct-parent": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/81560044F6DE4CDE9E77/direct-parent",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/81560044F6DE4CDE9E77/direct-parent-relationship"
+          }
+        },
+        "field-modifications": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/81560044F6DE4CDE9E77/field-modifications"
+          }
+        },
+        "fund-manager": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/81560044F6DE4CDE9E77/fund-manager",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/81560044F6DE4CDE9E77/fund-manager-relationship"
+          }
+        },
+        "lei-issuer": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/81560044F6DE4CDE9E77/lei-issuer"
+          }
+        },
+        "managing-lou": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/81560044F6DE4CDE9E77/managing-lou"
+          }
+        },
+        "ultimate-parent": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/81560044F6DE4CDE9E77/ultimate-parent",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/81560044F6DE4CDE9E77/ultimate-parent-relationship"
+          }
+        }
+      },
+      "type": "lei-records"
+    },
+    {
+      "attributes": {
+        "bic": null,
+        "conformityFlag": "CONFORMING",
+        "entity": {
+          "associatedEntity": {
+            "lei": null,
+            "name": null
+          },
+          "category": "FUND",
+          "creationDate": "1998-10-15T22:00:00Z",
+          "eventGroups": [],
+          "expiration": {
+            "date": null,
+            "reason": null
+          },
+          "headquartersAddress": {
+            "addressLines": [
+              "c/o ALLIANZ SOCIETA' PER AZIONI IN FORMA ABBREVIATA \"ALLIANZ S.P.A.\"",
+              "PIAZZA TRE TORRI, 3"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "MILANO",
+            "country": "IT",
+            "language": "it-IT",
+            "mailRouting": null,
+            "postalCode": "20145",
+            "region": "IT-MI"
+          },
+          "jurisdiction": "IT",
+          "legalAddress": {
+            "addressLines": [
+              "PIAZZA TRE TORRI, 3"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "MILANO",
+            "country": "IT",
+            "language": "it-IT",
+            "mailRouting": null,
+            "postalCode": "20145",
+            "region": "IT-MI"
+          },
+          "legalForm": {
+            "id": "OQ8C",
+            "other": null
+          },
+          "legalName": {
+            "language": "it-IT",
+            "name": "ALLIANZ PREVIDENZA FONDO PENSIONE APERTO A CONTRIBUZIONE DEFINITA"
+          },
+          "otherAddresses": [],
+          "otherNames": [],
+          "registeredAs": "4",
+          "registeredAt": {
+            "id": "RA000409",
+            "other": null
+          },
+          "status": "ACTIVE",
+          "subCategory": null,
+          "successorEntities": [],
+          "successorEntity": {
+            "lei": null,
+            "name": null
+          },
+          "transliteratedOtherNames": []
+        },
+        "lei": "8156003E18B22867E589",
+        "mic": null,
+        "ocid": null,
+        "qcc": null,
+        "registration": {
+          "corroborationLevel": "FULLY_CORROBORATED",
+          "initialRegistrationDate": "2025-06-10T12:42:35Z",
+          "lastUpdateDate": "2025-06-10T12:42:35Z",
+          "managingLou": "815600EAD78C57FCE690",
+          "nextRenewalDate": "2026-06-10T12:42:35Z",
+          "otherValidationAuthorities": [],
+          "status": "ISSUED",
+          "validatedAs": "4",
+          "validatedAt": {
+            "id": "RA000409",
+            "other": null
+          }
+        },
+        "spglobal": [
+          "1948597465"
+        ]
+      },
+      "id": "8156003E18B22867E589",
+      "links": {
+        "self": "https://api.gleif.org/api/v1/lei-records/8156003E18B22867E589"
+      },
+      "relationships": {
+        "direct-parent": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/8156003E18B22867E589/direct-parent",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/8156003E18B22867E589/direct-parent-relationship"
+          }
+        },
+        "field-modifications": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/8156003E18B22867E589/field-modifications"
+          }
+        },
+        "fund-manager": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/8156003E18B22867E589/fund-manager",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/8156003E18B22867E589/fund-manager-relationship"
+          }
+        },
+        "lei-issuer": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/8156003E18B22867E589/lei-issuer"
+          }
+        },
+        "managing-lou": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/8156003E18B22867E589/managing-lou"
+          }
+        },
+        "ultimate-parent": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/8156003E18B22867E589/ultimate-parent",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/8156003E18B22867E589/ultimate-parent-relationship"
+          }
+        }
+      },
+      "type": "lei-records"
+    },
+    {
+      "attributes": {
+        "bic": null,
+        "conformityFlag": "CONFORMING",
+        "entity": {
+          "associatedEntity": {
+            "lei": null,
+            "name": null
+          },
+          "category": "GENERAL",
+          "creationDate": "2019-01-07T23:00:00Z",
+          "eventGroups": [],
+          "expiration": {
+            "date": null,
+            "reason": null
+          },
+          "headquartersAddress": {
+            "addressLines": [
+              "2A, Rue Albert Borschette"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Luxembourg",
+            "country": "LU",
+            "language": "fr",
+            "mailRouting": null,
+            "postalCode": "L-1246",
+            "region": "LU-LU"
+          },
+          "jurisdiction": "LU",
+          "legalAddress": {
+            "addressLines": [
+              "2A, Rue Albert Borschette"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Luxembourg",
+            "country": "LU",
+            "language": "fr",
+            "mailRouting": null,
+            "postalCode": "L-1246",
+            "region": "LU-LU"
+          },
+          "legalForm": {
+            "id": "U8KA",
+            "other": null
+          },
+          "legalName": {
+            "language": "fr",
+            "name": "UK Logistics S.C.Sp."
+          },
+          "otherAddresses": [],
+          "otherNames": [],
+          "registeredAs": "B230679",
+          "registeredAt": {
+            "id": "RA000432",
+            "other": null
+          },
+          "status": "ACTIVE",
+          "subCategory": null,
+          "successorEntities": [],
+          "successorEntity": {
+            "lei": null,
+            "name": null
+          },
+          "transliteratedOtherNames": []
+        },
+        "lei": "529900NCVUCTCD8Z1P88",
+        "mic": null,
+        "ocid": null,
+        "qcc": "QLUW027KQC",
+        "registration": {
+          "corroborationLevel": "FULLY_CORROBORATED",
+          "initialRegistrationDate": "2025-05-22T12:36:14Z",
+          "lastUpdateDate": "2025-05-22T12:36:14Z",
+          "managingLou": "5299000J2N45DDNE4Y28",
+          "nextRenewalDate": "2026-05-22T12:36:14Z",
+          "otherValidationAuthorities": [],
+          "status": "ISSUED",
+          "validatedAs": "B230679",
+          "validatedAt": {
+            "id": "RA000432",
+            "other": null
+          }
+        },
+        "spglobal": [
+          "688437076"
+        ]
+      },
+      "id": "529900NCVUCTCD8Z1P88",
+      "links": {
+        "self": "https://api.gleif.org/api/v1/lei-records/529900NCVUCTCD8Z1P88"
+      },
+      "relationships": {
+        "direct-parent": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/529900NCVUCTCD8Z1P88/direct-parent",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/529900NCVUCTCD8Z1P88/direct-parent-relationship"
+          }
+        },
+        "field-modifications": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/529900NCVUCTCD8Z1P88/field-modifications"
+          }
+        },
+        "lei-issuer": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/529900NCVUCTCD8Z1P88/lei-issuer"
+          }
+        },
+        "managing-lou": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/529900NCVUCTCD8Z1P88/managing-lou"
+          }
+        },
+        "ultimate-parent": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/529900NCVUCTCD8Z1P88/ultimate-parent",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/529900NCVUCTCD8Z1P88/ultimate-parent-relationship"
+          }
+        }
+      },
+      "type": "lei-records"
+    },
+    {
+      "attributes": {
+        "bic": null,
+        "conformityFlag": "CONFORMING",
+        "entity": {
+          "associatedEntity": {
+            "lei": null,
+            "name": null
+          },
+          "category": "GENERAL",
+          "creationDate": "2019-07-02T22:00:00Z",
+          "eventGroups": [],
+          "expiration": {
+            "date": null,
+            "reason": null
+          },
+          "headquartersAddress": {
+            "addressLines": [
+              "Rue Albert Borschette 2A"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Luxembourg",
+            "country": "LU",
+            "language": "fr",
+            "mailRouting": null,
+            "postalCode": "1246",
+            "region": "LU-LU"
+          },
+          "jurisdiction": "LU",
+          "legalAddress": {
+            "addressLines": [
+              "Rue Albert Borschette 2A"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Luxembourg",
+            "country": "LU",
+            "language": "fr",
+            "mailRouting": null,
+            "postalCode": "1246",
+            "region": "LU-LU"
+          },
+          "legalForm": {
+            "id": "DVXS",
+            "other": null
+          },
+          "legalName": {
+            "language": "fr",
+            "name": "UK Logistics PropCo V S.à r.l."
+          },
+          "otherAddresses": [],
+          "otherNames": [],
+          "registeredAs": "B235580",
+          "registeredAt": {
+            "id": "RA000432",
+            "other": null
+          },
+          "status": "ACTIVE",
+          "subCategory": null,
+          "successorEntities": [],
+          "successorEntity": {
+            "lei": null,
+            "name": null
+          },
+          "transliteratedOtherNames": [
+            {
+              "language": "fr",
+              "name": "UK Logistics PropCo V S.a r.l.",
+              "type": "AUTO_ASCII_TRANSLITERATED_LEGAL_NAME"
+            }
+          ]
+        },
+        "lei": "529900X5D7405ZT3D867",
+        "mic": null,
+        "ocid": null,
+        "qcc": "QLU2NEP5CK",
+        "registration": {
+          "corroborationLevel": "FULLY_CORROBORATED",
+          "initialRegistrationDate": "2025-05-22T07:51:07Z",
+          "lastUpdateDate": "2025-05-22T07:51:07Z",
+          "managingLou": "5299000J2N45DDNE4Y28",
+          "nextRenewalDate": "2026-05-22T07:51:07Z",
+          "otherValidationAuthorities": [],
+          "status": "ISSUED",
+          "validatedAs": "B235580",
+          "validatedAt": {
+            "id": "RA000432",
+            "other": null
+          }
+        },
+        "spglobal": [
+          "695978486"
+        ]
+      },
+      "id": "529900X5D7405ZT3D867",
+      "links": {
+        "self": "https://api.gleif.org/api/v1/lei-records/529900X5D7405ZT3D867"
+      },
+      "relationships": {
+        "direct-parent": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/529900X5D7405ZT3D867/direct-parent",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/529900X5D7405ZT3D867/direct-parent-relationship"
+          }
+        },
+        "field-modifications": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/529900X5D7405ZT3D867/field-modifications"
+          }
+        },
+        "lei-issuer": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/529900X5D7405ZT3D867/lei-issuer"
+          }
+        },
+        "managing-lou": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/529900X5D7405ZT3D867/managing-lou"
+          }
+        },
+        "ultimate-parent": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/529900X5D7405ZT3D867/ultimate-parent",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/529900X5D7405ZT3D867/ultimate-parent-relationship"
+          }
+        }
+      },
+      "type": "lei-records"
+    },
+    {
+      "attributes": {
+        "bic": null,
+        "conformityFlag": "CONFORMING",
+        "entity": {
+          "associatedEntity": {
+            "lei": null,
+            "name": null
+          },
+          "category": "GENERAL",
+          "creationDate": "2019-07-02T22:00:00Z",
+          "eventGroups": [],
+          "expiration": {
+            "date": null,
+            "reason": null
+          },
+          "headquartersAddress": {
+            "addressLines": [
+              "Rue Albert Borschette 2A"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Luxembourg",
+            "country": "LU",
+            "language": "fr",
+            "mailRouting": null,
+            "postalCode": "1246",
+            "region": "LU-LU"
+          },
+          "jurisdiction": "LU",
+          "legalAddress": {
+            "addressLines": [
+              "Rue Albert Borschette 2A"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Luxembourg",
+            "country": "LU",
+            "language": "fr",
+            "mailRouting": null,
+            "postalCode": "1246",
+            "region": "LU-LU"
+          },
+          "legalForm": {
+            "id": "DVXS",
+            "other": null
+          },
+          "legalName": {
+            "language": "fr",
+            "name": "UK Logistics PropCo IV S.à r.l."
+          },
+          "otherAddresses": [],
+          "otherNames": [],
+          "registeredAs": "B235579",
+          "registeredAt": {
+            "id": "RA000432",
+            "other": null
+          },
+          "status": "ACTIVE",
+          "subCategory": null,
+          "successorEntities": [],
+          "successorEntity": {
+            "lei": null,
+            "name": null
+          },
+          "transliteratedOtherNames": [
+            {
+              "language": "fr",
+              "name": "UK Logistics PropCo IV S.a r.l.",
+              "type": "AUTO_ASCII_TRANSLITERATED_LEGAL_NAME"
+            }
+          ]
+        },
+        "lei": "5299005ORQPYGM8ESL85",
+        "mic": null,
+        "ocid": null,
+        "qcc": "QLU9REQS5S",
+        "registration": {
+          "corroborationLevel": "FULLY_CORROBORATED",
+          "initialRegistrationDate": "2025-05-22T07:33:25Z",
+          "lastUpdateDate": "2025-05-22T07:33:25Z",
+          "managingLou": "5299000J2N45DDNE4Y28",
+          "nextRenewalDate": "2026-05-22T07:33:25Z",
+          "otherValidationAuthorities": [],
+          "status": "ISSUED",
+          "validatedAs": "B235579",
+          "validatedAt": {
+            "id": "RA000432",
+            "other": null
+          }
+        },
+        "spglobal": [
+          "696085351"
+        ]
+      },
+      "id": "5299005ORQPYGM8ESL85",
+      "links": {
+        "self": "https://api.gleif.org/api/v1/lei-records/5299005ORQPYGM8ESL85"
+      },
+      "relationships": {
+        "direct-parent": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/5299005ORQPYGM8ESL85/direct-parent",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/5299005ORQPYGM8ESL85/direct-parent-relationship"
+          }
+        },
+        "field-modifications": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/5299005ORQPYGM8ESL85/field-modifications"
+          }
+        },
+        "lei-issuer": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/5299005ORQPYGM8ESL85/lei-issuer"
+          }
+        },
+        "managing-lou": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/5299005ORQPYGM8ESL85/managing-lou"
+          }
+        },
+        "ultimate-parent": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/5299005ORQPYGM8ESL85/ultimate-parent",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/5299005ORQPYGM8ESL85/ultimate-parent-relationship"
+          }
+        }
+      },
+      "type": "lei-records"
+    },
+    {
+      "attributes": {
+        "bic": null,
+        "conformityFlag": "CONFORMING",
+        "entity": {
+          "associatedEntity": {
+            "lei": null,
+            "name": null
+          },
+          "category": "GENERAL",
+          "creationDate": "1998-04-29T00:00:00Z",
+          "eventGroups": [],
+          "expiration": {
+            "date": null,
+            "reason": null
+          },
+          "headquartersAddress": {
+            "addressLines": [
+              "650 NEWPORT CENTER DRIVE"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "NEWPORT BEACH",
+            "country": "US",
+            "language": "en",
+            "mailRouting": null,
+            "postalCode": "92660",
+            "region": "US-CA"
+          },
+          "jurisdiction": "US-DE",
+          "legalAddress": {
+            "addressLines": [
+              "C/O REGISTERED AGENT SOLUTIONS, INC.",
+              "838 WALKER ROAD",
+              "SUITE 21-2"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "DOVER",
+            "country": "US",
+            "language": "en",
+            "mailRouting": null,
+            "postalCode": "19904",
+            "region": "US-DE"
+          },
+          "legalForm": {
+            "id": "HZEH",
+            "other": null
+          },
+          "legalName": {
+            "language": "en",
+            "name": "PIMCO GLOBAL ADVISORS LLC"
+          },
+          "otherAddresses": [],
+          "otherNames": [],
+          "registeredAs": "2890610",
+          "registeredAt": {
+            "id": "RA000602",
+            "other": null
+          },
+          "status": "ACTIVE",
+          "subCategory": null,
+          "successorEntities": [],
+          "successorEntity": {
+            "lei": null,
+            "name": null
+          },
+          "transliteratedOtherNames": []
+        },
+        "lei": "254900PKUZU0PVS5TA11",
+        "mic": null,
+        "ocid": "us_de/2890610",
+        "qcc": "QUS8JNP2EE",
+        "registration": {
+          "corroborationLevel": "FULLY_CORROBORATED",
+          "initialRegistrationDate": "2025-04-17T11:21:11Z",
+          "lastUpdateDate": "2025-04-17T11:21:11Z",
+          "managingLou": "5493001KJTIIGC8Y1R12",
+          "nextRenewalDate": "2026-04-17T11:21:11Z",
+          "otherValidationAuthorities": [],
+          "status": "ISSUED",
+          "validatedAs": "2890610",
+          "validatedAt": {
+            "id": "RA000602",
+            "other": null
+          }
+        },
+        "spglobal": [
+          "35016751"
+        ]
+      },
+      "id": "254900PKUZU0PVS5TA11",
+      "links": {
+        "self": "https://api.gleif.org/api/v1/lei-records/254900PKUZU0PVS5TA11"
+      },
+      "relationships": {
+        "direct-parent": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/254900PKUZU0PVS5TA11/direct-parent",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/254900PKUZU0PVS5TA11/direct-parent-relationship"
+          }
+        },
+        "field-modifications": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/254900PKUZU0PVS5TA11/field-modifications"
+          }
+        },
+        "lei-issuer": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/254900PKUZU0PVS5TA11/lei-issuer"
+          }
+        },
+        "managing-lou": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/254900PKUZU0PVS5TA11/managing-lou"
+          }
+        },
+        "ultimate-parent": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/254900PKUZU0PVS5TA11/ultimate-parent",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/254900PKUZU0PVS5TA11/ultimate-parent-relationship"
+          }
+        }
+      },
+      "type": "lei-records"
+    },
+    {
+      "attributes": {
+        "bic": null,
+        "conformityFlag": "CONFORMING",
+        "entity": {
+          "associatedEntity": {
+            "lei": null,
+            "name": null
+          },
+          "category": "GENERAL",
+          "creationDate": "2018-08-29T22:00:00Z",
+          "eventGroups": [],
+          "expiration": {
+            "date": null,
+            "reason": null
+          },
+          "headquartersAddress": {
+            "addressLines": [
+              "Königinstr. 28"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "München",
+            "country": "DE",
+            "language": "de",
+            "mailRouting": null,
+            "postalCode": "80802",
+            "region": "DE-BY"
+          },
+          "jurisdiction": "DE",
+          "legalAddress": {
+            "addressLines": [
+              "Königinstr. 28"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "München",
+            "country": "DE",
+            "language": "de",
+            "mailRouting": null,
+            "postalCode": "80802",
+            "region": "DE-BY"
+          },
+          "legalForm": {
+            "id": "2HBR",
+            "other": null
+          },
+          "legalName": {
+            "language": "de",
+            "name": "Allvest GmbH"
+          },
+          "otherAddresses": [],
+          "otherNames": [],
+          "registeredAs": "HRB 243249",
+          "registeredAt": {
+            "id": "RA000304",
+            "other": null
+          },
+          "status": "ACTIVE",
+          "subCategory": null,
+          "successorEntities": [],
+          "successorEntity": {
+            "lei": null,
+            "name": null
+          },
+          "transliteratedOtherNames": []
+        },
+        "lei": "391200YC6MPAB9UCR633",
+        "mic": null,
+        "ocid": null,
+        "qcc": "QDEFY85F9Y",
+        "registration": {
+          "corroborationLevel": "FULLY_CORROBORATED",
+          "initialRegistrationDate": "2025-04-16T12:49:13Z",
+          "lastUpdateDate": "2025-04-16T12:49:13Z",
+          "managingLou": "39120001KULK7200U106",
+          "nextRenewalDate": "2026-04-16T12:49:13Z",
+          "otherValidationAuthorities": [],
+          "status": "ISSUED",
+          "validatedAs": "HRB 243249",
+          "validatedAt": {
+            "id": "RA000304",
+            "other": null
+          }
+        },
+        "spglobal": [
+          "688944741"
+        ]
+      },
+      "id": "391200YC6MPAB9UCR633",
+      "links": {
+        "self": "https://api.gleif.org/api/v1/lei-records/391200YC6MPAB9UCR633"
+      },
+      "relationships": {
+        "direct-parent": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/391200YC6MPAB9UCR633/direct-parent",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/391200YC6MPAB9UCR633/direct-parent-relationship"
+          }
+        },
+        "field-modifications": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/391200YC6MPAB9UCR633/field-modifications"
+          }
+        },
+        "lei-issuer": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/391200YC6MPAB9UCR633/lei-issuer"
+          }
+        },
+        "managing-lou": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/391200YC6MPAB9UCR633/managing-lou"
+          }
+        },
+        "ultimate-parent": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/391200YC6MPAB9UCR633/ultimate-parent",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/391200YC6MPAB9UCR633/ultimate-parent-relationship"
+          }
+        }
+      },
+      "type": "lei-records"
+    },
+    {
+      "attributes": {
+        "bic": null,
+        "conformityFlag": "CONFORMING",
+        "entity": {
+          "associatedEntity": {
+            "lei": null,
+            "name": null
+          },
+          "category": "GENERAL",
+          "creationDate": "2005-09-07T22:00:00Z",
+          "eventGroups": [],
+          "expiration": {
+            "date": null,
+            "reason": null
+          },
+          "headquartersAddress": {
+            "addressLines": [
+              "Friedrichsplatz 2"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Bad Friedrichshall",
+            "country": "DE",
+            "language": "de",
+            "mailRouting": null,
+            "postalCode": "74177",
+            "region": "DE-BW"
+          },
+          "jurisdiction": "DE",
+          "legalAddress": {
+            "addressLines": [
+              "Friedrichsplatz 2"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Bad Friedrichshall",
+            "country": "DE",
+            "language": "de",
+            "mailRouting": null,
+            "postalCode": "74177",
+            "region": "DE-BW"
+          },
+          "legalForm": {
+            "id": "2HBR",
+            "other": null
+          },
+          "legalName": {
+            "language": "de",
+            "name": "Allianz Esa GmbH"
+          },
+          "otherAddresses": [],
+          "otherNames": [],
+          "registeredAs": "HRB 725082",
+          "registeredAt": {
+            "id": "RA000351",
+            "other": null
+          },
+          "status": "ACTIVE",
+          "subCategory": null,
+          "successorEntities": [],
+          "successorEntity": {
+            "lei": null,
+            "name": null
+          },
+          "transliteratedOtherNames": []
+        },
+        "lei": "529900BRR7RE7TRK1869",
+        "mic": null,
+        "ocid": "de/B8534_HRB725082",
+        "qcc": "QDE92J6EAE",
+        "registration": {
+          "corroborationLevel": "FULLY_CORROBORATED",
+          "initialRegistrationDate": "2025-04-16T12:28:36Z",
+          "lastUpdateDate": "2025-04-16T12:28:36Z",
+          "managingLou": "5299000J2N45DDNE4Y28",
+          "nextRenewalDate": "2026-04-16T12:28:36Z",
+          "otherValidationAuthorities": [],
+          "status": "ISSUED",
+          "validatedAs": "HRB 725082",
+          "validatedAt": {
+            "id": "RA000351",
+            "other": null
+          }
+        },
+        "spglobal": [
+          "676664577"
+        ]
+      },
+      "id": "529900BRR7RE7TRK1869",
+      "links": {
+        "self": "https://api.gleif.org/api/v1/lei-records/529900BRR7RE7TRK1869"
+      },
+      "relationships": {
+        "direct-parent": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/529900BRR7RE7TRK1869/direct-parent",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/529900BRR7RE7TRK1869/direct-parent-relationship"
+          }
+        },
+        "field-modifications": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/529900BRR7RE7TRK1869/field-modifications"
+          }
+        },
+        "lei-issuer": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/529900BRR7RE7TRK1869/lei-issuer"
+          }
+        },
+        "managing-lou": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/529900BRR7RE7TRK1869/managing-lou"
+          }
+        },
+        "ultimate-parent": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/529900BRR7RE7TRK1869/ultimate-parent",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/529900BRR7RE7TRK1869/ultimate-parent-relationship"
+          }
+        }
+      },
+      "type": "lei-records"
+    }
+  ],
+  "links": {
+    "first": "https://api.gleif.org/api/v1/lei-records/529900K9B0N5BT694847/direct-children?page%5Bnumber%5D=1&page%5Bsize%5D=10",
+    "last": "https://api.gleif.org/api/v1/lei-records/529900K9B0N5BT694847/direct-children?page%5Bnumber%5D=24&page%5Bsize%5D=10",
+    "next": "https://api.gleif.org/api/v1/lei-records/529900K9B0N5BT694847/direct-children?page%5Bnumber%5D=2&page%5Bsize%5D=10"
+  },
+  "meta": {
+    "goldenCopy": {
+      "publishDate": "2026-01-01T08:00:00Z"
+    },
+    "pagination": {
+      "currentPage": 1,
+      "from": 1,
+      "lastPage": 24,
+      "perPage": 10,
+      "to": 10,
+      "total": 237
+    }
+  }
+}

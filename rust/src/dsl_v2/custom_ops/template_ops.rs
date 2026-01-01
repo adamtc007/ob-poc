@@ -470,6 +470,7 @@ impl CustomOperation for TemplateBatchOp {
             transaction_id: ctx.transaction_id,
             execution_id: ctx.execution_id,
             idempotency_enabled: ctx.idempotency_enabled,
+            json_bindings: ctx.json_bindings.clone(),
         };
 
         // 10. Create and run BatchExecutor

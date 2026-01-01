@@ -10,6 +10,55 @@ error[D003]: @lei_oj2tiqsvqnd4izyyk658 is already defined earlier in this progra
 
 This occurred because the same entity (AllianzGI, LEI `OJ2TIQSVQND4IZYYK658`) appeared in multiple data sources and we tried to define the same `@lei_xxx` symbol binding twice.
 
+## Two Levels of Uniqueness Checking
+
+### Level 1: DSL Symbol Binding (D003 - Compile Time)
+
+**Location:** `rust/src/dsl_v2/csg_linter.rs` lines 625-644
+
+```rust
+// Check for duplicate binding
+if pending_context.contains(binding_name) {
+    diagnostics.push(Diagnostic {
+        severity: Severity::Error,
+        code: DiagnosticCode::DataflowDuplicateBinding,  // D003
+        message: format!(
+            "@{} is already defined earlier in this program.",
+            binding_name
+        ),
+        ...
+    });
+}
+```
+
+**When it fires:** Two statements in the same DSL program try to bind the same symbol name.
+
+**Example that fails:**
+```clojure
+(entity.ensure-limited-company :name "AllianzGI" :lei "ABC" :as @allianzgi)
+(entity.ensure-limited-company :name "AllianzGI" :lei "ABC" :as @allianzgi)  ;; D003!
+```
+
+### Level 2: Database Unique Constraint (Runtime)
+
+**Location:** Database schema / `generic_executor.rs` entity creation
+
+If the DSL passes validation but tries to insert duplicate LEIs at runtime:
+
+```sql
+-- entity_limited_companies has UNIQUE constraint on lei
+ERROR: duplicate key value violates unique constraint "entity_limited_companies_lei_key"
+```
+
+**When it fires:** Two DSL commands create entities with the same LEI, even if they have different symbol names.
+
+**Example that fails at runtime:**
+```clojure
+(entity.ensure-limited-company :name "AllianzGI" :lei "ABC" :as @foo)
+(entity.ensure-limited-company :name "AllianzGI" :lei "ABC" :as @bar)  
+;; Passes D003 (different symbols), but fails DB constraint!
+```
+
 ## Root Cause
 
 ### 1. Initial Mistake: Truncated Aliases
@@ -132,15 +181,51 @@ for entity in level2_entities { all_entities.insert(entity.lei.clone(), entity);
 for entity in corp_tree_children { all_entities.entry(entity.lei.clone()).or_insert(entity); }
 ```
 
+## Validation Pipeline Position
+
+```
+Source Text
+    │
+    ▼
+┌─────────┐
+│ Parser  │  Creates AST with symbol bindings
+└────┬────┘
+     │
+     ▼
+┌──────────────┐
+│ CSG Linter   │  Pass 6: Check for duplicate bindings (D003)
+└──────┬───────┘
+       │
+       ▼
+┌──────────────────┐
+│ Semantic Validator│  Additional context-aware checks
+└──────────┬───────┘
+           │
+           ▼
+┌──────────────┐
+│ Compiler     │  Build execution plan
+└──────┬───────┘
+       │
+       ▼
+┌──────────────┐
+│ Executor     │  Run against database
+└──────┬───────┘     (DB unique constraints apply here)
+       │
+       ▼
+   Database
+```
+
 ## Lessons Learned
 
 1. **Symbol names must be unique** - DSL validation enforces this before execution
 2. **LEIs are globally unique** - Use the full 20-character LEI, not truncated versions
 3. **Multi-source data has overlaps** - Track what's been defined and skip duplicates
 4. **Idempotency is database-level** - DSL syntax validation happens first
+5. **Two validation layers** - D003 at compile time, DB constraints at runtime
 
 ## Related Files
 
 - `rust/xtask/src/gleif_load.rs` - DSL generator with deduplication logic
-- `rust/src/dsl_v2/csg_linter.rs` - CSG validation including symbol uniqueness check
+- `rust/src/dsl_v2/csg_linter.rs` - CSG validation including symbol uniqueness check (line 625)
+- `rust/src/dsl_v2/validation.rs` - DiagnosticCode definitions (D003 = DataflowDuplicateBinding)
 - `rust/src/dsl_v2/parser.rs` - DSL parser that creates symbol bindings

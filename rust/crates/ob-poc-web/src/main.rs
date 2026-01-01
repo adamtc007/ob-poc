@@ -10,6 +10,7 @@ use axum::{routing::get, Router};
 use http::header::{HeaderValue, CACHE_CONTROL};
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 use tower::ServiceBuilder;
 use tower_http::{
     cors::{Any, CorsLayer},
@@ -58,13 +59,53 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("Starting OB-POC Hybrid Web Server");
 
-    // Database connection
+    // Database connection pool configuration
+    // Production-ready settings for concurrent connections
     let database_url =
         std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".to_string());
 
-    let pool = match sqlx::PgPool::connect(&database_url).await {
+    let max_connections: u32 = std::env::var("DATABASE_POOL_MAX")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(50);
+
+    let min_connections: u32 = std::env::var("DATABASE_POOL_MIN")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(5);
+
+    let acquire_timeout_secs: u64 = std::env::var("DATABASE_ACQUIRE_TIMEOUT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(5);
+
+    let idle_timeout_secs: u64 = std::env::var("DATABASE_IDLE_TIMEOUT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(600);
+
+    tracing::info!(
+        "Database pool config: max={}, min={}, acquire_timeout={}s, idle_timeout={}s",
+        max_connections,
+        min_connections,
+        acquire_timeout_secs,
+        idle_timeout_secs
+    );
+
+    let pool = match sqlx::postgres::PgPoolOptions::new()
+        .max_connections(max_connections)
+        .min_connections(min_connections)
+        .acquire_timeout(Duration::from_secs(acquire_timeout_secs))
+        .idle_timeout(Duration::from_secs(idle_timeout_secs))
+        .connect(&database_url)
+        .await
+    {
         Ok(p) => {
-            tracing::info!("Database connection established");
+            tracing::info!(
+                "Database connection pool established ({} min, {} max connections)",
+                min_connections,
+                max_connections
+            );
             p
         }
         Err(e) => {

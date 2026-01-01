@@ -1,0 +1,167 @@
+{
+  "data": {
+    "attributes": {
+      "bic": [
+        "AZSEDEMMXXX"
+      ],
+      "conformityFlag": "CONFORMING",
+      "entity": {
+        "associatedEntity": {
+          "lei": null,
+          "name": null
+        },
+        "category": "GENERAL",
+        "creationDate": "2006-10-12T22:00:00Z",
+        "eventGroups": [
+          {
+            "events": [
+              {
+                "effectiveDate": "2021-11-01T23:00:00Z",
+                "recordedDate": "2022-03-29T12:01:47Z",
+                "status": "COMPLETED",
+                "type": "MERGERS_AND_ACQUISITIONS",
+                "validationDocuments": "SUPPORTING_DOCUMENTS"
+              }
+            ],
+            "groupType": "STANDALONE"
+          }
+        ],
+        "expiration": {
+          "date": null,
+          "reason": null
+        },
+        "headquartersAddress": {
+          "addressLines": [
+            "Königinstr. 28"
+          ],
+          "addressNumber": null,
+          "addressNumberWithinBuilding": null,
+          "city": "München",
+          "country": "DE",
+          "language": "de",
+          "mailRouting": null,
+          "postalCode": "80802",
+          "region": "DE-BY"
+        },
+        "jurisdiction": "DE",
+        "legalAddress": {
+          "addressLines": [
+            "Königinstr. 28"
+          ],
+          "addressNumber": null,
+          "addressNumberWithinBuilding": null,
+          "city": "München",
+          "country": "DE",
+          "language": "de",
+          "mailRouting": null,
+          "postalCode": "80802",
+          "region": "DE-BY"
+        },
+        "legalForm": {
+          "id": "SGST",
+          "other": null
+        },
+        "legalName": {
+          "language": "de",
+          "name": "Allianz SE"
+        },
+        "otherAddresses": [],
+        "otherNames": [],
+        "registeredAs": "HRB 164232",
+        "registeredAt": {
+          "id": "RA000304",
+          "other": null
+        },
+        "status": "ACTIVE",
+        "subCategory": null,
+        "successorEntities": [],
+        "successorEntity": {
+          "lei": null,
+          "name": null
+        },
+        "transliteratedOtherNames": []
+      },
+      "lei": "529900K9B0N5BT694847",
+      "mic": null,
+      "ocid": null,
+      "qcc": "QDEVJNX63N",
+      "registration": {
+        "corroborationLevel": "FULLY_CORROBORATED",
+        "initialRegistrationDate": "2013-12-02T15:19:24Z",
+        "lastUpdateDate": "2025-10-06T23:02:08Z",
+        "managingLou": "5299000J2N45DDNE4Y28",
+        "nextRenewalDate": "2026-12-04T23:00:00Z",
+        "otherValidationAuthorities": [],
+        "status": "ISSUED",
+        "validatedAs": "HRB 164232",
+        "validatedAt": {
+          "id": "RA000304",
+          "other": null
+        }
+      },
+      "spglobal": [
+        "598807"
+      ]
+    },
+    "id": "529900K9B0N5BT694847",
+    "links": {
+      "self": "https://api.gleif.org/api/v1/lei-records/529900K9B0N5BT694847"
+    },
+    "relationships": {
+      "direct-children": {
+        "links": {
+          "related": "https://api.gleif.org/api/v1/lei-records/529900K9B0N5BT694847/direct-children",
+          "relationship-records": "https://api.gleif.org/api/v1/lei-records/529900K9B0N5BT694847/direct-child-relationships"
+        }
+      },
+      "direct-parent": {
+        "links": {
+          "reporting-exception": "https://api.gleif.org/api/v1/lei-records/529900K9B0N5BT694847/direct-parent-reporting-exception"
+        }
+      },
+      "field-modifications": {
+        "links": {
+          "related": "https://api.gleif.org/api/v1/lei-records/529900K9B0N5BT694847/field-modifications"
+        }
+      },
+      "isins": {
+        "links": {
+          "related": "https://api.gleif.org/api/v1/lei-records/529900K9B0N5BT694847/isins"
+        }
+      },
+      "lei-issuer": {
+        "links": {
+          "related": "https://api.gleif.org/api/v1/lei-records/529900K9B0N5BT694847/lei-issuer"
+        }
+      },
+      "managed-funds": {
+        "links": {
+          "related": "https://api.gleif.org/api/v1/lei-records/529900K9B0N5BT694847/managed-funds",
+          "relationship-records": "https://api.gleif.org/api/v1/lei-records/529900K9B0N5BT694847/managed-fund-relationships"
+        }
+      },
+      "managing-lou": {
+        "links": {
+          "related": "https://api.gleif.org/api/v1/lei-records/529900K9B0N5BT694847/managing-lou"
+        }
+      },
+      "ultimate-children": {
+        "links": {
+          "related": "https://api.gleif.org/api/v1/lei-records/529900K9B0N5BT694847/ultimate-children",
+          "relationship-records": "https://api.gleif.org/api/v1/lei-records/529900K9B0N5BT694847/ultimate-child-relationships"
+        }
+      },
+      "ultimate-parent": {
+        "links": {
+          "reporting-exception": "https://api.gleif.org/api/v1/lei-records/529900K9B0N5BT694847/ultimate-parent-reporting-exception"
+        }
+      }
+    },
+    "type": "lei-records"
+  },
+  "meta": {
+    "goldenCopy": {
+      "publishDate": "2026-01-01T08:00:00Z"
+    }
+  }
+}

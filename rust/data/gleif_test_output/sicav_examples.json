@@ -1,0 +1,421 @@
+{
+  "data": [
+    {
+      "attributes": {
+        "bic": null,
+        "conformityFlag": "NOT_APPLICABLE",
+        "entity": {
+          "associatedEntity": {
+            "lei": null,
+            "name": null
+          },
+          "category": "FUND",
+          "creationDate": null,
+          "eventGroups": [
+            {
+              "events": [
+                {
+                  "effectiveDate": "2016-12-14T00:00:00Z",
+                  "recordedDate": "2022-03-24T19:41:39Z",
+                  "status": "COMPLETED",
+                  "type": "DISSOLUTION",
+                  "validationDocuments": "SUPPORTING_DOCUMENTS"
+                }
+              ],
+              "groupType": "STANDALONE"
+            }
+          ],
+          "expiration": {
+            "date": null,
+            "reason": null
+          },
+          "headquartersAddress": {
+            "addressLines": [
+              "41, Op Bierg"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Mamer",
+            "country": "LU",
+            "language": "lb",
+            "mailRouting": null,
+            "postalCode": "L-8217",
+            "region": "LU-CA"
+          },
+          "jurisdiction": "LU",
+          "legalAddress": {
+            "addressLines": [
+              "106, route d'Arlon"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Mamer",
+            "country": "LU",
+            "language": "lb",
+            "mailRouting": null,
+            "postalCode": "L-8210",
+            "region": "LU-CA"
+          },
+          "legalForm": {
+            "id": "8888",
+            "other": "FUND"
+          },
+          "legalName": {
+            "language": "lb",
+            "name": "OPM SICAV - OPM SICAV - Kappa"
+          },
+          "otherAddresses": [],
+          "otherNames": [],
+          "registeredAs": null,
+          "registeredAt": {
+            "id": "RA999999",
+            "other": null
+          },
+          "status": "INACTIVE",
+          "subCategory": null,
+          "successorEntities": [],
+          "successorEntity": {
+            "lei": null,
+            "name": null
+          },
+          "transliteratedOtherNames": []
+        },
+        "lei": "549300Q1SRR63Q44TB91",
+        "mic": null,
+        "ocid": null,
+        "qcc": null,
+        "registration": {
+          "corroborationLevel": "ENTITY_SUPPLIED_ONLY",
+          "initialRegistrationDate": "2014-04-30T01:51:00Z",
+          "lastUpdateDate": "2023-08-02T10:34:00Z",
+          "managingLou": "549300O897ZC5H7CY412",
+          "nextRenewalDate": "2015-04-25T07:40:00Z",
+          "otherValidationAuthorities": [],
+          "status": "RETIRED",
+          "validatedAs": null,
+          "validatedAt": {
+            "id": "RA999999",
+            "other": null
+          }
+        },
+        "spglobal": [
+          "139624959"
+        ]
+      },
+      "id": "549300Q1SRR63Q44TB91",
+      "links": {
+        "self": "https://api.gleif.org/api/v1/lei-records/549300Q1SRR63Q44TB91"
+      },
+      "relationships": {
+        "field-modifications": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/549300Q1SRR63Q44TB91/field-modifications"
+          }
+        },
+        "lei-issuer": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/549300Q1SRR63Q44TB91/lei-issuer"
+          }
+        },
+        "managing-lou": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/549300Q1SRR63Q44TB91/managing-lou"
+          }
+        }
+      },
+      "type": "lei-records"
+    },
+    {
+      "attributes": {
+        "bic": null,
+        "conformityFlag": "NOT_APPLICABLE",
+        "entity": {
+          "associatedEntity": {
+            "lei": null,
+            "name": null
+          },
+          "category": "FUND",
+          "creationDate": null,
+          "eventGroups": [
+            {
+              "events": [
+                {
+                  "affectedFields": [
+                    {
+                      "value": "5299008F9ODK91J8RC41",
+                      "xpath": "/lei:LEIData/lei:LEIRecords/lei:LEIRecord/lei:Entity/lei:SuccessorEntity/lei:SuccessorLEI"
+                    }
+                  ],
+                  "effectiveDate": "2015-09-28T22:00:00Z",
+                  "recordedDate": "2022-03-29T11:19:19Z",
+                  "status": "COMPLETED",
+                  "type": "MERGERS_AND_ACQUISITIONS",
+                  "validationDocuments": "SUPPORTING_DOCUMENTS"
+                }
+              ],
+              "groupType": "STANDALONE"
+            }
+          ],
+          "expiration": {
+            "date": null,
+            "reason": null
+          },
+          "headquartersAddress": {
+            "addressLines": [
+              "24, rue Beaumont"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Luxembourg",
+            "country": "LU",
+            "language": null,
+            "mailRouting": "c/o MANTEX SICAV",
+            "postalCode": "L-1219",
+            "region": "LU-LU"
+          },
+          "jurisdiction": "LU",
+          "legalAddress": {
+            "addressLines": [
+              "24, rue Beaumont"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Luxembourg",
+            "country": "LU",
+            "language": null,
+            "mailRouting": "c/o MANTEX SICAV",
+            "postalCode": "L-1219",
+            "region": "LU-LU"
+          },
+          "legalForm": {
+            "id": "UDY2",
+            "other": null
+          },
+          "legalName": {
+            "language": null,
+            "name": "MANTEX SICAV - Mantex Sicav Balanced"
+          },
+          "otherAddresses": [],
+          "otherNames": [],
+          "registeredAs": null,
+          "registeredAt": {
+            "id": "RA000433",
+            "other": null
+          },
+          "status": "INACTIVE",
+          "subCategory": null,
+          "successorEntities": [
+            {
+              "lei": "5299008F9ODK91J8RC41"
+            }
+          ],
+          "successorEntity": {
+            "lei": "5299008F9ODK91J8RC41",
+            "name": null
+          },
+          "transliteratedOtherNames": []
+        },
+        "lei": "529900LG8QM04AAON372",
+        "mic": null,
+        "ocid": null,
+        "qcc": null,
+        "registration": {
+          "corroborationLevel": "FULLY_CORROBORATED",
+          "initialRegistrationDate": "2014-02-13T12:33:34Z",
+          "lastUpdateDate": "2022-03-29T11:19:20Z",
+          "managingLou": "5299000J2N45DDNE4Y28",
+          "nextRenewalDate": "2016-02-13T12:33:34Z",
+          "otherValidationAuthorities": [],
+          "status": "RETIRED",
+          "validatedAs": null,
+          "validatedAt": {
+            "id": "RA000433",
+            "other": null
+          }
+        },
+        "spglobal": [
+          "225515314"
+        ]
+      },
+      "id": "529900LG8QM04AAON372",
+      "links": {
+        "self": "https://api.gleif.org/api/v1/lei-records/529900LG8QM04AAON372"
+      },
+      "relationships": {
+        "field-modifications": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/529900LG8QM04AAON372/field-modifications"
+          }
+        },
+        "lei-issuer": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/529900LG8QM04AAON372/lei-issuer"
+          }
+        },
+        "managing-lou": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/529900LG8QM04AAON372/managing-lou"
+          }
+        },
+        "successor-entities": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/529900LG8QM04AAON372/successor-entities"
+          }
+        },
+        "successor-entity": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/529900LG8QM04AAON372/successor-entity"
+          }
+        }
+      },
+      "type": "lei-records"
+    },
+    {
+      "attributes": {
+        "bic": null,
+        "conformityFlag": "NON_CONFORMING",
+        "entity": {
+          "associatedEntity": {
+            "lei": null,
+            "name": null
+          },
+          "category": "FUND",
+          "creationDate": null,
+          "eventGroups": [],
+          "expiration": {
+            "date": null,
+            "reason": null
+          },
+          "headquartersAddress": {
+            "addressLines": [
+              "C/O Eurizon Capital S.A.",
+              "8, avenue de la Liberté"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Luxembourg",
+            "country": "LU",
+            "language": "lb",
+            "mailRouting": null,
+            "postalCode": "L-1930",
+            "region": "LU-LU"
+          },
+          "jurisdiction": "LU",
+          "legalAddress": {
+            "addressLines": [
+              "19/21, Boulevard du Prince-Henri"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Luxembourg",
+            "country": "LU",
+            "language": "lb",
+            "mailRouting": null,
+            "postalCode": "L-1724",
+            "region": "LU-LU"
+          },
+          "legalForm": {
+            "id": "9999",
+            "other": "FUND"
+          },
+          "legalName": {
+            "language": "lb",
+            "name": "MERCURIO SICAV - MERCURIO SICAV 1"
+          },
+          "otherAddresses": [],
+          "otherNames": [
+            {
+              "language": "lb",
+              "name": "Mercurio SICAV - 1",
+              "type": "PREVIOUS_LEGAL_NAME"
+            }
+          ],
+          "registeredAs": "O00007231_00000001",
+          "registeredAt": {
+            "id": "RA000433",
+            "other": null
+          },
+          "status": "ACTIVE",
+          "subCategory": null,
+          "successorEntities": [],
+          "successorEntity": {
+            "lei": null,
+            "name": null
+          },
+          "transliteratedOtherNames": []
+        },
+        "lei": "549300BK05TL0LZMY256",
+        "mic": null,
+        "ocid": null,
+        "qcc": null,
+        "registration": {
+          "corroborationLevel": "FULLY_CORROBORATED",
+          "initialRegistrationDate": "2014-01-16T03:03:00Z",
+          "lastUpdateDate": "2023-10-20T09:42:00Z",
+          "managingLou": "549300O897ZC5H7CY412",
+          "nextRenewalDate": "2021-09-17T18:01:00Z",
+          "otherValidationAuthorities": [],
+          "status": "LAPSED",
+          "validatedAs": "O00007231_00000001",
+          "validatedAt": {
+            "id": "RA000433",
+            "other": null
+          }
+        },
+        "spglobal": [
+          "238370421"
+        ]
+      },
+      "id": "549300BK05TL0LZMY256",
+      "links": {
+        "self": "https://api.gleif.org/api/v1/lei-records/549300BK05TL0LZMY256"
+      },
+      "relationships": {
+        "direct-parent": {
+          "links": {
+            "reporting-exception": "https://api.gleif.org/api/v1/lei-records/549300BK05TL0LZMY256/direct-parent-reporting-exception"
+          }
+        },
+        "field-modifications": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/549300BK05TL0LZMY256/field-modifications"
+          }
+        },
+        "lei-issuer": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/549300BK05TL0LZMY256/lei-issuer"
+          }
+        },
+        "managing-lou": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/549300BK05TL0LZMY256/managing-lou"
+          }
+        },
+        "ultimate-parent": {
+          "links": {
+            "reporting-exception": "https://api.gleif.org/api/v1/lei-records/549300BK05TL0LZMY256/ultimate-parent-reporting-exception"
+          }
+        }
+      },
+      "type": "lei-records"
+    }
+  ],
+  "links": {
+    "first": "https://api.gleif.org/api/v1/lei-records?filter%5Bentity.legalName%5D=SICAV&filter%5Bentity.category%5D=FUND&page%5Bnumber%5D=1&page%5Bsize%5D=3",
+    "last": "https://api.gleif.org/api/v1/lei-records?filter%5Bentity.legalName%5D=SICAV&filter%5Bentity.category%5D=FUND&page%5Bnumber%5D=2368&page%5Bsize%5D=3",
+    "next": "https://api.gleif.org/api/v1/lei-records?filter%5Bentity.legalName%5D=SICAV&filter%5Bentity.category%5D=FUND&page%5Bnumber%5D=2&page%5Bsize%5D=3"
+  },
+  "meta": {
+    "goldenCopy": {
+      "publishDate": "2026-01-01T08:00:00Z"
+    },
+    "pagination": {
+      "currentPage": 1,
+      "from": 1,
+      "lastPage": 2368,
+      "perPage": 3,
+      "to": 3,
+      "total": 7102
+    }
+  }
+}

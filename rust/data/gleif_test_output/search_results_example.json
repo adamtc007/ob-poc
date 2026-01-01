@@ -1,0 +1,721 @@
+{
+  "data": [
+    {
+      "attributes": {
+        "bic": null,
+        "conformityFlag": "NON_CONFORMING",
+        "entity": {
+          "associatedEntity": {
+            "lei": null,
+            "name": null
+          },
+          "category": "FUND",
+          "creationDate": null,
+          "eventGroups": [],
+          "expiration": {
+            "date": null,
+            "reason": null
+          },
+          "headquartersAddress": {
+            "addressLines": [
+              "6A, Route de Trèves"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Senningerberg",
+            "country": "LU",
+            "language": "fr-LU",
+            "mailRouting": "c/o Allianz Global Investors GmbH, Luxembourg Branch",
+            "postalCode": "L - 2633",
+            "region": "LU-LU"
+          },
+          "jurisdiction": "LU",
+          "legalAddress": {
+            "addressLines": [
+              "6A, Route de Trèves"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Senningerberg",
+            "country": "LU",
+            "language": "fr-LU",
+            "mailRouting": "c/o Allianz Global Investors GmbH, Luxembourg Branch",
+            "postalCode": "L - 2633",
+            "region": "LU-LU"
+          },
+          "legalForm": {
+            "id": "UDY2",
+            "other": null
+          },
+          "legalName": {
+            "language": "fr-LU",
+            "name": "Allianz Global Investors Fund - Allianz Global Financials"
+          },
+          "otherAddresses": [],
+          "otherNames": [],
+          "registeredAs": "O00002562_00000259",
+          "registeredAt": {
+            "id": "RA000433",
+            "other": null
+          },
+          "status": "ACTIVE",
+          "subCategory": null,
+          "successorEntities": [],
+          "successorEntity": {
+            "lei": null,
+            "name": null
+          },
+          "transliteratedOtherNames": []
+        },
+        "lei": "529900LNUUAYHOR95J54",
+        "mic": null,
+        "ocid": null,
+        "qcc": null,
+        "registration": {
+          "corroborationLevel": "FULLY_CORROBORATED",
+          "initialRegistrationDate": "2019-08-15T07:14:27Z",
+          "lastUpdateDate": "2022-08-15T23:30:06Z",
+          "managingLou": "5299000J2N45DDNE4Y28",
+          "nextRenewalDate": "2022-08-15T07:14:27Z",
+          "otherValidationAuthorities": [],
+          "status": "LAPSED",
+          "validatedAs": "O00002562_00000259",
+          "validatedAt": {
+            "id": "RA000433",
+            "other": null
+          }
+        },
+        "spglobal": [
+          "633859698"
+        ]
+      },
+      "id": "529900LNUUAYHOR95J54",
+      "links": {
+        "self": "https://api.gleif.org/api/v1/lei-records/529900LNUUAYHOR95J54"
+      },
+      "relationships": {
+        "direct-parent": {
+          "links": {
+            "reporting-exception": "https://api.gleif.org/api/v1/lei-records/529900LNUUAYHOR95J54/direct-parent-reporting-exception"
+          }
+        },
+        "field-modifications": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/529900LNUUAYHOR95J54/field-modifications"
+          }
+        },
+        "lei-issuer": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/529900LNUUAYHOR95J54/lei-issuer"
+          }
+        },
+        "managing-lou": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/529900LNUUAYHOR95J54/managing-lou"
+          }
+        },
+        "ultimate-parent": {
+          "links": {
+            "reporting-exception": "https://api.gleif.org/api/v1/lei-records/529900LNUUAYHOR95J54/ultimate-parent-reporting-exception"
+          }
+        }
+      },
+      "type": "lei-records"
+    },
+    {
+      "attributes": {
+        "bic": null,
+        "conformityFlag": "NON_CONFORMING",
+        "entity": {
+          "associatedEntity": {
+            "lei": null,
+            "name": null
+          },
+          "category": "FUND",
+          "creationDate": null,
+          "eventGroups": [],
+          "expiration": {
+            "date": null,
+            "reason": null
+          },
+          "headquartersAddress": {
+            "addressLines": [
+              "6A, route de Trèves"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Senningerberg",
+            "country": "LU",
+            "language": "fr-LU",
+            "mailRouting": "c/o Allianz Global Investors GmbH, Luxembourg Branch",
+            "postalCode": "L-2633",
+            "region": "LU-LU"
+          },
+          "jurisdiction": "LU",
+          "legalAddress": {
+            "addressLines": [
+              "6A, route de Trèves"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Senningerberg",
+            "country": "LU",
+            "language": "fr-LU",
+            "mailRouting": "c/o Allianz Global Investors GmbH, Luxembourg Branch",
+            "postalCode": "L-2633",
+            "region": "LU-LU"
+          },
+          "legalForm": {
+            "id": "UDY2",
+            "other": null
+          },
+          "legalName": {
+            "language": "fr-LU",
+            "name": "Allianz Global Investors Fund - Allianz Global Equity"
+          },
+          "otherAddresses": [],
+          "otherNames": [],
+          "registeredAs": "O00002562_00000002",
+          "registeredAt": {
+            "id": "RA000433",
+            "other": null
+          },
+          "status": "ACTIVE",
+          "subCategory": null,
+          "successorEntities": [],
+          "successorEntity": {
+            "lei": null,
+            "name": null
+          },
+          "transliteratedOtherNames": []
+        },
+        "lei": "5493006522GA7V5RIQ29",
+        "mic": null,
+        "ocid": null,
+        "qcc": null,
+        "registration": {
+          "corroborationLevel": "FULLY_CORROBORATED",
+          "initialRegistrationDate": "2012-12-28T10:01:06Z",
+          "lastUpdateDate": "2022-10-19T23:30:05Z",
+          "managingLou": "5299000J2N45DDNE4Y28",
+          "nextRenewalDate": "2022-10-19T08:23:58Z",
+          "otherValidationAuthorities": [],
+          "status": "LAPSED",
+          "validatedAs": "O00002562_00000002",
+          "validatedAt": {
+            "id": "RA000433",
+            "other": null
+          }
+        },
+        "spglobal": [
+          "28212941"
+        ]
+      },
+      "id": "5493006522GA7V5RIQ29",
+      "links": {
+        "self": "https://api.gleif.org/api/v1/lei-records/5493006522GA7V5RIQ29"
+      },
+      "relationships": {
+        "direct-parent": {
+          "links": {
+            "reporting-exception": "https://api.gleif.org/api/v1/lei-records/5493006522GA7V5RIQ29/direct-parent-reporting-exception"
+          }
+        },
+        "field-modifications": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/5493006522GA7V5RIQ29/field-modifications"
+          }
+        },
+        "lei-issuer": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/5493006522GA7V5RIQ29/lei-issuer"
+          }
+        },
+        "managing-lou": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/5493006522GA7V5RIQ29/managing-lou"
+          }
+        },
+        "ultimate-parent": {
+          "links": {
+            "reporting-exception": "https://api.gleif.org/api/v1/lei-records/5493006522GA7V5RIQ29/ultimate-parent-reporting-exception"
+          }
+        }
+      },
+      "type": "lei-records"
+    },
+    {
+      "attributes": {
+        "bic": null,
+        "conformityFlag": "NOT_APPLICABLE",
+        "entity": {
+          "associatedEntity": {
+            "lei": null,
+            "name": null
+          },
+          "category": "GENERAL",
+          "creationDate": null,
+          "eventGroups": [
+            {
+              "events": [
+                {
+                  "affectedFields": [
+                    {
+                      "value": "OJ2TIQSVQND4IZYYK658",
+                      "xpath": "/lei:LEIData/lei:LEIRecords/lei:LEIRecord/lei:Entity/lei:SuccessorEntity/lei:SuccessorLEI"
+                    }
+                  ],
+                  "effectiveDate": "2014-08-19T22:00:00Z",
+                  "recordedDate": "2022-03-29T11:12:18Z",
+                  "status": "COMPLETED",
+                  "type": "MERGERS_AND_ACQUISITIONS",
+                  "validationDocuments": "SUPPORTING_DOCUMENTS"
+                }
+              ],
+              "groupType": "STANDALONE"
+            }
+          ],
+          "expiration": {
+            "date": null,
+            "reason": null
+          },
+          "headquartersAddress": {
+            "addressLines": [
+              "Seidlstr. 24-24a"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Munich",
+            "country": "DE",
+            "language": null,
+            "mailRouting": null,
+            "postalCode": "80335",
+            "region": "DE-BY"
+          },
+          "jurisdiction": "DE",
+          "legalAddress": {
+            "addressLines": [
+              "Seidlstr. 24-24a"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "München",
+            "country": "DE",
+            "language": null,
+            "mailRouting": null,
+            "postalCode": "80335",
+            "region": "DE-BY"
+          },
+          "legalForm": {
+            "id": "2HBR",
+            "other": null
+          },
+          "legalName": {
+            "language": null,
+            "name": "Allianz Global Investors GmbH"
+          },
+          "otherAddresses": [],
+          "otherNames": [],
+          "registeredAs": "HRB 131172",
+          "registeredAt": {
+            "id": "RA000304",
+            "other": null
+          },
+          "status": "INACTIVE",
+          "subCategory": null,
+          "successorEntities": [
+            {
+              "lei": "OJ2TIQSVQND4IZYYK658"
+            }
+          ],
+          "successorEntity": {
+            "lei": "OJ2TIQSVQND4IZYYK658",
+            "name": null
+          },
+          "transliteratedOtherNames": []
+        },
+        "lei": "529900FAHFDMSXCPII15",
+        "mic": null,
+        "ocid": null,
+        "qcc": null,
+        "registration": {
+          "corroborationLevel": "FULLY_CORROBORATED",
+          "initialRegistrationDate": "2014-04-28T06:58:49Z",
+          "lastUpdateDate": "2022-03-29T11:12:18Z",
+          "managingLou": "5299000J2N45DDNE4Y28",
+          "nextRenewalDate": "2015-04-28T06:58:49Z",
+          "otherValidationAuthorities": [],
+          "status": "RETIRED",
+          "validatedAs": "HRB 131172",
+          "validatedAt": {
+            "id": "RA000304",
+            "other": null
+          }
+        },
+        "spglobal": [
+          "35423611"
+        ]
+      },
+      "id": "529900FAHFDMSXCPII15",
+      "links": {
+        "self": "https://api.gleif.org/api/v1/lei-records/529900FAHFDMSXCPII15"
+      },
+      "relationships": {
+        "field-modifications": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/529900FAHFDMSXCPII15/field-modifications"
+          }
+        },
+        "lei-issuer": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/529900FAHFDMSXCPII15/lei-issuer"
+          }
+        },
+        "managing-lou": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/529900FAHFDMSXCPII15/managing-lou"
+          }
+        },
+        "successor-entities": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/529900FAHFDMSXCPII15/successor-entities"
+          }
+        },
+        "successor-entity": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/529900FAHFDMSXCPII15/successor-entity"
+          }
+        }
+      },
+      "type": "lei-records"
+    },
+    {
+      "attributes": {
+        "bic": null,
+        "conformityFlag": "CONFORMING",
+        "entity": {
+          "associatedEntity": {
+            "lei": null,
+            "name": null
+          },
+          "category": "FUND",
+          "creationDate": "1999-08-08T22:00:00Z",
+          "eventGroups": [
+            {
+              "events": [
+                {
+                  "effectiveDate": "2022-06-21T22:00:00Z",
+                  "recordedDate": "2022-06-22T08:11:13Z",
+                  "status": "COMPLETED",
+                  "type": "CHANGE_HQ_ADDRESS",
+                  "validationDocuments": "SUPPORTING_DOCUMENTS"
+                }
+              ],
+              "groupType": "STANDALONE"
+            },
+            {
+              "events": [
+                {
+                  "effectiveDate": "2022-06-21T22:00:00Z",
+                  "recordedDate": "2022-06-22T08:11:13Z",
+                  "status": "COMPLETED",
+                  "type": "CHANGE_LEGAL_ADDRESS",
+                  "validationDocuments": "SUPPORTING_DOCUMENTS"
+                }
+              ],
+              "groupType": "STANDALONE"
+            }
+          ],
+          "expiration": {
+            "date": null,
+            "reason": null
+          },
+          "headquartersAddress": {
+            "addressLines": [
+              "c/o Allianz Global Investors GmbH, Bockenheimer Landstrasse 42 – 44"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Frankfurt am Main",
+            "country": "DE",
+            "language": "de",
+            "mailRouting": "c/o Allianz Global Investors GmbH",
+            "postalCode": "60323",
+            "region": "DE-HE"
+          },
+          "jurisdiction": "LU",
+          "legalAddress": {
+            "addressLines": [
+              "6A, route de Trèves"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Senningerberg",
+            "country": "LU",
+            "language": "fr",
+            "mailRouting": null,
+            "postalCode": "L-2633",
+            "region": "LU-LU"
+          },
+          "legalForm": {
+            "id": "UDY2",
+            "other": null
+          },
+          "legalName": {
+            "language": "fr",
+            "name": "Allianz Global Investors Fund"
+          },
+          "otherAddresses": [],
+          "otherNames": [],
+          "registeredAs": "O00002562",
+          "registeredAt": {
+            "id": "RA000433",
+            "other": null
+          },
+          "status": "ACTIVE",
+          "subCategory": null,
+          "successorEntities": [],
+          "successorEntity": {
+            "lei": null,
+            "name": null
+          },
+          "transliteratedOtherNames": []
+        },
+        "lei": "4KT8DCRLAREP7C35MW05",
+        "mic": null,
+        "ocid": null,
+        "qcc": "QLUTVDW9N5",
+        "registration": {
+          "corroborationLevel": "FULLY_CORROBORATED",
+          "initialRegistrationDate": "2012-06-06T15:58:00Z",
+          "lastUpdateDate": "2025-05-02T08:40:56Z",
+          "managingLou": "5299000J2N45DDNE4Y28",
+          "nextRenewalDate": "2026-06-22T09:17:25Z",
+          "otherValidationAuthorities": [],
+          "status": "ISSUED",
+          "validatedAs": "O00002562",
+          "validatedAt": {
+            "id": "RA000433",
+            "other": null
+          }
+        },
+        "spglobal": [
+          "215575562"
+        ]
+      },
+      "id": "4KT8DCRLAREP7C35MW05",
+      "links": {
+        "self": "https://api.gleif.org/api/v1/lei-records/4KT8DCRLAREP7C35MW05"
+      },
+      "relationships": {
+        "direct-parent": {
+          "links": {
+            "reporting-exception": "https://api.gleif.org/api/v1/lei-records/4KT8DCRLAREP7C35MW05/direct-parent-reporting-exception"
+          }
+        },
+        "field-modifications": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/4KT8DCRLAREP7C35MW05/field-modifications"
+          }
+        },
+        "fund-manager": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/4KT8DCRLAREP7C35MW05/fund-manager",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/4KT8DCRLAREP7C35MW05/fund-manager-relationship"
+          }
+        },
+        "lei-issuer": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/4KT8DCRLAREP7C35MW05/lei-issuer"
+          }
+        },
+        "managing-lou": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/4KT8DCRLAREP7C35MW05/managing-lou"
+          }
+        },
+        "sub-funds": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/4KT8DCRLAREP7C35MW05/sub-funds",
+            "relationship-records": "https://api.gleif.org/api/v1/lei-records/4KT8DCRLAREP7C35MW05/sub-fund-relationships"
+          }
+        },
+        "ultimate-parent": {
+          "links": {
+            "reporting-exception": "https://api.gleif.org/api/v1/lei-records/4KT8DCRLAREP7C35MW05/ultimate-parent-reporting-exception"
+          }
+        }
+      },
+      "type": "lei-records"
+    },
+    {
+      "attributes": {
+        "bic": [
+          "AGIDDEFBXXX"
+        ],
+        "conformityFlag": "CONFORMING",
+        "entity": {
+          "associatedEntity": {
+            "lei": null,
+            "name": null
+          },
+          "category": "GENERAL",
+          "creationDate": "1956-03-19T23:00:00Z",
+          "eventGroups": [
+            {
+              "events": [
+                {
+                  "effectiveDate": "2014-08-19T22:00:00Z",
+                  "recordedDate": "2022-03-29T11:12:18Z",
+                  "status": "COMPLETED",
+                  "type": "MERGERS_AND_ACQUISITIONS",
+                  "validationDocuments": "SUPPORTING_DOCUMENTS"
+                }
+              ],
+              "groupType": "STANDALONE"
+            }
+          ],
+          "expiration": {
+            "date": null,
+            "reason": null
+          },
+          "headquartersAddress": {
+            "addressLines": [
+              "Bockenheimer Landstraße 42-44"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Frankfurt am Main",
+            "country": "DE",
+            "language": "de",
+            "mailRouting": null,
+            "postalCode": "60323",
+            "region": "DE-HE"
+          },
+          "jurisdiction": "DE",
+          "legalAddress": {
+            "addressLines": [
+              "Bockenheimer Landstraße 42-44"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Frankfurt am Main",
+            "country": "DE",
+            "language": "de",
+            "mailRouting": null,
+            "postalCode": "60323",
+            "region": "DE-HE"
+          },
+          "legalForm": {
+            "id": "2HBR",
+            "other": null
+          },
+          "legalName": {
+            "language": "de",
+            "name": "Allianz Global Investors GmbH"
+          },
+          "otherAddresses": [],
+          "otherNames": [],
+          "registeredAs": "HRB 9340",
+          "registeredAt": {
+            "id": "RA000242",
+            "other": null
+          },
+          "status": "ACTIVE",
+          "subCategory": null,
+          "successorEntities": [],
+          "successorEntity": {
+            "lei": null,
+            "name": null
+          },
+          "transliteratedOtherNames": []
+        },
+        "lei": "OJ2TIQSVQND4IZYYK658",
+        "mic": null,
+        "ocid": "de/M1201_HRB9340",
+        "qcc": null,
+        "registration": {
+          "corroborationLevel": "FULLY_CORROBORATED",
+          "initialRegistrationDate": "2012-06-06T15:54:15Z",
+          "lastUpdateDate": "2025-07-01T09:55:55Z",
+          "managingLou": "5299000J2N45DDNE4Y28",
+          "nextRenewalDate": "2026-08-19T05:58:13Z",
+          "otherValidationAuthorities": [],
+          "status": "ISSUED",
+          "validatedAs": "HRB 9340",
+          "validatedAt": {
+            "id": "RA000242",
+            "other": null
+          }
+        },
+        "spglobal": [
+          "33446708"
+        ]
+      },
+      "id": "OJ2TIQSVQND4IZYYK658",
+      "links": {
+        "self": "https://api.gleif.org/api/v1/lei-records/OJ2TIQSVQND4IZYYK658"
+      },
+      "relationships": {
+        "direct-children": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/OJ2TIQSVQND4IZYYK658/direct-children",
+            "relationship-records": "https://api.gleif.org/api/v1/lei-records/OJ2TIQSVQND4IZYYK658/direct-child-relationships"
+          }
+        },
+        "direct-parent": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/OJ2TIQSVQND4IZYYK658/direct-parent",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/OJ2TIQSVQND4IZYYK658/direct-parent-relationship"
+          }
+        },
+        "field-modifications": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/OJ2TIQSVQND4IZYYK658/field-modifications"
+          }
+        },
+        "lei-issuer": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/OJ2TIQSVQND4IZYYK658/lei-issuer"
+          }
+        },
+        "managed-funds": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/OJ2TIQSVQND4IZYYK658/managed-funds",
+            "relationship-records": "https://api.gleif.org/api/v1/lei-records/OJ2TIQSVQND4IZYYK658/managed-fund-relationships"
+          }
+        },
+        "managing-lou": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/OJ2TIQSVQND4IZYYK658/managing-lou"
+          }
+        },
+        "ultimate-parent": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/OJ2TIQSVQND4IZYYK658/ultimate-parent",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/OJ2TIQSVQND4IZYYK658/ultimate-parent-relationship"
+          }
+        }
+      },
+      "type": "lei-records"
+    }
+  ],
+  "links": {
+    "first": "https://api.gleif.org/api/v1/lei-records?filter%5Bentity.legalName%5D=Allianz+Global+Investors&page%5Bnumber%5D=1&page%5Bsize%5D=5",
+    "last": "https://api.gleif.org/api/v1/lei-records?filter%5Bentity.legalName%5D=Allianz+Global+Investors&page%5Bnumber%5D=31&page%5Bsize%5D=5",
+    "next": "https://api.gleif.org/api/v1/lei-records?filter%5Bentity.legalName%5D=Allianz+Global+Investors&page%5Bnumber%5D=2&page%5Bsize%5D=5"
+  },
+  "meta": {
+    "goldenCopy": {
+      "publishDate": "2026-01-01T08:00:00Z"
+    },
+    "pagination": {
+      "currentPage": 1,
+      "from": 1,
+      "lastPage": 31,
+      "perPage": 5,
+      "to": 5,
+      "total": 155
+    }
+  }
+}

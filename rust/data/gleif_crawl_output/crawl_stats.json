@@ -1,0 +1,11 @@
+{
+  "dsl_statements_generated": 2,
+  "dsl_statements_executed": 2,
+  "funds_imported": 3,
+  "entities_created": 3,
+  "cbus_created": 3,
+  "roles_assigned": 9,
+  "parent_chains_traced": 1,
+  "errors": [],
+  "elapsed_secs": 1.601323584
+}

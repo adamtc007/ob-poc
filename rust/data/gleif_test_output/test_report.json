@@ -1,0 +1,148 @@
+{
+  "endpoints_tested": [
+    {
+      "endpoint": "/lei-records/{lei}",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 272,
+      "sample_lei": "529900K9B0N5BT694847",
+      "response_file": "data/gleif_test_output/lei_record_example.json",
+      "notes": [
+        "Returns full LEI record with entity details",
+        "Includes relationships links"
+      ]
+    },
+    {
+      "endpoint": "/lei-records?filter[entity.legalName]=...",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 216,
+      "sample_lei": "Allianz Global Investors",
+      "response_file": "data/gleif_test_output/search_results_example.json",
+      "notes": [
+        "Returned 5 results",
+        "Pagination: Object {\"currentPage\": Number(1), \"from\": Number(1), \"lastPage\": Number(31), \"perPage\": Number(5), \"to\": Number(5), \"total\": Number(155)}"
+      ]
+    },
+    {
+      "endpoint": "/lei-records/{lei}/managed-funds",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 184,
+      "sample_lei": "529900FAHFDMSXCPII15",
+      "response_file": "data/gleif_test_output/managed_funds_example.json",
+      "notes": [
+        "Found 0 managed funds",
+        "Fund categories: {}"
+      ]
+    },
+    {
+      "endpoint": "/lei-records/{lei}/direct-parent-relationship",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 124,
+      "sample_lei": "529900KMPEUGWRAWBE94",
+      "response_file": "data/gleif_test_output/direct_parent_example.json",
+      "notes": []
+    },
+    {
+      "endpoint": "/lei-records/{lei}/ultimate-parent-relationship",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 117,
+      "sample_lei": "529900KMPEUGWRAWBE94",
+      "response_file": "data/gleif_test_output/ultimate_parent_example.json",
+      "notes": []
+    },
+    {
+      "endpoint": "/lei-records/{lei}/direct-children",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 252,
+      "sample_lei": "529900K9B0N5BT694847",
+      "response_file": "data/gleif_test_output/direct_children_example.json",
+      "notes": [
+        "Found 10 direct children"
+      ]
+    }
+  ],
+  "relationship_types": [
+    "FIELD_MODIFICATIONS",
+    "SUB_FUNDS",
+    "MANAGING_LOU",
+    "ULTIMATE_CHILDREN",
+    "LEI_ISSUER",
+    "DIRECT_PARENT",
+    "DIRECT_CHILDREN",
+    "ULTIMATE_PARENT",
+    "SUCCESSOR_ENTITIES",
+    "ISINS",
+    "FUND_MANAGER",
+    "MANAGED_FUNDS",
+    "SUCCESSOR_ENTITY"
+  ],
+  "entity_categories": [
+    "FUND",
+    "GENERAL"
+  ],
+  "entity_statuses": [
+    "ACTIVE",
+    "INACTIVE"
+  ],
+  "legal_forms": [
+    "9999",
+    "OQ8C",
+    "HZEH",
+    "DVXS",
+    "SGST",
+    "UDY2",
+    "U8KA",
+    "8Z6G",
+    "2HBR"
+  ],
+  "edge_cases": [
+    {
+      "case_type": "SICAV",
+      "lei": "549300Q1SRR63Q44TB91",
+      "description": "SICAV fund: OPM SICAV - OPM SICAV - Kappa",
+      "observed_behavior": "has_umbrella: false, has_parent: false",
+      "response_file": "data/gleif_test_output/sicav_examples.json"
+    },
+    {
+      "case_type": "INACTIVE_LEI",
+      "lei": "984500300EYCD3782B66",
+      "description": "BSZ Consulting ApS (INACTIVE)",
+      "observed_behavior": "has_successor: false",
+      "response_file": "data/gleif_test_output/inactive_lei_examples.json"
+    },
+    {
+      "case_type": "INACTIVE_LEI",
+      "lei": "8156003BDF875F62C727",
+      "description": "ENOTRADE ITALIA SAS DI MARIA LUISA VANNI (INACTIVE)",
+      "observed_behavior": "has_successor: false",
+      "response_file": "data/gleif_test_output/inactive_lei_examples.json"
+    },
+    {
+      "case_type": "NO_PARENT",
+      "lei": "529900K9B0N5BT694847",
+      "description": "Top-level entity with no corporate parent",
+      "observed_behavior": "Status: 404, Response size: 96 bytes",
+      "response_file": "data/gleif_test_output/no_parent_example.json"
+    }
+  ],
+  "rate_limit_stats": {
+    "total_requests": 15,
+    "total_time_ms": 3997,
+    "avg_delay_ms": 266,
+    "rate_limit_hits": 0
+  },
+  "errors": [],
+  "summary": {
+    "total_endpoints": 6,
+    "successful_endpoints": 6,
+    "failed_endpoints": 0,
+    "unique_relationship_types": 13,
+    "unique_entity_categories": 2,
+    "edge_cases_tested": 4
+  }
+}

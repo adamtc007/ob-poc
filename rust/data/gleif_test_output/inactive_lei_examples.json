@@ -1,0 +1,438 @@
+{
+  "data": [
+    {
+      "attributes": {
+        "bic": null,
+        "conformityFlag": "NOT_APPLICABLE",
+        "entity": {
+          "associatedEntity": {
+            "lei": null,
+            "name": null
+          },
+          "category": "GENERAL",
+          "creationDate": "2019-06-17T00:00:00Z",
+          "eventGroups": [
+            {
+              "events": [
+                {
+                  "effectiveDate": "2025-12-05T00:00:00Z",
+                  "recordedDate": "2025-12-15T19:58:43Z",
+                  "status": "COMPLETED",
+                  "type": "DISSOLUTION",
+                  "validationDocuments": "SUPPORTING_DOCUMENTS"
+                }
+              ],
+              "groupType": "STANDALONE"
+            }
+          ],
+          "expiration": {
+            "date": null,
+            "reason": null
+          },
+          "headquartersAddress": {
+            "addressLines": [
+              "Falstersvej 2, 3. th."
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Frederiksberg",
+            "country": "DK",
+            "language": "da",
+            "mailRouting": "c/o Brian David Harris",
+            "postalCode": "2000",
+            "region": "DK-84"
+          },
+          "jurisdiction": "DK",
+          "legalAddress": {
+            "addressLines": [
+              "Falstersvej 2, 3. th."
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "Frederiksberg",
+            "country": "DK",
+            "language": "da",
+            "mailRouting": "c/o Brian David Harris",
+            "postalCode": "2000",
+            "region": "DK-84"
+          },
+          "legalForm": {
+            "id": "H8VP",
+            "other": null
+          },
+          "legalName": {
+            "language": "da",
+            "name": "BSZ Consulting ApS"
+          },
+          "otherAddresses": [],
+          "otherNames": [],
+          "registeredAs": "40592849",
+          "registeredAt": {
+            "id": "RA000170",
+            "other": null
+          },
+          "status": "INACTIVE",
+          "subCategory": null,
+          "successorEntities": [],
+          "successorEntity": {
+            "lei": null,
+            "name": null
+          },
+          "transliteratedOtherNames": []
+        },
+        "lei": "984500300EYCD3782B66",
+        "mic": null,
+        "ocid": "dk/40592849",
+        "qcc": "QDKX7CAUF0",
+        "registration": {
+          "corroborationLevel": "FULLY_CORROBORATED",
+          "initialRegistrationDate": "2025-12-15T19:58:43Z",
+          "lastUpdateDate": "2025-12-15T19:58:43Z",
+          "managingLou": "529900T8BM49AURSDO55",
+          "nextRenewalDate": "2026-12-15T19:58:45Z",
+          "otherValidationAuthorities": [],
+          "status": "RETIRED",
+          "validatedAs": "40592849",
+          "validatedAt": {
+            "id": "RA000170",
+            "other": null
+          }
+        },
+        "spglobal": [
+          "707750947"
+        ]
+      },
+      "id": "984500300EYCD3782B66",
+      "links": {
+        "self": "https://api.gleif.org/api/v1/lei-records/984500300EYCD3782B66"
+      },
+      "relationships": {
+        "direct-parent": {
+          "links": {
+            "reporting-exception": "https://api.gleif.org/api/v1/lei-records/984500300EYCD3782B66/direct-parent-reporting-exception"
+          }
+        },
+        "field-modifications": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/984500300EYCD3782B66/field-modifications"
+          }
+        },
+        "lei-issuer": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/984500300EYCD3782B66/lei-issuer"
+          }
+        },
+        "managing-lou": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/984500300EYCD3782B66/managing-lou"
+          }
+        },
+        "ultimate-parent": {
+          "links": {
+            "reporting-exception": "https://api.gleif.org/api/v1/lei-records/984500300EYCD3782B66/ultimate-parent-reporting-exception"
+          }
+        }
+      },
+      "type": "lei-records"
+    },
+    {
+      "attributes": {
+        "bic": null,
+        "conformityFlag": "CONFORMING",
+        "entity": {
+          "associatedEntity": {
+            "lei": null,
+            "name": null
+          },
+          "category": "GENERAL",
+          "creationDate": "2004-07-27T22:00:00Z",
+          "eventGroups": [
+            {
+              "events": [
+                {
+                  "effectiveDate": "2025-12-30T23:00:00Z",
+                  "recordedDate": "2026-01-01T03:27:54Z",
+                  "status": "COMPLETED",
+                  "type": "DISSOLUTION",
+                  "validationDocuments": "OTHER_OFFICIAL_DOCUMENTS"
+                }
+              ],
+              "groupType": "STANDALONE"
+            }
+          ],
+          "expiration": {
+            "date": null,
+            "reason": null
+          },
+          "headquartersAddress": {
+            "addressLines": [
+              "PIAVE, 59"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "MERANO",
+            "country": "IT",
+            "language": "it-IT",
+            "mailRouting": null,
+            "postalCode": "39012",
+            "region": "IT-BZ"
+          },
+          "jurisdiction": "IT",
+          "legalAddress": {
+            "addressLines": [
+              "PIAVE, 59"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "MERANO",
+            "country": "IT",
+            "language": "it-IT",
+            "mailRouting": null,
+            "postalCode": "39012",
+            "region": "IT-BZ"
+          },
+          "legalForm": {
+            "id": "CGSO",
+            "other": null
+          },
+          "legalName": {
+            "language": "it-IT",
+            "name": "ENOTRADE ITALIA SAS DI MARIA LUISA VANNI"
+          },
+          "otherAddresses": [],
+          "otherNames": [],
+          "registeredAs": "02415620216",
+          "registeredAt": {
+            "id": "RA000407",
+            "other": null
+          },
+          "status": "INACTIVE",
+          "subCategory": null,
+          "successorEntities": [],
+          "successorEntity": {
+            "lei": null,
+            "name": null
+          },
+          "transliteratedOtherNames": []
+        },
+        "lei": "8156003BDF875F62C727",
+        "mic": null,
+        "ocid": null,
+        "qcc": null,
+        "registration": {
+          "corroborationLevel": "FULLY_CORROBORATED",
+          "initialRegistrationDate": "2025-12-12T18:00:22Z",
+          "lastUpdateDate": "2026-01-01T03:27:54Z",
+          "managingLou": "815600EAD78C57FCE690",
+          "nextRenewalDate": "2026-12-12T18:00:22Z",
+          "otherValidationAuthorities": [],
+          "status": "RETIRED",
+          "validatedAs": "02415620216",
+          "validatedAt": {
+            "id": "RA000407",
+            "other": null
+          }
+        },
+        "spglobal": [
+          "1974403322"
+        ]
+      },
+      "id": "8156003BDF875F62C727",
+      "links": {
+        "self": "https://api.gleif.org/api/v1/lei-records/8156003BDF875F62C727"
+      },
+      "relationships": {
+        "direct-parent": {
+          "links": {
+            "reporting-exception": "https://api.gleif.org/api/v1/lei-records/8156003BDF875F62C727/direct-parent-reporting-exception"
+          }
+        },
+        "field-modifications": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/8156003BDF875F62C727/field-modifications"
+          }
+        },
+        "lei-issuer": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/8156003BDF875F62C727/lei-issuer"
+          }
+        },
+        "managing-lou": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/8156003BDF875F62C727/managing-lou"
+          }
+        },
+        "ultimate-parent": {
+          "links": {
+            "reporting-exception": "https://api.gleif.org/api/v1/lei-records/8156003BDF875F62C727/ultimate-parent-reporting-exception"
+          }
+        }
+      },
+      "type": "lei-records"
+    },
+    {
+      "attributes": {
+        "bic": null,
+        "conformityFlag": "NOT_APPLICABLE",
+        "entity": {
+          "associatedEntity": {
+            "lei": null,
+            "name": null
+          },
+          "category": "GENERAL",
+          "creationDate": "2010-11-30T00:00:00Z",
+          "eventGroups": [
+            {
+              "events": [
+                {
+                  "affectedFields": [
+                    {
+                      "value": "Sultklämmen TMSEP256 AB",
+                      "xpath": "/lei:LEIData/lei:LEIRecords/lei:LEIRecord/lei:Entity/lei:SuccessorEntity/lei:SuccessorEntityName"
+                    }
+                  ],
+                  "effectiveDate": "2025-09-18T00:00:00Z",
+                  "recordedDate": "2025-12-12T12:38:39Z",
+                  "status": "COMPLETED",
+                  "type": "ABSORPTION",
+                  "validationDocuments": "SUPPORTING_DOCUMENTS"
+                }
+              ],
+              "groupType": "STANDALONE"
+            }
+          ],
+          "expiration": {
+            "date": null,
+            "reason": null
+          },
+          "headquartersAddress": {
+            "addressLines": [
+              "Box 1067"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "LUND",
+            "country": "SE",
+            "language": "sv",
+            "mailRouting": "c/o Bolagspartner avveckling",
+            "postalCode": "221 04",
+            "region": "SE-M"
+          },
+          "jurisdiction": "SE",
+          "legalAddress": {
+            "addressLines": [
+              "Box 1067"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "city": "LUND",
+            "country": "SE",
+            "language": "sv",
+            "mailRouting": "c/o Bolagspartner avveckling",
+            "postalCode": "221 04",
+            "region": "SE-M"
+          },
+          "legalForm": {
+            "id": "XJHM",
+            "other": null
+          },
+          "legalName": {
+            "language": "sv",
+            "name": "Sista versen 91583 AB"
+          },
+          "otherAddresses": [],
+          "otherNames": [],
+          "registeredAs": "556828-4839",
+          "registeredAt": {
+            "id": "RA000544",
+            "other": null
+          },
+          "status": "INACTIVE",
+          "subCategory": null,
+          "successorEntities": [
+            {
+              "lang": "sv",
+              "name": "Sultklämmen TMSEP256 AB"
+            }
+          ],
+          "successorEntity": {
+            "lei": null,
+            "name": "Sultklämmen TMSEP256 AB"
+          },
+          "transliteratedOtherNames": []
+        },
+        "lei": "984500A97C8AE3A8F572",
+        "mic": null,
+        "ocid": "se/556828-4839",
+        "qcc": "QSE5FT6UGW",
+        "registration": {
+          "corroborationLevel": "FULLY_CORROBORATED",
+          "initialRegistrationDate": "2025-12-12T12:38:39Z",
+          "lastUpdateDate": "2025-12-12T12:38:39Z",
+          "managingLou": "529900T8BM49AURSDO55",
+          "nextRenewalDate": "2026-12-12T12:38:42Z",
+          "otherValidationAuthorities": [],
+          "status": "RETIRED",
+          "validatedAs": "556828-4839",
+          "validatedAt": {
+            "id": "RA000544",
+            "other": null
+          }
+        },
+        "spglobal": [
+          "686190777"
+        ]
+      },
+      "id": "984500A97C8AE3A8F572",
+      "links": {
+        "self": "https://api.gleif.org/api/v1/lei-records/984500A97C8AE3A8F572"
+      },
+      "relationships": {
+        "direct-parent": {
+          "links": {
+            "reporting-exception": "https://api.gleif.org/api/v1/lei-records/984500A97C8AE3A8F572/direct-parent-reporting-exception"
+          }
+        },
+        "field-modifications": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/984500A97C8AE3A8F572/field-modifications"
+          }
+        },
+        "lei-issuer": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/984500A97C8AE3A8F572/lei-issuer"
+          }
+        },
+        "managing-lou": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/984500A97C8AE3A8F572/managing-lou"
+          }
+        },
+        "ultimate-parent": {
+          "links": {
+            "reporting-exception": "https://api.gleif.org/api/v1/lei-records/984500A97C8AE3A8F572/ultimate-parent-reporting-exception"
+          }
+        }
+      },
+      "type": "lei-records"
+    }
+  ],
+  "links": {
+    "first": "https://api.gleif.org/api/v1/lei-records?filter%5Bentity.status%5D=INACTIVE&page%5Bnumber%5D=1&page%5Bsize%5D=3",
+    "last": "https://api.gleif.org/api/v1/lei-records?filter%5Bentity.status%5D=INACTIVE&page%5Bnumber%5D=74130&page%5Bsize%5D=3",
+    "next": "https://api.gleif.org/api/v1/lei-records?filter%5Bentity.status%5D=INACTIVE&page%5Bnumber%5D=2&page%5Bsize%5D=3"
+  },
+  "meta": {
+    "goldenCopy": {
+      "publishDate": "2026-01-01T08:00:00Z"
+    },
+    "pagination": {
+      "currentPage": 1,
+      "from": 1,
+      "lastPage": 74130,
+      "perPage": 3,
+      "to": 3,
+      "total": 222390
+    }
+  }
+}
