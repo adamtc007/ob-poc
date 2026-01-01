@@ -1,0 +1,332 @@
+domains:
+  gleif:
+    description: GLEIF API integration for LEI data enrichment and corporate tree import
+    verbs:
+      enrich:
+        description: Enrich an entity with GLEIF data by LEI (creates entity if not exists)
+        behavior: plugin
+        args:
+          - name: lei
+            type: string
+            required: false
+            description: LEI to look up in GLEIF (required if entity-id not provided)
+          - name: entity-id
+            type: uuid
+            required: false
+            description: Existing entity to enrich (will use its LEI)
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: uuid
+          name: entity_id
+          capture: true
+
+      search:
+        description: Search GLEIF for entities by name, jurisdiction, or category
+        behavior: plugin
+        args:
+          - name: name
+            type: string
+            required: false
+            description: Entity name to search for (partial match)
+          - name: jurisdiction
+            type: string
+            required: false
+            description: ISO 2-letter jurisdiction code (e.g., DE, LU, US)
+          - name: category
+            type: string
+            required: false
+            description: Entity category filter
+            valid_values:
+              - FUND
+              - BRANCH
+              - SOLE_PROPRIETOR
+              - GENERAL
+          - name: status
+            type: string
+            required: false
+            description: Registration status filter
+            valid_values:
+              - ACTIVE
+              - INACTIVE
+              - LAPSED
+          - name: limit
+            type: integer
+            required: false
+            default: 20
+            description: Maximum results to return (max 100)
+        returns:
+          type: record_set
+
+      import-tree:
+        description: Import corporate tree (parents and/or children) from GLEIF
+        behavior: plugin
+        args:
+          - name: root-lei
+            type: string
+            required: true
+            description: LEI of the root entity to start traversal from
+          - name: direction
+            type: string
+            required: false
+            default: DOWN
+            description: Direction to traverse the tree
+            valid_values:
+              - UP
+              - DOWN
+              - BOTH
+          - name: max-depth
+            type: integer
+            required: false
+            default: 3
+            description: Maximum depth to traverse (1-10)
+          - name: create-entities
+            type: boolean
+            required: false
+            default: true
+            description: Whether to create entities for discovered records
+        returns:
+          type: record
+
+      import-managed-funds:
+        description: Import funds managed by an investment manager with full CBU structure
+        behavior: plugin
+        args:
+          - name: manager-lei
+            type: string
+            required: true
+            description: LEI of the fund manager (e.g., AllianzGI)
+          - name: ultimate-client-lei
+            type: string
+            required: false
+            description: LEI of ultimate parent client for role assignment
+          - name: create-cbus
+            type: boolean
+            required: false
+            default: true
+            description: Whether to create CBUs for each fund
+          - name: limit
+            type: integer
+            required: false
+            description: Maximum number of funds to import (for testing)
+          - name: dry-run
+            type: boolean
+            required: false
+            default: false
+            description: If true, only report what would be imported without making changes
+        returns:
+          type: record
+
+      refresh:
+        description: Refresh stale GLEIF data for entities
+        behavior: plugin
+        args:
+          - name: entity-id
+            type: uuid
+            required: false
+            description: Specific entity to refresh (if omitted, refreshes all stale)
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: stale-days
+            type: integer
+            required: false
+            default: 30
+            description: Consider data stale if older than this many days
+          - name: limit
+            type: integer
+            required: false
+            default: 100
+            description: Maximum entities to refresh in one call
+        returns:
+          type: record
+
+      get-record:
+        description: Fetch raw GLEIF record for an LEI (does not persist)
+        behavior: plugin
+        args:
+          - name: lei
+            type: string
+            required: true
+            description: LEI to fetch from GLEIF API
+        returns:
+          type: record
+
+      get-parent:
+        description: Get direct parent relationship from GLEIF
+        behavior: plugin
+        args:
+          - name: lei
+            type: string
+            required: true
+            description: LEI to get parent for
+        returns:
+          type: record
+
+      get-children:
+        description: Get direct children from GLEIF
+        behavior: plugin
+        args:
+          - name: lei
+            type: string
+            required: true
+            description: LEI to get children for
+          - name: limit
+            type: integer
+            required: false
+            default: 100
+            description: Maximum children to return
+        returns:
+          type: record_set
+
+      trace-ownership:
+        description: Trace ownership chain from entity to UBO terminus via GLEIF parent relationships
+        behavior: plugin
+        args:
+          - name: lei
+            type: string
+            required: false
+            description: LEI of entity to trace from
+          - name: entity-id
+            type: uuid
+            required: false
+            description: Entity UUID to trace from (will look up LEI)
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record
+          name: chain
+          capture: true
+
+      get-managed-funds:
+        description: Get all funds managed by an investment manager from GLEIF
+        behavior: plugin
+        args:
+          - name: manager-lei
+            type: string
+            required: true
+            description: LEI of the investment manager
+          - name: resolve-umbrellas
+            type: boolean
+            required: false
+            default: true
+            description: Also fetch SICAV umbrella structure for funds
+          - name: limit
+            type: integer
+            required: false
+            description: Maximum funds to return
+        returns:
+          type: record
+          name: funds
+          capture: true
+
+      resolve-successor:
+        description: Resolve a merged or inactive LEI to its current successor entity
+        behavior: plugin
+        args:
+          - name: lei
+            type: string
+            required: true
+            description: LEI of potentially inactive/merged entity
+        returns:
+          type: record
+          name: successor
+          capture: true
+
+      # =========================================================================
+      # Lean GLEIF Fund Structure Relationship Verbs
+      # Single deterministic lookups - no heuristics, no discovery loops
+      # =========================================================================
+
+      get-umbrella:
+        description: Get umbrella fund for a sub-fund (IS_SUBFUND_OF relationship). SICAVs have no umbrella - use get-manager instead.
+        behavior: plugin
+        args:
+          - name: lei
+            type: string
+            required: false
+            description: LEI of the sub-fund to look up umbrella for
+          - name: entity-id
+            type: uuid
+            required: false
+            description: Entity UUID to look up umbrella for (will get LEI from entity)
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record
+          name: umbrella
+          capture: true
+
+      get-manager:
+        description: Get fund manager for a fund (IS_FUND-MANAGED_BY relationship). Use this for SICAVs which have no umbrella above them.
+        behavior: plugin
+        args:
+          - name: lei
+            type: string
+            required: false
+            description: LEI of the fund to look up manager for
+          - name: entity-id
+            type: uuid
+            required: false
+            description: Entity UUID to look up manager for (will get LEI from entity)
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record
+          name: manager
+          capture: true
+
+      get-master-fund:
+        description: Get master fund for a feeder fund (IS_FEEDER_TO relationship)
+        behavior: plugin
+        args:
+          - name: lei
+            type: string
+            required: false
+            description: LEI of the feeder fund to look up master for
+          - name: entity-id
+            type: uuid
+            required: false
+            description: Entity UUID to look up master fund for (will get LEI from entity)
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record
+          name: master
+          capture: true
+
+      lookup-by-isin:
+        description: Look up entity LEI by ISIN (uses GLEIF ISIN-LEI mapping)
+        behavior: plugin
+        args:
+          - name: isin
+            type: string
+            required: true
+            description: ISIN of the security to look up issuer LEI for
+        returns:
+          type: record
+          name: issuer
+          capture: true

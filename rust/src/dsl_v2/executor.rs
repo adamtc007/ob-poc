@@ -88,6 +88,9 @@ pub struct ExecutionContext {
     pub parent_symbols: HashMap<String, Uuid>,
     /// Parent symbol types
     pub parent_symbol_types: HashMap<String, String>,
+    /// JSON bindings for complex data (e.g., GLEIF discovery results)
+    /// Used when operations need to pass structured data between verb calls
+    pub json_bindings: HashMap<String, JsonValue>,
     /// Batch iteration index (None if not in batch context)
     pub batch_index: Option<usize>,
     /// Audit user for tracking
@@ -107,6 +110,7 @@ impl Default for ExecutionContext {
             symbol_types: HashMap::new(),
             parent_symbols: HashMap::new(),
             parent_symbol_types: HashMap::new(),
+            json_bindings: HashMap::new(),
             batch_index: None,
             audit_user: None,
             transaction_id: None,
@@ -139,6 +143,21 @@ impl ExecutionContext {
         self.symbols.insert(name.to_string(), value);
         self.symbol_types
             .insert(name.to_string(), entity_type.to_string());
+    }
+
+    /// Bind a JSON value to a symbol (for complex data like discovery results)
+    pub fn bind_json(&mut self, name: &str, value: JsonValue) {
+        self.json_bindings.insert(name.to_string(), value);
+    }
+
+    /// Resolve a JSON binding by name
+    pub fn resolve_json<T: serde::de::DeserializeOwned>(&self, name: &str) -> anyhow::Result<T> {
+        let value = self
+            .json_bindings
+            .get(name)
+            .ok_or_else(|| anyhow::anyhow!("JSON binding not found: @{}", name))?;
+        serde_json::from_value(value.clone())
+            .map_err(|e| anyhow::anyhow!("Failed to deserialize JSON binding @{}: {}", name, e))
     }
 
     /// Resolve a symbol reference, checking local scope first then parent
@@ -197,6 +216,7 @@ impl ExecutionContext {
             symbol_types: HashMap::new(),
             parent_symbols: self.effective_symbols(),
             parent_symbol_types: self.effective_symbol_types(),
+            json_bindings: self.json_bindings.clone(),
             batch_index: Some(index),
             audit_user: self.audit_user.clone(),
             transaction_id: self.transaction_id,
@@ -729,11 +749,22 @@ impl DslExecutor {
 
             // Handle explicit :as binding (in addition to verb's default capture)
             if let Some(ref binding_name) = step.bind_as {
-                if let ExecutionResult::Uuid(id) = &result {
-                    ctx.bind(binding_name, *id);
-                    // Also bind domain_id alias (e.g., cbu_id, entity_id) for convenience
-                    let alias = format!("{}_id", step.verb_call.domain);
-                    ctx.bind(&alias, *id);
+                match &result {
+                    ExecutionResult::Uuid(id) => {
+                        ctx.bind(binding_name, *id);
+                        // Also bind domain_id alias (e.g., cbu_id, entity_id) for convenience
+                        let alias = format!("{}_id", step.verb_call.domain);
+                        ctx.bind(&alias, *id);
+                    }
+                    ExecutionResult::RecordSet(records) => {
+                        // Bind RecordSet to json_bindings for downstream access
+                        ctx.bind_json(binding_name, serde_json::Value::Array(records.clone()));
+                    }
+                    ExecutionResult::Record(record) => {
+                        // Bind single Record to json_bindings
+                        ctx.bind_json(binding_name, record.clone());
+                    }
+                    _ => {}
                 }
             }
 

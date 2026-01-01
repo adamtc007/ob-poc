@@ -42,8 +42,12 @@ pub struct PaginationInfo {
     pub current_page: i32,
     #[serde(rename = "perPage")]
     pub per_page: i32,
-    pub from: i32,
-    pub to: i32,
+    /// May be null for empty results
+    #[serde(default)]
+    pub from: Option<i32>,
+    /// May be null for empty results
+    #[serde(default)]
+    pub to: Option<i32>,
     pub total: i32,
     #[serde(rename = "lastPage")]
     pub last_page: i32,
@@ -58,15 +62,40 @@ pub struct LeiRecord {
     pub attributes: LeiAttributes,
     #[serde(default)]
     pub relationships: Option<LeiRelationships>,
+    /// Record-specific links (present in search results)
+    #[serde(default)]
+    pub links: Option<serde_json::Value>,
+}
+
+impl LeiRecord {
+    /// Get the LEI, preferring attributes.lei but falling back to id
+    pub fn lei(&self) -> &str {
+        self.attributes.lei.as_deref().unwrap_or_else(|| &self.id)
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LeiAttributes {
-    pub lei: String,
+    /// The LEI - may be missing in some older records (use parent id instead)
+    #[serde(default)]
+    pub lei: Option<String>,
     pub entity: EntityInfo,
     pub registration: RegistrationInfo,
     #[serde(rename = "conformityFlag")]
     pub conformity_flag: Option<String>,
+    // Additional optional fields that may be present in API responses
+    // These fields have polymorphic types (can be null, string, or array)
+    // so we use serde_json::Value to handle them generically
+    #[serde(default)]
+    pub bic: Option<serde_json::Value>,
+    #[serde(default)]
+    pub mic: Option<serde_json::Value>,
+    #[serde(default)]
+    pub ocid: Option<serde_json::Value>,
+    #[serde(default)]
+    pub qcc: Option<serde_json::Value>,
+    #[serde(default)]
+    pub spglobal: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -235,33 +264,37 @@ pub struct RegistrationInfo {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LeiRelationships {
-    #[serde(rename = "managing-lou")]
+    #[serde(rename = "managing-lou", default)]
     pub managing_lou: Option<RelationshipLink>,
-    #[serde(rename = "lei-issuer")]
+    #[serde(rename = "lei-issuer", default)]
     pub lei_issuer: Option<RelationshipLink>,
-    #[serde(rename = "direct-parent")]
+    #[serde(rename = "direct-parent", default)]
     pub direct_parent: Option<RelationshipLink>,
-    #[serde(rename = "ultimate-parent")]
+    #[serde(rename = "ultimate-parent", default)]
     pub ultimate_parent: Option<RelationshipLink>,
-    #[serde(rename = "direct-children")]
+    #[serde(rename = "direct-children", default)]
     pub direct_children: Option<RelationshipLink>,
-    #[serde(rename = "ultimate-children")]
+    #[serde(rename = "ultimate-children", default)]
     pub ultimate_children: Option<RelationshipLink>,
-    #[serde(rename = "fund-manager")]
+    #[serde(rename = "fund-manager", default)]
     pub fund_manager: Option<RelationshipLink>,
-    #[serde(rename = "managed-funds")]
+    #[serde(rename = "managed-funds", default)]
     pub managed_funds: Option<RelationshipLink>,
-    #[serde(rename = "umbrella-fund")]
+    #[serde(rename = "umbrella-fund", default)]
     pub umbrella_fund: Option<RelationshipLink>,
-    #[serde(rename = "sub-funds")]
+    #[serde(rename = "sub-funds", default)]
     pub sub_funds: Option<RelationshipLink>,
-    #[serde(rename = "master-fund")]
+    #[serde(rename = "master-fund", default)]
     pub master_fund: Option<RelationshipLink>,
-    #[serde(rename = "feeder-funds")]
+    #[serde(rename = "feeder-funds", default)]
     pub feeder_funds: Option<RelationshipLink>,
-    #[serde(rename = "successor-entities")]
+    #[serde(rename = "successor-entities", default)]
     pub successor_entities: Option<RelationshipLink>,
+    #[serde(rename = "field-modifications", default)]
+    pub field_modifications: Option<RelationshipLink>,
+    #[serde(default)]
     pub isins: Option<RelationshipLink>,
+    #[serde(default)]
     pub bics: Option<RelationshipLink>,
 }
 
@@ -272,9 +305,16 @@ pub struct RelationshipLink {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RelationshipLinkData {
+    #[serde(default)]
     pub related: Option<String>,
-    #[serde(rename = "relationship-record")]
+    #[serde(rename = "relationship-record", default)]
     pub relationship_record: Option<String>,
+    #[serde(rename = "relationship-records", default)]
+    pub relationship_records: Option<String>,
+    #[serde(rename = "reporting-exception", default)]
+    pub reporting_exception: Option<String>,
+    #[serde(rename = "lei-record", default)]
+    pub lei_record: Option<String>,
 }
 
 // =============================================================================
@@ -464,4 +504,171 @@ pub struct TerminalEntity {
     pub lei: String,
     pub name: String,
     pub exception: Option<ReportingException>,
+}
+
+// =============================================================================
+// UBO and Ownership Chain Types
+// =============================================================================
+
+/// UBO terminus status
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum UboStatus {
+    /// Publicly traded - no single UBO
+    PublicFloat,
+    /// Government/state owned
+    StateOwned,
+    /// Natural person at terminus
+    NaturalPerson { name: String },
+    /// Regulated entity with no public UBO
+    RegulatedEntity,
+    /// Unknown/not determined
+    Unknown,
+}
+
+impl UboStatus {
+    pub fn from_exception(exception: Option<&str>) -> Self {
+        match exception {
+            Some("NO_KNOWN_PERSON") => Self::PublicFloat,
+            Some("NON_CONSOLIDATING") => Self::RegulatedEntity,
+            Some("NATURAL_PERSONS") => Self::NaturalPerson {
+                name: "Unknown".to_string(),
+            },
+            _ => Self::Unknown,
+        }
+    }
+}
+
+/// Discovered entity from GLEIF
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiscoveredEntity {
+    pub lei: String,
+    pub name: String,
+    pub jurisdiction: Option<String>,
+    pub category: Option<String>,
+    pub status: Option<String>,
+    pub direct_parent_lei: Option<String>,
+    pub ultimate_parent_lei: Option<String>,
+    pub legal_form_id: Option<String>,
+}
+
+impl DiscoveredEntity {
+    pub fn from_lei_record(record: &LeiRecord) -> Self {
+        Self {
+            lei: record.lei().to_string(),
+            name: record.attributes.entity.legal_name.name.clone(),
+            jurisdiction: record.attributes.entity.jurisdiction.clone(),
+            category: record.attributes.entity.category.clone(),
+            status: record.attributes.entity.status.clone(),
+            direct_parent_lei: None,
+            ultimate_parent_lei: None,
+            legal_form_id: record
+                .attributes
+                .entity
+                .legal_form
+                .as_ref()
+                .and_then(|lf| lf.id.clone()),
+        }
+    }
+}
+
+/// Ownership chain trace result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OwnershipChain {
+    pub start_lei: String,
+    pub start_name: String,
+    pub chain: Vec<ChainLink>,
+    pub terminus: UboStatus,
+    pub total_depth: usize,
+}
+
+/// Single link in ownership chain
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChainLink {
+    pub lei: String,
+    pub name: String,
+    pub jurisdiction: Option<String>,
+    pub relationship_type: String,
+    pub corroboration_level: Option<String>,
+}
+
+/// Result of managed funds query
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FundListResult {
+    pub manager_lei: String,
+    pub manager_name: Option<String>,
+    pub funds: Vec<DiscoveredEntity>,
+    pub fund_umbrellas: std::collections::HashMap<String, DiscoveredEntity>,
+    pub total_count: usize,
+}
+
+/// Result of successor resolution
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SuccessorResult {
+    pub original_lei: String,
+    pub current_lei: String,
+    pub chain: Vec<String>,
+    pub current_entity: DiscoveredEntity,
+    pub was_merged: bool,
+}
+
+// =============================================================================
+// Fund Structure Relationship Results
+// =============================================================================
+
+/// Result of umbrella fund lookup (IS_SUBFUND_OF)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UmbrellaResult {
+    pub subfund_lei: String,
+    pub subfund_name: String,
+    pub umbrella: Option<UmbrellaEntity>,
+}
+
+/// Umbrella fund entity info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UmbrellaEntity {
+    pub lei: String,
+    pub name: String,
+    pub jurisdiction: Option<String>,
+}
+
+/// Result of fund manager lookup (IS_FUND-MANAGED_BY)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ManagerResult {
+    pub fund_lei: String,
+    pub fund_name: String,
+    pub manager: Option<ManagerEntity>,
+}
+
+/// Fund manager entity info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ManagerEntity {
+    pub lei: String,
+    pub name: String,
+    pub jurisdiction: Option<String>,
+    pub role: String,
+}
+
+/// Result of master fund lookup (IS_FEEDER_TO)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MasterFundResult {
+    pub feeder_lei: String,
+    pub feeder_name: String,
+    pub master: Option<MasterEntity>,
+}
+
+/// Master fund entity info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MasterEntity {
+    pub lei: String,
+    pub name: String,
+    pub jurisdiction: Option<String>,
+}
+
+/// Result of ISIN to LEI lookup
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IsinLookupResult {
+    pub isin: String,
+    pub lei: String,
+    pub name: String,
+    pub jurisdiction: Option<String>,
 }

@@ -70,7 +70,7 @@ impl GleifRepository {
         "#,
         )
         .bind(entity_id)
-        .bind(&record.attributes.lei)
+        .bind(record.lei())
         .bind(&entity.status)
         .bind(&entity.category)
         .bind(&entity.sub_category)
@@ -278,7 +278,7 @@ impl GleifRepository {
         "#,
         )
         .bind(entity_id)
-        .bind(&record.attributes.lei)
+        .bind(record.lei())
         .execute(self.pool.as_ref())
         .await?;
         count += 1;
@@ -407,6 +407,15 @@ impl GleifRepository {
                     })
                     .collect();
 
+                // Map GLEIF event types to our valid constraint values
+                let mapped_event_type = map_gleif_event_type(&event.event_type);
+
+                // Skip unknown event types
+                let Some(event_type) = mapped_event_type else {
+                    tracing::debug!("Skipping unknown GLEIF event type: {}", event.event_type);
+                    continue;
+                };
+
                 sqlx::query(
                     r#"
                     INSERT INTO "ob-poc".entity_lifecycle_events
@@ -416,7 +425,7 @@ impl GleifRepository {
                 "#,
                 )
                 .bind(entity_id)
-                .bind(&event.event_type)
+                .bind(event_type)
                 .bind(&event.status)
                 .bind(effective_date)
                 .bind(recorded_date)
@@ -556,10 +565,40 @@ impl GleifRepository {
         .bind(entity_id)
         .bind(&entity.legal_name.name)
         .bind(&entity.jurisdiction)
-        .bind(&record.attributes.lei)
+        .bind(record.lei())
         .execute(self.pool.as_ref())
         .await?;
 
         Ok(entity_id)
+    }
+}
+
+/// Map GLEIF event types to our database constraint values
+///
+/// Valid constraint values:
+/// CHANGE_LEGAL_NAME, CHANGE_LEGAL_ADDRESS, CHANGE_HQ_ADDRESS, CHANGE_LEGAL_FORM,
+/// MERGER, SPIN_OFF, ACQUISITION, DISSOLUTION, BANKRUPTCY, DEREGISTRATION, RELOCATION
+fn map_gleif_event_type(gleif_type: &str) -> Option<&'static str> {
+    match gleif_type {
+        // Direct mappings
+        "CHANGE_LEGAL_NAME" => Some("CHANGE_LEGAL_NAME"),
+        "CHANGE_LEGAL_ADDRESS" => Some("CHANGE_LEGAL_ADDRESS"),
+        "CHANGE_HQ_ADDRESS" | "CHANGE_HEADQUARTERS_ADDRESS" => Some("CHANGE_HQ_ADDRESS"),
+        "CHANGE_LEGAL_FORM" => Some("CHANGE_LEGAL_FORM"),
+        "MERGER" => Some("MERGER"),
+        "SPIN_OFF" | "SPINOFF" => Some("SPIN_OFF"),
+        "ACQUISITION" => Some("ACQUISITION"),
+        "DISSOLUTION" => Some("DISSOLUTION"),
+        "BANKRUPTCY" => Some("BANKRUPTCY"),
+        "DEREGISTRATION" => Some("DEREGISTRATION"),
+        "RELOCATION" => Some("RELOCATION"),
+
+        // GLEIF-specific mappings
+        "MERGERS_AND_ACQUISITIONS" => Some("MERGER"), // Map to MERGER as closest match
+        "CHANGE_OTHER" => None,                       // Skip - not in our constraint
+        "TRANSFORMATION" => Some("CHANGE_LEGAL_FORM"), // Transformation often means legal form change
+
+        // Unknown types - skip them
+        _ => None,
     }
 }

@@ -9,8 +9,11 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use xshell::{cmd, Shell};
 
+mod allianz_harness;
+mod gleif_crawl_dsl;
 mod gleif_import;
 mod gleif_load;
+mod gleif_test;
 mod seed_allianz;
 mod ubo_test;
 
@@ -182,11 +185,15 @@ enum Command {
         verbose: bool,
     },
 
-    /// Import funds from GLEIF API by search term
+    /// Import funds from GLEIF API by search term or manager LEI
     GleifImport {
         /// Search term for GLEIF API (e.g., "Allianz Global Investors")
-        #[arg(long, short = 's')]
-        search: String,
+        #[arg(long, short = 's', required_unless_present = "manager_lei")]
+        search: Option<String>,
+
+        /// Manager LEI to fetch managed funds (e.g., "OJ2TIQSVQND4IZYYK658" for AllianzGI)
+        #[arg(long, short = 'm', conflicts_with = "search")]
+        manager_lei: Option<String>,
 
         /// Limit number of records to import
         #[arg(long, short = 'l')]
@@ -195,6 +202,10 @@ enum Command {
         /// Dry run - show what would be imported
         #[arg(long, short = 'n')]
         dry_run: bool,
+
+        /// Also create CBUs for each fund (with ASSET_OWNER role)
+        #[arg(long)]
+        create_cbus: bool,
     },
 
     /// Load Allianz structure via DSL (clean + execute DSL file)
@@ -226,7 +237,7 @@ enum Command {
         #[arg(long)]
         fund_limit: Option<usize>,
 
-        /// Limit number of corporate subsidiaries to include
+        /// Limit number of corporate subsidiaries to include (legacy mode only)
         #[arg(long)]
         corp_limit: Option<usize>,
 
@@ -237,6 +248,66 @@ enum Command {
         /// Execute the generated DSL against the database
         #[arg(long, short = 'x')]
         execute: bool,
+
+        /// Use complete funds file (417 funds with umbrella data) instead of legacy sample
+        #[arg(long, short = 'c')]
+        complete: bool,
+    },
+
+    /// Allianz Test Harness - Complete GLEIF/BODS onboarding pipeline test
+    AllianzHarness {
+        /// Mode: discover, import, clean, full
+        #[arg(long, short = 'm', default_value = "full")]
+        mode: String,
+
+        /// Limit number of funds to process
+        #[arg(long, short = 'l')]
+        limit: Option<usize>,
+
+        /// Dry run - show what would be done without making changes
+        #[arg(long, short = 'n')]
+        dry_run: bool,
+
+        /// Verbose output
+        #[arg(long, short = 'v')]
+        verbose: bool,
+    },
+
+    /// GLEIF Verb Test Harness - Test all GLEIF DSL verbs with Allianz seed data
+    GleifTest {
+        /// Verbose output
+        #[arg(long, short = 'v')]
+        verbose: bool,
+    },
+
+    /// GLEIF Crawl - DSL-based entity import from GLEIF API
+    ///
+    /// This command uses DSL verbs (gleif.import-managed-funds, gleif.trace-ownership)
+    /// instead of raw SQL for data import.
+    GleifCrawl {
+        /// Root LEI to start crawl from (default: Allianz GI)
+        #[arg(long)]
+        root_lei: Option<String>,
+
+        /// Maximum funds to import (default: unlimited)
+        #[arg(long)]
+        limit: Option<usize>,
+
+        /// Create CBUs for each fund
+        #[arg(long, default_value = "true")]
+        create_cbus: bool,
+
+        /// Trace parent ownership chains
+        #[arg(long, default_value = "true")]
+        trace_parents: bool,
+
+        /// Dry run - generate DSL but don't execute
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Verbose output
+        #[arg(long, short = 'v')]
+        verbose: bool,
     },
 }
 
@@ -297,11 +368,19 @@ fn main() -> Result<()> {
         }
         Command::GleifImport {
             search,
+            manager_lei,
             limit,
             dry_run,
+            create_cbus,
         } => {
             let rt = tokio::runtime::Runtime::new()?;
-            rt.block_on(gleif_import::gleif_import(&search, limit, dry_run))
+            rt.block_on(gleif_import::gleif_import(
+                search.as_deref(),
+                manager_lei.as_deref(),
+                limit,
+                dry_run,
+                create_cbus,
+            ))
         }
         Command::EtlAllianz {
             file,
@@ -315,13 +394,76 @@ fn main() -> Result<()> {
             corp_limit,
             dry_run,
             execute,
+            complete,
         } => {
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(gleif_load::gleif_load(
-                output, fund_limit, corp_limit, dry_run, execute,
+                output, fund_limit, corp_limit, dry_run, execute, complete,
             ))
         }
+        Command::AllianzHarness {
+            mode,
+            limit,
+            dry_run,
+            verbose,
+        } => {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(run_allianz_harness(&mode, limit, dry_run, verbose))
+        }
+        Command::GleifTest { verbose } => {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(gleif_test::run_gleif_tests(verbose))
+        }
+        Command::GleifCrawl {
+            root_lei,
+            limit,
+            create_cbus,
+            trace_parents,
+            dry_run,
+            verbose,
+        } => {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(gleif_crawl_dsl::run_gleif_crawl_dsl(
+                root_lei,
+                limit,
+                create_cbus,
+                trace_parents,
+                dry_run,
+                verbose,
+            ))?;
+            Ok(())
+        }
     }
+}
+
+async fn run_allianz_harness(
+    mode: &str,
+    limit: Option<usize>,
+    dry_run: bool,
+    verbose: bool,
+) -> Result<()> {
+    use sqlx::PgPool;
+
+    let database_url =
+        std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".to_string());
+    let pool = PgPool::connect(&database_url).await?;
+
+    let harness_mode = match mode.to_lowercase().as_str() {
+        "discover" => allianz_harness::HarnessMode::Discover,
+        "import" => allianz_harness::HarnessMode::Import,
+        "clean" => allianz_harness::HarnessMode::Clean,
+        "full" => allianz_harness::HarnessMode::Full,
+        _ => anyhow::bail!("Unknown mode: {}. Use: discover, import, clean, full", mode),
+    };
+
+    let mut harness = allianz_harness::AllianzTestHarness::new(pool)
+        .with_dry_run(dry_run)
+        .with_verbose(verbose)
+        .with_limit(limit);
+
+    harness.run(harness_mode).await?;
+
+    Ok(())
 }
 
 fn project_root() -> Result<std::path::PathBuf> {

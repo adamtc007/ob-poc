@@ -5541,6 +5541,108 @@ pub fn get_intent_patterns() -> HashMap<&'static str, Vec<&'static str>> {
             "gleif update",
         ],
     );
+    m.insert(
+        "gleif.trace-ownership",
+        vec![
+            // Core tracing patterns
+            "trace ownership from gleif",
+            "trace ubo chain",
+            "follow ownership chain",
+            "ownership path lookup",
+            "find ultimate owner",
+            "who owns this entity",
+            "ownership chain to ubo",
+            "gleif ownership tracing",
+            // Terminus patterns
+            "find ubo terminus",
+            "reach natural person",
+            "find public company",
+            "ownership termination",
+            "chain termination point",
+            "ultimate beneficial owner chain",
+            // Question patterns
+            "who is the ultimate owner",
+            "who really owns",
+            "trace to real owner",
+            "find controlling person",
+            "ownership hierarchy up",
+            // Corner cases
+            "lei ownership chain",
+            "gleif parent chain",
+            "direct parent chain",
+            "ownership breadcrumbs",
+            "chain visualization",
+            "ownership path finder",
+            "ubo discovery via gleif",
+            "regulatory ownership check",
+        ],
+    );
+    m.insert(
+        "gleif.get-managed-funds",
+        vec![
+            // Core fund lookup patterns
+            "get managed funds from gleif",
+            "list funds by manager",
+            "funds under management",
+            "managed fund lookup",
+            "fund inventory",
+            "investment manager funds",
+            "aifm fund list",
+            "manco fund list",
+            // Manager name patterns
+            "what funds does allianzgi manage",
+            "blackrock fund list",
+            "vanguard managed funds",
+            "fidelity fund inventory",
+            "schroders fund list",
+            "jpmorgan funds",
+            "pimco fund list",
+            "state street funds",
+            // Corner cases
+            "fund management relationship",
+            "manager to fund mapping",
+            "fund manager portfolio",
+            "umbrella fund discovery",
+            "sicav discovery",
+            "sub-fund discovery",
+            "fund structure lookup",
+            "aum by fund",
+            "fund count by manager",
+        ],
+    );
+    m.insert(
+        "gleif.resolve-successor",
+        vec![
+            // Core successor patterns
+            "resolve lei successor",
+            "find successor entity",
+            "merged entity lookup",
+            "acquisition successor",
+            "entity succession",
+            "follow merger chain",
+            "inactive lei resolution",
+            "lei status check",
+            // Merger/acquisition patterns
+            "where did this entity merge",
+            "what happened to this company",
+            "merger successor",
+            "acquisition target successor",
+            "surviving entity",
+            "successor company",
+            "new entity after merger",
+            // Corner cases
+            "lei chain resolution",
+            "historical lei lookup",
+            "deprecated lei",
+            "lapsed lei",
+            "transferred lei",
+            "consolidated entity",
+            "absorbed entity",
+            "successor trail",
+            "corporate succession",
+            "legal successor",
+        ],
+    );
 
     // ==========================================================================
     // BODS VERBS - Beneficial Ownership Data Standard
@@ -13370,6 +13472,9 @@ pub fn get_workflow_phases() -> HashMap<&'static str, &'static str> {
     m.insert("gleif.enrich", "gleif_enrichment");
     m.insert("gleif.import-tree", "gleif_enrichment");
     m.insert("gleif.refresh", "gleif_enrichment");
+    m.insert("gleif.trace-ownership", "gleif_enrichment");
+    m.insert("gleif.get-managed-funds", "gleif_enrichment");
+    m.insert("gleif.resolve-successor", "gleif_enrichment");
 
     // ==========================================================================
     // BODS UBO DISCOVERY PHASE
@@ -14869,6 +14974,18 @@ pub fn get_typical_next() -> HashMap<&'static str, Vec<&'static str>> {
         vec!["bods.discover-ubos", "ubo.calculate", "ubo.trace-chains"],
     );
     m.insert("gleif.refresh", vec!["gleif.import-tree", "ubo.calculate"]);
+    m.insert(
+        "gleif.trace-ownership",
+        vec!["ubo.register-ubo", "ubo.mark-terminus", "gleif.enrich"],
+    );
+    m.insert(
+        "gleif.get-managed-funds",
+        vec!["cbu.create", "fund.create-umbrella"],
+    );
+    m.insert(
+        "gleif.resolve-successor",
+        vec!["gleif.enrich", "entity.update"],
+    );
 
     // ==========================================================================
     // BODS UBO DISCOVERY FLOW

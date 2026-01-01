@@ -7435,13 +7435,69 @@ impl UboDiscoveryService {
 }
 ```
 
-### GLEIF/BODS DSL Verbs
+### GLEIF DSL Verbs
+
+The GLEIF integration provides comprehensive verbs for entity enrichment, corporate tree traversal, and fund structure discovery.
+
+**Core Operations:**
 
 | Verb | Description |
 |------|-------------|
-| `gleif.enrich` | Enrich entity with GLEIF data by LEI |
-| `gleif.import-tree` | Import full corporate tree from LEI |
-| `gleif.refresh` | Refresh GLEIF data for entity |
+| `gleif.enrich` | Enrich entity with GLEIF data by LEI (creates entity if not exists) |
+| `gleif.search` | Search GLEIF for entities by name, jurisdiction, or category |
+| `gleif.import-tree` | Import corporate tree (parents and/or children) from GLEIF |
+| `gleif.refresh` | Refresh stale GLEIF data for entities |
+| `gleif.get-record` | Fetch raw GLEIF record for an LEI (does not persist) |
+
+**Relationship Lookups (deterministic single lookups):**
+
+| Verb | Description |
+|------|-------------|
+| `gleif.get-parent` | Get direct parent relationship from GLEIF |
+| `gleif.get-children` | Get direct children from GLEIF |
+| `gleif.get-umbrella` | Get umbrella fund for a sub-fund (IS_SUBFUND_OF relationship) |
+| `gleif.get-manager` | Get fund manager for a fund (IS_FUND-MANAGED_BY relationship) |
+| `gleif.get-master-fund` | Get master fund for a feeder fund (IS_FEEDER_TO relationship) |
+| `gleif.lookup-by-isin` | Look up entity LEI by ISIN (uses GLEIF ISIN-LEI mapping) |
+
+**Ownership & Fund Discovery:**
+
+| Verb | Description |
+|------|-------------|
+| `gleif.trace-ownership` | Trace ownership chain from entity to UBO terminus via GLEIF parent relationships |
+| `gleif.get-managed-funds` | Get all funds managed by an investment manager from GLEIF |
+| `gleif.import-managed-funds` | Import funds managed by an IM with full CBU structure and role assignments |
+| `gleif.resolve-successor` | Resolve a merged or inactive LEI to its current successor entity |
+
+### Fund Import Crawler
+
+The `gleif.import-managed-funds` verb provides a complete fund onboarding pipeline:
+
+```clojure
+;; Import all funds managed by Allianz Global Investors
+(gleif.import-managed-funds
+  :manager-lei "529900CJLGA97K34T894"
+  :ultimate-client-lei "529900CJLGA97K34T894"
+  :create-cbus true
+  :limit 10
+  :dry-run false)
+```
+
+**What it creates for each fund:**
+1. **Fund Entity** - `entity_funds` record with LEI, GLEIF metadata, legal form
+2. **CBU** - Client Business Unit with fund name and jurisdiction
+3. **Role Assignments**:
+   - `ASSET_OWNER` - The fund itself
+   - `INVESTMENT_MANAGER` - The manager entity
+   - `MANAGEMENT_COMPANY` - ManCo if different from IM
+   - `SICAV` - For SICAV umbrella funds
+
+**Name-based fallback:** When the GLEIF relationship API returns empty results, the crawler falls back to searching for funds by the manager's name.
+
+### BODS DSL Verbs
+
+| Verb | Description |
+|------|-------------|
 | `bods.discover-ubos` | Discover UBOs via BODS for entity |
 | `bods.import-ownership` | Import ownership statements from BODS |
 | `bods.refresh` | Refresh BODS data for entity |

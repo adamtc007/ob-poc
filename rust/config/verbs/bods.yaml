@@ -1,0 +1,221 @@
+domains:
+  bods:
+    description: Beneficial Ownership Data Standard (BODS) integration for UBO discovery
+    verbs:
+      discover-ubos:
+        description: Discover Ultimate Beneficial Owners for an entity using GLEIF + BODS data
+        behavior: plugin
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            description: Entity to discover UBOs for (must have LEI)
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: save
+            type: boolean
+            required: false
+            default: true
+            description: Whether to persist discovered UBOs to database
+        returns:
+          type: record
+
+      import:
+        description: Bulk import BODS statements from data dump
+        behavior: plugin
+        args:
+          - name: source
+            type: string
+            required: true
+            description: Source type of BODS data
+            valid_values:
+              - FILE
+              - API
+              - OPENOWNERSHIP
+          - name: file-path
+            type: string
+            required: false
+            description: Path to BODS JSON file (required if source=FILE)
+          - name: limit
+            type: integer
+            required: false
+            description: Maximum statements to import
+          - name: entity-filter
+            type: string
+            required: false
+            description: Only import statements for entities matching this LEI pattern
+        returns:
+          type: record
+
+      link-entity:
+        description: Link a local entity to a BODS entity statement
+        behavior: crud
+        crud:
+          operation: upsert
+          table: entity_bods_links
+          schema: ob-poc
+          returning: link_id
+          conflict_keys:
+            - entity_id
+            - bods_statement_id
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: bods-statement-id
+            type: string
+            required: true
+            maps_to: bods_statement_id
+            description: BODS entity statement ID
+          - name: match-confidence
+            type: decimal
+            required: false
+            maps_to: match_confidence
+            default: 1.0
+            description: Confidence score for the match (0.0-1.0)
+          - name: match-method
+            type: string
+            required: false
+            maps_to: match_method
+            valid_values:
+              - LEI
+              - NAME
+              - MANUAL
+              - API
+        returns:
+          type: uuid
+          name: link_id
+          capture: true
+
+      get-statement:
+        description: Get a BODS statement by ID
+        behavior: plugin
+        args:
+          - name: statement-id
+            type: string
+            required: true
+            description: BODS statement ID
+          - name: statement-type
+            type: string
+            required: false
+            description: Statement type filter
+            valid_values:
+              - entity
+              - person
+              - ownership
+        returns:
+          type: record
+
+      list-by-entity:
+        description: List BODS statements linked to an entity
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: v_entity_bods_statements
+          schema: ob-poc
+          fk_col: entity_id
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record_set
+
+      find-by-lei:
+        description: Find BODS entity statement by LEI
+        behavior: plugin
+        args:
+          - name: lei
+            type: string
+            required: true
+            description: LEI to search for in BODS data
+        returns:
+          type: record
+
+      list-persons:
+        description: List person statements with beneficial ownership
+        behavior: crud
+        crud:
+          operation: select
+          table: bods_person_statements
+          schema: ob-poc
+        args:
+          - name: nationality
+            type: string
+            required: false
+            description: Filter by nationality (ISO 2-letter code)
+          - name: country-of-residence
+            type: string
+            required: false
+            description: Filter by country of residence
+          - name: limit
+            type: integer
+            required: false
+            default: 100
+        returns:
+          type: record_set
+
+      list-ownership:
+        description: List ownership statements for an entity
+        behavior: plugin
+        args:
+          - name: subject-lei
+            type: string
+            required: false
+            description: LEI of the subject entity
+          - name: entity-id
+            type: uuid
+            required: false
+            description: Local entity ID (will look up LEI)
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: include-expired
+            type: boolean
+            required: false
+            default: false
+            description: Include expired ownership statements
+        returns:
+          type: record_set
+
+      sync-from-gleif:
+        description: Sync BODS data from GLEIF reporting exceptions
+        behavior: plugin
+        args:
+          - name: entity-id
+            type: uuid
+            required: false
+            description: Specific entity to sync (if omitted, syncs all with exceptions)
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: limit
+            type: integer
+            required: false
+            default: 100
+            description: Maximum entities to sync
+        returns:
+          type: record

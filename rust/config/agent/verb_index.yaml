@@ -510,6 +510,97 @@ intents:
     priority: 75
 
   # ---------------------------------------------------------------------------
+  # GLEIF RESEARCH INTENTS
+  # ---------------------------------------------------------------------------
+  # Single deterministic lookups - each verb does ONE thing reliably.
+  # NOTE: SICAVs are self-governed umbrella-level structures. They have NO
+  # umbrella above them, so get-umbrella will return null. For SICAVs, use
+  # get-manager to find the ManCo, then trace-ownership from the ManCo.
+
+  gleif_research:
+    patterns:
+      - "research entity"
+      - "lookup lei"
+      - "find in gleif"
+      - "gleif search"
+      - "external registry"
+      - "check lei"
+    verbs:
+      - gleif.search
+      - gleif.get-record
+      - gleif.enrich
+    priority: 90
+
+  gleif_fund_structure:
+    patterns:
+      - "find umbrella"
+      - "get umbrella fund"
+      - "which umbrella"
+      - "subfund of"
+      - "parent fund"
+      - "sicav structure"
+    verbs:
+      - gleif.get-umbrella
+      - gleif.get-manager
+    context: |
+      SICAVs are self-governed umbrella structures with NO parent above them.
+      If get-umbrella returns null, try get-manager to find the ManCo, then
+      trace-ownership from there to find natural person UBOs.
+    priority: 85
+
+  gleif_fund_manager:
+    patterns:
+      - "find manager"
+      - "who manages fund"
+      - "fund manager"
+      - "manco"
+      - "aifm"
+      - "investment manager for fund"
+    verbs:
+      - gleif.get-manager
+      - gleif.get-managed-funds
+    context: |
+      IS_FUND-MANAGED_BY relationship. For SICAVs, this is the starting point
+      for ownership tracing since they have no umbrella above them.
+    priority: 85
+
+  gleif_master_feeder:
+    patterns:
+      - "master fund"
+      - "feeder fund"
+      - "master-feeder"
+      - "invests into"
+      - "feeder structure"
+    verbs:
+      - gleif.get-master-fund
+    priority: 80
+
+  gleif_isin_lookup:
+    patterns:
+      - "lookup isin"
+      - "isin to lei"
+      - "find by isin"
+      - "security issuer"
+      - "who issued"
+    verbs:
+      - gleif.lookup-by-isin
+    priority: 80
+
+  gleif_ownership_trace:
+    patterns:
+      - "trace ownership"
+      - "ownership chain"
+      - "who owns"
+      - "parent company"
+      - "corporate structure"
+      - "ultimate parent"
+    verbs:
+      - gleif.trace-ownership
+      - gleif.get-parent
+      - gleif.resolve-successor
+    priority: 90
+
+  # ---------------------------------------------------------------------------
   # PRODUCT & SERVICE INTENTS
   # ---------------------------------------------------------------------------
   add_product:
@@ -680,6 +771,22 @@ categories:
       - holding.create
       - movement.subscribe
       - movement.redeem
+
+  gleif_research:
+    label: "GLEIF Research"
+    description: "External registry lookups for entity verification and fund structure discovery. SICAVs have no umbrella - use get-manager to find ManCo."
+    verbs:
+      - gleif.search
+      - gleif.get-record
+      - gleif.enrich
+      - gleif.get-umbrella
+      - gleif.get-manager
+      - gleif.get-master-fund
+      - gleif.lookup-by-isin
+      - gleif.trace-ownership
+      - gleif.get-parent
+      - gleif.get-children
+      - gleif.resolve-successor
 
   trading_matrix:
     label: "Trading Matrix"
@@ -981,6 +1088,29 @@ examples:
   "service-resource.provision":
     short: "Provision custody account"
     dsl: '(service-resource.provision :cbu-id @fund :resource-type "CUSTODY_ACCT" :instance-url "https://custody.bank.com/12345")'
+
+  # ---------------------------------------------------------------------------
+  # GLEIF RESEARCH EXAMPLES
+  # ---------------------------------------------------------------------------
+  # Single deterministic lookups - each does ONE thing reliably.
+
+  "gleif.get-umbrella":
+    short: "Get umbrella fund for a sub-fund (returns null for SICAVs)"
+    dsl: '(gleif.get-umbrella :lei "549300EXAMPLE123456" :as @umbrella)'
+    context: "SICAVs are self-governed and have NO umbrella above them. If this returns null, use get-manager instead."
+
+  "gleif.get-manager":
+    short: "Get fund manager (ManCo/AIFM) for a fund"
+    dsl: "(gleif.get-manager :entity-id @fund :as @manco)"
+    context: "For SICAVs, this is your starting point for ownership tracing since they have no umbrella."
+
+  "gleif.get-master-fund":
+    short: "Get master fund for a feeder fund"
+    dsl: '(gleif.get-master-fund :lei "549300FEEDER789012" :as @master)'
+
+  "gleif.lookup-by-isin":
+    short: "Find entity by ISIN (security issuer lookup)"
+    dsl: '(gleif.lookup-by-isin :isin "LU0123456789" :as @issuer)'
 
   # ---------------------------------------------------------------------------
   # TRADING MATRIX EXAMPLES

@@ -103,6 +103,42 @@ pub fn extract_string_list_opt(verb_call: &VerbCall, arg_name: &str) -> Option<V
 }
 
 // ============================================================================
+// Boolean Extraction (sync, no DB)
+// ============================================================================
+
+/// Extract an optional boolean argument from a verb call.
+pub fn extract_bool_opt(verb_call: &VerbCall, arg_name: &str) -> Option<bool> {
+    verb_call
+        .arguments
+        .iter()
+        .find(|a| a.key == arg_name)
+        .and_then(|a| a.value.as_boolean())
+}
+
+/// Extract a required boolean argument from a verb call.
+pub fn extract_bool(verb_call: &VerbCall, arg_name: &str) -> Result<bool> {
+    extract_bool_opt(verb_call, arg_name).ok_or_else(|| anyhow!("Missing {} argument", arg_name))
+}
+
+// ============================================================================
+// Integer Extraction (sync, no DB)
+// ============================================================================
+
+/// Extract an optional integer argument from a verb call.
+pub fn extract_int_opt(verb_call: &VerbCall, arg_name: &str) -> Option<i64> {
+    verb_call
+        .arguments
+        .iter()
+        .find(|a| a.key == arg_name)
+        .and_then(|a| a.value.as_integer())
+}
+
+/// Extract a required integer argument from a verb call.
+pub fn extract_int(verb_call: &VerbCall, arg_name: &str) -> Result<i64> {
+    extract_int_opt(verb_call, arg_name).ok_or_else(|| anyhow!("Missing {} argument", arg_name))
+}
+
+// ============================================================================
 // CBU ID Extraction (sync, no DB) - handles "cbu" or "cbu-id" aliases
 // ============================================================================
 

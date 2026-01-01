@@ -1,13 +1,16 @@
 //! GLEIF API Import for Entity Funds
 //!
-//! Fetches fund data from the GLEIF API and imports into entity_funds table.
-//! Uses LEI as the unique key for upsert (idempotent).
-//! Walks up the ownership chain to import parent entities.
+//! Imports fund data from the GLEIF API using DSL verbs.
+//! Uses the gleif.import-managed-funds verb for the actual import.
 //!
 //! Usage:
+//!   # Search by name (legacy mode - direct API)
 //!   cargo x gleif-import --search "Allianz Global Investors" --dry-run
 //!   cargo x gleif-import --search "Allianz Global Investors" --limit 10
-//!   cargo x gleif-import --search "Allianz Global Investors"
+//!
+//!   # Fetch by manager LEI using DSL verb (recommended)
+//!   cargo x gleif-import --manager-lei OJ2TIQSVQND4IZYYK658 --limit 10
+//!   cargo x gleif-import -m OJ2TIQSVQND4IZYYK658 --create-cbus
 
 use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, Utc};
@@ -15,6 +18,8 @@ use serde::Deserialize;
 use sqlx::PgPool;
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
+
+use ob_poc::dsl_v2::{compile, parse_program, DslExecutor, ExecutionContext};
 
 const GLEIF_API_BASE: &str = "https://api.gleif.org/api/v1/lei-records";
 const PAGE_SIZE: usize = 100;
@@ -166,27 +171,139 @@ pub struct ImportStats {
     pub parents_discovered: usize,
     pub relationships_created: usize,
     pub cbus_linked: usize,
+    pub cbus_created: usize,
+    pub roles_assigned: usize,
     pub errors: usize,
 }
 
 // =============================================================================
-// Main Import Function
+// DSL-Based Import Function
 // =============================================================================
 
-pub async fn gleif_import(search_term: &str, limit: Option<usize>, dry_run: bool) -> Result<()> {
+/// Import managed funds using the gleif.import-managed-funds DSL verb
+///
+/// This function builds a DSL command and executes it through the standard
+/// DSL pipeline (parse → compile → execute), ensuring the verb handlers
+/// are properly tested.
+async fn gleif_import_via_dsl(
+    manager_lei: &str,
+    limit: Option<usize>,
+    dry_run: bool,
+    create_cbus: bool,
+) -> Result<()> {
+    println!("Using DSL verb: gleif.import-managed-funds\n");
+
+    // Connect to database
+    let db_url =
+        std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".to_string());
+    let pool = PgPool::connect(&db_url)
+        .await
+        .context("Failed to connect to database")?;
+
+    // Build the DSL command
+    let mut dsl = format!(
+        r#"(gleif.import-managed-funds :manager-lei "{}" :create-cbus {}"#,
+        manager_lei, create_cbus
+    );
+
+    if let Some(lim) = limit {
+        dsl.push_str(&format!(" :limit {}", lim));
+    }
+
+    if dry_run {
+        dsl.push_str(" :dry-run true");
+    }
+
+    dsl.push(')');
+
+    println!("DSL command:\n  {}\n", dsl);
+
+    // Parse the DSL
+    let ast = parse_program(&dsl).map_err(|e| anyhow!("Parse error: {:?}", e))?;
+    println!("Parsed {} statement(s)", ast.statements.len());
+
+    // Compile to execution plan
+    let plan = compile(&ast).map_err(|e| anyhow!("Compile error: {:?}", e))?;
+    println!("Compiled to {} step(s)", plan.steps.len());
+
+    // Execute
+    let executor = DslExecutor::new(pool);
+    let mut ctx = ExecutionContext::new();
+
+    println!("\nExecuting...\n");
+    let start = std::time::Instant::now();
+
+    let results = executor
+        .execute_plan(&plan, &mut ctx)
+        .await
+        .map_err(|e| anyhow!("Execution error: {:?}", e))?;
+
+    let elapsed = start.elapsed();
+
+    // Print results
     println!("===========================================");
-    println!("  GLEIF Fund Import (Idempotent)");
+    println!("  Import Complete ({:.2}s)", elapsed.as_secs_f64());
     println!("===========================================\n");
 
-    println!("Search term: {}", search_term);
+    for (i, result) in results.iter().enumerate() {
+        println!("Step {}: {:?}", i + 1, result);
+    }
+
+    // Print bindings
+    if !ctx.symbols.is_empty() {
+        println!("\nBindings:");
+        for (name, id) in &ctx.symbols {
+            println!("  @{} = {}", name, id);
+        }
+    }
+
+    Ok(())
+}
+
+// =============================================================================
+// Main Import Function (Legacy for search mode)
+// =============================================================================
+
+pub async fn gleif_import(
+    search_term: Option<&str>,
+    manager_lei: Option<&str>,
+    limit: Option<usize>,
+    dry_run: bool,
+    create_cbus: bool,
+) -> Result<()> {
+    println!("===========================================");
+    println!("  GLEIF Fund Import via DSL Verbs");
+    println!("===========================================\n");
+
+    if let Some(search) = search_term {
+        println!("Search term: {}", search);
+    }
+    if let Some(lei) = manager_lei {
+        println!("Manager LEI: {}", lei);
+    }
     println!("Limit: {:?}", limit);
     println!("Dry run: {}", dry_run);
+    println!("Create CBUs: {}", create_cbus);
     println!();
+
+    // Use DSL verb for manager-lei imports
+    if let Some(lei) = manager_lei {
+        return gleif_import_via_dsl(lei, limit, dry_run, create_cbus).await;
+    }
+
+    // Legacy mode: search by name (direct API, not via DSL)
+    println!("Note: Search mode uses legacy direct API. Use --manager-lei for DSL-based import.\n");
 
     let client = reqwest::Client::new();
 
-    // Fetch all records from GLEIF API
-    let records = fetch_all_records(&client, search_term, limit).await?;
+    // Fetch records based on mode
+    let records = if let Some(lei) = manager_lei {
+        fetch_managed_funds(&client, lei, limit).await?
+    } else if let Some(search) = search_term {
+        fetch_all_records(&client, search, limit).await?
+    } else {
+        anyhow::bail!("Either --search or --manager-lei must be provided");
+    };
     println!("\nFetched {} records from GLEIF API\n", records.len());
 
     if records.is_empty() {
@@ -302,14 +419,54 @@ pub async fn gleif_import(search_term: &str, limit: Option<usize>, dry_run: bool
         }
     }
 
-    // Phase 4: Find head office and link CBUs
-    println!("\nPhase 4: Linking CBUs to head office...");
-    if let Some(head_office_id) = find_head_office(&pool, search_term).await? {
-        stats.cbus_linked = link_cbus_to_head_office(&pool, search_term, head_office_id).await?;
+    // Phase 4: Create CBUs if requested
+    if create_cbus {
+        println!("\nPhase 4: Creating CBUs for funds...");
+
+        // Get the manager entity if we have a manager_lei
+        let manager_entity_id = if let Some(lei) = manager_lei {
+            get_entity_by_lei(&pool, lei).await?
+        } else {
+            None
+        };
+
+        for (lei, &entity_id) in &lei_to_entity {
+            // Only create CBUs for FUND category entities
+            let is_fund: bool = sqlx::query_scalar(
+                r#"SELECT COALESCE(gleif_category = 'FUND', false) FROM "ob-poc".entity_funds WHERE entity_id = $1"#
+            )
+            .bind(entity_id)
+            .fetch_optional(&pool)
+            .await?
+            .unwrap_or(false);
+
+            if !is_fund {
+                continue;
+            }
+
+            match create_cbu_for_fund(&pool, entity_id, manager_entity_id).await {
+                Ok((cbu_created, roles_assigned)) => {
+                    if cbu_created {
+                        stats.cbus_created += 1;
+                    }
+                    stats.roles_assigned += roles_assigned;
+                }
+                Err(e) => {
+                    eprintln!("  Error creating CBU for {}: {}", lei, e);
+                    stats.errors += 1;
+                }
+            }
+        }
+    } else if let Some(search) = search_term {
+        // Legacy behavior: link CBUs to head office
+        println!("\nPhase 4: Linking CBUs to head office...");
+        if let Some(head_office_id) = find_head_office(&pool, search).await? {
+            stats.cbus_linked = link_cbus_to_head_office(&pool, search, head_office_id).await?;
+        }
     }
 
     // Print summary
-    print_summary(&stats);
+    print_summary(&stats, create_cbus);
 
     Ok(())
 }
@@ -398,6 +555,63 @@ async fn fetch_all_records(
         let response: GleifResponse = fetch_with_retry(client, &url)
             .await?
             .ok_or_else(|| anyhow!("Unexpected 404 for search results"))?;
+
+        println!(
+            "  Got {} records (page {}/{}, total: {})",
+            response.data.len(),
+            response.meta.pagination.current_page,
+            response.meta.pagination.last_page,
+            response.meta.pagination.total
+        );
+
+        all_records.extend(response.data);
+
+        if let Some(max) = limit {
+            if all_records.len() >= max {
+                all_records.truncate(max);
+                break;
+            }
+        }
+
+        if page >= response.meta.pagination.last_page {
+            break;
+        }
+
+        page += 1;
+        // Rate limiting delay between pages
+        tokio::time::sleep(tokio::time::Duration::from_millis(BASE_DELAY_MS)).await;
+    }
+
+    Ok(all_records)
+}
+
+/// Fetch all funds managed by a given fund manager LEI
+/// Uses the GLEIF relationship endpoint: /{manager_lei}/managed-funds
+async fn fetch_managed_funds(
+    client: &reqwest::Client,
+    manager_lei: &str,
+    limit: Option<usize>,
+) -> Result<Vec<GleifRecord>> {
+    let mut all_records = Vec::new();
+    let mut page = 1;
+
+    println!("Fetching funds managed by LEI: {}", manager_lei);
+
+    loop {
+        println!("Fetching page {}...", page);
+
+        // Use the managed-funds relationship endpoint
+        let url = format!(
+            "{}/{}/managed-funds?page%5Bnumber%5D={}&page%5Bsize%5D={}",
+            GLEIF_API_BASE, manager_lei, page, PAGE_SIZE
+        );
+
+        let response: GleifResponse = fetch_with_retry(client, &url).await?.ok_or_else(|| {
+            anyhow!(
+                "Unexpected 404 for managed funds query - is {} a valid fund manager LEI?",
+                manager_lei
+            )
+        })?;
 
         println!(
             "  Got {} records (page {}/{}, total: {})",
@@ -1103,6 +1317,155 @@ async fn get_or_create_entity_type(pool: &PgPool, type_code: &str, name: &str) -
 }
 
 // =============================================================================
+// CBU Creation Helpers
+// =============================================================================
+
+/// Get entity by LEI
+async fn get_entity_by_lei(pool: &PgPool, lei: &str) -> Result<Option<Uuid>> {
+    let result: Option<(Uuid,)> =
+        sqlx::query_as(r#"SELECT entity_id FROM "ob-poc".entity_funds WHERE lei = $1"#)
+            .bind(lei)
+            .fetch_optional(pool)
+            .await?;
+    Ok(result.map(|(id,)| id))
+}
+
+/// Create a CBU for a fund entity, with ASSET_OWNER role and optionally INVESTMENT_MANAGER role
+/// Returns (cbu_created, roles_assigned)
+async fn create_cbu_for_fund(
+    pool: &PgPool,
+    fund_entity_id: Uuid,
+    manager_entity_id: Option<Uuid>,
+) -> Result<(bool, usize)> {
+    // Get fund name and jurisdiction
+    let fund_info: Option<(String, Option<String>)> = sqlx::query_as(
+        r#"
+        SELECT e.name, ef.jurisdiction
+        FROM "ob-poc".entities e
+        JOIN "ob-poc".entity_funds ef ON e.entity_id = ef.entity_id
+        WHERE e.entity_id = $1
+        "#,
+    )
+    .bind(fund_entity_id)
+    .fetch_optional(pool)
+    .await?;
+
+    let (fund_name, jurisdiction) = match fund_info {
+        Some(info) => info,
+        None => return Err(anyhow!("Fund entity not found: {}", fund_entity_id)),
+    };
+
+    // Check if CBU already exists for this fund name
+    let existing_cbu: Option<(Uuid,)> =
+        sqlx::query_as(r#"SELECT cbu_id FROM "ob-poc".cbus WHERE name = $1"#)
+            .bind(&fund_name)
+            .fetch_optional(pool)
+            .await?;
+
+    let (cbu_id, cbu_created) = if let Some((id,)) = existing_cbu {
+        (id, false)
+    } else {
+        // Create new CBU
+        let id = Uuid::new_v4();
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".cbus (cbu_id, name, jurisdiction, client_type)
+            VALUES ($1, $2, $3, 'fund')
+            "#,
+        )
+        .bind(id)
+        .bind(&fund_name)
+        .bind(&jurisdiction)
+        .execute(pool)
+        .await?;
+        println!("  Created CBU: {}", fund_name);
+        (id, true)
+    };
+
+    let mut roles_assigned = 0;
+
+    // Get or create ASSET_OWNER role
+    let asset_owner_role_id = get_or_create_role(pool, "ASSET_OWNER").await?;
+
+    // Assign ASSET_OWNER role (fund owns itself)
+    if assign_role_if_not_exists(pool, cbu_id, fund_entity_id, asset_owner_role_id).await? {
+        roles_assigned += 1;
+    }
+
+    // Assign INVESTMENT_MANAGER role if we have a manager
+    if let Some(manager_id) = manager_entity_id {
+        let im_role_id = get_or_create_role(pool, "INVESTMENT_MANAGER").await?;
+        if assign_role_if_not_exists(pool, cbu_id, manager_id, im_role_id).await? {
+            roles_assigned += 1;
+        }
+    }
+
+    Ok((cbu_created, roles_assigned))
+}
+
+/// Get or create a role by name
+async fn get_or_create_role(pool: &PgPool, role_name: &str) -> Result<Uuid> {
+    let existing: Option<(Uuid,)> =
+        sqlx::query_as(r#"SELECT role_id FROM "ob-poc".roles WHERE name = $1"#)
+            .bind(role_name)
+            .fetch_optional(pool)
+            .await?;
+
+    if let Some((id,)) = existing {
+        return Ok(id);
+    }
+
+    let id = Uuid::new_v4();
+    sqlx::query(r#"INSERT INTO "ob-poc".roles (role_id, name) VALUES ($1, $2)"#)
+        .bind(id)
+        .bind(role_name)
+        .execute(pool)
+        .await?;
+    Ok(id)
+}
+
+/// Assign role if it doesn't already exist, returns true if created
+async fn assign_role_if_not_exists(
+    pool: &PgPool,
+    cbu_id: Uuid,
+    entity_id: Uuid,
+    role_id: Uuid,
+) -> Result<bool> {
+    let exists: bool = sqlx::query_scalar(
+        r#"
+        SELECT EXISTS(
+            SELECT 1 FROM "ob-poc".cbu_entity_roles
+            WHERE cbu_id = $1 AND entity_id = $2 AND role_id = $3
+        )
+        "#,
+    )
+    .bind(cbu_id)
+    .bind(entity_id)
+    .bind(role_id)
+    .fetch_one(pool)
+    .await?;
+
+    if exists {
+        return Ok(false);
+    }
+
+    sqlx::query(
+        r#"
+        INSERT INTO "ob-poc".cbu_entity_roles (cbu_entity_role_id, cbu_id, entity_id, role_id)
+        VALUES ($1, $2, $3, $4)
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(cbu_id)
+    .bind(entity_id)
+    .bind(role_id)
+    .execute(pool)
+    .await?;
+
+    Ok(true)
+}
+
+// =============================================================================
 // Output Helpers
 // =============================================================================
 
@@ -1128,7 +1491,7 @@ fn print_dry_run_summary(records: &[GleifRecord]) {
     println!("\nRun without --dry-run to actually import.");
 }
 
-fn print_summary(stats: &ImportStats) {
+fn print_summary(stats: &ImportStats, create_cbus: bool) {
     println!("\n===========================================");
     println!("  Import Summary");
     println!("===========================================");
@@ -1136,6 +1499,11 @@ fn print_summary(stats: &ImportStats) {
     println!("Entities upserted:      {}", stats.upserted);
     println!("Parents discovered:     {}", stats.parents_discovered);
     println!("Relationships created:  {}", stats.relationships_created);
-    println!("CBUs linked:            {}", stats.cbus_linked);
+    if create_cbus {
+        println!("CBUs created:           {}", stats.cbus_created);
+        println!("Roles assigned:         {}", stats.roles_assigned);
+    } else {
+        println!("CBUs linked:            {}", stats.cbus_linked);
+    }
     println!("Errors:                 {}", stats.errors);
 }

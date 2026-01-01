@@ -20,12 +20,14 @@
 
 mod access_review_ops;
 pub mod batch_control_ops;
+mod bods_ops;
 mod cbu_ops;
 mod cbu_role_ops;
 mod custody;
 mod document_ops;
 mod entity_ops;
 pub mod entity_query;
+mod gleif_ops;
 pub mod helpers;
 mod kyc_case_ops;
 mod lifecycle_ops;
@@ -159,6 +161,20 @@ pub use access_review_ops::{
     AccessReviewAttestOp, AccessReviewBulkConfirmOp, AccessReviewConfirmCleanOp,
     AccessReviewLaunchOp, AccessReviewPopulateOp, AccessReviewProcessDeadlineOp,
     AccessReviewRevokeOp, AccessReviewSendRemindersOp,
+};
+
+// BODS operations (UBO discovery via GLEIF + BODS)
+pub use bods_ops::{
+    BodsDiscoverUbosOp, BodsFindByLeiOp, BodsGetStatementOp, BodsImportOp, BodsListOwnershipOp,
+    BodsSyncFromGleifOp,
+};
+
+// GLEIF operations (LEI data enrichment)
+pub use gleif_ops::{
+    GleifEnrichOp, GleifGetChildrenOp, GleifGetManagedFundsOp, GleifGetManagerOp,
+    GleifGetMasterFundOp, GleifGetParentOp, GleifGetRecordOp, GleifGetUmbrellaOp,
+    GleifImportManagedFundsOp, GleifImportTreeOp, GleifLookupByIsinOp, GleifRefreshOp,
+    GleifResolveSuccessorOp, GleifSearchOp, GleifTraceOwnershipOp,
 };
 
 #[cfg(feature = "database")]
@@ -418,6 +434,32 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(TemporalEntityHistoryOp));
         registry.register(Arc::new(TemporalCompareOwnershipOp));
 
+        // GLEIF operations (LEI data enrichment from GLEIF API)
+        registry.register(Arc::new(GleifEnrichOp));
+        registry.register(Arc::new(GleifSearchOp));
+        registry.register(Arc::new(GleifImportTreeOp));
+        registry.register(Arc::new(GleifImportManagedFundsOp));
+        registry.register(Arc::new(GleifRefreshOp));
+        registry.register(Arc::new(GleifGetRecordOp));
+        registry.register(Arc::new(GleifGetParentOp));
+        registry.register(Arc::new(GleifGetChildrenOp));
+        registry.register(Arc::new(GleifTraceOwnershipOp));
+        registry.register(Arc::new(GleifGetManagedFundsOp));
+        registry.register(Arc::new(GleifResolveSuccessorOp));
+        // Lean GLEIF fund structure relationship verbs
+        registry.register(Arc::new(GleifGetUmbrellaOp));
+        registry.register(Arc::new(GleifGetManagerOp));
+        registry.register(Arc::new(GleifGetMasterFundOp));
+        registry.register(Arc::new(GleifLookupByIsinOp));
+
+        // BODS operations (UBO discovery via GLEIF + BODS)
+        registry.register(Arc::new(BodsDiscoverUbosOp));
+        registry.register(Arc::new(BodsImportOp));
+        registry.register(Arc::new(BodsGetStatementOp));
+        registry.register(Arc::new(BodsFindByLeiOp));
+        registry.register(Arc::new(BodsListOwnershipOp));
+        registry.register(Arc::new(BodsSyncFromGleifOp));
+
         registry
     }
 
@@ -551,6 +593,24 @@ mod tests {
         assert!(registry.has("temporal", "relationship-history"));
         assert!(registry.has("temporal", "entity-history"));
         assert!(registry.has("temporal", "compare-ownership"));
+        // GLEIF operations (LEI data enrichment)
+        assert!(registry.has("gleif", "enrich"));
+        assert!(registry.has("gleif", "search"));
+        assert!(registry.has("gleif", "import-tree"));
+        assert!(registry.has("gleif", "refresh"));
+        assert!(registry.has("gleif", "get-record"));
+        assert!(registry.has("gleif", "get-parent"));
+        assert!(registry.has("gleif", "get-children"));
+        assert!(registry.has("gleif", "trace-ownership"));
+        assert!(registry.has("gleif", "get-managed-funds"));
+        assert!(registry.has("gleif", "resolve-successor"));
+        // BODS operations (UBO discovery)
+        assert!(registry.has("bods", "discover-ubos"));
+        assert!(registry.has("bods", "import"));
+        assert!(registry.has("bods", "get-statement"));
+        assert!(registry.has("bods", "find-by-lei"));
+        assert!(registry.has("bods", "list-ownership"));
+        assert!(registry.has("bods", "sync-from-gleif"));
     }
 
     #[test]
