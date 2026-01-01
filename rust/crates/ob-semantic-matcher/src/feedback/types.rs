@@ -1,0 +1,153 @@
+//! Intent feedback types for ML continuous learning
+
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+/// Source of user input
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InputSource {
+    Chat,
+    Voice,
+    Command,
+}
+
+impl InputSource {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            InputSource::Chat => "chat",
+            InputSource::Voice => "voice",
+            InputSource::Command => "command",
+        }
+    }
+}
+
+/// Match confidence level
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MatchConfidence {
+    High,
+    Medium,
+    Low,
+    None,
+}
+
+impl MatchConfidence {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            MatchConfidence::High => "high",
+            MatchConfidence::Medium => "medium",
+            MatchConfidence::Low => "low",
+            MatchConfidence::None => "none",
+        }
+    }
+
+    pub fn from_score(score: f32) -> Self {
+        if score >= 0.85 {
+            MatchConfidence::High
+        } else if score >= 0.7 {
+            MatchConfidence::Medium
+        } else if score >= 0.5 {
+            MatchConfidence::Low
+        } else {
+            MatchConfidence::None
+        }
+    }
+}
+
+/// Outcome of an intent match
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Outcome {
+    /// User executed the matched verb
+    Executed,
+    /// User selected an alternative from the suggestions
+    SelectedAlt,
+    /// User explicitly corrected ("no, I meant X")
+    Corrected,
+    /// User immediately rephrased their input
+    Rephrased,
+    /// User abandoned (changed topic, session ended)
+    Abandoned,
+}
+
+impl Outcome {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Outcome::Executed => "executed",
+            Outcome::SelectedAlt => "selected_alt",
+            Outcome::Corrected => "corrected",
+            Outcome::Rephrased => "rephrased",
+            Outcome::Abandoned => "abandoned",
+        }
+    }
+}
+
+/// Alternative verb suggestion
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Alternative {
+    pub verb: String,
+    pub score: f32,
+}
+
+/// Intent feedback record for capture
+#[derive(Debug, Clone)]
+pub struct IntentFeedback {
+    pub session_id: Uuid,
+    pub interaction_id: Uuid,
+    pub user_input: String,
+    pub user_input_hash: String,
+    pub input_source: InputSource,
+    pub matched_verb: Option<String>,
+    pub match_score: Option<f32>,
+    pub match_confidence: Option<MatchConfidence>,
+    pub semantic_score: Option<f32>,
+    pub phonetic_score: Option<f32>,
+    pub alternatives: Vec<Alternative>,
+    pub graph_context: Option<String>,
+    pub workflow_phase: Option<String>,
+}
+
+/// Outcome update for an existing feedback record
+#[derive(Debug, Clone)]
+pub struct OutcomeUpdate {
+    pub interaction_id: Uuid,
+    pub outcome: Outcome,
+    pub outcome_verb: Option<String>,
+    pub correction_input: Option<String>,
+    pub time_to_outcome_ms: Option<i32>,
+}
+
+/// Analysis result types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum AnalysisResult {
+    /// New pattern discovered from successful executions
+    PatternDiscovery {
+        user_input: String,
+        verb: String,
+        occurrence_count: i64,
+        avg_score: f32,
+    },
+    /// Confusion between two verbs
+    ConfusionPair {
+        matched_verb: String,
+        actual_verb: String,
+        confusion_count: i64,
+        example_inputs: Vec<String>,
+    },
+    /// Input with no good match (potential new verb or pattern)
+    Gap {
+        user_input: String,
+        occurrence_count: i64,
+        best_match: Option<String>,
+        best_score: Option<f32>,
+    },
+    /// Low score match that was actually correct
+    LowScoreSuccess {
+        user_input: String,
+        verb: String,
+        avg_score: f32,
+        occurrence_count: i64,
+    },
+}

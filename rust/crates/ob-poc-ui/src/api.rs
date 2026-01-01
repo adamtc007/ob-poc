@@ -3,7 +3,7 @@
 //! All API calls are async and return Results.
 //! Results are stored in AsyncState by the caller, then processed in update().
 
-use ob_poc_graph::{CbuGraphData, ViewMode};
+use ob_poc_graph::{CbuGraphData, TradingMatrix, ViewMode};
 use ob_poc_types::{
     CbuSummary, ChatRequest, ChatResponse, CommitResolutionResponse, ConfirmAllRequest,
     ConfirmResolutionRequest, CreateSessionRequest, CreateSessionResponse, ExecuteRequest,
@@ -239,6 +239,58 @@ pub async fn get_cbu_graph(cbu_id: Uuid, view_mode: ViewMode) -> Result<CbuGraph
     // Use shared CbuGraphResponse type, then convert to CbuGraphData
     let response: ob_poc_types::CbuGraphResponse = get(&url).await?;
     Ok(response.into())
+}
+
+/// Get trading matrix (hierarchical custody configuration) for a CBU
+pub async fn get_trading_matrix(cbu_id: Uuid) -> Result<TradingMatrix, String> {
+    use ob_poc_graph::{
+        TradingMatrixMetadata, TradingMatrixNode, TradingMatrixNodeId, TradingMatrixNodeType,
+    };
+
+    // The API returns a flat response that we convert to TradingMatrix
+    let response: TradingMatrixApiResponse =
+        get(&format!("/api/cbu/{}/trading-matrix", cbu_id)).await?;
+
+    // Build the root node
+    let root_id = TradingMatrixNodeId::root();
+    let mut root = TradingMatrixNode {
+        id: root_id,
+        node_type: TradingMatrixNodeType::Cbu {
+            cbu_id: response.cbu_id.clone(),
+            cbu_name: response.cbu_name.clone(),
+        },
+        label: response.cbu_name.clone(),
+        sublabel: None,
+        children: response.children,
+        leaf_count: response.total_leaf_count,
+        status_color: None,
+        is_loaded: true,
+    };
+
+    // Recompute leaf counts
+    root.compute_leaf_counts();
+
+    let mut matrix = TradingMatrix {
+        root,
+        metadata: TradingMatrixMetadata {
+            cbu_id: response.cbu_id,
+            cbu_name: response.cbu_name,
+            ..Default::default()
+        },
+    };
+
+    matrix.recompute_counts();
+    Ok(matrix)
+}
+
+/// API response wrapper for trading matrix
+#[derive(Clone, Debug, serde::Deserialize)]
+struct TradingMatrixApiResponse {
+    pub cbu_id: String,
+    pub cbu_name: String,
+    pub children: Vec<ob_poc_graph::TradingMatrixNode>,
+    #[allow(dead_code)]
+    pub total_leaf_count: usize,
 }
 
 // =============================================================================

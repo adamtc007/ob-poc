@@ -8,6 +8,9 @@ pub mod graph;
 pub use graph::{
     entity_matches_type,
     get_entities_for_type,
+    // Trading Matrix (hierarchical custody config browser)
+    render_node_detail_panel,
+    render_trading_matrix_browser,
     render_type_browser,
     // Astronomy view (universe/solar system transitions)
     AstronomyView,
@@ -33,6 +36,13 @@ pub use graph::{
     SpringF32,
     SpringVec2,
     TaxonomyState,
+    TradingMatrix,
+    TradingMatrixAction,
+    TradingMatrixMetadata,
+    TradingMatrixNode,
+    TradingMatrixNodeId,
+    TradingMatrixNodeType,
+    TradingMatrixState,
     TransitionAction,
     TypeBrowserAction,
     TypeNode,

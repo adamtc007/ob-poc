@@ -7146,6 +7146,460 @@ match self.resolve_all(intents).await {
 
 **Key insight:** The Gateway's fuzzy matching handles typos and natural language variations. "fund admin" → "FUND_ACCOUNTING" for free.
 
+## Voice Recognition & Semantic Matching
+
+The system includes voice command support with Deepgram speech-to-text and semantic matching for natural language navigation.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   Browser (Voice Input)                          │
+│  Deepgram WebSocket ──► Transcript ──► CustomEvent              │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   VoiceBridge (WASM)                             │
+│  rust/crates/ob-poc-ui/src/voice_bridge.rs                      │
+│  Listens for voice-command events, queues for egui              │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   /api/voice/match                               │
+│  rust/crates/ob-poc-web/src/routes/voice.rs                     │
+│  SemanticMatcher → MatchResult + interaction_id                 │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+        Exact Match    Semantic (ML)    Phonetic
+        (priority 1)   (priority 2)    (priority 3)
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   Feedback Capture (ML Learning)                 │
+│  /api/voice/outcome → Pattern analysis → Model improvement      │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Deepgram Integration
+
+Voice transcription uses Deepgram's WebSocket streaming API for real-time speech-to-text:
+
+| Feature | Implementation |
+|---------|----------------|
+| Provider | Deepgram Nova-2 model |
+| Mode | WebSocket streaming |
+| Languages | English (primary) |
+| Confidence | 0.0-1.0 score per transcript |
+| Events | `voice-command`, `voice-transcript` CustomEvents |
+
+**JavaScript VoiceService** dispatches events that the WASM VoiceBridge receives:
+
+```javascript
+// voice-command: Matched navigation command
+document.dispatchEvent(new CustomEvent('voice-command', {
+  detail: { command: 'ZoomIn', transcript: 'zoom in', confidence: 0.95, provider: 'deepgram' }
+}));
+
+// voice-transcript: Raw transcript for chat input
+document.dispatchEvent(new CustomEvent('voice-transcript', {
+  detail: { transcript: 'add john as director', confidence: 0.92 }
+}));
+```
+
+### Semantic Matcher (ob-semantic-matcher crate)
+
+The semantic matcher combines multiple matching strategies:
+
+```
+rust/crates/ob-semantic-matcher/
+├── lib.rs              # Module exports
+├── embedder.rs         # Candle ML sentence embeddings (all-MiniLM-L6-v2)
+├── matcher.rs          # SemanticMatcher - main entry point
+├── phonetic.rs         # Double Metaphone fallback
+├── types.rs            # MatchResult, VerbPattern, etc.
+└── feedback/           # ML learning loop
+    ├── types.rs        # Outcome, InputSource enums
+    ├── repository.rs   # Database persistence
+    ├── service.rs      # FeedbackService
+    ├── analysis.rs     # Pattern analysis
+    └── learner.rs      # Continuous learning
+```
+
+**Matching Pipeline:**
+
+| Stage | Method | Threshold | Description |
+|-------|--------|-----------|-------------|
+| 1 | Exact | 1.0 | Direct phrase match |
+| 2 | Semantic | >0.85 | Sentence embedding similarity (pgvector) |
+| 3 | Phonetic | >0.7 | Double Metaphone for misheard words |
+
+**Key Types:**
+
+```rust
+pub struct MatchResult {
+    pub verb_name: String,        // e.g., "ui.zoom-in", "ubo.list-owners"
+    pub pattern_phrase: String,   // The pattern that matched
+    pub similarity: f32,          // 0.0-1.0 confidence
+    pub match_method: MatchMethod,// Exact, Semantic, Phonetic, Cached
+    pub category: String,         // navigation, investigation
+    pub is_agent_bound: bool,     // Requires agent processing
+}
+
+pub enum VoiceMatchAction {
+    ExecuteNavigation,  // Execute locally (zoom, pan, select)
+    SendToAgent,        // Send to agent for DSL generation
+    Clarify,            // Low confidence, ask user
+    None,               // Unrecognized
+}
+```
+
+### Voice API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/voice/match` | POST | Match transcript, returns `interaction_id` |
+| `/api/voice/outcome` | POST | Record what user did (for ML feedback) |
+| `/api/voice/match/batch` | POST | Batch match multiple transcripts |
+| `/api/voice/health` | GET | Service health check |
+
+### Feedback Learning Loop
+
+The system captures user outcomes to continuously improve matching:
+
+```
+1. User says "zoom in on this"
+2. /api/voice/match returns { verb: "ui.zoom-in", interaction_id: "..." }
+3. User executes (or corrects, or abandons)
+4. /api/voice/outcome records { interaction_id, outcome: "executed" }
+5. Batch analysis discovers patterns
+6. Model embeddings updated for new phrases
+```
+
+**Outcome Types:**
+
+| Outcome | Meaning |
+|---------|---------|
+| `executed` | User executed the matched command |
+| `selected_alt` | User selected an alternative match |
+| `corrected` | User manually entered correct command |
+| `rephrased` | User spoke again with different phrasing |
+| `abandoned` | User gave up |
+
+### VoiceBridge (WASM)
+
+The `voice_bridge.rs` module connects JavaScript voice events to the egui application:
+
+```rust
+// Install listener on app init
+voice_bridge::install_voice_listener()?;
+
+// In update() loop, process pending commands
+for cmd in voice_bridge::take_pending_voice_commands() {
+    match cmd.command.as_str() {
+        "ZoomIn" => self.camera.zoom_in(),
+        "SendChat" => self.send_chat_message(&cmd.transcript),
+        _ => { /* handle other commands */ }
+    }
+}
+
+// Dispatch context updates to JavaScript
+voice_bridge::dispatch_context_update(
+    Some("entity-uuid"),
+    Some("cbu-uuid"),
+    "KYC_UBO"
+);
+```
+
+## GLEIF/BODS Entity Enrichment
+
+The system integrates with GLEIF (Global LEI Foundation) and BODS (Beneficial Ownership Data Standard) for corporate structure and UBO discovery.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   Entity with LEI                                │
+│  entity_limited_companies.lei = "549300..."                     │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              GLEIF API (Level 1 + Level 2)                       │
+│  https://api.gleif.org/api/v1/lei-records/{lei}                 │
+│  - Entity data, legal form, addresses                           │
+│  - Direct/ultimate parent relationships                          │
+│  - Reporting exceptions (public float, no known person)         │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┴───────────────┐
+              ▼                               ▼
+┌─────────────────────────┐     ┌─────────────────────────┐
+│  Corporate Tree         │     │  Reporting Exception    │
+│  (parent chain)         │     │  NO_KNOWN_PERSON →      │
+│                         │     │  Query BODS for UBOs    │
+└─────────────────────────┘     └─────────────────────────┘
+                                              │
+                                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              BODS API (Beneficial Ownership)                     │
+│  Person statements with ownership/control details               │
+│  → entity_ubos table                                            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### GLEIF Module Structure
+
+```
+rust/src/gleif/
+├── mod.rs              # Module exports
+├── types.rs            # GLEIF API response types (LeiRecord, Entity, etc.)
+├── client.rs           # HTTP client for GLEIF API
+├── repository.rs       # Database operations
+└── enrichment.rs       # GleifEnrichmentService orchestration
+```
+
+### GLEIF Database Schema
+
+**Enhanced columns in `entity_limited_companies`:**
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `lei` | VARCHAR(20) | Legal Entity Identifier |
+| `gleif_entity_status` | VARCHAR(20) | ACTIVE, INACTIVE |
+| `gleif_legal_form_id` | VARCHAR(10) | ELF code (e.g., UDY2 = Societas Europaea) |
+| `gleif_legal_form_name` | VARCHAR(200) | Legal form description |
+| `gleif_jurisdiction` | VARCHAR(10) | ISO country code |
+| `gleif_category` | VARCHAR(20) | FUND, GENERAL, BRANCH |
+| `direct_parent_lei` | VARCHAR(20) | FK to parent entity |
+| `ultimate_parent_lei` | VARCHAR(20) | FK to top-level parent |
+| `direct_parent_exception` | VARCHAR(50) | NO_KNOWN_PERSON, NON_CONSOLIDATING, etc. |
+| `ultimate_parent_exception` | VARCHAR(50) | Reporting exception code |
+
+**Supporting tables:**
+
+| Table | Purpose |
+|-------|---------|
+| `gleif_lifecycle_events` | Entity lifecycle events (initial registration, renewals) |
+| `gleif_parent_relationships` | Direct/ultimate parent chain with percentages |
+| `gleif_sync_log` | Enrichment audit trail |
+
+### BODS Module Structure
+
+```
+rust/src/bods/
+├── mod.rs              # Module exports
+├── types.rs            # BODS API types + discovery result types
+├── repository.rs       # Database operations
+└── ubo_discovery.rs    # UboDiscoveryService
+```
+
+### BODS Database Schema
+
+| Table | Purpose |
+|-------|---------|
+| `bods_entity_statements` | BODS entity records |
+| `bods_person_statements` | BODS person records (natural persons) |
+| `bods_ownership_statements` | Ownership/control relationships |
+| `entity_bods_links` | Links ob-poc entities to BODS statements |
+| `entity_ubos` | Discovered UBOs for entities |
+
+### UBO Discovery Flow
+
+```rust
+pub struct UboDiscoveryService {
+    gleif_client: GleifClient,
+    bods_client: BodsClient,
+    repository: BodsRepository,
+}
+
+impl UboDiscoveryService {
+    /// Main discovery flow
+    pub async fn discover_ubos(&self, entity_id: Uuid, lei: &str) -> Result<UboDiscoveryResult> {
+        // 1. Check GLEIF for reporting exceptions
+        let gleif_data = self.gleif_client.get_lei_record(lei).await?;
+        
+        // 2. If NO_KNOWN_PERSON or NATURAL_PERSONS exception, query BODS
+        if has_ubo_exception(&gleif_data) {
+            let bods_persons = self.query_bods_for_ubos(lei).await?;
+            // 3. Store discovered UBOs
+            self.save_discovery_result(entity_id, &bods_persons).await?;
+        }
+        
+        // 4. Return discovery result with chain links
+        Ok(UboDiscoveryResult { ... })
+    }
+}
+```
+
+### GLEIF/BODS DSL Verbs
+
+| Verb | Description |
+|------|-------------|
+| `gleif.enrich` | Enrich entity with GLEIF data by LEI |
+| `gleif.import-tree` | Import full corporate tree from LEI |
+| `gleif.refresh` | Refresh GLEIF data for entity |
+| `bods.discover-ubos` | Discover UBOs via BODS for entity |
+| `bods.import-ownership` | Import ownership statements from BODS |
+| `bods.refresh` | Refresh BODS data for entity |
+
+### Reporting Exceptions
+
+GLEIF defines exceptions when parent information is unavailable:
+
+| Exception | Meaning | Action |
+|-----------|---------|--------|
+| `NO_KNOWN_PERSON` | Public company (no single controller) | Query BODS for board/control persons |
+| `NATURAL_PERSONS` | Owned by natural persons | Query BODS for person statements |
+| `NON_CONSOLIDATING` | Parent doesn't consolidate | Follow alternate ownership chain |
+| `NON_PUBLIC` | Confidential for legal reasons | Flag for manual review |
+
+## Teams & Access Management
+
+The `teams` schema implements role-based access control with delegated authority patterns.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   Delegating Entity                              │
+│  (ManCo, IM, Fund Sponsor - the legal entity granting access)  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                         Team                                     │
+│  team_type: fund-ops, manco-oversight, im-trading, etc.        │
+│  access_mode: explicit, by-manco, by-im, by-filter              │
+│  authority_type: operational, oversight, trading, governance    │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┴───────────────┐
+              ▼                               ▼
+┌─────────────────────────┐     ┌─────────────────────────┐
+│      Memberships        │     │    CBU Access           │
+│  role_key composite:    │     │  Resolved via mode:     │
+│  {team}.{function}:lvl  │     │  explicit, by-manco,    │
+│                         │     │  by-im, by-filter       │
+└─────────────────────────┘     └─────────────────────────┘
+```
+
+### Team Types
+
+| Type | Description | Typical Functions |
+|------|-------------|-------------------|
+| `fund-ops` | Fund operations team | settlement, cash-management, reconciliation |
+| `manco-oversight` | ManCo oversight | compliance, board, conducting, risk |
+| `im-trading` | Investment manager trading | portfolio, dealing, middle-office |
+| `spv-admin` | SPV administration | trustee, servicer, waterfall |
+| `client-service` | Client relationship | relationship, onboarding, support |
+| `accounting` | Accounting & billing | accounts-payable, billing, contract-admin |
+| `reporting` | Reporting | investor-reporting, regulatory-reporting |
+| `board` | Board of directors | governance |
+| `investment-committee` | Investment committee | investment-decision |
+| `conducting-officers` | Conducting officers | compliance-oversight |
+| `executive` | Executive team | cio, coo, cfo, cro |
+
+### Access Domains
+
+Functions map to access domains that control what data users can see:
+
+| Domain | Description | Visualizer Views |
+|--------|-------------|------------------|
+| `KYC` | KYC, AML, entity management | entity_graph, ubo_graph, document_catalog |
+| `TRADING` | Trading, settlement, positions | trading_matrix, ssi_map, settlement_status |
+| `ACCOUNTING` | Invoicing, contracts, fees | invoice_history, fee_schedule |
+| `REPORTING` | Reports, dashboards | report_catalog, dashboard |
+| `ADMIN` | System administration | all |
+
+### CBU Access Resolution
+
+Teams can access CBUs through different modes:
+
+| Mode | Resolution |
+|------|------------|
+| `explicit` | Listed in `team_cbu_access` table |
+| `by-manco` | CBUs where delegating entity has MANAGEMENT_COMPANY role |
+| `by-im` | CBUs with IM assignment to delegating entity |
+| `by-filter` | Dynamic filter based on `scope_filter` JSONB |
+
+### Team DSL Verbs
+
+| Verb | Description |
+|------|-------------|
+| `team.create` | Create team with delegated authority |
+| `team.archive` | Archive team (soft delete) |
+| `team.add-member` | Add user to team with role |
+| `team.remove-member` | Remove user from team |
+| `team.transfer-member` | Move user between teams atomically |
+| `team.add-cbu-access` | Grant explicit CBU access |
+| `team.grant-service` | Grant service entitlement |
+| `team.list-cbus` | List CBUs accessible to team |
+| `user.offboard` | Offboard user completely |
+| `user.list-cbus` | List CBUs user can access |
+| `user.check-access` | Check if user can access CBU |
+
+### Access Review Automation
+
+The system includes periodic access review with detection, attestation, and enforcement:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              Access Review Campaign                              │
+│  QUARTERLY, ANNUAL, TRIGGERED, JOINER_MOVER_LEAVER              │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              Auto-Detection Flags                                │
+│  - flag_no_legal_link: No legal appointment linked              │
+│  - flag_legal_expired: Legal appointment expired                │
+│  - flag_dormant_account: No login in 90+ days                   │
+│  - flag_never_logged_in: Account never used                     │
+│  - flag_role_mismatch: Role doesn't match legal position        │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┴───────────────┐
+              ▼                               ▼
+┌─────────────────────────┐     ┌─────────────────────────┐
+│   Reviewer Workflow     │     │   Attestation           │
+│   CONFIRM, REVOKE,      │     │   Digital signature     │
+│   EXTEND, ESCALATE      │     │   Audit trail           │
+└─────────────────────────┘     └─────────────────────────┘
+```
+
+### Access Review DSL Verbs
+
+| Verb | Description |
+|------|-------------|
+| `access-review.create-campaign` | Create review campaign |
+| `access-review.populate-campaign` | Populate with review items |
+| `access-review.launch-campaign` | Set campaign to ACTIVE |
+| `access-review.confirm-item` | Confirm access for item |
+| `access-review.revoke-access` | Revoke access (ends membership) |
+| `access-review.extend-item` | Extend access with new expiry |
+| `access-review.escalate-item` | Escalate to higher authority |
+| `access-review.bulk-confirm` | Confirm multiple items |
+| `access-review.attest` | Create formal attestation |
+| `access-review.my-pending` | Get current user's pending items |
+| `access-review.campaign-status` | Get campaign statistics |
+
+### Governance Access
+
+For governance teams (board, investment-committee, conducting-officers, executive), memberships can link to legal appointments:
+
+```sql
+-- Membership with legal appointment link
+INSERT INTO teams.memberships (team_id, user_id, role_key, legal_appointment_id)
+VALUES (@board_team, @user, 'board.board-secretary:lead', @cbu_entity_role_id);
+
+-- View shows warning if requires_legal_appointment but no link
+SELECT * FROM teams.v_governance_access WHERE missing_legal_appointment = TRUE;
+```
+
 ## Client Portal Architecture
 
 The system supports two portal modes using the same backend infrastructure:

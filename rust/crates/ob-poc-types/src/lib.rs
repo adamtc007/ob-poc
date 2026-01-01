@@ -190,6 +190,9 @@ pub enum ChatStreamEvent {
 /// Commands the agent can issue to the UI
 /// This is the canonical vocabulary for agent → UI communication.
 /// The LLM maps natural language ("run it", "undo that") to these commands.
+///
+/// Design: Blade Runner Esper-style - natural language voice commands for
+/// graph navigation: "enhance", "track 45 right", "stop", "give me a hard copy"
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case")]
 pub enum AgentCommand {
@@ -208,9 +211,9 @@ pub enum AgentCommand {
     DeleteLast,
 
     // =========================================================================
-    // Navigation Commands
+    // CBU & Entity Navigation
     // =========================================================================
-    /// Show a specific CBU in the graph ("show me X fund")
+    /// Show a specific CBU in the graph ("show me X fund", "load allianz")
     ShowCbu { cbu_id: String },
     /// Highlight an entity in the graph
     HighlightEntity { entity_id: String },
@@ -218,6 +221,82 @@ pub enum AgentCommand {
     NavigateDsl { line: u32 },
     /// Focus an AST node
     FocusAst { node_id: String },
+    /// Focus on a specific entity ("center on john smith", "zoom to that director")
+    FocusEntity {
+        /// Entity ID or search term
+        entity_id: String,
+    },
+    /// Select an entity for details ("select that", "tell me about this one")
+    SelectEntity { entity_id: String },
+    /// Clear entity selection ("deselect", "clear selection", "never mind")
+    ClearSelection,
+
+    // =========================================================================
+    // View Mode Commands
+    // =========================================================================
+    /// Set the view mode ("show kyc view", "switch to custody", "trading matrix")
+    SetViewMode {
+        /// View mode: "KYC_UBO", "SERVICE_DELIVERY", "CUSTODY", "TRADING_MATRIX"
+        view_mode: String,
+    },
+
+    // =========================================================================
+    // Zoom Commands (Esper-style)
+    // =========================================================================
+    /// Zoom in ("enhance", "zoom in", "closer", "magnify")
+    ZoomIn {
+        /// Optional zoom factor (1.0 = 100% = no change, 2.0 = 2x zoom)
+        #[serde(default)]
+        factor: Option<f32>,
+    },
+    /// Zoom out ("pull back", "zoom out", "wider")
+    ZoomOut {
+        /// Optional zoom factor
+        #[serde(default)]
+        factor: Option<f32>,
+    },
+    /// Fit entire graph to screen ("fit to screen", "show all", "bird's eye")
+    ZoomFit,
+    /// Zoom to specific level ("zoom to 50%", "set zoom 200%")
+    ZoomTo {
+        /// Zoom level as percentage (100 = 100%)
+        level: f32,
+    },
+
+    // =========================================================================
+    // Pan Commands (Esper-style)
+    // =========================================================================
+    /// Pan in a direction ("track left", "pan right", "move up")
+    Pan {
+        direction: PanDirection,
+        /// Optional amount in pixels or relative units
+        #[serde(default)]
+        amount: Option<f32>,
+    },
+    /// Center view on current selection or graph center ("center", "home")
+    Center,
+    /// Stop all animation/movement ("stop", "hold", "freeze", "that's good")
+    Stop,
+
+    // =========================================================================
+    // Hierarchy Navigation
+    // =========================================================================
+    /// Drill down into selected node ("drill down", "go deeper", "expand")
+    DrillDown {
+        /// Optional node to drill into (defaults to selected)
+        #[serde(default)]
+        node_key: Option<String>,
+    },
+    /// Drill up to parent level ("drill up", "go up", "collapse")
+    DrillUp,
+    /// Expand all nodes ("expand all", "show everything")
+    ExpandAll,
+    /// Collapse all nodes ("collapse all", "close all")
+    CollapseAll,
+    /// Expand specific node ("expand allianz", "open that")
+    ExpandNode { node_key: String },
+    /// Collapse specific node ("collapse that", "close allianz")
+    CollapseNode { node_key: String },
 
     // =========================================================================
     // Graph Filtering Commands
@@ -234,11 +313,220 @@ pub enum AgentCommand {
     },
     /// Clear all graph filters and highlights
     ClearFilter,
-    /// Set the view mode ("show kyc view", "switch to custody")
-    SetViewMode {
-        /// View mode: "KYC_UBO", "SERVICE_DELIVERY", "CUSTODY"
-        view_mode: String,
+    /// Show/hide a specific layer ("show ubo layer", "hide services")
+    SetLayerVisibility { layer: String, visible: bool },
+
+    // =========================================================================
+    // Export Commands ("Give me a hard copy")
+    // =========================================================================
+    /// Export current view ("give me a hard copy", "print", "screenshot")
+    Export {
+        /// Format: "png", "svg", "pdf"
+        #[serde(default)]
+        format: Option<String>,
     },
+
+    // =========================================================================
+    // Animation & Playback
+    // =========================================================================
+    /// Play animation sequence ("animate", "show me the flow")
+    PlayAnimation {
+        #[serde(default)]
+        animation_type: Option<String>,
+    },
+    /// Pause animation ("pause", "wait")
+    PauseAnimation,
+    /// Resume animation ("continue", "resume", "keep going")
+    ResumeAnimation,
+
+    // =========================================================================
+    // Layout Commands
+    // =========================================================================
+    /// Reset layout to default ("reset layout", "auto arrange")
+    ResetLayout,
+    /// Toggle layout orientation ("flip", "rotate layout")
+    ToggleOrientation,
+
+    // =========================================================================
+    // Search Commands
+    // =========================================================================
+    /// Search within graph ("find john", "search for director")
+    Search { query: String },
+    /// Clear search results
+    ClearSearch,
+
+    // =========================================================================
+    // Comparison Commands
+    // =========================================================================
+    /// Compare with another CBU or snapshot ("compare with", "diff")
+    Compare {
+        /// ID or name of entity to compare with
+        target: String,
+    },
+    /// Exit comparison mode
+    ExitCompare,
+
+    // =========================================================================
+    // Scale Navigation (Astronomical metaphor for client book depth)
+    // =========================================================================
+    /// Show full universe/client book ("show universe", "full book", "god view")
+    ScaleUniverse,
+    /// Show galaxy/segment view ("hedge fund galaxy", "segment view")
+    ScaleGalaxy {
+        /// Optional segment filter (e.g., "hedge_fund", "pension")
+        #[serde(default)]
+        segment: Option<String>,
+    },
+    /// Show solar system/CBU view ("enter system", "cbu with satellites")
+    ScaleSystem {
+        /// Optional CBU ID to focus on
+        #[serde(default)]
+        cbu_id: Option<String>,
+    },
+    /// Land on planet/single entity ("land on", "focus entity")
+    ScalePlanet {
+        /// Entity ID to focus on
+        #[serde(default)]
+        entity_id: Option<String>,
+    },
+    /// Surface scan/entity details ("surface scan", "show attributes")
+    ScaleSurface,
+    /// Core sample/derived data ("core sample", "show hidden", "indirect ownership")
+    ScaleCore,
+
+    // =========================================================================
+    // Depth Navigation (Z-axis through entity structures)
+    // =========================================================================
+    /// Drill all the way through to natural persons ("drill through", "find the humans")
+    DrillThrough,
+    /// Return to surface/top level ("surface", "come up", "back to top")
+    SurfaceReturn,
+    /// X-ray/transparent view showing all layers ("x-ray", "skeleton view")
+    XRay,
+    /// Peel one layer at a time ("peel", "next layer")
+    Peel,
+    /// Horizontal slice at current depth ("cross section", "peers at this level")
+    CrossSection,
+    /// Show depth indicator ("how deep", "what level")
+    DepthIndicator,
+
+    // =========================================================================
+    // Orbital Navigation (Rotating around entities)
+    // =========================================================================
+    /// Orbit around entity showing all connections ("orbit", "360 view")
+    Orbit {
+        /// Entity ID to orbit around
+        #[serde(default)]
+        entity_id: Option<String>,
+    },
+    /// Rotate to different relationship layer ("rotate to ownership", "flip to control")
+    RotateLayer {
+        /// Layer to rotate to (e.g., "ownership", "control", "services")
+        layer: String,
+    },
+    /// Flip view direction ("flip", "upstream vs downstream")
+    Flip,
+    /// Tilt view towards dimension ("tilt to time", "angle to services")
+    Tilt {
+        /// Dimension to tilt towards
+        dimension: String,
+    },
+
+    // =========================================================================
+    // Temporal Navigation (4th dimension - time)
+    // =========================================================================
+    /// Rewind to historical state ("rewind to", "as of date", "before restructure")
+    TimeRewind {
+        /// Target date (ISO format or relative like "last_quarter")
+        #[serde(default)]
+        target_date: Option<String>,
+    },
+    /// Play forward through time ("play", "animate changes", "show evolution")
+    TimePlay {
+        /// Start date
+        #[serde(default)]
+        from_date: Option<String>,
+        /// End date
+        #[serde(default)]
+        to_date: Option<String>,
+    },
+    /// Freeze at current time ("freeze time", "lock date")
+    TimeFreeze,
+    /// Compare two time points ("time slice", "before after", "what changed")
+    TimeSlice {
+        /// First time point
+        #[serde(default)]
+        date1: Option<String>,
+        /// Second time point
+        #[serde(default)]
+        date2: Option<String>,
+    },
+    /// Show full timeline/audit trail ("show trail", "history", "chronology")
+    TimeTrail {
+        /// Entity ID for entity-specific trail
+        #[serde(default)]
+        entity_id: Option<String>,
+    },
+
+    // =========================================================================
+    // Investigation Patterns (Compound navigation intentions)
+    // =========================================================================
+    /// Trace money/ownership flow ("follow the money", "trace ownership")
+    FollowTheMoney {
+        /// Starting entity ID
+        #[serde(default)]
+        from_entity: Option<String>,
+    },
+    /// Trace control chain ("who controls", "find puppet master")
+    WhoControls {
+        /// Target entity ID
+        #[serde(default)]
+        entity_id: Option<String>,
+    },
+    /// Illuminate/highlight specific aspect ("illuminate ownership", "highlight risk")
+    Illuminate {
+        /// Aspect to illuminate (e.g., "ownership", "control", "risk", "changes")
+        aspect: String,
+    },
+    /// Show shadow/indirect relationships ("show shadow", "indirect ownership")
+    Shadow,
+    /// Scan for red flags ("red flag scan", "show problems", "anomaly scan")
+    RedFlagScan,
+    /// Show black holes/data gaps ("black hole", "what's missing", "where does it go dark")
+    BlackHole,
+
+    // =========================================================================
+    // Context Intentions (User declares purpose)
+    // =========================================================================
+    /// Set context to board/committee review mode
+    ContextReview,
+    /// Set context to investigation/forensic mode
+    ContextInvestigation,
+    /// Set context to onboarding/intake mode
+    ContextOnboarding,
+    /// Set context to monitoring/pkyc mode
+    ContextMonitoring,
+    /// Set context to remediation/gap-filling mode
+    ContextRemediation,
+
+    // =========================================================================
+    // Help
+    // =========================================================================
+    /// Show help for navigation ("help", "what can I say")
+    ShowHelp {
+        #[serde(default)]
+        topic: Option<String>,
+    },
+}
+
+/// Direction for pan commands
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PanDirection {
+    Left,
+    Right,
+    Up,
+    Down,
 }
 
 // ============================================================================
@@ -1103,6 +1391,46 @@ mod tests {
         let json = serde_json::to_string(&cmd).unwrap();
 
         assert!(json.contains(r#""action":"show_cbu""#));
+    }
+
+    #[test]
+    fn agent_command_esper_zoom() {
+        // "enhance" -> ZoomIn
+        let cmd = AgentCommand::ZoomIn { factor: Some(1.5) };
+        let json = serde_json::to_string(&cmd).unwrap();
+        assert!(json.contains(r#""action":"zoom_in""#));
+        assert!(json.contains(r#""factor":1.5"#));
+    }
+
+    #[test]
+    fn agent_command_esper_pan() {
+        // "track 45 left" -> Pan
+        let cmd = AgentCommand::Pan {
+            direction: PanDirection::Left,
+            amount: Some(45.0),
+        };
+        let json = serde_json::to_string(&cmd).unwrap();
+        assert!(json.contains(r#""action":"pan""#));
+        assert!(json.contains(r#""direction":"left""#));
+    }
+
+    #[test]
+    fn agent_command_esper_stop() {
+        // "stop", "hold", "freeze"
+        let cmd = AgentCommand::Stop;
+        let json = serde_json::to_string(&cmd).unwrap();
+        assert!(json.contains(r#""action":"stop""#));
+    }
+
+    #[test]
+    fn agent_command_hard_copy() {
+        // "give me a hard copy"
+        let cmd = AgentCommand::Export {
+            format: Some("png".into()),
+        };
+        let json = serde_json::to_string(&cmd).unwrap();
+        assert!(json.contains(r#""action":"export""#));
+        assert!(json.contains(r#""format":"png""#));
     }
 
     #[test]

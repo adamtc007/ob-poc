@@ -45,6 +45,7 @@ pub mod layout;
 pub mod lod;
 pub mod ontology;
 pub mod render;
+pub mod trading_matrix;
 pub mod types;
 
 pub use animation::{SpringConfig, SpringF32, SpringVec2};
@@ -59,7 +60,16 @@ pub use ontology::{
     TaxonomyState, TypeBrowserAction, TypeNode,
 };
 pub use render::GraphRenderer;
+pub use trading_matrix::{
+    get_node_type_color, get_node_type_icon, render_node_detail_panel,
+    render_trading_matrix_browser, StatusColor, TradingMatrix, TradingMatrixAction,
+    TradingMatrixMetadata, TradingMatrixNode, TradingMatrixNodeId, TradingMatrixNodeType,
+    TradingMatrixState,
+};
 pub use types::*;
+
+// Re-export PanDirection from ob-poc-types for Esper-style navigation
+pub use ob_poc_types::PanDirection;
 
 /// View mode for the graph visualization
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -427,6 +437,185 @@ impl CbuGraphWidget {
     /// Reset camera to default position
     pub fn reset_camera(&mut self) {
         self.camera.reset();
+    }
+
+    // =========================================================================
+    // ESPER-STYLE NAVIGATION COMMANDS (Blade Runner voice control)
+    // =========================================================================
+
+    /// Zoom in by factor ("enhance", "zoom in", "closer")
+    /// factor: 1.2 = 20% zoom in, 2.0 = 2x zoom
+    pub fn zoom_in(&mut self, factor: Option<f32>) {
+        let factor = factor.unwrap_or(1.3);
+        let current = self.camera.zoom();
+        self.camera.zoom_to(current * factor);
+    }
+
+    /// Zoom out by factor ("zoom out", "pull back", "wider")
+    pub fn zoom_out(&mut self, factor: Option<f32>) {
+        let factor = factor.unwrap_or(1.3);
+        let current = self.camera.zoom();
+        self.camera.zoom_to(current / factor);
+    }
+
+    /// Zoom to fit all content ("zoom fit", "show all", "full view")
+    pub fn zoom_fit(&mut self) {
+        // Note: needs screen_rect, so we set a flag and do it in ui()
+        self.needs_initial_fit = true;
+    }
+
+    /// Zoom to specific level ("zoom to 200%", "set zoom 1.5")
+    pub fn zoom_to_level(&mut self, level: f32) {
+        self.camera.zoom_to(level);
+    }
+
+    /// Pan in direction ("track left", "pan right", "move up")
+    /// amount: pixels to pan (default 100)
+    pub fn pan_direction(&mut self, direction: PanDirection, amount: Option<f32>) {
+        let amount = amount.unwrap_or(100.0);
+        let delta = match direction {
+            PanDirection::Left => egui::Vec2::new(-amount, 0.0),
+            PanDirection::Right => egui::Vec2::new(amount, 0.0),
+            PanDirection::Up => egui::Vec2::new(0.0, -amount),
+            PanDirection::Down => egui::Vec2::new(0.0, amount),
+        };
+        self.camera.pan(delta);
+    }
+
+    /// Center on graph content ("center", "home")
+    pub fn center_view(&mut self) {
+        if let Some(ref graph) = self.layout_graph {
+            self.camera.fly_to(graph.bounds.center());
+        }
+    }
+
+    /// Stop all animation ("stop", "hold", "freeze")
+    pub fn stop_animation(&mut self) {
+        self.camera.snap_to_target();
+    }
+
+    /// Check if camera is animating
+    pub fn is_animating(&self) -> bool {
+        self.camera.is_animating()
+    }
+
+    // =========================================================================
+    // VOICE COMMAND HELPERS (for unified command dispatcher)
+    // =========================================================================
+
+    /// Get currently selected/focused entity ID (for voice command context)
+    pub fn selected_entity_id(&self) -> Option<String> {
+        self.input_state.focused_node.clone()
+    }
+
+    /// Focus on entity by ID and pan camera to it
+    pub fn focus_on_entity(&mut self, entity_id: &str) {
+        self.focus_entity(entity_id);
+    }
+
+    /// Select next entity in graph (cycles through nodes)
+    pub fn select_next_entity(&mut self) {
+        let next_id = {
+            let Some(ref graph) = self.layout_graph else {
+                return;
+            };
+            let node_ids: Vec<&String> = graph.nodes.keys().collect();
+            if node_ids.is_empty() {
+                return;
+            }
+
+            let current_idx = self
+                .input_state
+                .focused_node
+                .as_ref()
+                .and_then(|id| node_ids.iter().position(|n| *n == id));
+
+            let next_idx = match current_idx {
+                Some(idx) => (idx + 1) % node_ids.len(),
+                None => 0,
+            };
+
+            node_ids.get(next_idx).map(|s| (*s).clone())
+        };
+
+        if let Some(id) = next_id {
+            self.focus_node(&id);
+        }
+    }
+
+    /// Select previous entity in graph (cycles through nodes)
+    pub fn select_previous_entity(&mut self) {
+        let prev_id = {
+            let Some(ref graph) = self.layout_graph else {
+                return;
+            };
+            let node_ids: Vec<&String> = graph.nodes.keys().collect();
+            if node_ids.is_empty() {
+                return;
+            }
+
+            let current_idx = self
+                .input_state
+                .focused_node
+                .as_ref()
+                .and_then(|id| node_ids.iter().position(|n| *n == id));
+
+            let prev_idx = match current_idx {
+                Some(idx) if idx > 0 => idx - 1,
+                Some(_) => node_ids.len() - 1,
+                None => 0,
+            };
+
+            node_ids.get(prev_idx).map(|s| (*s).clone())
+        };
+
+        if let Some(id) = prev_id {
+            self.focus_node(&id);
+        }
+    }
+
+    /// Clear current selection/focus
+    pub fn clear_selection(&mut self) {
+        self.input_state.clear_focus();
+    }
+
+    /// Go back in navigation history (placeholder - could track history)
+    pub fn go_back(&mut self) {
+        // For now, just center the view
+        self.center_view();
+    }
+
+    /// Zoom to fit all content (triggers fit on next frame)
+    pub fn zoom_to_fit(&mut self) {
+        self.zoom_fit();
+    }
+
+    /// Set zoom level directly ("zoom to 150%")
+    pub fn set_zoom(&mut self, level: f32) {
+        self.zoom_to_level(level);
+    }
+
+    /// Pan by pixel amount ("pan left 50", "move right")
+    pub fn pan(&mut self, dx: f32, dy: f32) {
+        self.camera.pan(egui::Vec2::new(dx, dy));
+    }
+
+    /// Reset layout to default positions
+    pub fn reset_layout(&mut self) {
+        // Trigger re-layout by clearing and re-setting data
+        self.needs_initial_fit = true;
+        self.center_view();
+    }
+
+    /// Highlight entities of a specific type
+    pub fn highlight_type(&mut self, _type_code: &str) {
+        // TODO: Implement type highlighting
+        // This would set a filter or highlight state on nodes matching the type
+    }
+
+    /// Clear any type highlighting
+    pub fn clear_highlight(&mut self) {
+        // TODO: Clear type highlighting
     }
 
     /// Main UI function

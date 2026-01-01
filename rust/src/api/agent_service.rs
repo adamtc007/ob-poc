@@ -721,6 +721,12 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             return Ok(cmd_response);
         }
 
+        // Check for Esper-style UI navigation commands (enhance, zoom, pan, stop, etc.)
+        if let Some(cmd_response) = self.handle_esper_command(&request.message) {
+            tracing::info!("Handled as Esper navigation command");
+            return Ok(cmd_response);
+        }
+
         // Check for DSL management commands (delete, undo, clear, execute)
         if let Some(cmd_response) = self.handle_dsl_command(session, &request.message).await? {
             tracing::info!("Handled as DSL command");
@@ -1468,6 +1474,924 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             types.retain(|t| seen.insert(t.clone()));
             Some(types)
         }
+    }
+
+    /// Handle Esper-style UI navigation commands (Blade Runner photo analysis style).
+    ///
+    /// Recognized patterns:
+    /// - "enhance" / "zoom in" / "closer" / "magnify" → ZoomIn
+    /// - "pull back" / "zoom out" / "wider" → ZoomOut
+    /// - "fit" / "show all" / "bird's eye" → ZoomFit
+    /// - "track left" / "pan left" / "move left" → Pan(Left)
+    /// - "track right" / "pan right" / "move right" → Pan(Right)
+    /// - "track 45 left" → Pan(Left, 45)
+    /// - "stop" / "hold" / "freeze" / "that's good" → Stop
+    /// - "center" / "home" → Center
+    /// - "drill down" / "go deeper" / "expand" → DrillDown
+    /// - "drill up" / "go up" / "collapse" → DrillUp
+    /// - "expand all" → ExpandAll
+    /// - "collapse all" → CollapseAll
+    /// - "give me a hard copy" / "print" / "screenshot" → Export
+    /// - "reset layout" / "auto arrange" → ResetLayout
+    /// - "help" / "what can I say" → ShowHelp
+    fn handle_esper_command(&self, message: &str) -> Option<AgentChatResponse> {
+        use ob_poc_types::PanDirection;
+
+        let lower_msg = message.to_lowercase().trim().to_string();
+        let words: Vec<&str> = lower_msg.split_whitespace().collect();
+
+        if words.is_empty() {
+            return None;
+        }
+
+        // Helper to build response
+        let make_response = |msg: &str, cmd: AgentCommand| AgentChatResponse {
+            message: msg.to_string(),
+            intents: vec![],
+            validation_results: vec![],
+            session_state: SessionState::New,
+            can_execute: false,
+            dsl_source: None,
+            ast: None,
+            disambiguation: None,
+            commands: Some(vec![cmd]),
+        };
+
+        // =========================================================================
+        // STOP / HOLD / FREEZE (highest priority - Esper classic)
+        // =========================================================================
+        if matches!(
+            words[0],
+            "stop" | "hold" | "freeze" | "pause" | "wait" | "halt"
+        ) || lower_msg == "that's good"
+            || lower_msg == "right there"
+            || lower_msg == "there"
+            || lower_msg == "okay stop"
+        {
+            return Some(make_response("Stopping.", AgentCommand::Stop));
+        }
+
+        // =========================================================================
+        // ZOOM COMMANDS (Esper-style)
+        // =========================================================================
+
+        // "enhance" - the classic Blade Runner command
+        if words[0] == "enhance" {
+            let factor = self.parse_number_after(&words, "enhance");
+            return Some(make_response(
+                "Enhancing...",
+                AgentCommand::ZoomIn { factor },
+            ));
+        }
+
+        // "zoom in" / "zoom" / "closer" / "magnify"
+        if (words[0] == "zoom" && words.get(1) == Some(&"in"))
+            || words[0] == "closer"
+            || words[0] == "magnify"
+            || (words[0] == "move" && words.get(1) == Some(&"in"))
+        {
+            let factor = self.parse_number_from_message(&lower_msg);
+            return Some(make_response(
+                "Zooming in...",
+                AgentCommand::ZoomIn { factor },
+            ));
+        }
+
+        // "zoom out" / "pull back" / "wider"
+        if (words[0] == "zoom" && words.get(1) == Some(&"out"))
+            || (words[0] == "pull" && words.get(1) == Some(&"back"))
+            || words[0] == "wider"
+            || (words[0] == "move" && words.get(1) == Some(&"out"))
+        {
+            let factor = self.parse_number_from_message(&lower_msg);
+            return Some(make_response(
+                "Zooming out...",
+                AgentCommand::ZoomOut { factor },
+            ));
+        }
+
+        // "fit" / "fit to screen" / "show all" / "bird's eye"
+        if words[0] == "fit"
+            || lower_msg.contains("fit to screen")
+            || lower_msg.contains("show all")
+            || lower_msg.contains("bird")
+            || lower_msg.contains("overview")
+            || lower_msg.contains("30000 foot")
+        {
+            return Some(make_response("Fitting to screen.", AgentCommand::ZoomFit));
+        }
+
+        // =========================================================================
+        // PAN COMMANDS (Esper-style: "track 45 left")
+        // =========================================================================
+
+        // "track" / "pan" + direction
+        if matches!(words[0], "track" | "pan" | "move" | "go" | "scroll") {
+            // Parse direction and optional amount
+            // "track 45 left" → direction=Left, amount=45
+            // "track left" → direction=Left, amount=None
+            // "pan right 100" → direction=Right, amount=100
+
+            let (direction, amount) = self.parse_pan_direction_and_amount(&words);
+
+            if let Some(dir) = direction {
+                let dir_name = match dir {
+                    PanDirection::Left => "left",
+                    PanDirection::Right => "right",
+                    PanDirection::Up => "up",
+                    PanDirection::Down => "down",
+                };
+                return Some(make_response(
+                    &format!("Tracking {}...", dir_name),
+                    AgentCommand::Pan {
+                        direction: dir,
+                        amount,
+                    },
+                ));
+            }
+        }
+
+        // Simple direction commands: "left", "right", "up", "down"
+        if words.len() == 1 {
+            let dir = match words[0] {
+                "left" => Some(PanDirection::Left),
+                "right" => Some(PanDirection::Right),
+                "up" => Some(PanDirection::Up),
+                "down" => Some(PanDirection::Down),
+                _ => None,
+            };
+            if let Some(d) = dir {
+                return Some(make_response(
+                    &format!("Panning {}...", words[0]),
+                    AgentCommand::Pan {
+                        direction: d,
+                        amount: None,
+                    },
+                ));
+            }
+        }
+
+        // =========================================================================
+        // CENTER / HOME
+        // =========================================================================
+        if words[0] == "center" || words[0] == "home" || lower_msg == "center and stop" {
+            return Some(make_response("Centering view.", AgentCommand::Center));
+        }
+
+        // =========================================================================
+        // HIERARCHY NAVIGATION
+        // =========================================================================
+
+        // "drill down" / "go deeper" / "expand"
+        if (words[0] == "drill" && words.get(1) == Some(&"down"))
+            || (words[0] == "go" && words.get(1) == Some(&"deeper"))
+            || (words[0] == "dive" && words.get(1) == Some(&"in"))
+            || lower_msg.contains("what's inside")
+        {
+            return Some(make_response(
+                "Drilling down...",
+                AgentCommand::DrillDown { node_key: None },
+            ));
+        }
+
+        // "drill up" / "go up" / "back up"
+        if (words[0] == "drill" && words.get(1) == Some(&"up"))
+            || (words[0] == "go" && words.get(1) == Some(&"up"))
+            || (words[0] == "back" && words.get(1) == Some(&"up"))
+            || lower_msg.contains("show parent")
+        {
+            return Some(make_response("Drilling up...", AgentCommand::DrillUp));
+        }
+
+        // "expand all" / "show all" / "blow it all open"
+        if lower_msg.contains("expand all")
+            || lower_msg.contains("show everything")
+            || lower_msg.contains("blow it")
+        {
+            return Some(make_response(
+                "Expanding all nodes.",
+                AgentCommand::ExpandAll,
+            ));
+        }
+
+        // "collapse all" / "close all" / "fold it up"
+        if lower_msg.contains("collapse all")
+            || lower_msg.contains("close all")
+            || lower_msg.contains("fold it")
+        {
+            return Some(make_response(
+                "Collapsing all nodes.",
+                AgentCommand::CollapseAll,
+            ));
+        }
+
+        // =========================================================================
+        // EXPORT ("Give me a hard copy" - Blade Runner classic)
+        // =========================================================================
+        if lower_msg.contains("hard copy")
+            || lower_msg.contains("print")
+            || lower_msg.contains("screenshot")
+            || lower_msg.contains("export")
+            || lower_msg.contains("save image")
+        {
+            let format = if lower_msg.contains("svg") {
+                Some("svg".to_string())
+            } else if lower_msg.contains("pdf") {
+                Some("pdf".to_string())
+            } else {
+                Some("png".to_string())
+            };
+            return Some(make_response(
+                "Generating hard copy...",
+                AgentCommand::Export { format },
+            ));
+        }
+
+        // =========================================================================
+        // LAYOUT COMMANDS
+        // =========================================================================
+        if lower_msg.contains("reset layout")
+            || lower_msg.contains("auto arrange")
+            || lower_msg.contains("auto layout")
+            || lower_msg.contains("rearrange")
+        {
+            return Some(make_response(
+                "Resetting layout.",
+                AgentCommand::ResetLayout,
+            ));
+        }
+
+        if lower_msg.contains("flip layout")
+            || lower_msg.contains("rotate layout")
+            || lower_msg.contains("toggle orientation")
+            || lower_msg.contains("switch orientation")
+        {
+            return Some(make_response(
+                "Toggling orientation.",
+                AgentCommand::ToggleOrientation,
+            ));
+        }
+
+        // =========================================================================
+        // SEARCH
+        // =========================================================================
+        if words[0] == "find" || words[0] == "search" || words[0] == "locate" {
+            if words.len() > 1 {
+                let query = words[1..].join(" ");
+                return Some(make_response(
+                    &format!("Searching for '{}'...", query),
+                    AgentCommand::Search { query },
+                ));
+            }
+        }
+
+        // =========================================================================
+        // HELP
+        // =========================================================================
+        if words[0] == "help"
+            || lower_msg.contains("what can i say")
+            || lower_msg.contains("what commands")
+            || lower_msg.contains("navigation help")
+        {
+            let topic = if words.len() > 1 {
+                Some(words[1..].join(" "))
+            } else {
+                None
+            };
+            return Some(make_response(
+                "Here are the available navigation commands...",
+                AgentCommand::ShowHelp { topic },
+            ));
+        }
+
+        // =========================================================================
+        // SCALE NAVIGATION (Astronomical metaphor)
+        // =========================================================================
+
+        // Universe view - full client book
+        if lower_msg.contains("universe")
+            || lower_msg.contains("full book")
+            || lower_msg.contains("entire book")
+            || lower_msg.contains("client book")
+            || lower_msg.contains("god view")
+            || lower_msg.contains("see everything")
+            || lower_msg.contains("all clients")
+            || lower_msg.contains("the whole picture")
+        {
+            return Some(make_response(
+                "Showing full universe...",
+                AgentCommand::ScaleUniverse,
+            ));
+        }
+
+        // Galaxy view - segment level
+        if lower_msg.contains("galaxy")
+            || lower_msg.contains("segment view")
+            || lower_msg.contains("cluster view")
+            || lower_msg.contains("portfolio view")
+        {
+            let segment = if lower_msg.contains("hedge fund") {
+                Some("hedge_fund".to_string())
+            } else if lower_msg.contains("pension") {
+                Some("pension".to_string())
+            } else if lower_msg.contains("sovereign") {
+                Some("sovereign_wealth".to_string())
+            } else if lower_msg.contains("family office") {
+                Some("family_office".to_string())
+            } else if lower_msg.contains("insurance") {
+                Some("insurance".to_string())
+            } else {
+                None
+            };
+            return Some(make_response(
+                "Showing galaxy view...",
+                AgentCommand::ScaleGalaxy { segment },
+            ));
+        }
+
+        // System view - CBU with satellites
+        if lower_msg.contains("enter system")
+            || lower_msg.contains("solar system")
+            || lower_msg.contains("cbu system")
+            || lower_msg.contains("with satellites")
+            || lower_msg.contains("what's orbiting")
+        {
+            return Some(make_response(
+                "Entering system view...",
+                AgentCommand::ScaleSystem { cbu_id: None },
+            ));
+        }
+
+        // Planet view - single entity
+        if lower_msg.contains("land on")
+            || lower_msg.contains("planet view")
+            || lower_msg.contains("touch down")
+            || lower_msg.contains("go to surface")
+        {
+            return Some(make_response(
+                "Landing on entity...",
+                AgentCommand::ScalePlanet { entity_id: None },
+            ));
+        }
+
+        // Surface view - entity details
+        if lower_msg.contains("surface scan")
+            || lower_msg.contains("surface view")
+            || lower_msg.contains("ground level")
+            || lower_msg.contains("show attributes")
+            || lower_msg.contains("entity details")
+            || lower_msg.contains("full profile")
+            || lower_msg.contains("what do we know")
+            || lower_msg.contains("everything about")
+        {
+            return Some(make_response(
+                "Scanning surface...",
+                AgentCommand::ScaleSurface,
+            ));
+        }
+
+        // Core view - derived/hidden data
+        if lower_msg.contains("core sample")
+            || lower_msg.contains("to the core")
+            || lower_msg.contains("deep scan")
+            || lower_msg.contains("below surface")
+            || lower_msg.contains("hidden layers")
+            || lower_msg.contains("what's hidden")
+            || lower_msg.contains("indirect ownership")
+            || lower_msg.contains("indirect control")
+            || lower_msg.contains("derived")
+            || lower_msg.contains("inferred")
+            || lower_msg.contains("beneath the surface")
+        {
+            return Some(make_response(
+                "Sampling core data...",
+                AgentCommand::ScaleCore,
+            ));
+        }
+
+        // =========================================================================
+        // DEPTH NAVIGATION (Z-axis through structures)
+        // =========================================================================
+
+        // Drill through - all the way to natural persons
+        if lower_msg.contains("drill through")
+            || lower_msg.contains("drill all the way")
+            || lower_msg.contains("to the bottom")
+            || lower_msg.contains("find the humans")
+            || lower_msg.contains("find natural persons")
+            || lower_msg.contains("who's really behind")
+            || lower_msg.contains("ultimate owners")
+            || lower_msg.contains("trace to terminus")
+            || lower_msg.contains("follow the money")
+            || lower_msg.contains("cui bono")
+        {
+            return Some(make_response(
+                "Drilling through to natural persons...",
+                AgentCommand::DrillThrough,
+            ));
+        }
+
+        // Surface return
+        if lower_msg == "surface"
+            || lower_msg.contains("come up")
+            || lower_msg.contains("return to surface")
+            || lower_msg.contains("back to top")
+            || lower_msg.contains("top level")
+            || lower_msg.contains("emerge")
+            || lower_msg.contains("rise up")
+            || lower_msg.contains("float up")
+            || lower_msg.contains("back to daylight")
+        {
+            return Some(make_response(
+                "Returning to surface...",
+                AgentCommand::SurfaceReturn,
+            ));
+        }
+
+        // X-ray view
+        if lower_msg.contains("x-ray")
+            || lower_msg.contains("xray")
+            || lower_msg.contains("transparent")
+            || lower_msg.contains("see through")
+            || lower_msg.contains("skeleton view")
+            || lower_msg.contains("wireframe")
+            || lower_msg.contains("show all layers")
+            || lower_msg.contains("reveal structure")
+        {
+            return Some(make_response(
+                "Activating x-ray view...",
+                AgentCommand::XRay,
+            ));
+        }
+
+        // Peel layer
+        if words[0] == "peel"
+            || lower_msg.contains("peel back")
+            || lower_msg.contains("next layer")
+            || lower_msg.contains("one layer")
+            || lower_msg.contains("remove layer")
+            || lower_msg.contains("unwrap")
+            || lower_msg.contains("layer by layer")
+        {
+            return Some(make_response("Peeling layer...", AgentCommand::Peel));
+        }
+
+        // Cross section
+        if lower_msg.contains("cross section")
+            || lower_msg.contains("horizontal slice")
+            || lower_msg.contains("slice")
+            || lower_msg.contains("cut through")
+            || lower_msg.contains("peers at this level")
+            || lower_msg.contains("same level")
+            || lower_msg.contains("siblings")
+            || lower_msg.contains("who else is at this level")
+        {
+            return Some(make_response(
+                "Showing cross section...",
+                AgentCommand::CrossSection,
+            ));
+        }
+
+        // Depth indicator
+        if lower_msg.contains("how deep")
+            || lower_msg.contains("what depth")
+            || lower_msg.contains("how many layers")
+            || lower_msg.contains("depth check")
+            || lower_msg.contains("where am i")
+            || lower_msg.contains("how far down")
+        {
+            return Some(make_response(
+                "Checking depth...",
+                AgentCommand::DepthIndicator,
+            ));
+        }
+
+        // =========================================================================
+        // ORBITAL NAVIGATION (Rotating around entities)
+        // =========================================================================
+
+        // Orbit
+        if words[0] == "orbit"
+            || lower_msg.contains("orbit around")
+            || lower_msg.contains("circle around")
+            || lower_msg.contains("rotate around")
+            || lower_msg.contains("360 view")
+            || lower_msg.contains("full rotation")
+            || lower_msg.contains("all connections")
+            || lower_msg.contains("what's connected")
+        {
+            return Some(make_response(
+                "Orbiting entity...",
+                AgentCommand::Orbit { entity_id: None },
+            ));
+        }
+
+        // Rotate layer
+        if lower_msg.contains("rotate to")
+            || lower_msg.contains("switch layer")
+            || lower_msg.contains("flip to")
+        {
+            let layer = if lower_msg.contains("ownership") {
+                "ownership"
+            } else if lower_msg.contains("control") {
+                "control"
+            } else if lower_msg.contains("service") {
+                "services"
+            } else if lower_msg.contains("custody") {
+                "custody"
+            } else {
+                "ownership"
+            };
+            return Some(make_response(
+                &format!("Rotating to {} layer...", layer),
+                AgentCommand::RotateLayer {
+                    layer: layer.to_string(),
+                },
+            ));
+        }
+
+        // Flip
+        if words[0] == "flip"
+            || lower_msg.contains("flip view")
+            || lower_msg.contains("invert")
+            || lower_msg.contains("reverse view")
+            || lower_msg.contains("opposite view")
+            || lower_msg.contains("upstream")
+            || lower_msg.contains("downstream")
+        {
+            return Some(make_response("Flipping view...", AgentCommand::Flip));
+        }
+
+        // Tilt
+        if words[0] == "tilt" || lower_msg.contains("tilt view") || lower_msg.contains("angle") {
+            let dimension = if lower_msg.contains("time") {
+                "time"
+            } else if lower_msg.contains("service") {
+                "services"
+            } else if lower_msg.contains("ownership") {
+                "ownership"
+            } else {
+                "default"
+            };
+            return Some(make_response(
+                &format!("Tilting towards {}...", dimension),
+                AgentCommand::Tilt {
+                    dimension: dimension.to_string(),
+                },
+            ));
+        }
+
+        // =========================================================================
+        // TEMPORAL NAVIGATION (4th dimension - time)
+        // =========================================================================
+
+        // Time rewind
+        if lower_msg.contains("rewind")
+            || lower_msg.contains("go back to")
+            || lower_msg.contains("as of")
+            || lower_msg.contains("at date")
+            || lower_msg.contains("historical")
+            || lower_msg.contains("back in time")
+            || lower_msg.contains("time travel")
+            || lower_msg.contains("take me back")
+            || lower_msg.contains("before the")
+            || lower_msg.contains("previous state")
+        {
+            // Try to extract date reference
+            let target_date = if lower_msg.contains("last quarter") {
+                Some("last_quarter".to_string())
+            } else if lower_msg.contains("last year") {
+                Some("last_year".to_string())
+            } else if lower_msg.contains("year end") {
+                Some("year_end".to_string())
+            } else {
+                None
+            };
+            return Some(make_response(
+                "Rewinding...",
+                AgentCommand::TimeRewind { target_date },
+            ));
+        }
+
+        // Time play
+        if (words[0] == "play" && !lower_msg.contains("display"))
+            || lower_msg.contains("play forward")
+            || lower_msg.contains("animate")
+            || lower_msg.contains("show changes")
+            || lower_msg.contains("evolve")
+            || lower_msg.contains("progression")
+            || lower_msg.contains("time lapse")
+            || lower_msg.contains("show evolution")
+            || lower_msg.contains("watch it change")
+        {
+            return Some(make_response(
+                "Playing timeline...",
+                AgentCommand::TimePlay {
+                    from_date: None,
+                    to_date: None,
+                },
+            ));
+        }
+
+        // Time freeze
+        if lower_msg.contains("freeze time")
+            || lower_msg.contains("freeze frame")
+            || lower_msg.contains("lock time")
+            || lower_msg.contains("fix date")
+            || lower_msg.contains("temporal lock")
+            || lower_msg.contains("hold that date")
+        {
+            return Some(make_response("Freezing time...", AgentCommand::TimeFreeze));
+        }
+
+        // Time slice (comparison)
+        if lower_msg.contains("time slice")
+            || lower_msg.contains("compare times")
+            || lower_msg.contains("temporal diff")
+            || lower_msg.contains("before after")
+            || lower_msg.contains("then vs now")
+            || lower_msg.contains("what changed")
+            || lower_msg.contains("year over year")
+            || lower_msg.contains("show the difference")
+            || lower_msg.contains("what moved")
+            || lower_msg.contains("ownership delta")
+        {
+            return Some(make_response(
+                "Comparing time slices...",
+                AgentCommand::TimeSlice {
+                    date1: None,
+                    date2: None,
+                },
+            ));
+        }
+
+        // Time trail
+        if lower_msg.contains("show trail")
+            || lower_msg.contains("history trail")
+            || lower_msg.contains("audit trail")
+            || lower_msg.contains("timeline")
+            || lower_msg.contains("chronology")
+            || lower_msg.contains("full history")
+            || lower_msg.contains("event history")
+            || lower_msg.contains("how did we get here")
+        {
+            return Some(make_response(
+                "Showing timeline...",
+                AgentCommand::TimeTrail { entity_id: None },
+            ));
+        }
+
+        // =========================================================================
+        // INVESTIGATION PATTERNS
+        // =========================================================================
+
+        // Follow the money (also caught above in drill through)
+        if lower_msg.contains("follow the money")
+            || lower_msg.contains("trace the money")
+            || lower_msg.contains("money trail")
+            || lower_msg.contains("capital flow")
+            || lower_msg.contains("trace ownership")
+            || lower_msg.contains("ownership chain")
+            || lower_msg.contains("who owns who")
+        {
+            return Some(make_response(
+                "Following the money...",
+                AgentCommand::FollowTheMoney { from_entity: None },
+            ));
+        }
+
+        // Who controls
+        if lower_msg.contains("who controls")
+            || lower_msg.contains("who's in charge")
+            || lower_msg.contains("who decides")
+            || lower_msg.contains("control trace")
+            || lower_msg.contains("decision makers")
+            || lower_msg.contains("power structure")
+            || lower_msg.contains("puppet master")
+            || lower_msg.contains("who's really running")
+        {
+            return Some(make_response(
+                "Tracing control...",
+                AgentCommand::WhoControls { entity_id: None },
+            ));
+        }
+
+        // Illuminate
+        if words[0] == "illuminate"
+            || lower_msg.contains("bring out")
+            || lower_msg.contains("spotlight")
+            || lower_msg.contains("light it up")
+            || lower_msg.contains("make it obvious")
+        {
+            let aspect = if lower_msg.contains("ownership") {
+                "ownership"
+            } else if lower_msg.contains("control") {
+                "control"
+            } else if lower_msg.contains("risk") {
+                "risk"
+            } else if lower_msg.contains("change") {
+                "changes"
+            } else {
+                "all"
+            };
+            return Some(make_response(
+                &format!("Illuminating {}...", aspect),
+                AgentCommand::Illuminate {
+                    aspect: aspect.to_string(),
+                },
+            ));
+        }
+
+        // Shadow view
+        if lower_msg.contains("show shadow")
+            || lower_msg.contains("shadow view")
+            || lower_msg.contains("indirect")
+            || lower_msg.contains("behind the scenes")
+            || lower_msg.contains("hidden connections")
+            || lower_msg.contains("implicit")
+        {
+            return Some(make_response(
+                "Showing shadow relationships...",
+                AgentCommand::Shadow,
+            ));
+        }
+
+        // Red flag scan
+        if lower_msg.contains("red flag")
+            || lower_msg.contains("risk scan")
+            || lower_msg.contains("anomaly")
+            || lower_msg.contains("what's wrong")
+            || lower_msg.contains("problems")
+            || lower_msg.contains("suspicious")
+            || lower_msg.contains("circular ownership")
+            || lower_msg.contains("show me problems")
+            || lower_msg.contains("what should worry")
+        {
+            return Some(make_response(
+                "Scanning for red flags...",
+                AgentCommand::RedFlagScan,
+            ));
+        }
+
+        // Black holes - data gaps
+        if lower_msg.contains("black hole")
+            || lower_msg.contains("missing information")
+            || lower_msg.contains("data void")
+            || lower_msg.contains("information gap")
+            || lower_msg.contains("what's missing")
+            || lower_msg.contains("incomplete")
+            || lower_msg.contains("dead end")
+            || lower_msg.contains("where does it go dark")
+            || lower_msg.contains("opacity")
+            || lower_msg.contains("can't see past")
+        {
+            return Some(make_response(
+                "Finding black holes...",
+                AgentCommand::BlackHole,
+            ));
+        }
+
+        // =========================================================================
+        // CONTEXT INTENTIONS
+        // =========================================================================
+
+        // Context: Review
+        if lower_msg.contains("board review")
+            || lower_msg.contains("committee review")
+            || lower_msg.contains("quarterly review")
+            || lower_msg.contains("annual review")
+            || lower_msg.contains("audit preparation")
+            || lower_msg.contains("preparing for review")
+            || lower_msg.contains("need board pack")
+        {
+            return Some(make_response(
+                "Setting context: Board/Committee Review",
+                AgentCommand::ContextReview,
+            ));
+        }
+
+        // Context: Investigation
+        if lower_msg.contains("investigation mode")
+            || lower_msg.contains("investigating")
+            || lower_msg.contains("forensic")
+            || lower_msg.contains("deep dive")
+            || lower_msg.contains("due diligence")
+            || lower_msg.contains("enhanced due diligence")
+            || lower_msg.contains("suspicious activity")
+            || lower_msg.contains("something's not right")
+        {
+            return Some(make_response(
+                "Setting context: Investigation",
+                AgentCommand::ContextInvestigation,
+            ));
+        }
+
+        // Context: Onboarding
+        if lower_msg.contains("onboarding mode")
+            || lower_msg.contains("new client")
+            || lower_msg.contains("client intake")
+            || lower_msg.contains("initial setup")
+            || lower_msg.contains("setting up new")
+            || lower_msg.contains("kyc collection")
+        {
+            return Some(make_response(
+                "Setting context: Onboarding",
+                AgentCommand::ContextOnboarding,
+            ));
+        }
+
+        // Context: Monitoring
+        if lower_msg.contains("monitoring mode")
+            || lower_msg.contains("ongoing monitoring")
+            || lower_msg.contains("pkyc")
+            || lower_msg.contains("periodic kyc")
+            || lower_msg.contains("event monitoring")
+            || lower_msg.contains("checking for changes")
+        {
+            return Some(make_response(
+                "Setting context: Monitoring",
+                AgentCommand::ContextMonitoring,
+            ));
+        }
+
+        // Context: Remediation
+        if lower_msg.contains("remediation mode")
+            || lower_msg.contains("fixing")
+            || lower_msg.contains("gap filling")
+            || lower_msg.contains("completing")
+            || lower_msg.contains("need to fix")
+            || lower_msg.contains("what's outstanding")
+            || lower_msg.contains("what's blocking")
+        {
+            return Some(make_response(
+                "Setting context: Remediation",
+                AgentCommand::ContextRemediation,
+            ));
+        }
+
+        // Not an Esper command
+        None
+    }
+
+    /// Parse a number that appears after a keyword in the word list
+    fn parse_number_after(&self, words: &[&str], keyword: &str) -> Option<f32> {
+        for (i, word) in words.iter().enumerate() {
+            if *word == keyword {
+                // Look at next word for a number
+                if let Some(next) = words.get(i + 1) {
+                    if let Ok(n) = next.parse::<f32>() {
+                        return Some(n);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Parse any number from the message
+    fn parse_number_from_message(&self, message: &str) -> Option<f32> {
+        for word in message.split_whitespace() {
+            // Try parsing as float
+            if let Ok(n) = word.parse::<f32>() {
+                return Some(n);
+            }
+            // Try parsing percentage like "50%"
+            if word.ends_with('%') {
+                if let Ok(n) = word.trim_end_matches('%').parse::<f32>() {
+                    return Some(n / 100.0);
+                }
+            }
+        }
+        None
+    }
+
+    /// Parse pan direction and amount from words like "track 45 left" or "pan right 100"
+    fn parse_pan_direction_and_amount(
+        &self,
+        words: &[&str],
+    ) -> (Option<ob_poc_types::PanDirection>, Option<f32>) {
+        use ob_poc_types::PanDirection;
+
+        let mut direction: Option<PanDirection> = None;
+        let mut amount: Option<f32> = None;
+
+        for word in words.iter().skip(1) {
+            // Skip the command word (track, pan, etc.)
+            match *word {
+                "left" => direction = Some(PanDirection::Left),
+                "right" => direction = Some(PanDirection::Right),
+                "up" => direction = Some(PanDirection::Up),
+                "down" => direction = Some(PanDirection::Down),
+                _ => {
+                    // Try to parse as number
+                    if let Ok(n) = word.parse::<f32>() {
+                        amount = Some(n);
+                    }
+                }
+            }
+        }
+
+        (direction, amount)
     }
 
     /// Handle "show/load/select CBU" commands

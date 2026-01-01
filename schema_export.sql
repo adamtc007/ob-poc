@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict hZIPIScftbutj8CN4bJMxjcXwPDJrCGLl8f6WmPaSTgAwBTCdUPVz9DYohfN1o8
+\restrict J3iAbwNFfXgBRTO7AuQ1NVpH4PLO1Fo1uxAfao5vMVMMujcYLz70bSXduu0fn6K
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -1528,6 +1528,62 @@ $$;
 --
 
 COMMENT ON FUNCTION "ob-poc".evaluate_case_decision(p_case_id uuid, p_evaluator character varying) IS 'Evaluates case and creates recommendation snapshot';
+
+
+--
+-- Name: find_phonetic_matches(text[], integer); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".find_phonetic_matches(query_phonetic_codes text[], top_k integer DEFAULT 5) RETURNS TABLE(verb_name character varying, pattern_phrase text, category character varying, is_agent_bound boolean, priority integer, matching_codes text[])
+    LANGUAGE sql STABLE
+    AS $$
+    SELECT 
+        vpe.verb_name,
+        vpe.pattern_phrase,
+        vpe.category,
+        vpe.is_agent_bound,
+        vpe.priority,
+        ARRAY(SELECT unnest(vpe.phonetic_codes) INTERSECT SELECT unnest(query_phonetic_codes)) AS matching_codes
+    FROM "ob-poc".verb_pattern_embeddings vpe
+    WHERE vpe.phonetic_codes && query_phonetic_codes
+    ORDER BY 
+        array_length(ARRAY(SELECT unnest(vpe.phonetic_codes) INTERSECT SELECT unnest(query_phonetic_codes)), 1) DESC NULLS LAST,
+        vpe.priority
+    LIMIT top_k;
+$$;
+
+
+--
+-- Name: find_similar_patterns(public.vector, integer, real, character varying, boolean); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".find_similar_patterns(query_embedding public.vector, top_k integer DEFAULT 5, min_similarity real DEFAULT 0.5, category_filter character varying DEFAULT NULL::character varying, agent_bound_filter boolean DEFAULT NULL::boolean) RETURNS TABLE(verb_name character varying, pattern_phrase text, similarity real, category character varying, is_agent_bound boolean, priority integer)
+    LANGUAGE sql STABLE
+    AS $$
+    SELECT
+        vpe.verb_name,
+        vpe.pattern_phrase,
+        1 - (vpe.embedding <=> query_embedding) AS similarity,
+        vpe.category,
+        vpe.is_agent_bound,
+        vpe.priority
+    FROM "ob-poc".verb_pattern_embeddings vpe
+    WHERE
+        (category_filter IS NULL OR vpe.category = category_filter)
+        AND (agent_bound_filter IS NULL OR vpe.is_agent_bound = agent_bound_filter)
+        AND 1 - (vpe.embedding <=> query_embedding) >= min_similarity
+    ORDER BY
+        vpe.embedding <=> query_embedding,
+        vpe.priority
+    LIMIT top_k;
+$$;
+
+
+--
+-- Name: FUNCTION find_similar_patterns(query_embedding public.vector, top_k integer, min_similarity real, category_filter character varying, agent_bound_filter boolean); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".find_similar_patterns(query_embedding public.vector, top_k integer, min_similarity real, category_filter character varying, agent_bound_filter boolean) IS 'Find top-k verb patterns most semantically similar to query embedding. Uses cosine similarity.';
 
 
 --
@@ -4464,6 +4520,114 @@ ALTER SEQUENCE "ob-poc".attribute_values_typed_id_seq OWNED BY "ob-poc".attribut
 
 
 --
+-- Name: bods_entity_statements; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".bods_entity_statements (
+    statement_id character varying(100) NOT NULL,
+    entity_type character varying(50),
+    name text,
+    jurisdiction character varying(10),
+    lei character varying(20),
+    company_number character varying(100),
+    opencorporates_id character varying(200),
+    identifiers jsonb,
+    source_register character varying(100),
+    statement_date date,
+    source_url text,
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT valid_entity_type CHECK (((entity_type)::text = ANY ((ARRAY['registeredEntity'::character varying, 'legalEntity'::character varying, 'arrangement'::character varying, 'anonymousEntity'::character varying, 'unknownEntity'::character varying, 'state'::character varying, 'stateBody'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE bods_entity_statements; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".bods_entity_statements IS 'BODS entity statements from beneficial ownership registers (UK PSC, etc.)';
+
+
+--
+-- Name: COLUMN bods_entity_statements.lei; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".bods_entity_statements.lei IS 'LEI identifier if present - join key to GLEIF data';
+
+
+--
+-- Name: bods_ownership_statements; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".bods_ownership_statements (
+    statement_id character varying(100) NOT NULL,
+    subject_entity_statement_id character varying(100),
+    subject_lei character varying(20),
+    subject_name text,
+    interested_party_type character varying(20),
+    interested_party_statement_id character varying(100),
+    interested_party_name text,
+    ownership_type character varying(50),
+    share_min numeric,
+    share_max numeric,
+    share_exact numeric,
+    is_direct boolean,
+    control_types character varying(50)[],
+    start_date date,
+    end_date date,
+    source_register character varying(100),
+    statement_date date,
+    source_description text,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE bods_ownership_statements; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".bods_ownership_statements IS 'BODS ownership/control statements linking persons to entities';
+
+
+--
+-- Name: bods_person_statements; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".bods_person_statements (
+    statement_id character varying(100) NOT NULL,
+    person_type character varying(50),
+    full_name text,
+    given_name character varying(200),
+    family_name character varying(200),
+    names jsonb,
+    birth_date date,
+    birth_date_precision character varying(20),
+    death_date date,
+    nationalities character varying(10)[],
+    country_of_residence character varying(10),
+    addresses jsonb,
+    tax_residencies character varying(10)[],
+    source_register character varying(100),
+    statement_date date,
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT valid_person_type CHECK (((person_type)::text = ANY ((ARRAY['knownPerson'::character varying, 'anonymousPerson'::character varying, 'unknownPerson'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE bods_person_statements; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".bods_person_statements IS 'BODS person statements - natural persons who are UBOs';
+
+
+--
+-- Name: COLUMN bods_person_statements.birth_date_precision; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".bods_person_statements.birth_date_precision IS 'Precision of birth date: exact, month, or year';
+
+
+--
 -- Name: case_decision_thresholds; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -6017,6 +6181,56 @@ COMMENT ON TABLE "ob-poc".dsl_workflow_phases IS 'KYC workflow phase reference d
 
 
 --
+-- Name: entity_addresses; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".entity_addresses (
+    address_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    entity_id uuid NOT NULL,
+    address_type character varying(50) NOT NULL,
+    language character varying(10),
+    address_lines text[],
+    city character varying(200),
+    region character varying(50),
+    country character varying(3) NOT NULL,
+    postal_code character varying(50),
+    is_primary boolean DEFAULT false,
+    source character varying(50),
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT valid_address_type CHECK (((address_type)::text = ANY ((ARRAY['LEGAL'::character varying, 'HEADQUARTERS'::character varying, 'BRANCH'::character varying, 'ALTERNATIVE'::character varying, 'TRANSLITERATED'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE entity_addresses; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".entity_addresses IS 'Structured address data from GLEIF legalAddress, headquartersAddress, otherAddresses';
+
+
+--
+-- Name: entity_bods_links; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".entity_bods_links (
+    link_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    entity_id uuid NOT NULL,
+    bods_entity_statement_id character varying(100),
+    match_method character varying(50),
+    match_confidence numeric,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE entity_bods_links; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".entity_bods_links IS 'Links our entities to BODS entity statements';
+
+
+--
 -- Name: entity_cooperatives; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -6142,6 +6356,63 @@ CREATE TABLE "ob-poc".entity_government (
 
 
 --
+-- Name: entity_identifiers; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".entity_identifiers (
+    identifier_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    entity_id uuid NOT NULL,
+    identifier_type character varying(30) NOT NULL,
+    identifier_value character varying(100) NOT NULL,
+    issuing_authority character varying(100),
+    is_primary boolean DEFAULT false,
+    valid_from date,
+    valid_until date,
+    source character varying(50),
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT valid_identifier_type CHECK (((identifier_type)::text = ANY ((ARRAY['LEI'::character varying, 'BIC'::character varying, 'ISIN'::character varying, 'CIK'::character varying, 'MIC'::character varying, 'REG_NUM'::character varying, 'FIGI'::character varying, 'CUSIP'::character varying, 'SEDOL'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE entity_identifiers; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".entity_identifiers IS 'Cross-reference identifiers from GLEIF (LEI, BIC mappings, etc.) and other sources';
+
+
+--
+-- Name: entity_lifecycle_events; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".entity_lifecycle_events (
+    event_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    entity_id uuid NOT NULL,
+    event_type character varying(50) NOT NULL,
+    event_status character varying(30),
+    effective_date date,
+    recorded_date date,
+    affected_fields jsonb,
+    old_values jsonb,
+    new_values jsonb,
+    successor_lei character varying(20),
+    successor_name text,
+    validation_documents character varying(50),
+    validation_reference text,
+    source character varying(50) DEFAULT 'GLEIF'::character varying,
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT valid_event_type CHECK (((event_type)::text = ANY ((ARRAY['CHANGE_LEGAL_NAME'::character varying, 'CHANGE_LEGAL_ADDRESS'::character varying, 'CHANGE_HQ_ADDRESS'::character varying, 'CHANGE_LEGAL_FORM'::character varying, 'MERGER'::character varying, 'SPIN_OFF'::character varying, 'ACQUISITION'::character varying, 'DISSOLUTION'::character varying, 'BANKRUPTCY'::character varying, 'DEREGISTRATION'::character varying, 'RELOCATION'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE entity_lifecycle_events; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".entity_lifecycle_events IS 'Corporate lifecycle events from GLEIF eventGroups - name changes, mergers, etc.';
+
+
+--
 -- Name: entity_limited_companies; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -6155,8 +6426,52 @@ CREATE TABLE "ob-poc".entity_limited_companies (
     business_nature text,
     created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
     updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
-    entity_id uuid
+    entity_id uuid,
+    lei character varying(20),
+    gleif_status character varying(20),
+    gleif_category character varying(50),
+    gleif_subcategory character varying(50),
+    legal_form_code character varying(10),
+    legal_form_text character varying(200),
+    gleif_validation_level character varying(30),
+    gleif_last_update timestamp with time zone,
+    gleif_next_renewal date,
+    direct_parent_lei character varying(20),
+    ultimate_parent_lei character varying(20),
+    entity_creation_date date,
+    headquarters_address text,
+    headquarters_city character varying(200),
+    headquarters_country character varying(3),
+    fund_manager_lei character varying(20),
+    umbrella_fund_lei character varying(20),
+    master_fund_lei character varying(20),
+    is_fund boolean DEFAULT false,
+    fund_type character varying(30),
+    gleif_direct_parent_exception character varying(50),
+    gleif_ultimate_parent_exception character varying(50),
+    ubo_status character varying(30) DEFAULT 'PENDING'::character varying
 );
+
+
+--
+-- Name: COLUMN entity_limited_companies.gleif_direct_parent_exception; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".entity_limited_companies.gleif_direct_parent_exception IS 'GLEIF Level 2 reporting exception for direct parent: NO_KNOWN_PERSON, NATURAL_PERSONS, NON_CONSOLIDATING, etc.';
+
+
+--
+-- Name: COLUMN entity_limited_companies.gleif_ultimate_parent_exception; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".entity_limited_companies.gleif_ultimate_parent_exception IS 'GLEIF Level 2 reporting exception for ultimate parent';
+
+
+--
+-- Name: COLUMN entity_limited_companies.ubo_status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".entity_limited_companies.ubo_status IS 'UBO discovery status: PENDING, DISCOVERED, PUBLIC_FLOAT, EXEMPT, MANUAL_REQUIRED';
 
 
 --
@@ -6178,6 +6493,64 @@ CREATE TABLE "ob-poc".entity_manco (
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now()
 );
+
+
+--
+-- Name: entity_names; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".entity_names (
+    name_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    entity_id uuid NOT NULL,
+    name_type character varying(50) NOT NULL,
+    name text NOT NULL,
+    language character varying(10),
+    is_primary boolean DEFAULT false,
+    effective_from date,
+    effective_to date,
+    source character varying(50),
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT valid_name_type CHECK (((name_type)::text = ANY ((ARRAY['LEGAL'::character varying, 'TRADING'::character varying, 'TRANSLITERATED'::character varying, 'HISTORICAL'::character varying, 'ALTERNATIVE'::character varying, 'SHORT'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE entity_names; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".entity_names IS 'Alternative names for entities from GLEIF otherNames and transliteratedOtherNames fields';
+
+
+--
+-- Name: entity_parent_relationships; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".entity_parent_relationships (
+    relationship_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    child_entity_id uuid NOT NULL,
+    parent_entity_id uuid,
+    parent_lei character varying(20),
+    parent_name text,
+    relationship_type character varying(50) NOT NULL,
+    accounting_standard character varying(20),
+    relationship_start date,
+    relationship_end date,
+    relationship_status character varying(30) DEFAULT 'ACTIVE'::character varying,
+    validation_source character varying(50),
+    validation_reference text,
+    source character varying(50) DEFAULT 'GLEIF'::character varying,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT valid_relationship_type CHECK (((relationship_type)::text = ANY ((ARRAY['DIRECT_PARENT'::character varying, 'ULTIMATE_PARENT'::character varying, 'FUND_MANAGER'::character varying, 'UMBRELLA_FUND'::character varying, 'MASTER_FUND'::character varying, 'BRANCH_OF'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE entity_parent_relationships; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".entity_parent_relationships IS 'Corporate ownership relationships from GLEIF Level 2 data - direct and ultimate parents';
 
 
 --
@@ -6475,6 +6848,56 @@ COMMENT ON COLUMN "ob-poc".entity_type_dependencies.priority IS 'Ordering hint w
 
 
 --
+-- Name: entity_ubos; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".entity_ubos (
+    ubo_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    entity_id uuid NOT NULL,
+    person_statement_id character varying(100),
+    person_name text,
+    nationalities character varying(10)[],
+    country_of_residence character varying(10),
+    ownership_chain jsonb,
+    chain_depth integer,
+    ownership_min numeric,
+    ownership_max numeric,
+    ownership_exact numeric,
+    control_types character varying(50)[],
+    is_direct boolean,
+    ubo_type character varying(30),
+    confidence_level character varying(20),
+    source character varying(50),
+    source_register character varying(100),
+    discovered_at timestamp with time zone DEFAULT now(),
+    verified_at timestamp with time zone,
+    verified_by character varying(255),
+    CONSTRAINT valid_ubo_type CHECK (((ubo_type)::text = ANY ((ARRAY['NATURAL_PERSON'::character varying, 'PUBLIC_FLOAT'::character varying, 'STATE_OWNED'::character varying, 'WIDELY_HELD'::character varying, 'UNKNOWN'::character varying, 'EXEMPT'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE entity_ubos; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".entity_ubos IS 'Denormalized UBO summary for quick access';
+
+
+--
+-- Name: COLUMN entity_ubos.ownership_chain; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".entity_ubos.ownership_chain IS 'JSON array of intermediate entities in ownership chain';
+
+
+--
+-- Name: COLUMN entity_ubos.ubo_type; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".entity_ubos.ubo_type IS 'Type: NATURAL_PERSON, PUBLIC_FLOAT, STATE_OWNED, WIDELY_HELD, UNKNOWN, EXEMPT';
+
+
+--
 -- Name: entity_validation_rules; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -6564,6 +6987,33 @@ CREATE TABLE "ob-poc".fund_structure (
 
 
 --
+-- Name: gleif_sync_log; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".gleif_sync_log (
+    sync_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    entity_id uuid,
+    lei character varying(20),
+    sync_type character varying(30) NOT NULL,
+    sync_status character varying(30) NOT NULL,
+    records_fetched integer DEFAULT 0,
+    records_updated integer DEFAULT 0,
+    records_created integer DEFAULT 0,
+    error_message text,
+    started_at timestamp with time zone DEFAULT now(),
+    completed_at timestamp with time zone,
+    CONSTRAINT valid_sync_status CHECK (((sync_status)::text = ANY ((ARRAY['SUCCESS'::character varying, 'FAILED'::character varying, 'PARTIAL'::character varying, 'IN_PROGRESS'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE gleif_sync_log; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".gleif_sync_log IS 'Audit log for GLEIF data synchronization operations';
+
+
+--
 -- Name: instrument_lifecycles; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -6585,6 +7035,106 @@ CREATE TABLE "ob-poc".instrument_lifecycles (
 --
 
 COMMENT ON TABLE "ob-poc".instrument_lifecycles IS 'Junction: which lifecycles apply to which instrument classes (analogous to product_services)';
+
+
+--
+-- Name: intent_feedback; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".intent_feedback (
+    id bigint NOT NULL,
+    session_id uuid NOT NULL,
+    interaction_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_input text NOT NULL,
+    user_input_hash text NOT NULL,
+    input_source text DEFAULT 'chat'::text NOT NULL,
+    matched_verb text,
+    match_score real,
+    match_confidence text,
+    semantic_score real,
+    phonetic_score real,
+    alternatives jsonb,
+    outcome text,
+    outcome_verb text,
+    correction_input text,
+    time_to_outcome_ms integer,
+    graph_context text,
+    workflow_phase text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT valid_confidence CHECK (((match_confidence = ANY (ARRAY['high'::text, 'medium'::text, 'low'::text, 'none'::text])) OR (match_confidence IS NULL))),
+    CONSTRAINT valid_outcome CHECK (((outcome = ANY (ARRAY['executed'::text, 'selected_alt'::text, 'corrected'::text, 'rephrased'::text, 'abandoned'::text])) OR (outcome IS NULL))),
+    CONSTRAINT valid_source CHECK ((input_source = ANY (ARRAY['chat'::text, 'voice'::text, 'command'::text])))
+);
+
+
+--
+-- Name: TABLE intent_feedback; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".intent_feedback IS 'ML feedback capture for intent matching continuous learning. Append-only, batch analysis.';
+
+
+--
+-- Name: intent_feedback_analysis; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".intent_feedback_analysis (
+    id integer NOT NULL,
+    analysis_type text NOT NULL,
+    analysis_date date DEFAULT CURRENT_DATE NOT NULL,
+    data jsonb NOT NULL,
+    reviewed boolean DEFAULT false,
+    applied boolean DEFAULT false,
+    reviewed_by text,
+    reviewed_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE intent_feedback_analysis; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".intent_feedback_analysis IS 'Materialized analysis results from batch feedback analysis. Reviewed by humans, applied to patterns.';
+
+
+--
+-- Name: intent_feedback_analysis_id_seq; Type: SEQUENCE; Schema: ob-poc; Owner: -
+--
+
+CREATE SEQUENCE "ob-poc".intent_feedback_analysis_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: intent_feedback_analysis_id_seq; Type: SEQUENCE OWNED BY; Schema: ob-poc; Owner: -
+--
+
+ALTER SEQUENCE "ob-poc".intent_feedback_analysis_id_seq OWNED BY "ob-poc".intent_feedback_analysis.id;
+
+
+--
+-- Name: intent_feedback_id_seq; Type: SEQUENCE; Schema: ob-poc; Owner: -
+--
+
+CREATE SEQUENCE "ob-poc".intent_feedback_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: intent_feedback_id_seq; Type: SEQUENCE OWNED BY; Schema: ob-poc; Owner: -
+--
+
+ALTER SEQUENCE "ob-poc".intent_feedback_id_seq OWNED BY "ob-poc".intent_feedback.id;
 
 
 --
@@ -7426,6 +7976,22 @@ CREATE TABLE "ob-poc".screening_types (
     description text,
     is_active boolean DEFAULT true,
     display_order integer DEFAULT 0
+);
+
+
+--
+-- Name: semantic_match_cache; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".semantic_match_cache (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    transcript_normalized text NOT NULL,
+    matched_verb character varying(100) NOT NULL,
+    similarity_score real NOT NULL,
+    match_method character varying(20) NOT NULL,
+    hit_count integer DEFAULT 1 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_accessed_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -9287,6 +9853,46 @@ CREATE VIEW "ob-poc".v_workflow_summary AS
 
 
 --
+-- Name: verb_pattern_embeddings; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".verb_pattern_embeddings (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    verb_name character varying(100) NOT NULL,
+    pattern_phrase text NOT NULL,
+    pattern_normalized text NOT NULL,
+    phonetic_codes text[] DEFAULT '{}'::text[] NOT NULL,
+    embedding public.vector(384) NOT NULL,
+    category character varying(50) DEFAULT 'navigation'::character varying NOT NULL,
+    is_agent_bound boolean DEFAULT false NOT NULL,
+    priority integer DEFAULT 50 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE verb_pattern_embeddings; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".verb_pattern_embeddings IS 'Pre-computed embeddings for voice command patterns. Used for semantic similarity matching of voice transcripts to DSL verbs.';
+
+
+--
+-- Name: COLUMN verb_pattern_embeddings.phonetic_codes; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".verb_pattern_embeddings.phonetic_codes IS 'Double Metaphone codes for phonetic fallback matching. Handles "enhawnce" → "enhance".';
+
+
+--
+-- Name: COLUMN verb_pattern_embeddings.embedding; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".verb_pattern_embeddings.embedding IS 'all-MiniLM-L6-v2 embedding (384 dimensions). Captures semantic meaning of pattern phrase.';
+
+
+--
 -- Name: verification_challenges; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -10470,6 +11076,20 @@ ALTER TABLE ONLY "ob-poc".dsl_instances ALTER COLUMN id SET DEFAULT nextval('"ob
 
 
 --
+-- Name: intent_feedback id; Type: DEFAULT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".intent_feedback ALTER COLUMN id SET DEFAULT nextval('"ob-poc".intent_feedback_id_seq'::regclass);
+
+
+--
+-- Name: intent_feedback_analysis id; Type: DEFAULT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".intent_feedback_analysis ALTER COLUMN id SET DEFAULT nextval('"ob-poc".intent_feedback_analysis_id_seq'::regclass);
+
+
+--
 -- Name: attribute_sources id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -11214,6 +11834,30 @@ ALTER TABLE ONLY "ob-poc".attribute_values_typed
 
 
 --
+-- Name: bods_entity_statements bods_entity_statements_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".bods_entity_statements
+    ADD CONSTRAINT bods_entity_statements_pkey PRIMARY KEY (statement_id);
+
+
+--
+-- Name: bods_ownership_statements bods_ownership_statements_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".bods_ownership_statements
+    ADD CONSTRAINT bods_ownership_statements_pkey PRIMARY KEY (statement_id);
+
+
+--
+-- Name: bods_person_statements bods_person_statements_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".bods_person_statements
+    ADD CONSTRAINT bods_person_statements_pkey PRIMARY KEY (statement_id);
+
+
+--
 -- Name: case_decision_thresholds case_decision_thresholds_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -11790,6 +12434,30 @@ ALTER TABLE ONLY "ob-poc".entities
 
 
 --
+-- Name: entity_addresses entity_addresses_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_addresses
+    ADD CONSTRAINT entity_addresses_pkey PRIMARY KEY (address_id);
+
+
+--
+-- Name: entity_bods_links entity_bods_links_entity_id_bods_entity_statement_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_bods_links
+    ADD CONSTRAINT entity_bods_links_entity_id_bods_entity_statement_id_key UNIQUE (entity_id, bods_entity_statement_id);
+
+
+--
+-- Name: entity_bods_links entity_bods_links_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_bods_links
+    ADD CONSTRAINT entity_bods_links_pkey PRIMARY KEY (link_id);
+
+
+--
 -- Name: entity_cooperatives entity_cooperatives_entity_id_uniq; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -11862,11 +12530,43 @@ ALTER TABLE ONLY "ob-poc".entity_government
 
 
 --
+-- Name: entity_identifiers entity_identifiers_entity_id_identifier_type_identifier_val_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_identifiers
+    ADD CONSTRAINT entity_identifiers_entity_id_identifier_type_identifier_val_key UNIQUE (entity_id, identifier_type, identifier_value);
+
+
+--
+-- Name: entity_identifiers entity_identifiers_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_identifiers
+    ADD CONSTRAINT entity_identifiers_pkey PRIMARY KEY (identifier_id);
+
+
+--
+-- Name: entity_lifecycle_events entity_lifecycle_events_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_lifecycle_events
+    ADD CONSTRAINT entity_lifecycle_events_pkey PRIMARY KEY (event_id);
+
+
+--
 -- Name: entity_limited_companies entity_limited_companies_entity_id_uniq; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
 ALTER TABLE ONLY "ob-poc".entity_limited_companies
     ADD CONSTRAINT entity_limited_companies_entity_id_uniq UNIQUE (entity_id);
+
+
+--
+-- Name: entity_limited_companies entity_limited_companies_lei_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_limited_companies
+    ADD CONSTRAINT entity_limited_companies_lei_key UNIQUE (lei);
 
 
 --
@@ -11891,6 +12591,30 @@ ALTER TABLE ONLY "ob-poc".entity_manco
 
 ALTER TABLE ONLY "ob-poc".entity_manco
     ADD CONSTRAINT entity_manco_pkey PRIMARY KEY (entity_id);
+
+
+--
+-- Name: entity_names entity_names_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_names
+    ADD CONSTRAINT entity_names_pkey PRIMARY KEY (name_id);
+
+
+--
+-- Name: entity_parent_relationships entity_parent_relationships_child_entity_id_parent_lei_rela_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_parent_relationships
+    ADD CONSTRAINT entity_parent_relationships_child_entity_id_parent_lei_rela_key UNIQUE (child_entity_id, parent_lei, relationship_type);
+
+
+--
+-- Name: entity_parent_relationships entity_parent_relationships_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_parent_relationships
+    ADD CONSTRAINT entity_parent_relationships_pkey PRIMARY KEY (relationship_id);
 
 
 --
@@ -12022,6 +12746,14 @@ ALTER TABLE ONLY "ob-poc".entity_types
 
 
 --
+-- Name: entity_ubos entity_ubos_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_ubos
+    ADD CONSTRAINT entity_ubos_pkey PRIMARY KEY (ubo_id);
+
+
+--
 -- Name: entity_validation_rules entity_validation_rules_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -12070,6 +12802,14 @@ ALTER TABLE ONLY "ob-poc".fund_structure
 
 
 --
+-- Name: gleif_sync_log gleif_sync_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".gleif_sync_log
+    ADD CONSTRAINT gleif_sync_log_pkey PRIMARY KEY (sync_id);
+
+
+--
 -- Name: instrument_lifecycles instrument_lifecycles_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -12083,6 +12823,30 @@ ALTER TABLE ONLY "ob-poc".instrument_lifecycles
 
 ALTER TABLE ONLY "ob-poc".instrument_lifecycles
     ADD CONSTRAINT instrument_lifecycles_unique UNIQUE (instrument_class_id, lifecycle_id);
+
+
+--
+-- Name: intent_feedback_analysis intent_feedback_analysis_analysis_type_analysis_date_data_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".intent_feedback_analysis
+    ADD CONSTRAINT intent_feedback_analysis_analysis_type_analysis_date_data_key UNIQUE (analysis_type, analysis_date, data);
+
+
+--
+-- Name: intent_feedback_analysis intent_feedback_analysis_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".intent_feedback_analysis
+    ADD CONSTRAINT intent_feedback_analysis_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: intent_feedback intent_feedback_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".intent_feedback
+    ADD CONSTRAINT intent_feedback_pkey PRIMARY KEY (id);
 
 
 --
@@ -12502,6 +13266,22 @@ ALTER TABLE ONLY "ob-poc".screening_types
 
 
 --
+-- Name: semantic_match_cache semantic_match_cache_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".semantic_match_cache
+    ADD CONSTRAINT semantic_match_cache_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: semantic_match_cache semantic_match_cache_transcript_normalized_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".semantic_match_cache
+    ADD CONSTRAINT semantic_match_cache_transcript_normalized_key UNIQUE (transcript_normalized);
+
+
+--
 -- Name: service_delivery_map service_delivery_map_cbu_id_product_id_service_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -12859,6 +13639,22 @@ ALTER TABLE ONLY "ob-poc".workflow_instances
 
 ALTER TABLE ONLY "ob-poc".workflow_definitions
     ADD CONSTRAINT uq_workflow_version UNIQUE (workflow_id, version);
+
+
+--
+-- Name: verb_pattern_embeddings verb_pattern_embeddings_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".verb_pattern_embeddings
+    ADD CONSTRAINT verb_pattern_embeddings_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: verb_pattern_embeddings verb_pattern_embeddings_verb_name_pattern_normalized_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".verb_pattern_embeddings
+    ADD CONSTRAINT verb_pattern_embeddings_verb_name_pattern_normalized_key UNIQUE (verb_name, pattern_normalized);
 
 
 --
@@ -13862,6 +14658,20 @@ CREATE INDEX idx_alleg_workstream ON "ob-poc".client_allegations USING btree (wo
 
 
 --
+-- Name: idx_analysis_pending; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_analysis_pending ON "ob-poc".intent_feedback_analysis USING btree (reviewed) WHERE (NOT reviewed);
+
+
+--
+-- Name: idx_analysis_type_date; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_analysis_type_date ON "ob-poc".intent_feedback_analysis USING btree (analysis_type, analysis_date);
+
+
+--
 -- Name: idx_assertion_log_case; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -13964,6 +14774,48 @@ CREATE INDEX idx_attribute_values_typed_entity_attribute ON "ob-poc".attribute_v
 --
 
 CREATE INDEX idx_audit_instance ON "ob-poc".workflow_audit_log USING btree (instance_id, transitioned_at DESC);
+
+
+--
+-- Name: idx_bods_entity_company_num; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_bods_entity_company_num ON "ob-poc".bods_entity_statements USING btree (company_number) WHERE (company_number IS NOT NULL);
+
+
+--
+-- Name: idx_bods_entity_lei; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_bods_entity_lei ON "ob-poc".bods_entity_statements USING btree (lei) WHERE (lei IS NOT NULL);
+
+
+--
+-- Name: idx_bods_ownership_interested; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_bods_ownership_interested ON "ob-poc".bods_ownership_statements USING btree (interested_party_statement_id);
+
+
+--
+-- Name: idx_bods_ownership_subject; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_bods_ownership_subject ON "ob-poc".bods_ownership_statements USING btree (subject_entity_statement_id);
+
+
+--
+-- Name: idx_bods_ownership_subject_lei; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_bods_ownership_subject_lei ON "ob-poc".bods_ownership_statements USING btree (subject_lei) WHERE (subject_lei IS NOT NULL);
+
+
+--
+-- Name: idx_bods_person_name; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_bods_person_name ON "ob-poc".bods_person_statements USING gin (to_tsvector('english'::regconfig, full_name));
 
 
 --
@@ -14877,6 +15729,20 @@ CREATE UNIQUE INDEX idx_entities_type_name ON "ob-poc".entities USING btree (ent
 
 
 --
+-- Name: idx_entity_addresses_country; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_addresses_country ON "ob-poc".entity_addresses USING btree (country);
+
+
+--
+-- Name: idx_entity_addresses_entity; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_addresses_entity ON "ob-poc".entity_addresses USING btree (entity_id);
+
+
+--
 -- Name: idx_entity_crud_rules_active; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -14926,6 +15792,27 @@ CREATE INDEX idx_entity_deps_to ON "ob-poc".entity_type_dependencies USING btree
 
 
 --
+-- Name: idx_entity_events_date; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_events_date ON "ob-poc".entity_lifecycle_events USING btree (effective_date DESC);
+
+
+--
+-- Name: idx_entity_events_entity; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_events_entity ON "ob-poc".entity_lifecycle_events USING btree (entity_id);
+
+
+--
+-- Name: idx_entity_events_type; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_events_type ON "ob-poc".entity_lifecycle_events USING btree (event_type);
+
+
+--
 -- Name: idx_entity_funds_jurisdiction; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -14951,6 +15838,55 @@ CREATE INDEX idx_entity_funds_master ON "ob-poc".entity_funds USING btree (maste
 --
 
 CREATE INDEX idx_entity_funds_parent ON "ob-poc".entity_funds USING btree (parent_fund_id);
+
+
+--
+-- Name: idx_entity_identifiers_lookup; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_identifiers_lookup ON "ob-poc".entity_identifiers USING btree (identifier_type, identifier_value);
+
+
+--
+-- Name: idx_entity_names_entity; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_names_entity ON "ob-poc".entity_names USING btree (entity_id);
+
+
+--
+-- Name: idx_entity_names_search; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_names_search ON "ob-poc".entity_names USING gin (to_tsvector('english'::regconfig, name));
+
+
+--
+-- Name: idx_entity_parents_child; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_parents_child ON "ob-poc".entity_parent_relationships USING btree (child_entity_id);
+
+
+--
+-- Name: idx_entity_parents_parent; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_parents_parent ON "ob-poc".entity_parent_relationships USING btree (parent_entity_id) WHERE (parent_entity_id IS NOT NULL);
+
+
+--
+-- Name: idx_entity_parents_parent_lei; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_parents_parent_lei ON "ob-poc".entity_parent_relationships USING btree (parent_lei) WHERE (parent_lei IS NOT NULL);
+
+
+--
+-- Name: idx_entity_parents_type; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_parents_type ON "ob-poc".entity_parent_relationships USING btree (relationship_type);
 
 
 --
@@ -15059,6 +15995,20 @@ CREATE UNIQUE INDEX idx_entity_types_type_code ON "ob-poc".entity_types USING bt
 
 
 --
+-- Name: idx_entity_ubos_entity; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_ubos_entity ON "ob-poc".entity_ubos USING btree (entity_id);
+
+
+--
+-- Name: idx_entity_ubos_person; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_ubos_person ON "ob-poc".entity_ubos USING btree (person_statement_id) WHERE (person_statement_id IS NOT NULL);
+
+
+--
 -- Name: idx_entity_validation_active; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -15077,6 +16027,55 @@ CREATE INDEX idx_entity_validation_field ON "ob-poc".entity_validation_rules USI
 --
 
 CREATE INDEX idx_entity_validation_type ON "ob-poc".entity_validation_rules USING btree (entity_type);
+
+
+--
+-- Name: idx_feedback_confidence; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_feedback_confidence ON "ob-poc".intent_feedback USING btree (match_confidence);
+
+
+--
+-- Name: idx_feedback_created; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_feedback_created ON "ob-poc".intent_feedback USING btree (created_at);
+
+
+--
+-- Name: idx_feedback_input_hash; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_feedback_input_hash ON "ob-poc".intent_feedback USING btree (user_input_hash);
+
+
+--
+-- Name: idx_feedback_outcome; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_feedback_outcome ON "ob-poc".intent_feedback USING btree (outcome) WHERE (outcome IS NOT NULL);
+
+
+--
+-- Name: idx_feedback_pending; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_feedback_pending ON "ob-poc".intent_feedback USING btree (interaction_id) WHERE (outcome IS NULL);
+
+
+--
+-- Name: idx_feedback_session; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_feedback_session ON "ob-poc".intent_feedback USING btree (session_id);
+
+
+--
+-- Name: idx_feedback_verb; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_feedback_verb ON "ob-poc".intent_feedback USING btree (matched_verb) WHERE (matched_verb IS NOT NULL);
 
 
 --
@@ -15199,6 +16198,20 @@ CREATE INDEX idx_gen_log_success ON "ob-poc".dsl_generation_log USING btree (suc
 
 
 --
+-- Name: idx_gleif_sync_entity; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_gleif_sync_entity ON "ob-poc".gleif_sync_log USING btree (entity_id) WHERE (entity_id IS NOT NULL);
+
+
+--
+-- Name: idx_gleif_sync_lei; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_gleif_sync_lei ON "ob-poc".gleif_sync_log USING btree (lei) WHERE (lei IS NOT NULL);
+
+
+--
 -- Name: idx_government_country; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -15318,6 +16331,13 @@ CREATE INDEX idx_lifecycles_owner ON "ob-poc".lifecycles USING btree (owner);
 
 
 --
+-- Name: idx_limited_companies_direct_parent; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_limited_companies_direct_parent ON "ob-poc".entity_limited_companies USING btree (direct_parent_lei) WHERE (direct_parent_lei IS NOT NULL);
+
+
+--
 -- Name: idx_limited_companies_entity_id; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -15332,10 +16352,24 @@ CREATE INDEX idx_limited_companies_jurisdiction ON "ob-poc".entity_limited_compa
 
 
 --
+-- Name: idx_limited_companies_lei; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_limited_companies_lei ON "ob-poc".entity_limited_companies USING btree (lei) WHERE (lei IS NOT NULL);
+
+
+--
 -- Name: idx_limited_companies_reg_num; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
 CREATE INDEX idx_limited_companies_reg_num ON "ob-poc".entity_limited_companies USING btree (registration_number);
+
+
+--
+-- Name: idx_limited_companies_ultimate_parent; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_limited_companies_ultimate_parent ON "ob-poc".entity_limited_companies USING btree (ultimate_parent_lei) WHERE (ultimate_parent_lei IS NOT NULL);
 
 
 --
@@ -15745,6 +16779,13 @@ CREATE INDEX idx_sdm_status ON "ob-poc".service_delivery_map USING btree (delive
 
 
 --
+-- Name: idx_semantic_cache_accessed; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_semantic_cache_accessed ON "ob-poc".semantic_match_cache USING btree (last_accessed_at);
+
+
+--
 -- Name: idx_service_capabilities_resource; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -16120,6 +17161,34 @@ CREATE INDEX idx_ubo_snapshots_cbu_id ON "ob-poc".ubo_snapshots USING btree (cbu
 --
 
 CREATE INDEX idx_values_attr_uuid ON "ob-poc".attribute_values_typed USING btree (attribute_uuid);
+
+
+--
+-- Name: idx_verb_pattern_agent_bound; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_verb_pattern_agent_bound ON "ob-poc".verb_pattern_embeddings USING btree (is_agent_bound);
+
+
+--
+-- Name: idx_verb_pattern_category; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_verb_pattern_category ON "ob-poc".verb_pattern_embeddings USING btree (category);
+
+
+--
+-- Name: idx_verb_pattern_embedding_ivfflat; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_verb_pattern_embedding_ivfflat ON "ob-poc".verb_pattern_embeddings USING ivfflat (embedding public.vector_cosine_ops) WITH (lists='10');
+
+
+--
+-- Name: idx_verb_pattern_phonetic; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_verb_pattern_phonetic ON "ob-poc".verb_pattern_embeddings USING gin (phonetic_codes);
 
 
 --
@@ -18317,6 +19386,30 @@ ALTER TABLE ONLY "ob-poc".entities
 
 
 --
+-- Name: entity_addresses entity_addresses_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_addresses
+    ADD CONSTRAINT entity_addresses_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
+
+
+--
+-- Name: entity_bods_links entity_bods_links_bods_entity_statement_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_bods_links
+    ADD CONSTRAINT entity_bods_links_bods_entity_statement_id_fkey FOREIGN KEY (bods_entity_statement_id) REFERENCES "ob-poc".bods_entity_statements(statement_id);
+
+
+--
+-- Name: entity_bods_links entity_bods_links_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_bods_links
+    ADD CONSTRAINT entity_bods_links_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
+
+
+--
 -- Name: entity_cooperatives entity_cooperatives_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -18365,6 +19458,22 @@ ALTER TABLE ONLY "ob-poc".entity_government
 
 
 --
+-- Name: entity_identifiers entity_identifiers_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_identifiers
+    ADD CONSTRAINT entity_identifiers_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
+
+
+--
+-- Name: entity_lifecycle_events entity_lifecycle_events_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_lifecycle_events
+    ADD CONSTRAINT entity_lifecycle_events_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
+
+
+--
 -- Name: entity_limited_companies entity_limited_companies_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -18378,6 +19487,30 @@ ALTER TABLE ONLY "ob-poc".entity_limited_companies
 
 ALTER TABLE ONLY "ob-poc".entity_manco
     ADD CONSTRAINT entity_manco_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
+
+
+--
+-- Name: entity_names entity_names_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_names
+    ADD CONSTRAINT entity_names_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
+
+
+--
+-- Name: entity_parent_relationships entity_parent_relationships_child_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_parent_relationships
+    ADD CONSTRAINT entity_parent_relationships_child_entity_id_fkey FOREIGN KEY (child_entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
+
+
+--
+-- Name: entity_parent_relationships entity_parent_relationships_parent_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_parent_relationships
+    ADD CONSTRAINT entity_parent_relationships_parent_entity_id_fkey FOREIGN KEY (parent_entity_id) REFERENCES "ob-poc".entities(entity_id);
 
 
 --
@@ -18466,6 +19599,14 @@ ALTER TABLE ONLY "ob-poc".entity_trusts
 
 ALTER TABLE ONLY "ob-poc".entity_types
     ADD CONSTRAINT entity_types_parent_type_id_fkey FOREIGN KEY (parent_type_id) REFERENCES "ob-poc".entity_types(entity_type_id);
+
+
+--
+-- Name: entity_ubos entity_ubos_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_ubos
+    ADD CONSTRAINT entity_ubos_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
 
 
 --
@@ -18666,6 +19807,14 @@ ALTER TABLE ONLY "ob-poc".fund_structure
 
 ALTER TABLE ONLY "ob-poc".fund_structure
     ADD CONSTRAINT fund_structure_parent_entity_id_fkey FOREIGN KEY (parent_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: gleif_sync_log gleif_sync_log_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".gleif_sync_log
+    ADD CONSTRAINT gleif_sync_log_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id);
 
 
 --
@@ -19552,5 +20701,5 @@ ALTER TABLE ONLY teams.teams
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hZIPIScftbutj8CN4bJMxjcXwPDJrCGLl8f6WmPaSTgAwBTCdUPVz9DYohfN1o8
+\unrestrict J3iAbwNFfXgBRTO7AuQ1NVpH4PLO1Fo1uxAfao5vMVMMujcYLz70bSXduu0fn6K
 

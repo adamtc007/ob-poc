@@ -43,5 +43,8 @@ dsl-lsp = { path = "../dsl-lsp" }
 entity-gateway = { path = "../entity-gateway" }
 tonic = "0.12"
 
+# Semantic voice command matching
+ob-semantic-matcher = { path = "../ob-semantic-matcher" }
+
 [features]
 default = []

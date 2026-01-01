@@ -9,8 +9,9 @@ use crate::api;
 use crate::panels::{
     ast_panel, cbu_search_modal, chat_panel, container_browse_panel, context_panel,
     dsl_editor_panel, entity_detail_panel, repl_panel, results_panel, taxonomy_panel, toolbar,
-    CbuSearchAction, CbuSearchData, ContainerBrowseAction, ContainerBrowseData, ContextPanelAction,
-    DslEditorAction, TaxonomyPanelAction, ToolbarAction, ToolbarData,
+    trading_matrix_panel, CbuSearchAction, CbuSearchData, ContainerBrowseAction,
+    ContainerBrowseData, ContextPanelAction, DslEditorAction, TaxonomyPanelAction, ToolbarAction,
+    ToolbarData, TradingMatrixPanelAction,
 };
 use crate::state::{AppState, AsyncState, CbuSearchUi, LayoutMode, PanelState, TextBuffers};
 use ob_poc_graph::{CbuGraphWidget, ViewMode};
@@ -39,6 +40,7 @@ impl App {
             messages: Vec::new(),
             cbu_list: Vec::new(),
             session_context: None,
+            trading_matrix: None,
             buffers: TextBuffers::default(),
             view_mode: ViewMode::KycUbo,
             panels: PanelState::default(),
@@ -56,6 +58,8 @@ impl App {
             entity_ontology: ob_poc_graph::EntityTypeOntology::new(),
             taxonomy_state: ob_poc_graph::TaxonomyState::new(),
             type_filter: None,
+            trading_matrix_state: ob_poc_graph::TradingMatrixState::new(),
+            selected_matrix_node: None,
         };
 
         // Try to restore session from localStorage
@@ -64,7 +68,343 @@ impl App {
         // Fetch initial CBU list
         state.fetch_cbu_list();
 
+        // Install voice command listener (WASM only)
+        #[cfg(target_arch = "wasm32")]
+        {
+            if let Err(e) = crate::voice_bridge::install_voice_listener() {
+                web_sys::console::warn_1(
+                    &format!("Failed to install voice listener: {:?}", e).into(),
+                );
+            }
+        }
+
         Self { state }
+    }
+
+    // =========================================================================
+    // Voice Command Processing (WASM only)
+    // =========================================================================
+
+    /// Process pending voice commands from the JavaScript voice bridge.
+    /// Commands flow through the unified dispatcher and then either:
+    /// - NavigationVerb → executed locally
+    /// - AgentPrompt → sent via AgentPromptConduit
+    #[cfg(target_arch = "wasm32")]
+    fn process_voice_commands(&mut self) {
+        use crate::command::{
+            dispatch_command, CommandResult, CommandSource, InvestigationContext,
+        };
+        use crate::voice_bridge::take_pending_voice_commands;
+
+        // Take all pending voice commands from the queue
+        let commands = take_pending_voice_commands();
+        if commands.is_empty() {
+            return;
+        }
+
+        // Build investigation context from current app state
+        let context = InvestigationContext {
+            focused_entity_id: self.state.graph_widget.selected_entity_id(),
+            current_cbu_id: self
+                .state
+                .session
+                .as_ref()
+                .and_then(|s| s.active_cbu.as_ref().map(|cbu| cbu.id.clone())),
+            current_view_mode: self.state.graph_widget.view_mode(),
+            current_zoom: 1.0,
+            selected_entities: self
+                .state
+                .graph_widget
+                .selected_entity_id()
+                .map(|id| vec![id])
+                .unwrap_or_default(),
+        };
+
+        for cmd in commands {
+            let source = CommandSource::Voice {
+                transcript: cmd.transcript.clone(),
+                confidence: cmd.confidence,
+                provider: crate::command::VoiceProvider::from_str(&cmd.provider),
+            };
+
+            let result = dispatch_command(source, &context);
+
+            web_sys::console::log_1(
+                &format!(
+                    "Voice command: '{}' -> {:?} (confidence: {:.2})",
+                    cmd.transcript, result, cmd.confidence
+                )
+                .into(),
+            );
+
+            // Route based on command result
+            match result {
+                CommandResult::Navigation(verb) => self.execute_navigation_verb(verb),
+                CommandResult::Agent(prompt) => self.send_to_agent(prompt),
+                CommandResult::None => {}
+            }
+        }
+    }
+
+    /// Execute a navigation verb from any command source (voice, chat, egui).
+    /// These are LOCAL UI commands - no server round-trip needed.
+    #[cfg(target_arch = "wasm32")]
+    fn execute_navigation_verb(&mut self, verb: crate::command::NavigationVerb) {
+        use crate::command::NavigationVerb;
+        use ob_poc_graph::ViewMode;
+        use ob_poc_types::PanDirection;
+
+        match verb {
+            NavigationVerb::None => {}
+
+            // Zoom commands
+            NavigationVerb::ZoomIn { factor } => {
+                self.state.graph_widget.zoom_in(factor);
+            }
+            NavigationVerb::ZoomOut { factor } => {
+                self.state.graph_widget.zoom_out(factor);
+            }
+            NavigationVerb::ZoomFit => {
+                self.state.graph_widget.zoom_to_fit();
+            }
+            NavigationVerb::ZoomTo { level } => {
+                self.state.graph_widget.set_zoom(level);
+            }
+
+            // Pan commands
+            NavigationVerb::Pan { direction, amount } => {
+                let amt = amount.unwrap_or(100.0);
+                match direction {
+                    PanDirection::Left => self.state.graph_widget.pan(-amt, 0.0),
+                    PanDirection::Right => self.state.graph_widget.pan(amt, 0.0),
+                    PanDirection::Up => self.state.graph_widget.pan(0.0, -amt),
+                    PanDirection::Down => self.state.graph_widget.pan(0.0, amt),
+                }
+            }
+            NavigationVerb::Center => {
+                self.state.graph_widget.center_view();
+            }
+            NavigationVerb::Stop => {
+                self.state.graph_widget.stop_animation();
+            }
+            NavigationVerb::ResetLayout => {
+                self.state.graph_widget.reset_layout();
+            }
+
+            // Focus/Selection
+            NavigationVerb::FocusEntity { entity_id } => {
+                self.state.graph_widget.focus_on_entity(&entity_id);
+            }
+
+            // View Mode
+            NavigationVerb::SetViewMode { mode } => {
+                self.state.graph_widget.set_view_mode(mode);
+                self.trigger_graph_refresh();
+            }
+
+            // Filtering
+            NavigationVerb::FilterByType { type_codes } => {
+                self.state.type_filter = Some(type_codes);
+            }
+            NavigationVerb::HighlightType { type_code } => {
+                self.state.graph_widget.highlight_type(&type_code);
+            }
+            NavigationVerb::ClearFilter => {
+                self.state.type_filter = None;
+                self.state.graph_widget.clear_highlight();
+            }
+
+            // Scale navigation (astronomical metaphor)
+            NavigationVerb::ScaleUniverse => {
+                self.state.graph_widget.zoom_to_fit();
+            }
+            NavigationVerb::ScaleGalaxy { segment: _ } => {
+                // Zoom to segment level
+                self.state.graph_widget.set_zoom(0.3);
+            }
+            NavigationVerb::ScaleSystem { cbu_id } => {
+                if let Some(id) = cbu_id {
+                    self.state.select_cbu(Uuid::parse_str(&id).ok());
+                }
+            }
+            NavigationVerb::ScalePlanet { entity_id } => {
+                if let Some(id) = entity_id {
+                    self.state.graph_widget.focus_on_entity(&id);
+                }
+            }
+            NavigationVerb::ScaleSurface => {
+                self.state.graph_widget.set_zoom(1.5);
+            }
+            NavigationVerb::ScaleCore => {
+                self.state.graph_widget.set_zoom(3.0);
+            }
+
+            // Depth navigation
+            NavigationVerb::DrillThrough => {
+                self.state.graph_widget.zoom_in(Some(1.5));
+            }
+            NavigationVerb::SurfaceReturn => {
+                self.state.graph_widget.zoom_to_fit();
+            }
+            NavigationVerb::Xray => {
+                // Toggle transparency mode
+                web_sys::console::log_1(&"X-ray mode toggled".into());
+            }
+            NavigationVerb::Peel => {
+                // Peel layer
+                web_sys::console::log_1(&"Layer peeled".into());
+            }
+            NavigationVerb::CrossSection => {
+                // Show cross section
+                web_sys::console::log_1(&"Cross section view".into());
+            }
+            NavigationVerb::DepthIndicator => {
+                // Show depth indicator
+                web_sys::console::log_1(&"Depth indicator shown".into());
+            }
+
+            // Orbital navigation
+            NavigationVerb::Orbit { entity_id } => {
+                if let Some(id) = entity_id {
+                    self.state.graph_widget.focus_on_entity(&id);
+                }
+            }
+            NavigationVerb::RotateLayer { layer: _ } => {
+                web_sys::console::log_1(&"Rotating layer".into());
+            }
+            NavigationVerb::Flip => {
+                web_sys::console::log_1(&"View flipped".into());
+            }
+            NavigationVerb::Tilt { dimension: _ } => {
+                web_sys::console::log_1(&"View tilted".into());
+            }
+
+            // Temporal navigation
+            NavigationVerb::TimeRewind { target_date: _ } => {
+                web_sys::console::log_1(&"Time rewind".into());
+            }
+            NavigationVerb::TimePlay { from: _, to: _ } => {
+                web_sys::console::log_1(&"Timeline playing".into());
+            }
+            NavigationVerb::TimeFreeze => {
+                web_sys::console::log_1(&"Time frozen".into());
+            }
+            NavigationVerb::TimeSlice { date1: _, date2: _ } => {
+                web_sys::console::log_1(&"Time slice comparison".into());
+            }
+            NavigationVerb::TimeTrail { entity_id: _ } => {
+                web_sys::console::log_1(&"Showing time trail".into());
+            }
+
+            // Investigation patterns (these are navigation, not agent)
+            NavigationVerb::FollowMoney { from_entity } => {
+                if let Some(id) = from_entity {
+                    self.state.graph_widget.focus_on_entity(&id);
+                }
+                // TODO: Highlight money flow edges
+            }
+            NavigationVerb::WhoControls { entity_id } => {
+                if let Some(id) = entity_id {
+                    self.state.graph_widget.focus_on_entity(&id);
+                }
+                // TODO: Trace control chain visually
+            }
+            NavigationVerb::Illuminate { aspect: _ } => {
+                // Highlight specific aspect
+            }
+            NavigationVerb::Shadow => {
+                // Dim background entities
+            }
+            NavigationVerb::RedFlagScan => {
+                // Highlight red flag entities
+            }
+            NavigationVerb::BlackHole => {
+                // Highlight entities with missing data
+            }
+
+            // Context
+            NavigationVerb::SetContext { context: _ } => {
+                // Switch investigation context
+            }
+        }
+    }
+
+    /// Trigger a graph data refresh from the server
+    #[cfg(target_arch = "wasm32")]
+    fn trigger_graph_refresh(&mut self) {
+        if let Ok(mut state) = self.state.async_state.lock() {
+            state.needs_graph_refetch = true;
+        }
+    }
+}
+
+// =============================================================================
+// AgentPromptConduit Implementation
+// =============================================================================
+
+#[cfg(target_arch = "wasm32")]
+impl crate::command::AgentPromptConduit for App {
+    /// Send an agent prompt for processing.
+    /// This is the SINGLE entry point for ALL agent-bound commands,
+    /// regardless of source (voice, chat, egui button).
+    fn send_to_agent(&mut self, prompt: crate::command::AgentPrompt) {
+        use crate::command::AgentPrompt;
+
+        // Log the prompt with source attribution
+        let source_desc = match prompt.source() {
+            crate::command::PromptSource::Voice { confidence, .. } => {
+                format!("voice (confidence: {:.0}%)", confidence * 100.0)
+            }
+            crate::command::PromptSource::ChatInput => "chat".to_string(),
+            crate::command::PromptSource::EguiWidget { widget_id } => {
+                format!("widget:{}", widget_id)
+            }
+            crate::command::PromptSource::System => "system".to_string(),
+        };
+
+        web_sys::console::log_1(
+            &format!(
+                "[AgentConduit] Prompt from {}: {}",
+                source_desc,
+                prompt.to_chat_message()
+            )
+            .into(),
+        );
+
+        // Check if we're ready to send (not already processing)
+        if !self.is_ready() {
+            web_sys::console::warn_1(&"[AgentConduit] Request in flight, queueing...".into());
+            // TODO: Queue the prompt for later
+            return;
+        }
+
+        // Convert to chat message and send
+        let message = prompt.to_chat_message();
+
+        // Get session ID
+        let Some(session_id) = self.state.session_id else {
+            web_sys::console::warn_1(&"[AgentConduit] No session, cannot send".into());
+            return;
+        };
+
+        // Use the existing chat infrastructure
+        self.state.buffers.chat_input = message;
+        self.state.send_chat(session_id);
+    }
+
+    /// Check if the conduit is ready to accept new prompts.
+    fn is_ready(&self) -> bool {
+        if let Ok(state) = self.state.async_state.lock() {
+            !state.loading_chat
+        } else {
+            false
+        }
+    }
+
+    /// Get the last error from the conduit, if any.
+    fn last_error(&self) -> Option<&str> {
+        // TODO: Track last error in async state
+        None
     }
 }
 
@@ -74,6 +414,15 @@ impl eframe::App for App {
         // STEP 1: Process any pending async results
         // =================================================================
         self.state.process_async_results();
+
+        // =================================================================
+        // STEP 1.5: Process voice commands (WASM only)
+        // Voice commands flow through unified dispatcher
+        // =================================================================
+        #[cfg(target_arch = "wasm32")]
+        {
+            self.process_voice_commands();
+        }
 
         // =================================================================
         // STEP 2: Handle state change flags (SINGLE CENTRAL PLACE)
@@ -95,6 +444,14 @@ impl eframe::App for App {
                 &format!("update: central graph fetch for cbu_id={}", cbu_id).into(),
             );
             self.state.fetch_graph(cbu_id);
+        }
+
+        // Central trading matrix refetch - triggered by: Trading view mode selected
+        if let Some(cbu_id) = self.state.take_pending_trading_matrix_refetch() {
+            web_sys::console::log_1(
+                &format!("update: central trading matrix fetch for cbu_id={}", cbu_id).into(),
+            );
+            self.state.fetch_trading_matrix(cbu_id);
         }
 
         // Central context refetch - triggered by: select_cbu
@@ -180,6 +537,248 @@ impl eframe::App for App {
             self.state
                 .graph_widget
                 .set_highlighted_type(Some(type_code));
+        }
+
+        // =================================================================
+        // Process Esper-style navigation commands from agent chat
+        // =================================================================
+
+        // Handle zoom in command
+        if let Some(factor) = self.state.take_pending_zoom_in() {
+            web_sys::console::log_1(&format!("update: zoom in factor={}", factor).into());
+            self.state.graph_widget.zoom_in(Some(factor));
+        }
+
+        // Handle zoom out command
+        if let Some(factor) = self.state.take_pending_zoom_out() {
+            web_sys::console::log_1(&format!("update: zoom out factor={}", factor).into());
+            self.state.graph_widget.zoom_out(Some(factor));
+        }
+
+        // Handle zoom fit command
+        if self.state.take_pending_zoom_fit() {
+            web_sys::console::log_1(&"update: zoom fit".into());
+            self.state.graph_widget.zoom_fit();
+        }
+
+        // Handle zoom to level command
+        if let Some(level) = self.state.take_pending_zoom_to() {
+            web_sys::console::log_1(&format!("update: zoom to level={}", level).into());
+            self.state.graph_widget.zoom_to_level(level);
+        }
+
+        // Handle pan command
+        if let Some((direction, amount)) = self.state.take_pending_pan() {
+            web_sys::console::log_1(
+                &format!("update: pan direction={:?} amount={:?}", direction, amount).into(),
+            );
+            self.state.graph_widget.pan_direction(direction, amount);
+        }
+
+        // Handle center command
+        if self.state.take_pending_center() {
+            web_sys::console::log_1(&"update: center view".into());
+            self.state.graph_widget.center_view();
+        }
+
+        // Handle stop command
+        if self.state.take_pending_stop() {
+            web_sys::console::log_1(&"update: stop animation".into());
+            self.state.graph_widget.stop_animation();
+        }
+
+        // Handle focus entity command
+        if let Some(entity_id) = self.state.take_pending_focus_entity() {
+            web_sys::console::log_1(&format!("update: focus entity {}", entity_id).into());
+            self.state.graph_widget.focus_entity(&entity_id);
+            self.state.selected_entity_id = Some(entity_id);
+        }
+
+        // Handle reset layout command
+        if self.state.take_pending_reset_layout() {
+            web_sys::console::log_1(&"update: reset layout".into());
+            self.state.graph_widget.reset_camera();
+        }
+
+        // =================================================================
+        // Process Extended Esper 3D/Multi-dimensional Navigation Commands
+        // =================================================================
+
+        // Scale Navigation (astronomical metaphor)
+        if self.state.take_pending_scale_universe() {
+            web_sys::console::log_1(&"update: scale universe (full book view)".into());
+            // TODO: Implement universe/full book view - zoom out to show all CBUs
+            self.state.graph_widget.zoom_fit();
+        }
+
+        if let Some(segment) = self.state.take_pending_scale_galaxy() {
+            web_sys::console::log_1(&format!("update: scale galaxy segment={:?}", segment).into());
+            // TODO: Implement galaxy/segment view
+        }
+
+        if let Some(cbu_id) = self.state.take_pending_scale_system() {
+            web_sys::console::log_1(&format!("update: scale system cbu_id={:?}", cbu_id).into());
+            // TODO: Focus on specific CBU system
+            if let Some(id) = cbu_id {
+                self.state.graph_widget.focus_entity(&id);
+            }
+        }
+
+        if let Some(entity_id) = self.state.take_pending_scale_planet() {
+            web_sys::console::log_1(
+                &format!("update: scale planet entity_id={:?}", entity_id).into(),
+            );
+            // Focus on specific entity
+            if let Some(id) = entity_id {
+                self.state.graph_widget.focus_entity(&id);
+                self.state.selected_entity_id = Some(id);
+            }
+        }
+
+        if self.state.take_pending_scale_surface() {
+            web_sys::console::log_1(&"update: scale surface (attribute level)".into());
+            // TODO: Zoom in to show entity attributes
+            self.state.graph_widget.zoom_in(Some(2.0));
+        }
+
+        if self.state.take_pending_scale_core() {
+            web_sys::console::log_1(&"update: scale core (raw data level)".into());
+            // TODO: Show raw data/JSON view
+            self.state.graph_widget.zoom_in(Some(3.0));
+        }
+
+        // Depth Navigation (Z-axis through entity structures)
+        if self.state.take_pending_drill_through() {
+            web_sys::console::log_1(&"update: drill through".into());
+            // TODO: Drill through to subsidiary/ownership structure
+        }
+
+        if self.state.take_pending_surface_return() {
+            web_sys::console::log_1(&"update: surface return".into());
+            // TODO: Return to top-level view
+            self.state.graph_widget.zoom_fit();
+        }
+
+        if self.state.take_pending_xray() {
+            web_sys::console::log_1(&"update: x-ray mode".into());
+            // TODO: Toggle x-ray/transparency mode to see through layers
+        }
+
+        if self.state.take_pending_peel() {
+            web_sys::console::log_1(&"update: peel layer".into());
+            // TODO: Remove outermost layer to reveal next
+        }
+
+        if self.state.take_pending_cross_section() {
+            web_sys::console::log_1(&"update: cross section".into());
+            // TODO: Show cross-section view of entity structure
+        }
+
+        if self.state.take_pending_depth_indicator() {
+            web_sys::console::log_1(&"update: depth indicator".into());
+            // TODO: Toggle depth indicator overlay
+        }
+
+        // Orbital Navigation
+        if let Some(entity_id) = self.state.take_pending_orbit() {
+            web_sys::console::log_1(&format!("update: orbit entity_id={:?}", entity_id).into());
+            // TODO: Start orbiting around entity
+            if let Some(id) = entity_id {
+                self.state.graph_widget.focus_entity(&id);
+            }
+        }
+
+        if let Some(layer) = self.state.take_pending_rotate_layer() {
+            web_sys::console::log_1(&format!("update: rotate layer={}", layer).into());
+            // TODO: Rotate specific layer (ownership, services, etc.)
+        }
+
+        if self.state.take_pending_flip() {
+            web_sys::console::log_1(&"update: flip view".into());
+            // TODO: Flip perspective (top-down vs bottom-up)
+        }
+
+        if let Some(dimension) = self.state.take_pending_tilt() {
+            web_sys::console::log_1(&format!("update: tilt dimension={}", dimension).into());
+            // TODO: Tilt to reveal specific dimension
+        }
+
+        // Temporal Navigation
+        if let Some(target_date) = self.state.take_pending_time_rewind() {
+            web_sys::console::log_1(&format!("update: time rewind to={:?}", target_date).into());
+            // TODO: Rewind to historical snapshot
+        }
+
+        if let Some((from_date, to_date)) = self.state.take_pending_time_play() {
+            web_sys::console::log_1(
+                &format!("update: time play from={:?} to={:?}", from_date, to_date).into(),
+            );
+            // TODO: Animate changes over time period
+        }
+
+        if self.state.take_pending_time_freeze() {
+            web_sys::console::log_1(&"update: time freeze".into());
+            // TODO: Pause temporal animation
+        }
+
+        if let Some((date1, date2)) = self.state.take_pending_time_slice() {
+            web_sys::console::log_1(
+                &format!("update: time slice dates={:?},{:?}", date1, date2).into(),
+            );
+            // TODO: Show diff between two points in time
+        }
+
+        if let Some(entity_id) = self.state.take_pending_time_trail() {
+            web_sys::console::log_1(
+                &format!("update: time trail entity_id={:?}", entity_id).into(),
+            );
+            // TODO: Show entity's history trail/timeline
+        }
+
+        // Investigation Patterns
+        if let Some(from_entity) = self.state.take_pending_follow_money() {
+            web_sys::console::log_1(
+                &format!("update: follow the money from={:?}", from_entity).into(),
+            );
+            // TODO: Trace financial flows from entity
+        }
+
+        if let Some(entity_id) = self.state.take_pending_who_controls() {
+            web_sys::console::log_1(
+                &format!("update: who controls entity_id={:?}", entity_id).into(),
+            );
+            // TODO: Highlight control relationships leading to entity
+        }
+
+        if let Some(aspect) = self.state.take_pending_illuminate() {
+            web_sys::console::log_1(&format!("update: illuminate aspect={}", aspect).into());
+            // TODO: Highlight specific aspect (risks, documents, screenings, etc.)
+        }
+
+        if self.state.take_pending_shadow() {
+            web_sys::console::log_1(&"update: shadow mode".into());
+            // TODO: Dim everything except high-risk/flagged items
+        }
+
+        if self.state.take_pending_red_flag_scan() {
+            web_sys::console::log_1(&"update: red flag scan".into());
+            // TODO: Highlight all red flags and risk indicators
+        }
+
+        if self.state.take_pending_black_hole() {
+            web_sys::console::log_1(&"update: black hole (find gaps)".into());
+            // TODO: Highlight missing data, incomplete chains
+        }
+
+        // Context Intentions
+        if let Some(context) = self.state.take_pending_context() {
+            web_sys::console::log_1(&format!("update: set context={}", context).into());
+            // TODO: Adjust UI mode based on context
+            // - review: read-only, focus on summary
+            // - investigation: forensic tools, full detail
+            // - onboarding: workflow-driven, progress focus
+            // - monitoring: alerts, changes, flags
+            // - remediation: issues, resolutions, actions
         }
 
         // =================================================================
@@ -644,6 +1243,79 @@ impl App {
         }
     }
 
+    /// Handle trading matrix browser actions
+    fn handle_trading_matrix_action(&mut self, action: TradingMatrixPanelAction) {
+        match action {
+            TradingMatrixPanelAction::None => {}
+            TradingMatrixPanelAction::ToggleExpand { node_key } => {
+                // Parse the node key back to a TradingMatrixNodeId
+                let path: Vec<String> = if node_key.is_empty() {
+                    Vec::new()
+                } else {
+                    node_key.split('/').map(|s| s.to_string()).collect()
+                };
+                let node_id = ob_poc_graph::TradingMatrixNodeId { path };
+                self.state.trading_matrix_state.toggle(&node_id);
+            }
+            TradingMatrixPanelAction::SelectNode { node_key } => {
+                web_sys::console::log_1(&format!("TradingMatrix: Select node {}", node_key).into());
+                let path: Vec<String> = if node_key.is_empty() {
+                    Vec::new()
+                } else {
+                    node_key.split('/').map(|s| s.to_string()).collect()
+                };
+                let node_id = ob_poc_graph::TradingMatrixNodeId { path };
+                self.state.trading_matrix_state.select(Some(&node_id));
+            }
+            TradingMatrixPanelAction::ClearSelection => {
+                self.state.trading_matrix_state.select(None);
+            }
+            TradingMatrixPanelAction::NavigateToEntity { entity_id } => {
+                web_sys::console::log_1(
+                    &format!("TradingMatrix: Navigate to entity {}", entity_id).into(),
+                );
+                self.state.selected_entity_id = Some(entity_id.clone());
+                self.state.graph_widget.focus_entity(&entity_id);
+            }
+            TradingMatrixPanelAction::OpenSsiDetail { ssi_id } => {
+                web_sys::console::log_1(
+                    &format!("TradingMatrix: Open SSI detail {}", ssi_id).into(),
+                );
+                // TODO: Navigate to SSI detail view
+            }
+            TradingMatrixPanelAction::OpenIsdaDetail { isda_id } => {
+                web_sys::console::log_1(
+                    &format!("TradingMatrix: Open ISDA detail {}", isda_id).into(),
+                );
+                // TODO: Navigate to ISDA detail view
+            }
+            TradingMatrixPanelAction::ExpandAll => {
+                if let Some(ref matrix) = self.state.trading_matrix {
+                    // Expand all nodes by traversing the tree
+                    fn expand_all_nodes(
+                        state: &mut ob_poc_graph::TradingMatrixState,
+                        node: &ob_poc_graph::TradingMatrixNode,
+                    ) {
+                        state.expand(&node.id);
+                        for child in &node.children {
+                            expand_all_nodes(state, child);
+                        }
+                    }
+                    expand_all_nodes(&mut self.state.trading_matrix_state, &matrix.root);
+                }
+            }
+            TradingMatrixPanelAction::CollapseAll => {
+                self.state.trading_matrix_state.collapse_all();
+            }
+            TradingMatrixPanelAction::LoadChildren { node_key } => {
+                web_sys::console::log_1(
+                    &format!("TradingMatrix: Load children for {}", node_key).into(),
+                );
+                // TODO: Lazy loading of children
+            }
+        }
+    }
+
     /// Render layout:
     /// - Top 50%: Graph (full width)
     /// - Bottom left 60%: Unified REPL (chat + resolution + DSL)
@@ -653,21 +1325,42 @@ impl App {
         let top_height = available.y * 0.5;
         let bottom_height = available.y * 0.5 - 4.0;
 
-        // Top: Graph (full width, 50% height) with taxonomy browser overlay
-        let taxonomy_action = ui
+        // Top: Graph (full width, 50% height) with taxonomy/trading matrix browser overlay
+        // Use Trading Matrix browser when in Trading view mode, Taxonomy browser otherwise
+        let is_trading_mode = matches!(self.state.view_mode, ViewMode::Trading);
+
+        let (taxonomy_action, trading_matrix_action) = ui
             .allocate_ui(egui::vec2(available.x, top_height), |ui| {
                 egui::Frame::default()
                     .inner_margin(0.0)
                     .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
                     .show(ui, |ui| {
-                        // Horizontal split: taxonomy browser (left) + graph (right)
+                        // Horizontal split: browser (left) + graph (right)
                         ui.horizontal(|ui| {
-                            // Taxonomy browser (collapsible, 180px when open)
-                            let taxonomy_width = 180.0;
-                            let action = ui
+                            let browser_width = if is_trading_mode { 240.0 } else { 180.0 };
+
+                            let (tax_action, matrix_action) = ui
                                 .allocate_ui(
-                                    egui::vec2(taxonomy_width, ui.available_height()),
-                                    |ui| taxonomy_panel(ui, &self.state, ui.available_height()),
+                                    egui::vec2(browser_width, ui.available_height()),
+                                    |ui| {
+                                        if is_trading_mode {
+                                            // Trading Matrix browser for Trading view
+                                            let action = trading_matrix_panel(
+                                                ui,
+                                                &self.state,
+                                                ui.available_height(),
+                                            );
+                                            (TaxonomyPanelAction::None, action)
+                                        } else {
+                                            // Taxonomy browser for other views
+                                            let action = taxonomy_panel(
+                                                ui,
+                                                &self.state,
+                                                ui.available_height(),
+                                            );
+                                            (action, TradingMatrixPanelAction::None)
+                                        }
+                                    },
                                 )
                                 .inner;
 
@@ -676,7 +1369,7 @@ impl App {
                                 self.state.graph_widget.ui(ui);
                             });
 
-                            action
+                            (tax_action, matrix_action)
                         })
                         .inner
                     })
@@ -684,8 +1377,9 @@ impl App {
             })
             .inner;
 
-        // Handle taxonomy actions AFTER rendering (Rule 2)
+        // Handle actions AFTER rendering (Rule 2)
         self.handle_taxonomy_action(taxonomy_action);
+        self.handle_trading_matrix_action(trading_matrix_action);
 
         ui.separator();
 
@@ -1017,6 +1711,10 @@ impl AppState {
         // Set flag - actual fetch happens in update() after all state changes
         if let Ok(mut state) = self.async_state.lock() {
             state.needs_graph_refetch = true;
+            // Also trigger trading matrix refetch when switching to Trading mode
+            if matches!(mode, ViewMode::Trading) {
+                state.needs_trading_matrix_refetch = true;
+            }
         }
     }
 
@@ -1163,6 +1861,282 @@ impl AppState {
                                             .into(),
                                         );
                                         state.pending_view_mode = Some(view_mode.clone());
+                                    }
+                                    // Esper-style navigation commands
+                                    ob_poc_types::AgentCommand::ZoomIn { factor } => {
+                                        web_sys::console::log_1(
+                                            &format!("Command: ZoomIn factor={:?}", factor).into(),
+                                        );
+                                        state.pending_zoom_in = Some(factor.unwrap_or(1.3));
+                                    }
+                                    ob_poc_types::AgentCommand::ZoomOut { factor } => {
+                                        web_sys::console::log_1(
+                                            &format!("Command: ZoomOut factor={:?}", factor).into(),
+                                        );
+                                        state.pending_zoom_out = Some(factor.unwrap_or(1.3));
+                                    }
+                                    ob_poc_types::AgentCommand::ZoomFit => {
+                                        web_sys::console::log_1(&"Command: ZoomFit".into());
+                                        state.pending_zoom_fit = true;
+                                    }
+                                    ob_poc_types::AgentCommand::ZoomTo { level } => {
+                                        web_sys::console::log_1(
+                                            &format!("Command: ZoomTo level={}", level).into(),
+                                        );
+                                        state.pending_zoom_to = Some(*level);
+                                    }
+                                    ob_poc_types::AgentCommand::Pan { direction, amount } => {
+                                        web_sys::console::log_1(
+                                            &format!(
+                                                "Command: Pan direction={:?} amount={:?}",
+                                                direction, amount
+                                            )
+                                            .into(),
+                                        );
+                                        state.pending_pan = Some((direction.clone(), *amount));
+                                    }
+                                    ob_poc_types::AgentCommand::Center => {
+                                        web_sys::console::log_1(&"Command: Center".into());
+                                        state.pending_center = true;
+                                    }
+                                    ob_poc_types::AgentCommand::Stop => {
+                                        web_sys::console::log_1(&"Command: Stop".into());
+                                        state.pending_stop = true;
+                                    }
+                                    ob_poc_types::AgentCommand::FocusEntity { entity_id } => {
+                                        web_sys::console::log_1(
+                                            &format!(
+                                                "Command: FocusEntity entity_id={}",
+                                                entity_id
+                                            )
+                                            .into(),
+                                        );
+                                        state.pending_focus_entity = Some(entity_id.clone());
+                                    }
+                                    ob_poc_types::AgentCommand::ResetLayout => {
+                                        web_sys::console::log_1(&"Command: ResetLayout".into());
+                                        state.pending_reset_layout = true;
+                                    }
+
+                                    // =========================================================
+                                    // Extended Esper 3D/Multi-dimensional Navigation Commands
+                                    // =========================================================
+
+                                    // Scale Navigation (astronomical metaphor)
+                                    ob_poc_types::AgentCommand::ScaleUniverse => {
+                                        web_sys::console::log_1(&"Command: ScaleUniverse".into());
+                                        state.pending_scale_universe = true;
+                                    }
+                                    ob_poc_types::AgentCommand::ScaleGalaxy { segment } => {
+                                        web_sys::console::log_1(
+                                            &format!("Command: ScaleGalaxy segment={:?}", segment)
+                                                .into(),
+                                        );
+                                        state.pending_scale_galaxy = Some(segment.clone());
+                                    }
+                                    ob_poc_types::AgentCommand::ScaleSystem { cbu_id } => {
+                                        web_sys::console::log_1(
+                                            &format!("Command: ScaleSystem cbu_id={:?}", cbu_id)
+                                                .into(),
+                                        );
+                                        state.pending_scale_system = Some(cbu_id.clone());
+                                    }
+                                    ob_poc_types::AgentCommand::ScalePlanet { entity_id } => {
+                                        web_sys::console::log_1(
+                                            &format!(
+                                                "Command: ScalePlanet entity_id={:?}",
+                                                entity_id
+                                            )
+                                            .into(),
+                                        );
+                                        state.pending_scale_planet = Some(entity_id.clone());
+                                    }
+                                    ob_poc_types::AgentCommand::ScaleSurface => {
+                                        web_sys::console::log_1(&"Command: ScaleSurface".into());
+                                        state.pending_scale_surface = true;
+                                    }
+                                    ob_poc_types::AgentCommand::ScaleCore => {
+                                        web_sys::console::log_1(&"Command: ScaleCore".into());
+                                        state.pending_scale_core = true;
+                                    }
+
+                                    // Depth Navigation (Z-axis through entity structures)
+                                    ob_poc_types::AgentCommand::DrillThrough => {
+                                        web_sys::console::log_1(&"Command: DrillThrough".into());
+                                        state.pending_drill_through = true;
+                                    }
+                                    ob_poc_types::AgentCommand::SurfaceReturn => {
+                                        web_sys::console::log_1(&"Command: SurfaceReturn".into());
+                                        state.pending_surface_return = true;
+                                    }
+                                    ob_poc_types::AgentCommand::XRay => {
+                                        web_sys::console::log_1(&"Command: XRay".into());
+                                        state.pending_xray = true;
+                                    }
+                                    ob_poc_types::AgentCommand::Peel => {
+                                        web_sys::console::log_1(&"Command: Peel".into());
+                                        state.pending_peel = true;
+                                    }
+                                    ob_poc_types::AgentCommand::CrossSection => {
+                                        web_sys::console::log_1(&"Command: CrossSection".into());
+                                        state.pending_cross_section = true;
+                                    }
+                                    ob_poc_types::AgentCommand::DepthIndicator => {
+                                        web_sys::console::log_1(&"Command: DepthIndicator".into());
+                                        state.pending_depth_indicator = true;
+                                    }
+
+                                    // Orbital Navigation
+                                    ob_poc_types::AgentCommand::Orbit { entity_id } => {
+                                        web_sys::console::log_1(
+                                            &format!("Command: Orbit entity_id={:?}", entity_id)
+                                                .into(),
+                                        );
+                                        state.pending_orbit = Some(entity_id.clone());
+                                    }
+                                    ob_poc_types::AgentCommand::RotateLayer { layer } => {
+                                        web_sys::console::log_1(
+                                            &format!("Command: RotateLayer layer={}", layer).into(),
+                                        );
+                                        state.pending_rotate_layer = Some(layer.clone());
+                                    }
+                                    ob_poc_types::AgentCommand::Flip => {
+                                        web_sys::console::log_1(&"Command: Flip".into());
+                                        state.pending_flip = true;
+                                    }
+                                    ob_poc_types::AgentCommand::Tilt { dimension } => {
+                                        web_sys::console::log_1(
+                                            &format!("Command: Tilt dimension={}", dimension)
+                                                .into(),
+                                        );
+                                        state.pending_tilt = Some(dimension.clone());
+                                    }
+
+                                    // Temporal Navigation
+                                    ob_poc_types::AgentCommand::TimeRewind { target_date } => {
+                                        web_sys::console::log_1(
+                                            &format!(
+                                                "Command: TimeRewind target_date={:?}",
+                                                target_date
+                                            )
+                                            .into(),
+                                        );
+                                        state.pending_time_rewind = Some(target_date.clone());
+                                    }
+                                    ob_poc_types::AgentCommand::TimePlay { from_date, to_date } => {
+                                        web_sys::console::log_1(
+                                            &format!(
+                                                "Command: TimePlay from={:?} to={:?}",
+                                                from_date, to_date
+                                            )
+                                            .into(),
+                                        );
+                                        state.pending_time_play =
+                                            Some((from_date.clone(), to_date.clone()));
+                                    }
+                                    ob_poc_types::AgentCommand::TimeFreeze => {
+                                        web_sys::console::log_1(&"Command: TimeFreeze".into());
+                                        state.pending_time_freeze = true;
+                                    }
+                                    ob_poc_types::AgentCommand::TimeSlice { date1, date2 } => {
+                                        web_sys::console::log_1(
+                                            &format!(
+                                                "Command: TimeSlice date1={:?} date2={:?}",
+                                                date1, date2
+                                            )
+                                            .into(),
+                                        );
+                                        state.pending_time_slice =
+                                            Some((date1.clone(), date2.clone()));
+                                    }
+                                    ob_poc_types::AgentCommand::TimeTrail { entity_id } => {
+                                        web_sys::console::log_1(
+                                            &format!(
+                                                "Command: TimeTrail entity_id={:?}",
+                                                entity_id
+                                            )
+                                            .into(),
+                                        );
+                                        state.pending_time_trail = Some(entity_id.clone());
+                                    }
+
+                                    // Investigation Patterns
+                                    ob_poc_types::AgentCommand::FollowTheMoney { from_entity } => {
+                                        web_sys::console::log_1(
+                                            &format!(
+                                                "Command: FollowTheMoney from={:?}",
+                                                from_entity
+                                            )
+                                            .into(),
+                                        );
+                                        state.pending_follow_money = Some(from_entity.clone());
+                                    }
+                                    ob_poc_types::AgentCommand::WhoControls { entity_id } => {
+                                        web_sys::console::log_1(
+                                            &format!(
+                                                "Command: WhoControls entity_id={:?}",
+                                                entity_id
+                                            )
+                                            .into(),
+                                        );
+                                        state.pending_who_controls = Some(entity_id.clone());
+                                    }
+                                    ob_poc_types::AgentCommand::Illuminate { aspect } => {
+                                        web_sys::console::log_1(
+                                            &format!("Command: Illuminate aspect={}", aspect)
+                                                .into(),
+                                        );
+                                        state.pending_illuminate = Some(aspect.clone());
+                                    }
+                                    ob_poc_types::AgentCommand::Shadow => {
+                                        web_sys::console::log_1(&"Command: Shadow".into());
+                                        state.pending_shadow = true;
+                                    }
+                                    ob_poc_types::AgentCommand::RedFlagScan => {
+                                        web_sys::console::log_1(&"Command: RedFlagScan".into());
+                                        state.pending_red_flag_scan = true;
+                                    }
+                                    ob_poc_types::AgentCommand::BlackHole => {
+                                        web_sys::console::log_1(&"Command: BlackHole".into());
+                                        state.pending_black_hole = true;
+                                    }
+
+                                    // Context Intentions
+                                    ob_poc_types::AgentCommand::ContextReview => {
+                                        web_sys::console::log_1(&"Command: ContextReview".into());
+                                        state.pending_context = Some("review".to_string());
+                                    }
+                                    ob_poc_types::AgentCommand::ContextInvestigation => {
+                                        web_sys::console::log_1(
+                                            &"Command: ContextInvestigation".into(),
+                                        );
+                                        state.pending_context = Some("investigation".to_string());
+                                    }
+                                    ob_poc_types::AgentCommand::ContextOnboarding => {
+                                        web_sys::console::log_1(
+                                            &"Command: ContextOnboarding".into(),
+                                        );
+                                        state.pending_context = Some("onboarding".to_string());
+                                    }
+                                    ob_poc_types::AgentCommand::ContextMonitoring => {
+                                        web_sys::console::log_1(
+                                            &"Command: ContextMonitoring".into(),
+                                        );
+                                        state.pending_context = Some("monitoring".to_string());
+                                    }
+                                    ob_poc_types::AgentCommand::ContextRemediation => {
+                                        web_sys::console::log_1(
+                                            &"Command: ContextRemediation".into(),
+                                        );
+                                        state.pending_context = Some("remediation".to_string());
+                                    }
+
+                                    // Unhandled commands - log but don't fail
+                                    _ => {
+                                        web_sys::console::warn_1(
+                                            &format!("Command not yet implemented: {:?}", cmd)
+                                                .into(),
+                                        );
                                     }
                                 }
                             }

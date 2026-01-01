@@ -1,5 +1,5 @@
 ;; GLEIF-Verified Allianz Global Investors Ownership Structure
-;; Generated: 2025-12-28T17:43:19.914029
+;; Generated: 2026-01-01T10:30:20.595916
 ;; Source: GLEIF API (api.gleif.org)
 ;; Relationship Type: IS_DIRECTLY_CONSOLIDATED_BY (accounting consolidation = 100%)
 
@@ -37,35 +37,38 @@
 
 ;; === OWNERSHIP CHAIN ===
 ;; GLEIF reports 'IS_DIRECTLY_CONSOLIDATED_BY' = 100% accounting ownership
-;; Using ubo.add-ownership (idempotent via upsert on from_entity_id + to_entity_id + relationship_type)
 
-(ubo.add-ownership
+(cbu.role:assign-ownership
     :owner-entity-id @529900k9
     :owned-entity-id @oj2tiqsv
     :percentage 100.0
-    :ownership-type "DIRECT")
+    :ownership-type "ACCOUNTING_CONSOLIDATION"
+    :source "GLEIF"
+    :corroboration "FULLY_CORROBORATED")
 
-(ubo.add-ownership
+(cbu.role:assign-ownership
     :owner-entity-id @oj2tiqsv
     :owned-entity-id @5493005j
     :percentage 100.0
-    :ownership-type "DIRECT")
+    :ownership-type "ACCOUNTING_CONSOLIDATION"
+    :source "GLEIF"
+    :corroboration "UNKNOWN")
 
-(ubo.add-ownership
+(cbu.role:assign-ownership
     :owner-entity-id @oj2tiqsv
     :owned-entity-id @353800nv
     :percentage 100.0
-    :ownership-type "DIRECT")
+    :ownership-type "ACCOUNTING_CONSOLIDATION"
+    :source "GLEIF"
+    :corroboration "UNKNOWN")
 
 ;; === UBO TERMINUS ===
 ;; Allianz SE is publicly traded with dispersed ownership
-;; Chain terminates here - no natural person UBO (XETRA: ALV)
 
-(ubo.mark-terminus
+(cbu.role:mark-ubo-terminus
     :entity-id @529900k9
-    :terminus-type "LISTED_COMPANY"
-    :exchange "XETRA"
-    :lei "529900K9B0N5BT694847")
+    :reason "NO_KNOWN_PERSON"
+    :notes "GLEIF reporting exception - no consolidating parent")
 
 ;; === FUND MANAGEMENT (sample) ===
 ;; AllianzGI manages 300 funds registered in GLEIF

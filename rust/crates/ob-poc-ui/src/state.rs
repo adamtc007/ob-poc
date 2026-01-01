@@ -14,7 +14,10 @@
 
 use crate::panels::ContainerBrowseState;
 use crate::tokens::TokenRegistry;
-use ob_poc_graph::{CbuGraphData, CbuGraphWidget, EntityTypeOntology, TaxonomyState, ViewMode};
+use ob_poc_graph::{
+    CbuGraphData, CbuGraphWidget, EntityTypeOntology, TaxonomyState, TradingMatrix,
+    TradingMatrixNode, TradingMatrixState, ViewMode,
+};
 use ob_poc_types::{
     CbuSummary, ExecuteResponse, ResolutionSearchResponse, ResolutionSessionResponse,
     SessionContext, SessionStateResponse, ValidateDslResponse,
@@ -87,6 +90,10 @@ pub struct AppState {
     /// Set via fetch_session_context(), never modified directly
     pub session_context: Option<SessionContext>,
 
+    /// Trading matrix data (hierarchical custody configuration)
+    /// Set via fetch_trading_matrix(), never modified directly
+    pub trading_matrix: Option<TradingMatrix>,
+
     // =========================================================================
     // UI-ONLY STATE (ephemeral, not persisted)
     // =========================================================================
@@ -127,6 +134,12 @@ pub struct AppState {
     /// Active type filter (None = show all, Some = filter to type)
     pub type_filter: Option<String>,
 
+    /// Trading matrix browser state (expand/collapse, selection)
+    pub trading_matrix_state: TradingMatrixState,
+
+    /// Currently selected trading matrix node (for detail panel)
+    pub selected_matrix_node: Option<TradingMatrixNode>,
+
     // =========================================================================
     // ASYNC COORDINATION
     // =========================================================================
@@ -150,6 +163,7 @@ impl Default for AppState {
             messages: Vec::new(),
             cbu_list: Vec::new(),
             session_context: None,
+            trading_matrix: None,
 
             // UI-only state
             buffers: TextBuffers::default(),
@@ -169,6 +183,8 @@ impl Default for AppState {
             entity_ontology: EntityTypeOntology::new(),
             taxonomy_state: TaxonomyState::new(),
             type_filter: None,
+            trading_matrix_state: TradingMatrixState::new(),
+            selected_matrix_node: None,
 
             // Async coordination
             async_state: Arc::new(Mutex::new(AsyncState::default())),
@@ -306,6 +322,7 @@ pub struct AsyncState {
     pub pending_resolution_search: Option<Result<ResolutionSearchResponse, String>>,
     pub pending_cbu_search: Option<Result<crate::api::CbuSearchResponse, String>>,
     pub pending_session_context: Option<Result<SessionContext, String>>,
+    pub pending_trading_matrix: Option<Result<TradingMatrix, String>>,
 
     // Command triggers (from agent commands)
     pub pending_execute: Option<Uuid>, // Session ID to execute
@@ -316,10 +333,63 @@ pub struct AsyncState {
     pub pending_clear_filter: bool,                  // Clear all filters
     pub pending_view_mode: Option<String>,           // View mode to set
 
+    // Esper-style navigation commands (from agent chat)
+    pub pending_zoom_in: Option<f32>, // Zoom in with optional factor
+    pub pending_zoom_out: Option<f32>, // Zoom out with optional factor
+    pub pending_zoom_fit: bool,       // Zoom to fit all content
+    pub pending_zoom_to: Option<f32>, // Zoom to specific level
+    pub pending_pan: Option<(ob_poc_types::PanDirection, Option<f32>)>, // Pan direction + amount
+    pub pending_center: bool,         // Center view
+    pub pending_stop: bool,           // Stop all animation
+    pub pending_focus_entity: Option<String>, // Focus on entity by ID
+    pub pending_reset_layout: bool,   // Reset layout to default
+
+    // Extended Esper 3D/Multi-dimensional commands
+    // Scale navigation (astronomical metaphor)
+    pub pending_scale_universe: bool,
+    pub pending_scale_galaxy: Option<Option<String>>, // segment filter
+    pub pending_scale_system: Option<Option<String>>, // cbu_id
+    pub pending_scale_planet: Option<Option<String>>, // entity_id
+    pub pending_scale_surface: bool,
+    pub pending_scale_core: bool,
+
+    // Depth navigation (Z-axis)
+    pub pending_drill_through: bool,
+    pub pending_surface_return: bool,
+    pub pending_xray: bool,
+    pub pending_peel: bool,
+    pub pending_cross_section: bool,
+    pub pending_depth_indicator: bool,
+
+    // Orbital navigation
+    pub pending_orbit: Option<Option<String>>, // entity_id
+    pub pending_rotate_layer: Option<String>,  // layer name
+    pub pending_flip: bool,
+    pub pending_tilt: Option<String>, // dimension
+
+    // Temporal navigation
+    pub pending_time_rewind: Option<Option<String>>, // target_date
+    pub pending_time_play: Option<(Option<String>, Option<String>)>, // from, to
+    pub pending_time_freeze: bool,
+    pub pending_time_slice: Option<(Option<String>, Option<String>)>, // date1, date2
+    pub pending_time_trail: Option<Option<String>>,                   // entity_id
+
+    // Investigation patterns
+    pub pending_follow_money: Option<Option<String>>, // from_entity
+    pub pending_who_controls: Option<Option<String>>, // entity_id
+    pub pending_illuminate: Option<String>,           // aspect
+    pub pending_shadow: bool,
+    pub pending_red_flag_scan: bool,
+    pub pending_black_hole: bool,
+
+    // Context intentions
+    pub pending_context: Option<String>, // "review", "investigation", "onboarding", etc.
+
     // State change flags (set by actions, processed centrally in update loop)
     // These are checked ONCE in update() AFTER process_async_results()
     pub needs_graph_refetch: bool, // CBU selected or view mode changed
     pub needs_context_refetch: bool, // CBU selected, fetch session context
+    pub needs_trading_matrix_refetch: bool, // Trading view mode selected
     pub pending_cbu_id: Option<Uuid>, // CBU to fetch graph for (set by select_cbu)
 
     // Execution tracking - prevents repeated refetch
@@ -333,6 +403,7 @@ pub struct AsyncState {
     pub loading_resolution: bool,
     pub searching_resolution: bool,
     pub loading_session_context: bool,
+    pub loading_trading_matrix: bool,
 
     // Chat focus tracking - set when chat completes to refocus input
     pub chat_just_finished: bool,
@@ -509,6 +580,19 @@ impl AppState {
                 Err(e) => state.last_error = Some(format!("Session context fetch failed: {}", e)),
             }
         }
+
+        // Process trading matrix
+        if let Some(result) = state.pending_trading_matrix.take() {
+            state.loading_trading_matrix = false;
+            match result {
+                Ok(matrix) => {
+                    // Expand first level by default for better UX
+                    self.trading_matrix_state.expand_first_level(&matrix);
+                    self.trading_matrix = Some(matrix);
+                }
+                Err(e) => state.last_error = Some(format!("Trading matrix fetch failed: {}", e)),
+            }
+        }
     }
 
     /// Check if any async operation is in progress
@@ -572,6 +656,30 @@ impl AppState {
         self.session_id
     }
 
+    /// Check if trading matrix refetch is needed and return the CBU ID to fetch
+    /// Called ONCE per frame in update() - the single central place for trading matrix fetches
+    pub fn take_pending_trading_matrix_refetch(&self) -> Option<Uuid> {
+        let Ok(mut state) = self.async_state.lock() else {
+            return None;
+        };
+
+        if !state.needs_trading_matrix_refetch {
+            return None;
+        }
+
+        // Clear the flag
+        state.needs_trading_matrix_refetch = false;
+
+        // Use pending_cbu_id if set (from select_cbu), otherwise use session_id
+        if let Some(cbu_id) = state.pending_cbu_id.clone() {
+            return Some(cbu_id);
+        }
+
+        // Fall back to current session_id (for view mode changes)
+        drop(state); // Release lock before accessing self
+        self.session_id
+    }
+
     /// Check if context refetch is needed and return true if so
     /// Called ONCE per frame in update() - the single central place for context fetches
     pub fn take_pending_context_refetch(&self) -> bool {
@@ -621,6 +729,361 @@ impl AppState {
     pub fn take_pending_view_mode(&self) -> Option<String> {
         if let Ok(mut state) = self.async_state.lock() {
             state.pending_view_mode.take()
+        } else {
+            None
+        }
+    }
+
+    // =========================================================================
+    // ESPER-STYLE NAVIGATION COMMAND HANDLERS
+    // =========================================================================
+
+    /// Check if a zoom in command is pending
+    pub fn take_pending_zoom_in(&self) -> Option<f32> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_zoom_in.take()
+        } else {
+            None
+        }
+    }
+
+    /// Check if a zoom out command is pending
+    pub fn take_pending_zoom_out(&self) -> Option<f32> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_zoom_out.take()
+        } else {
+            None
+        }
+    }
+
+    /// Check if a zoom fit command is pending
+    pub fn take_pending_zoom_fit(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_zoom_fit;
+            state.pending_zoom_fit = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    /// Check if a zoom to level command is pending
+    pub fn take_pending_zoom_to(&self) -> Option<f32> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_zoom_to.take()
+        } else {
+            None
+        }
+    }
+
+    /// Check if a pan command is pending
+    pub fn take_pending_pan(&self) -> Option<(ob_poc_types::PanDirection, Option<f32>)> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_pan.take()
+        } else {
+            None
+        }
+    }
+
+    /// Check if a center command is pending
+    pub fn take_pending_center(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_center;
+            state.pending_center = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    /// Check if a stop command is pending
+    pub fn take_pending_stop(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_stop;
+            state.pending_stop = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    /// Check if a focus entity command is pending
+    pub fn take_pending_focus_entity(&self) -> Option<String> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_focus_entity.take()
+        } else {
+            None
+        }
+    }
+
+    /// Check if a reset layout command is pending
+    pub fn take_pending_reset_layout(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_reset_layout;
+            state.pending_reset_layout = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    // =========================================================================
+    // Extended Esper 3D Navigation - Take Methods
+    // =========================================================================
+
+    // Scale navigation
+    pub fn take_pending_scale_universe(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_scale_universe;
+            state.pending_scale_universe = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    pub fn take_pending_scale_galaxy(&self) -> Option<Option<String>> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_scale_galaxy.take()
+        } else {
+            None
+        }
+    }
+
+    pub fn take_pending_scale_system(&self) -> Option<Option<String>> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_scale_system.take()
+        } else {
+            None
+        }
+    }
+
+    pub fn take_pending_scale_planet(&self) -> Option<Option<String>> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_scale_planet.take()
+        } else {
+            None
+        }
+    }
+
+    pub fn take_pending_scale_surface(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_scale_surface;
+            state.pending_scale_surface = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    pub fn take_pending_scale_core(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_scale_core;
+            state.pending_scale_core = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    // Depth navigation
+    pub fn take_pending_drill_through(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_drill_through;
+            state.pending_drill_through = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    pub fn take_pending_surface_return(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_surface_return;
+            state.pending_surface_return = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    pub fn take_pending_xray(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_xray;
+            state.pending_xray = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    pub fn take_pending_peel(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_peel;
+            state.pending_peel = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    pub fn take_pending_cross_section(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_cross_section;
+            state.pending_cross_section = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    pub fn take_pending_depth_indicator(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_depth_indicator;
+            state.pending_depth_indicator = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    // Orbital navigation
+    pub fn take_pending_orbit(&self) -> Option<Option<String>> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_orbit.take()
+        } else {
+            None
+        }
+    }
+
+    pub fn take_pending_rotate_layer(&self) -> Option<String> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_rotate_layer.take()
+        } else {
+            None
+        }
+    }
+
+    pub fn take_pending_flip(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_flip;
+            state.pending_flip = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    pub fn take_pending_tilt(&self) -> Option<String> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_tilt.take()
+        } else {
+            None
+        }
+    }
+
+    // Temporal navigation
+    pub fn take_pending_time_rewind(&self) -> Option<Option<String>> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_time_rewind.take()
+        } else {
+            None
+        }
+    }
+
+    pub fn take_pending_time_play(&self) -> Option<(Option<String>, Option<String>)> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_time_play.take()
+        } else {
+            None
+        }
+    }
+
+    pub fn take_pending_time_freeze(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_time_freeze;
+            state.pending_time_freeze = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    pub fn take_pending_time_slice(&self) -> Option<(Option<String>, Option<String>)> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_time_slice.take()
+        } else {
+            None
+        }
+    }
+
+    pub fn take_pending_time_trail(&self) -> Option<Option<String>> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_time_trail.take()
+        } else {
+            None
+        }
+    }
+
+    // Investigation patterns
+    pub fn take_pending_follow_money(&self) -> Option<Option<String>> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_follow_money.take()
+        } else {
+            None
+        }
+    }
+
+    pub fn take_pending_who_controls(&self) -> Option<Option<String>> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_who_controls.take()
+        } else {
+            None
+        }
+    }
+
+    pub fn take_pending_illuminate(&self) -> Option<String> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_illuminate.take()
+        } else {
+            None
+        }
+    }
+
+    pub fn take_pending_shadow(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_shadow;
+            state.pending_shadow = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    pub fn take_pending_red_flag_scan(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_red_flag_scan;
+            state.pending_red_flag_scan = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    pub fn take_pending_black_hole(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_black_hole;
+            state.pending_black_hole = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    // Context intentions
+    pub fn take_pending_context(&self) -> Option<String> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_context.take()
         } else {
             None
         }
@@ -713,6 +1176,32 @@ impl AppState {
             if let Ok(mut state) = async_state.lock() {
                 state.pending_session_context = Some(result);
                 state.loading_session_context = false;
+            }
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+    }
+
+    /// Fetch trading matrix for a CBU
+    /// Called when a CBU is selected and Trading view mode is active
+    pub fn fetch_trading_matrix(&mut self, cbu_id: Uuid) {
+        use crate::api;
+        use wasm_bindgen_futures::spawn_local;
+
+        let async_state = std::sync::Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+
+        {
+            let mut state = async_state.lock().unwrap();
+            state.loading_trading_matrix = true;
+        }
+
+        spawn_local(async move {
+            let result = api::get_trading_matrix(cbu_id).await;
+            if let Ok(mut state) = async_state.lock() {
+                state.pending_trading_matrix = Some(result);
+                state.loading_trading_matrix = false;
             }
             if let Some(ctx) = ctx {
                 ctx.request_repaint();

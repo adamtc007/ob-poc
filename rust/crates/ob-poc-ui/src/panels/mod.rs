@@ -15,6 +15,7 @@ mod repl;
 mod results;
 mod taxonomy;
 mod toolbar;
+mod trading_matrix;
 
 pub use ast::ast_panel;
 pub use cbu_search::{cbu_search_modal, CbuSearchAction, CbuSearchData};
@@ -29,3 +30,4 @@ pub use repl::repl_panel;
 pub use results::results_panel;
 pub use taxonomy::{taxonomy_panel, TaxonomyPanelAction};
 pub use toolbar::{toolbar, ToolbarAction, ToolbarData};
+pub use trading_matrix::{trading_matrix_panel, TradingMatrixPanelAction};

@@ -25,7 +25,7 @@ use crate::state::AppState;
 use ob_poc::api::{
     create_agent_router_with_sessions, create_attribute_router, create_client_router,
     create_dsl_viewer_router, create_entity_router, create_resolution_router, create_session_store,
-    create_verb_discovery_router,
+    create_trading_matrix_router, create_verb_discovery_router,
 };
 
 // Import resolution store from services
@@ -301,7 +301,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Client portal router (separate auth, scoped access)
         .merge(create_client_router(pool.clone(), sessions))
         // Verb discovery router (RAG-style verb suggestions)
-        .merge(create_verb_discovery_router(pool.clone()));
+        .merge(create_verb_discovery_router(pool.clone()))
+        // Trading matrix router (custody taxonomy browser)
+        .merge(create_trading_matrix_router(pool.clone()));
+
+    // Build voice matching router (semantic + phonetic)
+    let voice_router = routes::voice::create_voice_router(pool.clone());
 
     // Build main app router with state
     // Session routes (including /bind) now share the same session store via create_agent_router_with_sessions
@@ -329,6 +334,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_state(state)
         // Merge stateless API routes (includes session, agent, entity, dsl viewer)
         .merge(api_router)
+        // Voice matching routes (semantic ML + phonetic) - stateless router
+        .merge(voice_router)
         // Layers
         .layer(TraceLayer::new_for_http())
         .layer(cors);
@@ -356,6 +363,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("  /api/dsl/*            - DSL viewer");
     tracing::info!("  /api/verbs/discover   - Verb discovery (RAG)");
     tracing::info!("  /api/verbs/agent-context - Agent verb context");
+    tracing::info!("  /api/voice/match      - Semantic voice matching");
+    tracing::info!("  /api/voice/health     - Voice matcher health");
     tracing::info!("");
     tracing::info!("Client Portal API:");
     tracing::info!("  /api/client/login     - Client authentication");

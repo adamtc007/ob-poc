@@ -1,0 +1,68 @@
+{
+  "generated_at": "2026-01-01T10:32:11.806117",
+  "entities": {
+    "529900K9B0N5BT694847": {
+      "name": "Allianz SE",
+      "lei": "529900K9B0N5BT694847",
+      "jurisdiction": "DE",
+      "category": "GENERAL",
+      "legal_form": "SGST",
+      "status": "ACTIVE",
+      "creation_date": "2006-10-12T22:00:00Z",
+      "registration_number": "HRB 164232",
+      "registration_status": "ISSUED",
+      "validation_level": "FULLY_CORROBORATED",
+      "initial_registration": "2013-12-02T15:19:24Z",
+      "last_update": "2025-10-06T23:02:08Z",
+      "next_renewal": "2026-12-04T23:00:00Z",
+      "address": {
+        "lines": [
+          "K\u00f6niginstr. 28"
+        ],
+        "city": "M\u00fcnchen",
+        "region": "DE-BY",
+        "country": "DE",
+        "postal_code": "80802"
+      },
+      "parent_exception": "NO_KNOWN_PERSON",
+      "ultimate_parent_exception": "NO_KNOWN_PERSON"
+    },
+    "OJ2TIQSVQND4IZYYK658": {
+      "name": "Allianz Global Investors GmbH",
+      "lei": "OJ2TIQSVQND4IZYYK658",
+      "jurisdiction": "DE",
+      "category": "GENERAL",
+      "legal_form": "2HBR",
+      "status": "ACTIVE",
+      "creation_date": "1956-03-19T23:00:00Z",
+      "registration_number": "HRB 9340",
+      "registration_status": "ISSUED",
+      "validation_level": "FULLY_CORROBORATED",
+      "initial_registration": "2012-06-06T15:54:15Z",
+      "last_update": "2025-07-01T09:55:55Z",
+      "next_renewal": "2026-08-19T05:58:13Z",
+      "address": {
+        "lines": [
+          "Bockenheimer Landstra\u00dfe 42-44"
+        ],
+        "city": "Frankfurt am Main",
+        "region": "DE-HE",
+        "country": "DE",
+        "postal_code": "60323"
+      },
+      "direct_parent": {
+        "parent_lei": "529900K9B0N5BT694847",
+        "relationship_type": "IS_DIRECTLY_CONSOLIDATED_BY",
+        "status": "ACTIVE",
+        "start_date": null,
+        "accounting_standard": null,
+        "corroboration": null
+      },
+      "ultimate_parent": {
+        "parent_lei": "529900K9B0N5BT694847",
+        "relationship_type": "IS_ULTIMATELY_CONSOLIDATED_BY",
+        "status": "ACTIVE"
+      }
+    }
+  }
+}

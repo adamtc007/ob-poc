@@ -80,6 +80,14 @@ pub mod verification;
 // Taxonomy module - generic taxonomy pattern for Product/Instrument domains
 pub mod taxonomy;
 
+// GLEIF integration - LEI data enrichment and corporate tree traversal
+#[cfg(feature = "database")]
+pub mod gleif;
+
+// BODS integration - Beneficial Ownership Data Standard for UBO discovery
+#[cfg(feature = "database")]
+pub mod bods;
+
 // Database integration re-exports (when database feature is enabled)
 #[cfg(feature = "database")]
 pub use database::DictionaryDatabaseService;
