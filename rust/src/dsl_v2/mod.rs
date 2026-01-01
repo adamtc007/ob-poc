@@ -101,7 +101,6 @@ pub mod planning_facade;
 pub mod ref_resolver;
 pub mod repl_session;
 pub mod runtime_registry;
-pub mod semantic_context;
 #[cfg(feature = "database")]
 pub mod semantic_validator;
 pub mod submission;
@@ -155,7 +154,6 @@ pub use planning_facade::{
 pub use ref_resolver::RefResolver;
 pub use repl_session::{ExecutedBlock, ReplSession};
 pub use runtime_registry::{runtime_registry, runtime_registry_arc, RuntimeVerbRegistry};
-pub use semantic_context::SemanticContextStore;
 #[cfg(feature = "database")]
 pub use semantic_validator::{validate_dsl, validate_dsl_with_csg, SemanticValidator};
 pub use submission::{

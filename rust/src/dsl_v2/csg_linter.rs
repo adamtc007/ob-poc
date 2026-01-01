@@ -15,8 +15,6 @@
 
 use crate::dsl_v2::applicability_rules::ApplicabilityRules;
 use crate::dsl_v2::ast::{AstNode, Program, Span, Statement, VerbCall};
-#[cfg(feature = "database")]
-use crate::dsl_v2::semantic_context::SemanticContextStore;
 use crate::dsl_v2::validation::{
     Diagnostic, DiagnosticCode, Severity, SourceSpan, Suggestion, ValidationContext,
 };
@@ -152,8 +150,6 @@ pub struct CsgLinter {
     #[cfg(feature = "database")]
     pool: PgPool,
     rules: ApplicabilityRules,
-    #[cfg(feature = "database")]
-    semantic_store: SemanticContextStore,
     initialized: bool,
 }
 
@@ -161,9 +157,8 @@ impl CsgLinter {
     #[cfg(feature = "database")]
     pub fn new(pool: PgPool) -> Self {
         Self {
-            pool: pool.clone(),
+            pool,
             rules: ApplicabilityRules::default(),
-            semantic_store: SemanticContextStore::new(pool),
             initialized: false,
         }
     }
@@ -188,7 +183,6 @@ impl CsgLinter {
         Self {
             pool,
             rules: ApplicabilityRules::default(),
-            semantic_store: SemanticContextStore::new_empty(),
             initialized: true, // Pre-initialized with empty rules
         }
     }
@@ -201,7 +195,6 @@ impl CsgLinter {
             return Ok(());
         }
         self.rules = ApplicabilityRules::load(&self.pool).await?;
-        self.semantic_store.initialize().await?;
         self.initialized = true;
         Ok(())
     }
