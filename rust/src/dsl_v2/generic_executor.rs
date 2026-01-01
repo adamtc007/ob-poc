@@ -1072,6 +1072,52 @@ impl GenericCrudExecutor {
             }
         }
 
+        // Add set_values from config (for implicit columns like relationship_type)
+        if let Some(set_values) = &crud.set_values {
+            for (col, value) in set_values {
+                // Skip if column is already in columns list (arg took precedence)
+                let col_quoted = format!("\"{}\"", col);
+                if columns.contains(&col_quoted) {
+                    continue;
+                }
+
+                if let Some(s) = value.as_str() {
+                    // Check if this is a SQL expression (e.g., now(), CURRENT_TIMESTAMP)
+                    let s_lower = s.to_lowercase();
+                    if s_lower == "now()" || s_lower == "current_timestamp" {
+                        columns.push(col_quoted.clone());
+                        placeholders.push("NOW()".to_string());
+                        // Don't add to updates - conflict keys shouldn't include timestamps
+                    } else {
+                        columns.push(col_quoted.clone());
+                        placeholders.push(format!("${}", idx));
+                        bind_values.push(SqlValue::String(s.to_string()));
+                        // Only update if not a conflict key
+                        if !crud.conflict_keys.contains(col) {
+                            updates.push(format!("\"{}\" = EXCLUDED.\"{}\"", col, col));
+                        }
+                        idx += 1;
+                    }
+                } else if let Some(b) = value.as_bool() {
+                    columns.push(col_quoted.clone());
+                    placeholders.push(format!("${}", idx));
+                    bind_values.push(SqlValue::Boolean(b));
+                    if !crud.conflict_keys.contains(col) {
+                        updates.push(format!("\"{}\" = EXCLUDED.\"{}\"", col, col));
+                    }
+                    idx += 1;
+                } else if let Some(n) = value.as_i64() {
+                    columns.push(col_quoted.clone());
+                    placeholders.push(format!("${}", idx));
+                    bind_values.push(SqlValue::Integer(n));
+                    if !crud.conflict_keys.contains(col) {
+                        updates.push(format!("\"{}\" = EXCLUDED.\"{}\"", col, col));
+                    }
+                    idx += 1;
+                }
+            }
+        }
+
         let conflict_cols: Vec<String> = crud
             .conflict_keys
             .iter()

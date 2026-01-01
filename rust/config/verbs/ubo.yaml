@@ -14,6 +14,8 @@ domains:
             - from_entity_id
             - to_entity_id
             - relationship_type
+          set_values:
+            relationship_type: ownership
         args:
           - name: owner-entity-id
             type: uuid
@@ -41,12 +43,14 @@ domains:
             maps_to: percentage
           - name: ownership-type
             type: string
-            required: true
+            required: false
             maps_to: ownership_type
             valid_values:
               - DIRECT
               - INDIRECT
               - BENEFICIAL
+              - DIRECTLY_CONSOLIDATED
+              - ULTIMATELY_CONSOLIDATED
           - name: effective-from
             type: date
             required: false
@@ -65,9 +69,6 @@ domains:
             type: string
             required: false
             maps_to: notes
-        defaults:
-          relationship_type: OWNERSHIP
-          source: DSL
         returns:
           type: uuid
           name: relationship_id

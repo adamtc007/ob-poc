@@ -10,6 +10,7 @@ use clap::{Parser, Subcommand};
 use xshell::{cmd, Shell};
 
 mod gleif_import;
+mod gleif_load;
 mod seed_allianz;
 mod ubo_test;
 
@@ -214,6 +215,29 @@ enum Command {
         #[arg(long)]
         no_regen: bool,
     },
+
+    /// Load Allianz GLEIF data from JSON files and generate/execute DSL
+    GleifLoad {
+        /// Output DSL file (default: data/derived/dsl/allianz_gleif_load.dsl)
+        #[arg(long, short = 'o')]
+        output: Option<std::path::PathBuf>,
+
+        /// Limit number of funds to include
+        #[arg(long)]
+        fund_limit: Option<usize>,
+
+        /// Limit number of corporate subsidiaries to include
+        #[arg(long)]
+        corp_limit: Option<usize>,
+
+        /// Dry run - generate DSL but don't save or execute
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Execute the generated DSL against the database
+        #[arg(long, short = 'x')]
+        execute: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -285,6 +309,18 @@ fn main() -> Result<()> {
             dry_run,
             no_regen,
         } => etl_allianz(&sh, file, no_clean, dry_run, no_regen),
+        Command::GleifLoad {
+            output,
+            fund_limit,
+            corp_limit,
+            dry_run,
+            execute,
+        } => {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(gleif_load::gleif_load(
+                output, fund_limit, corp_limit, dry_run, execute,
+            ))
+        }
     }
 }
 
@@ -831,7 +867,6 @@ async fn execute_dsl_simple(dsl: &str, pool: &sqlx::PgPool) -> Result<()> {
     Ok(())
 }
 
-
 /// Load Allianz structure via DSL (clean existing data + execute DSL file)
 fn etl_allianz(
     sh: &Shell,
@@ -847,9 +882,7 @@ fn etl_allianz(
     let root = project_root()?;
 
     // Default DSL file
-    let dsl_file = file.unwrap_or_else(|| {
-        root.join("data/derived/dsl/allianz_full_etl.dsl")
-    });
+    let dsl_file = file.unwrap_or_else(|| root.join("data/derived/dsl/allianz_full_etl.dsl"));
 
     // Step 1: Regenerate DSL from sources (unless --no-regen)
     if !no_regen {
@@ -886,8 +919,8 @@ fn etl_allianz(
     sh.change_dir(root.join("rust"));
 
     let dsl_path = dsl_file.to_str().context("Invalid DSL path")?;
-    let db_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgresql:///data_designer".to_string());
+    let db_url =
+        std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".to_string());
 
     if dry_run {
         // Just validate/plan
