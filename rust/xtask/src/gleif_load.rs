@@ -313,17 +313,7 @@ fn generate_fund_dsl(fund: &ManagedFund, im_alias: &str) -> String {
         "    :role \"MANAGEMENT_COMPANY\")".to_string(),
     ]);
 
-    // For Luxembourg funds, add SICAV role
-    if fund.fund_jurisdiction == "LU" {
-        lines.extend(vec![
-            format!(""),
-            format!(";; Step 5: SICAV role (Luxembourg)"),
-            "(cbu.assign-role".to_string(),
-            format!("    :cbu-id {}", cbu_alias),
-            format!("    :entity-id {}", entity_alias),
-            "    :role \"SICAV\")".to_string(),
-        ]);
-    }
+    // Note: SICAV is a fund structure type, not a role - handled via entity_funds.fund_structure_type
 
     lines.join("\n")
 }

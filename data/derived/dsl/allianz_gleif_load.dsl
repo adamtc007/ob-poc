@@ -1,6 +1,6 @@
 ;; ============================================================================
 ;; ALLIANZ GLEIF DATA LOAD
-;; Generated: 2026-01-01T10:58:45.757836+00:00
+;; Generated: 2026-01-01T11:08:27.272630+00:00
 ;; Source: GLEIF API (api.gleif.org)
 ;; ============================================================================
 
@@ -125,12 +125,6 @@
     :entity-id @lei_oj2tiqsvqnd4izyyk658
     :role "MANAGEMENT_COMPANY")
 
-;; Step 5: SICAV role (Luxembourg)
-(cbu.assign-role
-    :cbu-id @cbu_529900lsfq65emqnbp87
-    :entity-id @lei_529900lsfq65emqnbp87
-    :role "SICAV")
-
 ;; Fund: Allianz Global Enhanced Equity Income
 
 ;; Step 1: Create fund entity
@@ -160,12 +154,6 @@
     :entity-id @lei_oj2tiqsvqnd4izyyk658
     :role "MANAGEMENT_COMPANY")
 
-;; Step 5: SICAV role (Luxembourg)
-(cbu.assign-role
-    :cbu-id @cbu_529900o2d7wttp2ecm60
-    :entity-id @lei_529900o2d7wttp2ecm60
-    :role "SICAV")
-
 ;; Fund: Allianz EuropEquity Crescendo
 
 ;; Step 1: Create fund entity
@@ -194,12 +182,6 @@
     :cbu-id @cbu_529900a4n4fmrf1qit75
     :entity-id @lei_oj2tiqsvqnd4izyyk658
     :role "MANAGEMENT_COMPANY")
-
-;; Step 5: SICAV role (Luxembourg)
-(cbu.assign-role
-    :cbu-id @cbu_529900a4n4fmrf1qit75
-    :entity-id @lei_529900a4n4fmrf1qit75
-    :role "SICAV")
 
 ;; Fund: OCIRP Actions Multifacteurs
 
@@ -259,12 +241,6 @@
     :entity-id @lei_oj2tiqsvqnd4izyyk658
     :role "MANAGEMENT_COMPANY")
 
-;; Step 5: SICAV role (Luxembourg)
-(cbu.assign-role
-    :cbu-id @cbu_5299007d2y764jwnw850
-    :entity-id @lei_5299007d2y764jwnw850
-    :role "SICAV")
-
 ;; Fund: Allianz European Autonomy
 
 ;; Step 1: Create fund entity
@@ -293,12 +269,6 @@
     :cbu-id @cbu_529900e5teg9cgu33298
     :entity-id @lei_oj2tiqsvqnd4izyyk658
     :role "MANAGEMENT_COMPANY")
-
-;; Step 5: SICAV role (Luxembourg)
-(cbu.assign-role
-    :cbu-id @cbu_529900e5teg9cgu33298
-    :entity-id @lei_529900e5teg9cgu33298
-    :role "SICAV")
 
 ;; Fund: Aktien Dividende Global
 
@@ -387,12 +357,6 @@
     :entity-id @lei_oj2tiqsvqnd4izyyk658
     :role "MANAGEMENT_COMPANY")
 
-;; Step 5: SICAV role (Luxembourg)
-(cbu.assign-role
-    :cbu-id @cbu_5299008buz4793qzrd79
-    :entity-id @lei_5299008buz4793qzrd79
-    :role "SICAV")
-
 ;; Fund: Allianz Private Debt Secondary Fund II SCSp, SICAV-RAIF
 
 ;; Step 1: Create fund entity
@@ -421,12 +385,6 @@
     :cbu-id @cbu_529900kp3l513irkr804
     :entity-id @lei_oj2tiqsvqnd4izyyk658
     :role "MANAGEMENT_COMPANY")
-
-;; Step 5: SICAV role (Luxembourg)
-(cbu.assign-role
-    :cbu-id @cbu_529900kp3l513irkr804
-    :entity-id @lei_529900kp3l513irkr804
-    :role "SICAV")
 
 ;; ============================================================================
 ;; PHASE 4: Allianz SE Direct Subsidiaries
