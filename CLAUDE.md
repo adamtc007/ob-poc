@@ -554,16 +554,18 @@ pub enum MyEvent {
 
 ## Code Statistics
 
-As of 2025-12-17:
+As of 2026-01-01:
 
 | Language | Files | Lines |
 |----------|-------|-------|
-| Rust | 238 | ~106,000 |
-| SQL | 11 | ~50,000 |
-| YAML Config | 74 | ~16,000 |
-| Markdown | 45 | ~25,000 |
-| TypeScript/JS | 16 | ~3,700 |
-| **Total** | **543** | **~200,000** |
+| Rust | 367 | ~197,000 |
+| SQL | 45 | ~68,000 |
+| YAML Config | 119 | ~39,000 |
+| Markdown | 228 | ~85,000 |
+| JavaScript | 11 | ~6,000 |
+| **Total** | **770** | **~395,000** |
+
+Note: UI is pure egui/WASM. JavaScript is minimal (voice integration + WASM loader only).
 
 ### YAML-Driven Configuration
 
