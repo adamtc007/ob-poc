@@ -88,6 +88,10 @@ pub mod gleif;
 #[cfg(feature = "database")]
 pub mod bods;
 
+// Research macros - LLM + web search for structured discovery with human review
+#[cfg(feature = "database")]
+pub mod research;
+
 // Database integration re-exports (when database feature is enabled)
 #[cfg(feature = "database")]
 pub use database::DictionaryDatabaseService;

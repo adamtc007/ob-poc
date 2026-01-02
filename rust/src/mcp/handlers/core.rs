@@ -24,7 +24,7 @@ use crate::dsl_v2::{
     compile, gateway_resolver, parse_program, registry, DslExecutor, ExecutionContext,
 };
 
-use super::protocol::ToolCallResult;
+use crate::mcp::protocol::ToolCallResult;
 
 /// Tool handlers with database access, EntityGateway client, and UI session store
 pub struct ToolHandlers {
@@ -163,6 +163,13 @@ impl ToolHandlers {
             "batch_record_result" => self.batch_record_result(args).await,
             "batch_skip_current" => self.batch_skip_current(args).await,
             "batch_cancel" => self.batch_cancel(args).await,
+            // Research macro tools - LLM + web search for structured discovery
+            "research_list" => self.research_list(args).await,
+            "research_get" => self.research_get(args).await,
+            "research_execute" => self.research_execute(args).await,
+            "research_approve" => self.research_approve(args).await,
+            "research_reject" => self.research_reject(args).await,
+            "research_status" => self.research_status(args).await,
             _ => Err(anyhow!("Unknown tool: {}", name)),
         }
     }
@@ -174,10 +181,12 @@ impl ToolHandlers {
     /// - Suggested fixes for implicit creates
     /// - Reordering warnings
     async fn dsl_validate(&self, args: Value) -> Result<Value> {
-        use super::types::{AgentDiagnostic, ResolutionOption, SuggestedFix, ValidationOutput};
         use crate::dsl_v2::config::ConfigLoader;
         use crate::dsl_v2::planning_facade::{analyse_and_plan, PlanningInput};
         use crate::dsl_v2::runtime_registry::RuntimeVerbRegistry;
+        use crate::mcp::types::{
+            AgentDiagnostic, ResolutionOption, SuggestedFix, ValidationOutput,
+        };
         use std::sync::Arc;
 
         let source = args["source"]
@@ -186,7 +195,7 @@ impl ToolHandlers {
 
         // Get session bindings if provided (for future use with known_symbols)
         let session_id = args["session_id"].as_str();
-        let _binding_context = session_id.and_then(super::session::get_session_bindings);
+        let _binding_context = session_id.and_then(crate::mcp::session::get_session_bindings);
 
         // Load verb registry for planning
         let loader = ConfigLoader::from_env();
@@ -1355,8 +1364,8 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
     ///
     /// Sessions persist bindings across multiple DSL executions within a conversation.
     fn session_context(&self, args: Value) -> Result<Value> {
-        use super::session;
-        use super::types::SessionAction;
+        use crate::mcp::session;
+        use crate::mcp::types::SessionAction;
 
         let action: SessionAction =
             serde_json::from_value(args).map_err(|e| anyhow!("Invalid session action: {}", e))?;
@@ -1378,8 +1387,8 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
     /// - Human-readable disambiguation labels
     /// - Confidence scoring with suggested actions
     async fn entity_search(&self, args: Value) -> Result<Value> {
-        use super::enrichment::{EntityEnricher, EntityType as EnrichEntityType};
-        use super::resolution::{ConversationContext, EnrichedMatch, ResolutionStrategy};
+        use crate::mcp::enrichment::{EntityEnricher, EntityType as EnrichEntityType};
+        use crate::mcp::resolution::{ConversationContext, EnrichedMatch, ResolutionStrategy};
 
         let query = args["query"]
             .as_str()
@@ -1414,9 +1423,9 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
         let raw_matches = self.gateway_search(nickname, Some(query), limit).await?;
 
         if raw_matches.is_empty() {
-            let result = super::resolution::ResolutionResult {
-                confidence: super::resolution::ResolutionConfidence::None,
-                action: super::resolution::SuggestedAction::SuggestCreate,
+            let result = crate::mcp::resolution::ResolutionResult {
+                confidence: crate::mcp::resolution::ResolutionConfidence::None,
+                action: crate::mcp::resolution::SuggestedAction::SuggestCreate,
                 prompt: Some(format!(
                     "No matches found for '{}'. Would you like to create a new entity?",
                     query
@@ -2557,6 +2566,306 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
             "completed_count": completed_count,
             "skipped_count": failed_count,
             "abandoned_count": pending_count
+        }))
+    }
+
+    // ========================================================================
+    // Research Macro Handlers
+    // ========================================================================
+
+    /// List available research macros with optional filtering
+    async fn research_list(&self, args: Value) -> Result<Value> {
+        use crate::research::{ResearchMacroRegistry, ReviewRequirement};
+
+        let search = args["search"].as_str();
+        let tag = args["tag"].as_str();
+
+        // Load registry from config directory
+        let config_dir = std::env::var("DSL_CONFIG_DIR").unwrap_or_else(|_| "config".to_string());
+        let macros_dir = std::path::Path::new(&config_dir).join("macros/research");
+
+        let registry = ResearchMacroRegistry::load_from_dir(&macros_dir)
+            .map_err(|e| anyhow!("Failed to load research macros: {}", e))?;
+
+        let macros: Vec<Value> = registry
+            .list(search)
+            .iter()
+            .filter(|m| {
+                // Apply tag filter
+                if let Some(tag_filter) = tag {
+                    if !m.tags.iter().any(|t| t.eq_ignore_ascii_case(tag_filter)) {
+                        return false;
+                    }
+                }
+                true
+            })
+            .map(|m| {
+                json!({
+                    "name": m.name,
+                    "description": m.description,
+                    "tags": m.tags,
+                    "review_required": matches!(m.output.review, ReviewRequirement::Required),
+                    "param_count": m.parameters.len()
+                })
+            })
+            .collect();
+
+        Ok(json!({
+            "macros": macros,
+            "count": macros.len()
+        }))
+    }
+
+    /// Get full details of a specific research macro
+    async fn research_get(&self, args: Value) -> Result<Value> {
+        use crate::research::ResearchMacroRegistry;
+
+        let macro_name = args["macro_name"]
+            .as_str()
+            .ok_or_else(|| anyhow!("macro_name required"))?;
+
+        let config_dir = std::env::var("DSL_CONFIG_DIR").unwrap_or_else(|_| "config".to_string());
+        let macros_dir = std::path::Path::new(&config_dir).join("macros/research");
+
+        let registry = ResearchMacroRegistry::load_from_dir(&macros_dir)
+            .map_err(|e| anyhow!("Failed to load research macros: {}", e))?;
+
+        let macro_def = registry
+            .get(macro_name)
+            .ok_or_else(|| anyhow!("Research macro not found: {}", macro_name))?;
+
+        // Build parameter descriptions
+        let params: Vec<Value> = macro_def
+            .parameters
+            .iter()
+            .map(|p| {
+                json!({
+                    "name": p.name,
+                    "param_type": &p.param_type,
+                    "required": p.required,
+                    "description": p.description,
+                    "default": p.default,
+                    "enum_values": p.enum_values
+                })
+            })
+            .collect();
+
+        Ok(json!({
+            "name": macro_def.name,
+            "description": macro_def.description,
+            "params": params,
+            "output_schema": macro_def.output.schema,
+            "review_requirement": format!("{:?}", macro_def.output.review),
+            "suggested_verbs_template": macro_def.suggested_verbs,
+            "tags": macro_def.tags
+        }))
+    }
+
+    /// Execute a research macro with LLM + web search
+    async fn research_execute(&self, args: Value) -> Result<Value> {
+        use crate::research::{ClaudeResearchClient, ResearchExecutor, ResearchMacroRegistry};
+
+        let sessions = self.require_sessions()?;
+
+        let session_id = args["session_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("session_id required"))?;
+        let session_uuid =
+            Uuid::parse_str(session_id).map_err(|_| anyhow!("Invalid session_id"))?;
+
+        let macro_name = args["macro_name"]
+            .as_str()
+            .ok_or_else(|| anyhow!("macro_name required"))?;
+
+        let params = args["params"].as_object().cloned().unwrap_or_default();
+
+        // Load registry
+        let config_dir = std::env::var("DSL_CONFIG_DIR").unwrap_or_else(|_| "config".to_string());
+        let macros_dir = std::path::Path::new(&config_dir).join("macros/research");
+
+        let registry = ResearchMacroRegistry::load_from_dir(&macros_dir)
+            .map_err(|e| anyhow!("Failed to load research macros: {}", e))?;
+
+        // Convert params to HashMap
+        let params_map: std::collections::HashMap<String, serde_json::Value> =
+            params.into_iter().collect();
+
+        // Create LLM client and executor
+        let llm_client = ClaudeResearchClient::from_env()
+            .map_err(|e| anyhow!("Failed to create LLM client: {}", e))?;
+        let executor = ResearchExecutor::new(registry, llm_client);
+        let result = executor
+            .execute(macro_name, params_map)
+            .await
+            .map_err(|e| anyhow!("Research execution failed: {}", e))?;
+
+        // Store result in session for review workflow using ResearchContext API
+        {
+            let mut sessions_guard = sessions.write().await;
+            let session = sessions_guard
+                .get_mut(&session_uuid)
+                .ok_or_else(|| anyhow!("Session not found: {}", session_uuid))?;
+
+            // Use the ResearchContext.set_pending() method
+            session.context.research.set_pending(result.clone());
+        }
+
+        Ok(json!({
+            "success": true,
+            "result_id": result.result_id,
+            "macro_name": result.macro_name,
+            "data": result.data,
+            "schema_valid": result.schema_valid,
+            "validation_errors": result.validation_errors,
+            "review_required": result.review_required,
+            "suggested_verbs": result.suggested_verbs,
+            "search_quality": result.search_quality
+        }))
+    }
+
+    /// Approve research results and get generated DSL verbs
+    async fn research_approve(&self, args: Value) -> Result<Value> {
+        use crate::session::ResearchState;
+
+        let sessions = self.require_sessions()?;
+
+        let session_id = args["session_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("session_id required"))?;
+        let session_uuid =
+            Uuid::parse_str(session_id).map_err(|_| anyhow!("Invalid session_id"))?;
+
+        // Optional edits to the research data before approval
+        let edits: Option<Value> = args.get("edits").cloned();
+
+        let (verbs, macro_name, result_id) = {
+            let mut sessions_guard = sessions.write().await;
+            let session = sessions_guard
+                .get_mut(&session_uuid)
+                .ok_or_else(|| anyhow!("Session not found: {}", session_uuid))?;
+
+            let research = &mut session.context.research;
+
+            // Verify we're in the right state
+            if research.state != ResearchState::PendingReview {
+                return Err(anyhow!(
+                    "Cannot approve: research is not pending review (state: {})",
+                    research.state
+                ));
+            }
+
+            // Get macro name before approval
+            let macro_name = research
+                .pending_macro_name()
+                .unwrap_or("unknown")
+                .to_string();
+            let result_id = research.pending.as_ref().map(|r| r.result_id);
+
+            // Use the ResearchContext.approve() method
+            let approved = research
+                .approve(edits)
+                .map_err(|e| anyhow!("Approval failed: {}", e))?;
+
+            let verbs = Some(approved.generated_verbs.clone());
+
+            (verbs, macro_name, result_id)
+        };
+
+        Ok(json!({
+            "success": true,
+            "approved": true,
+            "result_id": result_id,
+            "macro_name": macro_name,
+            "suggested_verbs": verbs,
+            "message": "Research approved. Use the suggested_verbs DSL to create entities."
+        }))
+    }
+
+    /// Reject research results
+    async fn research_reject(&self, args: Value) -> Result<Value> {
+        use crate::session::ResearchState;
+
+        let sessions = self.require_sessions()?;
+
+        let session_id = args["session_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("session_id required"))?;
+        let session_uuid =
+            Uuid::parse_str(session_id).map_err(|_| anyhow!("Invalid session_id"))?;
+
+        let reason = args["reason"].as_str().unwrap_or("No reason provided");
+
+        {
+            let mut sessions_guard = sessions.write().await;
+            let session = sessions_guard
+                .get_mut(&session_uuid)
+                .ok_or_else(|| anyhow!("Session not found: {}", session_uuid))?;
+
+            let research = &mut session.context.research;
+
+            // Verify we're in the right state
+            if research.state != ResearchState::PendingReview {
+                return Err(anyhow!(
+                    "Cannot reject: research is not pending review (state: {})",
+                    research.state
+                ));
+            }
+
+            // Use the ResearchContext.reject() method
+            research.reject();
+        }
+
+        Ok(json!({
+            "success": true,
+            "rejected": true,
+            "reason": reason,
+            "message": "Research rejected. You can re-execute with different parameters."
+        }))
+    }
+
+    /// Get current research status for a session
+    async fn research_status(&self, args: Value) -> Result<Value> {
+        let sessions = self.require_sessions()?;
+
+        let session_id = args["session_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("session_id required"))?;
+        let session_uuid =
+            Uuid::parse_str(session_id).map_err(|_| anyhow!("Invalid session_id"))?;
+
+        let status = {
+            let sessions_guard = sessions.read().await;
+            let session = sessions_guard
+                .get(&session_uuid)
+                .ok_or_else(|| anyhow!("Session not found: {}", session_uuid))?;
+
+            let research = &session.context.research;
+
+            json!({
+                "state": research.state.to_string(),
+                "current_macro": research.pending_macro_name(),
+                "has_pending_result": research.has_pending(),
+                "has_pending_verbs": research.has_verbs_ready(),
+                "approved_count": research.approved_count(),
+                "recent_approvals": research.approved.values()
+                    .collect::<Vec<_>>()
+                    .iter()
+                    .rev()
+                    .take(5)
+                    .map(|a| {
+                        json!({
+                            "result_id": a.result_id,
+                            "approved_at": a.approved_at.to_rfc3339(),
+                            "edits_made": a.edits_made
+                        })
+                    })
+                    .collect::<Vec<_>>()
+            })
+        };
+
+        Ok(json!({
+            "success": true,
+            "status": status
         }))
     }
 }

@@ -800,5 +800,190 @@ Completed items remain executed, pending items are abandoned."#.into(),
                 "required": ["session_id"]
             }),
         },
+        // =====================================================================
+        // Research Macro Tools
+        // LLM + web search for structured discovery with human review gate
+        // =====================================================================
+        Tool {
+            name: "research_list".into(),
+            description: r#"List available research macros.
+
+Research macros use LLM + web search to discover structured information
+about clients, entities, and regulatory status. Results require human
+review before generating executable DSL.
+
+Available macros include:
+- client-discovery: Research institutional client corporate structure
+- ubo-investigation: Investigate beneficial ownership chains
+- regulatory-check: Check regulatory status and compliance concerns
+
+Use search param to filter by name, description, or tags."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "search": {
+                        "type": "string",
+                        "description": "Search text to filter macros (name, description, tags)"
+                    },
+                    "tag": {
+                        "type": "string",
+                        "description": "Filter by specific tag (e.g., 'ubo', 'gleif', 'compliance')"
+                    }
+                }
+            }),
+        },
+        Tool {
+            name: "research_get".into(),
+            description: r#"Get full research macro definition.
+
+Returns:
+- Parameters with types, defaults, and validation rules
+- Expected output schema
+- Review requirement level
+- Suggested DSL verb template
+
+Use before research_execute to understand what a macro does
+and what parameters it needs."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "macro_name": {
+                        "type": "string",
+                        "description": "Research macro name (e.g., 'client-discovery', 'ubo-investigation')"
+                    }
+                },
+                "required": ["macro_name"]
+            }),
+        },
+        Tool {
+            name: "research_execute".into(),
+            description: r#"Execute a research macro with LLM + web search.
+
+This initiates an LLM-powered research session that:
+1. Renders the prompt template with your parameters
+2. Allows the LLM to perform web searches iteratively
+3. Extracts structured JSON matching the output schema
+4. Validates JSON against schema
+5. Optionally validates LEIs against GLEIF API
+6. Returns results in PendingReview state
+
+The result is stored in session.research.pending and requires
+human review before generating DSL verbs.
+
+Use research_status to check progress, research_approve to
+approve results, or research_reject to discard."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Session ID for state persistence"
+                    },
+                    "macro_name": {
+                        "type": "string",
+                        "description": "Research macro to execute (e.g., 'client-discovery')"
+                    },
+                    "params": {
+                        "type": "object",
+                        "description": "Parameters for the macro. Use research_get to see required params.",
+                        "additionalProperties": true
+                    },
+                    "validate_leis": {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Validate discovered LEIs against GLEIF API"
+                    }
+                },
+                "required": ["session_id", "macro_name", "params"]
+            }),
+        },
+        Tool {
+            name: "research_approve".into(),
+            description: r#"Approve research results and generate suggested DSL verbs.
+
+Call after reviewing research results from research_execute.
+Optionally provide edits to correct any issues before approval.
+
+After approval:
+- Results move to session.research.approved
+- Suggested DSL verbs are generated from the template
+- State changes to VerbsReady
+
+Use research_status to see the generated verbs, then
+review/edit before executing with dsl_execute."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Session ID"
+                    },
+                    "edits": {
+                        "type": "object",
+                        "description": "Optional JSON edits to apply before approval. Use JSON Merge Patch semantics - keys set to null are removed.",
+                        "additionalProperties": true
+                    },
+                    "reviewer_notes": {
+                        "type": "string",
+                        "description": "Optional notes from the human reviewer"
+                    }
+                },
+                "required": ["session_id"]
+            }),
+        },
+        Tool {
+            name: "research_reject".into(),
+            description: r#"Reject research results.
+
+Discards the pending research results and resets state to Idle.
+Use when results are too low quality, contain hallucinated data,
+or the research direction was wrong.
+
+After rejection, you can start a new research_execute with
+different parameters."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Session ID"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Reason for rejection (for audit trail)"
+                    }
+                },
+                "required": ["session_id"]
+            }),
+        },
+        Tool {
+            name: "research_status".into(),
+            description: r#"Get current research state for a session.
+
+Returns:
+- state: Current research state (Idle, PendingReview, VerbsReady, Executed)
+- pending: If PendingReview, the research results awaiting review
+- approved: Map of approved research by ID
+- generated_verbs: If VerbsReady, the suggested DSL code
+
+Use to:
+- Check if there are pending results to review
+- See what was approved and what verbs were generated
+- Track the research workflow state"#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Session ID"
+                    }
+                },
+                "required": ["session_id"]
+            }),
+        },
     ]
 }

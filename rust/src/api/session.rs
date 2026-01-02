@@ -1092,6 +1092,10 @@ pub struct SessionContext {
     /// This is separate from template_execution which is for conversational batch
     #[serde(skip_serializing_if = "Option::is_none")]
     pub active_batch: Option<ActiveBatchState>,
+
+    /// Research macro state - tracks pending results and approvals
+    #[serde(default)]
+    pub research: crate::session::ResearchContext,
 }
 
 /// Primary domain keys tracked across the session

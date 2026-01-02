@@ -138,7 +138,7 @@
     {
       "attributes": {
         "bic": null,
-        "conformityFlag": "CONFORMING",
+        "conformityFlag": "NOT_APPLICABLE",
         "entity": {
           "associatedEntity": {
             "lei": null,
@@ -419,20 +419,20 @@
   ],
   "links": {
     "first": "https://api.gleif.org/api/v1/lei-records?filter%5Bentity.status%5D=INACTIVE&page%5Bnumber%5D=1&page%5Bsize%5D=3",
-    "last": "https://api.gleif.org/api/v1/lei-records?filter%5Bentity.status%5D=INACTIVE&page%5Bnumber%5D=74130&page%5Bsize%5D=3",
+    "last": "https://api.gleif.org/api/v1/lei-records?filter%5Bentity.status%5D=INACTIVE&page%5Bnumber%5D=74133&page%5Bsize%5D=3",
     "next": "https://api.gleif.org/api/v1/lei-records?filter%5Bentity.status%5D=INACTIVE&page%5Bnumber%5D=2&page%5Bsize%5D=3"
   },
   "meta": {
     "goldenCopy": {
-      "publishDate": "2026-01-01T08:00:00Z"
+      "publishDate": "2026-01-02T00:00:00Z"
     },
     "pagination": {
       "currentPage": 1,
       "from": 1,
-      "lastPage": 74130,
+      "lastPage": 74133,
       "perPage": 3,
       "to": 3,
-      "total": 222390
+      "total": 222398
     }
   }
 }

@@ -251,7 +251,7 @@ pub async fn execute_submission(
 ) -> Result<SubmissionResult, SubmissionError>
 ```
 
-**MCP Tools** (`rust/src/mcp/handlers.rs`):
+**MCP Tools** (`rust/src/mcp/handlers/`):
 
 | Tool | Description |
 |------|-------------|
@@ -5253,7 +5253,9 @@ Get full parameter information for any verb:
 rust/src/mcp/
 ├── mod.rs              # Module exports
 ├── tools.rs            # Tool schema definitions (JSON Schema)
-├── handlers.rs         # Tool implementation handlers
+├── handlers/           # Tool implementation handlers (modular)
+│   ├── mod.rs          # Re-exports ToolHandlers from core
+│   └── core.rs         # Main ToolHandlers struct and all handler implementations
 ├── types.rs            # Agent-friendly response types
 ├── enrichment.rs       # EntityEnricher - fetches rich context for disambiguation
 └── resolution.rs       # ResolutionStrategy - determines auto-resolve vs ask user

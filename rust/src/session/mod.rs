@@ -18,6 +18,7 @@
 
 pub mod agent_context;
 pub mod enhanced_context;
+pub mod research_context;
 pub mod scope;
 pub mod verb_discovery;
 pub mod verb_rag_metadata;
@@ -32,11 +33,13 @@ use crate::dsl_v2::ExecutionContext;
 use crate::graph::{EntityGraph, GraphFilters, ViewportContext};
 use crate::navigation::{NavCommand, NavExecutor, NavResult};
 
+pub use crate::research::ApprovedResearch;
 pub use agent_context::AgentGraphContext;
 pub use enhanced_context::{
     get_verb_suggestions, EnhancedAgentContext, EnhancedContextBuilder, SerializableAgentContext,
     SerializableBinding,
 };
+pub use research_context::{ResearchContext, ResearchState};
 pub use scope::{ExpandableNode, LoadStatus, ScopeSummary, SessionScope};
 pub use verb_discovery::{
     AgentVerbContext, CategoryInfo, DiscoveryQuery, SuggestionReason, VerbDiscoveryError,
@@ -71,6 +74,9 @@ pub struct UnifiedSessionContext {
 
     /// Named bookmarks
     pub bookmarks: HashMap<String, Bookmark>,
+
+    /// Research macro state (pending results, approvals)
+    pub research: ResearchContext,
 }
 
 impl Clone for UnifiedSessionContext {
@@ -86,6 +92,7 @@ impl Clone for UnifiedSessionContext {
             scope: self.scope.clone(),
             command_history: self.command_history.clone(),
             bookmarks: self.bookmarks.clone(),
+            research: self.research.clone(),
         }
     }
 }
@@ -127,6 +134,7 @@ impl UnifiedSessionContext {
             scope: SessionScope::empty(),
             command_history: Vec::new(),
             bookmarks: HashMap::new(),
+            research: ResearchContext::new(),
         }
     }
 

@@ -4,7 +4,7 @@
       "endpoint": "/lei-records/{lei}",
       "method": "GET",
       "status_code": 200,
-      "response_time_ms": 272,
+      "response_time_ms": 361,
       "sample_lei": "529900K9B0N5BT694847",
       "response_file": "data/gleif_test_output/lei_record_example.json",
       "notes": [
@@ -16,7 +16,7 @@
       "endpoint": "/lei-records?filter[entity.legalName]=...",
       "method": "GET",
       "status_code": 200,
-      "response_time_ms": 216,
+      "response_time_ms": 368,
       "sample_lei": "Allianz Global Investors",
       "response_file": "data/gleif_test_output/search_results_example.json",
       "notes": [
@@ -28,7 +28,7 @@
       "endpoint": "/lei-records/{lei}/managed-funds",
       "method": "GET",
       "status_code": 200,
-      "response_time_ms": 184,
+      "response_time_ms": 172,
       "sample_lei": "529900FAHFDMSXCPII15",
       "response_file": "data/gleif_test_output/managed_funds_example.json",
       "notes": [
@@ -40,7 +40,7 @@
       "endpoint": "/lei-records/{lei}/direct-parent-relationship",
       "method": "GET",
       "status_code": 200,
-      "response_time_ms": 124,
+      "response_time_ms": 98,
       "sample_lei": "529900KMPEUGWRAWBE94",
       "response_file": "data/gleif_test_output/direct_parent_example.json",
       "notes": []
@@ -49,7 +49,7 @@
       "endpoint": "/lei-records/{lei}/ultimate-parent-relationship",
       "method": "GET",
       "status_code": 200,
-      "response_time_ms": 117,
+      "response_time_ms": 213,
       "sample_lei": "529900KMPEUGWRAWBE94",
       "response_file": "data/gleif_test_output/ultimate_parent_example.json",
       "notes": []
@@ -58,7 +58,7 @@
       "endpoint": "/lei-records/{lei}/direct-children",
       "method": "GET",
       "status_code": 200,
-      "response_time_ms": 252,
+      "response_time_ms": 230,
       "sample_lei": "529900K9B0N5BT694847",
       "response_file": "data/gleif_test_output/direct_children_example.json",
       "notes": [
@@ -67,38 +67,38 @@
     }
   ],
   "relationship_types": [
+    "SUCCESSOR_ENTITIES",
+    "FUND_MANAGER",
+    "ISINS",
     "FIELD_MODIFICATIONS",
     "SUB_FUNDS",
-    "MANAGING_LOU",
-    "ULTIMATE_CHILDREN",
     "LEI_ISSUER",
-    "DIRECT_PARENT",
+    "SUCCESSOR_ENTITY",
     "DIRECT_CHILDREN",
+    "MANAGING_LOU",
+    "DIRECT_PARENT",
+    "ULTIMATE_CHILDREN",
     "ULTIMATE_PARENT",
-    "SUCCESSOR_ENTITIES",
-    "ISINS",
-    "FUND_MANAGER",
-    "MANAGED_FUNDS",
-    "SUCCESSOR_ENTITY"
+    "MANAGED_FUNDS"
   ],
   "entity_categories": [
-    "FUND",
-    "GENERAL"
+    "GENERAL",
+    "FUND"
   ],
   "entity_statuses": [
-    "ACTIVE",
-    "INACTIVE"
+    "INACTIVE",
+    "ACTIVE"
   ],
   "legal_forms": [
-    "9999",
-    "OQ8C",
-    "HZEH",
     "DVXS",
-    "SGST",
     "UDY2",
+    "HZEH",
+    "2HBR",
+    "OQ8C",
     "U8KA",
     "8Z6G",
-    "2HBR"
+    "SGST",
+    "9999"
   ],
   "edge_cases": [
     {
@@ -132,8 +132,8 @@
   ],
   "rate_limit_stats": {
     "total_requests": 15,
-    "total_time_ms": 3997,
-    "avg_delay_ms": 266,
+    "total_time_ms": 4228,
+    "avg_delay_ms": 281,
     "rate_limit_hits": 0
   },
   "errors": [],

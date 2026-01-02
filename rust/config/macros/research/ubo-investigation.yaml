@@ -1,0 +1,324 @@
+# UBO Investigation Research Macro
+# Investigates Ultimate Beneficial Ownership chains using web search
+# Critical for AML compliance - all findings require human verification
+
+name: ubo-investigation
+version: "1.0"
+
+description: |
+  Investigate the Ultimate Beneficial Ownership (UBO) chain for an entity.
+  Uses web search to discover ownership relationships, control structures,
+  and identify natural persons who may be beneficial owners.
+  All findings require human verification before use.
+
+parameters:
+  - name: entity_name
+    type: string
+    required: true
+    description: Name of the entity to investigate
+
+  - name: entity_lei
+    type: string
+    required: false
+    description: LEI of the entity if known (improves search accuracy)
+    pattern: "^[A-Z0-9]{20}$"
+
+  - name: jurisdiction
+    type: string
+    required: false
+    description: Jurisdiction of the entity
+    default: null
+
+  - name: ownership_threshold
+    type: number
+    required: false
+    description: Minimum ownership percentage to consider (e.g., 25 for 25%)
+    default: 25
+
+  - name: include_control
+    type: boolean
+    required: false
+    description: Also investigate control relationships (voting rights, board control)
+    default: true
+
+tools:
+  - web_search
+
+prompt: |
+  You are conducting a UBO (Ultimate Beneficial Owner) investigation for "{{entity_name}}" for AML/KYC compliance.
+
+  {{#if entity_lei}}
+  Entity LEI: {{entity_lei}}
+  {{/if}}
+
+  {{#if jurisdiction}}
+  Primary jurisdiction: {{jurisdiction}}
+  {{/if}}
+
+  Ownership threshold for UBO status: {{ownership_threshold}}%
+
+  Use web_search to find:
+  1. Direct shareholders/owners and their ownership percentages
+  2. Indirect ownership chains (who owns the owners)
+  3. Ultimate parent entities
+  4. Natural persons who control or own >{{ownership_threshold}}%
+  5. Control relationships (voting rights, board appointments, veto powers)
+  6. Trust structures (identify settlors, trustees, beneficiaries)
+  7. Nominee arrangements
+
+  Search for:
+  - "[entity name] shareholders"
+  - "[entity name] ownership structure"
+  - "[entity name] annual report" (often contains ownership info)
+  - "[entity name] beneficial owner"
+  - "[parent company name] subsidiaries"
+  - Company registry filings in relevant jurisdictions
+
+  For each ownership relationship found:
+  - Note the percentage if stated
+  - Classify as DIRECT (direct shareholding) or INDIRECT (through intermediaries)
+  - Mark confidence level based on source quality
+
+  {{#if include_control}}
+  Also investigate control relationships:
+  - Board composition and who appoints directors
+  - Voting agreements
+  - Veto rights
+  - Significant influence without majority ownership
+  {{/if}}
+
+  Return findings as JSON matching the output schema.
+  IMPORTANT: All UBO determinations require human verification. Mark clearly what is ALLEGED vs VERIFIED.
+
+output:
+  review_requirement: required
+  schema:
+    type: object
+    required:
+      - entity
+      - ownership_chain
+      - investigation_summary
+    properties:
+      entity:
+        type: object
+        description: The investigated entity
+        required:
+          - name
+        properties:
+          name:
+            type: string
+          lei:
+            type: string
+          jurisdiction:
+            type: string
+          entity_type:
+            type: string
+
+      ownership_chain:
+        type: array
+        description: Ownership relationships discovered
+        items:
+          type: object
+          required:
+            - owner_name
+            - owned_entity
+            - relationship_type
+          properties:
+            owner_name:
+              type: string
+            owner_lei:
+              type: string
+            owner_type:
+              type: string
+              enum: [natural_person, legal_entity, trust, partnership, government, unknown]
+            owned_entity:
+              type: string
+            percentage:
+              type: number
+              minimum: 0
+              maximum: 100
+            relationship_type:
+              type: string
+              enum: [direct_ownership, indirect_ownership, voting_rights, board_control, trust_beneficiary, trust_settlor, other_control]
+            is_natural_person:
+              type: boolean
+            nationality:
+              type: string
+            source:
+              type: string
+              description: Where this information was found
+            confidence:
+              type: string
+              enum: [high, medium, low]
+
+      potential_ubos:
+        type: array
+        description: Natural persons identified as potential UBOs
+        items:
+          type: object
+          required:
+            - name
+            - qualifying_reason
+          properties:
+            name:
+              type: string
+            nationality:
+              type: string
+            role:
+              type: string
+              description: Role or position if known
+            qualifying_reason:
+              type: string
+              enum: [ownership_25pct, voting_control, board_control, trust_control, other_control]
+            ownership_percentage:
+              type: number
+            control_description:
+              type: string
+            via_entities:
+              type: array
+              items:
+                type: string
+              description: Chain of entities through which ownership/control flows
+            confidence:
+              type: string
+              enum: [high, medium, low]
+            verification_status:
+              type: string
+              enum: [alleged, needs_verification]
+              default: needs_verification
+
+      control_relationships:
+        type: array
+        description: Control relationships separate from ownership
+        items:
+          type: object
+          properties:
+            controller_name:
+              type: string
+            controller_type:
+              type: string
+              enum: [natural_person, legal_entity]
+            controlled_entity:
+              type: string
+            control_type:
+              type: string
+              enum: [voting_rights, board_appointment, veto_power, management_control, other]
+            control_description:
+              type: string
+            source:
+              type: string
+            confidence:
+              type: string
+              enum: [high, medium, low]
+
+      trust_structures:
+        type: array
+        description: Trust structures identified
+        items:
+          type: object
+          properties:
+            trust_name:
+              type: string
+            trust_type:
+              type: string
+              enum: [discretionary, fixed, unit, other]
+            jurisdiction:
+              type: string
+            settlor:
+              type: string
+            trustees:
+              type: array
+              items:
+                type: string
+            beneficiaries:
+              type: array
+              items:
+                type: string
+            protector:
+              type: string
+            source:
+              type: string
+            confidence:
+              type: string
+              enum: [high, medium, low]
+
+      investigation_summary:
+        type: object
+        required:
+          - ownership_completeness
+          - ubo_determination_status
+        properties:
+          ownership_completeness:
+            type: string
+            enum: [complete, partial, incomplete, unknown]
+            description: Whether 100% of ownership is accounted for
+          total_ownership_identified:
+            type: number
+            description: Sum of all ownership percentages identified
+          ubo_determination_status:
+            type: string
+            enum: [clear_ubos_identified, possible_ubos_need_verification, complex_structure_needs_review, insufficient_information]
+          complexity_level:
+            type: string
+            enum: [simple, moderate, complex, highly_complex]
+          red_flags:
+            type: array
+            items:
+              type: string
+            description: Potential red flags identified (layering, opacity jurisdictions, etc.)
+          data_gaps:
+            type: array
+            items:
+              type: string
+          recommended_actions:
+            type: array
+            items:
+              type: string
+          sources_consulted:
+            type: array
+            items:
+              type: string
+
+suggested_verbs: |
+  ;; UBO Investigation Results for {{entity.name}}
+  ;; ALL FINDINGS REQUIRE HUMAN VERIFICATION - DO NOT AUTO-EXECUTE
+
+  {{#each ownership_chain}}
+  {{#if this.is_natural_person}}
+  ;; Potential UBO (natural person): {{this.owner_name}}
+  ;; Relationship: {{this.relationship_type}} ({{this.percentage}}%)
+  ;; Confidence: {{this.confidence}} | Source: {{this.source}}
+  ;; STATUS: NEEDS_VERIFICATION
+
+  {{else}}
+  ;; Ownership: {{this.owner_name}} -> {{this.owned_entity}} ({{this.percentage}}%)
+  {{#if this.owner_lei}}
+  (ubo.add-ownership :owner-lei "{{this.owner_lei}}" :owned-entity-name "{{this.owned_entity}}" :percentage {{this.percentage}} :ownership-type "{{this.relationship_type}}")
+  {{/if}}
+  {{/if}}
+  {{/each}}
+
+  {{#each potential_ubos}}
+  ;; === POTENTIAL UBO: {{this.name}} ===
+  ;; Qualifying reason: {{this.qualifying_reason}}
+  ;; Ownership: {{this.ownership_percentage}}%
+  ;; Via: {{#each this.via_entities}}{{this}}{{#unless @last}} -> {{/unless}}{{/each}}
+  ;; Confidence: {{this.confidence}}
+  ;; ACTION REQUIRED: Verify identity and register UBO after confirmation
+  ;; (ubo.register-ubo :cbu-id @cbu :ubo-name "{{this.name}}" :qualifying-reason "{{this.qualifying_reason}}" :ownership-percentage {{this.ownership_percentage}})
+  {{/each}}
+
+  {{#if investigation_summary.red_flags}}
+  ;; === RED FLAGS IDENTIFIED ===
+  {{#each investigation_summary.red_flags}}
+  ;; - {{this}}
+  {{/each}}
+  {{/if}}
+
+tags:
+  - ubo
+  - ownership
+  - control
+  - aml
+  - kyc
+  - investigation

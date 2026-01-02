@@ -7,6 +7,105 @@
 
 ---
 
+## ⚠️ IMPLEMENTATION STATUS (Updated 2026-01-02)
+
+### Summary
+
+The **Research Macro wrapper system described below was NOT implemented**. Instead, the underlying GLEIF DSL verbs were implemented directly, providing the same deterministic functionality without the LLM + human review wrapper layer.
+
+### What WAS Implemented
+
+| Component | Status | Location |
+|-----------|--------|----------|
+| GLEIF DSL Verbs | ✅ FULLY IMPLEMENTED | `rust/config/verbs/gleif.yaml`, `rust/src/dsl_v2/custom_ops/gleif_ops.rs` |
+| GLEIF API Client | ✅ IMPLEMENTED | `rust/src/gleif/client.rs` |
+| Entity Enrichment | ✅ IMPLEMENTED | `gleif.enrich`, `gleif.import-tree` |
+| Ownership Tracing | ✅ IMPLEMENTED | `gleif.trace-ownership` |
+| Managed Funds Discovery | ✅ IMPLEMENTED | `gleif.get-managed-funds`, `gleif.import-managed-funds` |
+| Fund Structure Queries | ✅ IMPLEMENTED | `gleif.get-umbrella`, `gleif.get-manager`, `gleif.get-master-fund` |
+| Test Harness (Allianz) | ✅ IMPLEMENTED | `rust/xtask/src/gleif_test.rs`, `cargo x gleif-test` |
+
+### What was NOT Implemented
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Research Macro Schema (YAML) | ❌ NOT IMPLEMENTED | No `config/macros/research/` directory |
+| `MacroType::Research` enum | ❌ NOT IMPLEMENTED | Only `Template` exists |
+| `ResearchExecutor` | ❌ NOT IMPLEMENTED | No LLM + review wrapper |
+| MCP `execute_research_macro` | ❌ NOT IMPLEMENTED | Direct verb calls used instead |
+| `macro_rag_metadata.rs` | ❌ NOT IMPLEMENTED | Verb RAG exists in `verb_rag_metadata.rs` |
+
+### Why the Difference?
+
+The GLEIF verbs provide **deterministic, database-backed enrichment** without needing:
+1. LLM interpretation layer (verbs take LEIs directly)
+2. Human review gate (GLEIF data is authoritative)
+3. JSON schema validation (verb args are validated by DSL parser)
+
+The "research macro" concept was designed for fuzzy discovery → human review → deterministic execution. Since GLEIF provides authoritative data directly, the intermediate layer was unnecessary.
+
+### Verified Working (2026-01-02)
+
+Tested with both **Allianz** and **Aviva** clients:
+
+```bash
+# Allianz SE (German insurance parent)
+(gleif.get-record :lei "529900K9B0N5BT694847")  # ✅ Works
+
+# Aviva plc (UK insurance)  
+(gleif.get-record :lei "YF0Y5B0IB8SM0ZFG9G81")  # ✅ Works
+
+# Search functionality
+(gleif.search :name "Aviva" :jurisdiction "GB" :limit 5)  # ✅ Works
+```
+
+Full GLEIF API test harness passes with Allianz data:
+```bash
+cargo x gleif-test  # ✅ All 6 endpoints tested, 13 relationship types discovered
+```
+
+### Suggested Verbs from TODO → Actual Implementation
+
+| TODO Suggested | Actual Verb | Status |
+|----------------|-------------|--------|
+| `gleif.enrich :lei "{{apex.lei}}"` | `gleif.enrich :lei "..." :as @entity` | ✅ Implemented |
+| `gleif.trace-ownership :entity-id @apex` | `gleif.trace-ownership :entity-id @entity` | ✅ Implemented |
+| `gleif.get-managed-funds :manager-lei "..."` | `gleif.get-managed-funds :manager-lei "..."` | ✅ Implemented |
+
+### Additional Verbs Implemented (Beyond TODO)
+
+| Verb | Description |
+|------|-------------|
+| `gleif.search` | Search GLEIF by name, jurisdiction, or category |
+| `gleif.import-tree` | Import corporate tree (parents and/or children) |
+| `gleif.import-managed-funds` | Import funds with full CBU structure and roles |
+| `gleif.refresh` | Refresh stale GLEIF data |
+| `gleif.get-record` | Fetch raw GLEIF record (does not persist) |
+| `gleif.get-parent` | Get direct parent relationship |
+| `gleif.get-children` | Get direct children |
+| `gleif.get-umbrella` | Get umbrella fund for a sub-fund |
+| `gleif.get-manager` | Get fund manager |
+| `gleif.get-master-fund` | Get master fund for feeder |
+| `gleif.lookup-by-isin` | Look up entity LEI by ISIN |
+| `gleif.resolve-successor` | Resolve merged/inactive LEI to successor |
+
+### Recommendation
+
+The Research Macro system as designed is **no longer needed** for GLEIF operations. The direct verb approach is simpler and more reliable. However, the Research Macro pattern could still be valuable for:
+
+1. **Unstructured data sources** (news, web scraping) where LLM interpretation is needed
+2. **Compliance research** where human review is mandatory before action
+3. **Multi-source reconciliation** where confidence scoring matters
+
+If Research Macros are implemented in the future, they should target these use cases rather than GLEIF (which has authoritative, structured data).
+
+---
+
+## Original Design (Archived for Reference)
+
+<details>
+<summary>Click to expand original TODO content</summary>
+
 ## Concept
 
 Research macros are a new macro type that bridges fuzzy LLM discovery and deterministic DSL verbs.
@@ -850,3 +949,5 @@ Generate suggested verbs:
          ▼
 Execute deterministic verbs
 ```
+
+</details>
